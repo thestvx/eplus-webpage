@@ -164,6 +164,7 @@ function openModal(type) {
   const titleEl = document.getElementById('modal-title');
   const langLevelGroup = document.getElementById('langLevelGroup');
   const langLevelSelect = document.getElementById('langLevel');
+  const langToggle = document.getElementById('lang-toggle');
   const t = translations[currentLang];
   
   const titles = {
@@ -189,11 +190,17 @@ function openModal(type) {
   
   overlay.classList.add('active');
   document.body.style.overflow = 'hidden';
+  
+  // إخفاء أزرار اللغة أثناء المودال
+  if (langToggle) langToggle.classList.add('hidden');
 }
 
 function closeModal() {
-  document.getElementById('modal').classList.remove('active');
+  const overlay = document.getElementById('modal');
+  const langToggle = document.getElementById('lang-toggle');
+  overlay.classList.remove('active');
   document.body.style.overflow = '';
+  if (langToggle) langToggle.classList.remove('hidden');
 }
 
 function closeModalOutside(e) {
