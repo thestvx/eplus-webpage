@@ -175,7 +175,6 @@ function openModal(type) {
   
   titleEl.textContent = titles[type] || t.formTitle;
   
-  // إظهار/إخفاء حقل مستوى اللغة
   if (type === 'lang') {
     langLevelGroup.style.display = 'block';
     langLevelSelect.setAttribute('required', 'required');
