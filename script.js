@@ -148,7 +148,6 @@ function applyTranslations() {
     }
   });
   
-  // ترجمة مستويات اللغة
   document.querySelectorAll('[data-i18n-level]').forEach(el => {
     const level = el.getAttribute('data-i18n-level');
     if (t.levels && t.levels[level]) {
