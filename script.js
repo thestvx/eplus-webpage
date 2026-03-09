@@ -1,13 +1,126 @@
-// ─── الترجمة ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// SQUARES BACKGROUND ANIMATION
+// ─────────────────────────────────────────────────────────
+const squaresCanvas = document.getElementById('squares-canvas');
+const squaresCtx = squaresCanvas.getContext('2d');
+
+let squares = [];
+const squareSize = 40;
+const squareGap = 4;
+let cols, rows;
+
+function resizeSquares() {
+  squaresCanvas.width = window.innerWidth;
+  squaresCanvas.height = window.innerHeight;
+  cols = Math.ceil(window.innerWidth / (squareSize + squareGap));
+  rows = Math.ceil(window.innerHeight / (squareSize + squareGap));
+  initSquares();
+}
+
+function initSquares() {
+  squares = [];
+  for (let i = 0; i < cols; i++) {
+    for (let j = 0; j < rows; j++) {
+      squares.push({
+        x: i * (squareSize + squareGap),
+        y: j * (squareSize + squareGap),
+        opacity: Math.random() * 0.3,
+        targetOpacity: Math.random() * 0.3,
+        speed: 0.005 + Math.random() * 0.01
+      });
+    }
+  }
+}
+
+function animateSquares() {
+  squaresCtx.clearRect(0, 0, squaresCanvas.width, squaresCanvas.height);
+  
+  squares.forEach(sq => {
+    // Smooth opacity transition
+    if (Math.abs(sq.opacity - sq.targetOpacity) < 0.01) {
+      sq.targetOpacity = Math.random() * 0.4;
+    }
+    sq.opacity += (sq.targetOpacity - sq.opacity) * sq.speed;
+    
+    squaresCtx.fillStyle = `rgba(4, 130, 195, ${sq.opacity})`;
+    squaresCtx.fillRect(sq.x, sq.y, squareSize, squareSize);
+  });
+  
+  requestAnimationFrame(animateSquares);
+}
+
+window.addEventListener('resize', resizeSquares);
+resizeSquares();
+animateSquares();
+
+// ─────────────────────────────────────────────────────────
+// SPLIT TEXT ANIMATION
+// ─────────────────────────────────────────────────────────
+function initSplitText() {
+  document.querySelectorAll('.split-text').forEach((el, index) => {
+    const text = el.getAttribute('data-text') || el.textContent;
+    el.innerHTML = '';
+    
+    text.split('').forEach((char, i) => {
+      const span = document.createElement('span');
+      span.className = 'split-char';
+      span.textContent = char === ' ' ? '\u00A0' : char;
+      span.style.animationDelay = `${(i * 0.05) + (index * 0.3)}s`;
+      el.appendChild(span);
+    });
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+// PILL NAVIGATION
+// ─────────────────────────────────────────────────────────
+function initPillNav() {
+  const pillNav = document.querySelector('.pill-nav');
+  const pillSlider = document.querySelector('.pill-slider');
+  const pillBtns = document.querySelectorAll('.pill-btn');
+  
+  if (!pillNav || !pillSlider) return;
+  
+  function updateSlider(btn) {
+    const rect = btn.getBoundingClientRect();
+    const navRect = pillNav.getBoundingClientRect();
+    
+    pillSlider.style.width = `${rect.width}px`;
+    pillSlider.style.transform = `translateX(${rect.left - navRect.left - 6}px)``;
+  }
+  
+  // Initial position
+  const activeBtn = document.querySelector('.pill-btn.active');
+  if (activeBtn) updateSlider(activeBtn);
+  
+  // Click handlers
+  pillBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      pillBtns.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      updateSlider(this);
+    });
+  });
+  
+  // Update on resize
+  window.addEventListener('resize', () => {
+    const active = document.querySelector('.pill-btn.active');
+    if (active) updateSlider(active);
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+// TRANSLATIONS
+// ─────────────────────────────────────────────────────────
 const translations = {
   ar: {
     badge:        "✦ أكاديمية التعليم المتقدم ✦",
     subtitle:     "التسجيل في الدورات والبرامج التعليمية",
     btn1:         "تسجيلات الدعم",
     btn1sub:      "Support Registration",
-    btn2:         "تسجيلات دورات اللغات",
+    btn2:         "دورات اللغات",
     btn2sub:      "Language Courses",
-    btn3:         "تسجيلات دروس VIP",
+    btn3:         "دروس VIP",
     btn3sub:      "VIP Private Lessons",
     formTitle:    "نموذج التسجيل",
     firstName:    "الاسم",
@@ -19,7 +132,7 @@ const translations = {
     optional:     "(اختياري)",
     submitBtn:    "إرسال التسجيل ✦",
     successTitle: "🎉 تم التسجيل بنجاح!",
-    successMsg:   "تم تسجيل معلوماتك بنجاح،\nسيتم التواصل معك قريباً.",
+    successMsg:   "تم تسجيل معلوماتك بنجاح،\nسيتم التواصل معك قريباُ.",
     closeBtn:     "العودة إلى الصفحة الرئيسية",
     supportTitle: "تسجيلات الدعم",
     langTitle:    "تسجيلات دورات اللغات",
@@ -45,27 +158,26 @@ const translations = {
     submitBtn:    "Submit Registration ✦",
     successTitle: "🎉 Registered Successfully!",
     successMsg:   "Your information has been recorded.\nWe will contact you soon.",
-    closeBtn:     "Back to main page",
+    closeBtn:     "Back to Main Page",
     supportTitle: "Support Registration",
     langTitle:    "Language Courses Registration",
     vipTitle:     "VIP Lessons Registration"
   }
 };
 
-// ─── اللغة ───────────────────────────────────────────────
 let currentLang = localStorage.getItem('eplus-lang') || 'ar';
 
 function setLang(lang) {
   currentLang = lang;
   localStorage.setItem('eplus-lang', lang);
-
+  
   const html = document.documentElement;
   html.setAttribute('lang', lang);
   html.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
-
+  
   document.getElementById('btn-ar').classList.toggle('active', lang === 'ar');
   document.getElementById('btn-en').classList.toggle('active', lang === 'en');
-
+  
   applyTranslations();
 }
 
@@ -75,7 +187,7 @@ function applyTranslations() {
     const key = el.getAttribute('data-i18n');
     if (t[key]) {
       if (key === 'successMsg') {
-        el.innerHTML = t[key].replace('\n','<br>');
+        el.innerHTML = t[key].replace('\n', '<br>');
       } else {
         el.textContent = t[key];
       }
@@ -83,7 +195,9 @@ function applyTranslations() {
   });
 }
 
-// ─── المودال ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// MODAL
+// ─────────────────────────────────────────────────────────
 let currentType = '';
 
 const modalTitles = {
@@ -94,18 +208,18 @@ const modalTitles = {
 
 function openModal(type) {
   currentType = type;
-  const overlay  = document.getElementById('modal');
+  const overlay = document.getElementById('modal');
   const formView = document.getElementById('form-view');
   const succView = document.getElementById('success-view');
-  const titleEl  = document.getElementById('modal-title');
-  const t        = translations[currentLang];
-
+  const titleEl = document.getElementById('modal-title');
+  const t = translations[currentLang];
+  
   titleEl.textContent = t[modalTitles[type]] || t.formTitle;
-
+  
   formView.style.display = 'block';
   succView.classList.remove('show');
   document.getElementById('reg-form').reset();
-
+  
   overlay.classList.add('active');
   document.body.style.overflow = 'hidden';
 }
@@ -116,40 +230,45 @@ function closeModal() {
 }
 
 function closeModalOutside(e) {
-  if (e.target === document.getElementById('modal')) closeModal();
+  if (e.target === document.getElementById('modal')) {
+    closeModal();
+  }
 }
 
-// ─── إرسال الفورم ────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// FORM VALIDATION & SUBMIT
+// ─────────────────────────────────────────────────────────
 function submitForm(e) {
   e.preventDefault();
-  const form   = document.getElementById('reg-form');
-  const inputs = form.querySelectorAll('[required]');
+  const inputs = document.getElementById('reg-form').querySelectorAll('[required]');
   let valid = true;
-
+  
   inputs.forEach(input => {
     if (!input.value.trim()) {
       valid = false;
       input.style.borderColor = '#e86b6b';
-      input.style.boxShadow   = '0 0 0 3px rgba(232,107,107,0.25)';
+      input.style.boxShadow = '0 0 0 3px rgba(232,107,107,0.25)';
       setTimeout(() => {
         input.style.borderColor = '';
-        input.style.boxShadow   = '';
+        input.style.boxShadow = '';
       }, 2000);
     }
   });
-
+  
   if (!valid) return;
-
+  
   document.getElementById('form-view').style.display = 'none';
   document.getElementById('success-view').classList.add('show');
   launchConfetti();
 }
 
-// ─── Confetti ────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// CONFETTI
+// ─────────────────────────────────────────────────────────
 function launchConfetti() {
   const colors = ['#045283', '#0570b0', '#0a8acb', '#f4b41a', '#ffffff'];
-  const box    = document.getElementById('modal-box');
-
+  const box = document.getElementById('modal-box');
+  
   for (let i = 0; i < 20; i++) {
     const c = document.createElement('div');
     c.className = 'confetti';
@@ -165,44 +284,36 @@ function launchConfetti() {
   }
 }
 
-// ─── Ripple Effect على الأزرار ──────────────────────────
-document.querySelectorAll('.reg-btn').forEach(btn => {
-  btn.addEventListener('click', function (e) {
-    const r    = document.createElement('span');
-    const rect = this.getBoundingClientRect();
-    const size = Math.max(rect.width, rect.height);
-
-    r.className = 'ripple-effect';
-    r.style.cssText = `
-      width: ${size}px;
-      height: ${size}px;
-      left: ${e.clientX - rect.left - size / 2}px;
-      top: ${e.clientY - rect.top - size / 2}px;
-    `;
-
-    this.appendChild(r);
-    setTimeout(() => r.remove(), 650);
+// ─────────────────────────────────────────────────────────
+// RIPPLE EFFECT
+// ─────────────────────────────────────────────────────────
+function initRipple() {
+  document.querySelectorAll('.pill-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      const r = document.createElement('span');
+      const rect = this.getBoundingClientRect();
+      const size = Math.max(rect.width, rect.height);
+      
+      r.className = 'ripple-effect';
+      r.style.cssText = `
+        width: ${size}px;
+        height: ${size}px;
+        left: ${e.clientX - rect.left - size / 2}px;
+        top: ${e.clientY - rect.top - size / 2}px;
+      `;
+      
+      this.appendChild(r);
+      setTimeout(() => r.remove(), 650);
+    });
   });
-});
-
-// ─── Particles في الخلفية ───────────────────────────────
-function createParticles() {
-  for (let i = 0; i < 12; i++) {
-    const p = document.createElement('div');
-    p.className = 'particle';
-    p.style.cssText = `
-      left: ${Math.random() * 100}%;
-      animation-duration: ${9 + Math.random() * 10}s;
-      animation-delay: ${Math.random() * 10}s;
-      opacity: ${0.35 + Math.random() * 0.45};
-      width: ${2 + Math.random() * 3}px;
-      height: ${2 + Math.random() * 3}px;
-      background: ${Math.random() > 0.5 ? 'rgba(4,130,195,0.8)' : 'rgba(151,198,238,0.8)'};
-    `;
-    document.body.appendChild(p);
-  }
 }
 
-// ─── Init ────────────────────────────────────────────────
-createParticles();
-setLang(currentLang);
+// ─────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  initSplitText();
+  initPillNav();
+  initRipple();
+  setLang(currentLang);
+});
