@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────
-// SQUARES BACKGROUND ANIMATION
+// SQUARES BACKGROUND
 // ─────────────────────────────────────────────────────────
 const squaresCanvas = document.getElementById('squares-canvas');
 const squaresCtx = squaresCanvas.getContext('2d');
@@ -36,7 +36,6 @@ function animateSquares() {
   squaresCtx.clearRect(0, 0, squaresCanvas.width, squaresCanvas.height);
   
   squares.forEach(sq => {
-    // Smooth opacity transition
     if (Math.abs(sq.opacity - sq.targetOpacity) < 0.01) {
       sq.targetOpacity = Math.random() * 0.4;
     }
@@ -54,7 +53,7 @@ resizeSquares();
 animateSquares();
 
 // ─────────────────────────────────────────────────────────
-// SPLIT TEXT ANIMATION
+// SPLIT TEXT
 // ─────────────────────────────────────────────────────────
 function initSplitText() {
   document.querySelectorAll('.split-text').forEach((el, index) => {
@@ -74,6 +73,8 @@ function initSplitText() {
 // ─────────────────────────────────────────────────────────
 // PILL NAVIGATION
 // ─────────────────────────────────────────────────────────
+let currentService = 'support';
+
 function initPillNav() {
   const pillNav = document.querySelector('.pill-nav');
   const pillSlider = document.querySelector('.pill-slider');
@@ -86,14 +87,12 @@ function initPillNav() {
     const navRect = pillNav.getBoundingClientRect();
     
     pillSlider.style.width = `${rect.width}px`;
-    pillSlider.style.transform = `translateX(${rect.left - navRect.left - 6}px)``;
+    pillSlider.style.transform = `translateX(${rect.left - navRect.left - 6}px)`;
   }
   
-  // Initial position
   const activeBtn = document.querySelector('.pill-btn.active');
   if (activeBtn) updateSlider(activeBtn);
   
-  // Click handlers
   pillBtns.forEach(btn => {
     btn.addEventListener('click', function() {
       pillBtns.forEach(b => b.classList.remove('active'));
@@ -102,11 +101,15 @@ function initPillNav() {
     });
   });
   
-  // Update on resize
   window.addEventListener('resize', () => {
     const active = document.querySelector('.pill-btn.active');
     if (active) updateSlider(active);
   });
+}
+
+function selectService(type) {
+  currentService = type;
+  openModal(type);
 }
 
 // ─────────────────────────────────────────────────────────
@@ -117,41 +120,39 @@ const translations = {
     badge:        "✦ أكاديمية التعليم المتقدم ✦",
     subtitle:     "التسجيل في الدورات والبرامج التعليمية",
     btn1:         "تسجيلات الدعم",
-    btn1sub:      "Support Registration",
     btn2:         "دورات اللغات",
-    btn2sub:      "Language Courses",
     btn3:         "دروس VIP",
-    btn3sub:      "VIP Private Lessons",
     formTitle:    "نموذج التسجيل",
     firstName:    "الاسم",
     lastName:     "اللقب",
     birthDate:    "تاريخ الميلاد",
     birthPlace:   "مكان الميلاد",
+    langLevel:    "مستوى اللغة (CEFR)",
+    selectLevel:  "-- اختر المستوى --",
     phone:        "رقم الهاتف",
     motivation:   "ما هو الدافع الذي جعلك تختار أكاديمية E-PLUS؟",
     optional:     "(اختياري)",
     submitBtn:    "إرسال التسجيل ✦",
     successTitle: "🎉 تم التسجيل بنجاح!",
-    successMsg:   "تم تسجيل معلوماتك بنجاح،\nسيتم التواصل معك قريباُ.",
+    successMsg:   "تم تسجيل معلوماتك بنجاح،\nسيتم التواصل معك قريباً.",
     closeBtn:     "العودة إلى الصفحة الرئيسية",
     supportTitle: "تسجيلات الدعم",
-    langTitle:    "تسجيلات دورات اللغات",
-    vipTitle:     "تسجيلات دروس VIP"
+    langTitle:    "تسجيل دورة لغة",
+    vipTitle:     "تسجيل دروس VIP"
   },
   en: {
     badge:        "✦ Advanced Education Academy ✦",
     subtitle:     "Register for Courses & Educational Programs",
     btn1:         "Support Registration",
-    btn1sub:      "تسجيلات الدعم",
     btn2:         "Language Courses",
-    btn2sub:      "تسجيلات دورات اللغات",
-    btn3:         "VIP Private Lessons",
-    btn3sub:      "تسجيلات دروس VIP",
+    btn3:         "VIP Lessons",
     formTitle:    "Registration Form",
     firstName:    "First Name",
     lastName:     "Last Name",
     birthDate:    "Date of Birth",
     birthPlace:   "Place of Birth",
+    langLevel:    "Language Level (CEFR)",
+    selectLevel:  "-- Select Level --",
     phone:        "Phone Number",
     motivation:   "What motivated you to choose E-PLUS Academy?",
     optional:     "(optional)",
@@ -160,7 +161,7 @@ const translations = {
     successMsg:   "Your information has been recorded.\nWe will contact you soon.",
     closeBtn:     "Back to Main Page",
     supportTitle: "Support Registration",
-    langTitle:    "Language Courses Registration",
+    langTitle:    "Language Course Registration",
     vipTitle:     "VIP Lessons Registration"
   }
 };
@@ -198,8 +199,6 @@ function applyTranslations() {
 // ─────────────────────────────────────────────────────────
 // MODAL
 // ─────────────────────────────────────────────────────────
-let currentType = '';
-
 const modalTitles = {
   support: 'supportTitle',
   lang:    'langTitle',
@@ -207,113 +206,17 @@ const modalTitles = {
 };
 
 function openModal(type) {
-  currentType = type;
   const overlay = document.getElementById('modal');
   const formView = document.getElementById('form-view');
   const succView = document.getElementById('success-view');
   const titleEl = document.getElementById('modal-title');
+  const langLevelGroup = document.getElementById('langLevelGroup');
+  const langLevelSelect = document.getElementById('langLevel');
   const t = translations[currentLang];
   
   titleEl.textContent = t[modalTitles[type]] || t.formTitle;
   
-  formView.style.display = 'block';
-  succView.classList.remove('show');
-  document.getElementById('reg-form').reset();
-  
-  overlay.classList.add('active');
-  document.body.style.overflow = 'hidden';
-}
-
-function closeModal() {
-  document.getElementById('modal').classList.remove('active');
-  document.body.style.overflow = '';
-}
-
-function closeModalOutside(e) {
-  if (e.target === document.getElementById('modal')) {
-    closeModal();
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-// FORM VALIDATION & SUBMIT
-// ─────────────────────────────────────────────────────────
-function submitForm(e) {
-  e.preventDefault();
-  const inputs = document.getElementById('reg-form').querySelectorAll('[required]');
-  let valid = true;
-  
-  inputs.forEach(input => {
-    if (!input.value.trim()) {
-      valid = false;
-      input.style.borderColor = '#e86b6b';
-      input.style.boxShadow = '0 0 0 3px rgba(232,107,107,0.25)';
-      setTimeout(() => {
-        input.style.borderColor = '';
-        input.style.boxShadow = '';
-      }, 2000);
-    }
-  });
-  
-  if (!valid) return;
-  
-  document.getElementById('form-view').style.display = 'none';
-  document.getElementById('success-view').classList.add('show');
-  launchConfetti();
-}
-
-// ─────────────────────────────────────────────────────────
-// CONFETTI
-// ─────────────────────────────────────────────────────────
-function launchConfetti() {
-  const colors = ['#045283', '#0570b0', '#0a8acb', '#f4b41a', '#ffffff'];
-  const box = document.getElementById('modal-box');
-  
-  for (let i = 0; i < 20; i++) {
-    const c = document.createElement('div');
-    c.className = 'confetti';
-    c.style.cssText = `
-      left: ${Math.random() * 100}%;
-      top: 0;
-      background: ${colors[Math.floor(Math.random() * colors.length)]};
-      animation-delay: ${Math.random() * 0.4}s;
-      animation-duration: ${1.5 + Math.random()}s;
-    `;
-    box.appendChild(c);
-    setTimeout(() => c.remove(), 2400);
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-// RIPPLE EFFECT
-// ─────────────────────────────────────────────────────────
-function initRipple() {
-  document.querySelectorAll('.pill-btn').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-      const r = document.createElement('span');
-      const rect = this.getBoundingClientRect();
-      const size = Math.max(rect.width, rect.height);
-      
-      r.className = 'ripple-effect';
-      r.style.cssText = `
-        width: ${size}px;
-        height: ${size}px;
-        left: ${e.clientX - rect.left - size / 2}px;
-        top: ${e.clientY - rect.top - size / 2}px;
-      `;
-      
-      this.appendChild(r);
-      setTimeout(() => r.remove(), 650);
-    });
-  });
-}
-
-// ─────────────────────────────────────────────────────────
-// INIT
-// ─────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  initSplitText();
-  initPillNav();
-  initRipple();
-  setLang(currentLang);
-});
+  // إظهار/إخفاء حقل مستوى اللغة حسب نوع التسجيل
+  if (type === 'lang') {
+    langLevelGroup.style.display = 'block';
+    langLevelSelect.setAttribute('required', 'required');
