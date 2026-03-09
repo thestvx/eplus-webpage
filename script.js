@@ -53,8 +53,8 @@ animateSquares();
 // ─── TRANSLATIONS ─────────────────────────────────────────
 const translations = {
   ar: {
-    badge: "✦ أكاديمية التعليم المتقدم ✦",
-    title: "E-PLUS",
+    badge: "✦ رحلتك نحو النجاح تبدأ من هنا ✦",
+    title: "EDUCATION PLUS CENTER",
     subtitle: "التسجيل في الدورات والبرامج التعليمية",
     btn1: "تسجيلات الدعم",
     btn2: "دورات اللغات",
@@ -85,8 +85,8 @@ const translations = {
     }
   },
   en: {
-    badge: "✦ ADVANCED EDUCATION ACADEMY ✦",
-    title: "E-PLUS",
+    badge: "✦ Your journey to success starts here ✦",
+    title: "EDUCATION PLUS CENTER",
     subtitle: "Register for Courses & Educational Programs",
     btn1: "Support Registration",
     btn2: "Language Courses",
