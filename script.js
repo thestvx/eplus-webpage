@@ -49,8 +49,6 @@ function animateSquares() {
 }
 
 window.addEventListener('resize', resizeSquares);
-resizeSquares();
-animateSquares();
 
 // ─────────────────────────────────────────────────────────
 // SPLIT TEXT
@@ -199,12 +197,6 @@ function applyTranslations() {
 // ─────────────────────────────────────────────────────────
 // MODAL
 // ─────────────────────────────────────────────────────────
-const modalTitles = {
-  support: 'supportTitle',
-  lang:    'langTitle',
-  vip:     'vipTitle'
-};
-
 function openModal(type) {
   const overlay = document.getElementById('modal');
   const formView = document.getElementById('form-view');
@@ -214,9 +206,124 @@ function openModal(type) {
   const langLevelSelect = document.getElementById('langLevel');
   const t = translations[currentLang];
   
-  titleEl.textContent = t[modalTitles[type]] || t.formTitle;
+  const titles = {
+    support: 'supportTitle',
+    lang: 'langTitle',
+    vip: 'vipTitle'
+  };
   
-  // إظهار/إخفاء حقل مستوى اللغة حسب نوع التسجيل
+  titleEl.textContent = t[titles[type]] || t.formTitle;
+  
+  // إظهار/إخفاء حقل مستوى اللغة
   if (type === 'lang') {
     langLevelGroup.style.display = 'block';
     langLevelSelect.setAttribute('required', 'required');
+  } else {
+    langLevelGroup.style.display = 'none';
+    langLevelSelect.removeAttribute('required');
+    langLevelSelect.value = '';
+  }
+  
+  formView.style.display = 'block';
+  succView.classList.remove('show');
+  document.getElementById('reg-form').reset();
+  
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('modal')) {
+    closeModal();
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// FORM SUBMIT
+// ─────────────────────────────────────────────────────────
+function submitForm(e) {
+  e.preventDefault();
+  const inputs = document.getElementById('reg-form').querySelectorAll('[required]');
+  let valid = true;
+  
+  inputs.forEach(input => {
+    if (!input.value.trim()) {
+      valid = false;
+      input.style.borderColor = '#e86b6b';
+      input.style.boxShadow = '0 0 0 3px rgba(232,107,107,0.25)';
+      setTimeout(() => {
+        input.style.borderColor = '';
+        input.style.boxShadow = '';
+      }, 2000);
+    }
+  });
+  
+  if (!valid) return;
+  
+  document.getElementById('form-view').style.display = 'none';
+  document.getElementById('success-view').classList.add('show');
+  launchConfetti();
+}
+
+// ─────────────────────────────────────────────────────────
+// CONFETTI
+// ─────────────────────────────────────────────────────────
+function launchConfetti() {
+  const colors = ['#045283', '#0570b0', '#0a8acb', '#f4b41a', '#ffffff'];
+  const box = document.getElementById('modal-box');
+  
+  for (let i = 0; i < 20; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.cssText = `
+      left: ${Math.random() * 100}%;
+      top: 0;
+      background: ${colors[Math.floor(Math.random() * colors.length)]};
+      animation-delay: ${Math.random() * 0.4}s;
+      animation-duration: ${1.5 + Math.random()}s;
+    `;
+    box.appendChild(c);
+    setTimeout(() => c.remove(), 2400);
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// RIPPLE EFFECT
+// ─────────────────────────────────────────────────────────
+function initRipple() {
+  document.querySelectorAll('.pill-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      const r = document.createElement('span');
+      const rect = this.getBoundingClientRect();
+      const size = Math.max(rect.width, rect.height);
+      
+      r.className = 'ripple-effect';
+      r.style.cssText = `
+        width: ${size}px;
+        height: ${size}px;
+        left: ${e.clientX - rect.left - size / 2}px;
+        top: ${e.clientY - rect.top - size / 2}px;
+      `;
+      
+      this.appendChild(r);
+      setTimeout(() => r.remove(), 650);
+    });
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  resizeSquares();
+  animateSquares();
+  initSplitText();
+  initPillNav();
+  initRipple();
+  setLang(currentLang);
+});
