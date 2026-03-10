@@ -45,18 +45,18 @@ const specialties = {
 
 // ─── CURRICULUM DATA ──────────────────────────────────────
 const curriculum = {
-  'تحضيري':        [], 'أولى ابتدائي':  [], 'ثانية ابتدائي': [],
-  'ثالثة ابتدائي': [], 'رابعة ابتدائي': [], 'خامسة ابتدائي': [],
-  'أولى متوسط':    [], 'ثانية متوسط':   [], 'ثالثة متوسط':   [],
+  'تحضيري':[], 'أولى ابتدائي':[], 'ثانية ابتدائي':[],
+  'ثالثة ابتدائي':[], 'رابعة ابتدائي':[], 'خامسة ابتدائي':[],
+  'أولى متوسط':[], 'ثانية متوسط':[], 'ثالثة متوسط':[],
   'رابعة متوسط': [
     { subject:'رياضيات',          teachers:['الأستاذ شامي سهيل'] },
     { subject:'اللغة الإنجليزية', teachers:['الأستاذة نصبة فاطمة'] },
     { subject:'اللغة الفرنسية',   teachers:['الأستاذة مرغني ريهام'] },
   ],
-  'أولى ثانوي|علوم تجريبية': [], 'أولى ثانوي|آداب ولغات': [],
-  'ثانية ثانوي|علوم تجريبية': [], 'ثانية ثانوي|تقني رياضي': [],
-  'ثانية ثانوي|رياضيات': [],      'ثانية ثانوي|تسيير واقتصاد': [],
-  'ثانية ثانوي|آداب وفلسفة': [],  'ثانية ثانوي|لغات أجنبية': [],
+  'أولى ثانوي|علوم تجريبية':[], 'أولى ثانوي|آداب ولغات':[],
+  'ثانية ثانوي|علوم تجريبية':[], 'ثانية ثانوي|تقني رياضي':[],
+  'ثانية ثانوي|رياضيات':[], 'ثانية ثانوي|تسيير واقتصاد':[],
+  'ثانية ثانوي|آداب وفلسفة':[], 'ثانية ثانوي|لغات أجنبية':[],
   'ثالثة ثانوي (بكالوريا)|علوم تجريبية': [
     { subject:'العلوم الفيزيائية والتكنولوجيا', teachers:['الأستاذ نمسي عبدالرحمان','الأستاذ لكموتة لمين'] },
     { subject:'الرياضيات (العلميين)',           teachers:['الأستاذة ترعة فاطمة','الأستاذ عبدالباسط نعورة'] },
@@ -105,9 +105,9 @@ const curriculum = {
   ],
 };
 
-const needsParent    = ['تحضيري','أولى ابتدائي','ثانية ابتدائي','ثالثة ابتدائي','رابعة ابتدائي','خامسة ابتدائي','أولى متوسط','ثانية متوسط','ثالثة متوسط','رابعة متوسط'];
-const needsSpecialty = ['أولى ثانوي','ثانية ثانوي','ثالثة ثانوي (بكالوريا)'];
-const needsCandidateType = ['ثالثة ثانوي (بكالوريا)'];
+const needsParent       = ['تحضيري','أولى ابتدائي','ثانية ابتدائي','ثالثة ابتدائي','رابعة ابتدائي','خامسة ابتدائي','أولى متوسط','ثانية متوسط','ثالثة متوسط','رابعة متوسط'];
+const needsSpecialty    = ['أولى ثانوي','ثانية ثانوي','ثالثة ثانوي (بكالوريا)'];
+const needsCandidateType= ['ثالثة ثانوي (بكالوريا)'];
 
 // ─── HELPERS ──────────────────────────────────────────────
 function animateShow(el) {
@@ -161,15 +161,14 @@ function populateSubjects(key) {
 
 // ─── EDU LEVEL HANDLER ────────────────────────────────────
 function onEduLevelChange() {
-  const level           = document.getElementById('eduLevel').value;
-  const parentGrp       = document.getElementById('parentGroup');
-  const specialtyGrp    = document.getElementById('specialtyGroup');
-  const specialtySel    = document.getElementById('specialty');
-  const subGrp          = document.getElementById('subjectGroup');
-  const teachGrp        = document.getElementById('teacherGroup');
-  const candidateTypeGrp= document.getElementById('candidateTypeGroup');
-  const parentName      = document.getElementById('parentName');
-  const parentPhone     = document.getElementById('parentPhone');
+  const level            = document.getElementById('eduLevel').value;
+  const parentGrp        = document.getElementById('parentGroup');
+  const specialtyGrp     = document.getElementById('specialtyGroup');
+  const subGrp           = document.getElementById('subjectGroup');
+  const teachGrp         = document.getElementById('teacherGroup');
+  const candidateTypeGrp = document.getElementById('candidateTypeGroup');
+  const parentName       = document.getElementById('parentName');
+  const parentPhone      = document.getElementById('parentPhone');
 
   document.getElementById('comingSoonNote')?.remove();
   hideField(parentGrp,        'parentName','parentPhone');
@@ -179,26 +178,21 @@ function onEduLevelChange() {
   hideField(candidateTypeGrp);
   parentName.removeAttribute('required');
   parentPhone.removeAttribute('required');
-  // reset radio buttons
   document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
 
   if (!level) return;
 
-  // ولي الأمر
   if (needsParent.includes(level)) {
     animateShow(parentGrp);
     parentName.setAttribute('required','required');
     parentPhone.setAttribute('required','required');
   }
 
-  // نوع المترشح (بكالوريا)
   if (needsCandidateType.includes(level)) {
     animateShow(candidateTypeGrp);
-    // التخصص سيظهر بعد اختيار نوع المترشح
     return;
   }
 
-  // تخصص بدون نوع مترشح
   if (needsSpecialty.includes(level)) {
     showSpecialtyField(level);
     return;
@@ -209,10 +203,10 @@ function onEduLevelChange() {
 
 // ─── CANDIDATE TYPE HANDLER ───────────────────────────────
 function onCandidateTypeChange() {
-  const level       = document.getElementById('eduLevel').value;
-  const specialtyGrp= document.getElementById('specialtyGroup');
-  const subGrp      = document.getElementById('subjectGroup');
-  const teachGrp    = document.getElementById('teacherGroup');
+  const level        = document.getElementById('eduLevel').value;
+  const specialtyGrp = document.getElementById('specialtyGroup');
+  const subGrp       = document.getElementById('subjectGroup');
+  const teachGrp     = document.getElementById('teacherGroup');
 
   document.getElementById('comingSoonNote')?.remove();
   hideField(specialtyGrp, 'specialty');
@@ -222,7 +216,6 @@ function onCandidateTypeChange() {
   const selected = document.querySelector('input[name="candidateType"]:checked');
   if (!selected) return;
 
-  // بعد اختيار نوع المترشح → نظهر التخصص
   showSpecialtyField(level);
 }
 
@@ -284,6 +277,18 @@ function onSubjectChange() {
   teachSelect.setAttribute('required','required');
 }
 
+// ─── LANG LEVEL HANDLER ───────────────────────────────────
+function onLangLevelChange() {
+  const levelTestGrp = document.getElementById('levelTestGroup');
+  const val = document.getElementById('langLevel').value;
+  if (val) {
+    animateShow(levelTestGrp);
+  } else {
+    levelTestGrp.style.display = 'none';
+    document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+  }
+}
+
 // ─── TRANSLATIONS ─────────────────────────────────────────
 const translations = {
   ar: {
@@ -291,7 +296,7 @@ const translations = {
     title:"EDUCATION PLUS CENTER",
     subtitle:"التسجيل في الدورات والبرامج التعليمية",
     btn1:"تسجيلات الدعم", btn2:"دورات اللغات",
-    btn3:"دروس VIP",      btn4:"اختبار IELTS", btn5:"دورات أونلاين",
+    btn3:"دروس VIP", btn4:"اختبار IELTS", btn5:"دورات أونلاين",
     firstName:"الاسم", lastName:"اللقب",
     birthDate:"تاريخ الميلاد", birthPlace:"مكان الميلاد",
     eduLevel:"المستوى الدراسي",
@@ -301,15 +306,17 @@ const translations = {
     parentInfo:"معلومات ولي الأمر",
     parentName:"اسم ولي الأمر", parentPhone:"هاتف ولي الأمر",
     langLevel:"مستوى اللغة (CEFR)",
+    levelTest:"هل تريد إجراء اختبار تحديد المستوى؟",
+    yes:"نعم", no:"لا",
     phone:"رقم الهاتف",
     motivation:"ما هو الدافع الذي جعلك تختار أكاديمية E-PLUS؟",
     optional:"(اختياري)",
     submitBtn:"إرسال التسجيل ✦",
     successTitle:"🎉 تم التسجيل بنجاح!",
-    successMsg:"تم تسجيل معلوماتك بنجاح،\\nسيتم التواصل معك قريباً.",
+    successMsg:"تم تسجيل معلوماتك بنجاح،<br>سيتم التواصل معك قريباً.",
     closeBtn:"العودة إلى الصفحة الرئيسية",
     supportTitle:"تسجيلات الدعم", langTitle:"تسجيل دورة لغة",
-    vipTitle:"تسجيل دروس VIP",   ieltsTitle:"التسجيل في اختبار IELTS",
+    vipTitle:"تسجيل دروس VIP", ieltsTitle:"التسجيل في اختبار IELTS",
     onlineTitle:"التسجيل في دورات أونلاين",
     levels:{ A1:"A1 - مبتدئ",A2:"A2 - مبتدئ متقدم",B1:"B1 - متوسط",B2:"B2 - متوسط متقدم",C1:"C1 - متقدم",C2:"C2 - احترافي" }
   },
@@ -318,7 +325,7 @@ const translations = {
     title:"EDUCATION PLUS CENTER",
     subtitle:"Register for Courses & Educational Programs",
     btn1:"Support Registration", btn2:"Language Courses",
-    btn3:"VIP Lessons",          btn4:"IELTS Test", btn5:"Online Courses",
+    btn3:"VIP Lessons", btn4:"IELTS Test", btn5:"Online Courses",
     firstName:"First Name", lastName:"Last Name",
     birthDate:"Date of Birth", birthPlace:"Place of Birth",
     eduLevel:"Academic Level",
@@ -328,12 +335,14 @@ const translations = {
     parentInfo:"Parent / Guardian Info",
     parentName:"Parent Name", parentPhone:"Parent Phone",
     langLevel:"Language Level (CEFR)",
+    levelTest:"Would you like a placement test?",
+    yes:"Yes", no:"No",
     phone:"Phone Number",
     motivation:"What motivated you to choose E-PLUS Academy?",
     optional:"(optional)",
     submitBtn:"Submit Registration ✦",
     successTitle:"🎉 Registered Successfully!",
-    successMsg:"Your information has been recorded.\\nWe will contact you soon.",
+    successMsg:"Your information has been recorded.<br>We will contact you soon.",
     closeBtn:"Back to Main Page",
     supportTitle:"Support Registration", langTitle:"Language Course Registration",
     vipTitle:"VIP Lessons Registration", ieltsTitle:"IELTS Test Registration",
@@ -358,8 +367,8 @@ function applyTranslations() {
   const t = translations[currentLang];
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
-    if (t[key]) {
-      if (key === 'successMsg') el.innerHTML = t[key].replace('\\n','<br>');
+    if (t[key] !== undefined) {
+      if (key === 'successMsg') el.innerHTML = t[key];
       else el.textContent = t[key];
     }
   });
@@ -377,41 +386,40 @@ let currentModalType = 'support';
 
 function openModal(type) {
   currentModalType = type;
-  const t             = translations[currentLang];
-  const overlay       = document.getElementById('modal');
-  const langToggle    = document.getElementById('lang-toggle');
-  const eduLevelGrp   = document.getElementById('eduLevelGroup');
-  const parentGrp     = document.getElementById('parentGroup');
-  const specialtyGrp  = document.getElementById('specialtyGroup');
-  const subGrp        = document.getElementById('subjectGroup');
-  const teachGrp      = document.getElementById('teacherGroup');
-  const langLevelGrp  = document.getElementById('langLevelGroup');
-  const langLevelSel  = document.getElementById('langLevel');
-  const candidateGrp  = document.getElementById('candidateTypeGroup');
-  const parentName    = document.getElementById('parentName');
-  const parentPhone   = document.getElementById('parentPhone');
+  const t              = translations[currentLang];
+  const overlay        = document.getElementById('modal');
+  const langToggle     = document.getElementById('lang-toggle');
+  const eduLevelGrp    = document.getElementById('eduLevelGroup');
+  const parentGrp      = document.getElementById('parentGroup');
+  const specialtyGrp   = document.getElementById('specialtyGroup');
+  const subGrp         = document.getElementById('subjectGroup');
+  const teachGrp       = document.getElementById('teacherGroup');
+  const langLevelGrp   = document.getElementById('langLevelGroup');
+  const langLevelSel   = document.getElementById('langLevel');
+  const candidateGrp   = document.getElementById('candidateTypeGroup');
+  const levelTestGrp   = document.getElementById('levelTestGroup');
+  const parentName     = document.getElementById('parentName');
+  const parentPhone    = document.getElementById('parentPhone');
 
   document.getElementById('modal-title').textContent =
     { support:t.supportTitle, lang:t.langTitle, vip:t.vipTitle, ielts:t.ieltsTitle, online:t.onlineTitle }[type] || '';
 
-  // إخفاء كل الحقول
-  [eduLevelGrp,parentGrp,specialtyGrp,subGrp,teachGrp,langLevelGrp,candidateGrp]
+  [eduLevelGrp,parentGrp,specialtyGrp,subGrp,teachGrp,langLevelGrp,candidateGrp,levelTestGrp]
     .forEach(el => el.style.display = 'none');
+
   langLevelSel.removeAttribute('required');
   parentName.removeAttribute('required');
   parentPhone.removeAttribute('required');
   document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
+  document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
   document.getElementById('comingSoonNote')?.remove();
 
-  // إظهار الحقول حسب النوع
   if (type === 'support') {
     eduLevelGrp.style.display = 'block';
   } else if (type === 'lang') {
-    // IELTS بدون مستوى لغة — lang فقط
     langLevelGrp.style.display = 'block';
     langLevelSel.setAttribute('required','required');
   }
-  // vip, ielts, online → نفس الحقول الأساسية فقط
 
   document.getElementById('form-view').style.display = 'block';
   document.getElementById('success-view').classList.remove('show');
@@ -446,7 +454,6 @@ async function submitForm(e) {
   });
   if (!valid) return;
 
-  // التحقق من نوع المترشح إذا كان ظاهراً
   const candidateGrp = document.getElementById('candidateTypeGroup');
   if (candidateGrp.style.display !== 'none') {
     const selected = document.querySelector('input[name="candidateType"]:checked');
@@ -462,7 +469,6 @@ async function submitForm(e) {
   btn.classList.add('loading');
 
   const typeLabels = { support:'دعم', lang:'لغات', vip:'VIP', ielts:'IELTS', online:'أونلاين' };
-  const candidateTypeVal = document.querySelector('input[name="candidateType"]:checked')?.value || '-';
 
   const data = {
     timestamp:     new Date().toLocaleString('ar-DZ'),
@@ -473,13 +479,14 @@ async function submitForm(e) {
     birthPlace:    document.getElementById('birthPlace').value.trim(),
     phone:         document.getElementById('phone').value.trim(),
     eduLevel:      document.getElementById('eduLevel').value      || '-',
-    candidateType: candidateTypeVal,
+    candidateType: document.querySelector('input[name="candidateType"]:checked')?.value || '-',
     specialty:     document.getElementById('specialty').value     || '-',
     subject:       document.getElementById('subject').value       || '-',
     teacher:       document.getElementById('teacher').value       || '-',
     parentName:    document.getElementById('parentName').value.trim()  || '-',
     parentPhone:   document.getElementById('parentPhone').value.trim() || '-',
     langLevel:     document.getElementById('langLevel').value     || '-',
+    levelTest:     document.querySelector('input[name="levelTest"]:checked')?.value || '-',
     motivation:    document.getElementById('motivation').value.trim()  || '-',
   };
 
