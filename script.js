@@ -1,51 +1,156 @@
 // ─── SQUARES BACKGROUND ───────────────────────────────────
 const canvas = document.getElementById('squares-canvas');
 const ctx = canvas.getContext('2d');
-
 let squares = [];
-const squareSize = 40;
-const squareGap = 4;
+const squareSize = 40, squareGap = 4;
 let cols, rows;
 
 function resizeCanvas() {
-  canvas.width = window.innerWidth;
+  canvas.width  = window.innerWidth;
   canvas.height = window.innerHeight;
-  cols = Math.ceil(window.innerWidth / (squareSize + squareGap));
+  cols = Math.ceil(window.innerWidth  / (squareSize + squareGap));
   rows = Math.ceil(window.innerHeight / (squareSize + squareGap));
   initSquares();
 }
-
 function initSquares() {
   squares = [];
-  for (let i = 0; i < cols; i++) {
-    for (let j = 0; j < rows; j++) {
-      squares.push({
-        x: i * (squareSize + squareGap),
-        y: j * (squareSize + squareGap),
-        opacity: Math.random() * 0.3,
-        targetOpacity: Math.random() * 0.3,
-        speed: 0.005 + Math.random() * 0.01
-      });
-    }
-  }
+  for (let i = 0; i < cols; i++)
+    for (let j = 0; j < rows; j++)
+      squares.push({ x: i*(squareSize+squareGap), y: j*(squareSize+squareGap),
+        opacity: Math.random()*0.3, targetOpacity: Math.random()*0.3,
+        speed: 0.005 + Math.random()*0.01 });
 }
-
 function animateSquares() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   squares.forEach(sq => {
-    if (Math.abs(sq.opacity - sq.targetOpacity) < 0.01) {
-      sq.targetOpacity = Math.random() * 0.4;
-    }
+    if (Math.abs(sq.opacity - sq.targetOpacity) < 0.01) sq.targetOpacity = Math.random()*0.4;
     sq.opacity += (sq.targetOpacity - sq.opacity) * sq.speed;
-    ctx.fillStyle = `rgba(4, 130, 195, ${sq.opacity})`;
+    ctx.fillStyle = `rgba(4,130,195,${sq.opacity})`;
     ctx.fillRect(sq.x, sq.y, squareSize, squareSize);
   });
   requestAnimationFrame(animateSquares);
 }
-
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 animateSquares();
+
+// ─── CURRICULUM DATA ──────────────────────────────────────
+// المواد والأساتذة لكل مستوى
+// المستويات بدون مواد → مصفوفة فارغة = يظهر "قريباً"
+const curriculum = {
+  'تحضيري':                      [],
+  'أولى ابتدائي':                 [],
+  'ثانية ابتدائي':                [],
+  'ثالثة ابتدائي':                [],
+  'رابعة ابتدائي':                [],
+  'خامسة ابتدائي':                [],
+  'أولى متوسط':                   [],
+  'ثانية متوسط':                  [],
+  'ثالثة متوسط':                  [],
+  'رابعة متوسط': [
+    { subject: 'رياضيات',         teachers: ['الأستاذ شامي سهيل'] },
+    { subject: 'اللغة الإنجليزية', teachers: ['الأستاذة نصبة فاطمة'] },
+    { subject: 'اللغة الفرنسية',  teachers: ['الأستاذة مرغني ريهام'] },
+  ],
+  'أولى ثانوي':                   [],
+  'ثانية ثانوي':                  [],
+  'ثالثة ثانوي (بكالوريا)': [
+    { subject: 'العلوم الفيزيائية والتكنولوجيا', teachers: ['الأستاذ نمسي عبدالرحمان', 'الأستاذ لكموتة لمين'] },
+    { subject: 'الرياضيات (العلميين)',           teachers: ['الأستاذة ترعة فاطمة', 'الأستاذ عبدالباسط نعورة'] },
+    { subject: 'العلوم الطبيعية والحياة',        teachers: ['الأستاذ صحراوي شكري'] },
+    { subject: 'اللغة الإسبانية',               teachers: ['الأستاذ طوالبية ابراهيم'] },
+    { subject: 'اللغة الألمانية',               teachers: ['الأستاذ حمزة علالي'] },
+    { subject: 'اللغة العربية',                 teachers: ['الأستاذة موساوي زبيدة'] },
+    { subject: 'اللغة الفرنسية',                teachers: ['الأستاذة كروش شمس الهدى'] },
+    { subject: 'اللغة الإنجليزية',              teachers: ['الأستاذ كرام الصادق'] },
+    { subject: 'الفلسفة',                       teachers: ['الأستاذة دادة نجاح سلام'] },
+    { subject: 'تاريخ وجغرافيا',                teachers: ['الأستاذ ايمن دخان'] },
+  ],
+};
+
+// ─── CURRICULUM HANDLERS ──────────────────────────────────
+function onEduLevelChange() {
+  const level      = document.getElementById('eduLevel').value;
+  const subGrp     = document.getElementById('subjectGroup');
+  const teachGrp   = document.getElementById('teacherGroup');
+  const subSelect  = document.getElementById('subject');
+  const teachSelect= document.getElementById('teacher');
+
+  // إزالة coming-soon قديم إن وجد
+  document.getElementById('comingSoonNote')?.remove();
+
+  // إخفاء المادة والأستاذ
+  subGrp.style.display   = 'none';
+  teachGrp.style.display = 'none';
+  subSelect.removeAttribute('required');
+  teachSelect.removeAttribute('required');
+  subSelect.value   = '';
+  teachSelect.value = '';
+
+  if (!level) return;
+
+  const subjects = curriculum[level] || [];
+
+  if (subjects.length === 0) {
+    // رسالة قريباً
+    const note = document.createElement('div');
+    note.id = 'comingSoonNote';
+    note.className = 'coming-soon-note field-appear';
+    note.innerHTML = `<span>🚧</span><span>المواد والأساتذة لهذا المستوى ستُضاف قريباً</span>`;
+    document.getElementById('eduLevelGroup').insertAdjacentElement('afterend', note);
+    return;
+  }
+
+  // تعبئة المواد
+  subSelect.innerHTML = `<option value="">-- اختر المادة --</option>`;
+  subjects.forEach(item => {
+    const opt = document.createElement('option');
+    opt.value = item.subject;
+    opt.textContent = item.subject;
+    subSelect.appendChild(opt);
+  });
+
+  subGrp.style.display = 'block';
+  subGrp.classList.remove('field-appear');
+  void subGrp.offsetWidth; // reflow لإعادة الأنيميشن
+  subGrp.classList.add('field-appear');
+  subSelect.setAttribute('required', 'required');
+}
+
+function onSubjectChange() {
+  const level      = document.getElementById('eduLevel').value;
+  const subjectVal = document.getElementById('subject').value;
+  const teachGrp   = document.getElementById('teacherGroup');
+  const teachSelect= document.getElementById('teacher');
+
+  teachGrp.style.display = 'none';
+  teachSelect.removeAttribute('required');
+  teachSelect.value = '';
+
+  if (!subjectVal) return;
+
+  const subjects = curriculum[level] || [];
+  const found    = subjects.find(s => s.subject === subjectVal);
+  if (!found || found.teachers.length === 0) return;
+
+  teachSelect.innerHTML = `<option value="">-- اختر الأستاذ/ة --</option>`;
+  found.teachers.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t; opt.textContent = t;
+    teachSelect.appendChild(opt);
+  });
+
+  // لو أستاذ واحد → اختره تلقائياً
+  if (found.teachers.length === 1) {
+    teachSelect.value = found.teachers[0];
+  }
+
+  teachGrp.style.display = 'block';
+  teachGrp.classList.remove('field-appear');
+  void teachGrp.offsetWidth;
+  teachGrp.classList.add('field-appear');
+  teachSelect.setAttribute('required', 'required');
+}
 
 // ─── TRANSLATIONS ─────────────────────────────────────────
 const translations = {
@@ -60,6 +165,12 @@ const translations = {
     lastName: "اللقب",
     birthDate: "تاريخ الميلاد",
     birthPlace: "مكان الميلاد",
+    eduLevel: "المستوى الدراسي",
+    selectEduLevel: "-- اختر المستوى --",
+    subject: "المادة",
+    selectSubject: "-- اختر المادة --",
+    teacher: "الأستاذ/ة",
+    selectTeacher: "-- اختر الأستاذ/ة --",
     langLevel: "مستوى اللغة (CEFR)",
     selectLevel: "-- اختر المستوى --",
     phone: "رقم الهاتف",
@@ -73,12 +184,9 @@ const translations = {
     langTitle: "تسجيل دورة لغة",
     vipTitle: "تسجيل دروس VIP",
     levels: {
-      A1: "A1 - مبتدئ",
-      A2: "A2 - مبتدئ متقدم",
-      B1: "B1 - متوسط",
-      B2: "B2 - متوسط متقدم",
-      C1: "C1 - متقدم",
-      C2: "C2 - احترافي"
+      A1: "A1 - مبتدئ", A2: "A2 - مبتدئ متقدم",
+      B1: "B1 - متوسط", B2: "B2 - متوسط متقدم",
+      C1: "C1 - متقدم", C2: "C2 - احترافي"
     }
   },
   en: {
@@ -92,6 +200,12 @@ const translations = {
     lastName: "Last Name",
     birthDate: "Date of Birth",
     birthPlace: "Place of Birth",
+    eduLevel: "Academic Level",
+    selectEduLevel: "-- Select Level --",
+    subject: "Subject",
+    selectSubject: "-- Select Subject --",
+    teacher: "Teacher",
+    selectTeacher: "-- Select Teacher --",
     langLevel: "Language Level (CEFR)",
     selectLevel: "-- Select Level --",
     phone: "Phone Number",
@@ -105,12 +219,9 @@ const translations = {
     langTitle: "Language Course Registration",
     vipTitle: "VIP Lessons Registration",
     levels: {
-      A1: "A1 - Beginner",
-      A2: "A2 - Elementary",
-      B1: "B1 - Intermediate",
-      B2: "B2 - Upper Intermediate",
-      C1: "C1 - Advanced",
-      C2: "C2 - Proficiency"
+      A1: "A1 - Beginner", A2: "A2 - Elementary",
+      B1: "B1 - Intermediate", B2: "B2 - Upper Intermediate",
+      C1: "C1 - Advanced", C2: "C2 - Proficiency"
     }
   }
 };
@@ -133,21 +244,17 @@ function applyTranslations() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     if (t[key]) {
-      if (key === 'successMsg') {
-        el.innerHTML = t[key].replace('\\n', '<br>');
-      } else {
-        el.textContent = t[key];
-      }
+      if (key === 'successMsg') el.innerHTML = t[key].replace('\\n', '<br>');
+      else el.textContent = t[key];
     }
   });
   document.querySelectorAll('[data-i18n-level]').forEach(el => {
     const level = el.getAttribute('data-i18n-level');
-    if (t.levels && t.levels[level]) el.textContent = t.levels[level];
+    if (t.levels?.[level]) el.textContent = t.levels[level];
   });
 }
 
 // ─── GOOGLE SHEETS ────────────────────────────────────────
-// ضع هنا رابط Apps Script بعد النشر
 const SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL';
 
 // ─── MODAL ────────────────────────────────────────────────
@@ -155,31 +262,39 @@ let currentModalType = 'support';
 
 function openModal(type) {
   currentModalType = type;
-  const overlay      = document.getElementById('modal');
-  const formView     = document.getElementById('form-view');
-  const succView     = document.getElementById('success-view');
-  const titleEl      = document.getElementById('modal-title');
-  const langLevelGroup  = document.getElementById('langLevelGroup');
-  const langLevelSelect = document.getElementById('langLevel');
-  const langToggle   = document.getElementById('lang-toggle');
+  const overlay     = document.getElementById('modal');
+  const formView    = document.getElementById('form-view');
+  const succView    = document.getElementById('success-view');
+  const titleEl     = document.getElementById('modal-title');
+  const langToggle  = document.getElementById('lang-toggle');
+  const eduLevelGrp = document.getElementById('eduLevelGroup');
+  const subGrp      = document.getElementById('subjectGroup');
+  const teachGrp    = document.getElementById('teacherGroup');
+  const langLevelGrp= document.getElementById('langLevelGroup');
+  const langLevelSel= document.getElementById('langLevel');
   const t = translations[currentLang];
 
-  const titles = {
-    support: t.supportTitle,
-    lang:    t.langTitle,
-    vip:     t.vipTitle
-  };
+  titleEl.textContent = { support: t.supportTitle, lang: t.langTitle, vip: t.vipTitle }[type] || '';
 
-  titleEl.textContent = titles[type] || '';
-
-  if (type === 'lang') {
-    langLevelGroup.style.display = 'block';
-    langLevelSelect.setAttribute('required', 'required');
+  // إظهار/إخفاء الحقول حسب نوع المودال
+  if (type === 'support') {
+    eduLevelGrp.style.display  = 'block';
+    langLevelGrp.style.display = 'none';
+    langLevelSel.removeAttribute('required');
+  } else if (type === 'lang') {
+    eduLevelGrp.style.display  = 'none';
+    langLevelGrp.style.display = 'block';
+    langLevelSel.setAttribute('required', 'required');
   } else {
-    langLevelGroup.style.display = 'none';
-    langLevelSelect.removeAttribute('required');
-    langLevelSelect.value = '';
+    eduLevelGrp.style.display  = 'none';
+    langLevelGrp.style.display = 'none';
+    langLevelSel.removeAttribute('required');
   }
+
+  // إخفاء المادة والأستاذ وإزالة coming soon
+  subGrp.style.display   = 'none';
+  teachGrp.style.display = 'none';
+  document.getElementById('comingSoonNote')?.remove();
 
   formView.style.display = 'block';
   succView.classList.remove('show');
@@ -190,8 +305,8 @@ function openModal(type) {
 }
 
 function closeModal() {
-  const overlay    = document.getElementById('modal');
-  const langToggle = document.getElementById('lang-toggle');
+  const overlay   = document.getElementById('modal');
+  const langToggle= document.getElementById('lang-toggle');
   overlay.classList.remove('active');
   document.body.style.overflow = '';
   if (langToggle) langToggle.classList.remove('hidden');
@@ -231,14 +346,16 @@ async function submitForm(e) {
     birthDate:  document.getElementById('birthDate').value,
     birthPlace: document.getElementById('birthPlace').value.trim(),
     phone:      document.getElementById('phone').value.trim(),
-    langLevel:  document.getElementById('langLevel').value || '-',
+    eduLevel:   document.getElementById('eduLevel').value   || '-',
+    subject:    document.getElementById('subject').value    || '-',
+    teacher:    document.getElementById('teacher').value    || '-',
+    langLevel:  document.getElementById('langLevel').value  || '-',
     motivation: document.getElementById('motivation').value.trim() || '-',
   };
 
   try {
     await fetch(SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
+      method: 'POST', mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
@@ -254,23 +371,20 @@ async function submitForm(e) {
 
 // ─── CONFETTI ─────────────────────────────────────────────
 function launchConfetti() {
-  const colors = ['#045283', '#0570b0', '#0a8acb', '#f4b41a', '#ffffff', '#53a9df'];
+  const colors = ['#045283','#0570b0','#0a8acb','#f4b41a','#ffffff','#53a9df'];
   const box = document.getElementById('modal-box');
-
   for (let i = 0; i < 40; i++) {
     setTimeout(() => {
       const c = document.createElement('div');
       c.className = 'confetti';
       const size = 6 + Math.random() * 9;
       c.style.cssText = `
-        left: ${5 + Math.random() * 90}%;
-        top: 8%;
-        width: ${size}px;
-        height: ${size}px;
-        background: ${colors[Math.floor(Math.random() * colors.length)]};
-        border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
-        animation-duration: ${1.2 + Math.random() * 1.2}s;
-        animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        left:${5+Math.random()*90}%; top:8%;
+        width:${size}px; height:${size}px;
+        background:${colors[Math.floor(Math.random()*colors.length)]};
+        border-radius:${Math.random()>0.5?'50%':'2px'};
+        animation-duration:${1.2+Math.random()*1.2}s;
+        animation-timing-function:cubic-bezier(0.25,0.46,0.45,0.94);
       `;
       box.appendChild(c);
       setTimeout(() => c.remove(), 2600);
