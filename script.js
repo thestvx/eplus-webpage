@@ -32,17 +32,14 @@ function initSquares() {
 
 function animateSquares() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
   squares.forEach(sq => {
     if (Math.abs(sq.opacity - sq.targetOpacity) < 0.01) {
       sq.targetOpacity = Math.random() * 0.4;
     }
     sq.opacity += (sq.targetOpacity - sq.opacity) * sq.speed;
-    
     ctx.fillStyle = `rgba(4, 130, 195, ${sq.opacity})`;
     ctx.fillRect(sq.x, sq.y, squareSize, squareSize);
   });
-  
   requestAnimationFrame(animateSquares);
 }
 
@@ -70,7 +67,7 @@ const translations = {
     optional: "(اختياري)",
     submitBtn: "إرسال التسجيل ✦",
     successTitle: "🎉 تم التسجيل بنجاح!",
-    successMsg: "تم تسجيل معلوماتك بنجاح،\nسيتم التواصل معك قريباً.",
+    successMsg: "تم تسجيل معلوماتك بنجاح،\\nسيتم التواصل معك قريباً.",
     closeBtn: "العودة إلى الصفحة الرئيسية",
     supportTitle: "تسجيلات الدعم",
     langTitle: "تسجيل دورة لغة",
@@ -102,7 +99,7 @@ const translations = {
     optional: "(optional)",
     submitBtn: "Submit Registration ✦",
     successTitle: "🎉 Registered Successfully!",
-    successMsg: "Your information has been recorded.\nWe will contact you soon.",
+    successMsg: "Your information has been recorded.\\nWe will contact you soon.",
     closeBtn: "Back to Main Page",
     supportTitle: "Support Registration",
     langTitle: "Language Course Registration",
@@ -118,63 +115,63 @@ const translations = {
   }
 };
 
-let currentLang = localStorage.getItem('eplus-lang') || 'en';
+let currentLang = localStorage.getItem('eplus-lang') || 'ar';
 
 function setLang(lang) {
   currentLang = lang;
   localStorage.setItem('eplus-lang', lang);
-  
   const html = document.documentElement;
   html.setAttribute('lang', lang);
   html.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
-  
   document.getElementById('btn-ar').classList.toggle('active', lang === 'ar');
   document.getElementById('btn-en').classList.toggle('active', lang === 'en');
-  
   applyTranslations();
 }
 
 function applyTranslations() {
   const t = translations[currentLang];
-  
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     if (t[key]) {
       if (key === 'successMsg') {
-        el.innerHTML = t[key].replace('\n', '<br>');
+        el.innerHTML = t[key].replace('\\n', '<br>');
       } else {
         el.textContent = t[key];
       }
     }
   });
-  
   document.querySelectorAll('[data-i18n-level]').forEach(el => {
     const level = el.getAttribute('data-i18n-level');
-    if (t.levels && t.levels[level]) {
-      el.textContent = t.levels[level];
-    }
+    if (t.levels && t.levels[level]) el.textContent = t.levels[level];
   });
 }
 
+// ─── GOOGLE SHEETS ────────────────────────────────────────
+// ضع هنا رابط Apps Script بعد النشر
+const SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL';
+
 // ─── MODAL ────────────────────────────────────────────────
+let currentModalType = 'support';
+
 function openModal(type) {
-  const overlay = document.getElementById('modal');
-  const formView = document.getElementById('form-view');
-  const succView = document.getElementById('success-view');
-  const titleEl = document.getElementById('modal-title');
-  const langLevelGroup = document.getElementById('langLevelGroup');
+  currentModalType = type;
+  const overlay      = document.getElementById('modal');
+  const formView     = document.getElementById('form-view');
+  const succView     = document.getElementById('success-view');
+  const titleEl      = document.getElementById('modal-title');
+  const langLevelGroup  = document.getElementById('langLevelGroup');
   const langLevelSelect = document.getElementById('langLevel');
-  const langToggle = document.getElementById('lang-toggle');
+  const langToggle   = document.getElementById('lang-toggle');
   const t = translations[currentLang];
-  
+
   const titles = {
     support: t.supportTitle,
-    lang: t.langTitle,
-    vip: t.vipTitle
+    lang:    t.langTitle,
+    vip:     t.vipTitle
   };
-  
-  titleEl.textContent = titles[type] || t.formTitle;
-  
+
+  titleEl.textContent = titles[type] || '';
+
   if (type === 'lang') {
     langLevelGroup.style.display = 'block';
     langLevelSelect.setAttribute('required', 'required');
@@ -183,20 +180,17 @@ function openModal(type) {
     langLevelSelect.removeAttribute('required');
     langLevelSelect.value = '';
   }
-  
+
   formView.style.display = 'block';
   succView.classList.remove('show');
   document.getElementById('reg-form').reset();
-  
   overlay.classList.add('active');
   document.body.style.overflow = 'hidden';
-  
-  // إخفاء أزرار اللغة أثناء المودال
   if (langToggle) langToggle.classList.add('hidden');
 }
 
 function closeModal() {
-  const overlay = document.getElementById('modal');
+  const overlay    = document.getElementById('modal');
   const langToggle = document.getElementById('lang-toggle');
   overlay.classList.remove('active');
   document.body.style.overflow = '';
@@ -204,27 +198,55 @@ function closeModal() {
 }
 
 function closeModalOutside(e) {
-  if (e.target === document.getElementById('modal')) {
-    closeModal();
-  }
+  if (e.target === document.getElementById('modal')) closeModal();
 }
 
 // ─── FORM SUBMIT ──────────────────────────────────────────
-function submitForm(e) {
+async function submitForm(e) {
   e.preventDefault();
   const inputs = document.getElementById('reg-form').querySelectorAll('[required]');
   let valid = true;
-  
+
   inputs.forEach(input => {
+    input.classList.remove('error');
     if (!input.value.trim()) {
       valid = false;
       input.classList.add('error');
       setTimeout(() => input.classList.remove('error'), 2000);
     }
   });
-  
+
   if (!valid) return;
-  
+
+  const btn = document.querySelector('#form-view .submit-btn');
+  btn.classList.add('loading');
+
+  const typeLabels = { support: 'دعم', lang: 'لغات', vip: 'VIP' };
+
+  const data = {
+    timestamp:  new Date().toLocaleString('ar-DZ'),
+    type:       typeLabels[currentModalType] || currentModalType,
+    firstName:  document.getElementById('firstName').value.trim(),
+    lastName:   document.getElementById('lastName').value.trim(),
+    birthDate:  document.getElementById('birthDate').value,
+    birthPlace: document.getElementById('birthPlace').value.trim(),
+    phone:      document.getElementById('phone').value.trim(),
+    langLevel:  document.getElementById('langLevel').value || '-',
+    motivation: document.getElementById('motivation').value.trim() || '-',
+  };
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch (err) {
+    console.warn('Sheet error:', err);
+  }
+
+  btn.classList.remove('loading');
   document.getElementById('form-view').style.display = 'none';
   document.getElementById('success-view').classList.add('show');
   launchConfetti();
@@ -232,21 +254,27 @@ function submitForm(e) {
 
 // ─── CONFETTI ─────────────────────────────────────────────
 function launchConfetti() {
-  const colors = ['#045283', '#0570b0', '#0a8acb', '#f4b41a', '#ffffff'];
+  const colors = ['#045283', '#0570b0', '#0a8acb', '#f4b41a', '#ffffff', '#53a9df'];
   const box = document.getElementById('modal-box');
-  
-  for (let i = 0; i < 20; i++) {
-    const c = document.createElement('div');
-    c.className = 'confetti';
-    c.style.cssText = `
-      left: ${Math.random() * 100}%;
-      top: 0;
-      background: ${colors[Math.floor(Math.random() * colors.length)]};
-      animation-delay: ${Math.random() * 0.4}s;
-      animation-duration: ${1.5 + Math.random()}s;
-    `;
-    box.appendChild(c);
-    setTimeout(() => c.remove(), 2400);
+
+  for (let i = 0; i < 40; i++) {
+    setTimeout(() => {
+      const c = document.createElement('div');
+      c.className = 'confetti';
+      const size = 6 + Math.random() * 9;
+      c.style.cssText = `
+        left: ${5 + Math.random() * 90}%;
+        top: 8%;
+        width: ${size}px;
+        height: ${size}px;
+        background: ${colors[Math.floor(Math.random() * colors.length)]};
+        border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
+        animation-duration: ${1.2 + Math.random() * 1.2}s;
+        animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      `;
+      box.appendChild(c);
+      setTimeout(() => c.remove(), 2600);
+    }, i * 35);
   }
 }
 
