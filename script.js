@@ -37,7 +37,6 @@ resizeCanvas();
 animateSquares();
 
 // ─── SPECIALTIES DATA ─────────────────────────────────────
-// التخصصات لأولى وثانية ثانوي
 const specialties = {
   'أولى ثانوي': [
     'علوم تجريبية',
@@ -51,48 +50,91 @@ const specialties = {
     'آداب وفلسفة',
     'لغات أجنبية',
   ],
+  'ثالثة ثانوي (بكالوريا)': [
+    'علوم تجريبية',
+    'تقني رياضي',
+    'رياضيات',
+    'تسيير واقتصاد',
+    'آداب وفلسفة',
+    'لغات أجنبية',
+  ],
 };
 
 // ─── CURRICULUM DATA ──────────────────────────────────────
-// المفتاح: "المستوى|التخصص" للمستويات التي لها تخصص
-// المفتاح: "المستوى" للمستويات بدون تخصص
 const curriculum = {
-  'تحضيري':                       [],
-  'أولى ابتدائي':                  [],
-  'ثانية ابتدائي':                 [],
-  'ثالثة ابتدائي':                 [],
-  'رابعة ابتدائي':                 [],
-  'خامسة ابتدائي':                 [],
-  'أولى متوسط':                    [],
-  'ثانية متوسط':                   [],
-  'ثالثة متوسط':                   [],
+  'تحضيري':        [],
+  'أولى ابتدائي':  [],
+  'ثانية ابتدائي': [],
+  'ثالثة ابتدائي': [],
+  'رابعة ابتدائي': [],
+  'خامسة ابتدائي': [],
+  'أولى متوسط':    [],
+  'ثانية متوسط':   [],
+  'ثالثة متوسط':   [],
   'رابعة متوسط': [
     { subject: 'رياضيات',          teachers: ['الأستاذ شامي سهيل'] },
     { subject: 'اللغة الإنجليزية', teachers: ['الأستاذة نصبة فاطمة'] },
     { subject: 'اللغة الفرنسية',   teachers: ['الأستاذة مرغني ريهام'] },
   ],
-  // أولى ثانوي — بحسب التخصص (تُضاف لاحقاً)
+
+  // ── أولى ثانوي ──
   'أولى ثانوي|علوم تجريبية': [],
   'أولى ثانوي|آداب ولغات':   [],
-  // ثانية ثانوي — بحسب التخصص (تُضاف لاحقاً)
+
+  // ── ثانية ثانوي ──
   'ثانية ثانوي|علوم تجريبية': [],
   'ثانية ثانوي|تقني رياضي':   [],
   'ثانية ثانوي|رياضيات':      [],
   'ثانية ثانوي|تسيير واقتصاد':[],
   'ثانية ثانوي|آداب وفلسفة':  [],
   'ثانية ثانوي|لغات أجنبية':  [],
-  // بكالوريا
-  'ثالثة ثانوي (بكالوريا)': [
-    { subject: 'العلوم الفيزيائية والتكنولوجيا', teachers: ['الأستاذ نمسي عبدالرحمان','الأستاذ لكموتة لمين'] },
-    { subject: 'الرياضيات (العلميين)',           teachers: ['الأستاذة ترعة فاطمة','الأستاذ عبدالباسط نعورة'] },
+
+  // ── بكالوريا — المواد موزّعة على التخصصات ──
+  'ثالثة ثانوي (بكالوريا)|علوم تجريبية': [
+    { subject: 'العلوم الفيزيائية والتكنولوجيا', teachers: ['الأستاذ نمسي عبدالرحمان', 'الأستاذ لكموتة لمين'] },
+    { subject: 'الرياضيات (العلميين)',           teachers: ['الأستاذة ترعة فاطمة', 'الأستاذ عبدالباسط نعورة'] },
     { subject: 'العلوم الطبيعية والحياة',        teachers: ['الأستاذ صحراوي شكري'] },
-    { subject: 'اللغة الإسبانية',               teachers: ['الأستاذ طوالبية ابراهيم'] },
-    { subject: 'اللغة الألمانية',               teachers: ['الأستاذ حمزة علالي'] },
     { subject: 'اللغة العربية',                 teachers: ['الأستاذة موساوي زبيدة'] },
     { subject: 'اللغة الفرنسية',                teachers: ['الأستاذة كروش شمس الهدى'] },
     { subject: 'اللغة الإنجليزية',              teachers: ['الأستاذ كرام الصادق'] },
     { subject: 'الفلسفة',                       teachers: ['الأستاذة دادة نجاح سلام'] },
     { subject: 'تاريخ وجغرافيا',                teachers: ['الأستاذ ايمن دخان'] },
+  ],
+  'ثالثة ثانوي (بكالوريا)|تقني رياضي': [
+    { subject: 'العلوم الفيزيائية والتكنولوجيا', teachers: ['الأستاذ نمسي عبدالرحمان', 'الأستاذ لكموتة لمين'] },
+    { subject: 'الرياضيات (العلميين)',           teachers: ['الأستاذة ترعة فاطمة', 'الأستاذ عبدالباسط نعورة'] },
+    { subject: 'اللغة العربية',                 teachers: ['الأستاذة موساوي زبيدة'] },
+    { subject: 'اللغة الفرنسية',                teachers: ['الأستاذة كروش شمس الهدى'] },
+    { subject: 'اللغة الإنجليزية',              teachers: ['الأستاذ كرام الصادق'] },
+  ],
+  'ثالثة ثانوي (بكالوريا)|رياضيات': [
+    { subject: 'العلوم الفيزيائية والتكنولوجيا', teachers: ['الأستاذ نمسي عبدالرحمان', 'الأستاذ لكموتة لمين'] },
+    { subject: 'الرياضيات (العلميين)',           teachers: ['الأستاذة ترعة فاطمة', 'الأستاذ عبدالباسط نعورة'] },
+    { subject: 'اللغة العربية',                 teachers: ['الأستاذة موساوي زبيدة'] },
+    { subject: 'اللغة الفرنسية',                teachers: ['الأستاذة كروش شمس الهدى'] },
+    { subject: 'اللغة الإنجليزية',              teachers: ['الأستاذ كرام الصادق'] },
+    { subject: 'الفلسفة',                       teachers: ['الأستاذة دادة نجاح سلام'] },
+  ],
+  'ثالثة ثانوي (بكالوريا)|تسيير واقتصاد': [
+    { subject: 'اللغة العربية',     teachers: ['الأستاذة موساوي زبيدة'] },
+    { subject: 'اللغة الفرنسية',    teachers: ['الأستاذة كروش شمس الهدى'] },
+    { subject: 'اللغة الإنجليزية', teachers: ['الأستاذ كرام الصادق'] },
+    { subject: 'الفلسفة',           teachers: ['الأستاذة دادة نجاح سلام'] },
+    { subject: 'تاريخ وجغرافيا',    teachers: ['الأستاذ ايمن دخان'] },
+  ],
+  'ثالثة ثانوي (بكالوريا)|آداب وفلسفة': [
+    { subject: 'اللغة العربية',     teachers: ['الأستاذة موساوي زبيدة'] },
+    { subject: 'اللغة الفرنسية',    teachers: ['الأستاذة كروش شمس الهدى'] },
+    { subject: 'اللغة الإنجليزية', teachers: ['الأستاذ كرام الصادق'] },
+    { subject: 'الفلسفة',           teachers: ['الأستاذة دادة نجاح سلام'] },
+    { subject: 'تاريخ وجغرافيا',    teachers: ['الأستاذ ايمن دخان'] },
+  ],
+  'ثالثة ثانوي (بكالوريا)|لغات أجنبية': [
+    { subject: 'اللغة الإسبانية',   teachers: ['الأستاذ طوالبية ابراهيم'] },
+    { subject: 'اللغة الألمانية',   teachers: ['الأستاذ حمزة علالي'] },
+    { subject: 'اللغة العربية',     teachers: ['الأستاذة موساوي زبيدة'] },
+    { subject: 'اللغة الفرنسية',    teachers: ['الأستاذة كروش شمس الهدى'] },
+    { subject: 'اللغة الإنجليزية', teachers: ['الأستاذ كرام الصادق'] },
   ],
 };
 
@@ -100,11 +142,11 @@ const curriculum = {
 const needsParent = [
   'تحضيري',
   'أولى ابتدائي','ثانية ابتدائي','ثالثة ابتدائي','رابعة ابتدائي','خامسة ابتدائي',
-  'أولى متوسط','ثانية متوسط','ثالثة متوسط','رابعة متوسط'
+  'أولى متوسط','ثانية متوسط','ثالثة متوسط','رابعة متوسط',
 ];
 
 // المستويات التي تحتاج تخصص
-const needsSpecialty = ['أولى ثانوي', 'ثانية ثانوي'];
+const needsSpecialty = ['أولى ثانوي', 'ثانية ثانوي', 'ثالثة ثانوي (بكالوريا)'];
 
 // ─── HELPERS ──────────────────────────────────────────────
 function animateShow(el) {
@@ -114,9 +156,9 @@ function animateShow(el) {
   el.classList.add('field-appear');
 }
 
-function hideField(el, ...selects) {
+function hideField(el, ...ids) {
   el.style.display = 'none';
-  selects.forEach(id => {
+  ids.forEach(id => {
     const s = document.getElementById(id);
     if (s) { s.removeAttribute('required'); s.value = ''; }
   });
@@ -143,7 +185,6 @@ function populateSubjects(key) {
   const subjects = curriculum[key] ?? [];
 
   if (subjects.length === 0) {
-    // تحديد العنصر المناسب لإضافة الرسالة بعده
     const specGrp = document.getElementById('specialtyGroup');
     const eduGrp  = document.getElementById('eduLevelGroup');
     const afterEl = specGrp.style.display !== 'none' ? specGrp : eduGrp;
@@ -158,26 +199,26 @@ function populateSubjects(key) {
     subSelect.appendChild(opt);
   });
   animateShow(subGrp);
-  subSelect.setAttribute('required','required');
+  subSelect.setAttribute('required', 'required');
 }
 
 // ─── EDU LEVEL HANDLER ────────────────────────────────────
 function onEduLevelChange() {
-  const level         = document.getElementById('eduLevel').value;
-  const parentGrp     = document.getElementById('parentGroup');
-  const specialtyGrp  = document.getElementById('specialtyGroup');
-  const specialtySel  = document.getElementById('specialty');
-  const subGrp        = document.getElementById('subjectGroup');
-  const teachGrp      = document.getElementById('teacherGroup');
-  const parentName    = document.getElementById('parentName');
-  const parentPhone   = document.getElementById('parentPhone');
+  const level        = document.getElementById('eduLevel').value;
+  const parentGrp    = document.getElementById('parentGroup');
+  const specialtyGrp = document.getElementById('specialtyGroup');
+  const specialtySel = document.getElementById('specialty');
+  const subGrp       = document.getElementById('subjectGroup');
+  const teachGrp     = document.getElementById('teacherGroup');
+  const parentName   = document.getElementById('parentName');
+  const parentPhone  = document.getElementById('parentPhone');
 
   // إعادة ضبط كامل
   document.getElementById('comingSoonNote')?.remove();
-  hideField(parentGrp,   'parentName', 'parentPhone');
-  hideField(specialtyGrp,'specialty');
-  hideField(subGrp,      'subject');
-  hideField(teachGrp,    'teacher');
+  hideField(parentGrp,    'parentName', 'parentPhone');
+  hideField(specialtyGrp, 'specialty');
+  hideField(subGrp,       'subject');
+  hideField(teachGrp,     'teacher');
   parentName.removeAttribute('required');
   parentPhone.removeAttribute('required');
 
@@ -186,8 +227,8 @@ function onEduLevelChange() {
   // ولي الأمر
   if (needsParent.includes(level)) {
     animateShow(parentGrp);
-    parentName.setAttribute('required','required');
-    parentPhone.setAttribute('required','required');
+    parentName.setAttribute('required', 'required');
+    parentPhone.setAttribute('required', 'required');
   }
 
   // تخصص
@@ -200,8 +241,8 @@ function onEduLevelChange() {
       specialtySel.appendChild(opt);
     });
     animateShow(specialtyGrp);
-    specialtySel.setAttribute('required','required');
-    return; // ننتظر اختيار التخصص قبل المواد
+    specialtySel.setAttribute('required', 'required');
+    return; // ننتظر اختيار التخصص
   }
 
   // مستويات بدون تخصص → مباشرة المواد
@@ -210,9 +251,9 @@ function onEduLevelChange() {
 
 // ─── SPECIALTY HANDLER ────────────────────────────────────
 function onSpecialtyChange() {
-  const level    = document.getElementById('eduLevel').value;
-  const spec     = document.getElementById('specialty').value;
-  const subGrp   = document.getElementById('subjectGroup');
+  const level  = document.getElementById('eduLevel').value;
+  const spec   = document.getElementById('specialty').value;
+  const subGrp = document.getElementById('subjectGroup');
   const teachGrp = document.getElementById('teacherGroup');
 
   document.getElementById('comingSoonNote')?.remove();
@@ -221,8 +262,7 @@ function onSpecialtyChange() {
 
   if (!spec) return;
 
-  const key = `${level}|${spec}`;
-  populateSubjects(key);
+  populateSubjects(`${level}|${spec}`);
 }
 
 // ─── SUBJECT HANDLER ──────────────────────────────────────
@@ -250,7 +290,7 @@ function onSubjectChange() {
   if (found.teachers.length === 1) teachSelect.value = found.teachers[0];
 
   animateShow(teachGrp);
-  teachSelect.setAttribute('required','required');
+  teachSelect.setAttribute('required', 'required');
 }
 
 // ─── TRANSLATIONS ─────────────────────────────────────────
@@ -264,9 +304,9 @@ const translations = {
     firstName: "الاسم",    lastName: "اللقب",
     birthDate: "تاريخ الميلاد", birthPlace: "مكان الميلاد",
     eduLevel: "المستوى الدراسي", selectEduLevel: "-- اختر المستوى --",
-    specialty: "التخصص",   selectSpecialty: "-- اختر التخصص --",
-    subject: "المادة",     selectSubject: "-- اختر المادة --",
-    teacher: "الأستاذ/ة",  selectTeacher: "-- اختر الأستاذ/ة --",
+    specialty: "التخصص",        selectSpecialty: "-- اختر التخصص --",
+    subject: "المادة",          selectSubject: "-- اختر المادة --",
+    teacher: "الأستاذ/ة",       selectTeacher: "-- اختر الأستاذ/ة --",
     parentInfo: "معلومات ولي الأمر",
     parentName: "اسم ولي الأمر", parentPhone: "هاتف ولي الأمر",
     langLevel: "مستوى اللغة (CEFR)", selectLevel: "-- اختر المستوى --",
@@ -295,12 +335,12 @@ const translations = {
     btn3: "VIP Lessons",          btn4: "IELTS Test",
     firstName: "First Name",  lastName: "Last Name",
     birthDate: "Date of Birth", birthPlace: "Place of Birth",
-    eduLevel: "Academic Level", selectEduLevel: "-- Select Level --",
-    specialty: "Specialty",     selectSpecialty: "-- Select Specialty --",
-    subject: "Subject",         selectSubject: "-- Select Subject --",
-    teacher: "Teacher",         selectTeacher: "-- Select Teacher --",
+    eduLevel: "Academic Level",  selectEduLevel: "-- Select Level --",
+    specialty: "Specialty",      selectSpecialty: "-- Select Specialty --",
+    subject: "Subject",          selectSubject: "-- Select Subject --",
+    teacher: "Teacher",          selectTeacher: "-- Select Teacher --",
     parentInfo: "Parent / Guardian Info",
-    parentName: "Parent Name",  parentPhone: "Parent Phone",
+    parentName: "Parent Name",   parentPhone: "Parent Phone",
     langLevel: "Language Level (CEFR)", selectLevel: "-- Select Level --",
     phone: "Phone Number",
     motivation: "What motivated you to choose E-PLUS Academy?",
@@ -314,7 +354,7 @@ const translations = {
     vipTitle: "VIP Lessons Registration",
     ieltsTitle: "IELTS Test Registration",
     levels: {
-      A1:"A1 - Beginner",    A2:"A2 - Elementary",
+      A1:"A1 - Beginner",     A2:"A2 - Elementary",
       B1:"B1 - Intermediate", B2:"B2 - Upper Intermediate",
       C1:"C1 - Advanced",     C2:"C2 - Proficiency"
     }
@@ -343,8 +383,8 @@ function applyTranslations() {
     }
   });
   document.querySelectorAll('[data-i18n-level]').forEach(el => {
-    const level = el.getAttribute('data-i18n-level');
-    if (t.levels?.[level]) el.textContent = t.levels[level];
+    const lv = el.getAttribute('data-i18n-level');
+    if (t.levels?.[lv]) el.textContent = t.levels[lv];
   });
 }
 
@@ -372,7 +412,6 @@ function openModal(type) {
   document.getElementById('modal-title').textContent =
     { support:t.supportTitle, lang:t.langTitle, vip:t.vipTitle, ielts:t.ieltsTitle }[type] || '';
 
-  // إخفاء كل الحقول
   [eduLevelGrp, parentGrp, specialtyGrp, subGrp, teachGrp, langLevelGrp]
     .forEach(el => el.style.display = 'none');
   langLevelSel.removeAttribute('required');
@@ -410,7 +449,6 @@ async function submitForm(e) {
   e.preventDefault();
   const inputs = document.getElementById('reg-form').querySelectorAll('[required]');
   let valid = true;
-
   inputs.forEach(input => {
     input.classList.remove('error');
     if (!input.value.trim()) {
@@ -425,7 +463,6 @@ async function submitForm(e) {
   btn.classList.add('loading');
 
   const typeLabels = { support:'دعم', lang:'لغات', vip:'VIP', ielts:'IELTS' };
-
   const data = {
     timestamp:   new Date().toLocaleString('ar-DZ'),
     type:        typeLabels[currentModalType] || currentModalType,
