@@ -36,7 +36,26 @@ window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 animateSquares();
 
+// ─── SPECIALTIES DATA ─────────────────────────────────────
+// التخصصات لأولى وثانية ثانوي
+const specialties = {
+  'أولى ثانوي': [
+    'علوم تجريبية',
+    'آداب ولغات',
+  ],
+  'ثانية ثانوي': [
+    'علوم تجريبية',
+    'تقني رياضي',
+    'رياضيات',
+    'تسيير واقتصاد',
+    'آداب وفلسفة',
+    'لغات أجنبية',
+  ],
+};
+
 // ─── CURRICULUM DATA ──────────────────────────────────────
+// المفتاح: "المستوى|التخصص" للمستويات التي لها تخصص
+// المفتاح: "المستوى" للمستويات بدون تخصص
 const curriculum = {
   'تحضيري':                       [],
   'أولى ابتدائي':                  [],
@@ -52,8 +71,17 @@ const curriculum = {
     { subject: 'اللغة الإنجليزية', teachers: ['الأستاذة نصبة فاطمة'] },
     { subject: 'اللغة الفرنسية',   teachers: ['الأستاذة مرغني ريهام'] },
   ],
-  'أولى ثانوي':                    [],
-  'ثانية ثانوي':                   [],
+  // أولى ثانوي — بحسب التخصص (تُضاف لاحقاً)
+  'أولى ثانوي|علوم تجريبية': [],
+  'أولى ثانوي|آداب ولغات':   [],
+  // ثانية ثانوي — بحسب التخصص (تُضاف لاحقاً)
+  'ثانية ثانوي|علوم تجريبية': [],
+  'ثانية ثانوي|تقني رياضي':   [],
+  'ثانية ثانوي|رياضيات':      [],
+  'ثانية ثانوي|تسيير واقتصاد':[],
+  'ثانية ثانوي|آداب وفلسفة':  [],
+  'ثانية ثانوي|لغات أجنبية':  [],
+  // بكالوريا
   'ثالثة ثانوي (بكالوريا)': [
     { subject: 'العلوم الفيزيائية والتكنولوجيا', teachers: ['الأستاذ نمسي عبدالرحمان','الأستاذ لكموتة لمين'] },
     { subject: 'الرياضيات (العلميين)',           teachers: ['الأستاذة ترعة فاطمة','الأستاذ عبدالباسط نعورة'] },
@@ -68,57 +96,58 @@ const curriculum = {
   ],
 };
 
-// المستويات التي تحتاج ولي أمر (رابعة متوسط وما دون)
+// المستويات التي تحتاج ولي أمر
 const needsParent = [
   'تحضيري',
   'أولى ابتدائي','ثانية ابتدائي','ثالثة ابتدائي','رابعة ابتدائي','خامسة ابتدائي',
   'أولى متوسط','ثانية متوسط','ثالثة متوسط','رابعة متوسط'
 ];
 
-// ─── EDU LEVEL HANDLER ────────────────────────────────────
-function onEduLevelChange() {
-  const level       = document.getElementById('eduLevel').value;
-  const subGrp      = document.getElementById('subjectGroup');
-  const teachGrp    = document.getElementById('teacherGroup');
-  const parentGrp   = document.getElementById('parentGroup');
-  const subSelect   = document.getElementById('subject');
-  const teachSelect = document.getElementById('teacher');
-  const parentName  = document.getElementById('parentName');
-  const parentPhone = document.getElementById('parentPhone');
+// المستويات التي تحتاج تخصص
+const needsSpecialty = ['أولى ثانوي', 'ثانية ثانوي'];
+
+// ─── HELPERS ──────────────────────────────────────────────
+function animateShow(el) {
+  el.style.display = 'block';
+  el.classList.remove('field-appear');
+  void el.offsetWidth;
+  el.classList.add('field-appear');
+}
+
+function hideField(el, ...selects) {
+  el.style.display = 'none';
+  selects.forEach(id => {
+    const s = document.getElementById(id);
+    if (s) { s.removeAttribute('required'); s.value = ''; }
+  });
+}
+
+function showComingSoon(afterEl) {
+  document.getElementById('comingSoonNote')?.remove();
+  const note = document.createElement('div');
+  note.id = 'comingSoonNote';
+  note.className = 'coming-soon-note field-appear';
+  note.innerHTML = `<span>🚧</span><span>المواد والأساتذة لهذا المستوى والتخصص ستُضاف قريباً</span>`;
+  afterEl.insertAdjacentElement('afterend', note);
+}
+
+function populateSubjects(key) {
+  const subGrp    = document.getElementById('subjectGroup');
+  const subSelect = document.getElementById('subject');
+  const teachGrp  = document.getElementById('teacherGroup');
 
   document.getElementById('comingSoonNote')?.remove();
+  hideField(subGrp,   'subject');
+  hideField(teachGrp, 'teacher');
 
-  // إعادة ضبط
-  subGrp.style.display    = 'none';
-  teachGrp.style.display  = 'none';
-  parentGrp.style.display = 'none';
-  subSelect.removeAttribute('required');
-  teachSelect.removeAttribute('required');
-  parentName.removeAttribute('required');
-  parentPhone.removeAttribute('required');
-  subSelect.value   = '';
-  teachSelect.value = '';
-
-  if (!level) return;
-
-  // ولي الأمر
-  if (needsParent.includes(level)) {
-    parentGrp.style.display = 'block';
-    parentGrp.classList.remove('field-appear');
-    void parentGrp.offsetWidth;
-    parentGrp.classList.add('field-appear');
-    parentName.setAttribute('required','required');
-    parentPhone.setAttribute('required','required');
-  }
-
-  const subjects = curriculum[level] || [];
+  const subjects = curriculum[key] ?? [];
 
   if (subjects.length === 0) {
-    const note = document.createElement('div');
-    note.id = 'comingSoonNote';
-    note.className = 'coming-soon-note field-appear';
-    note.innerHTML = `<span>🚧</span><span>المواد والأساتذة لهذا المستوى ستُضاف قريباً</span>`;
-    document.getElementById('eduLevelGroup').insertAdjacentElement('afterend', note);
+    // تحديد العنصر المناسب لإضافة الرسالة بعده
+    const specGrp = document.getElementById('specialtyGroup');
+    const eduGrp  = document.getElementById('eduLevelGroup');
+    const afterEl = specGrp.style.display !== 'none' ? specGrp : eduGrp;
+    showComingSoon(afterEl);
     return;
   }
 
@@ -128,27 +157,88 @@ function onEduLevelChange() {
     opt.value = item.subject; opt.textContent = item.subject;
     subSelect.appendChild(opt);
   });
-
-  subGrp.style.display = 'block';
-  subGrp.classList.remove('field-appear');
-  void subGrp.offsetWidth;
-  subGrp.classList.add('field-appear');
+  animateShow(subGrp);
   subSelect.setAttribute('required','required');
 }
 
+// ─── EDU LEVEL HANDLER ────────────────────────────────────
+function onEduLevelChange() {
+  const level         = document.getElementById('eduLevel').value;
+  const parentGrp     = document.getElementById('parentGroup');
+  const specialtyGrp  = document.getElementById('specialtyGroup');
+  const specialtySel  = document.getElementById('specialty');
+  const subGrp        = document.getElementById('subjectGroup');
+  const teachGrp      = document.getElementById('teacherGroup');
+  const parentName    = document.getElementById('parentName');
+  const parentPhone   = document.getElementById('parentPhone');
+
+  // إعادة ضبط كامل
+  document.getElementById('comingSoonNote')?.remove();
+  hideField(parentGrp,   'parentName', 'parentPhone');
+  hideField(specialtyGrp,'specialty');
+  hideField(subGrp,      'subject');
+  hideField(teachGrp,    'teacher');
+  parentName.removeAttribute('required');
+  parentPhone.removeAttribute('required');
+
+  if (!level) return;
+
+  // ولي الأمر
+  if (needsParent.includes(level)) {
+    animateShow(parentGrp);
+    parentName.setAttribute('required','required');
+    parentPhone.setAttribute('required','required');
+  }
+
+  // تخصص
+  if (needsSpecialty.includes(level)) {
+    const specs = specialties[level] || [];
+    specialtySel.innerHTML = `<option value="">-- اختر التخصص --</option>`;
+    specs.forEach(sp => {
+      const opt = document.createElement('option');
+      opt.value = sp; opt.textContent = sp;
+      specialtySel.appendChild(opt);
+    });
+    animateShow(specialtyGrp);
+    specialtySel.setAttribute('required','required');
+    return; // ننتظر اختيار التخصص قبل المواد
+  }
+
+  // مستويات بدون تخصص → مباشرة المواد
+  populateSubjects(level);
+}
+
+// ─── SPECIALTY HANDLER ────────────────────────────────────
+function onSpecialtyChange() {
+  const level    = document.getElementById('eduLevel').value;
+  const spec     = document.getElementById('specialty').value;
+  const subGrp   = document.getElementById('subjectGroup');
+  const teachGrp = document.getElementById('teacherGroup');
+
+  document.getElementById('comingSoonNote')?.remove();
+  hideField(subGrp,   'subject');
+  hideField(teachGrp, 'teacher');
+
+  if (!spec) return;
+
+  const key = `${level}|${spec}`;
+  populateSubjects(key);
+}
+
+// ─── SUBJECT HANDLER ──────────────────────────────────────
 function onSubjectChange() {
   const level       = document.getElementById('eduLevel').value;
+  const spec        = document.getElementById('specialty').value;
   const subjectVal  = document.getElementById('subject').value;
   const teachGrp    = document.getElementById('teacherGroup');
   const teachSelect = document.getElementById('teacher');
 
-  teachGrp.style.display = 'none';
-  teachSelect.removeAttribute('required');
-  teachSelect.value = '';
-
+  hideField(teachGrp, 'teacher');
   if (!subjectVal) return;
 
-  const found = (curriculum[level] || []).find(s => s.subject === subjectVal);
+  const key      = spec ? `${level}|${spec}` : level;
+  const subjects = curriculum[key] || [];
+  const found    = subjects.find(s => s.subject === subjectVal);
   if (!found || found.teachers.length === 0) return;
 
   teachSelect.innerHTML = `<option value="">-- اختر الأستاذ/ة --</option>`;
@@ -157,13 +247,9 @@ function onSubjectChange() {
     opt.value = t; opt.textContent = t;
     teachSelect.appendChild(opt);
   });
-
   if (found.teachers.length === 1) teachSelect.value = found.teachers[0];
 
-  teachGrp.style.display = 'block';
-  teachGrp.classList.remove('field-appear');
-  void teachGrp.offsetWidth;
-  teachGrp.classList.add('field-appear');
+  animateShow(teachGrp);
   teachSelect.setAttribute('required','required');
 }
 
@@ -173,15 +259,14 @@ const translations = {
     badge: "✦ رحلتك نحو النجاح تبدأ من هنا ✦",
     title: "EDUCATION PLUS CENTER",
     subtitle: "التسجيل في الدورات والبرامج التعليمية",
-    btn1: "تسجيلات الدعم",
-    btn2: "دورات اللغات",
-    btn3: "دروس VIP",
-    btn4: "اختبار IELTS",
-    firstName: "الاسم", lastName: "اللقب",
+    btn1: "تسجيلات الدعم", btn2: "دورات اللغات",
+    btn3: "دروس VIP",      btn4: "اختبار IELTS",
+    firstName: "الاسم",    lastName: "اللقب",
     birthDate: "تاريخ الميلاد", birthPlace: "مكان الميلاد",
     eduLevel: "المستوى الدراسي", selectEduLevel: "-- اختر المستوى --",
-    subject: "المادة", selectSubject: "-- اختر المادة --",
-    teacher: "الأستاذ/ة", selectTeacher: "-- اختر الأستاذ/ة --",
+    specialty: "التخصص",   selectSpecialty: "-- اختر التخصص --",
+    subject: "المادة",     selectSubject: "-- اختر المادة --",
+    teacher: "الأستاذ/ة",  selectTeacher: "-- اختر الأستاذ/ة --",
     parentInfo: "معلومات ولي الأمر",
     parentName: "اسم ولي الأمر", parentPhone: "هاتف ولي الأمر",
     langLevel: "مستوى اللغة (CEFR)", selectLevel: "-- اختر المستوى --",
@@ -199,7 +284,7 @@ const translations = {
     levels: {
       A1:"A1 - مبتدئ", A2:"A2 - مبتدئ متقدم",
       B1:"B1 - متوسط", B2:"B2 - متوسط متقدم",
-      C1:"C1 - متقدم", C2:"C2 - احترافي"
+      C1:"C1 - متقدم",  C2:"C2 - احترافي"
     }
   },
   en: {
@@ -207,14 +292,15 @@ const translations = {
     title: "EDUCATION PLUS CENTER",
     subtitle: "Register for Courses & Educational Programs",
     btn1: "Support Registration", btn2: "Language Courses",
-    btn3: "VIP Lessons", btn4: "IELTS Test",
-    firstName: "First Name", lastName: "Last Name",
+    btn3: "VIP Lessons",          btn4: "IELTS Test",
+    firstName: "First Name",  lastName: "Last Name",
     birthDate: "Date of Birth", birthPlace: "Place of Birth",
     eduLevel: "Academic Level", selectEduLevel: "-- Select Level --",
-    subject: "Subject", selectSubject: "-- Select Subject --",
-    teacher: "Teacher", selectTeacher: "-- Select Teacher --",
+    specialty: "Specialty",     selectSpecialty: "-- Select Specialty --",
+    subject: "Subject",         selectSubject: "-- Select Subject --",
+    teacher: "Teacher",         selectTeacher: "-- Select Teacher --",
     parentInfo: "Parent / Guardian Info",
-    parentName: "Parent Name", parentPhone: "Parent Phone",
+    parentName: "Parent Name",  parentPhone: "Parent Phone",
     langLevel: "Language Level (CEFR)", selectLevel: "-- Select Level --",
     phone: "Phone Number",
     motivation: "What motivated you to choose E-PLUS Academy?",
@@ -228,9 +314,9 @@ const translations = {
     vipTitle: "VIP Lessons Registration",
     ieltsTitle: "IELTS Test Registration",
     levels: {
-      A1:"A1 - Beginner", A2:"A2 - Elementary",
+      A1:"A1 - Beginner",    A2:"A2 - Elementary",
       B1:"B1 - Intermediate", B2:"B2 - Upper Intermediate",
-      C1:"C1 - Advanced", C2:"C2 - Proficiency"
+      C1:"C1 - Advanced",     C2:"C2 - Proficiency"
     }
   }
 };
@@ -270,37 +356,30 @@ let currentModalType = 'support';
 
 function openModal(type) {
   currentModalType = type;
-  const t           = translations[currentLang];
-  const overlay     = document.getElementById('modal');
-  const langToggle  = document.getElementById('lang-toggle');
-  const eduLevelGrp = document.getElementById('eduLevelGroup');
-  const parentGrp   = document.getElementById('parentGroup');
-  const subGrp      = document.getElementById('subjectGroup');
-  const teachGrp    = document.getElementById('teacherGroup');
-  const langLevelGrp= document.getElementById('langLevelGroup');
-  const langLevelSel= document.getElementById('langLevel');
-  const parentName  = document.getElementById('parentName');
-  const parentPhone = document.getElementById('parentPhone');
+  const t            = translations[currentLang];
+  const overlay      = document.getElementById('modal');
+  const langToggle   = document.getElementById('lang-toggle');
+  const eduLevelGrp  = document.getElementById('eduLevelGroup');
+  const parentGrp    = document.getElementById('parentGroup');
+  const specialtyGrp = document.getElementById('specialtyGroup');
+  const subGrp       = document.getElementById('subjectGroup');
+  const teachGrp     = document.getElementById('teacherGroup');
+  const langLevelGrp = document.getElementById('langLevelGroup');
+  const langLevelSel = document.getElementById('langLevel');
+  const parentName   = document.getElementById('parentName');
+  const parentPhone  = document.getElementById('parentPhone');
 
-  // العنوان
-  const titles = {
-    support: t.supportTitle, lang: t.langTitle,
-    vip: t.vipTitle, ielts: t.ieltsTitle
-  };
-  document.getElementById('modal-title').textContent = titles[type] || '';
+  document.getElementById('modal-title').textContent =
+    { support:t.supportTitle, lang:t.langTitle, vip:t.vipTitle, ielts:t.ieltsTitle }[type] || '';
 
-  // إخفاء كل الحقول الإضافية أولاً
-  eduLevelGrp.style.display  = 'none';
-  parentGrp.style.display    = 'none';
-  subGrp.style.display       = 'none';
-  teachGrp.style.display     = 'none';
-  langLevelGrp.style.display = 'none';
+  // إخفاء كل الحقول
+  [eduLevelGrp, parentGrp, specialtyGrp, subGrp, teachGrp, langLevelGrp]
+    .forEach(el => el.style.display = 'none');
   langLevelSel.removeAttribute('required');
   parentName.removeAttribute('required');
   parentPhone.removeAttribute('required');
   document.getElementById('comingSoonNote')?.remove();
 
-  // إظهار الحقول حسب النوع
   if (type === 'support') {
     eduLevelGrp.style.display = 'block';
   } else if (type === 'lang' || type === 'ielts') {
@@ -317,11 +396,10 @@ function openModal(type) {
 }
 
 function closeModal() {
-  const overlay    = document.getElementById('modal');
-  const langToggle = document.getElementById('lang-toggle');
-  overlay.classList.remove('active');
+  document.getElementById('modal').classList.remove('active');
   document.body.style.overflow = '';
-  if (langToggle) langToggle.classList.remove('hidden');
+  const lt = document.getElementById('lang-toggle');
+  if (lt) lt.classList.remove('hidden');
 }
 function closeModalOutside(e) {
   if (e.target === document.getElementById('modal')) closeModal();
@@ -357,6 +435,7 @@ async function submitForm(e) {
     birthPlace:  document.getElementById('birthPlace').value.trim(),
     phone:       document.getElementById('phone').value.trim(),
     eduLevel:    document.getElementById('eduLevel').value    || '-',
+    specialty:   document.getElementById('specialty').value   || '-',
     subject:     document.getElementById('subject').value     || '-',
     teacher:     document.getElementById('teacher').value     || '-',
     parentName:  document.getElementById('parentName').value.trim()  || '-',
@@ -371,9 +450,7 @@ async function submitForm(e) {
       headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify(data)
     });
-  } catch(err) {
-    console.warn('Sheet error:', err);
-  }
+  } catch(err) { console.warn('Sheet error:', err); }
 
   btn.classList.remove('loading');
   document.getElementById('form-view').style.display = 'none';
