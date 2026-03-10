@@ -187,17 +187,14 @@ function onEduLevelChange() {
     parentName.setAttribute('required','required');
     parentPhone.setAttribute('required','required');
   }
-
   if (needsCandidateType.includes(level)) {
     animateShow(candidateTypeGrp);
     return;
   }
-
   if (needsSpecialty.includes(level)) {
     showSpecialtyField(level);
     return;
   }
-
   populateSubjects(level);
 }
 
@@ -293,16 +290,19 @@ let pendingModalType = null;
 
 function openTerms(type) {
   pendingModalType = type;
-  const overlay = document.getElementById('terms-modal');
   const langToggle = document.getElementById('lang-toggle');
 
-  // reset checkbox
   document.getElementById('terms-checkbox').checked = false;
-  document.getElementById('terms-check-box').innerHTML = '';
-  document.getElementById('terms-proceed-btn').disabled = true;
-  document.getElementById('terms-proceed-btn').classList.remove('enabled');
+  const tcb = document.getElementById('terms-check-box');
+  if (tcb) tcb.innerHTML = '';
+  const tpb = document.getElementById('terms-proceed-btn');
+  if (tpb) { tpb.disabled = true; tpb.classList.remove('enabled'); }
 
-  overlay.classList.add('active');
+  // scroll القوانين للأعلى
+  const tbody = document.querySelector('.terms-body');
+  if (tbody) tbody.scrollTop = 0;
+
+  document.getElementById('terms-modal').classList.add('active');
   document.body.style.overflow = 'hidden';
   if (langToggle) langToggle.classList.add('hidden');
 }
@@ -333,7 +333,11 @@ function onTermsCheck() {
 
 function proceedToRegister() {
   document.getElementById('terms-modal').classList.remove('active');
-  if (pendingModalType) openModal(pendingModalType);
+  if (pendingModalType) {
+    const type = pendingModalType;
+    pendingModalType = null;
+    openModal(type);
+  }
 }
 
 // ─── TRANSLATIONS ─────────────────────────────────────────
@@ -360,4 +364,225 @@ const translations = {
     optional:"(اختياري)",
     submitBtn:"إرسال التسجيل ✦",
     successTitle:"🎉 تم التسجيل بنجاح!",
-    successMsg:"تم تسجيل
+    successMsg:"تم تسجيل معلوماتك بنجاح،<br>سيتم التواصل معك قريباً.",
+    closeBtn:"العودة إلى الصفحة الرئيسية",
+    supportTitle:"تسجيلات الدعم", langTitle:"تسجيل دورة لغة",
+    vipTitle:"تسجيل دروس VIP", ieltsTitle:"التسجيل في اختبار IELTS",
+    onlineTitle:"التسجيل في دورات أونلاين",
+    termsTitle:"قوانين وشروط الأكاديمية",
+    termsAgree:"لقد قرأت جميع القوانين والشروط وأوافق عليها",
+    termsProceed:"المتابعة للتسجيل ✦",
+    levels:{ A1:"A1 - مبتدئ",A2:"A2 - مبتدئ متقدم",B1:"B1 - متوسط",B2:"B2 - متوسط متقدم",C1:"C1 - متقدم",C2:"C2 - احترافي" }
+  },
+  en: {
+    badge:"✦ Your journey to success starts here ✦",
+    title:"EDUCATION PLUS CENTER",
+    subtitle:"Register for Courses & Educational Programs",
+    btn1:"Support Registration", btn2:"Language Courses",
+    btn3:"VIP Lessons", btn4:"IELTS Test", btn5:"Online Courses",
+    firstName:"First Name", lastName:"Last Name",
+    birthDate:"Date of Birth", birthPlace:"Place of Birth",
+    eduLevel:"Academic Level",
+    specialty:"Specialty", subject:"Subject", teacher:"Teacher",
+    candidateType:"Candidate Type",
+    enrolled:"Enrolled", freeCandidate:"Independent",
+    parentInfo:"Parent / Guardian Info",
+    parentName:"Parent Name", parentPhone:"Parent Phone",
+    langLevel:"Language Level (CEFR)",
+    levelTest:"Would you like a placement test?",
+    yes:"Yes", no:"No",
+    phone:"Phone Number",
+    motivation:"What motivated you to choose E-PLUS Academy?",
+    optional:"(optional)",
+    submitBtn:"Submit Registration ✦",
+    successTitle:"🎉 Registered Successfully!",
+    successMsg:"Your information has been recorded.<br>We will contact you soon.",
+    closeBtn:"Back to Main Page",
+    supportTitle:"Support Registration", langTitle:"Language Course Registration",
+    vipTitle:"VIP Lessons Registration", ieltsTitle:"IELTS Test Registration",
+    onlineTitle:"Online Courses Registration",
+    termsTitle:"Academy Terms & Conditions",
+    termsAgree:"I have read all the terms and conditions and I agree",
+    termsProceed:"Proceed to Register ✦",
+    levels:{ A1:"A1 - Beginner",A2:"A2 - Elementary",B1:"B1 - Intermediate",B2:"B2 - Upper Intermediate",C1:"C1 - Advanced",C2:"C2 - Proficiency" }
+  }
+};
+
+let currentLang = localStorage.getItem('eplus-lang') || 'ar';
+
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('eplus-lang', lang);
+  const html = document.documentElement;
+  html.setAttribute('lang', lang);
+  html.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+  document.getElementById('btn-ar').classList.toggle('active', lang === 'ar');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  applyTranslations();
+}
+function applyTranslations() {
+  const t = translations[currentLang];
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key] !== undefined) {
+      if (key === 'successMsg') el.innerHTML = t[key];
+      else el.textContent = t[key];
+    }
+  });
+  document.querySelectorAll('[data-i18n-level]').forEach(el => {
+    const lv = el.getAttribute('data-i18n-level');
+    if (t.levels?.[lv]) el.textContent = t.levels[lv];
+  });
+}
+
+// ─── GOOGLE SHEETS ────────────────────────────────────────
+const SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL';
+
+// ─── MODAL ────────────────────────────────────────────────
+let currentModalType = 'support';
+
+function openModal(type) {
+  currentModalType = type;
+  const t              = translations[currentLang];
+  const overlay        = document.getElementById('modal');
+  const langToggle     = document.getElementById('lang-toggle');
+  const eduLevelGrp    = document.getElementById('eduLevelGroup');
+  const parentGrp      = document.getElementById('parentGroup');
+  const specialtyGrp   = document.getElementById('specialtyGroup');
+  const subGrp         = document.getElementById('subjectGroup');
+  const teachGrp       = document.getElementById('teacherGroup');
+  const langLevelGrp   = document.getElementById('langLevelGroup');
+  const langLevelSel   = document.getElementById('langLevel');
+  const candidateGrp   = document.getElementById('candidateTypeGroup');
+  const levelTestGrp   = document.getElementById('levelTestGroup');
+  const parentName     = document.getElementById('parentName');
+  const parentPhone    = document.getElementById('parentPhone');
+
+  document.getElementById('modal-title').textContent =
+    { support:t.supportTitle, lang:t.langTitle, vip:t.vipTitle, ielts:t.ieltsTitle, online:t.onlineTitle }[type] || '';
+
+  [eduLevelGrp,parentGrp,specialtyGrp,subGrp,teachGrp,langLevelGrp,candidateGrp,levelTestGrp]
+    .forEach(el => el.style.display = 'none');
+
+  langLevelSel.removeAttribute('required');
+  parentName.removeAttribute('required');
+  parentPhone.removeAttribute('required');
+  document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
+  document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+  document.getElementById('comingSoonNote')?.remove();
+
+  if (type === 'support') {
+    eduLevelGrp.style.display = 'block';
+  } else if (type === 'lang') {
+    langLevelGrp.style.display = 'block';
+    langLevelSel.setAttribute('required','required');
+  }
+
+  document.getElementById('form-view').style.display = 'block';
+  document.getElementById('success-view').classList.remove('show');
+  document.getElementById('reg-form').reset();
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  if (langToggle) langToggle.classList.add('hidden');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+  document.body.style.overflow = '';
+  const lt = document.getElementById('lang-toggle');
+  if (lt) lt.classList.remove('hidden');
+}
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('modal')) closeModal();
+}
+
+// ─── FORM SUBMIT ──────────────────────────────────────────
+async function submitForm(e) {
+  e.preventDefault();
+  const inputs = document.getElementById('reg-form').querySelectorAll('[required]');
+  let valid = true;
+  inputs.forEach(input => {
+    input.classList.remove('error');
+    if (!input.value.trim()) {
+      valid = false;
+      input.classList.add('error');
+      setTimeout(() => input.classList.remove('error'), 2000);
+    }
+  });
+  if (!valid) return;
+
+  const candidateGrp = document.getElementById('candidateTypeGroup');
+  if (candidateGrp.style.display !== 'none') {
+    const selected = document.querySelector('input[name="candidateType"]:checked');
+    if (!selected) {
+      candidateGrp.style.animation = 'none';
+      void candidateGrp.offsetWidth;
+      candidateGrp.style.animation = 'shake 0.35s ease';
+      return;
+    }
+  }
+
+  const btn = document.querySelector('#form-view .submit-btn');
+  btn.classList.add('loading');
+
+  const typeLabels = { support:'دعم', lang:'لغات', vip:'VIP', ielts:'IELTS', online:'أونلاين' };
+
+  const data = {
+    timestamp:     new Date().toLocaleString('ar-DZ'),
+    type:          typeLabels[currentModalType] || currentModalType,
+    firstName:     document.getElementById('firstName').value.trim(),
+    lastName:      document.getElementById('lastName').value.trim(),
+    birthDate:     document.getElementById('birthDate').value,
+    birthPlace:    document.getElementById('birthPlace').value.trim(),
+    phone:         document.getElementById('phone').value.trim(),
+    eduLevel:      document.getElementById('eduLevel').value      || '-',
+    candidateType: document.querySelector('input[name="candidateType"]:checked')?.value || '-',
+    specialty:     document.getElementById('specialty').value     || '-',
+    subject:       document.getElementById('subject').value       || '-',
+    teacher:       document.getElementById('teacher').value       || '-',
+    parentName:    document.getElementById('parentName').value.trim()  || '-',
+    parentPhone:   document.getElementById('parentPhone').value.trim() || '-',
+    langLevel:     document.getElementById('langLevel').value     || '-',
+    levelTest:     document.querySelector('input[name="levelTest"]:checked')?.value || '-',
+    motivation:    document.getElementById('motivation').value.trim()  || '-',
+  };
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method:'POST', mode:'no-cors',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch(err) { console.warn('Sheet error:', err); }
+
+  btn.classList.remove('loading');
+  document.getElementById('form-view').style.display = 'none';
+  document.getElementById('success-view').classList.add('show');
+  launchConfetti();
+}
+
+// ─── CONFETTI ─────────────────────────────────────────────
+function launchConfetti() {
+  const colors = ['#045283','#0570b0','#0a8acb','#f4b41a','#ffffff','#53a9df'];
+  const box = document.getElementById('modal-box');
+  for (let i = 0; i < 40; i++) {
+    setTimeout(() => {
+      const c = document.createElement('div');
+      c.className = 'confetti';
+      const size = 6 + Math.random()*9;
+      c.style.cssText = `
+        left:${5+Math.random()*90}%; top:8%;
+        width:${size}px; height:${size}px;
+        background:${colors[Math.floor(Math.random()*colors.length)]};
+        border-radius:${Math.random()>0.5?'50%':'2px'};
+        animation-duration:${1.2+Math.random()*1.2}s;
+        animation-timing-function:cubic-bezier(0.25,0.46,0.45,0.94);
+      `;
+      box.appendChild(c);
+      setTimeout(() => c.remove(), 2600);
+    }, i*35);
+  }
+}
+
+// ─── INIT ─────────────────────────────────────────────────
+setLang(currentLang);
