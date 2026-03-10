@@ -38,115 +38,76 @@ animateSquares();
 
 // ─── SPECIALTIES DATA ─────────────────────────────────────
 const specialties = {
-  'أولى ثانوي': [
-    'علوم تجريبية',
-    'آداب ولغات',
-  ],
-  'ثانية ثانوي': [
-    'علوم تجريبية',
-    'تقني رياضي',
-    'رياضيات',
-    'تسيير واقتصاد',
-    'آداب وفلسفة',
-    'لغات أجنبية',
-  ],
-  'ثالثة ثانوي (بكالوريا)': [
-    'علوم تجريبية',
-    'تقني رياضي',
-    'رياضيات',
-    'تسيير واقتصاد',
-    'آداب وفلسفة',
-    'لغات أجنبية',
-  ],
+  'أولى ثانوي': ['علوم تجريبية','آداب ولغات'],
+  'ثانية ثانوي': ['علوم تجريبية','تقني رياضي','رياضيات','تسيير واقتصاد','آداب وفلسفة','لغات أجنبية'],
+  'ثالثة ثانوي (بكالوريا)': ['علوم تجريبية','تقني رياضي','رياضيات','تسيير واقتصاد','آداب وفلسفة','لغات أجنبية'],
 };
 
 // ─── CURRICULUM DATA ──────────────────────────────────────
 const curriculum = {
-  'تحضيري':        [],
-  'أولى ابتدائي':  [],
-  'ثانية ابتدائي': [],
-  'ثالثة ابتدائي': [],
-  'رابعة ابتدائي': [],
-  'خامسة ابتدائي': [],
-  'أولى متوسط':    [],
-  'ثانية متوسط':   [],
-  'ثالثة متوسط':   [],
+  'تحضيري':        [], 'أولى ابتدائي':  [], 'ثانية ابتدائي': [],
+  'ثالثة ابتدائي': [], 'رابعة ابتدائي': [], 'خامسة ابتدائي': [],
+  'أولى متوسط':    [], 'ثانية متوسط':   [], 'ثالثة متوسط':   [],
   'رابعة متوسط': [
-    { subject: 'رياضيات',          teachers: ['الأستاذ شامي سهيل'] },
-    { subject: 'اللغة الإنجليزية', teachers: ['الأستاذة نصبة فاطمة'] },
-    { subject: 'اللغة الفرنسية',   teachers: ['الأستاذة مرغني ريهام'] },
+    { subject:'رياضيات',          teachers:['الأستاذ شامي سهيل'] },
+    { subject:'اللغة الإنجليزية', teachers:['الأستاذة نصبة فاطمة'] },
+    { subject:'اللغة الفرنسية',   teachers:['الأستاذة مرغني ريهام'] },
   ],
-
-  // ── أولى ثانوي ──
-  'أولى ثانوي|علوم تجريبية': [],
-  'أولى ثانوي|آداب ولغات':   [],
-
-  // ── ثانية ثانوي ──
-  'ثانية ثانوي|علوم تجريبية': [],
-  'ثانية ثانوي|تقني رياضي':   [],
-  'ثانية ثانوي|رياضيات':      [],
-  'ثانية ثانوي|تسيير واقتصاد':[],
-  'ثانية ثانوي|آداب وفلسفة':  [],
-  'ثانية ثانوي|لغات أجنبية':  [],
-
-  // ── بكالوريا — المواد موزّعة على التخصصات ──
+  'أولى ثانوي|علوم تجريبية': [], 'أولى ثانوي|آداب ولغات': [],
+  'ثانية ثانوي|علوم تجريبية': [], 'ثانية ثانوي|تقني رياضي': [],
+  'ثانية ثانوي|رياضيات': [],      'ثانية ثانوي|تسيير واقتصاد': [],
+  'ثانية ثانوي|آداب وفلسفة': [],  'ثانية ثانوي|لغات أجنبية': [],
   'ثالثة ثانوي (بكالوريا)|علوم تجريبية': [
-    { subject: 'العلوم الفيزيائية والتكنولوجيا', teachers: ['الأستاذ نمسي عبدالرحمان', 'الأستاذ لكموتة لمين'] },
-    { subject: 'الرياضيات (العلميين)',           teachers: ['الأستاذة ترعة فاطمة', 'الأستاذ عبدالباسط نعورة'] },
-    { subject: 'العلوم الطبيعية والحياة',        teachers: ['الأستاذ صحراوي شكري'] },
-    { subject: 'اللغة العربية',                 teachers: ['الأستاذة موساوي زبيدة'] },
-    { subject: 'اللغة الفرنسية',                teachers: ['الأستاذة كروش شمس الهدى'] },
-    { subject: 'اللغة الإنجليزية',              teachers: ['الأستاذ كرام الصادق'] },
-    { subject: 'الفلسفة',                       teachers: ['الأستاذة دادة نجاح سلام'] },
-    { subject: 'تاريخ وجغرافيا',                teachers: ['الأستاذ ايمن دخان'] },
+    { subject:'العلوم الفيزيائية والتكنولوجيا', teachers:['الأستاذ نمسي عبدالرحمان','الأستاذ لكموتة لمين'] },
+    { subject:'الرياضيات (العلميين)',           teachers:['الأستاذة ترعة فاطمة','الأستاذ عبدالباسط نعورة'] },
+    { subject:'العلوم الطبيعية والحياة',        teachers:['الأستاذ صحراوي شكري'] },
+    { subject:'اللغة العربية',                 teachers:['الأستاذة موساوي زبيدة'] },
+    { subject:'اللغة الفرنسية',                teachers:['الأستاذة كروش شمس الهدى'] },
+    { subject:'اللغة الإنجليزية',              teachers:['الأستاذ كرام الصادق'] },
+    { subject:'الفلسفة',                       teachers:['الأستاذة دادة نجاح سلام'] },
+    { subject:'تاريخ وجغرافيا',                teachers:['الأستاذ ايمن دخان'] },
   ],
   'ثالثة ثانوي (بكالوريا)|تقني رياضي': [
-    { subject: 'العلوم الفيزيائية والتكنولوجيا', teachers: ['الأستاذ نمسي عبدالرحمان', 'الأستاذ لكموتة لمين'] },
-    { subject: 'الرياضيات (العلميين)',           teachers: ['الأستاذة ترعة فاطمة', 'الأستاذ عبدالباسط نعورة'] },
-    { subject: 'اللغة العربية',                 teachers: ['الأستاذة موساوي زبيدة'] },
-    { subject: 'اللغة الفرنسية',                teachers: ['الأستاذة كروش شمس الهدى'] },
-    { subject: 'اللغة الإنجليزية',              teachers: ['الأستاذ كرام الصادق'] },
+    { subject:'العلوم الفيزيائية والتكنولوجيا', teachers:['الأستاذ نمسي عبدالرحمان','الأستاذ لكموتة لمين'] },
+    { subject:'الرياضيات (العلميين)',           teachers:['الأستاذة ترعة فاطمة','الأستاذ عبدالباسط نعورة'] },
+    { subject:'اللغة العربية',                 teachers:['الأستاذة موساوي زبيدة'] },
+    { subject:'اللغة الفرنسية',                teachers:['الأستاذة كروش شمس الهدى'] },
+    { subject:'اللغة الإنجليزية',              teachers:['الأستاذ كرام الصادق'] },
   ],
   'ثالثة ثانوي (بكالوريا)|رياضيات': [
-    { subject: 'العلوم الفيزيائية والتكنولوجيا', teachers: ['الأستاذ نمسي عبدالرحمان', 'الأستاذ لكموتة لمين'] },
-    { subject: 'الرياضيات (العلميين)',           teachers: ['الأستاذة ترعة فاطمة', 'الأستاذ عبدالباسط نعورة'] },
-    { subject: 'اللغة العربية',                 teachers: ['الأستاذة موساوي زبيدة'] },
-    { subject: 'اللغة الفرنسية',                teachers: ['الأستاذة كروش شمس الهدى'] },
-    { subject: 'اللغة الإنجليزية',              teachers: ['الأستاذ كرام الصادق'] },
-    { subject: 'الفلسفة',                       teachers: ['الأستاذة دادة نجاح سلام'] },
+    { subject:'العلوم الفيزيائية والتكنولوجيا', teachers:['الأستاذ نمسي عبدالرحمان','الأستاذ لكموتة لمين'] },
+    { subject:'الرياضيات (العلميين)',           teachers:['الأستاذة ترعة فاطمة','الأستاذ عبدالباسط نعورة'] },
+    { subject:'اللغة العربية',                 teachers:['الأستاذة موساوي زبيدة'] },
+    { subject:'اللغة الفرنسية',                teachers:['الأستاذة كروش شمس الهدى'] },
+    { subject:'اللغة الإنجليزية',              teachers:['الأستاذ كرام الصادق'] },
+    { subject:'الفلسفة',                       teachers:['الأستاذة دادة نجاح سلام'] },
   ],
   'ثالثة ثانوي (بكالوريا)|تسيير واقتصاد': [
-    { subject: 'اللغة العربية',     teachers: ['الأستاذة موساوي زبيدة'] },
-    { subject: 'اللغة الفرنسية',    teachers: ['الأستاذة كروش شمس الهدى'] },
-    { subject: 'اللغة الإنجليزية', teachers: ['الأستاذ كرام الصادق'] },
-    { subject: 'الفلسفة',           teachers: ['الأستاذة دادة نجاح سلام'] },
-    { subject: 'تاريخ وجغرافيا',    teachers: ['الأستاذ ايمن دخان'] },
+    { subject:'اللغة العربية',     teachers:['الأستاذة موساوي زبيدة'] },
+    { subject:'اللغة الفرنسية',    teachers:['الأستاذة كروش شمس الهدى'] },
+    { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
+    { subject:'الفلسفة',           teachers:['الأستاذة دادة نجاح سلام'] },
+    { subject:'تاريخ وجغرافيا',    teachers:['الأستاذ ايمن دخان'] },
   ],
   'ثالثة ثانوي (بكالوريا)|آداب وفلسفة': [
-    { subject: 'اللغة العربية',     teachers: ['الأستاذة موساوي زبيدة'] },
-    { subject: 'اللغة الفرنسية',    teachers: ['الأستاذة كروش شمس الهدى'] },
-    { subject: 'اللغة الإنجليزية', teachers: ['الأستاذ كرام الصادق'] },
-    { subject: 'الفلسفة',           teachers: ['الأستاذة دادة نجاح سلام'] },
-    { subject: 'تاريخ وجغرافيا',    teachers: ['الأستاذ ايمن دخان'] },
+    { subject:'اللغة العربية',     teachers:['الأستاذة موساوي زبيدة'] },
+    { subject:'اللغة الفرنسية',    teachers:['الأستاذة كروش شمس الهدى'] },
+    { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
+    { subject:'الفلسفة',           teachers:['الأستاذة دادة نجاح سلام'] },
+    { subject:'تاريخ وجغرافيا',    teachers:['الأستاذ ايمن دخان'] },
   ],
   'ثالثة ثانوي (بكالوريا)|لغات أجنبية': [
-    { subject: 'اللغة الإسبانية',   teachers: ['الأستاذ طوالبية ابراهيم'] },
-    { subject: 'اللغة الألمانية',   teachers: ['الأستاذ حمزة علالي'] },
-    { subject: 'اللغة العربية',     teachers: ['الأستاذة موساوي زبيدة'] },
-    { subject: 'اللغة الفرنسية',    teachers: ['الأستاذة كروش شمس الهدى'] },
-    { subject: 'اللغة الإنجليزية', teachers: ['الأستاذ كرام الصادق'] },
+    { subject:'اللغة الإسبانية',   teachers:['الأستاذ طوالبية ابراهيم'] },
+    { subject:'اللغة الألمانية',   teachers:['الأستاذ حمزة علالي'] },
+    { subject:'اللغة العربية',     teachers:['الأستاذة موساوي زبيدة'] },
+    { subject:'اللغة الفرنسية',    teachers:['الأستاذة كروش شمس الهدى'] },
+    { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
   ],
 };
 
-// المستويات التي تحتاج ولي أمر
-const needsParent = [
-  'تحضيري',
-  'أولى ابتدائي','ثانية ابتدائي','ثالثة ابتدائي','رابعة ابتدائي','خامسة ابتدائي',
-  'أولى متوسط','ثانية متوسط','ثالثة متوسط','رابعة متوسط',
-];
-
-// المستويات التي تحتاج تخصص
-const needsSpecialty = ['أولى ثانوي', 'ثانية ثانوي', 'ثالثة ثانوي (بكالوريا)'];
+const needsParent    = ['تحضيري','أولى ابتدائي','ثانية ابتدائي','ثالثة ابتدائي','رابعة ابتدائي','خامسة ابتدائي','أولى متوسط','ثانية متوسط','ثالثة متوسط','رابعة متوسط'];
+const needsSpecialty = ['أولى ثانوي','ثانية ثانوي','ثالثة ثانوي (بكالوريا)'];
+const needsCandidateType = ['ثالثة ثانوي (بكالوريا)'];
 
 // ─── HELPERS ──────────────────────────────────────────────
 function animateShow(el) {
@@ -155,7 +116,6 @@ function animateShow(el) {
   void el.offsetWidth;
   el.classList.add('field-appear');
 }
-
 function hideField(el, ...ids) {
   el.style.display = 'none';
   ids.forEach(id => {
@@ -163,7 +123,6 @@ function hideField(el, ...ids) {
     if (s) { s.removeAttribute('required'); s.value = ''; }
   });
 }
-
 function showComingSoon(afterEl) {
   document.getElementById('comingSoonNote')?.remove();
   const note = document.createElement('div');
@@ -172,7 +131,6 @@ function showComingSoon(afterEl) {
   note.innerHTML = `<span>🚧</span><span>المواد والأساتذة لهذا المستوى والتخصص ستُضاف قريباً</span>`;
   afterEl.insertAdjacentElement('afterend', note);
 }
-
 function populateSubjects(key) {
   const subGrp    = document.getElementById('subjectGroup');
   const subSelect = document.getElementById('subject');
@@ -183,7 +141,6 @@ function populateSubjects(key) {
   hideField(teachGrp, 'teacher');
 
   const subjects = curriculum[key] ?? [];
-
   if (subjects.length === 0) {
     const specGrp = document.getElementById('specialtyGroup');
     const eduGrp  = document.getElementById('eduLevelGroup');
@@ -199,61 +156,96 @@ function populateSubjects(key) {
     subSelect.appendChild(opt);
   });
   animateShow(subGrp);
-  subSelect.setAttribute('required', 'required');
+  subSelect.setAttribute('required','required');
 }
 
 // ─── EDU LEVEL HANDLER ────────────────────────────────────
 function onEduLevelChange() {
-  const level        = document.getElementById('eduLevel').value;
-  const parentGrp    = document.getElementById('parentGroup');
-  const specialtyGrp = document.getElementById('specialtyGroup');
-  const specialtySel = document.getElementById('specialty');
-  const subGrp       = document.getElementById('subjectGroup');
-  const teachGrp     = document.getElementById('teacherGroup');
-  const parentName   = document.getElementById('parentName');
-  const parentPhone  = document.getElementById('parentPhone');
+  const level           = document.getElementById('eduLevel').value;
+  const parentGrp       = document.getElementById('parentGroup');
+  const specialtyGrp    = document.getElementById('specialtyGroup');
+  const specialtySel    = document.getElementById('specialty');
+  const subGrp          = document.getElementById('subjectGroup');
+  const teachGrp        = document.getElementById('teacherGroup');
+  const candidateTypeGrp= document.getElementById('candidateTypeGroup');
+  const parentName      = document.getElementById('parentName');
+  const parentPhone     = document.getElementById('parentPhone');
 
-  // إعادة ضبط كامل
   document.getElementById('comingSoonNote')?.remove();
-  hideField(parentGrp,    'parentName', 'parentPhone');
-  hideField(specialtyGrp, 'specialty');
-  hideField(subGrp,       'subject');
-  hideField(teachGrp,     'teacher');
+  hideField(parentGrp,        'parentName','parentPhone');
+  hideField(specialtyGrp,     'specialty');
+  hideField(subGrp,           'subject');
+  hideField(teachGrp,         'teacher');
+  hideField(candidateTypeGrp);
   parentName.removeAttribute('required');
   parentPhone.removeAttribute('required');
+  // reset radio buttons
+  document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
 
   if (!level) return;
 
   // ولي الأمر
   if (needsParent.includes(level)) {
     animateShow(parentGrp);
-    parentName.setAttribute('required', 'required');
-    parentPhone.setAttribute('required', 'required');
+    parentName.setAttribute('required','required');
+    parentPhone.setAttribute('required','required');
   }
 
-  // تخصص
+  // نوع المترشح (بكالوريا)
+  if (needsCandidateType.includes(level)) {
+    animateShow(candidateTypeGrp);
+    // التخصص سيظهر بعد اختيار نوع المترشح
+    return;
+  }
+
+  // تخصص بدون نوع مترشح
   if (needsSpecialty.includes(level)) {
-    const specs = specialties[level] || [];
-    specialtySel.innerHTML = `<option value="">-- اختر التخصص --</option>`;
-    specs.forEach(sp => {
-      const opt = document.createElement('option');
-      opt.value = sp; opt.textContent = sp;
-      specialtySel.appendChild(opt);
-    });
-    animateShow(specialtyGrp);
-    specialtySel.setAttribute('required', 'required');
-    return; // ننتظر اختيار التخصص
+    showSpecialtyField(level);
+    return;
   }
 
-  // مستويات بدون تخصص → مباشرة المواد
   populateSubjects(level);
+}
+
+// ─── CANDIDATE TYPE HANDLER ───────────────────────────────
+function onCandidateTypeChange() {
+  const level       = document.getElementById('eduLevel').value;
+  const specialtyGrp= document.getElementById('specialtyGroup');
+  const subGrp      = document.getElementById('subjectGroup');
+  const teachGrp    = document.getElementById('teacherGroup');
+
+  document.getElementById('comingSoonNote')?.remove();
+  hideField(specialtyGrp, 'specialty');
+  hideField(subGrp,       'subject');
+  hideField(teachGrp,     'teacher');
+
+  const selected = document.querySelector('input[name="candidateType"]:checked');
+  if (!selected) return;
+
+  // بعد اختيار نوع المترشح → نظهر التخصص
+  showSpecialtyField(level);
+}
+
+function showSpecialtyField(level) {
+  const specialtyGrp = document.getElementById('specialtyGroup');
+  const specialtySel = document.getElementById('specialty');
+  const specs = specialties[level] || [];
+
+  specialtySel.innerHTML = `<option value="">-- اختر التخصص --</option>`;
+  specs.forEach(sp => {
+    const opt = document.createElement('option');
+    opt.value = sp; opt.textContent = sp;
+    specialtySel.appendChild(opt);
+  });
+  animateShow(specialtyGrp);
+  specialtySel.setAttribute('required','required');
 }
 
 // ─── SPECIALTY HANDLER ────────────────────────────────────
 function onSpecialtyChange() {
-  const level  = document.getElementById('eduLevel').value;
-  const spec   = document.getElementById('specialty').value;
-  const subGrp = document.getElementById('subjectGroup');
+  const level    = document.getElementById('eduLevel').value;
+  const spec     = document.getElementById('specialty').value;
+  const subGrp   = document.getElementById('subjectGroup');
   const teachGrp = document.getElementById('teacherGroup');
 
   document.getElementById('comingSoonNote')?.remove();
@@ -261,7 +253,6 @@ function onSpecialtyChange() {
   hideField(teachGrp, 'teacher');
 
   if (!spec) return;
-
   populateSubjects(`${level}|${spec}`);
 }
 
@@ -290,74 +281,64 @@ function onSubjectChange() {
   if (found.teachers.length === 1) teachSelect.value = found.teachers[0];
 
   animateShow(teachGrp);
-  teachSelect.setAttribute('required', 'required');
+  teachSelect.setAttribute('required','required');
 }
 
 // ─── TRANSLATIONS ─────────────────────────────────────────
 const translations = {
   ar: {
-    badge: "✦ رحلتك نحو النجاح تبدأ من هنا ✦",
-    title: "EDUCATION PLUS CENTER",
-    subtitle: "التسجيل في الدورات والبرامج التعليمية",
-    btn1: "تسجيلات الدعم", btn2: "دورات اللغات",
-    btn3: "دروس VIP",      btn4: "اختبار IELTS",
-    firstName: "الاسم",    lastName: "اللقب",
-    birthDate: "تاريخ الميلاد", birthPlace: "مكان الميلاد",
-    eduLevel: "المستوى الدراسي", selectEduLevel: "-- اختر المستوى --",
-    specialty: "التخصص",        selectSpecialty: "-- اختر التخصص --",
-    subject: "المادة",          selectSubject: "-- اختر المادة --",
-    teacher: "الأستاذ/ة",       selectTeacher: "-- اختر الأستاذ/ة --",
-    parentInfo: "معلومات ولي الأمر",
-    parentName: "اسم ولي الأمر", parentPhone: "هاتف ولي الأمر",
-    langLevel: "مستوى اللغة (CEFR)", selectLevel: "-- اختر المستوى --",
-    phone: "رقم الهاتف",
-    motivation: "ما هو الدافع الذي جعلك تختار أكاديمية E-PLUS؟",
-    optional: "(اختياري)",
-    submitBtn: "إرسال التسجيل ✦",
-    successTitle: "🎉 تم التسجيل بنجاح!",
-    successMsg: "تم تسجيل معلوماتك بنجاح،\\nسيتم التواصل معك قريباً.",
-    closeBtn: "العودة إلى الصفحة الرئيسية",
-    supportTitle: "تسجيلات الدعم",
-    langTitle: "تسجيل دورة لغة",
-    vipTitle: "تسجيل دروس VIP",
-    ieltsTitle: "التسجيل في اختبار IELTS",
-    levels: {
-      A1:"A1 - مبتدئ", A2:"A2 - مبتدئ متقدم",
-      B1:"B1 - متوسط", B2:"B2 - متوسط متقدم",
-      C1:"C1 - متقدم",  C2:"C2 - احترافي"
-    }
+    badge:"✦ رحلتك نحو النجاح تبدأ من هنا ✦",
+    title:"EDUCATION PLUS CENTER",
+    subtitle:"التسجيل في الدورات والبرامج التعليمية",
+    btn1:"تسجيلات الدعم", btn2:"دورات اللغات",
+    btn3:"دروس VIP",      btn4:"اختبار IELTS", btn5:"دورات أونلاين",
+    firstName:"الاسم", lastName:"اللقب",
+    birthDate:"تاريخ الميلاد", birthPlace:"مكان الميلاد",
+    eduLevel:"المستوى الدراسي",
+    specialty:"التخصص", subject:"المادة", teacher:"الأستاذ/ة",
+    candidateType:"نوع المترشح",
+    enrolled:"متمدرس", freeCandidate:"حر",
+    parentInfo:"معلومات ولي الأمر",
+    parentName:"اسم ولي الأمر", parentPhone:"هاتف ولي الأمر",
+    langLevel:"مستوى اللغة (CEFR)",
+    phone:"رقم الهاتف",
+    motivation:"ما هو الدافع الذي جعلك تختار أكاديمية E-PLUS؟",
+    optional:"(اختياري)",
+    submitBtn:"إرسال التسجيل ✦",
+    successTitle:"🎉 تم التسجيل بنجاح!",
+    successMsg:"تم تسجيل معلوماتك بنجاح،\\nسيتم التواصل معك قريباً.",
+    closeBtn:"العودة إلى الصفحة الرئيسية",
+    supportTitle:"تسجيلات الدعم", langTitle:"تسجيل دورة لغة",
+    vipTitle:"تسجيل دروس VIP",   ieltsTitle:"التسجيل في اختبار IELTS",
+    onlineTitle:"التسجيل في دورات أونلاين",
+    levels:{ A1:"A1 - مبتدئ",A2:"A2 - مبتدئ متقدم",B1:"B1 - متوسط",B2:"B2 - متوسط متقدم",C1:"C1 - متقدم",C2:"C2 - احترافي" }
   },
   en: {
-    badge: "✦ Your journey to success starts here ✦",
-    title: "EDUCATION PLUS CENTER",
-    subtitle: "Register for Courses & Educational Programs",
-    btn1: "Support Registration", btn2: "Language Courses",
-    btn3: "VIP Lessons",          btn4: "IELTS Test",
-    firstName: "First Name",  lastName: "Last Name",
-    birthDate: "Date of Birth", birthPlace: "Place of Birth",
-    eduLevel: "Academic Level",  selectEduLevel: "-- Select Level --",
-    specialty: "Specialty",      selectSpecialty: "-- Select Specialty --",
-    subject: "Subject",          selectSubject: "-- Select Subject --",
-    teacher: "Teacher",          selectTeacher: "-- Select Teacher --",
-    parentInfo: "Parent / Guardian Info",
-    parentName: "Parent Name",   parentPhone: "Parent Phone",
-    langLevel: "Language Level (CEFR)", selectLevel: "-- Select Level --",
-    phone: "Phone Number",
-    motivation: "What motivated you to choose E-PLUS Academy?",
-    optional: "(optional)",
-    submitBtn: "Submit Registration ✦",
-    successTitle: "🎉 Registered Successfully!",
-    successMsg: "Your information has been recorded.\\nWe will contact you soon.",
-    closeBtn: "Back to Main Page",
-    supportTitle: "Support Registration",
-    langTitle: "Language Course Registration",
-    vipTitle: "VIP Lessons Registration",
-    ieltsTitle: "IELTS Test Registration",
-    levels: {
-      A1:"A1 - Beginner",     A2:"A2 - Elementary",
-      B1:"B1 - Intermediate", B2:"B2 - Upper Intermediate",
-      C1:"C1 - Advanced",     C2:"C2 - Proficiency"
-    }
+    badge:"✦ Your journey to success starts here ✦",
+    title:"EDUCATION PLUS CENTER",
+    subtitle:"Register for Courses & Educational Programs",
+    btn1:"Support Registration", btn2:"Language Courses",
+    btn3:"VIP Lessons",          btn4:"IELTS Test", btn5:"Online Courses",
+    firstName:"First Name", lastName:"Last Name",
+    birthDate:"Date of Birth", birthPlace:"Place of Birth",
+    eduLevel:"Academic Level",
+    specialty:"Specialty", subject:"Subject", teacher:"Teacher",
+    candidateType:"Candidate Type",
+    enrolled:"Enrolled", freeCandidate:"Independent",
+    parentInfo:"Parent / Guardian Info",
+    parentName:"Parent Name", parentPhone:"Parent Phone",
+    langLevel:"Language Level (CEFR)",
+    phone:"Phone Number",
+    motivation:"What motivated you to choose E-PLUS Academy?",
+    optional:"(optional)",
+    submitBtn:"Submit Registration ✦",
+    successTitle:"🎉 Registered Successfully!",
+    successMsg:"Your information has been recorded.\\nWe will contact you soon.",
+    closeBtn:"Back to Main Page",
+    supportTitle:"Support Registration", langTitle:"Language Course Registration",
+    vipTitle:"VIP Lessons Registration", ieltsTitle:"IELTS Test Registration",
+    onlineTitle:"Online Courses Registration",
+    levels:{ A1:"A1 - Beginner",A2:"A2 - Elementary",B1:"B1 - Intermediate",B2:"B2 - Upper Intermediate",C1:"C1 - Advanced",C2:"C2 - Proficiency" }
   }
 };
 
@@ -396,35 +377,41 @@ let currentModalType = 'support';
 
 function openModal(type) {
   currentModalType = type;
-  const t            = translations[currentLang];
-  const overlay      = document.getElementById('modal');
-  const langToggle   = document.getElementById('lang-toggle');
-  const eduLevelGrp  = document.getElementById('eduLevelGroup');
-  const parentGrp    = document.getElementById('parentGroup');
-  const specialtyGrp = document.getElementById('specialtyGroup');
-  const subGrp       = document.getElementById('subjectGroup');
-  const teachGrp     = document.getElementById('teacherGroup');
-  const langLevelGrp = document.getElementById('langLevelGroup');
-  const langLevelSel = document.getElementById('langLevel');
-  const parentName   = document.getElementById('parentName');
-  const parentPhone  = document.getElementById('parentPhone');
+  const t             = translations[currentLang];
+  const overlay       = document.getElementById('modal');
+  const langToggle    = document.getElementById('lang-toggle');
+  const eduLevelGrp   = document.getElementById('eduLevelGroup');
+  const parentGrp     = document.getElementById('parentGroup');
+  const specialtyGrp  = document.getElementById('specialtyGroup');
+  const subGrp        = document.getElementById('subjectGroup');
+  const teachGrp      = document.getElementById('teacherGroup');
+  const langLevelGrp  = document.getElementById('langLevelGroup');
+  const langLevelSel  = document.getElementById('langLevel');
+  const candidateGrp  = document.getElementById('candidateTypeGroup');
+  const parentName    = document.getElementById('parentName');
+  const parentPhone   = document.getElementById('parentPhone');
 
   document.getElementById('modal-title').textContent =
-    { support:t.supportTitle, lang:t.langTitle, vip:t.vipTitle, ielts:t.ieltsTitle }[type] || '';
+    { support:t.supportTitle, lang:t.langTitle, vip:t.vipTitle, ielts:t.ieltsTitle, online:t.onlineTitle }[type] || '';
 
-  [eduLevelGrp, parentGrp, specialtyGrp, subGrp, teachGrp, langLevelGrp]
+  // إخفاء كل الحقول
+  [eduLevelGrp,parentGrp,specialtyGrp,subGrp,teachGrp,langLevelGrp,candidateGrp]
     .forEach(el => el.style.display = 'none');
   langLevelSel.removeAttribute('required');
   parentName.removeAttribute('required');
   parentPhone.removeAttribute('required');
+  document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
   document.getElementById('comingSoonNote')?.remove();
 
+  // إظهار الحقول حسب النوع
   if (type === 'support') {
     eduLevelGrp.style.display = 'block';
-  } else if (type === 'lang' || type === 'ielts') {
+  } else if (type === 'lang') {
+    // IELTS بدون مستوى لغة — lang فقط
     langLevelGrp.style.display = 'block';
     langLevelSel.setAttribute('required','required');
   }
+  // vip, ielts, online → نفس الحقول الأساسية فقط
 
   document.getElementById('form-view').style.display = 'block';
   document.getElementById('success-view').classList.remove('show');
@@ -459,26 +446,41 @@ async function submitForm(e) {
   });
   if (!valid) return;
 
+  // التحقق من نوع المترشح إذا كان ظاهراً
+  const candidateGrp = document.getElementById('candidateTypeGroup');
+  if (candidateGrp.style.display !== 'none') {
+    const selected = document.querySelector('input[name="candidateType"]:checked');
+    if (!selected) {
+      candidateGrp.style.animation = 'none';
+      void candidateGrp.offsetWidth;
+      candidateGrp.style.animation = 'shake 0.35s ease';
+      return;
+    }
+  }
+
   const btn = document.querySelector('#form-view .submit-btn');
   btn.classList.add('loading');
 
-  const typeLabels = { support:'دعم', lang:'لغات', vip:'VIP', ielts:'IELTS' };
+  const typeLabels = { support:'دعم', lang:'لغات', vip:'VIP', ielts:'IELTS', online:'أونلاين' };
+  const candidateTypeVal = document.querySelector('input[name="candidateType"]:checked')?.value || '-';
+
   const data = {
-    timestamp:   new Date().toLocaleString('ar-DZ'),
-    type:        typeLabels[currentModalType] || currentModalType,
-    firstName:   document.getElementById('firstName').value.trim(),
-    lastName:    document.getElementById('lastName').value.trim(),
-    birthDate:   document.getElementById('birthDate').value,
-    birthPlace:  document.getElementById('birthPlace').value.trim(),
-    phone:       document.getElementById('phone').value.trim(),
-    eduLevel:    document.getElementById('eduLevel').value    || '-',
-    specialty:   document.getElementById('specialty').value   || '-',
-    subject:     document.getElementById('subject').value     || '-',
-    teacher:     document.getElementById('teacher').value     || '-',
-    parentName:  document.getElementById('parentName').value.trim()  || '-',
-    parentPhone: document.getElementById('parentPhone').value.trim() || '-',
-    langLevel:   document.getElementById('langLevel').value   || '-',
-    motivation:  document.getElementById('motivation').value.trim()  || '-',
+    timestamp:     new Date().toLocaleString('ar-DZ'),
+    type:          typeLabels[currentModalType] || currentModalType,
+    firstName:     document.getElementById('firstName').value.trim(),
+    lastName:      document.getElementById('lastName').value.trim(),
+    birthDate:     document.getElementById('birthDate').value,
+    birthPlace:    document.getElementById('birthPlace').value.trim(),
+    phone:         document.getElementById('phone').value.trim(),
+    eduLevel:      document.getElementById('eduLevel').value      || '-',
+    candidateType: candidateTypeVal,
+    specialty:     document.getElementById('specialty').value     || '-',
+    subject:       document.getElementById('subject').value       || '-',
+    teacher:       document.getElementById('teacher').value       || '-',
+    parentName:    document.getElementById('parentName').value.trim()  || '-',
+    parentPhone:   document.getElementById('parentPhone').value.trim() || '-',
+    langLevel:     document.getElementById('langLevel').value     || '-',
+    motivation:    document.getElementById('motivation').value.trim()  || '-',
   };
 
   try {
