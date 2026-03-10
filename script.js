@@ -379,7 +379,7 @@ function applyTranslations() {
 }
 
 // ─── GOOGLE SHEETS ────────────────────────────────────────
-const SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxxZl2-qMGrY0r_jnVB0yTUkye21bz9ziFViHcKFouFYE6JNW1iILN3OIhVgn9RVjGkWg/exec';
 
 // ─── MODAL ────────────────────────────────────────────────
 let currentModalType = 'support';
