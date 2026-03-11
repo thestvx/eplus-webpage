@@ -40,6 +40,15 @@ animateSquares();
 // ─── APPS SCRIPT URL ──────────────────────────────────────
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxJkfl-ACAU-Fgi1UDLi04j61Uo81vkh5ohv5xzNl-0rSclyYU_QrCG5exv6o5Cqm557w/exec';
 
+// ─── ترجمة نوع التسجيل للعربية ────────────────────────────
+const typeLabelsAr = {
+  support: 'تسجيلات الدعم',
+  lang:    'دورات اللغات',
+  vip:     'دروس VIP',
+  ielts:   'اختبار IELTS',
+  online:  'دورات أونلاين',
+};
+
 // ─── LANGUAGE VALIDATION ──────────────────────────────────
 function isArabic(text)  { return /[\u0600-\u06FF]/.test(text); }
 function isEnglish(text) { return /[a-zA-Z]/.test(text); }
@@ -159,12 +168,14 @@ function resetDays() {
 
 // ─── HELPERS ──────────────────────────────────────────────
 function animateShow(el) {
+  if (!el) return;
   el.style.display = 'block';
   el.classList.remove('field-appear');
   void el.offsetWidth;
   el.classList.add('field-appear');
 }
 function hideField(el, ...ids) {
+  if (!el) return;
   el.style.display = 'none';
   ids.forEach(id => {
     const s = document.getElementById(id);
@@ -190,7 +201,7 @@ function populateSubjects(key) {
   if (subjects.length === 0) {
     const specGrp = document.getElementById('specialtyGroup');
     const eduGrp  = document.getElementById('eduLevelGroup');
-    const afterEl = specGrp.style.display !== 'none' ? specGrp : eduGrp;
+    const afterEl = specGrp?.style.display !== 'none' ? specGrp : eduGrp;
     showComingSoon(afterEl);
     return;
   }
@@ -203,6 +214,25 @@ function populateSubjects(key) {
   animateShow(subGrp);
   subSelect.setAttribute('required','required');
 }
+
+// ─── LANG TYPE ────────────────────────────────────────────
+window.onLangTypeChange = function() {
+  const val        = document.getElementById('langType').value;
+  const langLvlGrp = document.getElementById('langLevelGroup');
+  const levelTestG = document.getElementById('levelTestGroup');
+  const daysGrp    = document.getElementById('daysGroup');
+
+  hideField(langLvlGrp, 'langLevel');
+  hideField(levelTestG);
+  hideField(daysGrp);
+  document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+  resetDays();
+
+  if (val) {
+    animateShow(langLvlGrp);
+    langLvlGrp.querySelector('select')?.setAttribute('required','required');
+  }
+};
 
 // ─── EDU LEVEL ────────────────────────────────────────────
 window.onEduLevelChange = function() {
@@ -261,8 +291,8 @@ function showSpecialtyField(level) {
 }
 
 window.onSpecialtyChange = function() {
-  const level  = document.getElementById('eduLevel').value;
-  const spec   = document.getElementById('specialty').value;
+  const level = document.getElementById('eduLevel').value;
+  const spec  = document.getElementById('specialty').value;
   document.getElementById('comingSoonNote')?.remove();
   hideField(document.getElementById('subjectGroup'), 'subject');
   hideField(document.getElementById('teacherGroup'), 'teacher');
@@ -294,7 +324,7 @@ window.onSubjectChange = function() {
 };
 
 window.onLangLevelChange = function() {
-  const val = document.getElementById('langLevel').value;
+  const val          = document.getElementById('langLevel').value;
   const levelTestGrp = document.getElementById('levelTestGroup');
   const daysGrp      = document.getElementById('daysGroup');
   if (val) {
@@ -311,7 +341,7 @@ window.onLangLevelChange = function() {
 // ─── TERMS ────────────────────────────────────────────────
 let pendingModalType   = null;
 let termsTimerInterval = null;
-const TERMS_WAIT_SECONDS = 10;
+const TERMS_WAIT_SECONDS = 30;
 
 window.openTerms = function(type) {
   pendingModalType = type;
@@ -327,8 +357,7 @@ window.openTerms = function(type) {
   showTermsTimer(TERMS_WAIT_SECONDS);
   document.getElementById('terms-modal').classList.add('active');
   document.body.style.overflow = 'hidden';
-  const lt = document.getElementById('lang-toggle');
-  if (lt) lt.classList.add('hidden');
+  document.getElementById('lang-toggle')?.classList.add('hidden');
 };
 
 function showTermsTimer(seconds) {
@@ -339,19 +368,19 @@ function showTermsTimer(seconds) {
     timerEl = document.createElement('div');
     timerEl.id = 'terms-timer';
     timerEl.className = 'terms-timer';
-    document.querySelector('.terms-footer').insertBefore(timerEl,
-      document.querySelector('.terms-footer').firstChild);
+    document.querySelector('.terms-footer')
+      .insertBefore(timerEl, document.querySelector('.terms-footer').firstChild);
   }
   timerEl.style.display = 'flex';
 
   function updateTimer() {
-    const m = String(Math.floor(remaining / 60)).padStart(2,'0');
-    const s = String(remaining % 60).padStart(2,'0');
+    const m = String(Math.floor(remaining/60)).padStart(2,'0');
+    const s = String(remaining%60).padStart(2,'0');
     timerEl.innerHTML = `
       <div style="display:flex;align-items:center;gap:8px;">
         <span class="timer-icon">⏱</span>
         <span class="timer-text">
-          ${currentLang === 'ar'
+          ${currentLang==='ar'
             ? `يرجى قراءة القوانين كاملاً — يمكنك الموافقة بعد <strong>${m}:${s}</strong>`
             : `Please read all terms — you can agree after <strong>${m}:${s}</strong>`}
         </span>
@@ -360,7 +389,7 @@ function showTermsTimer(seconds) {
         <div class="timer-bar" id="timer-bar"></div>
       </div>`;
     const bar = document.getElementById('timer-bar');
-    if (bar) bar.style.width = (((seconds - remaining) / seconds) * 100) + '%';
+    if (bar) bar.style.width = (((seconds-remaining)/seconds)*100)+'%';
   }
 
   updateTimer();
@@ -416,7 +445,8 @@ const translations = {
     subtitle:"التسجيل في الدورات والبرامج التعليمية",
     btn1:"تسجيلات الدعم", btn2:"دورات اللغات", btn3:"دروس VIP",
     btn4:"اختبار IELTS",  btn5:"دورات أونلاين",
-    firstName:"الاسم", lastName:"اللقب", birthDate:"تاريخ الميلاد", birthPlace:"مكان الميلاد",
+    firstName:"الاسم", lastName:"اللقب", birthDate:"تاريخ الميلاد",
+    birthPlace:"العنوان", langType:"اختر اللغة",
     eduLevel:"المستوى الدراسي", specialty:"التخصص", subject:"المادة", teacher:"الأستاذ/ة",
     candidateType:"نوع المترشح", enrolled:"متمدرس", freeCandidate:"حر",
     parentInfo:"معلومات ولي الأمر", parentName:"اسم ولي الأمر", parentPhone:"هاتف ولي الأمر",
@@ -454,7 +484,8 @@ const translations = {
     subtitle:"Register for Courses and Educational Programs",
     btn1:"Support Registration", btn2:"Language Courses", btn3:"VIP Lessons",
     btn4:"IELTS Test", btn5:"Online Courses",
-    firstName:"First Name", lastName:"Last Name", birthDate:"Date of Birth", birthPlace:"Place of Birth",
+    firstName:"First Name", lastName:"Last Name", birthDate:"Date of Birth",
+    birthPlace:"Address", langType:"Choose Language",
     eduLevel:"Academic Level", specialty:"Specialty", subject:"Subject", teacher:"Teacher",
     candidateType:"Candidate Type", enrolled:"Enrolled", freeCandidate:"Independent",
     parentInfo:"Guardian Information", parentName:"Guardian Name", parentPhone:"Guardian Phone",
@@ -474,18 +505,18 @@ const translations = {
     annTitle:"Academy Announcements",
     t1:"The learner is officially registered at the center upon payment of registration fees on the specified date.",
     t2:"The learner must demonstrate good conduct, cleanliness and appropriate dress.",
-    t3:"All individuals at the educational center must be respected — colleagues, teachers and administrative staff.",
+    t3:"All individuals at the educational center must be respected.",
     t4:"Respect study times and do not leave without prior permission.",
-    t5:"Do not miss classes except for necessary reasons with prior notification to administration.",
+    t5:"Do not miss classes except for necessary reasons with prior notification.",
     t6:"In case of absence without reason, the guardian will be notified.",
-    t7:"Class fees will not be compensated for repeated absences or discontinuation of study.",
+    t7:"Class fees will not be compensated for repeated absences.",
     t8:"In case of stopping studies, only 80% of the remaining value will be compensated.",
-    t9:"In case of long-term absence, please contact administration to settle the situation.",
-    t10:"The center is not responsible for loss of any valuables (money, phone, jewelry...).",
-    t11:"Touching or operating educational tools and equipment without permission is prohibited.",
-    t12:"Any damage to center equipment will subject the perpetrator to punishment and compensation.",
-    t13:"In case of unacceptable behavior, the guardian will be formally notified upon repeated violation.",
-    t14:"Agreement to publish the learner's photos on social media and educational videos of the center.",
+    t9:"In case of long-term absence, please contact administration.",
+    t10:"The center is not responsible for loss of any valuables.",
+    t11:"Touching or operating educational tools without permission is prohibited.",
+    t12:"Any damage to center equipment will subject the perpetrator to punishment.",
+    t13:"In case of unacceptable behavior, the guardian will be formally notified.",
+    t14:"Agreement to publish the learner's photos on social media and educational videos.",
   }
 };
 
@@ -546,7 +577,7 @@ window.openModal = function(type) {
   const titleEl = document.getElementById('modal-title');
   if (titleEl) titleEl.textContent = modalTitles[type]?.[currentLang] || type;
 
-  ['eduLevelGroup','langLevelGroup','daysGroup','levelTestGroup',
+  ['eduLevelGroup','langTypeGroup','langLevelGroup','daysGroup','levelTestGroup',
    'subjectGroup','teacherGroup','specialtyGroup','candidateTypeGroup','parentGroup']
     .forEach(id => {
       const el = document.getElementById(id);
@@ -558,9 +589,16 @@ window.openModal = function(type) {
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
   resetDays();
 
-  if (type === 'support' || type === 'vip') animateShow(document.getElementById('eduLevelGroup'));
-  if (type === 'lang'    || type === 'online') animateShow(document.getElementById('langLevelGroup'));
-  if (type === 'ielts')  animateShow(document.getElementById('daysGroup'));
+  if (type === 'support' || type === 'vip') {
+    animateShow(document.getElementById('eduLevelGroup'));
+  }
+  if (type === 'lang' || type === 'online') {
+    animateShow(document.getElementById('langTypeGroup'));
+    document.getElementById('langType').setAttribute('required','required');
+  }
+  if (type === 'ielts') {
+    animateShow(document.getElementById('daysGroup'));
+  }
 
   document.getElementById('form-view').style.display = 'block';
   document.getElementById('success-view').classList.remove('show');
@@ -587,15 +625,15 @@ window.submitForm = async function(e) {
   e.preventDefault();
   const btn = document.querySelector('#reg-form .submit-btn');
 
-  const firstName  = document.getElementById('firstName').value.trim();
-  const lastName   = document.getElementById('lastName').value.trim();
-  const birthDate  = document.getElementById('birthDate').value;
-  const birthPlace = document.getElementById('birthPlace').value.trim();
-  const phone      = document.getElementById('phone').value.trim();
+  const firstName = document.getElementById('firstName').value.trim();
+  const lastName  = document.getElementById('lastName').value.trim();
+  const birthDate = document.getElementById('birthDate').value;
+  const address   = document.getElementById('birthPlace').value.trim();
+  const phone     = document.getElementById('phone').value.trim();
 
   // ── تحقق اللغة ──
   let langError = false;
-  [['firstName',firstName],['lastName',lastName],['birthPlace',birthPlace]].forEach(([id,val]) => {
+  [['firstName',firstName],['lastName',lastName],['birthPlace',address]].forEach(([id,val]) => {
     if (val && !validateLang(val)) {
       const el = document.getElementById(id);
       el.classList.add('error');
@@ -618,26 +656,26 @@ window.submitForm = async function(e) {
 
   btn.classList.add('loading');
 
-  // ── بناء البيانات ──
+  // ── بناء البيانات بالعربية كاملاً ──
   const data = {
     timestamp:  new Date().toLocaleString('ar-DZ'),
-    type:       currentModalType,
+    type:       typeLabelsAr[currentModalType] || currentModalType,
     firstName,
     lastName,
     birthDate,
-    birthPlace,
+    address,
     phone,
     motivation: document.getElementById('motivation').value.trim(),
   };
 
   if (currentModalType === 'support' || currentModalType === 'vip') {
-    data.eduLevel      = document.getElementById('eduLevel').value;
-    const spec  = document.getElementById('specialty');
-    const subj  = document.getElementById('subject');
-    const teach = document.getElementById('teacher');
-    const ctype = document.querySelector('input[name="candidateType"]:checked');
-    const pName = document.getElementById('parentName');
-    const pPh   = document.getElementById('parentPhone');
+    data.eduLevel = document.getElementById('eduLevel').value;
+    const spec    = document.getElementById('specialty');
+    const subj    = document.getElementById('subject');
+    const teach   = document.getElementById('teacher');
+    const ctype   = document.querySelector('input[name="candidateType"]:checked');
+    const pName   = document.getElementById('parentName');
+    const pPh     = document.getElementById('parentPhone');
     if (spec?.value)  data.specialty     = spec.value;
     if (subj?.value)  data.subject       = subj.value;
     if (teach?.value) data.teacher       = teach.value;
@@ -647,6 +685,8 @@ window.submitForm = async function(e) {
   }
 
   if (currentModalType === 'lang' || currentModalType === 'online') {
+    const langTypeEl = document.getElementById('langType');
+    if (langTypeEl?.value) data.langType = langTypeEl.value;
     data.langLevel = document.getElementById('langLevel').value;
     const lt = document.querySelector('input[name="levelTest"]:checked');
     if (lt) data.levelTest = lt.value;
@@ -660,15 +700,13 @@ window.submitForm = async function(e) {
   }
 
   try {
-    // ── إرسال لـ Google Sheets فقط ──
-    const response = await fetch(APPS_SCRIPT_URL, {
+    await fetch(APPS_SCRIPT_URL, {
       method:  'POST',
       mode:    'no-cors',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(data)
     });
 
-    // mode: no-cors دائماً يرجع opaque response — نعتبرها نجاح
     btn.classList.remove('loading');
     document.getElementById('form-view').style.display = 'none';
     document.getElementById('success-view').classList.add('show');
@@ -700,7 +738,7 @@ function launchConfetti() {
   }
 }
 
-// ─── ANNOUNCEMENTS (Firebase — للقراءة فقط) ───────────────
+// ─── ANNOUNCEMENTS (Firebase — قراءة فقط) ────────────────
 import { initializeApp }
   from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import { getFirestore, collection, query, orderBy, onSnapshot }
@@ -750,7 +788,7 @@ function renderAnnouncements(docs) {
     track.appendChild(card);
 
     const dot = document.createElement('div');
-    dot.className = 'ann-dot' + (i === 0 ? ' active' : '');
+    dot.className = 'ann-dot' + (i===0?' active':'');
     dot.onclick = () => { goToSlide(i); resetAuto(); };
     dotsEl.appendChild(dot);
   });
@@ -763,12 +801,10 @@ function renderAnnouncements(docs) {
     prev.className = 'ann-arrow ann-arrow-prev';
     prev.innerHTML = '‹';
     prev.onclick = () => { goToSlide((current-1+docs.length)%docs.length); resetAuto(); };
-
     const next = document.createElement('button');
     next.className = 'ann-arrow ann-arrow-next';
     next.innerHTML = '›';
     next.onclick = () => { goToSlide((current+1)%docs.length); resetAuto(); };
-
     wrapper.appendChild(prev);
     wrapper.appendChild(next);
   }
@@ -780,9 +816,7 @@ function renderAnnouncements(docs) {
   track.addEventListener('touchend', e => {
     const diff = e.changedTouches[0].clientX - touchStartX;
     if (Math.abs(diff) > 50) {
-      goToSlide(diff > 0
-        ? (current-1+docs.length)%docs.length
-        : (current+1)%docs.length);
+      goToSlide(diff>0?(current-1+docs.length)%docs.length:(current+1)%docs.length);
       resetAuto();
     }
   });
@@ -800,9 +834,9 @@ function renderAnnouncements(docs) {
   window.addEventListener('mouseup', () => {
     if (!isDragging) return;
     isDragging=false; track.style.transition=''; track.style.cursor='';
-    if (Math.abs(dragDelta) > 60) {
-      goToSlide(dragDelta>0?(current-1+docs.length)%docs.length:(current+1)%docs.length);
-    } else goToSlide(current);
+    goToSlide(Math.abs(dragDelta)>60
+      ? (dragDelta>0?(current-1+docs.length)%docs.length:(current+1)%docs.length)
+      : current);
     resetAuto();
   });
 
@@ -813,11 +847,10 @@ function renderAnnouncements(docs) {
       d.classList.toggle('active', i===idx));
   }
   function startAuto() {
-    if (docs.length <= 1) return;
-    autoSlide = setInterval(() => goToSlide((current+1)%docs.length), 8000);
+    if (docs.length<=1) return;
+    autoSlide = setInterval(()=>goToSlide((current+1)%docs.length), 8000);
   }
   function resetAuto() { clearInterval(autoSlide); startAuto(); }
-
   startAuto();
 }
 
