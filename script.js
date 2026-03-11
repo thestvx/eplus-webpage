@@ -472,7 +472,7 @@ function updateLangWarning() {
 }
 
 // ─── GOOGLE SHEETS URL ────────────────────────────────────
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxRvZQ2dbtdYJPtNzQHBVQiEpMn-sQPNnSDxMLjnxqzxA7WeC8Ixvr-Viv0UMn5W83uvQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyqwCoilqE9X-yqAO8SZ871UjPl7_n-4cuiEeRxJj1pYSHTolxP6-gYETr7b-n-W9FTMQ/exec';
 
 // ─── MODAL ────────────────────────────────────────────────
 let currentModalType = 'support';
