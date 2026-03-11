@@ -298,7 +298,6 @@ function openTerms(type) {
   const tpb = document.getElementById('terms-proceed-btn');
   if (tpb) { tpb.disabled = true; tpb.classList.remove('enabled'); }
 
-  // scroll القوانين للأعلى
   const tbody = document.querySelector('.terms-body');
   if (tbody) tbody.scrollTop = 0;
 
@@ -549,11 +548,13 @@ async function submitForm(e) {
 
   try {
     await fetch(SCRIPT_URL, {
-      method:'POST', mode:'no-cors',
-      headers:{ 'Content-Type':'application/json' },
+      method: 'POST',
+      mode: 'no-cors',
       body: JSON.stringify(data)
     });
-  } catch(err) { console.warn('Sheet error:', err); }
+  } catch(err) {
+    console.warn('Sheet error:', err);
+  }
 
   btn.classList.remove('loading');
   document.getElementById('form-view').style.display = 'none';
