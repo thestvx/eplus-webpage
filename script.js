@@ -36,7 +36,7 @@ window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 animateSquares();
 
-// ─── GOOGLE APPS SCRIPT URL ───────────────────────────────
+// ─── APPS SCRIPT URL ──────────────────────────────────────
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyqwCoilqE9X-yqAO8SZ871UjPl7_n-4cuiEeRxJj1pYSHTolxP6-gYETr7b-n-W9FTMQ/exec';
 
 // ─── LANGUAGE VALIDATION ──────────────────────────────────
@@ -49,14 +49,14 @@ function validateLang(text) {
   return true;
 }
 
-// ─── SPECIALTIES DATA ─────────────────────────────────────
+// ─── SPECIALTIES ──────────────────────────────────────────
 const specialties = {
   'أولى ثانوي': ['علوم تجريبية','آداب ولغات'],
   'ثانية ثانوي': ['علوم تجريبية','تقني رياضي','رياضيات','تسيير واقتصاد','آداب وفلسفة','لغات أجنبية'],
   'ثالثة ثانوي (بكالوريا)': ['علوم تجريبية','تقني رياضي','رياضيات','تسيير واقتصاد','آداب وفلسفة','لغات أجنبية'],
 };
 
-// ─── CURRICULUM DATA ──────────────────────────────────────
+// ─── CURRICULUM ───────────────────────────────────────────
 const curriculum = {
   'تحضيري':[], 'أولى ابتدائي':[], 'ثانية ابتدائي':[],
   'ثالثة ابتدائي':[], 'رابعة ابتدائي':[], 'خامسة ابتدائي':[],
@@ -100,12 +100,12 @@ const curriculum = {
     { subject:'العلوم الإسلامية',              teachers:['الأستاذ هبيتة ربيع'] },
   ],
   'ثالثة ثانوي (بكالوريا)|تسيير واقتصاد': [
-    { subject:'اللغة العربية',     teachers:['الأستاذة موساوي زبيدة'] },
-    { subject:'اللغة الفرنسية',    teachers:['الأستاذة كروش شمس الهدى'] },
-    { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
-    { subject:'الفلسفة',           teachers:['الأستاذة دادة نجاح سلام'] },
-    { subject:'تاريخ وجغرافيا',    teachers:['الأستاذ ايمن دخان'] },
-    { subject:'العلوم الإسلامية',  teachers:['الأستاذ هبيتة ربيع'] },
+    { subject:'اللغة العربية',    teachers:['الأستاذة موساوي زبيدة'] },
+    { subject:'اللغة الفرنسية',   teachers:['الأستاذة كروش شمس الهدى'] },
+    { subject:'اللغة الإنجليزية',teachers:['الأستاذ كرام الصادق'] },
+    { subject:'الفلسفة',          teachers:['الأستاذة دادة نجاح سلام'] },
+    { subject:'تاريخ وجغرافيا',   teachers:['الأستاذ ايمن دخان'] },
+    { subject:'العلوم الإسلامية', teachers:['الأستاذ هبيتة ربيع'] },
   ],
   'ثالثة ثانوي (بكالوريا)|آداب وفلسفة': [
     { subject:'اللغة العربية',     teachers:['الأستاذة موساوي زبيدة'] },
@@ -131,7 +131,7 @@ const needsParent        = ['تحضيري','أولى ابتدائي','ثانية
 const needsSpecialty     = ['أولى ثانوي','ثانية ثانوي','ثالثة ثانوي (بكالوريا)'];
 const needsCandidateType = ['ثالثة ثانوي (بكالوريا)'];
 
-// ─── DAYS HANDLER ─────────────────────────────────────────
+// ─── DAYS ─────────────────────────────────────────────────
 window.onDayChange = function(checkbox) {
   const checked = document.querySelectorAll('input[name="days"]:checked');
   const count   = checked.length;
@@ -204,7 +204,7 @@ function populateSubjects(key) {
   subSelect.setAttribute('required','required');
 }
 
-// ─── EDU LEVEL HANDLER ────────────────────────────────────
+// ─── EDU LEVEL ────────────────────────────────────────────
 window.onEduLevelChange = function() {
   const level            = document.getElementById('eduLevel').value;
   const parentGrp        = document.getElementById('parentGroup');
@@ -314,7 +314,7 @@ window.onLangLevelChange = function() {
   }
 };
 
-// ─── TERMS MODAL ──────────────────────────────────────────
+// ─── TERMS ────────────────────────────────────────────────
 let pendingModalType   = null;
 let termsTimerInterval = null;
 const TERMS_WAIT_SECONDS = 30;
@@ -324,8 +324,6 @@ window.openTerms = function(type) {
   const checkbox = document.getElementById('terms-checkbox');
   checkbox.checked  = false;
   checkbox.disabled = true;
-  const tcb = document.getElementById('terms-check-box');
-  if (tcb) tcb.innerHTML = '';
   const label = document.getElementById('terms-agree-label');
   if (label) { label.classList.add('locked'); label.classList.remove('unlocked'); }
   const tpb = document.getElementById('terms-proceed-btn');
@@ -405,10 +403,9 @@ window.closeTermsOutside = function(e) {
 window.onTermsCheck = function() {
   const checkbox = document.getElementById('terms-checkbox');
   if (checkbox.disabled) return;
-  const checked = checkbox.checked;
   const btn = document.getElementById('terms-proceed-btn');
-  btn.disabled = !checked;
-  btn.classList.toggle('enabled', checked);
+  btn.disabled = !checkbox.checked;
+  btn.classList.toggle('enabled', checkbox.checked);
 };
 
 window.proceedToRegister = function() {
@@ -548,15 +545,17 @@ window.setLang = function(lang) {
     const key = el.getAttribute('data-i18n-day-sub');
     if (daySubNames[lang]?.[key]) el.textContent = daySubNames[lang][key];
   });
+  // ── إعادة رسم الإعلانات عند تغيير اللغة ──
+  if (window._lastAnnDocs) renderAnnouncements(window._lastAnnDocs);
 };
 
 // ─── MODAL ────────────────────────────────────────────────
 const modalTitles = {
-  support:{ ar:'تسجيلات الدعم',               en:'Support Registration' },
-  lang:   { ar:'تسجيل دورة لغة',              en:'Language Course Registration' },
-  vip:    { ar:'تسجيل دروس VIP',              en:'VIP Lessons Registration' },
-  ielts:  { ar:'التسجيل في اختبار IELTS',      en:'IELTS Test Registration' },
-  online: { ar:'التسجيل في دورات أونلاين',     en:'Online Courses Registration' },
+  support:{ ar:'تسجيلات الدعم',            en:'Support Registration' },
+  lang:   { ar:'تسجيل دورة لغة',           en:'Language Course Registration' },
+  vip:    { ar:'تسجيل دروس VIP',           en:'VIP Lessons Registration' },
+  ielts:  { ar:'التسجيل في اختبار IELTS',   en:'IELTS Test Registration' },
+  online: { ar:'التسجيل في دورات أونلاين',  en:'Online Courses Registration' },
 };
 
 let currentModalType = null;
@@ -662,11 +661,11 @@ window.submitForm = async function(e) {
   if (currentModalType === 'support' || currentModalType === 'vip') {
     data.eduLevel = document.getElementById('eduLevel').value;
     const spec  = document.getElementById('specialty');
-    if (spec && spec.value)   data.specialty    = spec.value;
+    if (spec?.value)  data.specialty    = spec.value;
     const subj  = document.getElementById('subject');
-    if (subj && subj.value)   data.subject      = subj.value;
+    if (subj?.value)  data.subject      = subj.value;
     const teach = document.getElementById('teacher');
-    if (teach && teach.value) data.teacher      = teach.value;
+    if (teach?.value) data.teacher      = teach.value;
     const ctype = document.querySelector('input[name="candidateType"]:checked');
     if (ctype) data.candidateType = ctype.value;
     const pName  = document.getElementById('parentName');
@@ -720,8 +719,7 @@ window.submitForm = async function(e) {
     await addDoc(collection(db, 'registrations'), data);
 
     fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode:   'no-cors',
+      method: 'POST', mode: 'no-cors',
       headers:{ 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }).catch(() => {});
@@ -775,6 +773,9 @@ const _app = initializeApp(firebaseConfig);
 const _db  = getFirestore(_app);
 
 function renderAnnouncements(docs) {
+  // ── حفظ آخر بيانات للاستخدام عند تغيير اللغة ──
+  window._lastAnnDocs = docs;
+
   const section = document.getElementById('announcements-section');
   const track   = document.getElementById('ann-track');
   const dotsEl  = document.getElementById('ann-dots');
@@ -794,9 +795,9 @@ function renderAnnouncements(docs) {
       ? d.createdAt.toDate().toLocaleDateString('ar-DZ',{ year:'numeric', month:'long', day:'numeric' })
       : '';
     card.innerHTML = `
-      ${d.imageUrl ? `<img class="ann-card-img" src="${d.imageUrl}" alt="${d.title||''}">` : ''}
+      ${d.imageUrl ? `<img class="ann-card-img" src="${d.imageUrl}" alt="${d.title||''}" draggable="false">` : ''}
       <div class="ann-card-body">
-        <div class="ann-card-badge">📢 إعلان</div>
+        <div class="ann-card-badge">📢 ${currentLang === 'ar' ? 'إعلان' : 'Announcement'}</div>
         ${d.title ? `<div class="ann-card-title">${d.title}</div>` : ''}
         ${d.text  ? `<div class="ann-card-text">${d.text}</div>`   : ''}
         ${dateStr ? `<div class="ann-card-date">🗓 ${dateStr}</div>` : ''}
@@ -809,7 +810,7 @@ function renderAnnouncements(docs) {
     dotsEl.appendChild(dot);
   });
 
-  // ── أزرار السهم — تظهر فقط إذا أكثر من إعلان ──
+  // ── أزرار السهم ──
   const wrapper = document.querySelector('.ann-track-wrapper');
   wrapper.querySelectorAll('.ann-arrow').forEach(a => a.remove());
 
@@ -830,28 +831,28 @@ function renderAnnouncements(docs) {
     wrapper.appendChild(btnNext);
   }
 
-  // ── Swipe موبايل + سحب ─────────────────────────────────
+  // ── Touch Swipe ──
   let touchStartX = 0;
-  let isDragging  = false;
-  let dragStartX  = 0;
-  let dragDelta   = 0;
-
-  // Touch
   track.addEventListener('touchstart', e => {
     touchStartX = e.touches[0].clientX;
   }, { passive:true });
   track.addEventListener('touchend', e => {
-    const diff = touchStartX - e.changedTouches[0].clientX;
+    const diff = e.changedTouches[0].clientX - touchStartX;
     if (Math.abs(diff) > 50) {
+      // سحب يمين = السابق | سحب يسار = التالي
       goToSlide(diff > 0
-        ? (current + 1) % docs.length
-        : (current - 1 + docs.length) % docs.length
+        ? (current - 1 + docs.length) % docs.length
+        : (current + 1) % docs.length
       );
       resetAutoSlide();
     }
   });
 
-  // Mouse drag
+  // ── Mouse Drag ──
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragDelta  = 0;
+
   track.addEventListener('mousedown', e => {
     isDragging = true;
     dragStartX = e.clientX;
@@ -862,9 +863,7 @@ function renderAnnouncements(docs) {
   window.addEventListener('mousemove', e => {
     if (!isDragging) return;
     dragDelta = e.clientX - dragStartX;
-    const base = current * 100;
-    const shift = (dragDelta / track.parentElement.offsetWidth) * 100;
-    track.style.transform = `translateX(calc(${base}% + ${dragDelta}px))`;
+    track.style.transform = `translateX(calc(${current * 100}% + ${dragDelta}px))`;
   });
   window.addEventListener('mouseup', () => {
     if (!isDragging) return;
@@ -872,9 +871,10 @@ function renderAnnouncements(docs) {
     track.style.transition = '';
     track.style.cursor = '';
     if (Math.abs(dragDelta) > 60) {
-      goToSlide(dragDelta < 0
-        ? (current + 1) % docs.length
-        : (current - 1 + docs.length) % docs.length
+      // سحب يمين = السابق | سحب يسار = التالي
+      goToSlide(dragDelta > 0
+        ? (current - 1 + docs.length) % docs.length
+        : (current + 1) % docs.length
       );
     } else {
       goToSlide(current);
@@ -889,7 +889,6 @@ function renderAnnouncements(docs) {
       d.classList.toggle('active', i === idx));
   }
 
-  // ── Auto slide — فقط إذا أكثر من إعلان ──
   function startAutoSlide() {
     if (docs.length <= 1) return;
     autoSlide = setInterval(() => goToSlide((current + 1) % docs.length), 8000);
