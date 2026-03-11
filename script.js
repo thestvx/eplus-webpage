@@ -70,6 +70,7 @@ const curriculum = {
   'ثانية ثانوي|علوم تجريبية':[], 'ثانية ثانوي|تقني رياضي':[],
   'ثانية ثانوي|رياضيات':[], 'ثانية ثانوي|تسيير واقتصاد':[],
   'ثانية ثانوي|آداب وفلسفة':[], 'ثانية ثانوي|لغات أجنبية':[],
+
   'ثالثة ثانوي (بكالوريا)|علوم تجريبية': [
     { subject:'العلوم الفيزيائية والتكنولوجيا', teachers:['الأستاذ نمسي عبدالرحمان','الأستاذ لكموتة لمين'] },
     { subject:'الرياضيات (العلميين)',           teachers:['الأستاذة ترعة فاطمة','الأستاذ عبدالباسط نعورة'] },
@@ -79,6 +80,7 @@ const curriculum = {
     { subject:'اللغة الإنجليزية',              teachers:['الأستاذ كرام الصادق'] },
     { subject:'الفلسفة',                       teachers:['الأستاذة دادة نجاح سلام'] },
     { subject:'تاريخ وجغرافيا',                teachers:['الأستاذ ايمن دخان'] },
+    { subject:'العلوم الإسلامية',              teachers:['الأستاذ هبيتة ربيع'] },
   ],
   'ثالثة ثانوي (بكالوريا)|تقني رياضي': [
     { subject:'العلوم الفيزيائية والتكنولوجيا', teachers:['الأستاذ نمسي عبدالرحمان','الأستاذ لكموتة لمين'] },
@@ -86,6 +88,7 @@ const curriculum = {
     { subject:'اللغة العربية',                 teachers:['الأستاذة موساوي زبيدة'] },
     { subject:'اللغة الفرنسية',                teachers:['الأستاذة كروش شمس الهدى'] },
     { subject:'اللغة الإنجليزية',              teachers:['الأستاذ كرام الصادق'] },
+    { subject:'العلوم الإسلامية',              teachers:['الأستاذ هبيتة ربيع'] },
   ],
   'ثالثة ثانوي (بكالوريا)|رياضيات': [
     { subject:'العلوم الفيزيائية والتكنولوجيا', teachers:['الأستاذ نمسي عبدالرحمان','الأستاذ لكموتة لمين'] },
@@ -94,6 +97,7 @@ const curriculum = {
     { subject:'اللغة الفرنسية',                teachers:['الأستاذة كروش شمس الهدى'] },
     { subject:'اللغة الإنجليزية',              teachers:['الأستاذ كرام الصادق'] },
     { subject:'الفلسفة',                       teachers:['الأستاذة دادة نجاح سلام'] },
+    { subject:'العلوم الإسلامية',              teachers:['الأستاذ هبيتة ربيع'] },
   ],
   'ثالثة ثانوي (بكالوريا)|تسيير واقتصاد': [
     { subject:'اللغة العربية',     teachers:['الأستاذة موساوي زبيدة'] },
@@ -101,6 +105,7 @@ const curriculum = {
     { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
     { subject:'الفلسفة',           teachers:['الأستاذة دادة نجاح سلام'] },
     { subject:'تاريخ وجغرافيا',    teachers:['الأستاذ ايمن دخان'] },
+    { subject:'العلوم الإسلامية',  teachers:['الأستاذ هبيتة ربيع'] },
   ],
   'ثالثة ثانوي (بكالوريا)|آداب وفلسفة': [
     { subject:'اللغة العربية',     teachers:['الأستاذة موساوي زبيدة'] },
@@ -108,6 +113,8 @@ const curriculum = {
     { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
     { subject:'الفلسفة',           teachers:['الأستاذة دادة نجاح سلام'] },
     { subject:'تاريخ وجغرافيا',    teachers:['الأستاذ ايمن دخان'] },
+    { subject:'الرياضيات (أدبيين)',teachers:['الأستاذ هبيتة ربيع'] },
+    { subject:'العلوم الإسلامية',  teachers:['الأستاذ هبيتة ربيع'] },
   ],
   'ثالثة ثانوي (بكالوريا)|لغات أجنبية': [
     { subject:'اللغة الإسبانية',   teachers:['الأستاذ طوالبية ابراهيم'] },
@@ -115,6 +122,8 @@ const curriculum = {
     { subject:'اللغة العربية',     teachers:['الأستاذة موساوي زبيدة'] },
     { subject:'اللغة الفرنسية',    teachers:['الأستاذة كروش شمس الهدى'] },
     { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
+    { subject:'الرياضيات (أدبيين)',teachers:['الأستاذ هبيتة ربيع'] },
+    { subject:'العلوم الإسلامية',  teachers:['الأستاذ هبيتة ربيع'] },
   ],
 };
 
@@ -308,7 +317,7 @@ window.onLangLevelChange = function() {
 // ─── TERMS MODAL ──────────────────────────────────────────
 let pendingModalType   = null;
 let termsTimerInterval = null;
-const TERMS_WAIT_SECONDS = 0;
+const TERMS_WAIT_SECONDS = 30;
 
 window.openTerms = function(type) {
   pendingModalType = type;
@@ -694,7 +703,6 @@ window.submitForm = async function(e) {
     const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
     const db  = getFirestore(app);
 
-    // ── فحص التكرار ──
     const dupQ = query(
       collection(db, 'registrations'),
       where('firstName', '==', firstName),
@@ -709,10 +717,8 @@ window.submitForm = async function(e) {
       return;
     }
 
-    // ── حفظ في Firebase ──
     await addDoc(collection(db, 'registrations'), data);
 
-    // ── إرسال لـ Google Sheets ──
     fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       mode:   'no-cors',
@@ -751,7 +757,7 @@ function launchConfetti() {
   }
 }
 
-// ─── ANNOUNCEMENTS (FIREBASE) ─────────────────────────────
+// ─── ANNOUNCEMENTS ────────────────────────────────────────
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import { getFirestore, collection, query, orderBy, onSnapshot }
   from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
@@ -803,7 +809,7 @@ function renderAnnouncements(docs) {
     dotsEl.appendChild(dot);
   });
 
-  // ── أزرار السهم ──
+  // ── أزرار السهم — تظهر فقط إذا أكثر من إعلان ──
   const wrapper = document.querySelector('.ann-track-wrapper');
   wrapper.querySelectorAll('.ann-arrow').forEach(a => a.remove());
 
@@ -811,20 +817,29 @@ function renderAnnouncements(docs) {
     const btnPrev = document.createElement('button');
     btnPrev.className = 'ann-arrow ann-arrow-prev';
     btnPrev.innerHTML = '‹';
+    btnPrev.setAttribute('aria-label','السابق');
     btnPrev.onclick = () => { goToSlide((current - 1 + docs.length) % docs.length); resetAutoSlide(); };
 
     const btnNext = document.createElement('button');
     btnNext.className = 'ann-arrow ann-arrow-next';
     btnNext.innerHTML = '›';
+    btnNext.setAttribute('aria-label','التالي');
     btnNext.onclick = () => { goToSlide((current + 1) % docs.length); resetAutoSlide(); };
 
     wrapper.appendChild(btnPrev);
     wrapper.appendChild(btnNext);
   }
 
-  // ── Swipe موبايل ──
+  // ── Swipe موبايل + سحب ─────────────────────────────────
   let touchStartX = 0;
-  track.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive:true });
+  let isDragging  = false;
+  let dragStartX  = 0;
+  let dragDelta   = 0;
+
+  // Touch
+  track.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive:true });
   track.addEventListener('touchend', e => {
     const diff = touchStartX - e.changedTouches[0].clientX;
     if (Math.abs(diff) > 50) {
@@ -836,6 +851,37 @@ function renderAnnouncements(docs) {
     }
   });
 
+  // Mouse drag
+  track.addEventListener('mousedown', e => {
+    isDragging = true;
+    dragStartX = e.clientX;
+    dragDelta  = 0;
+    track.style.transition = 'none';
+    track.style.cursor = 'grabbing';
+  });
+  window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    dragDelta = e.clientX - dragStartX;
+    const base = current * 100;
+    const shift = (dragDelta / track.parentElement.offsetWidth) * 100;
+    track.style.transform = `translateX(calc(${base}% + ${dragDelta}px))`;
+  });
+  window.addEventListener('mouseup', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    track.style.transition = '';
+    track.style.cursor = '';
+    if (Math.abs(dragDelta) > 60) {
+      goToSlide(dragDelta < 0
+        ? (current + 1) % docs.length
+        : (current - 1 + docs.length) % docs.length
+      );
+    } else {
+      goToSlide(current);
+    }
+    resetAutoSlide();
+  });
+
   function goToSlide(idx) {
     current = idx;
     track.style.transform = `translateX(${idx * 100}%)`;
@@ -843,11 +889,11 @@ function renderAnnouncements(docs) {
       d.classList.toggle('active', i === idx));
   }
 
+  // ── Auto slide — فقط إذا أكثر من إعلان ──
   function startAutoSlide() {
     if (docs.length <= 1) return;
     autoSlide = setInterval(() => goToSlide((current + 1) % docs.length), 8000);
   }
-
   function resetAutoSlide() {
     clearInterval(autoSlide);
     startAutoSlide();
