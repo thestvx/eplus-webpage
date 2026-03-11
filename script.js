@@ -308,7 +308,7 @@ window.onLangLevelChange = function() {
 // ─── TERMS MODAL ──────────────────────────────────────────
 let pendingModalType   = null;
 let termsTimerInterval = null;
-const TERMS_WAIT_SECONDS = 90;
+const TERMS_WAIT_SECONDS = 0;
 
 window.openTerms = function(type) {
   pendingModalType = type;
