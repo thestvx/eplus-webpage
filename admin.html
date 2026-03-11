@@ -80,7 +80,7 @@
     .upload-preview{ width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-top:14px; display:none; }
 
     .progress-wrap{ background:rgba(2,10,22,0.6); border-radius:999px; overflow:hidden; height:8px; margin-top:10px; display:none; }
-    .progress-bar{ height:100%; background:linear-gradient(90deg,#045283,#0a8acb); border-radius:999px; transition:width 0.3s; width:0%; }
+    .progress-bar{ height:100%; background:linear-gradient(90deg,#045283,#0a8acb); border-radius:999px; transition:width 0.4s; width:0%; }
 
     .btn-submit{
       width:100%; padding:14px; border:none; border-radius:14px;
@@ -111,7 +111,7 @@
     }
     .ann-item:hover{ border-color:rgba(10,138,203,0.4); }
     .ann-item-thumb{
-      width:54px; height:54px; border-radius:10px; object-fit:cover; flex-shrink:0;
+      width:54px; height:54px; border-radius:10px; flex-shrink:0;
       background:rgba(4,82,131,0.15); display:flex; align-items:center; justify-content:center;
       font-size:22px; border:1px solid rgba(4,82,131,0.2); overflow:hidden;
     }
@@ -204,7 +204,7 @@
   <div class="toast" id="toast"></div>
 
   <script type="module">
-    import { initializeApp }   from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import { initializeApp }  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
       from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, deleteDoc, doc, query, orderBy, onSnapshot, serverTimestamp }
@@ -212,26 +212,26 @@
 
     // ── Firebase Config ──
     const firebaseConfig = {
-      apiKey:            "YOUR_API_KEY",
-      authDomain:        "YOUR_PROJECT.firebaseapp.com",
-      projectId:         "YOUR_PROJECT_ID",
-      storageBucket:     "YOUR_PROJECT.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId:             "YOUR_APP_ID"
+      apiKey:            "AIzaSyCtb6RPW5sq5zK5JMmTYlBFEnQQZfVoI7s",
+      authDomain:        "epluscenter-panel.firebaseapp.com",
+      projectId:         "epluscenter-panel",
+      storageBucket:     "epluscenter-panel.firebasestorage.app",
+      messagingSenderId: "1000462675381",
+      appId:             "1:1000462675381:web:b2156128337f7c11c17dfc"
     };
 
     // ── Cloudinary Config ──
     const CLOUDINARY_CLOUD  = 'dvxyom2xg';
-    const CLOUDINARY_PRESET = 'YOUR_PRESET_NAME'; // ← ضع اسم الـ preset هنا
+    const CLOUDINARY_PRESET = 'EplusCenter';
 
-    const app = initializeApp(firebaseConfig);
+    const app  = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db   = getFirestore(app);
 
     let annType      = 'text';
     let fileToUpload = null;
 
-    // ── Auth ──
+    // ── Auth State ──
     onAuthStateChanged(auth, user => {
       if (user) {
         document.getElementById('login-screen').style.display = 'none';
@@ -280,7 +280,7 @@
 
       const btn = document.getElementById('submit-ann-btn');
       btn.disabled = true;
-      btn.innerHTML = '<span>جاري النشر...</span>';
+      btn.innerHTML = '<span>⏳ جاري النشر...</span>';
 
       try {
         let imageUrl = null;
@@ -301,7 +301,6 @@
             { method: 'POST', body: formData }
           );
           const data = await res.json();
-
           if (data.error) throw new Error(data.error.message);
 
           imageUrl = data.secure_url;
@@ -312,17 +311,17 @@
 
         await addDoc(collection(db, 'announcements'), {
           title,
-          text: text || '',
-          imageUrl,
-          publicId,
+          text:      text || '',
+          imageUrl:  imageUrl || null,
+          publicId:  publicId || null,
           createdAt: serverTimestamp()
         });
 
         showToast('✅ تم نشر الإعلان بنجاح!');
-        document.getElementById('ann-title').value        = '';
-        document.getElementById('ann-text').value         = '';
+        document.getElementById('ann-title').value             = '';
+        document.getElementById('ann-text').value              = '';
         document.getElementById('upload-preview').style.display = 'none';
-        document.getElementById('img-file').value         = '';
+        document.getElementById('img-file').value              = '';
         fileToUpload = null;
 
       } catch(err) {
@@ -333,7 +332,7 @@
       btn.innerHTML = '<span>🚀 نشر الإعلان</span>';
     };
 
-    // ── Load List ──
+    // ── Load Announcements ──
     function loadAnnouncements() {
       const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
       onSnapshot(q, snap => {
