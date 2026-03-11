@@ -620,7 +620,7 @@ window.closeModalOutside = function(e) {
   if (e.target === document.getElementById('modal')) window.closeModal();
 };
 
-// ─── FORM SUBMIT — Google Sheets فقط ──────────────────────
+// ─── FORM SUBMIT ──────────────────────────────────────────
 window.submitForm = async function(e) {
   e.preventDefault();
   const btn = document.querySelector('#reg-form .submit-btn');
@@ -631,7 +631,6 @@ window.submitForm = async function(e) {
   const address   = document.getElementById('birthPlace').value.trim();
   const phone     = document.getElementById('phone').value.trim();
 
-  // ── تحقق اللغة ──
   let langError = false;
   [['firstName',firstName],['lastName',lastName],['birthPlace',address]].forEach(([id,val]) => {
     if (val && !validateLang(val)) {
@@ -643,7 +642,6 @@ window.submitForm = async function(e) {
   });
   if (langError) return;
 
-  // ── تحقق الحقول المطلوبة ──
   let valid = true;
   document.querySelectorAll('#reg-form [required]').forEach(field => {
     if (!field.value.trim()) {
@@ -656,7 +654,6 @@ window.submitForm = async function(e) {
 
   btn.classList.add('loading');
 
-  // ── بناء البيانات بالعربية كاملاً ──
   const data = {
     timestamp:  new Date().toLocaleString('ar-DZ'),
     type:       typeLabelsAr[currentModalType] || currentModalType,
@@ -706,12 +703,10 @@ window.submitForm = async function(e) {
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(data)
     });
-
     btn.classList.remove('loading');
     document.getElementById('form-view').style.display = 'none';
     document.getElementById('success-view').classList.add('show');
     launchConfetti();
-
   } catch(err) {
     btn.classList.remove('loading');
     console.error(err);
@@ -738,21 +733,9 @@ function launchConfetti() {
   }
 }
 
-// ─── ANNOUNCEMENTS (Firebase — قراءة فقط) ────────────────
-import { initializeApp }
-  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-import { getFirestore, collection, query, orderBy, onSnapshot }
-  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-
-const _app = initializeApp({
-  apiKey:            "AIzaSyCtb6RPW5sq5zK5JMmTYlBFEnQQZfVoI7s",
-  authDomain:        "epluscenter-panel.firebaseapp.com",
-  projectId:         "epluscenter-panel",
-  storageBucket:     "epluscenter-panel.firebasestorage.app",
-  messagingSenderId: "1000462675381",
-  appId:             "1:1000462675381:web:b2156128337f7c11c17dfc"
-});
-const _db = getFirestore(_app);
+// ─── ANNOUNCEMENTS (Global State) ─────────────────────────
+let annCurrent   = 0;
+let annAutoSlide = null;
 
 function renderAnnouncements(docs) {
   window._lastAnnDocs = docs;
@@ -761,11 +744,12 @@ function renderAnnouncements(docs) {
   const dotsEl  = document.getElementById('ann-dots');
   if (!docs.length) { section.style.display = 'none'; return; }
 
+  const savedIndex = annCurrent;
+  clearInterval(annAutoSlide);
+
   section.style.display = 'block';
   track.innerHTML  = '';
   dotsEl.innerHTML = '';
-  let current = 0;
-  let autoSlide;
 
   docs.forEach((doc, i) => {
     const d    = doc.data();
@@ -800,11 +784,11 @@ function renderAnnouncements(docs) {
     const prev = document.createElement('button');
     prev.className = 'ann-arrow ann-arrow-prev';
     prev.innerHTML = '‹';
-    prev.onclick = () => { goToSlide((current-1+docs.length)%docs.length); resetAuto(); };
+    prev.onclick = () => { goToSlide((annCurrent-1+docs.length)%docs.length); resetAuto(); };
     const next = document.createElement('button');
     next.className = 'ann-arrow ann-arrow-next';
     next.innerHTML = '›';
-    next.onclick = () => { goToSlide((current+1)%docs.length); resetAuto(); };
+    next.onclick = () => { goToSlide((annCurrent+1)%docs.length); resetAuto(); };
     wrapper.appendChild(prev);
     wrapper.appendChild(next);
   }
@@ -816,7 +800,7 @@ function renderAnnouncements(docs) {
   track.addEventListener('touchend', e => {
     const diff = e.changedTouches[0].clientX - touchStartX;
     if (Math.abs(diff) > 50) {
-      goToSlide(diff>0?(current-1+docs.length)%docs.length:(current+1)%docs.length);
+      goToSlide(diff>0?(annCurrent-1+docs.length)%docs.length:(annCurrent+1)%docs.length);
       resetAuto();
     }
   });
@@ -829,30 +813,53 @@ function renderAnnouncements(docs) {
   window.addEventListener('mousemove', e => {
     if (!isDragging) return;
     dragDelta = e.clientX - dragStartX;
-    track.style.transform = `translateX(calc(${current*100}% + ${dragDelta}px))`;
+    track.style.transform = `translateX(calc(${annCurrent * -100}% + ${dragDelta}px))`;
   });
   window.addEventListener('mouseup', () => {
     if (!isDragging) return;
     isDragging=false; track.style.transition=''; track.style.cursor='';
     goToSlide(Math.abs(dragDelta)>60
-      ? (dragDelta>0?(current-1+docs.length)%docs.length:(current+1)%docs.length)
-      : current);
+      ? (dragDelta>0?(annCurrent-1+docs.length)%docs.length:(annCurrent+1)%docs.length)
+      : annCurrent);
     resetAuto();
   });
 
+  const startIndex = savedIndex < docs.length ? savedIndex : 0;
+  annCurrent = startIndex;
+  track.style.transform = `translateX(${startIndex * -100}%)`;
+  document.querySelectorAll('.ann-dot').forEach((d,i) =>
+    d.classList.toggle('active', i===startIndex));
+
+  startAuto();
+
   function goToSlide(idx) {
-    current = idx;
-    track.style.transform = `translateX(${idx*100}%)`;
+    annCurrent = idx;
+    track.style.transform = `translateX(${idx * -100}%)`;
     document.querySelectorAll('.ann-dot').forEach((d,i) =>
       d.classList.toggle('active', i===idx));
   }
   function startAuto() {
     if (docs.length<=1) return;
-    autoSlide = setInterval(()=>goToSlide((current+1)%docs.length), 8000);
+    annAutoSlide = setInterval(()=>goToSlide((annCurrent+1)%docs.length), 8000);
   }
-  function resetAuto() { clearInterval(autoSlide); startAuto(); }
-  startAuto();
+  function resetAuto() { clearInterval(annAutoSlide); startAuto(); }
 }
+
+// ─── FIREBASE — قراءة الإعلانات فقط ──────────────────────
+import { initializeApp }
+  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getFirestore, collection, query, orderBy, onSnapshot }
+  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+const _app = initializeApp({
+  apiKey:            "AIzaSyCtb6RPW5sq5zK5JMmTYlBFEnQQZfVoI7s",
+  authDomain:        "epluscenter-panel.firebaseapp.com",
+  projectId:         "epluscenter-panel",
+  storageBucket:     "epluscenter-panel.firebasestorage.app",
+  messagingSenderId: "1000462675381",
+  appId:             "1:1000462675381:web:b2156128337f7c11c17dfc"
+});
+const _db = getFirestore(_app);
 
 onSnapshot(
   query(collection(_db,'announcements'), orderBy('createdAt','desc')),
