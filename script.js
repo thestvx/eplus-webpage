@@ -39,7 +39,6 @@ animateSquares();
 // ─── LANGUAGE VALIDATION ──────────────────────────────────
 function isArabic(text)  { return /[\u0600-\u06FF]/.test(text); }
 function isEnglish(text) { return /[a-zA-Z]/.test(text); }
-
 function validateLang(text) {
   if (!text.trim()) return true;
   if (currentLang === 'ar') return isArabic(text) && !isEnglish(text);
@@ -124,25 +123,22 @@ const needsCandidateType = ['ثالثة ثانوي (بكالوريا)'];
 function onDayChange(checkbox) {
   const checked = document.querySelectorAll('input[name="days"]:checked');
   const count   = checked.length;
-  const counter = document.getElementById('days-counter');
-  const countEl = document.getElementById('days-count');
-
   if (count > 2) { checkbox.checked = false; return; }
-
   document.querySelectorAll('.day-card').forEach(card => {
     const inp = card.querySelector('input');
     card.classList.toggle('selected', inp.checked);
     if (!inp.checked && count >= 2) card.classList.add('disabled');
     else card.classList.remove('disabled');
   });
-
-  countEl.textContent = Math.min(count, 2);
-  counter.classList.toggle('complete', count === 2);
+  const countEl = document.getElementById('days-count');
+  if (countEl) countEl.textContent = Math.min(count, 2);
+  const counter = document.getElementById('days-counter');
+  if (counter) counter.classList.toggle('complete', count === 2);
 }
 
 function resetDays() {
   document.querySelectorAll('input[name="days"]').forEach(c => c.checked = false);
-  document.querySelectorAll('.day-card').forEach(c => { c.classList.remove('selected','disabled'); });
+  document.querySelectorAll('.day-card').forEach(c => c.classList.remove('selected','disabled'));
   const countEl = document.getElementById('days-count');
   if (countEl) countEl.textContent = '0';
   const counter = document.getElementById('days-counter');
@@ -175,11 +171,9 @@ function populateSubjects(key) {
   const subGrp    = document.getElementById('subjectGroup');
   const subSelect = document.getElementById('subject');
   const teachGrp  = document.getElementById('teacherGroup');
-
   document.getElementById('comingSoonNote')?.remove();
-  hideField(subGrp,   'subject');
+  hideField(subGrp, 'subject');
   hideField(teachGrp, 'teacher');
-
   const subjects = curriculum[key] ?? [];
   if (subjects.length === 0) {
     const specGrp = document.getElementById('specialtyGroup');
@@ -188,7 +182,6 @@ function populateSubjects(key) {
     showComingSoon(afterEl);
     return;
   }
-
   subSelect.innerHTML = `<option value="">-- اختر المادة --</option>`;
   subjects.forEach(item => {
     const opt = document.createElement('option');
@@ -221,7 +214,6 @@ function onEduLevelChange() {
   document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
 
   if (!level) return;
-
   if (needsParent.includes(level)) {
     animateShow(parentGrp);
     parentName.setAttribute('required','required');
@@ -237,12 +229,10 @@ function onCandidateTypeChange() {
   const specialtyGrp = document.getElementById('specialtyGroup');
   const subGrp       = document.getElementById('subjectGroup');
   const teachGrp     = document.getElementById('teacherGroup');
-
   document.getElementById('comingSoonNote')?.remove();
   hideField(specialtyGrp, 'specialty');
   hideField(subGrp,       'subject');
   hideField(teachGrp,     'teacher');
-
   const selected = document.querySelector('input[name="candidateType"]:checked');
   if (!selected) return;
   showSpecialtyField(level);
@@ -252,7 +242,6 @@ function showSpecialtyField(level) {
   const specialtyGrp = document.getElementById('specialtyGroup');
   const specialtySel = document.getElementById('specialty');
   const specs = specialties[level] || [];
-
   specialtySel.innerHTML = `<option value="">-- اختر التخصص --</option>`;
   specs.forEach(sp => {
     const opt = document.createElement('option');
@@ -268,7 +257,6 @@ function onSpecialtyChange() {
   const spec     = document.getElementById('specialty').value;
   const subGrp   = document.getElementById('subjectGroup');
   const teachGrp = document.getElementById('teacherGroup');
-
   document.getElementById('comingSoonNote')?.remove();
   hideField(subGrp,   'subject');
   hideField(teachGrp, 'teacher');
@@ -282,15 +270,12 @@ function onSubjectChange() {
   const subjectVal  = document.getElementById('subject').value;
   const teachGrp    = document.getElementById('teacherGroup');
   const teachSelect = document.getElementById('teacher');
-
   hideField(teachGrp, 'teacher');
   if (!subjectVal) return;
-
   const key      = spec ? `${level}|${spec}` : level;
   const subjects = curriculum[key] || [];
   const found    = subjects.find(s => s.subject === subjectVal);
   if (!found || found.teachers.length === 0) return;
-
   teachSelect.innerHTML = `<option value="">-- اختر الأستاذ/ة --</option>`;
   found.teachers.forEach(t => {
     const opt = document.createElement('option');
@@ -304,11 +289,16 @@ function onSubjectChange() {
 
 function onLangLevelChange() {
   const levelTestGrp = document.getElementById('levelTestGroup');
+  const daysGrp      = document.getElementById('daysGroup');
   const val = document.getElementById('langLevel').value;
-  if (val) animateShow(levelTestGrp);
-  else {
+  if (val) {
+    animateShow(levelTestGrp);
+    animateShow(daysGrp);
+  } else {
     levelTestGrp.style.display = 'none';
+    daysGrp.style.display = 'none';
     document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+    resetDays();
   }
 }
 
@@ -421,11 +411,268 @@ const translations = {
     chooseDays:"Choose 2 days per week to attend", daysOf:"/2", daysSelected:"days selected",
     langWarn:"Please enter all information in English only",
     langError:"Please write in English only",
-    t1:"The student is officially registered at the center upon payment of registration fees on the specified date.",
+    t1:"The student is officially registered upon payment of registration fees on the specified date.",
     t2:"The student must demonstrate good manners, cleanliness, and appropriate dress.",
-    t3:"All individuals at the educational center must be respected — peers, teachers, and administrative staff.",
+    t3:"All individuals at the center must be respected — peers, teachers, and administrative staff.",
     t4:"Study schedules must be respected, and students must not leave without prior permission.",
-    t5:"Absences are only permitted for necessary reasons, with prior notification to the administration.",
+    t5:"Absences are only permitted for necessary reasons, with prior notification to administration.",
     t6:"In case of absence without reason, the guardian will be notified.",
     t7:"Missed sessions will not be compensated for repeated absences or discontinuation.",
-    t8:"In case of study discontinuation, only 80% of the remaining value will be ref
+    t8:"In case of discontinuation, only 80% of the remaining value will be refunded.",
+    t9:"For long-term absences, please contact the administration to resolve the situation.",
+    t10:"The center is not responsible for loss of valuables (money, phone, jewelry...).",
+    t11:"Touching or operating educational equipment without permission is prohibited.",
+    t12:"Any damage to center equipment will result in penalties and compensation for losses.",
+    t13:"For unacceptable behavior, the guardian will be formally warned upon repeated violations.",
+    t14:"Consent to publish the student's photos on social media and educational videos of the center.",
+    days:{ sat:'Saturday', sun:'Sunday', mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday' },
+    levels:{ A1:"A1 - Beginner", A2:"A2 - Elementary", B1:"B1 - Intermediate", B2:"B2 - Upper Intermediate", C1:"C1 - Advanced", C2:"C2 - Proficiency" }
+  }
+};
+
+let currentLang = localStorage.getItem('eplus-lang') || 'ar';
+
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('eplus-lang', lang);
+  const html = document.documentElement;
+  html.setAttribute('lang', lang);
+  html.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+  document.getElementById('btn-ar').classList.toggle('active', lang === 'ar');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  applyTranslations();
+  updateLangWarning();
+}
+
+function applyTranslations() {
+  const t = translations[currentLang];
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key] !== undefined) {
+      if (['successMsg','duplicateMsg'].includes(key)) el.innerHTML = t[key];
+      else el.textContent = t[key];
+    }
+  });
+  document.querySelectorAll('[data-i18n-level]').forEach(el => {
+    const lv = el.getAttribute('data-i18n-level');
+    if (t.levels?.[lv]) el.textContent = t.levels[lv];
+  });
+  document.querySelectorAll('[data-i18n-day]').forEach(el => {
+    const dk = el.getAttribute('data-i18n-day');
+    if (t.days?.[dk]) el.textContent = t.days[dk];
+  });
+}
+
+function updateLangWarning() {
+  const t = translations[currentLang];
+  const icon = document.getElementById('lang-warning-icon');
+  const text = document.getElementById('lang-warning-text');
+  if (icon) icon.textContent = currentLang === 'ar' ? '🇸🇦' : '🇬🇧';
+  if (text) text.textContent = t.langWarn;
+}
+
+// ─── GOOGLE SHEETS URL ────────────────────────────────────
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxRvZQ2dbtdYJPtNzQHBVQiEpMn-sQPNnSDxMLjnxqzxA7WeC8Ixvr-Viv0UMn5W83uvQ/exec';
+
+// ─── MODAL ────────────────────────────────────────────────
+let currentModalType = 'support';
+
+function openModal(type) {
+  currentModalType = type;
+  const t            = translations[currentLang];
+  const overlay      = document.getElementById('modal');
+  const langToggle   = document.getElementById('lang-toggle');
+  const eduLevelGrp  = document.getElementById('eduLevelGroup');
+  const parentGrp    = document.getElementById('parentGroup');
+  const specialtyGrp = document.getElementById('specialtyGroup');
+  const subGrp       = document.getElementById('subjectGroup');
+  const teachGrp     = document.getElementById('teacherGroup');
+  const langLevelGrp = document.getElementById('langLevelGroup');
+  const langLevelSel = document.getElementById('langLevel');
+  const candidateGrp = document.getElementById('candidateTypeGroup');
+  const levelTestGrp = document.getElementById('levelTestGroup');
+  const daysGrp      = document.getElementById('daysGroup');
+  const parentName   = document.getElementById('parentName');
+  const parentPhone  = document.getElementById('parentPhone');
+
+  document.getElementById('modal-title').textContent =
+    { support:t.supportTitle, lang:t.langTitle, vip:t.vipTitle, ielts:t.ieltsTitle, online:t.onlineTitle }[type] || '';
+
+  [eduLevelGrp,parentGrp,specialtyGrp,subGrp,teachGrp,langLevelGrp,candidateGrp,levelTestGrp,daysGrp]
+    .forEach(el => el.style.display = 'none');
+
+  langLevelSel.removeAttribute('required');
+  parentName.removeAttribute('required');
+  parentPhone.removeAttribute('required');
+  document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
+  document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+  document.getElementById('comingSoonNote')?.remove();
+  resetDays();
+
+  if (type === 'support') {
+    eduLevelGrp.style.display = 'block';
+  } else if (type === 'lang') {
+    langLevelGrp.style.display = 'block';
+    langLevelSel.setAttribute('required','required');
+  }
+
+  updateLangWarning();
+  document.getElementById('form-view').style.display = 'block';
+  document.getElementById('success-view').classList.remove('show');
+  document.getElementById('duplicate-view').classList.remove('show');
+  document.getElementById('reg-form').reset();
+  resetDays();
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  if (langToggle) langToggle.classList.add('hidden');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+  document.body.style.overflow = '';
+  const lt = document.getElementById('lang-toggle');
+  if (lt) lt.classList.remove('hidden');
+}
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('modal')) closeModal();
+}
+
+// ─── FORM SUBMIT ──────────────────────────────────────────
+async function submitForm(e) {
+  e.preventDefault();
+  const t = translations[currentLang];
+
+  // تحقق اللغة في حقول النص
+  const textFields = ['firstName','lastName','birthPlace','parentName'];
+  let langValid = true;
+  textFields.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el.closest('[style*="display: none"]') || el.closest('[style*="display:none"]')) return;
+    if (el.value.trim() && !validateLang(el.value)) {
+      langValid = false;
+      el.classList.add('error');
+      el.placeholder = t.langError;
+      setTimeout(() => { el.classList.remove('error'); el.placeholder = ''; }, 3000);
+    }
+  });
+  const motivationEl = document.getElementById('motivation');
+  if (motivationEl.value.trim() && !validateLang(motivationEl.value)) {
+    langValid = false;
+    motivationEl.classList.add('error');
+    setTimeout(() => motivationEl.classList.remove('error'), 3000);
+  }
+  if (!langValid) return;
+
+  // تحقق الحقول المطلوبة
+  const inputs = document.getElementById('reg-form').querySelectorAll('[required]');
+  let valid = true;
+  inputs.forEach(input => {
+    input.classList.remove('error');
+    if (!input.value.trim()) {
+      valid = false;
+      input.classList.add('error');
+      setTimeout(() => input.classList.remove('error'), 2000);
+    }
+  });
+  if (!valid) return;
+
+  // تحقق نوع المترشح
+  const candidateGrp = document.getElementById('candidateTypeGroup');
+  if (candidateGrp.style.display !== 'none') {
+    const selected = document.querySelector('input[name="candidateType"]:checked');
+    if (!selected) {
+      candidateGrp.style.animation = 'none';
+      void candidateGrp.offsetWidth;
+      candidateGrp.style.animation = 'shake 0.35s ease';
+      return;
+    }
+  }
+
+  // تحقق الأيام لدورات اللغات
+  const daysGrp = document.getElementById('daysGroup');
+  if (daysGrp.style.display !== 'none') {
+    const selectedDays = document.querySelectorAll('input[name="days"]:checked');
+    if (selectedDays.length !== 2) {
+      daysGrp.style.animation = 'none';
+      void daysGrp.offsetWidth;
+      daysGrp.style.animation = 'shake 0.35s ease';
+      return;
+    }
+  }
+
+  const btn = document.querySelector('#form-view .submit-btn');
+  btn.classList.add('loading');
+
+  const typeLabels = { support:'دعم', lang:'لغات', vip:'VIP', ielts:'IELTS', online:'أونلاين' };
+  const selectedDaysArr = [...document.querySelectorAll('input[name="days"]:checked')].map(c => c.value);
+
+  const data = {
+    timestamp:     new Date().toLocaleString('ar-DZ'),
+    type:          typeLabels[currentModalType] || currentModalType,
+    firstName:     document.getElementById('firstName').value.trim(),
+    lastName:      document.getElementById('lastName').value.trim(),
+    birthDate:     document.getElementById('birthDate').value,
+    birthPlace:    document.getElementById('birthPlace').value.trim(),
+    phone:         document.getElementById('phone').value.trim(),
+    eduLevel:      document.getElementById('eduLevel').value      || '-',
+    candidateType: document.querySelector('input[name="candidateType"]:checked')?.value || '-',
+    specialty:     document.getElementById('specialty').value     || '-',
+    subject:       document.getElementById('subject').value       || '-',
+    teacher:       document.getElementById('teacher').value       || '-',
+    parentName:    document.getElementById('parentName').value.trim()  || '-',
+    parentPhone:   document.getElementById('parentPhone').value.trim() || '-',
+    langLevel:     document.getElementById('langLevel').value     || '-',
+    selectedDays:  selectedDaysArr.length ? selectedDaysArr.join(' - ') : '-',
+    levelTest:     document.querySelector('input[name="levelTest"]:checked')?.value || '-',
+    motivation:    document.getElementById('motivation').value.trim() || '-',
+  };
+
+  try {
+    const response = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    btn.classList.remove('loading');
+    if (result.status === 'duplicate') {
+      document.getElementById('form-view').style.display = 'none';
+      document.getElementById('duplicate-view').classList.add('show');
+      return;
+    }
+  } catch(err) {
+    btn.classList.remove('loading');
+    console.warn('Sheet error:', err);
+  }
+
+  document.getElementById('form-view').style.display = 'none';
+  document.getElementById('success-view').classList.add('show');
+  launchConfetti();
+}
+
+// ─── CONFETTI ─────────────────────────────────────────────
+function launchConfetti() {
+  const colors = ['#045283','#0570b0','#0a8acb','#f4b41a','#ffffff','#53a9df'];
+  const box = document.getElementById('modal-box');
+  for (let i = 0; i < 40; i++) {
+    setTimeout(() => {
+      const c = document.createElement('div');
+      c.className = 'confetti';
+      const size = 6 + Math.random()*9;
+      c.style.cssText = `
+        left:${5+Math.random()*90}%; top:8%;
+        width:${size}px; height:${size}px;
+        background:${colors[Math.floor(Math.random()*colors.length)]};
+        border-radius:${Math.random()>0.5?'50%':'2px'};
+        animation-duration:${1.2+Math.random()*1.2}s;
+        animation-timing-function:cubic-bezier(0.25,0.46,0.45,0.94);
+      `;
+      box.appendChild(c);
+      setTimeout(() => c.remove(), 2600);
+    }, i*35);
+  }
+}
+
+// ─── INIT ─────────────────────────────────────────────────
+setLang(currentLang);
