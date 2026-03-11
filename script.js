@@ -371,6 +371,8 @@ const translations = {
     termsTitle:"قوانين وشروط الأكاديمية",
     termsAgree:"لقد قرأت جميع القوانين والشروط وأوافق عليها",
     termsProceed:"المتابعة للتسجيل ✦",
+    duplicateTitle:"⚠️ تسجيل مكرر!",
+    duplicateMsg:"هذا الاسم واللقب مسجلان مسبقاً.<br>يرجى التواصل مع الإدارة إذا كان هناك خطأ.",
     levels:{ A1:"A1 - مبتدئ",A2:"A2 - مبتدئ متقدم",B1:"B1 - متوسط",B2:"B2 - متوسط متقدم",C1:"C1 - متقدم",C2:"C2 - احترافي" }
   },
   en: {
@@ -403,6 +405,8 @@ const translations = {
     termsTitle:"Academy Terms & Conditions",
     termsAgree:"I have read all the terms and conditions and I agree",
     termsProceed:"Proceed to Register ✦",
+    duplicateTitle:"⚠️ Already Registered!",
+    duplicateMsg:"This name is already registered.<br>Please contact the administration if this is an error.",
     levels:{ A1:"A1 - Beginner",A2:"A2 - Elementary",B1:"B1 - Intermediate",B2:"B2 - Upper Intermediate",C1:"C1 - Advanced",C2:"C2 - Proficiency" }
   }
 };
@@ -424,7 +428,7 @@ function applyTranslations() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     if (t[key] !== undefined) {
-      if (key === 'successMsg') el.innerHTML = t[key];
+      if (key === 'successMsg' || key === 'duplicateMsg') el.innerHTML = t[key];
       else el.textContent = t[key];
     }
   });
@@ -435,7 +439,7 @@ function applyTranslations() {
 }
 
 // ─── GOOGLE SHEETS ────────────────────────────────────────
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxxZl2-qMGrY0r_jnVB0yTUkye21bz9ziFViHcKFouFYE6JNW1iILN3OIhVgn9RVjGkWg/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcGr2Z-piZaLTgYhBnBp1PpEORudxRp2_RtVdGDag3XUKvc92CuFhA0ghqHuNZaml6Mg/exec';
 
 // ─── MODAL ────────────────────────────────────────────────
 let currentModalType = 'support';
@@ -479,6 +483,7 @@ function openModal(type) {
 
   document.getElementById('form-view').style.display = 'block';
   document.getElementById('success-view').classList.remove('show');
+  document.getElementById('duplicate-view').classList.remove('show');
   document.getElementById('reg-form').reset();
   overlay.classList.add('active');
   document.body.style.overflow = 'hidden';
@@ -547,16 +552,27 @@ async function submitForm(e) {
   };
 
   try {
-    await fetch(SCRIPT_URL, {
+    const response = await fetch(SCRIPT_URL, {
       method: 'POST',
-      mode: 'no-cors',
+      mode: 'cors',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
+    const result = await response.json();
+
+    btn.classList.remove('loading');
+
+    if (result.status === 'duplicate') {
+      document.getElementById('form-view').style.display = 'none';
+      document.getElementById('duplicate-view').classList.add('show');
+      return;
+    }
   } catch(err) {
+    // no-cors fallback
+    btn.classList.remove('loading');
     console.warn('Sheet error:', err);
   }
 
-  btn.classList.remove('loading');
   document.getElementById('form-view').style.display = 'none';
   document.getElementById('success-view').classList.add('show');
   launchConfetti();
