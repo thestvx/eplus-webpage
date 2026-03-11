@@ -38,7 +38,7 @@ resizeCanvas();
 animateSquares();
 
 // ─── APPS SCRIPT URL ──────────────────────────────────────
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyqwCoilqE9X-yqAO8SZ871UjPl7_n-4cuiEeRxJj1pYSHTolxP6-gYETr7b-n-W9FTMQ/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxJkfl-ACAU-Fgi1UDLi04j61Uo81vkh5ohv5xzNl-0rSclyYU_QrCG5exv6o5Cqm557w/exec';
 
 // ─── LANGUAGE VALIDATION ──────────────────────────────────
 function isArabic(text)  { return /[\u0600-\u06FF]/.test(text); }
@@ -311,7 +311,7 @@ window.onLangLevelChange = function() {
 // ─── TERMS ────────────────────────────────────────────────
 let pendingModalType   = null;
 let termsTimerInterval = null;
-const TERMS_WAIT_SECONDS = 30;
+const TERMS_WAIT_SECONDS = 10;
 
 window.openTerms = function(type) {
   pendingModalType = type;
