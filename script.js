@@ -36,6 +36,9 @@ window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 animateSquares();
 
+// ─── GOOGLE APPS SCRIPT URL ───────────────────────────────
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyqwCoilqE9X-yqAO8SZ871UjPl7_n-4cuiEeRxJj1pYSHTolxP6-gYETr7b-n-W9FTMQ/exec';
+
 // ─── LANGUAGE VALIDATION ──────────────────────────────────
 function isArabic(text)  { return /[\u0600-\u06FF]/.test(text); }
 function isEnglish(text) { return /[a-zA-Z]/.test(text); }
@@ -650,11 +653,11 @@ window.submitForm = async function(e) {
   if (currentModalType === 'support' || currentModalType === 'vip') {
     data.eduLevel = document.getElementById('eduLevel').value;
     const spec  = document.getElementById('specialty');
-    if (spec && spec.value)  data.specialty = spec.value;
+    if (spec && spec.value)   data.specialty    = spec.value;
     const subj  = document.getElementById('subject');
-    if (subj && subj.value)  data.subject   = subj.value;
+    if (subj && subj.value)   data.subject      = subj.value;
     const teach = document.getElementById('teacher');
-    if (teach && teach.value) data.teacher  = teach.value;
+    if (teach && teach.value) data.teacher      = teach.value;
     const ctype = document.querySelector('input[name="candidateType"]:checked');
     if (ctype) data.candidateType = ctype.value;
     const pName  = document.getElementById('parentName');
@@ -691,6 +694,7 @@ window.submitForm = async function(e) {
     const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
     const db  = getFirestore(app);
 
+    // ── فحص التكرار ──
     const dupQ = query(
       collection(db, 'registrations'),
       where('firstName', '==', firstName),
@@ -705,7 +709,17 @@ window.submitForm = async function(e) {
       return;
     }
 
+    // ── حفظ في Firebase ──
     await addDoc(collection(db, 'registrations'), data);
+
+    // ── إرسال لـ Google Sheets ──
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode:   'no-cors',
+      headers:{ 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }).catch(() => {});
+
     btn.classList.remove('loading');
     document.getElementById('form-view').style.display = 'none';
     document.getElementById('success-view').classList.add('show');
@@ -789,6 +803,7 @@ function renderAnnouncements(docs) {
     dotsEl.appendChild(dot);
   });
 
+  // ── أزرار السهم ──
   const wrapper = document.querySelector('.ann-track-wrapper');
   wrapper.querySelectorAll('.ann-arrow').forEach(a => a.remove());
 
@@ -807,6 +822,7 @@ function renderAnnouncements(docs) {
     wrapper.appendChild(btnNext);
   }
 
+  // ── Swipe موبايل ──
   let touchStartX = 0;
   track.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive:true });
   track.addEventListener('touchend', e => {
