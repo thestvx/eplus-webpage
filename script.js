@@ -678,11 +678,11 @@ async function submitForm(e) {
   if (hasError) return;
 
   const selectedDays = [...document.querySelectorAll('input[name="days"]:checked')]
-    .map(c => c.value).join('، ');
+    .map(c => c.value).join('، ') || '-';
 
-  const vipTypeVal    = document.querySelector('input[name="vipType"]:checked')?.value || '';
-  const vipEduLevel   = document.getElementById('vipEduLevel')?.value  || '';
-  const professionVal = document.getElementById('profession')?.value   || '';
+  const vipTypeVal    = document.querySelector('input[name="vipType"]:checked')?.value || '-';
+  const vipEduLevel   = document.getElementById('vipEduLevel')?.value  || '-';
+  const professionVal = document.getElementById('profession')?.value   || '-';
 
   const data = {
     type:          currentModalType,
@@ -691,23 +691,23 @@ async function submitForm(e) {
     birthDate,
     birthPlace,
     phone,
-    motivation:    document.getElementById('motivation').value.trim(),
+    motivation:    document.getElementById('motivation').value.trim() || '-',
     timestamp:     new Date().toISOString(),
-    eduLevel:      document.getElementById('eduLevel')?.value      || '',
-    specialty:     document.getElementById('specialty')?.value     || '',
-    subject:       document.getElementById('subject')?.value       || '',
-    teacher:       document.getElementById('teacher')?.value       || '',
-    candidateType: document.querySelector('input[name="candidateType"]:checked')?.value || '',
-    parentName:    document.getElementById('parentName')?.value    || '',
-    parentPhone:   document.getElementById('parentPhone')?.value   || '',
-    langType:      document.getElementById('langType')?.value      || '',
-    langLevel:     document.getElementById('langLevel')?.value     || '',
-    levelTest:     document.querySelector('input[name="levelTest"]:checked')?.value || '',
+    eduLevel:      document.getElementById('eduLevel')?.value      || '-',
+    specialty:     document.getElementById('specialty')?.value     || '-',
+    subject:       document.getElementById('subject')?.value       || '-',
+    teacher:       document.getElementById('teacher')?.value       || '-',
+    candidateType: document.querySelector('input[name="candidateType"]:checked')?.value || '-',
+    parentName:    document.getElementById('parentName')?.value    || '-',
+    parentPhone:   document.getElementById('parentPhone')?.value   || '-',
+    langType:      document.getElementById('langType')?.value      || '-',
+    langLevel:     document.getElementById('langLevel')?.value     || '-',
+    levelTest:     document.querySelector('input[name="levelTest"]:checked')?.value || '-',
     vipType:       vipTypeVal,
     vipEduLevel,
     profession:    professionVal,
     days:          selectedDays,
-    daysCount:     document.getElementById('vipDaysCount')?.value  || '',
+    daysCount:     document.getElementById('vipDaysCount')?.value  || '-',
   };
 
   openTermsForSubmit(data);
