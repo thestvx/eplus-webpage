@@ -61,7 +61,8 @@ const i18n = {
     annTitle:'إعلانات الأكاديمية',
     firstName:'الاسم', lastName:'اللقب', birthDate:'تاريخ الميلاد',
     birthPlace:'العنوان', phone:'رقم الهاتف',
-    motivation:'ما هو الدافع الذي جعلك تختار أكاديمية E-PLUS؟',
+    motivation:    'ما الذي دفعك إلى اختيار التسجيل في أكاديمية E-PLUS؟',
+    motivationVip: 'ما الذي جعلك تختار الدراسة عبر نظام الدروس الخاصة VIP؟',
     optional:'(اختياري)',
     eduLevel:'المستوى الدراسي', specialty:'التخصص',
     subject:'المادة', teacher:'الأستاذ/ة',
@@ -101,7 +102,8 @@ const i18n = {
     annTitle:'Academy Announcements',
     firstName:'First Name', lastName:'Last Name', birthDate:'Date of Birth',
     birthPlace:'Address', phone:'Phone Number',
-    motivation:'What motivated you to choose E-PLUS Academy?',
+    motivation:    'What motivated you to choose E-PLUS Academy?',
+    motivationVip: 'What led you to choose studying through the VIP private lessons system?',
     optional:'(optional)',
     eduLevel:'Education Level', specialty:'Specialty',
     subject:'Subject', teacher:'Teacher',
@@ -278,6 +280,15 @@ function openModal(type) {
   };
   document.getElementById('modal-title').textContent = titles[type] || 'نموذج التسجيل';
 
+  // ✅ تغيير سؤال الدافع حسب نوع التسجيل
+  const motivationLabel = document.querySelector('label[for="motivation"] span[data-i18n="motivation"]');
+  if (motivationLabel) {
+    const t = i18n[currentLang];
+    motivationLabel.textContent = (type === 'vip')
+      ? t.motivationVip
+      : t.motivation;
+  }
+
   // إظهار الحقول المناسبة
   const eduGrp     = document.getElementById('eduLevelGroup');
   const langGrp    = document.getElementById('langTypeGroup');
@@ -335,6 +346,12 @@ function resetForm() {
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
   resetDays();
   maxDaysAllowed = 2;
+
+  // ✅ إعادة سؤال الدافع للنص الافتراضي
+  const motivationLabel = document.querySelector('label[for="motivation"] span[data-i18n="motivation"]');
+  if (motivationLabel) {
+    motivationLabel.textContent = i18n[currentLang].motivation;
+  }
 }
 
 // ─── BUTTONS ──────────────────────────────────────────────
@@ -628,13 +645,12 @@ function onVipEduLevelChange() {
 async function submitForm(e) {
   e.preventDefault();
 
-  const firstName = document.getElementById('firstName').value.trim();
-  const lastName  = document.getElementById('lastName').value.trim();
-  const birthDate = document.getElementById('birthDate').value;
-  const birthPlace= document.getElementById('birthPlace').value.trim();
-  const phone     = document.getElementById('phone').value.trim();
+  const firstName  = document.getElementById('firstName').value.trim();
+  const lastName   = document.getElementById('lastName').value.trim();
+  const birthDate  = document.getElementById('birthDate').value;
+  const birthPlace = document.getElementById('birthPlace').value.trim();
+  const phone      = document.getElementById('phone').value.trim();
 
-  // Validation
   let hasError = false;
   [firstName, lastName, birthPlace].forEach((val, i) => {
     const ids = ['firstName','lastName','birthPlace'];
@@ -646,11 +662,9 @@ async function submitForm(e) {
   });
   if (hasError) return;
 
-  // جمع الأيام
   const selectedDays = [...document.querySelectorAll('input[name="days"]:checked')]
     .map(c => c.value).join('، ');
 
-  // جمع بيانات VIP
   const vipTypeVal    = document.querySelector('input[name="vipType"]:checked')?.value || '';
   const vipEduLevel   = document.getElementById('vipEduLevel')?.value  || '';
   const professionVal = document.getElementById('profession')?.value   || '';
@@ -664,7 +678,6 @@ async function submitForm(e) {
     phone,
     motivation:    document.getElementById('motivation').value.trim(),
     timestamp:     new Date().toISOString(),
-    // دعم
     eduLevel:      document.getElementById('eduLevel')?.value      || '',
     specialty:     document.getElementById('specialty')?.value     || '',
     subject:       document.getElementById('subject')?.value       || '',
@@ -672,15 +685,12 @@ async function submitForm(e) {
     candidateType: document.querySelector('input[name="candidateType"]:checked')?.value || '',
     parentName:    document.getElementById('parentName')?.value    || '',
     parentPhone:   document.getElementById('parentPhone')?.value   || '',
-    // لغات
     langType:      document.getElementById('langType')?.value      || '',
     langLevel:     document.getElementById('langLevel')?.value     || '',
     levelTest:     document.querySelector('input[name="levelTest"]:checked')?.value || '',
-    // VIP
     vipType:       vipTypeVal,
     vipEduLevel,
     profession:    professionVal,
-    // أيام
     days:          selectedDays,
     daysCount:     document.getElementById('vipDaysCount')?.value  || '',
   };
@@ -869,15 +879,35 @@ const firebaseConfig = {
 const _app = initializeApp(firebaseConfig);
 const _db  = getFirestore(_app);
 
-// ─── ANNOUNCEMENTS ────────────────────────────────────────
+// ─── ANNOUNCEMENTS STATE ──────────────────────────────────
 let annCurrent   = 0;
 let annAutoSlide = null;
+let annTotalDocs = 0;
+
+// ✅ Global — لا تُغلق داخل أي function
+function goToSlide(idx) {
+  annCurrent = idx;
+  const track = document.getElementById('ann-track');
+  if (track) track.style.transform = `translateX(${idx * -100}%)`;
+  document.querySelectorAll('.ann-dot').forEach((dot, i) =>
+    dot.classList.toggle('active', i === idx));
+}
+function startAnnAuto() {
+  if (annTotalDocs <= 1) return;
+  annAutoSlide = setInterval(
+    () => goToSlide((annCurrent + 1) % annTotalDocs),
+    8000
+  );
+}
+function resetAnnAuto() {
+  clearInterval(annAutoSlide);
+  startAnnAuto();
+}
 
 // ✅ onSnapshot — استخراج فوري وحفظ في كاش عالمي
 onSnapshot(
   query(collection(_db, 'announcements'), orderBy('createdAt', 'desc')),
   snap => {
-    // استخراج البيانات فوراً قبل أي شيء
     window._annCache = snap.docs.map(doc => {
       const d = doc.data();
       return {
@@ -902,7 +932,9 @@ function _renderFromData(dataArr) {
   }
 
   clearInterval(annAutoSlide);
+  annTotalDocs = dataArr.length;
   const savedIndex = (annCurrent < dataArr.length) ? annCurrent : 0;
+  annCurrent = savedIndex;
 
   section.style.display = 'block';
   track.innerHTML  = '';
@@ -911,7 +943,6 @@ function _renderFromData(dataArr) {
   const isRtl = currentLang === 'ar';
 
   dataArr.forEach((d, i) => {
-    // ✅ has-image فقط إذا imageUrl موجود وهو https URL حقيقي
     const hasImg = d.imageUrl && d.imageUrl.startsWith('https');
 
     const card = document.createElement('div');
@@ -950,21 +981,21 @@ function _renderFromData(dataArr) {
 
     track.appendChild(card);
 
-    // ✅ تأثير ظهور الصورة بعد تحميلها
+    // ✅ تحميل تدريجي للصورة
     const img = card.querySelector('.ann-card-img');
     if (img) {
       img.addEventListener('load', () => img.classList.add('loaded'));
       if (img.complete) img.classList.add('loaded');
     }
 
-    // Dot
+    // ✅ Dot — addEventListener بدل onclick
     const dot = document.createElement('div');
     dot.className = 'ann-dot' + (i === 0 ? ' active' : '');
-    dot.onclick = () => { goToSlide(i); resetAuto(); };
+    dot.addEventListener('click', () => { goToSlide(i); resetAnnAuto(); });
     dotsEl.appendChild(dot);
   });
 
-  // Arrows
+  // ✅ Arrows
   const wrapper = document.querySelector('.ann-track-wrapper');
   wrapper.querySelectorAll('.ann-arrow').forEach(a => a.remove());
 
@@ -972,22 +1003,22 @@ function _renderFromData(dataArr) {
     const prev = document.createElement('button');
     prev.className = 'ann-arrow ann-arrow-prev';
     prev.innerHTML = '‹';
-    prev.onclick = () => {
+    prev.addEventListener('click', () => {
       goToSlide((annCurrent - 1 + dataArr.length) % dataArr.length);
-      resetAuto();
-    };
+      resetAnnAuto();
+    });
     const next = document.createElement('button');
     next.className = 'ann-arrow ann-arrow-next';
     next.innerHTML = '›';
-    next.onclick = () => {
+    next.addEventListener('click', () => {
       goToSlide((annCurrent + 1) % dataArr.length);
-      resetAuto();
-    };
+      resetAnnAuto();
+    });
     wrapper.appendChild(prev);
     wrapper.appendChild(next);
   }
 
-  // Touch Swipe
+  // ✅ Touch Swipe
   let touchStartX = 0;
   track.addEventListener('touchstart', e => {
     touchStartX = e.touches[0].clientX;
@@ -998,11 +1029,11 @@ function _renderFromData(dataArr) {
       goToSlide(diff > 0
         ? (annCurrent - 1 + dataArr.length) % dataArr.length
         : (annCurrent + 1) % dataArr.length);
-      resetAuto();
+      resetAnnAuto();
     }
   });
 
-  // Mouse Drag
+  // ✅ Mouse Drag
   let isDragging = false, dragStartX = 0, dragDelta = 0;
   track.addEventListener('mousedown', e => {
     isDragging = true; dragStartX = e.clientX; dragDelta = 0;
@@ -1025,54 +1056,40 @@ function _renderFromData(dataArr) {
           ? (annCurrent - 1 + dataArr.length) % dataArr.length
           : (annCurrent + 1) % dataArr.length)
       : annCurrent);
-    resetAuto();
+    resetAnnAuto();
   });
 
-  // Init
-  annCurrent = savedIndex;
+  // ✅ Init position
   track.style.transform = `translateX(${savedIndex * -100}%)`;
   document.querySelectorAll('.ann-dot').forEach((dot, i) =>
     dot.classList.toggle('active', i === savedIndex));
 
-  startAuto();
-
-  function goToSlide(idx) {
-    annCurrent = idx;
-    track.style.transform = `translateX(${idx * -100}%)`;
-    document.querySelectorAll('.ann-dot').forEach((dot, i) =>
-      dot.classList.toggle('active', i === idx));
-  }
-  function startAuto() {
-    if (dataArr.length <= 1) return;
-    annAutoSlide = setInterval(
-      () => goToSlide((annCurrent + 1) % dataArr.length),
-      8000
-    );
-  }
-  function resetAuto() { clearInterval(annAutoSlide); startAuto(); }
+  startAnnAuto();
 }
 
 // ─── EXPOSE FUNCTIONS ─────────────────────────────────────
-window.setLang             = setLang;
-window.closeModal          = closeModal;
-window.closeModalOutside   = closeModalOutside;
-window.closeTerms          = closeTerms;
-window.closeTermsOutside   = closeTermsOutside;
-window.onTermsCheck        = onTermsCheck;
-window.proceedToRegister   = proceedToRegister;
-window.closeSuccessPopup   = closeSuccessPopup;
-window.onLangTypeChange    = onLangTypeChange;
-window.onLangLevelChange   = onLangLevelChange;
-window.onEduLevelChange    = onEduLevelChange;
-window.onCandidateTypeChange = onCandidateTypeChange;
-window.onSpecialtyChange   = onSpecialtyChange;
-window.onSubjectChange     = onSubjectChange;
-window.onTeacherChange     = onTeacherChange;
-window.onVipTypeChange     = onVipTypeChange;
-window.onVipEduLevelChange = onVipEduLevelChange;
-window.onVipDaysCountChange= onVipDaysCountChange;
-window.onDayChange         = onDayChange;
-window.submitForm          = submitForm;
+window.setLang              = setLang;
+window.closeModal           = closeModal;
+window.closeModalOutside    = closeModalOutside;
+window.closeTerms           = closeTerms;
+window.closeTermsOutside    = closeTermsOutside;
+window.onTermsCheck         = onTermsCheck;
+window.proceedToRegister    = proceedToRegister;
+window.closeSuccessPopup    = closeSuccessPopup;
+window.onLangTypeChange     = onLangTypeChange;
+window.onLangLevelChange    = onLangLevelChange;
+window.onEduLevelChange     = onEduLevelChange;
+window.onCandidateTypeChange= onCandidateTypeChange;
+window.onSpecialtyChange    = onSpecialtyChange;
+window.onSubjectChange      = onSubjectChange;
+window.onTeacherChange      = onTeacherChange;
+window.onVipTypeChange      = onVipTypeChange;
+window.onVipEduLevelChange  = onVipEduLevelChange;
+window.onVipDaysCountChange = onVipDaysCountChange;
+window.onDayChange          = onDayChange;
+window.submitForm           = submitForm;
+window.goToSlide            = goToSlide;
+window.resetAnnAuto         = resetAnnAuto;
 
 // ─── INIT LANG ────────────────────────────────────────────
 setLang('ar');
