@@ -38,7 +38,7 @@ resizeCanvas();
 animateSquares();
 
 // ─── APPS SCRIPT URL ──────────────────────────────────────
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz9xBF_sqR6Z7lc-pPQLCRiieff8hRbXbzRg-729rfK6yfP4L0Ustgxg4HBxUIsjCVX0w/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyiooCIgUPH3OHbdPJgjd23tnT1NA7IichZ28haow3Y5kf2wtGAXFFzpL1rpV2Fpnxysg/exec';
 
 const typeLabelsAr = {
   support: 'تسجيلات الدعم',
@@ -60,7 +60,7 @@ const i18n = {
     btn4:'اختبار IELTS',  btn5:'دورات أونلاين', btn6:'دورات تكوينية',
     annTitle:'إعلانات الأكاديمية',
     firstName:'الاسم', lastName:'اللقب', birthDate:'تاريخ الميلاد',
-    birthPlace:'العنوان', phone:'رقم الهاتف',
+    phone:'رقم الهاتف',
     motivation:    'ما الذي دفعك إلى اختيار التسجيل في أكاديمية E-PLUS؟',
     motivationVip: 'ما الذي جعلك تختار الدراسة عبر نظام الدروس الخاصة VIP؟',
     optional:'(اختياري)',
@@ -101,7 +101,7 @@ const i18n = {
     btn4:'IELTS Test', btn5:'Online Courses', btn6:'Training Courses',
     annTitle:'Academy Announcements',
     firstName:'First Name', lastName:'Last Name', birthDate:'Date of Birth',
-    birthPlace:'Address', phone:'Phone Number',
+    phone:'Phone Number',
     motivation:    'What motivated you to choose E-PLUS Academy?',
     motivationVip: 'What led you to choose studying through the VIP private lessons system?',
     optional:'(optional)',
@@ -267,6 +267,17 @@ const needsCandidateType = ['ثالثة ثانوي (بكالوريا)'];
 // ─── MODAL STATE ──────────────────────────────────────────
 let currentModalType = '';
 
+// ─── REGISTRATION NUMBER ──────────────────────────────────
+function generateRegNumber(type) {
+  const prefixes = {
+    support: 'SUP', lang: 'LNG', vip: 'VIP',
+    ielts: 'ILS', online: 'ONL', takwini: 'TRN'
+  };
+  const prefix = prefixes[type] || 'REG';
+  const num = Math.floor(10000 + Math.random() * 90000);
+  return `${prefix}-${num}`;
+}
+
 // ─── OPEN MODAL ───────────────────────────────────────────
 function openModal(type) {
   currentModalType = type;
@@ -308,6 +319,9 @@ function openModal(type) {
     const daysCountGrp = document.getElementById('vipDaysCountGroup');
     animateShow(daysCountGrp);
     daysCountGrp.querySelector('select').setAttribute('required','required');
+  } else if (type === 'takwini') {
+    const takwiniGrp = document.getElementById('takwiniTypeGroup');
+    if (takwiniGrp) animateShow(takwiniGrp);
   }
 
   document.getElementById('lang-toggle').classList.add('hidden');
@@ -333,7 +347,7 @@ function resetForm() {
   const groups = [
     'eduLevelGroup','candidateTypeGroup','specialtyGroup','subjectGroup',
     'teacherGroup','parentGroup','langTypeGroup','langLevelGroup',
-    'levelTestGroup','vipTypeGroup','vipEduLevelGroup','professionGroup',
+    'levelTestGroup','vipTypeGroup','vipEduLevelGroup','professionGroup','takwiniTypeGroup',
     'vipDaysCountGroup','daysGroup',
   ];
   groups.forEach(id => {
@@ -342,6 +356,7 @@ function resetForm() {
   });
   document.getElementById('comingSoonNote')?.remove();
   document.querySelectorAll('input[name="vipType"]').forEach(r => r.checked = false);
+  document.querySelectorAll('input[name="takwiniType"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
   resetDays();
@@ -663,12 +678,11 @@ async function submitForm(e) {
   const firstName  = document.getElementById('firstName').value.trim();
   const lastName   = document.getElementById('lastName').value.trim();
   const birthDate  = document.getElementById('birthDate').value;
-  const birthPlace = document.getElementById('birthPlace').value.trim();
   const phone      = document.getElementById('phone').value.trim();
 
   let hasError = false;
-  [firstName, lastName, birthPlace].forEach((val, i) => {
-    const ids = ['firstName','lastName','birthPlace'];
+  [firstName, lastName].forEach((val, i) => {
+    const ids = ['firstName','lastName'];
     if (!validateLang(val)) {
       document.getElementById(ids[i]).classList.add('error');
       setTimeout(() => document.getElementById(ids[i]).classList.remove('error'), 1500);
@@ -689,7 +703,6 @@ async function submitForm(e) {
     firstName,
     lastName,
     birthDate,
-    birthPlace,
     phone,
     motivation:    document.getElementById('motivation').value.trim() || '-',
     timestamp:     new Date().toISOString(),
@@ -708,6 +721,7 @@ async function submitForm(e) {
     profession:    professionVal,
     days:          selectedDays,
     daysCount:     document.getElementById('vipDaysCount')?.value  || '-',
+    takwiniType:   document.querySelector('input[name="takwiniType"]:checked')?.value || '-',
   };
 
   openTermsForSubmit(data);
@@ -786,6 +800,9 @@ async function proceedToRegister() {
   document.getElementById('scroll-hint')?.remove();
   document.getElementById('terms-modal').classList.remove('active');
 
+  const regNumber = generateRegNumber(pendingFormData.type);
+  pendingFormData.regNumber = regNumber;
+
   showLoadingPopup();
 
   try {
@@ -800,7 +817,7 @@ async function proceedToRegister() {
 
     hideLoadingPopup();
     pendingFormData = null;
-    showSuccessPopup();
+    showSuccessPopup(regNumber);
 
   } catch(err) {
     hideLoadingPopup();
@@ -811,6 +828,7 @@ async function proceedToRegister() {
       : 'A network error occurred. Please check your connection.');
   }
 }
+
 
 // ─── LOADING POPUP ────────────────────────────────────────
 function showLoadingPopup() {
@@ -845,7 +863,7 @@ function hideLoadingPopup() {
 }
 
 // ─── SUCCESS POPUP ────────────────────────────────────────
-function showSuccessPopup() {
+function showSuccessPopup(regNumber = '') {
   document.getElementById('success-popup-overlay')?.remove();
 
   const overlay = document.createElement('div');
@@ -865,6 +883,17 @@ function showSuccessPopup() {
           : 'Thank you! Your registration has been received.<br>The E-PLUS Academy team will contact you soon.<br><span class="success-popup-sub">✦ Your journey to success starts here ✦</span>'}
       </div>
       <div class="success-popup-divider"></div>
+      <div class="success-popup-reg">
+        <div class="success-popup-reg-label">
+          ${currentLang==='ar' ? '🔖 رقم تسجيلك' : '🔖 Your Registration ID'}
+        </div>
+        <div class="success-popup-reg-number">${regNumber}</div>
+        <div class="success-popup-reg-warning">
+          ${currentLang==='ar'
+            ? '⚠️ احفظ هذا الرقم أو خذ لقطة شاشة، ستحتاجه لاحقاً!'
+            : '⚠️ Save this number or take a screenshot, you will need it later!'}
+        </div>
+      </div>
       <div class="success-popup-info">
         <span>📋 ${typeLabelsAr[currentModalType] || currentModalType}</span>
         <span>🕐 ${new Date().toLocaleDateString(currentLang==='ar'?'ar-DZ':'en-GB',{year:'numeric',month:'long',day:'numeric'})}</span>
