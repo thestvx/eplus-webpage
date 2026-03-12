@@ -49,6 +49,125 @@ const typeLabelsAr = {
   takwini: 'دورات تكوينية',
 };
 
+// ─── LANGUAGE ─────────────────────────────────────────────
+let currentLang = 'ar';
+
+const i18n = {
+  ar: {
+    title:'EDUCATION PLUS CENTER', badge:'✦ رحلتك نحو النجاح تبدأ من هنا ✦',
+    subtitle:'التسجيل في الدورات والبرامج التعليمية',
+    btn1:'تسجيلات الدعم', btn2:'دورات اللغات', btn3:'دروس VIP',
+    btn4:'اختبار IELTS',  btn5:'دورات أونلاين', btn6:'دورات تكوينية',
+    annTitle:'إعلانات الأكاديمية',
+    firstName:'الاسم', lastName:'اللقب', birthDate:'تاريخ الميلاد',
+    birthPlace:'العنوان', phone:'رقم الهاتف',
+    motivation:'ما هو الدافع الذي جعلك تختار أكاديمية E-PLUS؟',
+    optional:'(اختياري)',
+    eduLevel:'المستوى الدراسي', specialty:'التخصص',
+    subject:'المادة', teacher:'الأستاذ/ة',
+    candidateType:'نوع المترشح', enrolled:'متمدرس', freeCandidate:'حر',
+    parentInfo:'معلومات ولي الأمر',
+    parentName:'اسم ولي الأمر', parentPhone:'هاتف ولي الأمر',
+    langType:'اختر اللغة', langLevel:'مستوى اللغة (CEFR)',
+    levelTest:'هل تريد إجراء اختبار تحديد المستوى؟',
+    yes:'نعم', no:'لا',
+    vipType:'نوع دروس VIP', vipSupport:'📚 دعم دراسي', vipLang:'🌍 لغات',
+    vipDaysCount:'كم يوم تريد الحضور في الأسبوع؟',
+    chooseDays:'اختر الأيام', daysSelected:'يوم محدد',
+    submitBtn:'إتمام التسجيل ✦',
+    termsTitle:'قوانين وشروط الأكاديمية',
+    termsAgree:'لقد قرأت جميع القوانين والشروط وأوافق عليها',
+    termsProceed:'تأكيد التسجيل ✦',
+    t1:'يعتبر المتعلم مسجلاً بصفة رسمية بالمركز عند قيامه بتسديد رسوم التسجيل في التاريخ المحدد.',
+    t2:'يجب أن يتسم المتعلم بحسن الأخلاق والنظافة والهندام الملائم.',
+    t3:'يجب احترام جميع الأفراد في المركز التعليمي، الزملاء، المدرسين والطاقم الإداري.',
+    t4:'احترام أوقات الدراسة، وعدم الانصراف دون إذن مسبق.',
+    t5:'عدم التغيب عن الحصص إلا لأسباب ضرورية مع إعلام الإدارة مسبقاً.',
+    t6:'في حالة الغياب بدون سبب يتم إعلام الولي.',
+    t7:'لا يتم تعويض قيمة الحصص عند الغياب المتكرر أو الانقطاع عن الدراسة.',
+    t8:'في حالة التوقف عن الدراسة يتم تعويض 80% فقط من القيمة المتبقية.',
+    t9:'في حالة الغياب طويل المدى يرجى الاتصال بالإدارة لأجل تسوية الوضعية.',
+    t10:'لا يتحمل المركز ضياع أي أغراض ثمينة (نقود، هاتف، مجوهرات...).',
+    t11:'يمنع لمس أو تشغيل أدوات وأجهزة التعليم المختلفة دون إذن.',
+    t12:'أي عملية إتلاف لتجهيزات المركز تعرض صاحبها للعقوبة وتعويض الخسائر.',
+    t13:'في حالة السلوكات غير المقبولة، ينذر الولي كتابياً عند تكرر المخالفة.',
+    t14:'الموافقة على نشر صور المتعلم في شبكات التواصل الاجتماعي، ومقاطع الفيديو التربوية الخاصة بالمركز.',
+  },
+  en: {
+    title:'EDUCATION PLUS CENTER', badge:'✦ Your journey to success starts here ✦',
+    subtitle:'Register for courses and educational programs',
+    btn1:'Support Registration', btn2:'Language Courses', btn3:'VIP Lessons',
+    btn4:'IELTS Test', btn5:'Online Courses', btn6:'Training Courses',
+    annTitle:'Academy Announcements',
+    firstName:'First Name', lastName:'Last Name', birthDate:'Date of Birth',
+    birthPlace:'Address', phone:'Phone Number',
+    motivation:'What motivated you to choose E-PLUS Academy?',
+    optional:'(optional)',
+    eduLevel:'Education Level', specialty:'Specialty',
+    subject:'Subject', teacher:'Teacher',
+    candidateType:'Candidate Type', enrolled:'Enrolled', freeCandidate:'Independent',
+    parentInfo:'Parent / Guardian Info',
+    parentName:'Parent Name', parentPhone:'Parent Phone',
+    langType:'Choose Language', langLevel:'Language Level (CEFR)',
+    levelTest:'Would you like a level placement test?',
+    yes:'Yes', no:'No',
+    vipType:'VIP Lesson Type', vipSupport:'📚 Academic Support', vipLang:'🌍 Languages',
+    vipDaysCount:'How many days per week?',
+    chooseDays:'Choose Days', daysSelected:'day(s) selected',
+    submitBtn:'Complete Registration ✦',
+    termsTitle:'Academy Terms & Conditions',
+    termsAgree:'I have read all terms and conditions and I agree',
+    termsProceed:'Confirm Registration ✦',
+    t1:'The learner is officially registered upon payment of registration fees on the specified date.',
+    t2:'The learner must demonstrate good conduct, cleanliness, and appropriate dress.',
+    t3:'All individuals at the center must be respected: peers, teachers, and administrative staff.',
+    t4:'Study schedules must be respected and leaving without prior permission is not allowed.',
+    t5:'Absence from sessions is only permitted for urgent reasons with prior notification to administration.',
+    t6:'In case of absence without reason, the guardian will be notified.',
+    t7:'Session fees are not compensated for repeated absences or discontinuation of study.',
+    t8:'In case of study discontinuation, only 80% of the remaining value will be refunded.',
+    t9:'In case of long-term absence, please contact administration to resolve the situation.',
+    t10:'The center is not responsible for loss of any valuables (money, phone, jewelry...).',
+    t11:'Touching or operating educational equipment without permission is prohibited.',
+    t12:'Any damage to center equipment will result in punishment and compensation for losses.',
+    t13:'In case of unacceptable behavior, the guardian will be formally warned upon repeated violations.',
+    t14:'Agreement to publish learner photos on social networks and educational videos related to the center.',
+  }
+};
+
+function setLang(lang) {
+  currentLang = lang;
+  document.documentElement.lang = lang;
+  document.documentElement.dir  = lang === 'ar' ? 'rtl' : 'ltr';
+
+  document.getElementById('btn-ar').classList.toggle('active', lang === 'ar');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+
+  const t = i18n[lang];
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key] !== undefined) el.textContent = t[key];
+  });
+
+  // تحديث warning اللغة
+  const warnIcon = document.getElementById('lang-warning-icon');
+  const warnText = document.getElementById('lang-warning-text');
+  if (warnIcon && warnText) {
+    if (lang === 'ar') {
+      warnIcon.textContent = '🇸🇦';
+      warnText.textContent = 'يرجى إدخال جميع المعلومات باللغة العربية فقط';
+    } else {
+      warnIcon.textContent = '🇬🇧';
+      warnText.textContent = 'Please enter all information in English only';
+    }
+  }
+
+  // ✅ إعادة render الإعلانات من الكاش عند تغيير اللغة
+  if (window._annCache && window._annCache.length > 0) {
+    _renderFromData(window._annCache);
+  }
+}
+
 // ─── LANGUAGE VALIDATION ──────────────────────────────────
 function isArabic(text)  { return /[\u0600-\u06FF]/.test(text); }
 function isEnglish(text) { return /[a-zA-Z]/.test(text); }
@@ -140,6 +259,91 @@ const curriculum = {
 const needsParent        = ['تحضيري','أولى ابتدائي','ثانية ابتدائي','ثالثة ابتدائي','رابعة ابتدائي','خامسة ابتدائي','أولى متوسط','ثانية متوسط','ثالثة متوسط','رابعة متوسط'];
 const needsSpecialty     = ['أولى ثانوي','ثانية ثانوي','ثالثة ثانوي (بكالوريا)'];
 const needsCandidateType = ['ثالثة ثانوي (بكالوريا)'];
+
+// ─── MODAL STATE ──────────────────────────────────────────
+let currentModalType = '';
+
+// ─── OPEN MODAL ───────────────────────────────────────────
+function openModal(type) {
+  currentModalType = type;
+  resetForm();
+
+  const titles = {
+    support: currentLang==='ar' ? 'تسجيل — دعم دراسي'      : 'Registration — Academic Support',
+    lang:    currentLang==='ar' ? 'تسجيل — دورات اللغات'   : 'Registration — Language Courses',
+    vip:     currentLang==='ar' ? 'تسجيل — دروس VIP'       : 'Registration — VIP Lessons',
+    ielts:   currentLang==='ar' ? 'تسجيل — اختبار IELTS'   : 'Registration — IELTS Test',
+    online:  currentLang==='ar' ? 'تسجيل — دورات أونلاين'  : 'Registration — Online Courses',
+    takwini: currentLang==='ar' ? 'تسجيل — دورات تكوينية'  : 'Registration — Training Courses',
+  };
+  document.getElementById('modal-title').textContent = titles[type] || 'نموذج التسجيل';
+
+  // إظهار الحقول المناسبة
+  const eduGrp     = document.getElementById('eduLevelGroup');
+  const langGrp    = document.getElementById('langTypeGroup');
+  const vipTypeGrp = document.getElementById('vipTypeGroup');
+
+  hideField(eduGrp,     'eduLevel');
+  hideField(langGrp,    'langType');
+  hideField(vipTypeGrp);
+
+  if (type === 'support') {
+    animateShow(eduGrp);
+    eduGrp.querySelector('select').setAttribute('required','required');
+  } else if (type === 'lang' || type === 'online') {
+    animateShow(langGrp);
+    langGrp.querySelector('select').setAttribute('required','required');
+  } else if (type === 'vip') {
+    animateShow(vipTypeGrp);
+  } else if (type === 'ielts') {
+    const daysCountGrp = document.getElementById('vipDaysCountGroup');
+    animateShow(daysCountGrp);
+    daysCountGrp.querySelector('select').setAttribute('required','required');
+  }
+
+  document.getElementById('lang-toggle').classList.add('hidden');
+  document.getElementById('modal').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+  document.body.style.overflow = '';
+  document.getElementById('lang-toggle').classList.remove('hidden');
+  resetForm();
+}
+
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('modal')) closeModal();
+}
+
+function resetForm() {
+  document.getElementById('reg-form').reset();
+  const groups = [
+    'eduLevelGroup','candidateTypeGroup','specialtyGroup','subjectGroup',
+    'teacherGroup','parentGroup','langTypeGroup','langLevelGroup',
+    'levelTestGroup','vipTypeGroup','vipEduLevelGroup','professionGroup',
+    'vipDaysCountGroup','daysGroup',
+  ];
+  groups.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  document.getElementById('comingSoonNote')?.remove();
+  document.querySelectorAll('input[name="vipType"]').forEach(r => r.checked = false);
+  document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
+  document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+  resetDays();
+  maxDaysAllowed = 2;
+}
+
+// ─── BUTTONS ──────────────────────────────────────────────
+document.querySelectorAll('.reg-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const type = btn.getAttribute('data-reg-type');
+    if (type) openModal(type);
+  });
+});
 
 // ─── DAYS ─────────────────────────────────────────────────
 let maxDaysAllowed = 2;
@@ -372,11 +576,10 @@ function showParentIfNeeded(level) {
   parentPhone.setAttribute('required','required');
 }
 
-// ─── VIP TYPE (جديد) ──────────────────────────────────────
+// ─── VIP TYPE ─────────────────────────────────────────────
 function onVipTypeChange() {
   const selected = document.querySelector('input[name="vipType"]:checked')?.value;
 
-  // إخفاء الكل أولاً
   const allGroups = [
     'vipEduLevelGroup','vipDaysCountGroup','professionGroup',
     'daysGroup','langTypeGroup','langLevelGroup','levelTestGroup'
@@ -386,19 +589,17 @@ function onVipTypeChange() {
     if (el) el.style.display = 'none';
   });
   resetDays();
-  document.getElementById('vipDaysCount').value   = '';
-  document.getElementById('profession').value      = '';
-  document.getElementById('langType').value        = '';
-  document.getElementById('langLevel').value       = '';
+  document.getElementById('vipDaysCount').value = '';
+  document.getElementById('profession').value   = '';
+  document.getElementById('langType').value     = '';
+  document.getElementById('langLevel').value    = '';
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
 
   if (selected === 'support') {
-    // VIP دعم → مستوى دراسي ابتدائي/متوسط/ثانوي + أيام
     const vipEduGrp = document.getElementById('vipEduLevelGroup');
     animateShow(vipEduGrp);
     document.getElementById('vipEduLevel').setAttribute('required','required');
   } else if (selected === 'lang') {
-    // VIP لغات → مهنة + اختيار لغة + أيام
     const profGrp = document.getElementById('professionGroup');
     animateShow(profGrp);
     document.getElementById('profession').setAttribute('required','required');
@@ -421,6 +622,70 @@ function onVipEduLevelChange() {
   if (!level) return;
   animateShow(daysCountGrp);
   document.getElementById('vipDaysCount').setAttribute('required','required');
+}
+
+// ─── SUBMIT FORM ──────────────────────────────────────────
+async function submitForm(e) {
+  e.preventDefault();
+
+  const firstName = document.getElementById('firstName').value.trim();
+  const lastName  = document.getElementById('lastName').value.trim();
+  const birthDate = document.getElementById('birthDate').value;
+  const birthPlace= document.getElementById('birthPlace').value.trim();
+  const phone     = document.getElementById('phone').value.trim();
+
+  // Validation
+  let hasError = false;
+  [firstName, lastName, birthPlace].forEach((val, i) => {
+    const ids = ['firstName','lastName','birthPlace'];
+    if (!validateLang(val)) {
+      document.getElementById(ids[i]).classList.add('error');
+      setTimeout(() => document.getElementById(ids[i]).classList.remove('error'), 1500);
+      hasError = true;
+    }
+  });
+  if (hasError) return;
+
+  // جمع الأيام
+  const selectedDays = [...document.querySelectorAll('input[name="days"]:checked')]
+    .map(c => c.value).join('، ');
+
+  // جمع بيانات VIP
+  const vipTypeVal    = document.querySelector('input[name="vipType"]:checked')?.value || '';
+  const vipEduLevel   = document.getElementById('vipEduLevel')?.value  || '';
+  const professionVal = document.getElementById('profession')?.value   || '';
+
+  const data = {
+    type:          currentModalType,
+    firstName,
+    lastName,
+    birthDate,
+    birthPlace,
+    phone,
+    motivation:    document.getElementById('motivation').value.trim(),
+    timestamp:     new Date().toISOString(),
+    // دعم
+    eduLevel:      document.getElementById('eduLevel')?.value      || '',
+    specialty:     document.getElementById('specialty')?.value     || '',
+    subject:       document.getElementById('subject')?.value       || '',
+    teacher:       document.getElementById('teacher')?.value       || '',
+    candidateType: document.querySelector('input[name="candidateType"]:checked')?.value || '',
+    parentName:    document.getElementById('parentName')?.value    || '',
+    parentPhone:   document.getElementById('parentPhone')?.value   || '',
+    // لغات
+    langType:      document.getElementById('langType')?.value      || '',
+    langLevel:     document.getElementById('langLevel')?.value     || '',
+    levelTest:     document.querySelector('input[name="levelTest"]:checked')?.value || '',
+    // VIP
+    vipType:       vipTypeVal,
+    vipEduLevel,
+    profession:    professionVal,
+    // أيام
+    days:          selectedDays,
+    daysCount:     document.getElementById('vipDaysCount')?.value  || '',
+  };
+
+  openTermsForSubmit(data);
 }
 
 // ─── PENDING FORM DATA ────────────────────────────────────
@@ -534,390 +799,111 @@ function showSuccessPopup() {
       <div class="success-popup-academy">
         <img src="images/eplus-logo.png" alt="E-PLUS" draggable="false">
       </div>
-      <h2 class="success-popup-title">
-        ${currentLang === 'ar' ? '🎉 تم استلام تسجيلك بنجاح' : '🎉 Registration Received Successfully'}
-      </h2>
-      <p class="success-popup-msg">
-        ${currentLang === 'ar'
-          ? `شكراً لك على الانضمام إلى <strong>أكاديمية E-PLUS</strong>،<br>
-             لقد وصلنا طلب تسجيلك وسيتم التواصل معك في أقرب وقت ممكن.<br>
-             <span class="success-popup-sub">✦ رحلتك نحو النجاح تبدأ من هنا ✦</span>`
-          : `Thank you for joining <strong>E-PLUS Academy</strong>.<br>
-             Your registration has been received and we will contact you soon.<br>
-             <span class="success-popup-sub">✦ Your journey to success starts here ✦</span>`}
-      </p>
+      <div class="success-popup-title">
+        ${currentLang==='ar'
+          ? '🎉 تم تسجيلك بنجاح!'
+          : '🎉 Registration Successful!'}
+      </div>
+      <div class="success-popup-msg">
+        ${currentLang==='ar'
+          ? 'شكراً لك! تم استلام طلب تسجيلك بنجاح.<br>سيتم التواصل معك قريباً من طرف فريق أكاديمية E-PLUS.<br><span class="success-popup-sub">✦ رحلتك نحو النجاح تبدأ من هنا ✦</span>'
+          : 'Thank you! Your registration has been received.<br>The E-PLUS Academy team will contact you soon.<br><span class="success-popup-sub">✦ Your journey to success starts here ✦</span>'}
+      </div>
       <div class="success-popup-divider"></div>
       <div class="success-popup-info">
-        <span>📞 0676431474</span>
-        <span>📍 ${currentLang === 'ar' ? 'قمار، الوادي' : 'Guemar, El Oued'}</span>
+        <span>📋 ${typeLabelsAr[currentModalType] || currentModalType}</span>
+        <span>🕐 ${new Date().toLocaleDateString(currentLang==='ar'?'ar-DZ':'en-GB',{year:'numeric',month:'long',day:'numeric'})}</span>
       </div>
       <button class="success-popup-btn" onclick="closeSuccessPopup()">
-        ${currentLang === 'ar' ? 'العودة إلى الصفحة الرئيسية' : 'Back to Home'}
+        ${currentLang==='ar' ? 'حسناً، شكراً!' : 'OK, Thank you!'}
       </button>
     </div>`;
-
   document.body.appendChild(overlay);
-  document.body.style.overflow = 'hidden';
-  document.getElementById('lang-toggle')?.classList.add('hidden');
-  launchConfetti(document.getElementById('success-popup-box'));
+  spawnConfetti(overlay);
   requestAnimationFrame(() => overlay.classList.add('active'));
 }
 
 function closeSuccessPopup() {
   const overlay = document.getElementById('success-popup-overlay');
-  if (overlay) {
-    overlay.classList.remove('active');
-    setTimeout(() => overlay.remove(), 350);
-  }
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  setTimeout(() => overlay.remove(), 400);
   document.body.style.overflow = '';
   document.getElementById('lang-toggle')?.classList.remove('hidden');
-  closeModal();
 }
 
-// ─── TRANSLATIONS ─────────────────────────────────────────
-const translations = {
-  ar: {
-    badge:"✦ رحلتك نحو النجاح تبدأ من هنا ✦",
-    title:"EDUCATION PLUS CENTER",
-    subtitle:"التسجيل في الدورات والبرامج التعليمية",
-    btn1:"تسجيلات الدعم", btn2:"دورات اللغات", btn3:"دروس VIP",
-    btn4:"اختبار IELTS",  btn5:"دورات أونلاين", btn6:"دورات تكوينية",
-    firstName:"الاسم", lastName:"اللقب", birthDate:"تاريخ الميلاد",
-    birthPlace:"العنوان", langType:"اختر اللغة",
-    eduLevel:"المستوى الدراسي", specialty:"التخصص",
-    subject:"المادة", teacher:"الأستاذ/ة",
-    candidateType:"نوع المترشح", enrolled:"متمدرس", freeCandidate:"حر",
-    parentInfo:"معلومات ولي الأمر", parentName:"اسم ولي الأمر", parentPhone:"هاتف ولي الأمر",
-    langLevel:"مستوى اللغة (CEFR)",
-    levelTest:"هل تريد إجراء اختبار تحديد المستوى؟",
-    yes:"نعم", no:"لا", phone:"رقم الهاتف",
-    motivation:"ما هو الدافع الذي جعلك تختار أكاديمية E-PLUS؟",
-    optional:"(اختياري)",
-    submitBtn:"إتمام التسجيل ✦",
-    termsTitle:"قوانين وشروط الأكاديمية",
-    termsAgree:"لقد قرأت جميع القوانين والشروط وأوافق عليها",
-    termsProceed:"تأكيد التسجيل ✦",
-    closeBtn:"العودة إلى الصفحة الرئيسية",
-    chooseDays:"اختر الأيام", daysOf:"/2", daysSelected:"يوم محدد",
-    langWarn:"يرجى إدخال جميع المعلومات باللغة العربية فقط",
-    annTitle:"إعلانات الأكاديمية",
-    vipDaysCount:"كم يوم تريد الحضور في الأسبوع؟",
-    vipType:"نوع دروس VIP",
-    vipSupport:"📚 دعم دراسي",
-    vipLang:"🌍 لغات",
-    t1:"يعتبر المتعلم مسجلاً بصفة رسمية بالمركز عند قيامه بتسديد رسوم التسجيل في التاريخ المحدد.",
-    t2:"يجب أن يتسم المتعلم بحسن الأخلاق والنظافة والهندام الملائم.",
-    t3:"يجب احترام جميع الأفراد في المركز التعليمي، الزملاء، المدرسين والطاقم الإداري.",
-    t4:"احترام أوقات الدراسة، وعدم الانصراف دون إذن مسبق.",
-    t5:"عدم التغيب عن الحصص إلا لأسباب ضرورية مع إعلام الإدارة مسبقاً.",
-    t6:"في حالة الغياب بدون سبب يتم إعلام الولي.",
-    t7:"لا يتم تعويض قيمة الحصص عند الغياب المتكرر أو الانقطاع عن الدراسة.",
-    t8:"في حالة التوقف عن الدراسة يتم تعويض 80% فقط من القيمة المتبقية.",
-    t9:"في حالة الغياب طويل المدى يرجى الاتصال بالإدارة لأجل تسوية الوضعية.",
-    t10:"لا يتحمل المركز ضياع أي أغراض ثمينة (نقود، هاتف، مجوهرات...).",
-    t11:"يمنع لمس أو تشغيل أدوات وأجهزة التعليم المختلفة دون إذن.",
-    t12:"أي عملية إتلاف لتجهيزات المركز تعرض صاحبها للعقوبة وتعويض الخسائر.",
-    t13:"في حالة السلوكات غير المقبولة، ينذر الولي كتابياً عند تكرر المخالفة.",
-    t14:"الموافقة على نشر صور المتعلم في شبكات التواصل الاجتماعي، ومقاطع الفيديو التربوية الخاصة بالمركز.",
-  },
-  en: {
-    badge:"✦ Your Journey to Success Starts Here ✦",
-    title:"EDUCATION PLUS CENTER",
-    subtitle:"Register for Courses and Educational Programs",
-    btn1:"Support Registration", btn2:"Language Courses", btn3:"VIP Lessons",
-    btn4:"IELTS Test", btn5:"Online Courses", btn6:"Training Courses",
-    firstName:"First Name", lastName:"Last Name", birthDate:"Date of Birth",
-    birthPlace:"Address", langType:"Choose Language",
-    eduLevel:"Academic Level", specialty:"Specialty",
-    subject:"Subject", teacher:"Teacher",
-    candidateType:"Candidate Type", enrolled:"Enrolled", freeCandidate:"Independent",
-    parentInfo:"Guardian Information", parentName:"Guardian Name", parentPhone:"Guardian Phone",
-    langLevel:"Language Level (CEFR)",
-    levelTest:"Do you want a placement test?",
-    yes:"Yes", no:"No", phone:"Phone Number",
-    motivation:"What motivated you to choose E-PLUS Academy?",
-    optional:"(optional)",
-    submitBtn:"Complete Registration ✦",
-    termsTitle:"Academy Terms & Conditions",
-    termsAgree:"I have read all terms and conditions and agree",
-    termsProceed:"Confirm Registration ✦",
-    closeBtn:"Return to Home Page",
-    chooseDays:"Choose your days", daysOf:"/2", daysSelected:"days selected",
-    langWarn:"Please enter all information in English only",
-    annTitle:"Academy Announcements",
-    vipDaysCount:"How many days per week?",
-    vipType:"VIP Lesson Type",
-    vipSupport:"📚 Academic Support",
-    vipLang:"🌍 Languages",
-    t1:"The learner is officially registered upon payment of registration fees on the specified date.",
-    t2:"The learner must demonstrate good conduct, cleanliness and appropriate dress.",
-    t3:"All individuals at the educational center must be respected.",
-    t4:"Respect study times and do not leave without prior permission.",
-    t5:"Do not miss classes except for necessary reasons with prior notification.",
-    t6:"In case of absence without reason, the guardian will be notified.",
-    t7:"Class fees will not be compensated for repeated absences.",
-    t8:"In case of stopping studies, only 80% of the remaining value will be compensated.",
-    t9:"In case of long-term absence, please contact administration.",
-    t10:"The center is not responsible for loss of any valuables.",
-    t11:"Touching or operating educational tools without permission is prohibited.",
-    t12:"Any damage to center equipment will subject the perpetrator to punishment.",
-    t13:"In case of unacceptable behavior, the guardian will be formally notified.",
-    t14:"Agreement to publish the learner's photos on social media and educational videos.",
-  }
-};
-
-let currentLang      = localStorage.getItem('lang') || 'ar';
-let currentModalType = null;
-
-// ─── SET LANG ─────────────────────────────────────────────
-function setLang(lang) {
-  currentLang = lang;
-  localStorage.setItem('lang', lang);
-  document.documentElement.lang = lang;
-  document.documentElement.dir  = lang === 'ar' ? 'rtl' : 'ltr';
-  document.getElementById('btn-ar').classList.toggle('active', lang === 'ar');
-  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
-
-  const t = translations[lang];
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.getAttribute('data-i18n');
-    if (t[key] !== undefined) el.innerHTML = t[key];
-  });
-
-  const warnIcon = document.getElementById('lang-warning-icon');
-  const warnText = document.getElementById('lang-warning-text');
-  if (warnIcon) warnIcon.textContent = lang === 'ar' ? '🇸🇦' : '🇬🇧';
-  if (warnText) warnText.textContent  = t.langWarn;
-
-  const levelNames = {
-    ar:{ A1:'A1 - مبتدئ', A2:'A2 - مبتدئ متقدم', B1:'B1 - متوسط',
-         B2:'B2 - متوسط متقدم', C1:'C1 - متقدم', C2:'C2 - احترافي' },
-    en:{ A1:'A1 - Beginner', A2:'A2 - Elementary', B1:'B1 - Intermediate',
-         B2:'B2 - Upper Intermediate', C1:'C1 - Advanced', C2:'C2 - Proficient' }
-  };
-  document.querySelectorAll('[data-i18n-level]').forEach(el => {
-    const lv = el.getAttribute('data-i18n-level');
-    if (levelNames[lang]?.[lv]) el.textContent = levelNames[lang][lv];
-  });
-
-  const dayNames = {
-    ar:{ sat:'السبت', sun:'الأحد', mon:'الإثنين', tue:'الثلاثاء',
-         wed:'الأربعاء', thu:'الخميس', fri:'الجمعة' },
-    en:{ sat:'Saturday', sun:'Sunday', mon:'Monday', tue:'Tuesday',
-         wed:'Wednesday', thu:'Thursday', fri:'Friday' }
-  };
-  document.querySelectorAll('[data-i18n-day]').forEach(el => {
-    const key = el.getAttribute('data-i18n-day');
-    if (dayNames[lang]?.[key]) el.textContent = dayNames[lang][key];
-  });
-
-  // ✅ إعادة رسم الإعلانات عند تغيير اللغة
-  if (window._lastAnnDocs?.length) renderAnnouncements(window._lastAnnDocs);
-}
-
-// ─── MODAL TITLES ─────────────────────────────────────────
-const modalTitles = {
-  support: { ar:'تسجيلات الدعم',            en:'Support Registration' },
-  lang:    { ar:'تسجيل دورة لغة',           en:'Language Course Registration' },
-  vip:     { ar:'تسجيل دروس VIP',           en:'VIP Lessons Registration' },
-  ielts:   { ar:'التسجيل في اختبار IELTS',   en:'IELTS Test Registration' },
-  online:  { ar:'التسجيل في دورات أونلاين',  en:'Online Courses Registration' },
-  takwini: { ar:'التسجيل في دورات تكوينية',  en:'Training Courses Registration' },
-};
-
-// ─── OPEN MODAL ───────────────────────────────────────────
-function openModal(type) {
-  currentModalType = type;
-  const titleEl = document.getElementById('modal-title');
-  if (titleEl) titleEl.textContent = modalTitles[type]?.[currentLang] || type;
-
-  const allGroups = [
-    'eduLevelGroup','vipEduLevelGroup','vipDaysCountGroup','professionGroup',
-    'langTypeGroup','langLevelGroup','daysGroup','levelTestGroup',
-    'subjectGroup','teacherGroup','specialtyGroup','candidateTypeGroup',
-    'parentGroup','vipTypeGroup'
-  ];
-  allGroups.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-  });
-
-  document.getElementById('comingSoonNote')?.remove();
-  document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
-  document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
-  document.querySelectorAll('input[name="vipType"]').forEach(r => r.checked = false);
-  maxDaysAllowed = 2;
-  resetDays();
-
-  if (type === 'support') animateShow(document.getElementById('eduLevelGroup'));
-
-  // ✅ VIP: أولاً يختار نوع (دعم / لغات)
-  if (type === 'vip') animateShow(document.getElementById('vipTypeGroup'));
-
-  if (type === 'lang' || type === 'online') {
-    animateShow(document.getElementById('langTypeGroup'));
-    document.getElementById('langType').setAttribute('required','required');
-  }
-  if (type === 'ielts') {
-    maxDaysAllowed = 2;
-    animateShow(document.getElementById('daysGroup'));
-  }
-
-  document.getElementById('reg-form').reset();
-  document.getElementById('modal').classList.add('active');
-  document.body.style.overflow = 'hidden';
-  document.getElementById('lang-toggle')?.classList.add('hidden');
-}
-
-function closeModal() {
-  document.getElementById('modal').classList.remove('active');
-  document.body.style.overflow = '';
-  currentModalType = null;
-  document.getElementById('lang-toggle')?.classList.remove('hidden');
-}
-
-function closeModalOutside(e) {
-  if (e.target === document.getElementById('modal')) closeModal();
-}
-
-// ─── FORM SUBMIT ──────────────────────────────────────────
-function submitForm(e) {
-  e.preventDefault();
-
-  const firstName = document.getElementById('firstName').value.trim();
-  const lastName  = document.getElementById('lastName').value.trim();
-  const address   = document.getElementById('birthPlace').value.trim();
-
-  let langError = false;
-  [['firstName',firstName],['lastName',lastName],['birthPlace',address]].forEach(([id,val]) => {
-    if (val && !validateLang(val)) {
-      const el = document.getElementById(id);
-      el.classList.add('error');
-      setTimeout(() => el.classList.remove('error'), 1500);
-      langError = true;
-    }
-  });
-  if (langError) return;
-
-  let valid = true;
-  document.querySelectorAll('#reg-form [required]').forEach(field => {
-    if (!field.value.trim()) {
-      field.classList.add('error');
-      setTimeout(() => field.classList.remove('error'), 1500);
-      valid = false;
-    }
-  });
-  if (!valid) return;
-
-  const data = {
-    timestamp:  new Date().toLocaleString('ar-DZ'),
-    type:       typeLabelsAr[currentModalType] || currentModalType,
-    firstName,
-    lastName,
-    birthDate:  document.getElementById('birthDate').value,
-    address,
-    phone:      document.getElementById('phone').value.trim(),
-    motivation: document.getElementById('motivation').value.trim(),
-  };
-
-  if (currentModalType === 'support') {
-    data.eduLevel = document.getElementById('eduLevel').value;
-    const spec  = document.getElementById('specialty');
-    const subj  = document.getElementById('subject');
-    const teach = document.getElementById('teacher');
-    const ctype = document.querySelector('input[name="candidateType"]:checked');
-    const pName = document.getElementById('parentName');
-    const pPh   = document.getElementById('parentPhone');
-    if (spec?.value)  data.specialty     = spec.value;
-    if (subj?.value)  data.subject       = subj.value;
-    if (teach?.value) data.teacher       = teach.value;
-    if (ctype)        data.candidateType = ctype.value;
-    if (pName?.value) data.parentName    = pName.value.trim();
-    if (pPh?.value)   data.parentPhone   = pPh.value.trim();
-  }
-
-  if (currentModalType === 'vip') {
-    const vipTypeSelected = document.querySelector('input[name="vipType"]:checked')?.value;
-    data.vipType = vipTypeSelected === 'support' ? 'دعم دراسي' : 'لغات';
-
-    if (vipTypeSelected === 'support') {
-      const vipLevel = document.getElementById('vipEduLevel');
-      if (vipLevel?.value) data.eduLevel = vipLevel.value;
-    } else if (vipTypeSelected === 'lang') {
-      const prof     = document.getElementById('profession');
-      const langType = document.getElementById('langType');
-      const langLvl  = document.getElementById('langLevel');
-      if (prof?.value)    data.profession = prof.value.trim();
-      if (langType?.value) data.langType  = langType.value;
-      if (langLvl?.value)  data.langLevel = langLvl.value;
-    }
-
-    const days = [...document.querySelectorAll('input[name="days"]:checked')].map(d => d.value);
-    if (days.length) data.selectedDays = days.join('، ');
-  }
-
-  if (currentModalType === 'lang' || currentModalType === 'online') {
-    const langTypeEl = document.getElementById('langType');
-    if (langTypeEl?.value) data.langType = langTypeEl.value;
-    data.langLevel = document.getElementById('langLevel').value;
-    const lt = document.querySelector('input[name="levelTest"]:checked');
-    if (lt) data.levelTest = lt.value;
-  }
-
-  if (currentModalType === 'ielts') {
-    const days = [...document.querySelectorAll('input[name="days"]:checked')].map(d => d.value);
-    if (days.length) data.selectedDays = days.join('، ');
-  }
-
-  openTermsForSubmit(data);
-}
-
-// ─── CONFETTI ─────────────────────────────────────────────
-function launchConfetti(container) {
-  const colors = ['#045283','#0a8acb','#f4b41a','#ffffff','#53a9df'];
-  for (let i = 0; i < 55; i++) {
+function spawnConfetti(parent) {
+  const colors = ['#0a8acb','#045283','#f4b41a','#ffffff','#53a9df'];
+  for (let i = 0; i < 38; i++) {
     const c = document.createElement('div');
     c.className = 'confetti';
     c.style.cssText = `
-      left:${Math.random()*100}%;top:${10+Math.random()*30}%;
-      width:${6+Math.random()*9}px;height:${6+Math.random()*9}px;
+      left:${Math.random()*100}%;
+      top:${-10 - Math.random()*30}px;
+      width:${6 + Math.random()*8}px;
+      height:${6 + Math.random()*8}px;
       background:${colors[Math.floor(Math.random()*colors.length)]};
-      border-radius:${Math.random()>0.5?'50%':'3px'};
-      animation-duration:${0.9+Math.random()*1}s;
-      animation-delay:${Math.random()*0.5}s;`;
-    container.appendChild(c);
-    setTimeout(() => c.remove(), 2500);
+      border-radius:${Math.random()>0.5?'50%':'2px'};
+      animation-duration:${1.2+Math.random()*1.2}s;
+      animation-delay:${Math.random()*0.6}s;
+    `;
+    parent.appendChild(c);
   }
 }
 
+// ─── FIREBASE ─────────────────────────────────────────────
+import { initializeApp }                        from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getFirestore, collection, query,
+         orderBy, onSnapshot }                  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyCtb6RPW5sq5zK5JMmTYlBFEnQQZfVoI7s",
+  authDomain:        "epluscenter-panel.firebaseapp.com",
+  projectId:         "epluscenter-panel",
+  storageBucket:     "epluscenter-panel.firebasestorage.app",
+  messagingSenderId: "1000462675381",
+  appId:             "1:1000462675381:web:b2156128337f7c11c17dfc"
+};
+
+const _app = initializeApp(firebaseConfig);
+const _db  = getFirestore(_app);
+
 // ─── ANNOUNCEMENTS ────────────────────────────────────────
-// ✅ إصلاح نهائي: حفظ الـ docs كـ plain objects لتجنب مشكلة Firestore snapshot stale
 let annCurrent   = 0;
 let annAutoSlide = null;
 
-function renderAnnouncements(docs) {
-  // ✅ حفظ البيانات كـ plain objects مستقلة عن Firestore
-  window._lastAnnData = docs.map(doc => {
-    const d = doc.data ? doc.data() : doc;
-    return {
-      title:     d.title     || '',
-      text:      d.text      || '',
-      imageUrl:  d.imageUrl  || '',
-      createdAt: d.createdAt || null,
-    };
-  });
-
-  _renderFromData(window._lastAnnData);
-}
+// ✅ onSnapshot — استخراج فوري وحفظ في كاش عالمي
+onSnapshot(
+  query(collection(_db, 'announcements'), orderBy('createdAt', 'desc')),
+  snap => {
+    // استخراج البيانات فوراً قبل أي شيء
+    window._annCache = snap.docs.map(doc => {
+      const d = doc.data();
+      return {
+        title:     d.title     || '',
+        text:      d.text      || '',
+        imageUrl:  d.imageUrl  || '',
+        createdAt: d.createdAt || null,
+      };
+    });
+    _renderFromData(window._annCache);
+  }
+);
 
 function _renderFromData(dataArr) {
   const section = document.getElementById('announcements-section');
   const track   = document.getElementById('ann-track');
   const dotsEl  = document.getElementById('ann-dots');
-  if (!dataArr?.length) { section.style.display = 'none'; return; }
 
-  const savedIndex = annCurrent;
+  if (!dataArr || dataArr.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+
   clearInterval(annAutoSlide);
+  const savedIndex = (annCurrent < dataArr.length) ? annCurrent : 0;
+
   section.style.display = 'block';
   track.innerHTML  = '';
   dotsEl.innerHTML = '';
@@ -925,35 +911,60 @@ function _renderFromData(dataArr) {
   const isRtl = currentLang === 'ar';
 
   dataArr.forEach((d, i) => {
+    // ✅ has-image فقط إذا imageUrl موجود وهو https URL حقيقي
+    const hasImg = d.imageUrl && d.imageUrl.startsWith('https');
+
     const card = document.createElement('div');
-    card.className = d.imageUrl ? 'ann-card has-image' : 'ann-card text-only';
+    card.className = hasImg ? 'ann-card has-image' : 'ann-card text-only';
     card.style.direction = isRtl ? 'rtl' : 'ltr';
     card.style.textAlign = isRtl ? 'right' : 'left';
 
     let dateStr = '';
     if (d.createdAt?.toDate) {
-      dateStr = d.createdAt.toDate().toLocaleDateString(
-        isRtl ? 'ar-DZ' : 'en-GB',
-        { year:'numeric', month:'long', day:'numeric' }
-      );
+      try {
+        dateStr = d.createdAt.toDate().toLocaleDateString(
+          isRtl ? 'ar-DZ' : 'en-GB',
+          { year:'numeric', month:'long', day:'numeric' }
+        );
+      } catch(e) { dateStr = ''; }
     }
 
     card.innerHTML = `
-      ${d.imageUrl ? `<img class="ann-card-img" src="${d.imageUrl}" alt="" draggable="false">` : ''}
+      ${hasImg
+        ? `<img class="ann-card-img"
+               src="${d.imageUrl}"
+               alt="" draggable="false"
+               loading="lazy"
+               onerror="this.closest('.ann-card').classList.remove('has-image');
+                        this.closest('.ann-card').classList.add('text-only');
+                        this.remove();">`
+        : ''}
       <div class="ann-card-body">
-        <div class="ann-card-badge">📢 ${isRtl ? 'إعلان' : 'Announcement'}</div>
+        <div class="ann-card-badge">
+          📢 ${isRtl ? 'إعلان' : 'Announcement'}
+        </div>
         ${d.title ? `<div class="ann-card-title">${d.title}</div>` : ''}
         ${d.text  ? `<div class="ann-card-text">${d.text}</div>`   : ''}
         ${dateStr ? `<div class="ann-card-date">🗓 ${dateStr}</div>` : ''}
       </div>`;
+
     track.appendChild(card);
 
+    // ✅ تأثير ظهور الصورة بعد تحميلها
+    const img = card.querySelector('.ann-card-img');
+    if (img) {
+      img.addEventListener('load', () => img.classList.add('loaded'));
+      if (img.complete) img.classList.add('loaded');
+    }
+
+    // Dot
     const dot = document.createElement('div');
     dot.className = 'ann-dot' + (i === 0 ? ' active' : '');
     dot.onclick = () => { goToSlide(i); resetAuto(); };
     dotsEl.appendChild(dot);
   });
 
+  // Arrows
   const wrapper = document.querySelector('.ann-track-wrapper');
   wrapper.querySelectorAll('.ann-arrow').forEach(a => a.remove());
 
@@ -961,17 +972,26 @@ function _renderFromData(dataArr) {
     const prev = document.createElement('button');
     prev.className = 'ann-arrow ann-arrow-prev';
     prev.innerHTML = '‹';
-    prev.onclick = () => { goToSlide((annCurrent - 1 + dataArr.length) % dataArr.length); resetAuto(); };
+    prev.onclick = () => {
+      goToSlide((annCurrent - 1 + dataArr.length) % dataArr.length);
+      resetAuto();
+    };
     const next = document.createElement('button');
     next.className = 'ann-arrow ann-arrow-next';
     next.innerHTML = '›';
-    next.onclick = () => { goToSlide((annCurrent + 1) % dataArr.length); resetAuto(); };
+    next.onclick = () => {
+      goToSlide((annCurrent + 1) % dataArr.length);
+      resetAuto();
+    };
     wrapper.appendChild(prev);
     wrapper.appendChild(next);
   }
 
+  // Touch Swipe
   let touchStartX = 0;
-  track.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive:true });
+  track.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive:true });
   track.addEventListener('touchend', e => {
     const diff = e.changedTouches[0].clientX - touchStartX;
     if (Math.abs(diff) > 50) {
@@ -982,19 +1002,24 @@ function _renderFromData(dataArr) {
     }
   });
 
+  // Mouse Drag
   let isDragging = false, dragStartX = 0, dragDelta = 0;
   track.addEventListener('mousedown', e => {
     isDragging = true; dragStartX = e.clientX; dragDelta = 0;
-    track.style.transition = 'none'; track.style.cursor = 'grabbing';
+    track.style.transition = 'none';
+    track.style.cursor = 'grabbing';
   });
   window.addEventListener('mousemove', e => {
     if (!isDragging) return;
     dragDelta = e.clientX - dragStartX;
-    track.style.transform = `translateX(calc(${annCurrent * -100}% + ${dragDelta}px))`;
+    track.style.transform =
+      `translateX(calc(${annCurrent * -100}% + ${dragDelta}px))`;
   });
   window.addEventListener('mouseup', () => {
     if (!isDragging) return;
-    isDragging = false; track.style.transition = ''; track.style.cursor = '';
+    isDragging = false;
+    track.style.transition = '';
+    track.style.cursor = '';
     goToSlide(Math.abs(dragDelta) > 60
       ? (dragDelta > 0
           ? (annCurrent - 1 + dataArr.length) % dataArr.length
@@ -1003,11 +1028,12 @@ function _renderFromData(dataArr) {
     resetAuto();
   });
 
-  const startIndex = savedIndex < dataArr.length ? savedIndex : 0;
-  annCurrent = startIndex;
-  track.style.transform = `translateX(${startIndex * -100}%)`;
-  document.querySelectorAll('.ann-dot').forEach((d, i) =>
-    d.classList.toggle('active', i === startIndex));
+  // Init
+  annCurrent = savedIndex;
+  track.style.transform = `translateX(${savedIndex * -100}%)`;
+  document.querySelectorAll('.ann-dot').forEach((dot, i) =>
+    dot.classList.toggle('active', i === savedIndex));
+
   startAuto();
 
   function goToSlide(idx) {
@@ -1018,60 +1044,35 @@ function _renderFromData(dataArr) {
   }
   function startAuto() {
     if (dataArr.length <= 1) return;
-    annAutoSlide = setInterval(() => goToSlide((annCurrent + 1) % dataArr.length), 8000);
+    annAutoSlide = setInterval(
+      () => goToSlide((annCurrent + 1) % dataArr.length),
+      8000
+    );
   }
   function resetAuto() { clearInterval(annAutoSlide); startAuto(); }
 }
 
-// ─── FIREBASE ─────────────────────────────────────────────
-import { initializeApp }
-  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-import { getFirestore, collection, query, orderBy, onSnapshot }
-  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-
-const _app = initializeApp({
-  apiKey:            "AIzaSyCtb6RPW5sq5zK5JMmTYlBFEnQQZfVoI7s",
-  authDomain:        "epluscenter-panel.firebaseapp.com",
-  projectId:         "epluscenter-panel",
-  storageBucket:     "epluscenter-panel.firebasestorage.app",
-  messagingSenderId: "1000462675381",
-  appId:             "1:1000462675381:web:b2156128337f7c11c17dfc"
-});
-const _db = getFirestore(_app);
-
-onSnapshot(
-  query(collection(_db, 'announcements'), orderBy('createdAt', 'desc')),
-  snap => renderAnnouncements(snap.docs)
-);
-
-// ─── تهيئة اللغة ──────────────────────────────────────────
-setLang(currentLang);
-
-// ─── أزرار التسجيل ────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('[data-reg-type]').forEach(btn => {
-    btn.addEventListener('click', () => openModal(btn.getAttribute('data-reg-type')));
-  });
-});
-
-// ─── GLOBAL EXPORTS ───────────────────────────────────────
-window.setLang               = setLang;
-window.closeTerms            = closeTerms;
-window.closeTermsOutside     = closeTermsOutside;
-window.onTermsCheck          = onTermsCheck;
-window.proceedToRegister     = proceedToRegister;
-window.closeModal            = closeModal;
-window.closeModalOutside     = closeModalOutside;
-window.submitForm            = submitForm;
-window.closeSuccessPopup     = closeSuccessPopup;
-window.onEduLevelChange      = onEduLevelChange;
+// ─── EXPOSE FUNCTIONS ─────────────────────────────────────
+window.setLang             = setLang;
+window.closeModal          = closeModal;
+window.closeModalOutside   = closeModalOutside;
+window.closeTerms          = closeTerms;
+window.closeTermsOutside   = closeTermsOutside;
+window.onTermsCheck        = onTermsCheck;
+window.proceedToRegister   = proceedToRegister;
+window.closeSuccessPopup   = closeSuccessPopup;
+window.onLangTypeChange    = onLangTypeChange;
+window.onLangLevelChange   = onLangLevelChange;
+window.onEduLevelChange    = onEduLevelChange;
 window.onCandidateTypeChange = onCandidateTypeChange;
-window.onSpecialtyChange     = onSpecialtyChange;
-window.onSubjectChange       = onSubjectChange;
-window.onTeacherChange       = onTeacherChange;
-window.onLangTypeChange      = onLangTypeChange;
-window.onLangLevelChange     = onLangLevelChange;
-window.onVipTypeChange       = onVipTypeChange;
-window.onVipEduLevelChange   = onVipEduLevelChange;
-window.onVipDaysCountChange  = onVipDaysCountChange;
-window.onDayChange           = onDayChange;
+window.onSpecialtyChange   = onSpecialtyChange;
+window.onSubjectChange     = onSubjectChange;
+window.onTeacherChange     = onTeacherChange;
+window.onVipTypeChange     = onVipTypeChange;
+window.onVipEduLevelChange = onVipEduLevelChange;
+window.onVipDaysCountChange= onVipDaysCountChange;
+window.onDayChange         = onDayChange;
+window.submitForm          = submitForm;
+
+// ─── INIT LANG ────────────────────────────────────────────
+setLang('ar');
