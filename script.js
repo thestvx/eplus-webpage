@@ -38,7 +38,7 @@ resizeCanvas();
 animateSquares();
 
 // ─── APPS SCRIPT URL ──────────────────────────────────────
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz9xBF_sqR6Z7lc-pPQLCRiieff8hRbXbzRg-729rfK6yfP4L0Ustgxg4HBxUIsjCVX0w/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyiooCIgUPH3OHbdPJgjd23tnT1NA7IichZ28haow3Y5kf2wtGAXFFzpL1rpV2Fpnxysg/exec';
 
 const typeLabelsAr = {
   support: 'تسجيلات الدعم',
@@ -763,7 +763,6 @@ function onTermsCheck() {
   btn.classList.toggle('enabled', checkbox.checked);
 }
 
-// ─── PROCEED TO REGISTER ✅ ───────────────────────────────
 async function proceedToRegister() {
   if (!pendingFormData) return;
   const tbody = document.querySelector('.terms-body');
@@ -771,59 +770,27 @@ async function proceedToRegister() {
   document.getElementById('scroll-hint')?.remove();
   document.getElementById('terms-modal').classList.remove('active');
 
-  // ✅ أظهر نافذة الانتظار
-  showLoadingPopup();
+  const btn = document.getElementById('terms-proceed-btn');
+  btn.classList.add('loading');
 
   try {
-    const formData = new FormData();
-    formData.append('payload', JSON.stringify(pendingFormData));
-
     await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode:   'no-cors',
-      body:   formData
+      method:  'POST',
+      mode:    'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(pendingFormData)
     });
-
-    // ✅ أخفي الانتظار وأظهر النجاح
-    hideLoadingPopup();
+    btn.classList.remove('loading');
     pendingFormData = null;
     showSuccessPopup();
-
   } catch(err) {
-    hideLoadingPopup();
+    btn.classList.remove('loading');
     console.error(err);
     document.getElementById('terms-modal').classList.add('active');
     alert(currentLang === 'ar'
       ? 'حدث خطأ أثناء الإرسال، تحقق من اتصالك بالإنترنت.'
       : 'A network error occurred. Please check your connection.');
   }
-}
-
-// ─── LOADING POPUP ✅ ─────────────────────────────────────
-function showLoadingPopup() {
-  document.getElementById('loading-popup-overlay')?.remove();
-  const overlay = document.createElement('div');
-  overlay.id = 'loading-popup-overlay';
-  overlay.className = 'loading-popup-overlay';
-  overlay.innerHTML = `
-    <div class="loading-popup-box">
-      <div class="loading-spinner"></div>
-      <div class="loading-popup-title">
-        ${currentLang === 'ar' ? '⏳ جاري تسجيل معلوماتك...' : '⏳ Submitting your registration...'}
-      </div>
-      <div class="loading-popup-msg">
-        ${currentLang === 'ar' ? 'انتظر قليلاً، يتم معالجة طلبك الآن' : 'Please wait, your request is being processed'}
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  requestAnimationFrame(() => overlay.classList.add('active'));
-}
-
-function hideLoadingPopup() {
-  const overlay = document.getElementById('loading-popup-overlay');
-  if (!overlay) return;
-  overlay.classList.remove('active');
-  setTimeout(() => overlay.remove(), 300);
 }
 
 // ─── SUCCESS POPUP ────────────────────────────────────────
@@ -880,4 +847,260 @@ function spawnConfetti(parent) {
       left:${Math.random()*100}%;
       top:${-10 - Math.random()*30}px;
       width:${6 + Math.random()*8}px;
-      height:${6 + Math.random()*
+      height:${6 + Math.random()*8}px;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      border-radius:${Math.random()>0.5?'50%':'2px'};
+      animation-duration:${1.2+Math.random()*1.2}s;
+      animation-delay:${Math.random()*0.6}s;
+    `;
+    parent.appendChild(c);
+  }
+}
+
+// ─── FIREBASE ─────────────────────────────────────────────
+import { initializeApp }                        from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getFirestore, collection, query,
+         orderBy, onSnapshot }                  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyCtb6RPW5sq5zK5JMmTYlBFEnQQZfVoI7s",
+  authDomain:        "epluscenter-panel.firebaseapp.com",
+  projectId:         "epluscenter-panel",
+  storageBucket:     "epluscenter-panel.firebasestorage.app",
+  messagingSenderId: "1000462675381",
+  appId:             "1:1000462675381:web:b2156128337f7c11c17dfc"
+};
+
+const _app = initializeApp(firebaseConfig);
+const _db  = getFirestore(_app);
+
+// ─── ANNOUNCEMENTS STATE ──────────────────────────────────
+let annCurrent   = 0;
+let annAutoSlide = null;
+let annTotalDocs = 0;
+
+// ✅ حساب اتجاه السلايدر دائماً LTR بغض النظر عن لغة الصفحة
+function getSlideDir() { return -1; }
+
+function goToSlide(idx) {
+  annCurrent = idx;
+  const track = document.getElementById('ann-track');
+  if (track) {
+    track.style.transform = `translateX(${idx * 100 * getSlideDir()}%)`;
+  }
+  document.querySelectorAll('.ann-dot').forEach((dot, i) =>
+    dot.classList.toggle('active', i === idx));
+}
+
+function startAnnAuto() {
+  if (annTotalDocs <= 1) return;
+  annAutoSlide = setInterval(
+    () => goToSlide((annCurrent + 1) % annTotalDocs),
+    8000
+  );
+}
+function resetAnnAuto() {
+  clearInterval(annAutoSlide);
+  startAnnAuto();
+}
+
+// ─── FIREBASE LISTENER ────────────────────────────────────
+onSnapshot(
+  query(collection(_db, 'announcements'), orderBy('createdAt', 'desc')),
+  snap => {
+    window._annCache = snap.docs
+      .map(doc => {
+        const d = doc.data();
+        return {
+          title:     d.title     || '',
+          text:      d.text      || '',
+          imageUrl:  d.imageUrl  || '',
+          createdAt: d.createdAt || null,
+          hidden:    d.hidden    || false,
+        };
+      })
+      .filter(d => d.hidden !== true);
+
+    _renderFromData(window._annCache);
+  }
+);
+
+// ─── RENDER ANNOUNCEMENTS ─────────────────────────────────
+function _renderFromData(dataArr) {
+  const section = document.getElementById('announcements-section');
+  const track   = document.getElementById('ann-track');
+  const dotsEl  = document.getElementById('ann-dots');
+
+  if (!dataArr || dataArr.length === 0) {
+    section.style.display = 'none';
+    clearInterval(annAutoSlide);
+    return;
+  }
+
+  clearInterval(annAutoSlide);
+  annTotalDocs = dataArr.length;
+  const savedIndex = (annCurrent < dataArr.length) ? annCurrent : 0;
+  annCurrent = savedIndex;
+
+  section.style.display = 'block';
+  track.innerHTML  = '';
+  dotsEl.innerHTML = '';
+
+  // ✅ إجبار LTR على الـ track دائماً لمنع انعكاس RTL
+  track.style.direction = 'ltr';
+
+  const isRtl = currentLang === 'ar';
+
+  dataArr.forEach((d, i) => {
+    const hasImg = d.imageUrl && d.imageUrl.startsWith('https');
+
+    const card = document.createElement('div');
+    card.className = hasImg ? 'ann-card has-image' : 'ann-card text-only';
+    // ✅ محتوى الكارد يكون بالاتجاه الصحيح للغة
+    card.style.direction = isRtl ? 'rtl' : 'ltr';
+    card.style.textAlign = isRtl ? 'right' : 'left';
+
+    let dateStr = '';
+    if (d.createdAt?.toDate) {
+      try {
+        dateStr = d.createdAt.toDate().toLocaleDateString(
+          isRtl ? 'ar-DZ' : 'en-GB',
+          { year:'numeric', month:'long', day:'numeric' }
+        );
+      } catch(e) { dateStr = ''; }
+    }
+
+    card.innerHTML = `
+      ${hasImg
+        ? `<img class="ann-card-img"
+               src="${d.imageUrl}"
+               alt="" draggable="false"
+               loading="lazy"
+               onerror="this.closest('.ann-card').classList.remove('has-image');
+                        this.closest('.ann-card').classList.add('text-only');
+                        this.remove();">`
+        : ''}
+      <div class="ann-card-body">
+        <div class="ann-card-badge">
+          📢 ${isRtl ? 'إعلان' : 'Announcement'}
+        </div>
+        ${d.title ? `<div class="ann-card-title">${d.title}</div>` : ''}
+        ${d.text  ? `<div class="ann-card-text">${d.text}</div>`   : ''}
+        ${dateStr ? `<div class="ann-card-date">🗓 ${dateStr}</div>` : ''}
+      </div>`;
+
+    track.appendChild(card);
+
+    const img = card.querySelector('.ann-card-img');
+    if (img) {
+      img.addEventListener('load', () => img.classList.add('loaded'));
+      if (img.complete) img.classList.add('loaded');
+    }
+
+    const dot = document.createElement('div');
+    dot.className = 'ann-dot' + (i === 0 ? ' active' : '');
+    dot.addEventListener('click', () => { goToSlide(i); resetAnnAuto(); });
+    dotsEl.appendChild(dot);
+  });
+
+  // ── Arrows ──
+  const wrapper = document.querySelector('.ann-track-wrapper');
+  wrapper.querySelectorAll('.ann-arrow').forEach(a => a.remove());
+
+  if (dataArr.length > 1) {
+    const prev = document.createElement('button');
+    prev.className = 'ann-arrow ann-arrow-prev';
+    prev.innerHTML = '‹';
+    prev.addEventListener('click', () => {
+      goToSlide((annCurrent - 1 + dataArr.length) % dataArr.length);
+      resetAnnAuto();
+    });
+    const next = document.createElement('button');
+    next.className = 'ann-arrow ann-arrow-next';
+    next.innerHTML = '›';
+    next.addEventListener('click', () => {
+      goToSlide((annCurrent + 1) % dataArr.length);
+      resetAnnAuto();
+    });
+    wrapper.appendChild(prev);
+    wrapper.appendChild(next);
+  }
+
+  // ── Touch Swipe ──
+  let touchStartX = 0;
+  track.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive:true });
+  track.addEventListener('touchend', e => {
+    const diff = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(diff) > 50) {
+      goToSlide(diff > 0
+        ? (annCurrent - 1 + dataArr.length) % dataArr.length
+        : (annCurrent + 1) % dataArr.length);
+      resetAnnAuto();
+    }
+  });
+
+  // ── Mouse Drag ──
+  let isDragging = false, dragStartX = 0, dragDelta = 0;
+  track.addEventListener('mousedown', e => {
+    isDragging = true; dragStartX = e.clientX; dragDelta = 0;
+    track.style.transition = 'none';
+    track.style.cursor = 'grabbing';
+  });
+  window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    dragDelta = e.clientX - dragStartX;
+    // ✅ LTR ثابت دائماً
+    track.style.transform =
+      `translateX(calc(${annCurrent * 100 * getSlideDir()}% + ${dragDelta}px))`;
+  });
+  window.addEventListener('mouseup', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    track.style.transition = '';
+    track.style.cursor = '';
+    goToSlide(Math.abs(dragDelta) > 60
+      ? (dragDelta > 0
+          ? (annCurrent - 1 + dataArr.length) % dataArr.length
+          : (annCurrent + 1) % dataArr.length)
+      : annCurrent);
+    resetAnnAuto();
+  });
+
+  // ── Init position ──
+  // ✅ LTR ثابت دائماً
+  track.style.transform = `translateX(${savedIndex * 100 * getSlideDir()}%)`;
+  document.querySelectorAll('.ann-dot').forEach((dot, i) =>
+    dot.classList.toggle('active', i === savedIndex));
+
+  startAnnAuto();
+}
+
+// ─── EXPOSE FUNCTIONS ─────────────────────────────────────
+window.setLang               = setLang;
+window.closeModal            = closeModal;
+window.closeModalOutside     = closeModalOutside;
+window.closeTerms            = closeTerms;
+window.closeTermsOutside     = closeTermsOutside;
+window.onTermsCheck          = onTermsCheck;
+window.proceedToRegister     = proceedToRegister;
+window.closeSuccessPopup     = closeSuccessPopup;
+window.onLangTypeChange      = onLangTypeChange;
+window.onLangLevelChange     = onLangLevelChange;
+window.onEduLevelChange      = onEduLevelChange;
+window.onCandidateTypeChange = onCandidateTypeChange;
+window.onSpecialtyChange     = onSpecialtyChange;
+window.onSubjectChange       = onSubjectChange;
+window.onTeacherChange       = onTeacherChange;
+window.onVipTypeChange       = onVipTypeChange;
+window.onVipEduLevelChange   = onVipEduLevelChange;
+window.onVipDaysCountChange  = onVipDaysCountChange;
+window.onDayChange           = onDayChange;
+window.submitForm            = submitForm;
+window.goToSlide             = goToSlide;
+window.resetAnnAuto          = resetAnnAuto;
+
+// ─── INIT LANG ────────────────────────────────────────────
+setLang('ar');
