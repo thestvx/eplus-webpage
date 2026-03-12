@@ -38,7 +38,7 @@ resizeCanvas();
 animateSquares();
 
 // ─── APPS SCRIPT URL ──────────────────────────────────────
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz9xBF_sqR6Z7lc-pPQLCRiieff8hRbXbzRg-729rfK6yfP4L0Ustgxg4HBxUIsjCVX0w/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyiooCIgUPH3OHbdPJgjd23tnT1NA7IichZ28haow3Y5kf2wtGAXFFzpL1rpV2Fpnxysg/exec';
 
 const typeLabelsAr = {
   support: 'تسجيلات الدعم',
@@ -626,6 +626,9 @@ function onVipTypeChange() {
     animateShow(vipEduGrp);
     document.getElementById('vipEduLevel').setAttribute('required','required');
   } else if (selected === 'lang') {
+    const profGrp = document.getElementById('professionGroup');
+    animateShow(profGrp);
+    document.getElementById('profession').setAttribute('required','required');
     animateShow(document.getElementById('langTypeGroup'));
     document.getElementById('langType').setAttribute('required','required');
   }
