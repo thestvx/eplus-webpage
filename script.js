@@ -463,8 +463,13 @@ function onLangTypeChange() {
   const val        = document.getElementById('langType').value;
   const langLvlGrp = document.getElementById('langLevelGroup');
   const levelTestG = document.getElementById('levelTestGroup');
+  const daysCountG = document.getElementById('vipDaysCountGroup');
+  const daysG      = document.getElementById('daysGroup');
   hideField(langLvlGrp, 'langLevel');
   hideField(levelTestG);
+  if (daysCountG) { daysCountG.style.display = 'none'; document.getElementById('vipDaysCount').value = ''; }
+  if (daysG) daysG.style.display = 'none';
+  resetDays();
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
   if (val) {
     animateShow(langLvlGrp);
@@ -476,14 +481,15 @@ function onLangLevelChange() {
   const val          = document.getElementById('langLevel').value;
   const levelTestGrp = document.getElementById('levelTestGroup');
   const daysCountGrp = document.getElementById('vipDaysCountGroup');
-  const serviceType  = document.querySelector('.service-btn.active')?.dataset?.service || '';
 
   levelTestGrp.style.display = 'none';
   if (daysCountGrp) daysCountGrp.style.display = 'none';
+  resetDays();
+  document.getElementById('vipDaysCount').value = '';
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
 
   if (val) {
-    if (serviceType === 'vip') {
+    if (currentModalType === 'vip') {
       animateShow(daysCountGrp);
       document.getElementById('vipDaysCount').setAttribute('required','required');
     } else {
