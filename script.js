@@ -805,8 +805,11 @@ function showLoadingPopup() {
   overlay.innerHTML = `
     <div class="loading-popup-box">
       <div class="loading-spinner"></div>
+      <div class="loading-popup-icon-wrap">
+        <img src="3d/wait.png" alt="wait" class="loading-popup-3d-icon" />
+      </div>
       <div class="loading-popup-title">
-        ${currentLang === 'ar' ? '⏳ جاري تسجيل معلوماتك...' : '⏳ Submitting your registration...'}
+        ${currentLang === 'ar' ? 'جاري تسجيل معلوماتك...' : 'Submitting your registration...'}
       </div>
       <div class="loading-popup-msg">
         ${currentLang === 'ar'
