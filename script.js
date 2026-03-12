@@ -151,7 +151,6 @@ function setLang(lang) {
     if (t[key] !== undefined) el.textContent = t[key];
   });
 
-  // تحديث warning اللغة
   const warnIcon = document.getElementById('lang-warning-icon');
   const warnText = document.getElementById('lang-warning-text');
   if (warnIcon && warnText) {
@@ -164,7 +163,6 @@ function setLang(lang) {
     }
   }
 
-  // ✅ إعادة render الإعلانات من الكاش عند تغيير اللغة
   if (window._annCache && window._annCache.length > 0) {
     _renderFromData(window._annCache);
   }
@@ -280,16 +278,12 @@ function openModal(type) {
   };
   document.getElementById('modal-title').textContent = titles[type] || 'نموذج التسجيل';
 
-  // ✅ تغيير سؤال الدافع حسب نوع التسجيل
   const motivationLabel = document.querySelector('label[for="motivation"] span[data-i18n="motivation"]');
   if (motivationLabel) {
     const t = i18n[currentLang];
-    motivationLabel.textContent = (type === 'vip')
-      ? t.motivationVip
-      : t.motivation;
+    motivationLabel.textContent = (type === 'vip') ? t.motivationVip : t.motivation;
   }
 
-  // إظهار الحقول المناسبة
   const eduGrp     = document.getElementById('eduLevelGroup');
   const langGrp    = document.getElementById('langTypeGroup');
   const vipTypeGrp = document.getElementById('vipTypeGroup');
@@ -347,7 +341,6 @@ function resetForm() {
   resetDays();
   maxDaysAllowed = 2;
 
-  // ✅ إعادة سؤال الدافع للنص الافتراضي
   const motivationLabel = document.querySelector('label[for="motivation"] span[data-i18n="motivation"]');
   if (motivationLabel) {
     motivationLabel.textContent = i18n[currentLang].motivation;
@@ -810,9 +803,7 @@ function showSuccessPopup() {
         <img src="images/eplus-logo.png" alt="E-PLUS" draggable="false">
       </div>
       <div class="success-popup-title">
-        ${currentLang==='ar'
-          ? '🎉 تم تسجيلك بنجاح!'
-          : '🎉 Registration Successful!'}
+        ${currentLang==='ar' ? '🎉 تم تسجيلك بنجاح!' : '🎉 Registration Successful!'}
       </div>
       <div class="success-popup-msg">
         ${currentLang==='ar'
@@ -884,7 +875,6 @@ let annCurrent   = 0;
 let annAutoSlide = null;
 let annTotalDocs = 0;
 
-// ✅ Global — لا تُغلق داخل أي function
 function goToSlide(idx) {
   annCurrent = idx;
   const track = document.getElementById('ann-track');
@@ -904,30 +894,38 @@ function resetAnnAuto() {
   startAnnAuto();
 }
 
-// ✅ onSnapshot — استخراج فوري وحفظ في كاش عالمي
+// ─── FIREBASE LISTENER ────────────────────────────────────
 onSnapshot(
   query(collection(_db, 'announcements'), orderBy('createdAt', 'desc')),
   snap => {
-    window._annCache = snap.docs.map(doc => {
-      const d = doc.data();
-      return {
-        title:     d.title     || '',
-        text:      d.text      || '',
-        imageUrl:  d.imageUrl  || '',
-        createdAt: d.createdAt || null,
-      };
-    });
+    // ✅ فلترة الإعلانات المخفية hidden:true
+    window._annCache = snap.docs
+      .map(doc => {
+        const d = doc.data();
+        return {
+          title:     d.title     || '',
+          text:      d.text      || '',
+          imageUrl:  d.imageUrl  || '',
+          createdAt: d.createdAt || null,
+          hidden:    d.hidden    || false,
+        };
+      })
+      .filter(d => d.hidden !== true);
+
     _renderFromData(window._annCache);
   }
 );
 
+// ─── RENDER ANNOUNCEMENTS ─────────────────────────────────
 function _renderFromData(dataArr) {
   const section = document.getElementById('announcements-section');
   const track   = document.getElementById('ann-track');
   const dotsEl  = document.getElementById('ann-dots');
 
+  // ✅ إخفاء القسم كاملاً إذا ما في إعلانات أو كلها مخفية
   if (!dataArr || dataArr.length === 0) {
     section.style.display = 'none';
+    clearInterval(annAutoSlide);
     return;
   }
 
@@ -981,21 +979,19 @@ function _renderFromData(dataArr) {
 
     track.appendChild(card);
 
-    // ✅ تحميل تدريجي للصورة
     const img = card.querySelector('.ann-card-img');
     if (img) {
       img.addEventListener('load', () => img.classList.add('loaded'));
       if (img.complete) img.classList.add('loaded');
     }
 
-    // ✅ Dot — addEventListener بدل onclick
     const dot = document.createElement('div');
     dot.className = 'ann-dot' + (i === 0 ? ' active' : '');
     dot.addEventListener('click', () => { goToSlide(i); resetAnnAuto(); });
     dotsEl.appendChild(dot);
   });
 
-  // ✅ Arrows
+  // ── Arrows ──
   const wrapper = document.querySelector('.ann-track-wrapper');
   wrapper.querySelectorAll('.ann-arrow').forEach(a => a.remove());
 
@@ -1018,7 +1014,7 @@ function _renderFromData(dataArr) {
     wrapper.appendChild(next);
   }
 
-  // ✅ Touch Swipe
+  // ── Touch Swipe ──
   let touchStartX = 0;
   track.addEventListener('touchstart', e => {
     touchStartX = e.touches[0].clientX;
@@ -1033,7 +1029,7 @@ function _renderFromData(dataArr) {
     }
   });
 
-  // ✅ Mouse Drag
+  // ── Mouse Drag ──
   let isDragging = false, dragStartX = 0, dragDelta = 0;
   track.addEventListener('mousedown', e => {
     isDragging = true; dragStartX = e.clientX; dragDelta = 0;
@@ -1059,7 +1055,7 @@ function _renderFromData(dataArr) {
     resetAnnAuto();
   });
 
-  // ✅ Init position
+  // ── Init position ──
   track.style.transform = `translateX(${savedIndex * -100}%)`;
   document.querySelectorAll('.ann-dot').forEach((dot, i) =>
     dot.classList.toggle('active', i === savedIndex));
@@ -1068,28 +1064,28 @@ function _renderFromData(dataArr) {
 }
 
 // ─── EXPOSE FUNCTIONS ─────────────────────────────────────
-window.setLang              = setLang;
-window.closeModal           = closeModal;
-window.closeModalOutside    = closeModalOutside;
-window.closeTerms           = closeTerms;
-window.closeTermsOutside    = closeTermsOutside;
-window.onTermsCheck         = onTermsCheck;
-window.proceedToRegister    = proceedToRegister;
-window.closeSuccessPopup    = closeSuccessPopup;
-window.onLangTypeChange     = onLangTypeChange;
-window.onLangLevelChange    = onLangLevelChange;
-window.onEduLevelChange     = onEduLevelChange;
-window.onCandidateTypeChange= onCandidateTypeChange;
-window.onSpecialtyChange    = onSpecialtyChange;
-window.onSubjectChange      = onSubjectChange;
-window.onTeacherChange      = onTeacherChange;
-window.onVipTypeChange      = onVipTypeChange;
-window.onVipEduLevelChange  = onVipEduLevelChange;
-window.onVipDaysCountChange = onVipDaysCountChange;
-window.onDayChange          = onDayChange;
-window.submitForm           = submitForm;
-window.goToSlide            = goToSlide;
-window.resetAnnAuto         = resetAnnAuto;
+window.setLang               = setLang;
+window.closeModal            = closeModal;
+window.closeModalOutside     = closeModalOutside;
+window.closeTerms            = closeTerms;
+window.closeTermsOutside     = closeTermsOutside;
+window.onTermsCheck          = onTermsCheck;
+window.proceedToRegister     = proceedToRegister;
+window.closeSuccessPopup     = closeSuccessPopup;
+window.onLangTypeChange      = onLangTypeChange;
+window.onLangLevelChange     = onLangLevelChange;
+window.onEduLevelChange      = onEduLevelChange;
+window.onCandidateTypeChange = onCandidateTypeChange;
+window.onSpecialtyChange     = onSpecialtyChange;
+window.onSubjectChange       = onSubjectChange;
+window.onTeacherChange       = onTeacherChange;
+window.onVipTypeChange       = onVipTypeChange;
+window.onVipEduLevelChange   = onVipEduLevelChange;
+window.onVipDaysCountChange  = onVipDaysCountChange;
+window.onDayChange           = onDayChange;
+window.submitForm            = submitForm;
+window.goToSlide             = goToSlide;
+window.resetAnnAuto          = resetAnnAuto;
 
 // ─── INIT LANG ────────────────────────────────────────────
 setLang('ar');
