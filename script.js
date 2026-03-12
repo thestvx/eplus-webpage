@@ -137,6 +137,10 @@ const i18n = {
   }
 };
 
+// ─── HELPER: إخفاء وإظهار اللوقو ─────────────────────────
+function hideLogo()  { document.querySelector('.top-logo').style.display = 'none'; }
+function showLogo()  { document.querySelector('.top-logo').style.display = 'flex'; }
+
 function setLang(lang) {
   currentLang = lang;
   document.documentElement.lang = lang;
@@ -307,6 +311,7 @@ function openModal(type) {
   }
 
   document.getElementById('lang-toggle').classList.add('hidden');
+  hideLogo(); // ✅ إخفاء اللوقو
   document.getElementById('modal').classList.add('active');
   document.body.style.overflow = 'hidden';
 }
@@ -315,6 +320,7 @@ function closeModal() {
   document.getElementById('modal').classList.remove('active');
   document.body.style.overflow = '';
   document.getElementById('lang-toggle').classList.remove('hidden');
+  showLogo(); // ✅ إظهار اللوقو
   resetForm();
 }
 
@@ -741,6 +747,7 @@ function closeTerms() {
   document.getElementById('terms-modal').classList.remove('active');
   document.body.style.overflow = '';
   document.getElementById('lang-toggle')?.classList.remove('hidden');
+  showLogo(); // ✅ إظهار اللوقو
   pendingFormData = null;
 }
 
@@ -799,9 +806,6 @@ function showSuccessPopup() {
         <div class="success-popup-ring"></div>
         <div class="success-popup-check">✓</div>
       </div>
-      <div class="success-popup-academy">
-        <img src="images/eplus-logo.png" alt="E-PLUS" draggable="false">
-      </div>
       <div class="success-popup-title">
         ${currentLang==='ar' ? '🎉 تم تسجيلك بنجاح!' : '🎉 Registration Successful!'}
       </div>
@@ -831,6 +835,7 @@ function closeSuccessPopup() {
   setTimeout(() => overlay.remove(), 400);
   document.body.style.overflow = '';
   document.getElementById('lang-toggle')?.classList.remove('hidden');
+  showLogo(); // ✅ إظهار اللوقو
 }
 
 function spawnConfetti(parent) {
@@ -898,7 +903,6 @@ function resetAnnAuto() {
 onSnapshot(
   query(collection(_db, 'announcements'), orderBy('createdAt', 'desc')),
   snap => {
-    // ✅ فلترة الإعلانات المخفية hidden:true
     window._annCache = snap.docs
       .map(doc => {
         const d = doc.data();
@@ -922,7 +926,6 @@ function _renderFromData(dataArr) {
   const track   = document.getElementById('ann-track');
   const dotsEl  = document.getElementById('ann-dots');
 
-  // ✅ إخفاء القسم كاملاً إذا ما في إعلانات أو كلها مخفية
   if (!dataArr || dataArr.length === 0) {
     section.style.display = 'none';
     clearInterval(annAutoSlide);
