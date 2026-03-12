@@ -138,8 +138,8 @@ const i18n = {
 };
 
 // ─── HELPER: إخفاء وإظهار اللوقو ─────────────────────────
-function hideLogo()  { document.querySelector('.top-logo').style.display = 'none'; }
-function showLogo()  { document.querySelector('.top-logo').style.display = 'flex'; }
+function hideLogo() { document.querySelector('.top-logo').style.display = 'none'; }
+function showLogo() { document.querySelector('.top-logo').style.display = 'flex'; }
 
 function setLang(lang) {
   currentLang = lang;
@@ -311,7 +311,7 @@ function openModal(type) {
   }
 
   document.getElementById('lang-toggle').classList.add('hidden');
-  hideLogo(); // ✅ إخفاء اللوقو
+  hideLogo();
   document.getElementById('modal').classList.add('active');
   document.body.style.overflow = 'hidden';
 }
@@ -320,7 +320,7 @@ function closeModal() {
   document.getElementById('modal').classList.remove('active');
   document.body.style.overflow = '';
   document.getElementById('lang-toggle').classList.remove('hidden');
-  showLogo(); // ✅ إظهار اللوقو
+  showLogo();
   resetForm();
 }
 
@@ -747,7 +747,7 @@ function closeTerms() {
   document.getElementById('terms-modal').classList.remove('active');
   document.body.style.overflow = '';
   document.getElementById('lang-toggle')?.classList.remove('hidden');
-  showLogo(); // ✅ إظهار اللوقو
+  showLogo();
   pendingFormData = null;
 }
 
@@ -835,7 +835,7 @@ function closeSuccessPopup() {
   setTimeout(() => overlay.remove(), 400);
   document.body.style.overflow = '';
   document.getElementById('lang-toggle')?.classList.remove('hidden');
-  showLogo(); // ✅ إظهار اللوقو
+  showLogo();
 }
 
 function spawnConfetti(parent) {
@@ -880,13 +880,19 @@ let annCurrent   = 0;
 let annAutoSlide = null;
 let annTotalDocs = 0;
 
+// ✅ حساب اتجاه السلايدر دائماً LTR بغض النظر عن لغة الصفحة
+function getSlideDir() { return -1; }
+
 function goToSlide(idx) {
   annCurrent = idx;
   const track = document.getElementById('ann-track');
-  if (track) track.style.transform = `translateX(${idx * -100}%)`;
+  if (track) {
+    track.style.transform = `translateX(${idx * 100 * getSlideDir()}%)`;
+  }
   document.querySelectorAll('.ann-dot').forEach((dot, i) =>
     dot.classList.toggle('active', i === idx));
 }
+
 function startAnnAuto() {
   if (annTotalDocs <= 1) return;
   annAutoSlide = setInterval(
@@ -941,6 +947,9 @@ function _renderFromData(dataArr) {
   track.innerHTML  = '';
   dotsEl.innerHTML = '';
 
+  // ✅ إجبار LTR على الـ track دائماً لمنع انعكاس RTL
+  track.style.direction = 'ltr';
+
   const isRtl = currentLang === 'ar';
 
   dataArr.forEach((d, i) => {
@@ -948,6 +957,7 @@ function _renderFromData(dataArr) {
 
     const card = document.createElement('div');
     card.className = hasImg ? 'ann-card has-image' : 'ann-card text-only';
+    // ✅ محتوى الكارد يكون بالاتجاه الصحيح للغة
     card.style.direction = isRtl ? 'rtl' : 'ltr';
     card.style.textAlign = isRtl ? 'right' : 'left';
 
@@ -1042,8 +1052,9 @@ function _renderFromData(dataArr) {
   window.addEventListener('mousemove', e => {
     if (!isDragging) return;
     dragDelta = e.clientX - dragStartX;
+    // ✅ LTR ثابت دائماً
     track.style.transform =
-      `translateX(calc(${annCurrent * -100}% + ${dragDelta}px))`;
+      `translateX(calc(${annCurrent * 100 * getSlideDir()}% + ${dragDelta}px))`;
   });
   window.addEventListener('mouseup', () => {
     if (!isDragging) return;
@@ -1059,7 +1070,8 @@ function _renderFromData(dataArr) {
   });
 
   // ── Init position ──
-  track.style.transform = `translateX(${savedIndex * -100}%)`;
+  // ✅ LTR ثابت دائماً
+  track.style.transform = `translateX(${savedIndex * 100 * getSlideDir()}%)`;
   document.querySelectorAll('.ann-dot').forEach((dot, i) =>
     dot.classList.toggle('active', i === savedIndex));
 
