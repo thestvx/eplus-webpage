@@ -763,6 +763,7 @@ function onTermsCheck() {
   btn.classList.toggle('enabled', checkbox.checked);
 }
 
+// ─── ✅ PROCEED TO REGISTER — المعدّل ─────────────────────
 async function proceedToRegister() {
   if (!pendingFormData) return;
   const tbody = document.querySelector('.terms-body');
@@ -774,12 +775,16 @@ async function proceedToRegister() {
   btn.classList.add('loading');
 
   try {
+    // ✅ نستخدم FormData بدل JSON مع no-cors
+    const formData = new FormData();
+    formData.append('payload', JSON.stringify(pendingFormData));
+
     await fetch(APPS_SCRIPT_URL, {
-      method:  'POST',
-      mode:    'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(pendingFormData)
+      method: 'POST',
+      mode:   'no-cors',
+      body:   formData
     });
+
     btn.classList.remove('loading');
     pendingFormData = null;
     showSuccessPopup();
@@ -880,7 +885,6 @@ let annCurrent   = 0;
 let annAutoSlide = null;
 let annTotalDocs = 0;
 
-// ✅ حساب اتجاه السلايدر دائماً LTR بغض النظر عن لغة الصفحة
 function getSlideDir() { return -1; }
 
 function goToSlide(idx) {
@@ -947,7 +951,6 @@ function _renderFromData(dataArr) {
   track.innerHTML  = '';
   dotsEl.innerHTML = '';
 
-  // ✅ إجبار LTR على الـ track دائماً لمنع انعكاس RTL
   track.style.direction = 'ltr';
 
   const isRtl = currentLang === 'ar';
@@ -957,7 +960,6 @@ function _renderFromData(dataArr) {
 
     const card = document.createElement('div');
     card.className = hasImg ? 'ann-card has-image' : 'ann-card text-only';
-    // ✅ محتوى الكارد يكون بالاتجاه الصحيح للغة
     card.style.direction = isRtl ? 'rtl' : 'ltr';
     card.style.textAlign = isRtl ? 'right' : 'left';
 
@@ -1004,7 +1006,6 @@ function _renderFromData(dataArr) {
     dotsEl.appendChild(dot);
   });
 
-  // ── Arrows ──
   const wrapper = document.querySelector('.ann-track-wrapper');
   wrapper.querySelectorAll('.ann-arrow').forEach(a => a.remove());
 
@@ -1027,7 +1028,6 @@ function _renderFromData(dataArr) {
     wrapper.appendChild(next);
   }
 
-  // ── Touch Swipe ──
   let touchStartX = 0;
   track.addEventListener('touchstart', e => {
     touchStartX = e.touches[0].clientX;
@@ -1042,7 +1042,6 @@ function _renderFromData(dataArr) {
     }
   });
 
-  // ── Mouse Drag ──
   let isDragging = false, dragStartX = 0, dragDelta = 0;
   track.addEventListener('mousedown', e => {
     isDragging = true; dragStartX = e.clientX; dragDelta = 0;
@@ -1052,7 +1051,6 @@ function _renderFromData(dataArr) {
   window.addEventListener('mousemove', e => {
     if (!isDragging) return;
     dragDelta = e.clientX - dragStartX;
-    // ✅ LTR ثابت دائماً
     track.style.transform =
       `translateX(calc(${annCurrent * 100 * getSlideDir()}% + ${dragDelta}px))`;
   });
@@ -1069,8 +1067,6 @@ function _renderFromData(dataArr) {
     resetAnnAuto();
   });
 
-  // ── Init position ──
-  // ✅ LTR ثابت دائماً
   track.style.transform = `translateX(${savedIndex * 100 * getSlideDir()}%)`;
   document.querySelectorAll('.ann-dot').forEach((dot, i) =>
     dot.classList.toggle('active', i === savedIndex));
