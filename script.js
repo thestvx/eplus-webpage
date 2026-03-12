@@ -770,27 +770,59 @@ async function proceedToRegister() {
   document.getElementById('scroll-hint')?.remove();
   document.getElementById('terms-modal').classList.remove('active');
 
-  const btn = document.getElementById('terms-proceed-btn');
-  btn.classList.add('loading');
+  showLoadingPopup();
 
   try {
+    const formData = new FormData();
+    formData.append('payload', JSON.stringify(pendingFormData));
+
     await fetch(APPS_SCRIPT_URL, {
-      method:  'POST',
-      mode:    'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(pendingFormData)
+      method: 'POST',
+      mode:   'no-cors',
+      body:   formData
     });
-    btn.classList.remove('loading');
+
+    hideLoadingPopup();
     pendingFormData = null;
     showSuccessPopup();
+
   } catch(err) {
-    btn.classList.remove('loading');
+    hideLoadingPopup();
     console.error(err);
     document.getElementById('terms-modal').classList.add('active');
     alert(currentLang === 'ar'
       ? 'حدث خطأ أثناء الإرسال، تحقق من اتصالك بالإنترنت.'
       : 'A network error occurred. Please check your connection.');
   }
+}
+
+// ─── LOADING POPUP ────────────────────────────────────────
+function showLoadingPopup() {
+  document.getElementById('loading-popup-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'loading-popup-overlay';
+  overlay.className = 'loading-popup-overlay';
+  overlay.innerHTML = `
+    <div class="loading-popup-box">
+      <div class="loading-spinner"></div>
+      <div class="loading-popup-title">
+        ${currentLang === 'ar' ? '⏳ جاري تسجيل معلوماتك...' : '⏳ Submitting your registration...'}
+      </div>
+      <div class="loading-popup-msg">
+        ${currentLang === 'ar'
+          ? 'انتظر قليلاً، يتم معالجة طلبك الآن'
+          : 'Please wait, your request is being processed'}
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('active'));
+}
+
+function hideLoadingPopup() {
+  const overlay = document.getElementById('loading-popup-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  setTimeout(() => overlay.remove(), 300);
 }
 
 // ─── SUCCESS POPUP ────────────────────────────────────────
@@ -803,8 +835,7 @@ function showSuccessPopup() {
   overlay.innerHTML = `
     <div class="success-popup-box" id="success-popup-box">
       <div class="success-popup-icon-wrap">
-        <div class="success-popup-ring"></div>
-        <div class="success-popup-check">✓</div>
+        <img src="3d/done.png" alt="done" class="success-popup-3d-icon" />
       </div>
       <div class="success-popup-title">
         ${currentLang==='ar' ? '🎉 تم تسجيلك بنجاح!' : '🎉 Registration Successful!'}
