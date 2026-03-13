@@ -38,7 +38,7 @@ resizeCanvas();
 animateSquares();
 
 // ─── APPS SCRIPT URL ──────────────────────────────────────
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw1f6Su-I5ReQL0MfTGk2ZxfhJg8eGo27KJmXsUNgh26rpBflC3QVEm33Mp4pTUdEGDhA/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxEPXLf1-k4G3D3Wv0zzq8e3ZpGf0hsB2YWE7UmaUFQwhA7uDoF0H4rXHZXdRyMvwxMAg/exec';
 
 const typeLabelsAr = {
   support: 'تسجيلات الدعم',
@@ -941,7 +941,7 @@ import { getFirestore, collection, query,
          orderBy, onSnapshot }                  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
-// ✅ الجديد
+// ✅ firebaseConfig الجديد — eplus-center-39
 const firebaseConfig = {
   apiKey:            "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
   authDomain:        "eplus-center-39.firebaseapp.com",
@@ -959,6 +959,7 @@ let annCurrent   = 0;
 let annAutoSlide = null;
 let annTotalDocs = 0;
 
+// ✅ حساب اتجاه السلايدر دائماً LTR بغض النظر عن لغة الصفحة
 function getSlideDir() { return -1; }
 
 function goToSlide(idx) {
@@ -1024,6 +1025,8 @@ function _renderFromData(dataArr) {
   section.style.display = 'block';
   track.innerHTML  = '';
   dotsEl.innerHTML = '';
+
+  // ✅ إجبار LTR على الـ track دائماً لمنع انعكاس RTL
   track.style.direction = 'ltr';
 
   const isRtl = currentLang === 'ar';
@@ -1033,6 +1036,7 @@ function _renderFromData(dataArr) {
 
     const card = document.createElement('div');
     card.className = hasImg ? 'ann-card has-image' : 'ann-card text-only';
+    // ✅ محتوى الكارد يكون بالاتجاه الصحيح للغة
     card.style.direction = isRtl ? 'rtl' : 'ltr';
     card.style.textAlign = isRtl ? 'right' : 'left';
 
@@ -1079,6 +1083,7 @@ function _renderFromData(dataArr) {
     dotsEl.appendChild(dot);
   });
 
+  // ── Arrows ──
   const wrapper = document.querySelector('.ann-track-wrapper');
   wrapper.querySelectorAll('.ann-arrow').forEach(a => a.remove());
 
@@ -1101,6 +1106,7 @@ function _renderFromData(dataArr) {
     wrapper.appendChild(next);
   }
 
+  // ── Touch Swipe ──
   let touchStartX = 0;
   track.addEventListener('touchstart', e => {
     touchStartX = e.touches[0].clientX;
@@ -1115,6 +1121,7 @@ function _renderFromData(dataArr) {
     }
   });
 
+  // ── Mouse Drag ──
   let isDragging = false, dragStartX = 0, dragDelta = 0;
   track.addEventListener('mousedown', e => {
     isDragging = true; dragStartX = e.clientX; dragDelta = 0;
@@ -1140,6 +1147,7 @@ function _renderFromData(dataArr) {
     resetAnnAuto();
   });
 
+  // ── Init position ──
   track.style.transform = `translateX(${savedIndex * 100 * getSlideDir()}%)`;
   document.querySelectorAll('.ann-dot').forEach((dot, i) =>
     dot.classList.toggle('active', i === savedIndex));
