@@ -941,7 +941,7 @@ import { getFirestore, collection, query,
          orderBy, onSnapshot }                  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
-// ✅ firebaseConfig الجديد
+// ✅ الجديد
 const firebaseConfig = {
   apiKey:            "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
   authDomain:        "eplus-center-39.firebaseapp.com",
