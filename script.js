@@ -962,6 +962,7 @@ function showSuccessJoinPopup() {
 
 // ─── FIREBASE ─────────────────────────────────────────────
 import { initializeApp }                       from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getAnalytics }                        from "https://www.gstatic.com/firebasejs/11.0.0/firebase-analytics.js";
 import { getFirestore, collection, query,
          orderBy, onSnapshot }                 from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
@@ -971,11 +972,13 @@ const firebaseConfig = {
   projectId:         "eplus-center-39",
   storageBucket:     "eplus-center-39.firebasestorage.app",
   messagingSenderId: "191532732034",
-  appId:             "1:191532732034:web:b11449a2f0595db5d02e9b"
+  appId:             "1:191532732034:web:b11449a2f0595db5d02e9b",
+  measurementId:     "G-L8KVV0MEKT"
 };
 
-const _app = initializeApp(firebaseConfig);
-const _db  = getFirestore(_app);
+const _app       = initializeApp(firebaseConfig);
+const _analytics = getAnalytics(_app);
+const _db        = getFirestore(_app);
 
 // ─── ANNOUNCEMENTS ────────────────────────────────────────
 let annCurrent   = 0;
