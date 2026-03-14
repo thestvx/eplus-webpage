@@ -58,10 +58,10 @@ const i18n = {
     subtitle:'التسجيل في الدورات والبرامج التعليمية',
     btn1:'تسجيلات الدعم', btn2:'دورات اللغات', btn3:'دروس VIP',
     btn4:'اختبار IELTS',  btn5:'دورات أونلاين', btn6:'دورات تكوينية',
-    annTitle:'إعلانات الأكاديمية',
+    annTitle:'إعلانات المركز التعليمي',
     firstName:'الاسم', lastName:'اللقب', birthDate:'تاريخ الميلاد',
     phone:'رقم الهاتف',
-    motivation:    'ما الذي دفعك إلى اختيار التسجيل في أكاديمية E-PLUS؟',
+    motivation:    'ما الذي دفعك إلى اختيار التسجيل في مركز E-PLUS؟',
     motivationVip: 'ما الذي جعلك تختار الدراسة عبر نظام الدروس الخاصة VIP؟',
     optional:'(اختياري)',
     eduLevel:'المستوى الدراسي', specialty:'التخصص',
@@ -73,10 +73,13 @@ const i18n = {
     levelTest:'هل تريد إجراء اختبار تحديد المستوى؟',
     yes:'نعم', no:'لا',
     vipType:'نوع دروس VIP', vipSupport:'📚 دعم دراسي', vipLang:'🌍 لغات',
+    vipStudyMode:'طريقة الدراسة',
+    vipModeInPerson:'🏫 حضوري', vipModeOnline:'💻 أونلاين', vipModeHybrid:'🔀 حضوري وأونلاين (هجين)',
     vipDaysCount:'كم يوم تريد الحضور في الأسبوع؟',
     chooseDays:'اختر الأيام', daysSelected:'يوم محدد',
+    requiredNote:'⚠️ يُرجى التأكد من تعبئة جميع الحقول الإلزامية قبل إتمام التسجيل.',
     submitBtn:'إتمام التسجيل ✦',
-    termsTitle:'قوانين وشروط الأكاديمية',
+    termsTitle:'قوانين وشروط المركز',
     termsAgree:'لقد قرأت جميع القوانين والشروط وأوافق عليها',
     termsProceed:'تأكيد التسجيل ✦',
     t1:'يعتبر المتعلم مسجلاً بصفة رسمية بالمركز عند قيامه بتسديد رسوم التسجيل في التاريخ المحدد.',
@@ -99,10 +102,10 @@ const i18n = {
     subtitle:'Register for courses and educational programs',
     btn1:'Support Registration', btn2:'Language Courses', btn3:'VIP Lessons',
     btn4:'IELTS Test', btn5:'Online Courses', btn6:'Training Courses',
-    annTitle:'Academy Announcements',
+    annTitle:'Center Announcements',
     firstName:'First Name', lastName:'Last Name', birthDate:'Date of Birth',
     phone:'Phone Number',
-    motivation:    'What motivated you to choose E-PLUS Academy?',
+    motivation:    'What motivated you to choose E-PLUS Center?',
     motivationVip: 'What led you to choose studying through the VIP private lessons system?',
     optional:'(optional)',
     eduLevel:'Education Level', specialty:'Specialty',
@@ -114,10 +117,13 @@ const i18n = {
     levelTest:'Would you like a level placement test?',
     yes:'Yes', no:'No',
     vipType:'VIP Lesson Type', vipSupport:'📚 Academic Support', vipLang:'🌍 Languages',
+    vipStudyMode:'Study Mode',
+    vipModeInPerson:'🏫 In-Person', vipModeOnline:'💻 Online', vipModeHybrid:'🔀 Hybrid',
     vipDaysCount:'How many days per week?',
     chooseDays:'Choose Days', daysSelected:'day(s) selected',
+    requiredNote:'⚠️ Please make sure to fill in all required fields before completing registration.',
     submitBtn:'Complete Registration ✦',
-    termsTitle:'Academy Terms & Conditions',
+    termsTitle:'Center Terms & Conditions',
     termsAgree:'I have read all terms and conditions and I agree',
     termsProceed:'Confirm Registration ✦',
     t1:'The learner is officially registered upon payment of registration fees on the specified date.',
@@ -137,15 +143,31 @@ const i18n = {
   }
 };
 
-// ─── HELPER: إخفاء وإظهار اللوقو ─────────────────────────
+// ─── HELPERS ──────────────────────────────────────────────
 function hideLogo() { document.querySelector('.top-logo').style.display = 'none'; }
 function showLogo() { document.querySelector('.top-logo').style.display = 'flex'; }
 
+function animateShow(el) {
+  if (!el) return;
+  el.style.display = 'block';
+  el.classList.remove('field-appear');
+  void el.offsetWidth;
+  el.classList.add('field-appear');
+}
+function hideField(el, ...ids) {
+  if (!el) return;
+  el.style.display = 'none';
+  ids.forEach(id => {
+    const s = document.getElementById(id);
+    if (s) { s.removeAttribute('required'); s.value = ''; }
+  });
+}
+
+// ─── LANGUAGE ─────────────────────────────────────────────
 function setLang(lang) {
   currentLang = lang;
   document.documentElement.lang = lang;
   document.documentElement.dir  = lang === 'ar' ? 'rtl' : 'ltr';
-
   document.getElementById('btn-ar').classList.toggle('active', lang === 'ar');
   document.getElementById('btn-en').classList.toggle('active', lang === 'en');
 
@@ -266,19 +288,16 @@ const needsCandidateType = ['ثالثة ثانوي (بكالوريا)'];
 
 // ─── MODAL STATE ──────────────────────────────────────────
 let currentModalType = '';
+let pendingFormData  = null;
 
 // ─── REGISTRATION NUMBER ──────────────────────────────────
 function generateRegNumber(type) {
-  const prefixes = {
-    support: 'SUP', lang: 'LNG', vip: 'VIP',
-    ielts: 'ILS', online: 'ONL', takwini: 'TRN'
-  };
+  const prefixes = { support:'SUP', lang:'LNG', vip:'VIP', ielts:'ILS', online:'ONL', takwini:'TRN' };
   const prefix = prefixes[type] || 'REG';
-  const num = Math.floor(10000 + Math.random() * 90000);
-  return `${prefix}-${num}`;
+  return `${prefix}-${Math.floor(10000 + Math.random()*90000)}`;
 }
 
-// ─── OPEN MODAL ───────────────────────────────────────────
+// ─── OPEN / CLOSE MODAL ───────────────────────────────────
 function openModal(type) {
   currentModalType = type;
   resetForm();
@@ -295,8 +314,7 @@ function openModal(type) {
 
   const motivationLabel = document.querySelector('label[for="motivation"] span[data-i18n="motivation"]');
   if (motivationLabel) {
-    const t = i18n[currentLang];
-    motivationLabel.textContent = (type === 'vip') ? t.motivationVip : t.motivation;
+    motivationLabel.textContent = (type === 'vip') ? i18n[currentLang].motivationVip : i18n[currentLang].motivation;
   }
 
   const eduGrp     = document.getElementById('eduLevelGroup');
@@ -319,9 +337,6 @@ function openModal(type) {
     const daysCountGrp = document.getElementById('vipDaysCountGroup');
     animateShow(daysCountGrp);
     daysCountGrp.querySelector('select').setAttribute('required','required');
-  } else if (type === 'takwini') {
-    const takwiniGrp = document.getElementById('takwiniTypeGroup');
-    if (takwiniGrp) animateShow(takwiniGrp);
   }
 
   document.getElementById('lang-toggle').classList.add('hidden');
@@ -338,43 +353,26 @@ function closeModal() {
   resetForm();
 }
 
-function closeModalOutside(e) {
-  if (e.target === document.getElementById('modal')) closeModal();
-}
-
 function resetForm() {
   document.getElementById('reg-form').reset();
-  const groups = [
+  [
     'eduLevelGroup','candidateTypeGroup','specialtyGroup','subjectGroup',
     'teacherGroup','parentGroup','langTypeGroup','langLevelGroup',
-    'levelTestGroup','vipTypeGroup','vipEduLevelGroup','professionGroup','takwiniTypeGroup',
-    'vipDaysCountGroup','daysGroup',
-  ];
-  groups.forEach(id => {
+    'levelTestGroup','vipTypeGroup','vipEduLevelGroup','professionGroup',
+    'vipDaysCountGroup','daysGroup','vipStudyModeGroup',
+  ].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
   document.getElementById('comingSoonNote')?.remove();
-  document.querySelectorAll('input[name="vipType"]').forEach(r => r.checked = false);
-  document.querySelectorAll('input[name="takwiniType"]').forEach(r => r.checked = false);
-  document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
-  document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+  ['vipType','candidateType','levelTest','vipStudyMode'].forEach(name =>
+    document.querySelectorAll(`input[name="${name}"]`).forEach(r => r.checked = false)
+  );
   resetDays();
   maxDaysAllowed = 2;
-
   const motivationLabel = document.querySelector('label[for="motivation"] span[data-i18n="motivation"]');
-  if (motivationLabel) {
-    motivationLabel.textContent = i18n[currentLang].motivation;
-  }
+  if (motivationLabel) motivationLabel.textContent = i18n[currentLang].motivation;
 }
-
-// ─── BUTTONS ──────────────────────────────────────────────
-document.querySelectorAll('.reg-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const type = btn.getAttribute('data-reg-type');
-    if (type) openModal(type);
-  });
-});
 
 // ─── DAYS ─────────────────────────────────────────────────
 let maxDaysAllowed = 2;
@@ -383,11 +381,11 @@ function onDayChange(checkbox) {
   const checked = document.querySelectorAll('input[name="days"]:checked');
   const count   = checked.length;
   if (count > maxDaysAllowed) { checkbox.checked = false; return; }
-  document.querySelectorAll('.day-card').forEach(card => {
-    const inp = card.querySelector('input');
-    card.classList.toggle('selected', inp.checked);
-    if (!inp.checked && count >= maxDaysAllowed) card.classList.add('disabled');
-    else card.classList.remove('disabled');
+  document.querySelectorAll('.week-day-cell').forEach(cell => {
+    const inp = cell.querySelector('input');
+    cell.classList.toggle('selected', inp.checked);
+    if (!inp.checked && count >= maxDaysAllowed) cell.classList.add('disabled');
+    else cell.classList.remove('disabled');
   });
   const countEl = document.getElementById('days-count');
   if (countEl) countEl.textContent = Math.min(count, maxDaysAllowed);
@@ -397,14 +395,13 @@ function onDayChange(checkbox) {
 
 function resetDays() {
   document.querySelectorAll('input[name="days"]').forEach(c => c.checked = false);
-  document.querySelectorAll('.day-card').forEach(c => c.classList.remove('selected','disabled'));
+  document.querySelectorAll('.week-day-cell').forEach(c => c.classList.remove('selected','disabled'));
   const countEl = document.getElementById('days-count');
   if (countEl) countEl.textContent = '0';
   const counter = document.getElementById('days-counter');
   if (counter) counter.classList.remove('complete');
 }
 
-// ─── VIP DAYS COUNT ───────────────────────────────────────
 function onVipDaysCountChange() {
   const val     = parseInt(document.getElementById('vipDaysCount').value);
   const daysGrp = document.getElementById('daysGroup');
@@ -424,22 +421,7 @@ function onVipDaysCountChange() {
   animateShow(daysGrp);
 }
 
-// ─── HELPERS ──────────────────────────────────────────────
-function animateShow(el) {
-  if (!el) return;
-  el.style.display = 'block';
-  el.classList.remove('field-appear');
-  void el.offsetWidth;
-  el.classList.add('field-appear');
-}
-function hideField(el, ...ids) {
-  if (!el) return;
-  el.style.display = 'none';
-  ids.forEach(id => {
-    const s = document.getElementById(id);
-    if (s) { s.removeAttribute('required'); s.value = ''; }
-  });
-}
+// ─── FORM FIELD HELPERS ───────────────────────────────────
 function showComingSoon(afterEl) {
   document.getElementById('comingSoonNote')?.remove();
   const note = document.createElement('div');
@@ -448,6 +430,7 @@ function showComingSoon(afterEl) {
   note.innerHTML = `<span>🚧</span><span>المواد والأساتذة لهذا المستوى ستُضاف قريباً</span>`;
   afterEl.insertAdjacentElement('afterend', note);
 }
+
 function populateSubjects(key) {
   const subGrp    = document.getElementById('subjectGroup');
   const subSelect = document.getElementById('subject');
@@ -473,7 +456,6 @@ function populateSubjects(key) {
   subSelect.setAttribute('required','required');
 }
 
-// ─── LANG TYPE ────────────────────────────────────────────
 function onLangTypeChange() {
   const val        = document.getElementById('langType').value;
   const langLvlGrp = document.getElementById('langLevelGroup');
@@ -496,13 +478,11 @@ function onLangLevelChange() {
   const val          = document.getElementById('langLevel').value;
   const levelTestGrp = document.getElementById('levelTestGroup');
   const daysCountGrp = document.getElementById('vipDaysCountGroup');
-
   levelTestGrp.style.display = 'none';
   if (daysCountGrp) daysCountGrp.style.display = 'none';
   resetDays();
   document.getElementById('vipDaysCount').value = '';
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
-
   if (val) {
     if (currentModalType === 'vip') {
       animateShow(daysCountGrp);
@@ -513,7 +493,6 @@ function onLangLevelChange() {
   }
 }
 
-// ─── EDU LEVEL (دعم) ──────────────────────────────────────
 function onEduLevelChange() {
   const level            = document.getElementById('eduLevel').value;
   const parentGrp        = document.getElementById('parentGroup');
@@ -523,7 +502,6 @@ function onEduLevelChange() {
   const candidateTypeGrp = document.getElementById('candidateTypeGroup');
   const parentName       = document.getElementById('parentName');
   const parentPhone      = document.getElementById('parentPhone');
-
   document.getElementById('comingSoonNote')?.remove();
   hideField(parentGrp,        'parentName','parentPhone');
   hideField(specialtyGrp,     'specialty');
@@ -533,7 +511,6 @@ function onEduLevelChange() {
   parentName.removeAttribute('required');
   parentPhone.removeAttribute('required');
   document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
-
   if (!level) return;
   if (needsCandidateType.includes(level)) { animateShow(candidateTypeGrp); return; }
   if (needsSpecialty.includes(level))     { showSpecialtyField(level); return; }
@@ -582,16 +559,13 @@ function onSubjectChange() {
   const subjectVal = document.getElementById('subject').value;
   const teachGrp   = document.getElementById('teacherGroup');
   const teachSel   = document.getElementById('teacher');
-
   hideField(teachGrp, 'teacher');
   hideField(document.getElementById('parentGroup'), 'parentName','parentPhone');
   if (!subjectVal) return;
-
   const key      = spec ? `${level}|${spec}` : level;
   const subjects = curriculum[key] || [];
   const found    = subjects.find(s => s.subject === subjectVal);
   if (!found || !found.teachers.length) return;
-
   teachSel.innerHTML = `<option value="">-- اختر الأستاذ/ة --</option>`;
   found.teachers.forEach(t => {
     const opt = document.createElement('option');
@@ -623,15 +597,10 @@ function showParentIfNeeded(level) {
   parentPhone.setAttribute('required','required');
 }
 
-// ─── VIP TYPE ─────────────────────────────────────────────
 function onVipTypeChange() {
   const selected = document.querySelector('input[name="vipType"]:checked')?.value;
-
-  const allGroups = [
-    'vipEduLevelGroup','vipDaysCountGroup','professionGroup',
-    'daysGroup','langTypeGroup','langLevelGroup','levelTestGroup'
-  ];
-  allGroups.forEach(id => {
+  ['vipEduLevelGroup','vipDaysCountGroup','professionGroup','daysGroup',
+   'langTypeGroup','langLevelGroup','levelTestGroup','vipStudyModeGroup'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -641,50 +610,38 @@ function onVipTypeChange() {
   document.getElementById('langType').value     = '';
   document.getElementById('langLevel').value    = '';
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+  document.querySelectorAll('input[name="vipStudyMode"]').forEach(r => r.checked = false);
 
   if (selected === 'support') {
     const vipEduGrp = document.getElementById('vipEduLevelGroup');
     animateShow(vipEduGrp);
     document.getElementById('vipEduLevel').setAttribute('required','required');
   } else if (selected === 'lang') {
-    const profGrp = document.getElementById('professionGroup');
-    animateShow(profGrp);
+    animateShow(document.getElementById('professionGroup'));
     document.getElementById('profession').setAttribute('required','required');
     animateShow(document.getElementById('langTypeGroup'));
     document.getElementById('langType').setAttribute('required','required');
   }
 }
 
-// ─── VIP EDU LEVEL ────────────────────────────────────────
 function onVipEduLevelChange() {
   const level        = document.getElementById('vipEduLevel').value;
   const daysCountGrp = document.getElementById('vipDaysCountGroup');
   const daysGrp      = document.getElementById('daysGroup');
-
   hideField(daysCountGrp);
   hideField(daysGrp);
   resetDays();
   document.getElementById('vipDaysCount').value = '';
-
   if (!level) return;
   animateShow(daysCountGrp);
   document.getElementById('vipDaysCount').setAttribute('required','required');
 }
 
-// ─── VIP STUDY MODE ───────────────────────────────────────
-function onVipStudyModeChange() {
-  // placeholder — extend if needed
-}
-
 // ─── SUBMIT FORM ──────────────────────────────────────────
 async function submitForm(e) {
   e.preventDefault();
-
-  const firstName  = document.getElementById('firstName').value.trim();
-  const lastName   = document.getElementById('lastName').value.trim();
-  const birthDate  = document.getElementById('birthDate').value;
-  const phone      = document.getElementById('phone').value.trim();
-
+  const firstName = document.getElementById('firstName').value.trim();
+  const lastName  = document.getElementById('lastName').value.trim();
   let hasError = false;
   [firstName, lastName].forEach((val, i) => {
     const ids = ['firstName','lastName'];
@@ -699,16 +656,12 @@ async function submitForm(e) {
   const selectedDays = [...document.querySelectorAll('input[name="days"]:checked')]
     .map(c => c.value).join('، ') || '-';
 
-  const vipTypeVal    = document.querySelector('input[name="vipType"]:checked')?.value || '-';
-  const vipEduLevel   = document.getElementById('vipEduLevel')?.value  || '-';
-  const professionVal = document.getElementById('profession')?.value   || '-';
-
   const data = {
     type:          currentModalType,
     firstName,
     lastName,
-    birthDate,
-    phone,
+    birthDate:     document.getElementById('birthDate').value,
+    phone:         document.getElementById('phone').value.trim(),
     motivation:    document.getElementById('motivation').value.trim() || '-',
     timestamp:     new Date().toISOString(),
     eduLevel:      document.getElementById('eduLevel')?.value      || '-',
@@ -721,24 +674,20 @@ async function submitForm(e) {
     langType:      document.getElementById('langType')?.value      || '-',
     langLevel:     document.getElementById('langLevel')?.value     || '-',
     levelTest:     document.querySelector('input[name="levelTest"]:checked')?.value || '-',
-    vipType:       vipTypeVal,
-    vipEduLevel,
-    profession:    professionVal,
+    vipType:       document.querySelector('input[name="vipType"]:checked')?.value  || '-',
+    vipEduLevel:   document.getElementById('vipEduLevel')?.value   || '-',
+    profession:    document.getElementById('profession')?.value    || '-',
+    vipStudyMode:  document.querySelector('input[name="vipStudyMode"]:checked')?.value || '-',
     days:          selectedDays,
     daysCount:     document.getElementById('vipDaysCount')?.value  || '-',
-    takwiniType:   document.querySelector('input[name="takwiniType"]:checked')?.value || '-',
   };
 
   openTermsForSubmit(data);
 }
 
-// ─── PENDING FORM DATA ────────────────────────────────────
-let pendingFormData = null;
-
 // ─── TERMS ────────────────────────────────────────────────
 function openTermsForSubmit(data) {
   pendingFormData = data;
-
   const checkbox = document.getElementById('terms-checkbox');
   checkbox.checked  = false;
   checkbox.disabled = true;
@@ -765,9 +714,7 @@ function openTermsForSubmit(data) {
   const hint = document.createElement('div');
   hint.id = 'scroll-hint';
   hint.className = 'scroll-hint';
-  hint.innerHTML = `<span>⬇</span><span>${
-    currentLang === 'ar' ? 'اقرأ القوانين كاملاً للمتابعة' : 'Scroll down to read all terms'
-  }</span>`;
+  hint.innerHTML = `<span>⬇</span><span>${currentLang === 'ar' ? 'اقرأ القوانين كاملاً للمتابعة' : 'Scroll down to read all terms'}</span>`;
   const footer = document.querySelector('.terms-footer');
   if (footer) footer.insertBefore(hint, footer.firstChild);
 
@@ -784,10 +731,6 @@ function closeTerms() {
   document.getElementById('lang-toggle')?.classList.remove('hidden');
   showLogo();
   pendingFormData = null;
-}
-
-function closeTermsOutside(e) {
-  if (e.target === document.getElementById('terms-modal')) closeTerms();
 }
 
 function onTermsCheck() {
@@ -807,23 +750,15 @@ async function proceedToRegister() {
 
   const regNumber = generateRegNumber(pendingFormData.type);
   pendingFormData.regNumber = regNumber;
-
   showLoadingPopup();
 
   try {
     const formData = new FormData();
     formData.append('payload', JSON.stringify(pendingFormData));
-
-    await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode:   'no-cors',
-      body:   formData
-    });
-
+    await fetch(APPS_SCRIPT_URL, { method:'POST', mode:'no-cors', body:formData });
     hideLoadingPopup();
     pendingFormData = null;
     showSuccessPopup(regNumber);
-
   } catch(err) {
     hideLoadingPopup();
     console.error(err);
@@ -850,9 +785,7 @@ function showLoadingPopup() {
         ${currentLang === 'ar' ? 'جاري تسجيل معلوماتك...' : 'Submitting your registration...'}
       </div>
       <div class="loading-popup-msg">
-        ${currentLang === 'ar'
-          ? 'انتظر قليلاً، يتم معالجة طلبك الآن'
-          : 'Please wait, your request is being processed'}
+        ${currentLang === 'ar' ? 'انتظر قليلاً، يتم معالجة طلبك الآن' : 'Please wait, your request is being processed'}
       </div>
     </div>`;
   document.body.appendChild(overlay);
@@ -869,7 +802,6 @@ function hideLoadingPopup() {
 // ─── SUCCESS POPUP ────────────────────────────────────────
 function showSuccessPopup(regNumber = '') {
   document.getElementById('success-popup-overlay')?.remove();
-
   const overlay = document.createElement('div');
   overlay.id = 'success-popup-overlay';
   overlay.className = 'success-popup-overlay';
@@ -883,8 +815,8 @@ function showSuccessPopup(regNumber = '') {
       </div>
       <div class="success-popup-msg">
         ${currentLang==='ar'
-          ? 'شكراً لك! تم استلام طلب تسجيلك بنجاح.<br>سيتم التواصل معك قريباً من طرف فريق أكاديمية E-PLUS.<br><span class="success-popup-sub">✦ رحلتك نحو النجاح تبدأ من هنا ✦</span>'
-          : 'Thank you! Your registration has been received.<br>The E-PLUS Academy team will contact you soon.<br><span class="success-popup-sub">✦ Your journey to success starts here ✦</span>'}
+          ? 'شكراً لك! تم استلام طلب تسجيلك بنجاح.<br>سيتم التواصل معك قريباً من طرف فريق مركز E-PLUS.<br><span class="success-popup-sub">✦ رحلتك نحو النجاح تبدأ من هنا ✦</span>'
+          : 'Thank you! Your registration has been received.<br>The E-PLUS Center team will contact you soon.<br><span class="success-popup-sub">✦ Your journey to success starts here ✦</span>'}
       </div>
       <div class="success-popup-divider"></div>
       <div class="success-popup-reg">
@@ -902,11 +834,12 @@ function showSuccessPopup(regNumber = '') {
         <span>📋 ${typeLabelsAr[currentModalType] || currentModalType}</span>
         <span>🕐 ${new Date().toLocaleDateString(currentLang==='ar'?'ar-DZ':'en-GB',{year:'numeric',month:'long',day:'numeric'})}</span>
       </div>
-      <button class="success-popup-btn" onclick="closeSuccessPopup()">
+      <button class="success-popup-btn" id="close-success-btn">
         ${currentLang==='ar' ? 'حسناً، شكراً!' : 'OK, Thank you!'}
       </button>
     </div>`;
   document.body.appendChild(overlay);
+  overlay.querySelector('#close-success-btn').addEventListener('click', closeSuccessPopup);
   spawnConfetti(overlay);
   requestAnimationFrame(() => overlay.classList.add('active'));
 }
@@ -940,118 +873,111 @@ function spawnConfetti(parent) {
   }
 }
 
-// ─── JOIN TEAM MODAL ──────────────────────────────────────
+// ─── JOIN TEAM ────────────────────────────────────────────
 function openJoinModal() {
   document.getElementById('join-modal').classList.add('active');
   document.body.style.overflow = 'hidden';
+  document.getElementById('lang-toggle').classList.add('hidden');
   hideLogo();
-  document.getElementById('lang-toggle')?.classList.add('hidden');
 }
 
 function closeJoinModal() {
   document.getElementById('join-modal').classList.remove('active');
   document.body.style.overflow = '';
+  document.getElementById('lang-toggle').classList.remove('hidden');
   showLogo();
-  document.getElementById('lang-toggle')?.classList.remove('hidden');
-  document.getElementById('join-form')?.reset();
-  const roleFields = document.getElementById('join-role-fields');
-  if (roleFields) roleFields.style.display = 'none';
-  const cvName = document.getElementById('cv-file-name');
-  if (cvName) cvName.textContent = '';
-}
-
-function closeJoinModalOutside(e) {
-  if (e.target === document.getElementById('join-modal')) closeJoinModal();
-}
-
-function onJoinRoleChange() {
-  const roleFields = document.getElementById('join-role-fields');
-  if (roleFields) {
-    roleFields.style.display = 'block';
-    roleFields.classList.remove('field-appear');
-    void roleFields.offsetWidth;
-    roleFields.classList.add('field-appear');
-  }
-}
-
-function onCvFileChange(input) {
-  const nameEl = document.getElementById('cv-file-name');
-  if (nameEl) {
-    nameEl.textContent = input.files[0] ? input.files[0].name : '';
-  }
+  document.getElementById('join-form').reset();
+  document.getElementById('join-role-fields').style.display = 'none';
+  document.getElementById('cv-file-name').textContent = '';
 }
 
 async function submitJoinForm(e) {
   e.preventDefault();
-  const btn = document.getElementById('join-submit-btn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span>⏳ جاري الإرسال...</span>'; }
+  const firstName = document.getElementById('joinFirstName').value.trim();
+  const lastName  = document.getElementById('joinLastName').value.trim();
+  const phone     = document.getElementById('joinPhone').value.trim();
+  const email     = document.getElementById('joinEmail').value.trim();
+  const role      = document.querySelector('input[name="joinRole"]:checked')?.value || '-';
+  const specialty = document.getElementById('joinSpecialty').value.trim();
+  const experience= document.getElementById('joinExperience').value.trim();
+
+  if (!firstName || !lastName || !phone || !email || role === '-') {
+    alert(currentLang === 'ar' ? 'يرجى تعبئة جميع الحقول الإلزامية.' : 'Please fill in all required fields.');
+    return;
+  }
 
   const data = {
-    type:         'join',
-    firstName:    document.getElementById('joinFirstName').value.trim(),
-    lastName:     document.getElementById('joinLastName').value.trim(),
-    phone:        document.getElementById('joinPhone').value.trim(),
-    email:        document.getElementById('joinEmail').value.trim(),
-    role:         document.querySelector('input[name="joinRole"]:checked')?.value || '-',
-    specialty:    document.getElementById('joinSpecialty')?.value.trim() || '-',
-    experience:   document.getElementById('joinExperience')?.value.trim() || '-',
-    timestamp:    new Date().toISOString(),
+    type: 'join-team',
+    firstName, lastName, phone, email, role, specialty, experience,
+    timestamp: new Date().toISOString(),
   };
+
+  const btn = document.getElementById('join-submit-btn');
+  btn.disabled = true;
+  showLoadingPopup();
 
   try {
     const formData = new FormData();
     formData.append('payload', JSON.stringify(data));
-    const cvFile = document.getElementById('joinCV')?.files[0];
-    if (cvFile) formData.append('cv', cvFile);
-
-    await fetch(APPS_SCRIPT_URL, { method:'POST', mode:'no-cors', body: formData });
-
+    await fetch(APPS_SCRIPT_URL, { method:'POST', mode:'no-cors', body:formData });
+    hideLoadingPopup();
     closeJoinModal();
-    const overlay = document.createElement('div');
-    overlay.className = 'success-popup-overlay';
-    overlay.id = 'join-success-overlay';
-    overlay.innerHTML = `
-      <div class="success-popup-box">
-        <div class="success-popup-icon-wrap">
-          <img src="3d/done.png" alt="done" class="success-popup-3d-icon"/>
-        </div>
-        <div class="success-popup-title">🎉 تم إرسال طلبك بنجاح!</div>
-        <div class="success-popup-msg">
-          شكراً لاهتمامك بالانضمام لفريق E-PLUS.<br>
-          سيتم مراجعة طلبك والتواصل معك في أقرب وقت.
-        </div>
-        <button class="success-popup-btn" onclick="document.getElementById('join-success-overlay').remove(); document.body.style.overflow=''; showLogo(); document.getElementById('lang-toggle')?.classList.remove('hidden');">
-          حسناً، شكراً!
-        </button>
-      </div>`;
-    document.body.appendChild(overlay);
-    requestAnimationFrame(() => overlay.classList.add('active'));
-
+    showSuccessJoinPopup();
   } catch(err) {
-    console.error(err);
-    alert('حدث خطأ أثناء الإرسال، تحقق من اتصالك بالإنترنت.');
-    if (btn) { btn.disabled = false; btn.innerHTML = '<span>إرسال الطلب ✦</span>'; }
+    hideLoadingPopup();
+    btn.disabled = false;
+    alert(currentLang === 'ar' ? 'حدث خطأ، تحقق من اتصالك.' : 'Error, check your connection.');
   }
 }
 
+function showSuccessJoinPopup() {
+  const overlay = document.createElement('div');
+  overlay.id = 'success-popup-overlay';
+  overlay.className = 'success-popup-overlay';
+  overlay.innerHTML = `
+    <div class="success-popup-box">
+      <div class="success-popup-icon-wrap">
+        <img src="3d/done.png" alt="done" class="success-popup-3d-icon" />
+      </div>
+      <div class="success-popup-title">🎉 ${currentLang==='ar' ? 'تم إرسال طلبك!' : 'Request Sent!'}</div>
+      <div class="success-popup-msg">
+        ${currentLang==='ar'
+          ? 'شكراً لاهتمامك! سيتواصل معك فريق E-PLUS قريباً.'
+          : 'Thank you for your interest! The E-PLUS team will contact you soon.'}
+      </div>
+      <button class="success-popup-btn" id="close-success-join-btn">
+        ${currentLang==='ar' ? 'حسناً، شكراً!' : 'OK, Thank you!'}
+      </button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#close-success-join-btn').addEventListener('click', () => {
+    overlay.classList.remove('active');
+    setTimeout(() => overlay.remove(), 400);
+    document.getElementById('lang-toggle')?.classList.remove('hidden');
+    showLogo();
+  });
+  spawnConfetti(overlay);
+  requestAnimationFrame(() => overlay.classList.add('active'));
+}
+
 // ─── FIREBASE ─────────────────────────────────────────────
-import { initializeApp }                   from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { initializeApp }                       from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import { getFirestore, collection, query,
-         orderBy, onSnapshot }             from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+         orderBy, onSnapshot }                 from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey:            "AIzaSyCtb6RPW5sq5zK5JMmTYlBFEnQQZfVoI7s",
-  authDomain:        "epluscenter-panel.firebaseapp.com",
-  projectId:         "epluscenter-panel",
-  storageBucket:     "epluscenter-panel.firebasestorage.app",
-  messagingSenderId: "1000462675381",
-  appId:             "1:1000462675381:web:b2156128337f7c11c17dfc"
+  apiKey:            "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
+  authDomain:        "eplus-center-39.firebaseapp.com",
+  projectId:         "eplus-center-39",
+  storageBucket:     "eplus-center-39.firebasestorage.app",
+  messagingSenderId: "191532732034",
+  appId:             "1:191532732034:web:b11449a2f0595db5d02e9b"
 };
 
 const _app = initializeApp(firebaseConfig);
 const _db  = getFirestore(_app);
 
-// ─── ANNOUNCEMENTS STATE ──────────────────────────────────
+// ─── ANNOUNCEMENTS ────────────────────────────────────────
 let annCurrent   = 0;
 let annAutoSlide = null;
 let annTotalDocs = 0;
@@ -1061,63 +987,38 @@ function getSlideDir() { return -1; }
 function goToSlide(idx) {
   annCurrent = idx;
   const track = document.getElementById('ann-track');
-  if (track) {
-    track.style.transform = `translateX(${idx * 100 * getSlideDir()}%)`;
-  }
+  if (track) track.style.transform = `translateX(${idx * 100 * getSlideDir()}%)`;
   document.querySelectorAll('.ann-dot').forEach((dot, i) =>
     dot.classList.toggle('active', i === idx));
 }
 
 function startAnnAuto() {
   if (annTotalDocs <= 1) return;
-  annAutoSlide = setInterval(
-    () => goToSlide((annCurrent + 1) % annTotalDocs),
-    8000
-  );
+  annAutoSlide = setInterval(() => goToSlide((annCurrent + 1) % annTotalDocs), 8000);
 }
-function resetAnnAuto() {
-  clearInterval(annAutoSlide);
-  startAnnAuto();
-}
+function resetAnnAuto() { clearInterval(annAutoSlide); startAnnAuto(); }
 
-// ─── FIREBASE LISTENER ────────────────────────────────────
 onSnapshot(
   query(collection(_db, 'announcements'), orderBy('createdAt', 'desc')),
   snap => {
     window._annCache = snap.docs
-      .map(doc => {
-        const d = doc.data();
-        return {
-          title:     d.title     || '',
-          text:      d.text      || '',
-          imageUrl:  d.imageUrl  || '',
-          createdAt: d.createdAt || null,
-          hidden:    d.hidden    || false,
-        };
-      })
+      .map(doc => { const d = doc.data(); return { title:d.title||'', text:d.text||'', imageUrl:d.imageUrl||'', createdAt:d.createdAt||null, hidden:d.hidden||false }; })
       .filter(d => d.hidden !== true);
-
     _renderFromData(window._annCache);
   }
 );
 
-// ─── RENDER ANNOUNCEMENTS ─────────────────────────────────
 function _renderFromData(dataArr) {
   const section = document.getElementById('announcements-section');
   const track   = document.getElementById('ann-track');
   const dotsEl  = document.getElementById('ann-dots');
 
-  if (!dataArr || dataArr.length === 0) {
-    section.style.display = 'none';
-    clearInterval(annAutoSlide);
-    return;
-  }
+  if (!dataArr || dataArr.length === 0) { section.style.display = 'none'; clearInterval(annAutoSlide); return; }
 
   clearInterval(annAutoSlide);
   annTotalDocs = dataArr.length;
   const savedIndex = (annCurrent < dataArr.length) ? annCurrent : 0;
   annCurrent = savedIndex;
-
   section.style.display = 'block';
   track.innerHTML  = '';
   dotsEl.innerHTML = '';
@@ -1134,40 +1035,22 @@ function _renderFromData(dataArr) {
 
     let dateStr = '';
     if (d.createdAt?.toDate) {
-      try {
-        dateStr = d.createdAt.toDate().toLocaleDateString(
-          isRtl ? 'ar-DZ' : 'en-GB',
-          { year:'numeric', month:'long', day:'numeric' }
-        );
-      } catch(e) { dateStr = ''; }
+      try { dateStr = d.createdAt.toDate().toLocaleDateString(isRtl?'ar-DZ':'en-GB',{year:'numeric',month:'long',day:'numeric'}); } catch(e) {}
     }
 
     card.innerHTML = `
-      ${hasImg
-        ? `<img class="ann-card-img"
-               src="${d.imageUrl}"
-               alt="" draggable="false"
-               loading="lazy"
-               onerror="this.closest('.ann-card').classList.remove('has-image');
-                        this.closest('.ann-card').classList.add('text-only');
-                        this.remove();">`
-        : ''}
+      ${hasImg ? `<img class="ann-card-img" src="${d.imageUrl}" alt="" draggable="false" loading="lazy"
+        onerror="this.closest('.ann-card').classList.remove('has-image');this.closest('.ann-card').classList.add('text-only');this.remove();">` : ''}
       <div class="ann-card-body">
-        <div class="ann-card-badge">
-          📢 ${isRtl ? 'إعلان' : 'Announcement'}
-        </div>
+        <div class="ann-card-badge">📢 ${isRtl ? 'إعلان' : 'Announcement'}</div>
         ${d.title ? `<div class="ann-card-title">${d.title}</div>` : ''}
         ${d.text  ? `<div class="ann-card-text">${d.text}</div>`   : ''}
         ${dateStr ? `<div class="ann-card-date">🗓 ${dateStr}</div>` : ''}
       </div>`;
-
     track.appendChild(card);
 
     const img = card.querySelector('.ann-card-img');
-    if (img) {
-      img.addEventListener('load', () => img.classList.add('loaded'));
-      if (img.complete) img.classList.add('loaded');
-    }
+    if (img) { img.addEventListener('load', () => img.classList.add('loaded')); if (img.complete) img.classList.add('loaded'); }
 
     const dot = document.createElement('div');
     dot.className = 'ann-dot' + (i === 0 ? ' active' : '');
@@ -1182,97 +1065,112 @@ function _renderFromData(dataArr) {
     const prev = document.createElement('button');
     prev.className = 'ann-arrow ann-arrow-prev';
     prev.innerHTML = '‹';
-    prev.addEventListener('click', () => {
-      goToSlide((annCurrent - 1 + dataArr.length) % dataArr.length);
-      resetAnnAuto();
-    });
+    prev.addEventListener('click', () => { goToSlide((annCurrent-1+dataArr.length)%dataArr.length); resetAnnAuto(); });
     const next = document.createElement('button');
     next.className = 'ann-arrow ann-arrow-next';
     next.innerHTML = '›';
-    next.addEventListener('click', () => {
-      goToSlide((annCurrent + 1) % dataArr.length);
-      resetAnnAuto();
-    });
+    next.addEventListener('click', () => { goToSlide((annCurrent+1)%dataArr.length); resetAnnAuto(); });
     wrapper.appendChild(prev);
     wrapper.appendChild(next);
   }
 
   let touchStartX = 0;
-  track.addEventListener('touchstart', e => {
-    touchStartX = e.touches[0].clientX;
-  }, { passive:true });
+  track.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, {passive:true});
   track.addEventListener('touchend', e => {
     const diff = e.changedTouches[0].clientX - touchStartX;
-    if (Math.abs(diff) > 50) {
-      goToSlide(diff > 0
-        ? (annCurrent - 1 + dataArr.length) % dataArr.length
-        : (annCurrent + 1) % dataArr.length);
-      resetAnnAuto();
-    }
+    if (Math.abs(diff) > 50) { goToSlide(diff > 0 ? (annCurrent-1+dataArr.length)%dataArr.length : (annCurrent+1)%dataArr.length); resetAnnAuto(); }
   });
 
   let isDragging = false, dragStartX = 0, dragDelta = 0;
-  track.addEventListener('mousedown', e => {
-    isDragging = true; dragStartX = e.clientX; dragDelta = 0;
-    track.style.transition = 'none';
-    track.style.cursor = 'grabbing';
-  });
+  track.addEventListener('mousedown', e => { isDragging=true; dragStartX=e.clientX; dragDelta=0; track.style.transition='none'; track.style.cursor='grabbing'; });
   window.addEventListener('mousemove', e => {
     if (!isDragging) return;
     dragDelta = e.clientX - dragStartX;
-    track.style.transform =
-      `translateX(calc(${annCurrent * 100 * getSlideDir()}% + ${dragDelta}px))`;
+    track.style.transform = `translateX(calc(${annCurrent*100*getSlideDir()}% + ${dragDelta}px))`;
   });
   window.addEventListener('mouseup', () => {
     if (!isDragging) return;
-    isDragging = false;
-    track.style.transition = '';
-    track.style.cursor = '';
-    goToSlide(Math.abs(dragDelta) > 60
-      ? (dragDelta > 0
-          ? (annCurrent - 1 + dataArr.length) % dataArr.length
-          : (annCurrent + 1) % dataArr.length)
-      : annCurrent);
+    isDragging=false; track.style.transition=''; track.style.cursor='';
+    goToSlide(Math.abs(dragDelta)>60 ? (dragDelta>0?(annCurrent-1+dataArr.length)%dataArr.length:(annCurrent+1)%dataArr.length) : annCurrent);
     resetAnnAuto();
   });
 
-  track.style.transform = `translateX(${savedIndex * 100 * getSlideDir()}%)`;
-  document.querySelectorAll('.ann-dot').forEach((dot, i) =>
-    dot.classList.toggle('active', i === savedIndex));
-
+  track.style.transform = `translateX(${savedIndex*100*getSlideDir()}%)`;
+  document.querySelectorAll('.ann-dot').forEach((dot,i) => dot.classList.toggle('active', i===savedIndex));
   startAnnAuto();
 }
 
-// ─── EXPOSE TO GLOBAL SCOPE ───────────────────────────────
-window.setLang               = setLang;
-window.closeModal            = closeModal;
-window.closeModalOutside     = closeModalOutside;
-window.closeTerms            = closeTerms;
-window.closeTermsOutside     = closeTermsOutside;
-window.onTermsCheck          = onTermsCheck;
-window.proceedToRegister     = proceedToRegister;
-window.closeSuccessPopup     = closeSuccessPopup;
-window.submitForm            = submitForm;
-window.onLangTypeChange      = onLangTypeChange;
-window.onLangLevelChange     = onLangLevelChange;
-window.onEduLevelChange      = onEduLevelChange;
-window.onCandidateTypeChange = onCandidateTypeChange;
-window.onSpecialtyChange     = onSpecialtyChange;
-window.onSubjectChange       = onSubjectChange;
-window.onTeacherChange       = onTeacherChange;
-window.onVipTypeChange       = onVipTypeChange;
-window.onVipEduLevelChange   = onVipEduLevelChange;
-window.onVipDaysCountChange  = onVipDaysCountChange;
-window.onVipStudyModeChange  = onVipStudyModeChange;
-window.onDayChange           = onDayChange;
-window.openJoinModal         = openJoinModal;
-window.closeJoinModal        = closeJoinModal;
-window.closeJoinModalOutside = closeJoinModalOutside;
-window.onJoinRoleChange      = onJoinRoleChange;
-window.onCvFileChange        = onCvFileChange;
-window.submitJoinForm        = submitJoinForm;
-window.goToSlide             = goToSlide;
-window.resetAnnAuto          = resetAnnAuto;
+// ─── EVENT LISTENERS (بديل onclick) ───────────────────────
+document.addEventListener('DOMContentLoaded', () => {
 
-// ─── INIT ─────────────────────────────────────────────────
-setLang('ar');
+  // أزرار التسجيل
+  document.querySelectorAll('.reg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = btn.getAttribute('data-reg-type');
+      if (type) openModal(type);
+    });
+  });
+
+  // أزرار اللغة
+  document.getElementById('btn-ar').addEventListener('click', () => setLang('ar'));
+  document.getElementById('btn-en').addEventListener('click', () => setLang('en'));
+
+  // إغلاق مودال التسجيل
+  document.getElementById('close-modal-btn').addEventListener('click', closeModal);
+  document.getElementById('modal').addEventListener('click', e => { if (e.target === document.getElementById('modal')) closeModal(); });
+
+  // إغلاق مودال الشروط
+  document.getElementById('close-terms-btn').addEventListener('click', closeTerms);
+  document.getElementById('terms-modal').addEventListener('click', e => { if (e.target === document.getElementById('terms-modal')) closeTerms(); });
+
+  // checkbox الشروط
+  document.getElementById('terms-checkbox').addEventListener('change', onTermsCheck);
+
+  // زر تأكيد التسجيل
+  document.getElementById('terms-proceed-btn').addEventListener('click', proceedToRegister);
+
+  // نموذج التسجيل submit
+  document.getElementById('reg-form').addEventListener('submit', submitForm);
+
+  // انضم لفريقنا
+  document.getElementById('join-team-btn').addEventListener('click', openJoinModal);
+  document.getElementById('close-join-btn').addEventListener('click', closeJoinModal);
+  document.getElementById('join-modal').addEventListener('click', e => { if (e.target === document.getElementById('join-modal')) closeJoinModal(); });
+  document.getElementById('join-form').addEventListener('submit', submitJoinForm);
+
+  // join role toggle
+  document.querySelectorAll('input[name="joinRole"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const fields = document.getElementById('join-role-fields');
+      fields.style.display = 'block';
+      fields.classList.remove('field-appear');
+      void fields.offsetWidth;
+      fields.classList.add('field-appear');
+    });
+  });
+
+  // CV file name
+  document.getElementById('joinCV').addEventListener('change', function() {
+    document.getElementById('cv-file-name').textContent = this.files[0]?.name || '';
+  });
+
+  // حقول الفورم الديناميكية
+  document.getElementById('eduLevel').addEventListener('change', onEduLevelChange);
+  document.getElementById('specialty').addEventListener('change', onSpecialtyChange);
+  document.getElementById('subject').addEventListener('change', onSubjectChange);
+  document.getElementById('teacher').addEventListener('change', onTeacherChange);
+  document.getElementById('langType').addEventListener('change', onLangTypeChange);
+  document.getElementById('langLevel').addEventListener('change', onLangLevelChange);
+  document.getElementById('vipDaysCount').addEventListener('change', onVipDaysCountChange);
+  document.getElementById('vipEduLevel').addEventListener('change', onVipEduLevelChange);
+
+  document.querySelectorAll('input[name="vipType"]').forEach(r =>
+    r.addEventListener('change', onVipTypeChange));
+  document.querySelectorAll('input[name="candidateType"]').forEach(r =>
+    r.addEventListener('change', onCandidateTypeChange));
+  document.querySelectorAll('input[name="days"]').forEach(cb =>
+    cb.addEventListener('change', function() { onDayChange(this); }));
+
+  // init lang
+  setLang('ar');
+});
