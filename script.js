@@ -917,21 +917,21 @@ function spawnConfetti(parent) {
 }
 
 // ─── FIREBASE ─────────────────────────────────────────────
-import { initializeApp }                        from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import { getFirestore, collection, query,
-         orderBy, onSnapshot }                  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+         orderBy, onSnapshot }             from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey:            "AIzaSyCtb6RPW5sq5zK5JMmTYlBFEnQQZfVoI7s",
-  authDomain:        "epluscenter-panel.firebaseapp.com",
-  projectId:         "epluscenter-panel",
-  storageBucket:     "epluscenter-panel.firebasestorage.app",
-  messagingSenderId: "1000462675381",
-  appId:             "1:1000462675381:web:b2156128337f7c11c17dfc"
+  apiKey:            "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
+  authDomain:        "eplus-center-39.firebaseapp.com",
+  projectId:         "eplus-center-39",
+  storageBucket:     "eplus-center-39.firebasestorage.app",
+  messagingSenderId: "191532732034",
+  appId:             "1:191532732034:web:b11449a2f0595db5d02e9b"
 };
 
-const _app = initializeApp(firebaseConfig);
+// تجنب duplicate-app إذا كان Firebase محمّلاً مسبقاً من index.html
+const _app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 const _db  = getFirestore(_app);
 
 // ─── ANNOUNCEMENTS STATE ──────────────────────────────────
