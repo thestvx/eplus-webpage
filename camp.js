@@ -2,11 +2,8 @@ import { initializeApp }  from "https://www.gstatic.com/firebasejs/11.0.0/fireba
 import { getAnalytics }   from "https://www.gstatic.com/firebasejs/11.0.0/firebase-analytics.js";
 import {
   getFirestore, collection, addDoc,
-  serverTimestamp, query, orderBy, onSnapshot
+  serverTimestamp, query, orderBy, onSnapshot, getDocs
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-import {
-  getStorage, ref, listAll, getDownloadURL
-} from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey:            "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
@@ -21,26 +18,39 @@ const firebaseConfig = {
 const _app       = initializeApp(firebaseConfig, "camp-app");
 const _analytics = getAnalytics(_app);
 const _db        = getFirestore(_app);
-const _storage   = getStorage(_app);
 
-/* ── Gallery ── */
+/* ════════════════════════════════════════
+   GOOGLE SHEET SYNC
+════════════════════════════════════════ */
+const SHEET_URL    = "https://script.google.com/macros/s/AKfycbw3YgpoLoMZ91M9COa00pt9LxnnG_MtzErJtiQpT9wbXKmknYWIDnyTKOisqeVo-uQM/exec";
+const SHEET_SECRET = "eplus2026camp";
+
+/* ════════════════════════════════════════
+   GALLERY — يجلب روابط Cloudinary من Firestore
+   collection: "camp-gallery"
+   كل document: { url: "https://res.cloudinary.com/...", order: 0 }
+════════════════════════════════════════ */
 async function loadGallery() {
   const grid = document.getElementById("camp-gallery-grid");
   try {
-    const storageRef = ref(_storage, "camp-gallery/");
-    const result = await listAll(storageRef);
-    if (result.items.length === 0) return; // keep empty state
+    const q    = query(collection(_db, "camp-gallery"), orderBy("order", "asc"));
+    const snap = await getDocs(q);
+    if (snap.empty) return; // يبقى الـ empty state
     grid.innerHTML = "";
-    for (const item of result.items) {
-      const url = await getDownloadURL(item);
+    snap.forEach(doc => {
+      const { url, caption } = doc.data();
       const img = document.createElement("img");
-      img.src = url;
-      img.alt = "صورة من المخيم";
+      img.src       = url;
+      img.alt       = caption || "صورة من المخيم";
       img.className = "camp-gallery-img";
       img.draggable = false;
-      img.loading = "lazy";
+      img.loading   = "lazy";
+      // Cloudinary transformation — جودة auto + ضغط
+      if (url.includes("cloudinary.com")) {
+        img.src = url.replace("/upload/", "/upload/q_auto,f_auto,w_600/");
+      }
       grid.appendChild(img);
-    }
+    });
   } catch (e) {
     console.warn("gallery load failed:", e);
   }
@@ -48,8 +58,10 @@ async function loadGallery() {
 
 loadGallery();
 
-/* ── Register Form ── */
-const form   = document.getElementById("camp-form");
+/* ════════════════════════════════════════
+   REGISTER FORM
+════════════════════════════════════════ */
+const form      = document.getElementById("camp-form");
 const submitBtn = document.getElementById("camp-submit-btn");
 
 form.addEventListener("submit", async (e) => {
@@ -63,10 +75,10 @@ form.addEventListener("submit", async (e) => {
 
   // validation
   const fields = [
-    { el: document.getElementById("campFirstName"),   val: firstName },
-    { el: document.getElementById("campLastName"),    val: lastName },
-    { el: document.getElementById("campAge"),         val: age },
-    { el: document.getElementById("campParentName"),  val: parentName },
+    { el: document.getElementById("campFirstName"),   val: firstName   },
+    { el: document.getElementById("campLastName"),    val: lastName    },
+    { el: document.getElementById("campAge"),         val: age         },
+    { el: document.getElementById("campParentName"),  val: parentName  },
     { el: document.getElementById("campParentPhone"), val: parentPhone },
   ];
   let valid = true;
@@ -79,27 +91,41 @@ form.addEventListener("submit", async (e) => {
   });
   if (!valid) return;
 
-  // loading
   submitBtn.classList.add("loading");
   submitBtn.disabled = true;
 
   try {
     await addDoc(collection(_db, "camp-registrations"), {
-      firstName, lastName, age: Number(age),
-      parentName, parentPhone,
+      firstName, lastName,
+      age:         Number(age),
+      parentName,  parentPhone,
       registeredAt: serverTimestamp(),
-      status: "pending"
+      status:      "pending"
     });
 
-    // success
+    // مزامنة مع Google Sheet
+    fetch(SHEET_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        secret:     SHEET_SECRET,
+        firstName,  lastName,
+        age:        Number(age),
+        parentName, parentPhone
+      })
+    }).catch(err => console.warn("Sheet sync failed:", err));
+
     form.innerHTML = `
-      <div style="text-align:center;padding:30px 0;display:flex;flex-direction:column;align-items:center;gap:16px;">
+      <div style="text-align:center;padding:30px 0;
+                  display:flex;flex-direction:column;
+                  align-items:center;gap:16px;">
         <div style="font-size:52px;">🎉</div>
         <div style="font-size:18px;font-weight:800;color:#fff;">تم التسجيل بنجاح!</div>
         <div style="font-size:14px;color:rgba(200,230,255,0.75);line-height:1.8;">
           أهلاً <strong style="color:#7cc8f0;">${firstName} ${lastName}</strong><br>
           سيتم التواصل معك قريباً على رقم ولي الأمر.<br>
-          <span style="color:rgba(255,210,80,0.8);font-size:12px;">نتمنى لك تجربة رائعة في المخيم الربيعي 🌿</span>
+          <span style="color:rgba(255,210,80,0.8);font-size:12px;">
+            نتمنى لك تجربة رائعة في المخيم الربيعي 🌿
+          </span>
         </div>
       </div>`;
   } catch (err) {
