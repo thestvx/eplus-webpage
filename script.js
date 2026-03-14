@@ -464,28 +464,55 @@ function populateSubjects(key) {
 }
 
 // ─── LANG TYPE ────────────────────────────────────────────
+// ✅ مُصلَح: في VIP لغات يُظهر langLevel فقط (بدون levelTest مباشرة)
+// وفي lang/online يُظهر langLevel ثم levelTest
 function onLangTypeChange() {
   const val        = document.getElementById('langType').value;
   const langLvlGrp = document.getElementById('langLevelGroup');
   const levelTestG = document.getElementById('levelTestGroup');
+  const smGrp      = document.getElementById('vipStudyModeGroup');
+  const dcGrp      = document.getElementById('vipDaysCountGroup');
+  const dGrp       = document.getElementById('daysGroup');
+
   hideField(langLvlGrp, 'langLevel');
   hideField(levelTestG);
+  if (smGrp)  { smGrp.style.display  = 'none'; }
+  if (dcGrp && currentModalType === 'vip')  { dcGrp.style.display  = 'none'; }
+  if (dGrp  && currentModalType === 'vip')  { dGrp.style.display   = 'none'; resetDays(); }
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="vipStudyMode"]').forEach(r => r.checked = false);
+
   if (val) {
     animateShow(langLvlGrp);
     langLvlGrp.querySelector('select')?.setAttribute('required','required');
   }
 }
 
+// ✅ مُصلَح: في VIP لغات يُظهر vipStudyMode بعد اختيار المستوى
+// في lang/online يُظهر levelTest كالمعتاد
 function onLangLevelChange() {
   const val          = document.getElementById('langLevel').value;
   const levelTestGrp = document.getElementById('levelTestGroup');
-  if (val) animateShow(levelTestGrp);
-  else {
-    levelTestGrp.style.display = 'none';
-    document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+  const smGrp        = document.getElementById('vipStudyModeGroup');
+  const dcGrp        = document.getElementById('vipDaysCountGroup');
+  const dGrp         = document.getElementById('daysGroup');
+
+  // أخفِ كل ما بعد langLevel أولاً
+  hideField(levelTestGrp);
+  if (smGrp)  { smGrp.style.display  = 'none'; }
+  if (dcGrp && currentModalType === 'vip') { dcGrp.style.display  = 'none'; }
+  if (dGrp  && currentModalType === 'vip') { dGrp.style.display   = 'none'; resetDays(); }
+  document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="vipStudyMode"]').forEach(r => r.checked = false);
+
+  if (!val) return;
+
+  if (currentModalType === 'vip') {
+    // VIP لغات: اختر طريقة الدراسة أولاً
+    animateShow(smGrp);
+  } else {
+    // دورات اللغات العادية / أونلاين: اختبار المستوى
+    animateShow(levelTestGrp);
   }
 }
 
@@ -600,6 +627,8 @@ function showParentIfNeeded(level) {
 }
 
 // ─── VIP TYPE ─────────────────────────────────────────────
+// ✅ مُصلَح: VIP لغات يُظهر langType مباشرة (بدون professionGroup أولاً)
+// professionGroup أُزيل من تدفق VIP لغات — التخصص/المهنة اختياري في النهاية
 function onVipTypeChange() {
   const selected = document.querySelector('input[name="vipType"]:checked')?.value;
 
@@ -620,19 +649,15 @@ function onVipTypeChange() {
   document.querySelectorAll('input[name="vipStudyMode"]').forEach(r => r.checked = false);
 
   if (selected === 'support') {
+    // VIP دعم دراسي: المستوى الدراسي أولاً
     const vipEduGrp = document.getElementById('vipEduLevelGroup');
     animateShow(vipEduGrp);
     document.getElementById('vipEduLevel').setAttribute('required','required');
   } else if (selected === 'lang') {
-    const profGrp = document.getElementById('professionGroup');
-    animateShow(profGrp);
-    document.getElementById('profession').setAttribute('required','required');
+    // ✅ VIP لغات: اللغة مباشرةً (بدون مهنة/تخصص أولاً)
     animateShow(document.getElementById('langTypeGroup'));
     document.getElementById('langType').setAttribute('required','required');
   }
-  // reset study mode
-  const smGrp = document.getElementById('vipStudyModeGroup');
-  if (smGrp) { smGrp.style.display = 'none'; document.querySelectorAll('input[name="vipStudyMode"]').forEach(r => r.checked = false); }
 }
 
 // ─── VIP EDU LEVEL ────────────────────────────────────────
@@ -647,20 +672,22 @@ function onVipEduLevelChange() {
   document.getElementById('vipDaysCount').value = '';
 
   if (!level) return;
-  animateShow(daysCountGrp);
-  document.getElementById('vipDaysCount').setAttribute('required','required');
+  // ✅ VIP دعم: بعد المستوى مباشرة يأتي طريقة الدراسة
+  animateShow(document.getElementById('vipStudyModeGroup'));
 }
 
-
 // ─── VIP STUDY MODE ───────────────────────────────────────
+// ✅ مُصلَح: يُظهر vipDaysCountGroup بعد اختيار طريقة الدراسة
 function onVipStudyModeChange() {
   const selected = document.querySelector('input[name="vipStudyMode"]:checked')?.value;
   const daysCountGrp = document.getElementById('vipDaysCountGroup');
-  const daysGrp = document.getElementById('daysGroup');
+  const daysGrp      = document.getElementById('daysGroup');
+
   if (daysCountGrp) daysCountGrp.style.display = 'none';
-  if (daysGrp) daysGrp.style.display = 'none';
+  if (daysGrp)      daysGrp.style.display      = 'none';
   resetDays();
   document.getElementById('vipDaysCount').value = '';
+
   if (selected) {
     animateShow(daysCountGrp);
     document.getElementById('vipDaysCount').setAttribute('required','required');
@@ -694,6 +721,7 @@ async function submitForm(e) {
   const vipTypeVal    = document.querySelector('input[name="vipType"]:checked')?.value || '';
   const vipEduLevel   = document.getElementById('vipEduLevel')?.value  || '';
   const professionVal = document.getElementById('profession')?.value   || '';
+  const vipStudyMode  = document.querySelector('input[name="vipStudyMode"]:checked')?.value || '';
 
   const data = {
     type:          currentModalType,
@@ -717,6 +745,7 @@ async function submitForm(e) {
     vipType:       vipTypeVal,
     vipEduLevel,
     profession:    professionVal,
+    vipStudyMode,
     days:          selectedDays,
     daysCount:     document.getElementById('vipDaysCount')?.value  || '',
   };
@@ -823,7 +852,6 @@ async function proceedToRegister() {
 // ─── SUCCESS POPUP ────────────────────────────────────────
 function showSuccessPopup() {
   document.getElementById('success-popup-overlay')?.remove();
-
   const overlay = document.createElement('div');
   overlay.id = 'success-popup-overlay';
   overlay.className = 'success-popup-overlay';
@@ -907,7 +935,6 @@ let annCurrent   = 0;
 let annAutoSlide = null;
 let annTotalDocs = 0;
 
-// ✅ حساب اتجاه السلايدر دائماً LTR بغض النظر عن لغة الصفحة
 function getSlideDir() { return -1; }
 
 function goToSlide(idx) {
@@ -974,7 +1001,6 @@ function _renderFromData(dataArr) {
   track.innerHTML  = '';
   dotsEl.innerHTML = '';
 
-  // ✅ إجبار LTR على الـ track دائماً لمنع انعكاس RTL
   track.style.direction = 'ltr';
 
   const isRtl = currentLang === 'ar';
@@ -984,7 +1010,6 @@ function _renderFromData(dataArr) {
 
     const card = document.createElement('div');
     card.className = hasImg ? 'ann-card has-image' : 'ann-card text-only';
-    // ✅ محتوى الكارد يكون بالاتجاه الصحيح للغة
     card.style.direction = isRtl ? 'rtl' : 'ltr';
     card.style.textAlign = isRtl ? 'right' : 'left';
 
@@ -1031,7 +1056,6 @@ function _renderFromData(dataArr) {
     dotsEl.appendChild(dot);
   });
 
-  // ── Arrows ──
   const wrapper = document.querySelector('.ann-track-wrapper');
   wrapper.querySelectorAll('.ann-arrow').forEach(a => a.remove());
 
@@ -1054,7 +1078,6 @@ function _renderFromData(dataArr) {
     wrapper.appendChild(next);
   }
 
-  // ── Touch Swipe ──
   let touchStartX = 0;
   track.addEventListener('touchstart', e => {
     touchStartX = e.touches[0].clientX;
@@ -1069,7 +1092,6 @@ function _renderFromData(dataArr) {
     }
   });
 
-  // ── Mouse Drag ──
   let isDragging = false, dragStartX = 0, dragDelta = 0;
   track.addEventListener('mousedown', e => {
     isDragging = true; dragStartX = e.clientX; dragDelta = 0;
@@ -1079,7 +1101,6 @@ function _renderFromData(dataArr) {
   window.addEventListener('mousemove', e => {
     if (!isDragging) return;
     dragDelta = e.clientX - dragStartX;
-    // ✅ LTR ثابت دائماً
     track.style.transform =
       `translateX(calc(${annCurrent * 100 * getSlideDir()}% + ${dragDelta}px))`;
   });
@@ -1096,8 +1117,6 @@ function _renderFromData(dataArr) {
     resetAnnAuto();
   });
 
-  // ── Init position ──
-  // ✅ LTR ثابت دائماً
   track.style.transform = `translateX(${savedIndex * 100 * getSlideDir()}%)`;
   document.querySelectorAll('.ann-dot').forEach((dot, i) =>
     dot.classList.toggle('active', i === savedIndex));
@@ -1107,6 +1126,7 @@ function _renderFromData(dataArr) {
 
 // ─── EXPOSE FUNCTIONS ─────────────────────────────────────
 window.setLang               = setLang;
+window.openModal             = openModal;
 window.closeModal            = closeModal;
 window.closeModalOutside     = closeModalOutside;
 window.closeTerms            = closeTerms;
@@ -1132,26 +1152,3 @@ window.resetAnnAuto          = resetAnnAuto;
 
 // ─── INIT LANG ────────────────────────────────────────────
 setLang('ar');
-
-// ─── EXPOSE GLOBALS ───────────────────────────────────────
-window.openModal            = openModal;
-window.closeModal           = closeModal;
-window.closeModalOutside    = closeModalOutside;
-window.submitForm           = submitForm;
-window.setLang              = setLang;
-window.onEduLevelChange     = onEduLevelChange;
-window.onCandidateTypeChange= onCandidateTypeChange;
-window.onSpecialtyChange    = onSpecialtyChange;
-window.onSubjectChange      = onSubjectChange;
-window.onTeacherChange      = onTeacherChange;
-window.onLangTypeChange     = onLangTypeChange;
-window.onLangLevelChange    = onLangLevelChange;
-window.onVipTypeChange      = onVipTypeChange;
-window.onVipEduLevelChange  = onVipEduLevelChange;
-window.onVipStudyModeChange = onVipStudyModeChange;
-window.onVipDaysCountChange = onVipDaysCountChange;
-window.onDayChange          = onDayChange;
-window.closeTerms           = closeTerms;
-window.closeTermsOutside    = closeTermsOutside;
-window.onTermsCheck         = onTermsCheck;
-window.proceedToRegister    = proceedToRegister;
