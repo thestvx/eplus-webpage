@@ -1124,6 +1124,157 @@ function _renderFromData(dataArr) {
   startAnnAuto();
 }
 
+
+// ─── JOIN TEAM ────────────────────────────────────────────
+const CLOUDINARY_UPLOAD_URL  = 'https://api.cloudinary.com/v1_1/dac4mwuwe/auto/upload';
+const CLOUDINARY_UPLOAD_PRESET = 'epluscenterbackup';
+const JOIN_APPS_SCRIPT_URL   = APPS_SCRIPT_URL; // نفس الـ Apps Script أو غيّره
+
+function openJoinModal() {
+  document.getElementById('join-modal').classList.add('active');
+  document.getElementById('lang-toggle').classList.add('hidden');
+  hideLogo();
+  document.body.style.overflow = 'hidden';
+}
+
+function closeJoinModal() {
+  document.getElementById('join-modal').classList.remove('active');
+  document.getElementById('join-form').reset();
+  document.getElementById('cv-file-name').textContent = '';
+  document.getElementById('join-role-fields').style.display = 'none';
+  document.getElementById('lang-toggle').classList.remove('hidden');
+  showLogo();
+  document.body.style.overflow = '';
+  // reset role selection
+  document.querySelectorAll('input[name="joinRole"]').forEach(r => r.checked = false);
+  document.getElementById('join-submit-btn').classList.remove('loading');
+}
+
+function closeJoinModalOutside(e) {
+  if (e.target === document.getElementById('join-modal')) closeJoinModal();
+}
+
+function onJoinRoleChange() {
+  const roleFields = document.getElementById('join-role-fields');
+  const selected = document.querySelector('input[name="joinRole"]:checked')?.value;
+  if (selected) {
+    roleFields.style.display = 'block';
+    roleFields.classList.remove('field-appear');
+    void roleFields.offsetWidth;
+    roleFields.classList.add('field-appear');
+  } else {
+    roleFields.style.display = 'none';
+  }
+}
+
+function onCvFileChange(input) {
+  const file = input.files[0];
+  const nameEl = document.getElementById('cv-file-name');
+  if (file) {
+    const maxMB = 10;
+    if (file.size > maxMB * 1024 * 1024) {
+      nameEl.textContent = '⚠️ الملف أكبر من 10MB';
+      nameEl.style.color = '#ff6b6b';
+      input.value = '';
+      return;
+    }
+    nameEl.textContent = '📎 ' + file.name;
+    nameEl.style.color = 'rgba(255,255,255,0.7)';
+  } else {
+    nameEl.textContent = '';
+  }
+}
+
+async function uploadToCloudinary(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  const res = await fetch(CLOUDINARY_UPLOAD_URL, { method: 'POST', body: fd });
+  if (!res.ok) throw new Error('Cloudinary upload failed');
+  const data = await res.json();
+  return data.secure_url;
+}
+
+async function submitJoinForm(e) {
+  e.preventDefault();
+  const btn = document.getElementById('join-submit-btn');
+  btn.classList.add('loading');
+
+  const firstName  = document.getElementById('joinFirstName').value.trim();
+  const lastName   = document.getElementById('joinLastName').value.trim();
+  const phone      = document.getElementById('joinPhone').value.trim();
+  const email      = document.getElementById('joinEmail').value.trim();
+  const role       = document.querySelector('input[name="joinRole"]:checked')?.value || '';
+  const specialty  = document.getElementById('joinSpecialty').value.trim();
+  const experience = document.getElementById('joinExperience').value.trim();
+  const cvInput    = document.getElementById('joinCV');
+  const cvFile     = cvInput.files[0] || null;
+
+  let cvUrl = '';
+  try {
+    if (cvFile) {
+      cvUrl = await uploadToCloudinary(cvFile);
+    }
+
+    const data = {
+      type:       'join',
+      firstName,
+      lastName,
+      phone,
+      email,
+      role,
+      specialty,
+      experience,
+      cvUrl,
+      timestamp:  new Date().toISOString(),
+    };
+
+    await fetch(APPS_SCRIPT_URL, {
+      method:  'POST',
+      mode:    'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(data)
+    });
+
+    btn.classList.remove('loading');
+    closeJoinModal();
+    showJoinSuccessPopup(role);
+  } catch(err) {
+    btn.classList.remove('loading');
+    console.error(err);
+    alert(currentLang === 'ar'
+      ? 'حدث خطأ أثناء الإرسال، تحقق من اتصالك بالإنترنت.'
+      : 'A network error occurred. Please check your connection.');
+  }
+}
+
+function showJoinSuccessPopup(role) {
+  document.getElementById('success-popup-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'success-popup-overlay';
+  overlay.className = 'success-popup-overlay';
+  overlay.innerHTML = `
+    <div class="success-popup-box" id="success-popup-box">
+      <div class="success-popup-icon-wrap">
+        <div class="success-popup-ring"></div>
+        <div class="success-popup-check">✓</div>
+      </div>
+      <div class="success-popup-title">🎉 ${currentLang==='ar' ? 'تم إرسال طلبك بنجاح!' : 'Application Submitted!'}</div>
+      <div class="success-popup-msg">
+        ${currentLang==='ar'
+          ? `شكراً لاهتمامك بالانضمام إلى فريق أكاديمية E-PLUS بصفة <strong>${role}</strong>.<br>سيتم مراجعة طلبك والتواصل معك قريباً.<br><span class="success-popup-sub">✦ معاً نبني مستقبل أفضل ✦</span>`
+          : `Thank you for your interest in joining E-PLUS Academy as <strong>${role}</strong>.<br>Your application will be reviewed and we'll contact you soon.<br><span class="success-popup-sub">✦ Together we build a better future ✦</span>`}
+      </div>
+      <div class="success-popup-divider"></div>
+      <button class="success-popup-btn" onclick="closeSuccessPopup()">
+        ${currentLang==='ar' ? 'حسناً، شكراً!' : 'OK, Thank you!'}
+      </button>
+    </div>`;
+  document.body.appendChild(overlay);
+  spawnConfetti(overlay);
+  requestAnimationFrame(() => overlay.classList.add('active'));
+}
+
 // ─── EXPOSE TO WINDOW (مرة واحدة فقط) ───────────────────
 window.setLang               = setLang;
 window.openModal             = openModal;
@@ -1150,6 +1301,12 @@ window.proceedToRegister     = proceedToRegister;
 window.closeSuccessPopup     = closeSuccessPopup;
 window.goToSlide             = goToSlide;
 window.resetAnnAuto          = resetAnnAuto;
+window.openJoinModal         = openJoinModal;
+window.closeJoinModal        = closeJoinModal;
+window.closeJoinModalOutside = closeJoinModalOutside;
+window.onJoinRoleChange      = onJoinRoleChange;
+window.onCvFileChange        = onCvFileChange;
+window.submitJoinForm        = submitJoinForm;
 
 // ─── INIT ─────────────────────────────────────────────────
 setLang('ar');
