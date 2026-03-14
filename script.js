@@ -38,7 +38,7 @@ resizeCanvas();
 animateSquares();
 
 // ─── APPS SCRIPT URL ──────────────────────────────────────
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxEPXLf1-k4G3D3Wv0zzq8e3ZpGf0hsB2YWE7UmaUFQwhA7uDoF0H4rXHZXdRyMvwxMAg/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyiooCIgUPH3OHbdPJgjd23tnT1NA7IichZ28haow3Y5kf2wtGAXFFzpL1rpV2Fpnxysg/exec';
 
 const typeLabelsAr = {
   support: 'تسجيلات الدعم',
@@ -671,11 +671,6 @@ function onVipEduLevelChange() {
   document.getElementById('vipDaysCount').setAttribute('required','required');
 }
 
-// ─── VIP STUDY MODE ───────────────────────────────────────
-function onVipStudyModeChange() {
-  // placeholder — extend if needed
-}
-
 // ─── SUBMIT FORM ──────────────────────────────────────────
 async function submitForm(e) {
   e.preventDefault();
@@ -940,24 +935,35 @@ function spawnConfetti(parent) {
   }
 }
 
-// ─── JOIN TEAM MODAL ──────────────────────────────────────
+// ─── JOIN MODAL ───────────────────────────────────────────
 function openJoinModal() {
-  document.getElementById('join-modal').classList.add('active');
-  document.body.style.overflow = 'hidden';
+  const modal = document.getElementById('join-modal');
+  if (!modal) return;
+  const form = document.getElementById('join-form');
+  if (form) form.reset();
+  const specGrp = document.getElementById('join-specialty-group');
+  if (specGrp) specGrp.style.display = 'none';
+  const cvLabel = document.getElementById('cv-file-label');
+  if (cvLabel) cvLabel.textContent = currentLang === 'ar' ? 'لم يتم اختيار ملف' : 'No file chosen';
   hideLogo();
   document.getElementById('lang-toggle')?.classList.add('hidden');
+  modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
 }
 
 function closeJoinModal() {
-  document.getElementById('join-modal').classList.remove('active');
+  const modal = document.getElementById('join-modal');
+  if (!modal) return;
+  modal.classList.remove('active');
   document.body.style.overflow = '';
-  showLogo();
   document.getElementById('lang-toggle')?.classList.remove('hidden');
-  document.getElementById('join-form')?.reset();
-  const roleFields = document.getElementById('join-role-fields');
-  if (roleFields) roleFields.style.display = 'none';
-  const cvName = document.getElementById('cv-file-name');
-  if (cvName) cvName.textContent = '';
+  showLogo();
+  const form = document.getElementById('join-form');
+  if (form) form.reset();
+  const specGrp = document.getElementById('join-specialty-group');
+  if (specGrp) specGrp.style.display = 'none';
+  const cvLabel = document.getElementById('cv-file-label');
+  if (cvLabel) cvLabel.textContent = currentLang === 'ar' ? 'لم يتم اختيار ملف' : 'No file chosen';
 }
 
 function closeJoinModalOutside(e) {
@@ -965,79 +971,80 @@ function closeJoinModalOutside(e) {
 }
 
 function onJoinRoleChange() {
-  const roleFields = document.getElementById('join-role-fields');
-  if (roleFields) {
-    roleFields.style.display = 'block';
-    roleFields.classList.remove('field-appear');
-    void roleFields.offsetWidth;
-    roleFields.classList.add('field-appear');
+  const roleVal = document.querySelector('input[name="joinRole"]:checked')?.value || '';
+  const specGrp = document.getElementById('join-specialty-group');
+  if (!specGrp) return;
+  if (roleVal === 'teacher') {
+    specGrp.style.display = 'block';
+    specGrp.classList.remove('field-appear');
+    void specGrp.offsetWidth;
+    specGrp.classList.add('field-appear');
+  } else {
+    specGrp.style.display = 'none';
   }
 }
 
 function onCvFileChange(input) {
-  const nameEl = document.getElementById('cv-file-name');
-  if (nameEl) {
-    nameEl.textContent = input.files[0] ? input.files[0].name : '';
+  const label = document.getElementById('cv-file-label');
+  if (!label) return;
+  if (input.files && input.files.length > 0) {
+    label.textContent = input.files[0].name;
+  } else {
+    label.textContent = currentLang === 'ar' ? 'لم يتم اختيار ملف' : 'No file chosen';
   }
 }
 
-async function submitJoinForm(e) {
+function submitJoinForm(e) {
   e.preventDefault();
-  const btn = document.getElementById('join-submit-btn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span>⏳ جاري الإرسال...</span>'; }
-
-  const data = {
-    type:         'join',
-    firstName:    document.getElementById('joinFirstName').value.trim(),
-    lastName:     document.getElementById('joinLastName').value.trim(),
-    phone:        document.getElementById('joinPhone').value.trim(),
-    email:        document.getElementById('joinEmail').value.trim(),
-    role:         document.querySelector('input[name="joinRole"]:checked')?.value || '-',
-    specialty:    document.getElementById('joinSpecialty')?.value.trim() || '-',
-    experience:   document.getElementById('joinExperience')?.value.trim() || '-',
-    timestamp:    new Date().toISOString(),
-  };
-
-  try {
-    const formData = new FormData();
-    formData.append('payload', JSON.stringify(data));
-    const cvFile = document.getElementById('joinCV')?.files[0];
-    if (cvFile) formData.append('cv', cvFile);
-
-    await fetch(APPS_SCRIPT_URL, { method:'POST', mode:'no-cors', body: formData });
-
-    closeJoinModal();
-    const overlay = document.createElement('div');
-    overlay.className = 'success-popup-overlay';
-    overlay.id = 'join-success-overlay';
-    overlay.innerHTML = `
+  closeJoinModal();
+  document.getElementById('loading-popup-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'loading-popup-overlay';
+  overlay.className = 'loading-popup-overlay';
+  overlay.innerHTML = `
+    <div class="loading-popup-box">
+      <div class="loading-spinner"></div>
+      <div class="loading-popup-title">
+        ${currentLang === 'ar' ? 'جاري إرسال طلبك...' : 'Sending your application...'}
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('active'));
+  setTimeout(() => {
+    hideLoadingPopup();
+    const successOv = document.createElement('div');
+    successOv.id = 'success-popup-overlay';
+    successOv.className = 'success-popup-overlay';
+    successOv.innerHTML = `
       <div class="success-popup-box">
         <div class="success-popup-icon-wrap">
-          <img src="3d/done.png" alt="done" class="success-popup-3d-icon"/>
+          <img src="3d/done.png" alt="done" class="success-popup-3d-icon" />
         </div>
-        <div class="success-popup-title">🎉 تم إرسال طلبك بنجاح!</div>
+        <div class="success-popup-title">
+          ${currentLang==='ar' ? '🎉 تم إرسال طلبك بنجاح!' : '🎉 Application Sent!'}
+        </div>
         <div class="success-popup-msg">
-          شكراً لاهتمامك بالانضمام لفريق E-PLUS.<br>
-          سيتم مراجعة طلبك والتواصل معك في أقرب وقت.
+          ${currentLang==='ar'
+            ? 'شكراً لاهتمامك! سيتم مراجعة طلبك والتواصل معك قريباً.'
+            : 'Thank you for your interest! We will review your application and contact you soon.'}
         </div>
-        <button class="success-popup-btn" onclick="document.getElementById('join-success-overlay').remove(); document.body.style.overflow=''; showLogo(); document.getElementById('lang-toggle')?.classList.remove('hidden');">
-          حسناً، شكراً!
+        <button class="success-popup-btn" onclick="closeSuccessPopup()">
+          ${currentLang==='ar' ? 'حسناً، شكراً!' : 'OK, Thank you!'}
         </button>
       </div>`;
-    document.body.appendChild(overlay);
-    requestAnimationFrame(() => overlay.classList.add('active'));
-
-  } catch(err) {
-    console.error(err);
-    alert('حدث خطأ أثناء الإرسال، تحقق من اتصالك بالإنترنت.');
-    if (btn) { btn.disabled = false; btn.innerHTML = '<span>إرسال الطلب ✦</span>'; }
-  }
+    document.body.appendChild(successOv);
+    spawnConfetti(successOv);
+    requestAnimationFrame(() => successOv.classList.add('active'));
+    document.getElementById('lang-toggle')?.classList.remove('hidden');
+    showLogo();
+  }, 1500);
 }
 
 // ─── FIREBASE ─────────────────────────────────────────────
-import { initializeApp }                   from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { initializeApp }                        from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import { getFirestore, collection, query,
-         orderBy, onSnapshot }             from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+         orderBy, onSnapshot }                  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey:            "AIzaSyCtb6RPW5sq5zK5JMmTYlBFEnQQZfVoI7s",
@@ -1121,12 +1128,14 @@ function _renderFromData(dataArr) {
   section.style.display = 'block';
   track.innerHTML  = '';
   dotsEl.innerHTML = '';
+
   track.style.direction = 'ltr';
 
   const isRtl = currentLang === 'ar';
 
   dataArr.forEach((d, i) => {
     const hasImg = d.imageUrl && d.imageUrl.startsWith('https');
+
     const card = document.createElement('div');
     card.className = hasImg ? 'ann-card has-image' : 'ann-card text-only';
     card.style.direction = isRtl ? 'rtl' : 'ltr';
@@ -1175,6 +1184,7 @@ function _renderFromData(dataArr) {
     dotsEl.appendChild(dot);
   });
 
+  // ── Arrows ──
   const wrapper = document.querySelector('.ann-track-wrapper');
   wrapper.querySelectorAll('.ann-arrow').forEach(a => a.remove());
 
@@ -1197,6 +1207,7 @@ function _renderFromData(dataArr) {
     wrapper.appendChild(next);
   }
 
+  // ── Touch Swipe ──
   let touchStartX = 0;
   track.addEventListener('touchstart', e => {
     touchStartX = e.touches[0].clientX;
@@ -1211,6 +1222,7 @@ function _renderFromData(dataArr) {
     }
   });
 
+  // ── Mouse Drag ──
   let isDragging = false, dragStartX = 0, dragDelta = 0;
   track.addEventListener('mousedown', e => {
     isDragging = true; dragStartX = e.clientX; dragDelta = 0;
@@ -1243,8 +1255,9 @@ function _renderFromData(dataArr) {
   startAnnAuto();
 }
 
-// ─── EXPOSE TO GLOBAL SCOPE ───────────────────────────────
+// ─── EXPOSE FUNCTIONS ─────────────────────────────────────
 window.setLang               = setLang;
+window.openModal             = openModal;
 window.closeModal            = closeModal;
 window.closeModalOutside     = closeModalOutside;
 window.closeTerms            = closeTerms;
@@ -1252,7 +1265,6 @@ window.closeTermsOutside     = closeTermsOutside;
 window.onTermsCheck          = onTermsCheck;
 window.proceedToRegister     = proceedToRegister;
 window.closeSuccessPopup     = closeSuccessPopup;
-window.submitForm            = submitForm;
 window.onLangTypeChange      = onLangTypeChange;
 window.onLangLevelChange     = onLangLevelChange;
 window.onEduLevelChange      = onEduLevelChange;
@@ -1263,16 +1275,16 @@ window.onTeacherChange       = onTeacherChange;
 window.onVipTypeChange       = onVipTypeChange;
 window.onVipEduLevelChange   = onVipEduLevelChange;
 window.onVipDaysCountChange  = onVipDaysCountChange;
-window.onVipStudyModeChange  = onVipStudyModeChange;
 window.onDayChange           = onDayChange;
+window.submitForm            = submitForm;
+window.goToSlide             = goToSlide;
+window.resetAnnAuto          = resetAnnAuto;
 window.openJoinModal         = openJoinModal;
 window.closeJoinModal        = closeJoinModal;
 window.closeJoinModalOutside = closeJoinModalOutside;
 window.onJoinRoleChange      = onJoinRoleChange;
 window.onCvFileChange        = onCvFileChange;
 window.submitJoinForm        = submitJoinForm;
-window.goToSlide             = goToSlide;
-window.resetAnnAuto          = resetAnnAuto;
 
-// ─── INIT ─────────────────────────────────────────────────
+// ─── INIT LANG ────────────────────────────────────────────
 setLang('ar');
