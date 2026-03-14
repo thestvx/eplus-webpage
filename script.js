@@ -38,7 +38,7 @@ resizeCanvas();
 animateSquares();
 
 // ─── APPS SCRIPT URL ──────────────────────────────────────
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxEPXLf1-k4G3D3Wv0zzq8e3ZpGf0hsB2YWE7UmaUFQwhA7uDoF0H4rXHZXdRyMvwxMAg/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyiooCIgUPH3OHbdPJgjd23tnT1NA7IichZ28haow3Y5kf2wtGAXFFzpL1rpV2Fpnxysg/exec';
 
 const typeLabelsAr = {
   support: 'تسجيلات الدعم',
@@ -60,7 +60,7 @@ const i18n = {
     btn4:'اختبار IELTS',  btn5:'دورات أونلاين', btn6:'دورات تكوينية',
     annTitle:'إعلانات الأكاديمية',
     firstName:'الاسم', lastName:'اللقب', birthDate:'تاريخ الميلاد',
-    phone:'رقم الهاتف',
+    birthPlace:'العنوان', phone:'رقم الهاتف',
     motivation:    'ما الذي دفعك إلى اختيار التسجيل في أكاديمية E-PLUS؟',
     motivationVip: 'ما الذي جعلك تختار الدراسة عبر نظام الدروس الخاصة VIP؟',
     optional:'(اختياري)',
@@ -74,6 +74,8 @@ const i18n = {
     yes:'نعم', no:'لا',
     vipType:'نوع دروس VIP', vipSupport:'📚 دعم دراسي', vipLang:'🌍 لغات',
     vipDaysCount:'كم يوم تريد الحضور في الأسبوع؟',
+    vipStudyMode:'طريقة الدراسة', vipModeInPerson:'🏫 حضوري', vipModeOnline:'💻 أونلاين', vipModeHybrid:'🔀 حضوري وأونلاين (هجين)',
+    requiredNote:'⚠️ يُرجى التأكد من تعبئة جميع الحقول الإلزامية قبل إتمام التسجيل. لا يمكن إرسال النموذج إلا بعد استكمال كافة المعلومات المطلوبة.',
     chooseDays:'اختر الأيام', daysSelected:'يوم محدد',
     submitBtn:'إتمام التسجيل ✦',
     termsTitle:'قوانين وشروط الأكاديمية',
@@ -101,7 +103,7 @@ const i18n = {
     btn4:'IELTS Test', btn5:'Online Courses', btn6:'Training Courses',
     annTitle:'Academy Announcements',
     firstName:'First Name', lastName:'Last Name', birthDate:'Date of Birth',
-    phone:'Phone Number',
+    birthPlace:'Address', phone:'Phone Number',
     motivation:    'What motivated you to choose E-PLUS Academy?',
     motivationVip: 'What led you to choose studying through the VIP private lessons system?',
     optional:'(optional)',
@@ -115,6 +117,8 @@ const i18n = {
     yes:'Yes', no:'No',
     vipType:'VIP Lesson Type', vipSupport:'📚 Academic Support', vipLang:'🌍 Languages',
     vipDaysCount:'How many days per week?',
+    vipStudyMode:'Study Mode', vipModeInPerson:'🏫 In-Person', vipModeOnline:'💻 Online', vipModeHybrid:'🔀 In-Person & Online (Hybrid)',
+    requiredNote:'⚠️ Please ensure all required fields are filled before completing your registration. The form cannot be submitted until all required information is provided.',
     chooseDays:'Choose Days', daysSelected:'day(s) selected',
     submitBtn:'Complete Registration ✦',
     termsTitle:'Academy Terms & Conditions',
@@ -267,17 +271,6 @@ const needsCandidateType = ['ثالثة ثانوي (بكالوريا)'];
 // ─── MODAL STATE ──────────────────────────────────────────
 let currentModalType = '';
 
-// ─── REGISTRATION NUMBER ──────────────────────────────────
-function generateRegNumber(type) {
-  const prefixes = {
-    support: 'SUP', lang: 'LNG', vip: 'VIP',
-    ielts: 'ILS', online: 'ONL', takwini: 'TRN'
-  };
-  const prefix = prefixes[type] || 'REG';
-  const num = Math.floor(10000 + Math.random() * 90000);
-  return `${prefix}-${num}`;
-}
-
 // ─── OPEN MODAL ───────────────────────────────────────────
 function openModal(type) {
   currentModalType = type;
@@ -319,9 +312,6 @@ function openModal(type) {
     const daysCountGrp = document.getElementById('vipDaysCountGroup');
     animateShow(daysCountGrp);
     daysCountGrp.querySelector('select').setAttribute('required','required');
-  } else if (type === 'takwini') {
-    const takwiniGrp = document.getElementById('takwiniTypeGroup');
-    if (takwiniGrp) animateShow(takwiniGrp);
   }
 
   document.getElementById('lang-toggle').classList.add('hidden');
@@ -347,8 +337,8 @@ function resetForm() {
   const groups = [
     'eduLevelGroup','candidateTypeGroup','specialtyGroup','subjectGroup',
     'teacherGroup','parentGroup','langTypeGroup','langLevelGroup',
-    'levelTestGroup','vipTypeGroup','vipEduLevelGroup','professionGroup','takwiniTypeGroup',
-    'vipDaysCountGroup','daysGroup',
+    'levelTestGroup','vipTypeGroup','vipEduLevelGroup','professionGroup',
+    'vipDaysCountGroup','daysGroup','vipStudyModeGroup',
   ];
   groups.forEach(id => {
     const el = document.getElementById(id);
@@ -356,9 +346,9 @@ function resetForm() {
   });
   document.getElementById('comingSoonNote')?.remove();
   document.querySelectorAll('input[name="vipType"]').forEach(r => r.checked = false);
-  document.querySelectorAll('input[name="takwiniType"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+  document.querySelectorAll('input[name="vipStudyMode"]').forEach(r => r.checked = false);
   resetDays();
   maxDaysAllowed = 2;
 
@@ -478,14 +468,10 @@ function onLangTypeChange() {
   const val        = document.getElementById('langType').value;
   const langLvlGrp = document.getElementById('langLevelGroup');
   const levelTestG = document.getElementById('levelTestGroup');
-  const daysCountG = document.getElementById('vipDaysCountGroup');
-  const daysG      = document.getElementById('daysGroup');
   hideField(langLvlGrp, 'langLevel');
   hideField(levelTestG);
-  if (daysCountG) { daysCountG.style.display = 'none'; document.getElementById('vipDaysCount').value = ''; }
-  if (daysG) daysG.style.display = 'none';
-  resetDays();
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+  document.querySelectorAll('input[name="vipStudyMode"]').forEach(r => r.checked = false);
   if (val) {
     animateShow(langLvlGrp);
     langLvlGrp.querySelector('select')?.setAttribute('required','required');
@@ -495,21 +481,11 @@ function onLangTypeChange() {
 function onLangLevelChange() {
   const val          = document.getElementById('langLevel').value;
   const levelTestGrp = document.getElementById('levelTestGroup');
-  const daysCountGrp = document.getElementById('vipDaysCountGroup');
-
-  levelTestGrp.style.display = 'none';
-  if (daysCountGrp) daysCountGrp.style.display = 'none';
-  resetDays();
-  document.getElementById('vipDaysCount').value = '';
-  document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
-
-  if (val) {
-    if (currentModalType === 'vip') {
-      animateShow(daysCountGrp);
-      document.getElementById('vipDaysCount').setAttribute('required','required');
-    } else {
-      animateShow(levelTestGrp);
-    }
+  if (val) animateShow(levelTestGrp);
+  else {
+    levelTestGrp.style.display = 'none';
+    document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+  document.querySelectorAll('input[name="vipStudyMode"]').forEach(r => r.checked = false);
   }
 }
 
@@ -629,7 +605,7 @@ function onVipTypeChange() {
 
   const allGroups = [
     'vipEduLevelGroup','vipDaysCountGroup','professionGroup',
-    'daysGroup','langTypeGroup','langLevelGroup','levelTestGroup'
+    'daysGroup','langTypeGroup','langLevelGroup','levelTestGroup','vipStudyModeGroup'
   ];
   allGroups.forEach(id => {
     const el = document.getElementById(id);
@@ -641,6 +617,7 @@ function onVipTypeChange() {
   document.getElementById('langType').value     = '';
   document.getElementById('langLevel').value    = '';
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+  document.querySelectorAll('input[name="vipStudyMode"]').forEach(r => r.checked = false);
 
   if (selected === 'support') {
     const vipEduGrp = document.getElementById('vipEduLevelGroup');
@@ -653,6 +630,9 @@ function onVipTypeChange() {
     animateShow(document.getElementById('langTypeGroup'));
     document.getElementById('langType').setAttribute('required','required');
   }
+  // reset study mode
+  const smGrp = document.getElementById('vipStudyModeGroup');
+  if (smGrp) { smGrp.style.display = 'none'; document.querySelectorAll('input[name="vipStudyMode"]').forEach(r => r.checked = false); }
 }
 
 // ─── VIP EDU LEVEL ────────────────────────────────────────
@@ -671,6 +651,22 @@ function onVipEduLevelChange() {
   document.getElementById('vipDaysCount').setAttribute('required','required');
 }
 
+
+// ─── VIP STUDY MODE ───────────────────────────────────────
+function onVipStudyModeChange() {
+  const selected = document.querySelector('input[name="vipStudyMode"]:checked')?.value;
+  const daysCountGrp = document.getElementById('vipDaysCountGroup');
+  const daysGrp = document.getElementById('daysGroup');
+  if (daysCountGrp) daysCountGrp.style.display = 'none';
+  if (daysGrp) daysGrp.style.display = 'none';
+  resetDays();
+  document.getElementById('vipDaysCount').value = '';
+  if (selected) {
+    animateShow(daysCountGrp);
+    document.getElementById('vipDaysCount').setAttribute('required','required');
+  }
+}
+
 // ─── SUBMIT FORM ──────────────────────────────────────────
 async function submitForm(e) {
   e.preventDefault();
@@ -678,11 +674,12 @@ async function submitForm(e) {
   const firstName  = document.getElementById('firstName').value.trim();
   const lastName   = document.getElementById('lastName').value.trim();
   const birthDate  = document.getElementById('birthDate').value;
+  const birthPlace = document.getElementById('birthPlace').value.trim();
   const phone      = document.getElementById('phone').value.trim();
 
   let hasError = false;
-  [firstName, lastName].forEach((val, i) => {
-    const ids = ['firstName','lastName'];
+  [firstName, lastName, birthPlace].forEach((val, i) => {
+    const ids = ['firstName','lastName','birthPlace'];
     if (!validateLang(val)) {
       document.getElementById(ids[i]).classList.add('error');
       setTimeout(() => document.getElementById(ids[i]).classList.remove('error'), 1500);
@@ -692,36 +689,36 @@ async function submitForm(e) {
   if (hasError) return;
 
   const selectedDays = [...document.querySelectorAll('input[name="days"]:checked')]
-    .map(c => c.value).join('، ') || '-';
+    .map(c => c.value).join('، ');
 
-  const vipTypeVal    = document.querySelector('input[name="vipType"]:checked')?.value || '-';
-  const vipEduLevel   = document.getElementById('vipEduLevel')?.value  || '-';
-  const professionVal = document.getElementById('profession')?.value   || '-';
+  const vipTypeVal    = document.querySelector('input[name="vipType"]:checked')?.value || '';
+  const vipEduLevel   = document.getElementById('vipEduLevel')?.value  || '';
+  const professionVal = document.getElementById('profession')?.value   || '';
 
   const data = {
     type:          currentModalType,
     firstName,
     lastName,
     birthDate,
+    birthPlace,
     phone,
-    motivation:    document.getElementById('motivation').value.trim() || '-',
+    motivation:    document.getElementById('motivation').value.trim(),
     timestamp:     new Date().toISOString(),
-    eduLevel:      document.getElementById('eduLevel')?.value      || '-',
-    specialty:     document.getElementById('specialty')?.value     || '-',
-    subject:       document.getElementById('subject')?.value       || '-',
-    teacher:       document.getElementById('teacher')?.value       || '-',
-    candidateType: document.querySelector('input[name="candidateType"]:checked')?.value || '-',
-    parentName:    document.getElementById('parentName')?.value    || '-',
-    parentPhone:   document.getElementById('parentPhone')?.value   || '-',
-    langType:      document.getElementById('langType')?.value      || '-',
-    langLevel:     document.getElementById('langLevel')?.value     || '-',
-    levelTest:     document.querySelector('input[name="levelTest"]:checked')?.value || '-',
+    eduLevel:      document.getElementById('eduLevel')?.value      || '',
+    specialty:     document.getElementById('specialty')?.value     || '',
+    subject:       document.getElementById('subject')?.value       || '',
+    teacher:       document.getElementById('teacher')?.value       || '',
+    candidateType: document.querySelector('input[name="candidateType"]:checked')?.value || '',
+    parentName:    document.getElementById('parentName')?.value    || '',
+    parentPhone:   document.getElementById('parentPhone')?.value   || '',
+    langType:      document.getElementById('langType')?.value      || '',
+    langLevel:     document.getElementById('langLevel')?.value     || '',
+    levelTest:     document.querySelector('input[name="levelTest"]:checked')?.value || '',
     vipType:       vipTypeVal,
     vipEduLevel,
     profession:    professionVal,
     days:          selectedDays,
-    daysCount:     document.getElementById('vipDaysCount')?.value  || '-',
-    takwiniType:   document.querySelector('input[name="takwiniType"]:checked')?.value || '-',
+    daysCount:     document.getElementById('vipDaysCount')?.value  || '',
   };
 
   openTermsForSubmit(data);
@@ -800,27 +797,21 @@ async function proceedToRegister() {
   document.getElementById('scroll-hint')?.remove();
   document.getElementById('terms-modal').classList.remove('active');
 
-  const regNumber = generateRegNumber(pendingFormData.type);
-  pendingFormData.regNumber = regNumber;
-
-  showLoadingPopup();
+  const btn = document.getElementById('terms-proceed-btn');
+  btn.classList.add('loading');
 
   try {
-    const formData = new FormData();
-    formData.append('payload', JSON.stringify(pendingFormData));
-
     await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode:   'no-cors',
-      body:   formData
+      method:  'POST',
+      mode:    'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(pendingFormData)
     });
-
-    hideLoadingPopup();
+    btn.classList.remove('loading');
     pendingFormData = null;
-    showSuccessPopup(regNumber);
-
+    showSuccessPopup();
   } catch(err) {
-    hideLoadingPopup();
+    btn.classList.remove('loading');
     console.error(err);
     document.getElementById('terms-modal').classList.add('active');
     alert(currentLang === 'ar'
@@ -829,40 +820,8 @@ async function proceedToRegister() {
   }
 }
 
-// ─── LOADING POPUP ────────────────────────────────────────
-function showLoadingPopup() {
-  document.getElementById('loading-popup-overlay')?.remove();
-  const overlay = document.createElement('div');
-  overlay.id = 'loading-popup-overlay';
-  overlay.className = 'loading-popup-overlay';
-  overlay.innerHTML = `
-    <div class="loading-popup-box">
-      <div class="loading-spinner"></div>
-      <div class="loading-popup-icon-wrap">
-        <img src="3d/wait.png" alt="wait" class="loading-popup-3d-icon" />
-      </div>
-      <div class="loading-popup-title">
-        ${currentLang === 'ar' ? 'جاري تسجيل معلوماتك...' : 'Submitting your registration...'}
-      </div>
-      <div class="loading-popup-msg">
-        ${currentLang === 'ar'
-          ? 'انتظر قليلاً، يتم معالجة طلبك الآن'
-          : 'Please wait, your request is being processed'}
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  requestAnimationFrame(() => overlay.classList.add('active'));
-}
-
-function hideLoadingPopup() {
-  const overlay = document.getElementById('loading-popup-overlay');
-  if (!overlay) return;
-  overlay.classList.remove('active');
-  setTimeout(() => overlay.remove(), 300);
-}
-
 // ─── SUCCESS POPUP ────────────────────────────────────────
-function showSuccessPopup(regNumber = '') {
+function showSuccessPopup() {
   document.getElementById('success-popup-overlay')?.remove();
 
   const overlay = document.createElement('div');
@@ -871,7 +830,8 @@ function showSuccessPopup(regNumber = '') {
   overlay.innerHTML = `
     <div class="success-popup-box" id="success-popup-box">
       <div class="success-popup-icon-wrap">
-        <img src="3d/done.png" alt="done" class="success-popup-3d-icon" />
+        <div class="success-popup-ring"></div>
+        <div class="success-popup-check">✓</div>
       </div>
       <div class="success-popup-title">
         ${currentLang==='ar' ? '🎉 تم تسجيلك بنجاح!' : '🎉 Registration Successful!'}
@@ -882,17 +842,6 @@ function showSuccessPopup(regNumber = '') {
           : 'Thank you! Your registration has been received.<br>The E-PLUS Academy team will contact you soon.<br><span class="success-popup-sub">✦ Your journey to success starts here ✦</span>'}
       </div>
       <div class="success-popup-divider"></div>
-      <div class="success-popup-reg">
-        <div class="success-popup-reg-label">
-          ${currentLang==='ar' ? '🔖 رقم تسجيلك' : '🔖 Your Registration ID'}
-        </div>
-        <div class="success-popup-reg-number">${regNumber}</div>
-        <div class="success-popup-reg-warning">
-          ${currentLang==='ar'
-            ? '⚠️ احفظ هذا الرقم أو خذ لقطة شاشة، ستحتاجه لاحقاً!'
-            : '⚠️ Save this number or take a screenshot, you will need it later!'}
-        </div>
-      </div>
       <div class="success-popup-info">
         <span>📋 ${typeLabelsAr[currentModalType] || currentModalType}</span>
         <span>🕐 ${new Date().toLocaleDateString(currentLang==='ar'?'ar-DZ':'en-GB',{year:'numeric',month:'long',day:'numeric'})}</span>
@@ -941,14 +890,13 @@ import { getFirestore, collection, query,
          orderBy, onSnapshot }                  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
-// ✅ firebaseConfig الجديد — eplus-center-39
 const firebaseConfig = {
-  apiKey:            "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
-  authDomain:        "eplus-center-39.firebaseapp.com",
-  projectId:         "eplus-center-39",
-  storageBucket:     "eplus-center-39.firebasestorage.app",
-  messagingSenderId: "191532732034",
-  appId:             "1:191532732034:web:b11449a2f0595db5d02e9b"
+  apiKey:            "AIzaSyCtb6RPW5sq5zK5JMmTYlBFEnQQZfVoI7s",
+  authDomain:        "epluscenter-panel.firebaseapp.com",
+  projectId:         "epluscenter-panel",
+  storageBucket:     "epluscenter-panel.firebasestorage.app",
+  messagingSenderId: "1000462675381",
+  appId:             "1:1000462675381:web:b2156128337f7c11c17dfc"
 };
 
 const _app = initializeApp(firebaseConfig);
@@ -1131,6 +1079,7 @@ function _renderFromData(dataArr) {
   window.addEventListener('mousemove', e => {
     if (!isDragging) return;
     dragDelta = e.clientX - dragStartX;
+    // ✅ LTR ثابت دائماً
     track.style.transform =
       `translateX(calc(${annCurrent * 100 * getSlideDir()}% + ${dragDelta}px))`;
   });
@@ -1148,6 +1097,7 @@ function _renderFromData(dataArr) {
   });
 
   // ── Init position ──
+  // ✅ LTR ثابت دائماً
   track.style.transform = `translateX(${savedIndex * 100 * getSlideDir()}%)`;
   document.querySelectorAll('.ann-dot').forEach((dot, i) =>
     dot.classList.toggle('active', i === savedIndex));
@@ -1174,6 +1124,7 @@ window.onTeacherChange       = onTeacherChange;
 window.onVipTypeChange       = onVipTypeChange;
 window.onVipEduLevelChange   = onVipEduLevelChange;
 window.onVipDaysCountChange  = onVipDaysCountChange;
+window.onVipStudyModeChange  = onVipStudyModeChange;
 window.onDayChange           = onDayChange;
 window.submitForm            = submitForm;
 window.goToSlide             = goToSlide;
@@ -1181,3 +1132,26 @@ window.resetAnnAuto          = resetAnnAuto;
 
 // ─── INIT LANG ────────────────────────────────────────────
 setLang('ar');
+
+// ─── EXPOSE GLOBALS ───────────────────────────────────────
+window.openModal            = openModal;
+window.closeModal           = closeModal;
+window.closeModalOutside    = closeModalOutside;
+window.submitForm           = submitForm;
+window.setLang              = setLang;
+window.onEduLevelChange     = onEduLevelChange;
+window.onCandidateTypeChange= onCandidateTypeChange;
+window.onSpecialtyChange    = onSpecialtyChange;
+window.onSubjectChange      = onSubjectChange;
+window.onTeacherChange      = onTeacherChange;
+window.onLangTypeChange     = onLangTypeChange;
+window.onLangLevelChange    = onLangLevelChange;
+window.onVipTypeChange      = onVipTypeChange;
+window.onVipEduLevelChange  = onVipEduLevelChange;
+window.onVipStudyModeChange = onVipStudyModeChange;
+window.onVipDaysCountChange = onVipDaysCountChange;
+window.onDayChange          = onDayChange;
+window.closeTerms           = closeTerms;
+window.closeTermsOutside    = closeTermsOutside;
+window.onTermsCheck         = onTermsCheck;
+window.proceedToRegister    = proceedToRegister;
