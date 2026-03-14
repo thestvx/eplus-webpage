@@ -22,7 +22,7 @@ const _db        = getFirestore(_app);
 /* ════════════════════════════════════════
    GOOGLE SHEET SYNC
 ════════════════════════════════════════ */
-const SHEET_URL    = "https://script.google.com/macros/s/AKfycbw3YgpoLoMZ91M9COa00pt9LxnnG_MtzErJtiQpT9wbXKmknYWIDnyTKOisqeVo-uQM/exec";
+const SHEET_URL    = "https://script.google.com/macros/s/AKfycbyH86crLod1oybm-RAowfa2vK2PQtpojNkQYlEd1u8ijEK8FWcPDF4g_ysyfNyLbAyh/exec";
 const SHEET_SECRET = "eplus2026camp";
 
 /* ════════════════════════════════════════
@@ -103,15 +103,18 @@ form.addEventListener("submit", async (e) => {
       status:      "pending"
     });
 
-    // مزامنة مع Google Sheet
+    // مزامنة مع Google Sheet — no-cors لتجنب CORS error
+    const sheetData = new URLSearchParams({
+      secret:      SHEET_SECRET,
+      firstName,   lastName,
+      age:         String(age),
+      parentName,  parentPhone
+    });
     fetch(SHEET_URL, {
-      method: "POST",
-      body: JSON.stringify({
-        secret:     SHEET_SECRET,
-        firstName,  lastName,
-        age:        Number(age),
-        parentName, parentPhone
-      })
+      method:  "POST",
+      mode:    "no-cors",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body:    sheetData.toString()
     }).catch(err => console.warn("Sheet sync failed:", err));
 
     form.innerHTML = `
