@@ -58,10 +58,10 @@ const i18n = {
     subtitle:'التسجيل في الدورات والبرامج التعليمية',
     btn1:'تسجيلات الدعم', btn2:'دورات اللغات', btn3:'دروس VIP',
     btn4:'اختبار IELTS',  btn5:'دورات أونلاين', btn6:'دورات تكوينية',
-    annTitle:'إعلانات الأكاديمية',
+    annTitle:'إعلانات المركز التعليمي',
     firstName:'الاسم', lastName:'اللقب', birthDate:'تاريخ الميلاد',
     birthPlace:'العنوان', phone:'رقم الهاتف',
-    motivation:    'ما الذي دفعك إلى اختيار التسجيل في أكاديمية E-PLUS؟',
+    motivation:    'ما الذي دفعك إلى اختيار التسجيل في مركز E-PLUS؟',
     motivationVip: 'ما الذي جعلك تختار الدراسة عبر نظام الدروس الخاصة VIP؟',
     optional:'(اختياري)',
     eduLevel:'المستوى الدراسي', specialty:'التخصص',
@@ -78,7 +78,7 @@ const i18n = {
     requiredNote:'⚠️ يُرجى التأكد من تعبئة جميع الحقول الإلزامية قبل إتمام التسجيل. لا يمكن إرسال النموذج إلا بعد استكمال كافة المعلومات المطلوبة.',
     chooseDays:'اختر الأيام', daysSelected:'يوم محدد',
     submitBtn:'إتمام التسجيل ✦',
-    termsTitle:'قوانين وشروط الأكاديمية',
+    termsTitle:'قوانين وشروط المركز',
     termsAgree:'لقد قرأت جميع القوانين والشروط وأوافق عليها',
     termsProceed:'تأكيد التسجيل ✦',
     t1:'يعتبر المتعلم مسجلاً بصفة رسمية بالمركز عند قيامه بتسديد رسوم التسجيل في التاريخ المحدد.',
@@ -101,10 +101,10 @@ const i18n = {
     subtitle:'Register for courses and educational programs',
     btn1:'Support Registration', btn2:'Language Courses', btn3:'VIP Lessons',
     btn4:'IELTS Test', btn5:'Online Courses', btn6:'Training Courses',
-    annTitle:'Academy Announcements',
+    annTitle:'Center Announcements',
     firstName:'First Name', lastName:'Last Name', birthDate:'Date of Birth',
     birthPlace:'Address', phone:'Phone Number',
-    motivation:    'What motivated you to choose E-PLUS Academy?',
+    motivation:    'What motivated you to choose E-PLUS Center?',
     motivationVip: 'What led you to choose studying through the VIP private lessons system?',
     optional:'(optional)',
     eduLevel:'Education Level', specialty:'Specialty',
@@ -121,7 +121,7 @@ const i18n = {
     requiredNote:'⚠️ Please ensure all required fields are filled before completing your registration. The form cannot be submitted until all required information is provided.',
     chooseDays:'Choose Days', daysSelected:'day(s) selected',
     submitBtn:'Complete Registration ✦',
-    termsTitle:'Academy Terms & Conditions',
+    termsTitle:'Center Terms & Conditions',
     termsAgree:'I have read all terms and conditions and I agree',
     termsProceed:'Confirm Registration ✦',
     t1:'The learner is officially registered upon payment of registration fees on the specified date.',
@@ -338,7 +338,7 @@ function resetForm() {
     'eduLevelGroup','candidateTypeGroup','specialtyGroup','subjectGroup',
     'teacherGroup','parentGroup','langTypeGroup','langLevelGroup',
     'levelTestGroup','vipTypeGroup','vipEduLevelGroup','professionGroup',
-    'vipDaysCountGroup','daysGroup','vipStudyModeGroup',
+    'vipDaysCountGroup','daysGroup','vipStudyModeGroup','vipDatePickerGroup',
   ];
   groups.forEach(id => {
     const el = document.getElementById(id);
@@ -351,6 +351,16 @@ function resetForm() {
   document.querySelectorAll('input[name="vipStudyMode"]').forEach(r => r.checked = false);
   resetDays();
   maxDaysAllowed = 2;
+
+  // reset calendar
+  vcalSelectedDate = null;
+  if (document.getElementById('vipSelectedDate'))
+    document.getElementById('vipSelectedDate').value = '';
+  if (document.getElementById('vipSelectedTime'))
+    document.getElementById('vipSelectedTime').value = '';
+  document.querySelectorAll('input[name="vipTime"]').forEach(r => r.checked = false);
+  const disp = document.getElementById('vcal-selected-display');
+  if (disp) disp.style.display = 'none';
 
   const motivationLabel = document.querySelector('label[for="motivation"] span[data-i18n="motivation"]');
   if (motivationLabel) {
@@ -379,6 +389,14 @@ function onDayChange(checkbox) {
     if (!inp.checked && count >= maxDaysAllowed) card.classList.add('disabled');
     else card.classList.remove('disabled');
   });
+  // week-day-cell support
+  document.querySelectorAll('.week-day-cell').forEach(cell => {
+    const inp = cell.querySelector('input');
+    if (!inp) return;
+    cell.classList.toggle('selected', inp.checked);
+    if (!inp.checked && count >= maxDaysAllowed) cell.classList.add('disabled');
+    else cell.classList.remove('disabled');
+  });
   const countEl = document.getElementById('days-count');
   if (countEl) countEl.textContent = Math.min(count, maxDaysAllowed);
   const counter = document.getElementById('days-counter');
@@ -388,6 +406,7 @@ function onDayChange(checkbox) {
 function resetDays() {
   document.querySelectorAll('input[name="days"]').forEach(c => c.checked = false);
   document.querySelectorAll('.day-card').forEach(c => c.classList.remove('selected','disabled'));
+  document.querySelectorAll('.week-day-cell').forEach(c => c.classList.remove('selected','disabled'));
   const countEl = document.getElementById('days-count');
   if (countEl) countEl.textContent = '0';
   const counter = document.getElementById('days-counter');
@@ -464,8 +483,6 @@ function populateSubjects(key) {
 }
 
 // ─── LANG TYPE ────────────────────────────────────────────
-// دورات لغات / أونلاين / VIP لغات: يُظهر langLevel بعد اختيار اللغة
-// عند التغيير: يُخفي كل ما بعده
 function onLangTypeChange() {
   const val        = document.getElementById('langType').value;
   const langLvlGrp = document.getElementById('langLevelGroup');
@@ -473,10 +490,12 @@ function onLangTypeChange() {
   const smGrp      = document.getElementById('vipStudyModeGroup');
   const dcGrp      = document.getElementById('vipDaysCountGroup');
   const dGrp       = document.getElementById('daysGroup');
+  const dpGrp      = document.getElementById('vipDatePickerGroup');
 
   hideField(langLvlGrp, 'langLevel');
   hideField(levelTestG);
-  if (smGrp) smGrp.style.display = 'none';
+  if (smGrp)  smGrp.style.display  = 'none';
+  if (dpGrp)  dpGrp.style.display  = 'none';
   if (currentModalType === 'vip') {
     if (dcGrp) dcGrp.style.display = 'none';
     if (dGrp)  { dGrp.style.display = 'none'; resetDays(); }
@@ -492,17 +511,17 @@ function onLangTypeChange() {
 }
 
 // ─── LANG LEVEL ───────────────────────────────────────────
-// دورات لغات / أونلاين → levelTest
-// VIP لغات            → vipStudyMode → vipDaysCount → daysGroup
 function onLangLevelChange() {
   const val          = document.getElementById('langLevel').value;
   const levelTestGrp = document.getElementById('levelTestGroup');
   const smGrp        = document.getElementById('vipStudyModeGroup');
   const dcGrp        = document.getElementById('vipDaysCountGroup');
   const dGrp         = document.getElementById('daysGroup');
+  const dpGrp        = document.getElementById('vipDatePickerGroup');
 
   hideField(levelTestGrp);
-  if (smGrp) smGrp.style.display = 'none';
+  if (smGrp)  smGrp.style.display  = 'none';
+  if (dpGrp)  dpGrp.style.display  = 'none';
   if (currentModalType === 'vip') {
     if (dcGrp) dcGrp.style.display = 'none';
     if (dGrp)  { dGrp.style.display = 'none'; resetDays(); }
@@ -514,8 +533,9 @@ function onLangLevelChange() {
   if (!val) return;
 
   if (currentModalType === 'vip') {
-    // VIP لغات: اختر طريقة الدراسة أولاً
-    animateShow(smGrp);
+    // VIP لغات → تقويم مباشرة
+    animateShow(dpGrp);
+    initVipCalendar();
   } else {
     // دورات لغات عادية / أونلاين
     animateShow(levelTestGrp);
@@ -633,15 +653,13 @@ function showParentIfNeeded(level) {
 }
 
 // ─── VIP TYPE ─────────────────────────────────────────────
-// VIP دعم  → vipEduLevel → vipStudyMode → vipDaysCount → daysGroup
-// VIP لغات → langType    → langLevel    → vipStudyMode → vipDaysCount → daysGroup
 function onVipTypeChange() {
   const selected = document.querySelector('input[name="vipType"]:checked')?.value;
 
   const allGroups = [
     'vipEduLevelGroup','vipDaysCountGroup','professionGroup',
     'daysGroup','langTypeGroup','langLevelGroup',
-    'levelTestGroup','vipStudyModeGroup'
+    'levelTestGroup','vipStudyModeGroup','vipDatePickerGroup'
   ];
   allGroups.forEach(id => {
     const el = document.getElementById(id);
@@ -654,20 +672,20 @@ function onVipTypeChange() {
   document.getElementById('langLevel').value    = '';
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="vipStudyMode"]').forEach(r => r.checked = false);
+  vcalSelectedDate = null;
+  document.querySelectorAll('input[name="vipTime"]').forEach(r => r.checked = false);
 
   if (selected === 'support') {
-    // خطوة 1: اختر المستوى الدراسي
     animateShow(document.getElementById('vipEduLevelGroup'));
     document.getElementById('vipEduLevel').setAttribute('required','required');
   } else if (selected === 'lang') {
-    // خطوة 1: اختر اللغة مباشرة (بدون professionGroup)
+    // خطوة 1: اختر اللغة
     animateShow(document.getElementById('langTypeGroup'));
     document.getElementById('langType').setAttribute('required','required');
   }
 }
 
 // ─── VIP EDU LEVEL ────────────────────────────────────────
-// بعد المستوى الدراسي في VIP دعم → اختر طريقة الدراسة
 function onVipEduLevelChange() {
   const level   = document.getElementById('vipEduLevel').value;
   const smGrp   = document.getElementById('vipStudyModeGroup');
@@ -681,12 +699,10 @@ function onVipEduLevelChange() {
   document.querySelectorAll('input[name="vipStudyMode"]').forEach(r => r.checked = false);
 
   if (!level) return;
-  // خطوة 2: اختر طريقة الدراسة
   animateShow(smGrp);
 }
 
 // ─── VIP STUDY MODE ───────────────────────────────────────
-// بعد اختيار طريقة الدراسة (في كلا VIP دعم و VIP لغات) → اختر عدد الأيام
 function onVipStudyModeChange() {
   const selected = document.querySelector('input[name="vipStudyMode"]:checked')?.value;
   const dcGrp    = document.getElementById('vipDaysCountGroup');
@@ -697,9 +713,177 @@ function onVipStudyModeChange() {
   document.getElementById('vipDaysCount').value = '';
 
   if (selected) {
-    // خطوة 3: اختر عدد الأيام في الأسبوع
     animateShow(dcGrp);
     document.getElementById('vipDaysCount').setAttribute('required','required');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ─── VIP CALENDAR (للغات VIP فقط) ─────────────────────────
+// ═══════════════════════════════════════════════════════════
+const AR_MONTHS = [
+  'يناير','فبراير','مارس','أبريل','مايو','يونيو',
+  'يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'
+];
+
+let vcalCurrentDate  = new Date();
+let vcalSelectedDate = null;
+let _vcalInitialized = false;
+
+function initVipCalendar() {
+  vcalCurrentDate  = new Date();
+  vcalSelectedDate = null;
+
+  const dateInp = document.getElementById('vipSelectedDate');
+  const timeInp = document.getElementById('vipSelectedTime');
+  if (dateInp) dateInp.value = '';
+  if (timeInp) timeInp.value = '';
+
+  const disp = document.getElementById('vcal-selected-display');
+  if (disp) disp.style.display = 'none';
+
+  document.querySelectorAll('input[name="vipTime"]').forEach(r => {
+    r.checked = false;
+    r.addEventListener('change', updateVcalDisplay);
+  });
+
+  if (!_vcalInitialized) {
+    document.getElementById('vcal-prev').addEventListener('click', () => {
+      vcalCurrentDate.setMonth(vcalCurrentDate.getMonth() - 1);
+      renderVcal();
+    });
+    document.getElementById('vcal-next').addEventListener('click', () => {
+      vcalCurrentDate.setMonth(vcalCurrentDate.getMonth() + 1);
+      renderVcal();
+    });
+    _vcalInitialized = true;
+  }
+
+  renderVcal();
+}
+
+function renderVcal() {
+  const y = vcalCurrentDate.getFullYear();
+  const m = vcalCurrentDate.getMonth();
+  const lbl = document.getElementById('vcal-month-label');
+  if (lbl) lbl.textContent = `${AR_MONTHS[m]} ${y}`;
+
+  const grid = document.getElementById('vcal-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  const firstDay    = new Date(y, m, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const today       = new Date();
+  today.setHours(0,0,0,0);
+
+  for (let i = 0; i < firstDay; i++) {
+    const e = document.createElement('div');
+    e.className = 'vcal-day vcal-day-empty';
+    grid.appendChild(e);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const cellDate = new Date(y, m, d);
+    const div      = document.createElement('div');
+    div.className  = 'vcal-day';
+    div.textContent = d;
+
+    if (cellDate < today) {
+      div.classList.add('vcal-day-past');
+    } else {
+      if (cellDate.toDateString() === today.toDateString())
+        div.classList.add('vcal-day-today');
+      if (vcalSelectedDate &&
+          cellDate.toDateString() === vcalSelectedDate.toDateString())
+        div.classList.add('vcal-day-selected');
+
+      div.addEventListener('click', () => {
+        vcalSelectedDate = new Date(y, m, d);
+        const dateInp = document.getElementById('vipSelectedDate');
+        if (dateInp) dateInp.value = `${d} ${AR_MONTHS[m]} ${y}`;
+        renderVcal();
+        updateVcalDisplay();
+      });
+    }
+    grid.appendChild(div);
+  }
+}
+
+function updateVcalDisplay() {
+  const dateVal  = document.getElementById('vipSelectedDate')?.value  || '';
+  const timeEl   = document.querySelector('input[name="vipTime"]:checked');
+  const timeVal  = timeEl ? timeEl.value : '';
+  const timeInp  = document.getElementById('vipSelectedTime');
+  if (timeInp) timeInp.value = timeVal;
+
+  const display  = document.getElementById('vcal-selected-display');
+  const textEl   = document.getElementById('vcal-selected-text');
+  if (display && textEl && dateVal) {
+    display.style.display = 'flex';
+    textEl.textContent = timeVal ? `${dateVal} — ${timeVal}` : dateVal;
+  }
+}
+
+// ─── JOIN TEAM MODAL ──────────────────────────────────────
+function openJoinModal() {
+  document.getElementById('join-modal')?.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  hideLogo();
+  document.getElementById('lang-toggle')?.classList.add('hidden');
+}
+
+function closeJoinModal() {
+  document.getElementById('join-modal')?.classList.remove('active');
+  document.body.style.overflow = '';
+  showLogo();
+  document.getElementById('lang-toggle')?.classList.remove('hidden');
+  document.getElementById('join-form')?.reset();
+  document.getElementById('join-role-fields').style.display = 'none';
+  document.getElementById('cv-file-name').textContent = '';
+}
+
+function closeJoinModalOutside(e) {
+  if (e.target === document.getElementById('join-modal')) closeJoinModal();
+}
+
+function onJoinRoleChange() {
+  const fields = document.getElementById('join-role-fields');
+  if (fields) animateShow(fields);
+}
+
+function onCvFileChange(input) {
+  const nameEl = document.getElementById('cv-file-name');
+  if (nameEl) nameEl.textContent = input.files[0]?.name || '';
+}
+
+async function submitJoinForm(e) {
+  e.preventDefault();
+  const btn = document.getElementById('join-submit-btn');
+  btn.classList.add('loading');
+  const data = {
+    formType:      'join_team',
+    joinFirstName: document.getElementById('joinFirstName').value.trim(),
+    joinLastName:  document.getElementById('joinLastName').value.trim(),
+    joinPhone:     document.getElementById('joinPhone').value.trim(),
+    joinEmail:     document.getElementById('joinEmail').value.trim(),
+    joinRole:      document.querySelector('input[name="joinRole"]:checked')?.value || '',
+    joinSpecialty: document.getElementById('joinSpecialty')?.value.trim() || '',
+    joinExperience:document.getElementById('joinExperience')?.value.trim() || '',
+    timestamp:     new Date().toISOString(),
+  };
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    btn.classList.remove('loading');
+    closeJoinModal();
+    alert('✅ تم إرسال طلبك بنجاح! سيتم التواصل معك قريباً.');
+  } catch(err) {
+    btn.classList.remove('loading');
+    alert('حدث خطأ أثناء الإرسال، تحقق من اتصالك بالإنترنت.');
   }
 }
 
@@ -710,12 +894,11 @@ async function submitForm(e) {
   const firstName  = document.getElementById('firstName').value.trim();
   const lastName   = document.getElementById('lastName').value.trim();
   const birthDate  = document.getElementById('birthDate').value;
-  const birthPlace = document.getElementById('birthPlace').value.trim();
   const phone      = document.getElementById('phone').value.trim();
 
   let hasError = false;
-  [firstName, lastName, birthPlace].forEach((val, i) => {
-    const ids = ['firstName','lastName','birthPlace'];
+  [firstName, lastName].forEach((val, i) => {
+    const ids = ['firstName','lastName'];
     if (!validateLang(val)) {
       document.getElementById(ids[i]).classList.add('error');
       setTimeout(() => document.getElementById(ids[i]).classList.remove('error'), 1500);
@@ -732,7 +915,6 @@ async function submitForm(e) {
     firstName,
     lastName,
     birthDate,
-    birthPlace,
     phone,
     motivation:    document.getElementById('motivation').value.trim(),
     timestamp:     new Date().toISOString(),
@@ -752,6 +934,8 @@ async function submitForm(e) {
     profession:    document.getElementById('profession')?.value    || '',
     days:          selectedDays,
     daysCount:     document.getElementById('vipDaysCount')?.value  || '',
+    vipSelectedDate: document.getElementById('vipSelectedDate')?.value || '',
+    vipSelectedTime: document.getElementById('vipSelectedTime')?.value || '',
   };
 
   openTermsForSubmit(data);
@@ -870,8 +1054,8 @@ function showSuccessPopup() {
       </div>
       <div class="success-popup-msg">
         ${currentLang==='ar'
-          ? 'شكراً لك! تم استلام طلب تسجيلك بنجاح.<br>سيتم التواصل معك قريباً من طرف فريق أكاديمية E-PLUS.<br><span class="success-popup-sub">✦ رحلتك نحو النجاح تبدأ من هنا ✦</span>'
-          : 'Thank you! Your registration has been received.<br>The E-PLUS Academy team will contact you soon.<br><span class="success-popup-sub">✦ Your journey to success starts here ✦</span>'}
+          ? 'شكراً لك! تم استلام طلب تسجيلك بنجاح.<br>سيتم التواصل معك قريباً من طرف فريق مركز E-PLUS.<br><span class="success-popup-sub">✦ رحلتك نحو النجاح تبدأ من هنا ✦</span>'
+          : 'Thank you! Your registration has been received.<br>The E-PLUS Center team will contact you soon.<br><span class="success-popup-sub">✦ Your journey to success starts here ✦</span>'}
       </div>
       <div class="success-popup-divider"></div>
       <div class="success-popup-info">
@@ -884,429 +1068,143 @@ function showSuccessPopup() {
     </div>`;
   document.body.appendChild(overlay);
   spawnConfetti(overlay);
-  requestAnimationFrame(() => overlay.classList.add('active'));
+  requestAnimationFrame(() => overlay.classList.add('visible'));
 }
 
 function closeSuccessPopup() {
   const overlay = document.getElementById('success-popup-overlay');
   if (!overlay) return;
-  overlay.classList.remove('active');
-  setTimeout(() => overlay.remove(), 400);
+  overlay.classList.remove('visible');
+  overlay.addEventListener('transitionend', () => overlay.remove(), { once: true });
   document.body.style.overflow = '';
   document.getElementById('lang-toggle')?.classList.remove('hidden');
   showLogo();
+  closeModal();
 }
 
-function spawnConfetti(parent) {
-  const colors = ['#0a8acb','#045283','#f4b41a','#ffffff','#53a9df'];
-  for (let i = 0; i < 38; i++) {
-    const c = document.createElement('div');
-    c.className = 'confetti';
-    c.style.cssText = `
-      left:${Math.random()*100}%;
-      top:${-10 - Math.random()*30}px;
+// ─── CONFETTI ─────────────────────────────────────────────
+function spawnConfetti(container) {
+  const colors = ['#0a8acb','#f0c040','#ffffff','#00e5ff','#ffd700','#00bcd4'];
+  for (let i = 0; i < 60; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.cssText = `
+      position:absolute;
       width:${6 + Math.random()*8}px;
       height:${6 + Math.random()*8}px;
       background:${colors[Math.floor(Math.random()*colors.length)]};
       border-radius:${Math.random()>0.5?'50%':'2px'};
-      animation-duration:${1.2+Math.random()*1.2}s;
-      animation-delay:${Math.random()*0.6}s;
+      left:${Math.random()*100}%;
+      top:-10px;
+      opacity:1;
+      pointer-events:none;
+      animation: confettiFall ${1.5+Math.random()*2}s ease-in forwards;
+      animation-delay:${Math.random()*0.8}s;
     `;
-    parent.appendChild(c);
+    container.appendChild(piece);
   }
 }
 
-// ─── FIREBASE ─────────────────────────────────────────────
-import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-import { getFirestore, collection, query,
-         orderBy, onSnapshot }             from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+// ─── ANNOUNCEMENTS (Firebase) ─────────────────────────────
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getFirestore, collection, getDocs, query, orderBy, where, Timestamp }
+  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
-const firebaseConfig = {
+const firebaseApp = initializeApp({
   apiKey:            "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
   authDomain:        "eplus-center-39.firebaseapp.com",
   projectId:         "eplus-center-39",
   storageBucket:     "eplus-center-39.firebasestorage.app",
   messagingSenderId: "191532732034",
   appId:             "1:191532732034:web:b11449a2f0595db5d02e9b"
-};
+}, 'main');
 
-// تجنب duplicate-app إذا كان Firebase محمّلاً مسبقاً من index.html
-const _app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-const _db  = getFirestore(_app);
+const db = getFirestore(firebaseApp);
 
-// ─── ANNOUNCEMENTS STATE ──────────────────────────────────
-let annCurrent   = 0;
-let annAutoSlide = null;
-let annTotalDocs = 0;
-
-function getSlideDir() { return -1; }
-
-function goToSlide(idx) {
-  annCurrent = idx;
-  const track = document.getElementById('ann-track');
-  if (track) track.style.transform = `translateX(${idx * 100 * getSlideDir()}%)`;
-  document.querySelectorAll('.ann-dot').forEach((dot, i) =>
-    dot.classList.toggle('active', i === idx));
-}
-
-function startAnnAuto() {
-  if (annTotalDocs <= 1) return;
-  annAutoSlide = setInterval(
-    () => goToSlide((annCurrent + 1) % annTotalDocs),
-    8000
-  );
-}
-function resetAnnAuto() {
-  clearInterval(annAutoSlide);
-  startAnnAuto();
-}
-
-// ─── FIREBASE LISTENER ────────────────────────────────────
-onSnapshot(
-  query(collection(_db, 'announcements'), orderBy('createdAt', 'desc')),
-  snap => {
-    window._annCache = snap.docs
-      .map(doc => {
-        const d = doc.data();
-        return {
-          title:     d.title     || '',
-          text:      d.text      || '',
-          imageUrl:  d.imageUrl  || '',
-          createdAt: d.createdAt || null,
-          hidden:    d.hidden    || false,
-        };
-      })
-      .filter(d => d.hidden !== true);
-    _renderFromData(window._annCache);
+async function loadAnnouncements() {
+  try {
+    const now = Timestamp.now();
+    const q   = query(
+      collection(db, 'announcements'),
+      where('active', '==', true),
+      orderBy('createdAt', 'desc')
+    );
+    const snap = await getDocs(q);
+    const docs = [];
+    snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
+    if (docs.length === 0) return;
+    window._annCache = docs;
+    _renderFromData(docs);
+  } catch(e) {
+    console.warn('announcements load failed:', e);
   }
-);
+}
 
-// ─── RENDER ANNOUNCEMENTS ─────────────────────────────────
-function _renderFromData(dataArr) {
+function _renderFromData(docs) {
   const section = document.getElementById('announcements-section');
   const track   = document.getElementById('ann-track');
   const dotsEl  = document.getElementById('ann-dots');
-
-  if (!dataArr || dataArr.length === 0) {
-    section.style.display = 'none';
-    clearInterval(annAutoSlide);
-    return;
-  }
-
-  clearInterval(annAutoSlide);
-  annTotalDocs = dataArr.length;
-  const savedIndex = (annCurrent < dataArr.length) ? annCurrent : 0;
-  annCurrent = savedIndex;
+  if (!section || !track || !dotsEl) return;
 
   section.style.display = 'block';
-  track.innerHTML  = '';
-  dotsEl.innerHTML = '';
-  track.style.direction = 'ltr';
+  track.innerHTML   = '';
+  dotsEl.innerHTML  = '';
 
-  const isRtl = currentLang === 'ar';
+  const t = i18n[currentLang];
 
-  dataArr.forEach((d, i) => {
-    const hasImg = d.imageUrl && d.imageUrl.startsWith('https');
+  docs.forEach((ann, idx) => {
+    const slide = document.createElement('div');
+    slide.className = 'ann-slide';
+    slide.dataset.index = idx;
 
-    const card = document.createElement('div');
-    card.className = hasImg ? 'ann-card has-image' : 'ann-card text-only';
-    card.style.direction = isRtl ? 'rtl' : 'ltr';
-    card.style.textAlign = isRtl ? 'right' : 'left';
-
-    let dateStr = '';
-    if (d.createdAt?.toDate) {
-      try {
-        dateStr = d.createdAt.toDate().toLocaleDateString(
-          isRtl ? 'ar-DZ' : 'en-GB',
+    const dateStr = ann.createdAt?.toDate
+      ? ann.createdAt.toDate().toLocaleDateString(
+          currentLang === 'ar' ? 'ar-DZ' : 'en-GB',
           { year:'numeric', month:'long', day:'numeric' }
-        );
-      } catch(e) { dateStr = ''; }
-    }
+        )
+      : '';
 
-    card.innerHTML = `
-      ${hasImg
-        ? `<img class="ann-card-img"
-               src="${d.imageUrl}"
-               alt="" draggable="false"
-               loading="lazy"
-               onerror="this.closest('.ann-card').classList.remove('has-image');
-                        this.closest('.ann-card').classList.add('text-only');
-                        this.remove();">`
-        : ''}
-      <div class="ann-card-body">
-        <div class="ann-card-badge">
-          📢 ${isRtl ? 'إعلان' : 'Announcement'}
-        </div>
-        ${d.title ? `<div class="ann-card-title">${d.title}</div>` : ''}
-        ${d.text  ? `<div class="ann-card-text">${d.text}</div>`   : ''}
-        ${dateStr ? `<div class="ann-card-date">🗓 ${dateStr}</div>` : ''}
-      </div>`;
+    const titleText = currentLang === 'en' && ann.titleEn ? ann.titleEn : (ann.title || '');
+    const bodyText  = currentLang === 'en' && ann.bodyEn  ? ann.bodyEn  : (ann.body  || '');
 
-    track.appendChild(card);
-
-    const img = card.querySelector('.ann-card-img');
-    if (img) {
-      img.addEventListener('load', () => img.classList.add('loaded'));
-      if (img.complete) img.classList.add('loaded');
-    }
+    slide.innerHTML = `
+      <div class="ann-slide-header">
+        <span class="ann-tag">📢 ${t.annTitle || 'إعلانات المركز التعليمي'}</span>
+        ${dateStr ? `<span class="ann-date">📅 ${dateStr}</span>` : ''}
+      </div>
+      <div class="ann-slide-title">${titleText}</div>
+      ${bodyText ? `<div class="ann-slide-body">${bodyText}</div>` : ''}
+      ${ann.imageUrl ? `<img src="${ann.imageUrl}" class="ann-slide-img" alt="" draggable="false">` : ''}
+    `;
+    track.appendChild(slide);
 
     const dot = document.createElement('div');
-    dot.className = 'ann-dot' + (i === 0 ? ' active' : '');
-    dot.addEventListener('click', () => { goToSlide(i); resetAnnAuto(); });
+    dot.className = 'ann-dot' + (idx === 0 ? ' active' : '');
+    dot.addEventListener('click', () => goToSlide(idx));
     dotsEl.appendChild(dot);
   });
 
-  const wrapper = document.querySelector('.ann-track-wrapper');
-  wrapper.querySelectorAll('.ann-arrow').forEach(a => a.remove());
-
-  if (dataArr.length > 1) {
-    const prev = document.createElement('button');
-    prev.className = 'ann-arrow ann-arrow-prev';
-    prev.innerHTML = '‹';
-    prev.addEventListener('click', () => {
-      goToSlide((annCurrent - 1 + dataArr.length) % dataArr.length);
-      resetAnnAuto();
-    });
-    const next = document.createElement('button');
-    next.className = 'ann-arrow ann-arrow-next';
-    next.innerHTML = '›';
-    next.addEventListener('click', () => {
-      goToSlide((annCurrent + 1) % dataArr.length);
-      resetAnnAuto();
-    });
-    wrapper.appendChild(prev);
-    wrapper.appendChild(next);
-  }
-
-  let touchStartX = 0;
-  track.addEventListener('touchstart', e => {
-    touchStartX = e.touches[0].clientX;
-  }, { passive:true });
-  track.addEventListener('touchend', e => {
-    const diff = e.changedTouches[0].clientX - touchStartX;
-    if (Math.abs(diff) > 50) {
-      goToSlide(diff > 0
-        ? (annCurrent - 1 + dataArr.length) % dataArr.length
-        : (annCurrent + 1) % dataArr.length);
-      resetAnnAuto();
-    }
-  });
-
-  let isDragging = false, dragStartX = 0, dragDelta = 0;
-  track.addEventListener('mousedown', e => {
-    isDragging = true; dragStartX = e.clientX; dragDelta = 0;
-    track.style.transition = 'none';
-    track.style.cursor = 'grabbing';
-  });
-  window.addEventListener('mousemove', e => {
-    if (!isDragging) return;
-    dragDelta = e.clientX - dragStartX;
-    track.style.transform =
-      `translateX(calc(${annCurrent * 100 * getSlideDir()}% + ${dragDelta}px))`;
-  });
-  window.addEventListener('mouseup', () => {
-    if (!isDragging) return;
-    isDragging = false;
-    track.style.transition = '';
-    track.style.cursor = '';
-    goToSlide(Math.abs(dragDelta) > 60
-      ? (dragDelta > 0
-          ? (annCurrent - 1 + dataArr.length) % dataArr.length
-          : (annCurrent + 1) % dataArr.length)
-      : annCurrent);
-    resetAnnAuto();
-  });
-
-  track.style.transform = `translateX(${savedIndex * 100 * getSlideDir()}%)`;
-  document.querySelectorAll('.ann-dot').forEach((dot, i) =>
-    dot.classList.toggle('active', i === savedIndex));
-
-  startAnnAuto();
+  if (docs.length > 1) startSlideshow(docs.length);
+  else goToSlide(0);
 }
 
+let _slideTimer = null;
+let _currentSlide = 0;
 
-// ─── JOIN TEAM ────────────────────────────────────────────
-const CLOUDINARY_UPLOAD_URL  = 'https://api.cloudinary.com/v1_1/dac4mwuwe/auto/upload';
-const CLOUDINARY_UPLOAD_PRESET = 'epluscenterbackup';
-const JOIN_APPS_SCRIPT_URL   = APPS_SCRIPT_URL; // نفس الـ Apps Script أو غيّره
-
-function openJoinModal() {
-  document.getElementById('join-modal').classList.add('active');
-  document.getElementById('lang-toggle').classList.add('hidden');
-  hideLogo();
-  document.body.style.overflow = 'hidden';
+function goToSlide(idx) {
+  const slides = document.querySelectorAll('.ann-slide');
+  const dots   = document.querySelectorAll('.ann-dot');
+  slides.forEach((s,i) => s.classList.toggle('active', i === idx));
+  dots.forEach((d,i)   => d.classList.toggle('active',  i === idx));
+  _currentSlide = idx;
 }
 
-function closeJoinModal() {
-  document.getElementById('join-modal').classList.remove('active');
-  document.getElementById('join-form').reset();
-  document.getElementById('cv-file-name').textContent = '';
-  document.getElementById('join-role-fields').style.display = 'none';
-  document.getElementById('lang-toggle').classList.remove('hidden');
-  showLogo();
-  document.body.style.overflow = '';
-  // reset role selection
-  document.querySelectorAll('input[name="joinRole"]').forEach(r => r.checked = false);
-  document.getElementById('join-submit-btn').classList.remove('loading');
+function startSlideshow(total) {
+  clearInterval(_slideTimer);
+  goToSlide(0);
+  _slideTimer = setInterval(() => {
+    goToSlide((_currentSlide + 1) % total);
+  }, 5000);
 }
 
-function closeJoinModalOutside(e) {
-  if (e.target === document.getElementById('join-modal')) closeJoinModal();
-}
-
-function onJoinRoleChange() {
-  const roleFields = document.getElementById('join-role-fields');
-  const selected = document.querySelector('input[name="joinRole"]:checked')?.value;
-  if (selected) {
-    roleFields.style.display = 'block';
-    roleFields.classList.remove('field-appear');
-    void roleFields.offsetWidth;
-    roleFields.classList.add('field-appear');
-  } else {
-    roleFields.style.display = 'none';
-  }
-}
-
-function onCvFileChange(input) {
-  const file = input.files[0];
-  const nameEl = document.getElementById('cv-file-name');
-  if (file) {
-    const maxMB = 10;
-    if (file.size > maxMB * 1024 * 1024) {
-      nameEl.textContent = '⚠️ الملف أكبر من 10MB';
-      nameEl.style.color = '#ff6b6b';
-      input.value = '';
-      return;
-    }
-    nameEl.textContent = '📎 ' + file.name;
-    nameEl.style.color = 'rgba(255,255,255,0.7)';
-  } else {
-    nameEl.textContent = '';
-  }
-}
-
-async function uploadToCloudinary(file) {
-  const fd = new FormData();
-  fd.append('file', file);
-  fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-  const res = await fetch(CLOUDINARY_UPLOAD_URL, { method: 'POST', body: fd });
-  if (!res.ok) throw new Error('Cloudinary upload failed');
-  const data = await res.json();
-  return data.secure_url;
-}
-
-async function submitJoinForm(e) {
-  e.preventDefault();
-  const btn = document.getElementById('join-submit-btn');
-  btn.classList.add('loading');
-
-  const firstName  = document.getElementById('joinFirstName').value.trim();
-  const lastName   = document.getElementById('joinLastName').value.trim();
-  const phone      = document.getElementById('joinPhone').value.trim();
-  const email      = document.getElementById('joinEmail').value.trim();
-  const role       = document.querySelector('input[name="joinRole"]:checked')?.value || '';
-  const specialty  = document.getElementById('joinSpecialty').value.trim();
-  const experience = document.getElementById('joinExperience').value.trim();
-  const cvInput    = document.getElementById('joinCV');
-  const cvFile     = cvInput.files[0] || null;
-
-  let cvUrl = '';
-  try {
-    if (cvFile) {
-      cvUrl = await uploadToCloudinary(cvFile);
-    }
-
-    const data = {
-      type:       'join',
-      firstName,
-      lastName,
-      phone,
-      email,
-      role,
-      specialty,
-      experience,
-      cvUrl,
-      timestamp:  new Date().toISOString(),
-    };
-
-    await fetch(APPS_SCRIPT_URL, {
-      method:  'POST',
-      mode:    'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(data)
-    });
-
-    btn.classList.remove('loading');
-    closeJoinModal();
-    showJoinSuccessPopup(role);
-  } catch(err) {
-    btn.classList.remove('loading');
-    console.error(err);
-    alert(currentLang === 'ar'
-      ? 'حدث خطأ أثناء الإرسال، تحقق من اتصالك بالإنترنت.'
-      : 'A network error occurred. Please check your connection.');
-  }
-}
-
-function showJoinSuccessPopup(role) {
-  document.getElementById('success-popup-overlay')?.remove();
-  const overlay = document.createElement('div');
-  overlay.id = 'success-popup-overlay';
-  overlay.className = 'success-popup-overlay';
-  overlay.innerHTML = `
-    <div class="success-popup-box" id="success-popup-box">
-      <div class="success-popup-icon-wrap">
-        <div class="success-popup-ring"></div>
-        <div class="success-popup-check">✓</div>
-      </div>
-      <div class="success-popup-title">🎉 ${currentLang==='ar' ? 'تم إرسال طلبك بنجاح!' : 'Application Submitted!'}</div>
-      <div class="success-popup-msg">
-        ${currentLang==='ar'
-          ? `شكراً لاهتمامك بالانضمام إلى فريق أكاديمية E-PLUS بصفة <strong>${role}</strong>.<br>سيتم مراجعة طلبك والتواصل معك قريباً.<br><span class="success-popup-sub">✦ معاً نبني مستقبل أفضل ✦</span>`
-          : `Thank you for your interest in joining E-PLUS Academy as <strong>${role}</strong>.<br>Your application will be reviewed and we'll contact you soon.<br><span class="success-popup-sub">✦ Together we build a better future ✦</span>`}
-      </div>
-      <div class="success-popup-divider"></div>
-      <button class="success-popup-btn" onclick="closeSuccessPopup()">
-        ${currentLang==='ar' ? 'حسناً، شكراً!' : 'OK, Thank you!'}
-      </button>
-    </div>`;
-  document.body.appendChild(overlay);
-  spawnConfetti(overlay);
-  requestAnimationFrame(() => overlay.classList.add('active'));
-}
-
-// ─── EXPOSE TO WINDOW (مرة واحدة فقط) ───────────────────
-window.setLang               = setLang;
-window.openModal             = openModal;
-window.closeModal            = closeModal;
-window.closeModalOutside     = closeModalOutside;
-window.resetForm             = resetForm;
-window.submitForm            = submitForm;
-window.onEduLevelChange      = onEduLevelChange;
-window.onCandidateTypeChange = onCandidateTypeChange;
-window.onSpecialtyChange     = onSpecialtyChange;
-window.onSubjectChange       = onSubjectChange;
-window.onTeacherChange       = onTeacherChange;
-window.onLangTypeChange      = onLangTypeChange;
-window.onLangLevelChange     = onLangLevelChange;
-window.onVipTypeChange       = onVipTypeChange;
-window.onVipEduLevelChange   = onVipEduLevelChange;
-window.onVipStudyModeChange  = onVipStudyModeChange;
-window.onVipDaysCountChange  = onVipDaysCountChange;
-window.onDayChange           = onDayChange;
-window.closeTerms            = closeTerms;
-window.closeTermsOutside     = closeTermsOutside;
-window.onTermsCheck          = onTermsCheck;
-window.proceedToRegister     = proceedToRegister;
-window.closeSuccessPopup     = closeSuccessPopup;
-window.goToSlide             = goToSlide;
-window.resetAnnAuto          = resetAnnAuto;
-window.openJoinModal         = openJoinModal;
-window.closeJoinModal        = closeJoinModal;
-window.closeJoinModalOutside = closeJoinModalOutside;
-window.onJoinRoleChange      = onJoinRoleChange;
-window.onCvFileChange        = onCvFileChange;
-window.submitJoinForm        = submitJoinForm;
-
-// ─── INIT ─────────────────────────────────────────────────
-setLang('ar');
+loadAnnouncements();
