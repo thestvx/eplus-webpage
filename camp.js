@@ -2,7 +2,7 @@ import { initializeApp }  from "https://www.gstatic.com/firebasejs/11.0.0/fireba
 import { getAnalytics }   from "https://www.gstatic.com/firebasejs/11.0.0/firebase-analytics.js";
 import {
   getFirestore, collection, addDoc,
-  serverTimestamp, query, orderBy, onSnapshot, getDocs
+  serverTimestamp, query, orderBy, getDocs
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -19,36 +19,29 @@ const _app       = initializeApp(firebaseConfig, "camp-app");
 const _analytics = getAnalytics(_app);
 const _db        = getFirestore(_app);
 
-/* ════════════════════════════════════════
-   GOOGLE SHEET SYNC
-════════════════════════════════════════ */
 const SHEET_URL    = "https://script.google.com/macros/s/AKfycbyH86crLod1oybm-RAowfa2vK2PQtpojNkQYlEd1u8ijEK8FWcPDF4g_ysyfNyLbAyh/exec";
 const SHEET_SECRET = "eplus2026camp";
 
 /* ════════════════════════════════════════
-   GALLERY — يجلب روابط Cloudinary من Firestore
-   collection: "camp-gallery"
-   كل document: { url: "https://res.cloudinary.com/...", order: 0 }
+   GALLERY
 ════════════════════════════════════════ */
 async function loadGallery() {
   const grid = document.getElementById("camp-gallery-grid");
   try {
     const q    = query(collection(_db, "camp-gallery"), orderBy("order", "asc"));
     const snap = await getDocs(q);
-    if (snap.empty) return; // يبقى الـ empty state
+    if (snap.empty) return;
     grid.innerHTML = "";
     snap.forEach(doc => {
       const { url, caption } = doc.data();
       const img = document.createElement("img");
-      img.src       = url;
       img.alt       = caption || "صورة من المخيم";
       img.className = "camp-gallery-img";
       img.draggable = false;
       img.loading   = "lazy";
-      // Cloudinary transformation — جودة auto + ضغط
-      if (url.includes("cloudinary.com")) {
-        img.src = url.replace("/upload/", "/upload/q_auto,f_auto,w_600/");
-      }
+      img.src       = url.includes("cloudinary.com")
+        ? url.replace("/upload/", "/upload/q_auto,f_auto,w_600/")
+        : url;
       grid.appendChild(img);
     });
   } catch (e) {
@@ -73,7 +66,6 @@ form.addEventListener("submit", async (e) => {
   const parentName  = document.getElementById("campParentName").value.trim();
   const parentPhone = document.getElementById("campParentPhone").value.trim();
 
-  // validation
   const fields = [
     { el: document.getElementById("campFirstName"),   val: firstName   },
     { el: document.getElementById("campLastName"),    val: lastName    },
@@ -95,20 +87,21 @@ form.addEventListener("submit", async (e) => {
   submitBtn.disabled = true;
 
   try {
+    // ① Firestore
     await addDoc(collection(_db, "camp-registrations"), {
       firstName, lastName,
-      age:         Number(age),
-      parentName,  parentPhone,
+      age:          Number(age),
+      parentName,   parentPhone,
       registeredAt: serverTimestamp(),
-      status:      "pending"
+      status:       "pending"
     });
 
-    // مزامنة مع Google Sheet — no-cors لتجنب CORS error
+    // ② Google Sheet — منفصل ولا يؤثر على النجاح
     const sheetData = new URLSearchParams({
-      secret:      SHEET_SECRET,
-      firstName,   lastName,
-      age:         String(age),
-      parentName,  parentPhone
+      secret: SHEET_SECRET,
+      firstName, lastName,
+      age:        String(age),
+      parentName, parentPhone
     });
     fetch(SHEET_URL, {
       method:  "POST",
@@ -117,6 +110,7 @@ form.addEventListener("submit", async (e) => {
       body:    sheetData.toString()
     }).catch(err => console.warn("Sheet sync failed:", err));
 
+    // ③ Success UI
     form.innerHTML = `
       <div style="text-align:center;padding:30px 0;
                   display:flex;flex-direction:column;
@@ -131,8 +125,9 @@ form.addEventListener("submit", async (e) => {
           </span>
         </div>
       </div>`;
+
   } catch (err) {
-    console.error(err);
+    console.error("Firestore error:", err);
     submitBtn.classList.remove("loading");
     submitBtn.disabled = false;
     alert("حدث خطأ أثناء التسجيل، يرجى المحاولة مرة أخرى.");
