@@ -17,7 +17,6 @@ function campRegister(e) {
   const fields = [
     { el: document.getElementById("campFirstName"),   val: firstName   },
     { el: document.getElementById("campLastName"),    val: lastName    },
-    { el: document.getElementById("campAge"),         val: age         },
     { el: document.getElementById("campParentName"),  val: parentName  },
     { el: document.getElementById("campParentPhone"), val: parentPhone },
   ];
@@ -30,6 +29,33 @@ function campRegister(e) {
       valid = false;
     }
   });
+
+  // التحقق من العمر
+  const ageEl  = document.getElementById("campAge");
+  const ageNum = parseInt(age);
+  if (!age || isNaN(ageNum)) {
+    ageEl.classList.add("error");
+    ageEl.addEventListener("input", () => ageEl.classList.remove("error"), { once: true });
+    ageEl.placeholder = "أدخل العمر";
+    valid = false;
+  } else if (ageNum < 8) {
+    ageEl.classList.add("error");
+    ageEl.addEventListener("input", () => ageEl.classList.remove("error"), { once: true });
+    ageEl.setCustomValidity("العمر الأدنى 8 سنوات");
+    setTimeout(() => {
+      alert("⚠️ الحد الأدنى للعمر هو 8 سنوات");
+      ageEl.setCustomValidity("");
+    }, 50);
+    valid = false;
+  } else if (ageNum > 13) {
+    ageEl.classList.add("error");
+    ageEl.addEventListener("input", () => ageEl.classList.remove("error"), { once: true });
+    setTimeout(() => {
+      alert("⚠️ الحد الأقصى للعمر هو 13 سنة");
+    }, 50);
+    valid = false;
+  }
+
   if (!valid) return;
 
   const submitBtn = document.getElementById("camp-submit-btn");
