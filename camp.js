@@ -19,7 +19,7 @@ const _app       = initializeApp(firebaseConfig, "camp-app");
 const _analytics = getAnalytics(_app);
 const _db        = getFirestore(_app);
 
-const SHEET_URL    = "https://script.google.com/macros/s/AKfycbyH86crLod1oybm-RAowfa2vK2PQtpojNkQYlEd1u8ijEK8FWcPDF4g_ysyfNyLbAyh/exec";
+const SHEET_URL    = "https://script.google.com/macros/s/AKfycbxMRbIuXx61F0KCH4b_Z6hZYTlNMcz5EL-I_gxn1Bf3hzWJI9E2mve7T1XRZ7J7RUoc/exec";
 const SHEET_SECRET = "eplus2026camp";
 
 /* ════════════════════════════════════════
