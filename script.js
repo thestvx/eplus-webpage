@@ -967,15 +967,14 @@ function _renderFromData(dataArr) {
     if (hasImg) {
       // ─ كارد بصورة كاملة Instagram 1350×1080 ─
       card.innerHTML = `
-        <div class="ann-img-full-wrap">
-          <img class="ann-card-img-full"
+        <div class="ann-img-wrap">
+          <img class="ann-card-img"
                src="${d.imageUrl}"
                alt="" draggable="false"
                loading="lazy"
                onerror="this.closest('.ann-card').classList.remove('has-image');
                         this.closest('.ann-card').classList.add('text-only');
-                        this.parentElement.remove();
-                        card.innerHTML = buildTextCard();">
+                        this.parentElement.remove();">
         </div>
         ${d.title || d.text || dateStr ? `
         <div class="ann-card-body">
