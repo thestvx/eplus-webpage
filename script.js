@@ -354,14 +354,6 @@ function resetForm() {
   }
 }
 
-// ─── BUTTONS ──────────────────────────────────────────────
-document.querySelectorAll('.reg-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const type = btn.getAttribute('data-reg-type');
-    if (type) openModal(type);
-  });
-});
-
 // ─── DAYS ─────────────────────────────────────────────────
 let maxDaysAllowed = 2;
 
@@ -648,12 +640,12 @@ async function submitForm(e) {
   const firstName  = document.getElementById('firstName').value.trim();
   const lastName   = document.getElementById('lastName').value.trim();
   const birthDate  = document.getElementById('birthDate').value;
-  const birthPlace = document.getElementById('birthPlace').value.trim();
+  const birthPlace = document.getElementById('birthPlace')?.value?.trim() || '';
   const phone      = document.getElementById('phone').value.trim();
 
   let hasError = false;
-  [firstName, lastName, birthPlace].forEach((val, i) => {
-    const ids = ['firstName','lastName','birthPlace'];
+  [firstName, lastName].forEach((val, i) => {
+    const ids = ['firstName','lastName'];
     if (!validateLang(val)) {
       document.getElementById(ids[i]).classList.add('error');
       setTimeout(() => document.getElementById(ids[i]).classList.remove('error'), 1500);
@@ -1105,6 +1097,32 @@ window.resetAnnAuto          = resetAnnAuto;
 window.openJoinModal         = openJoinModal;
 window.closeJoinModal        = closeJoinModal;
 window.submitJoinForm        = submitJoinForm;
+
+
+// ─── LOADING POPUP ────────────────────────────────────────
+function showLoadingPopup() {
+  document.getElementById('loading-popup-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'loading-popup-overlay';
+  overlay.className = 'success-popup-overlay';
+  overlay.style.cssText = 'display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div class="success-popup-box" style="text-align:center;padding:40px 30px;min-width:220px;">
+      <div style="font-size:2.2rem;margin-bottom:14px;">⏳</div>
+      <div class="success-popup-title" style="font-size:1.1rem;">
+        ${currentLang === 'ar' ? 'جارٍ الإرسال...' : 'Sending...'}
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('active'));
+}
+
+function hideLoadingPopup() {
+  const overlay = document.getElementById('loading-popup-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  setTimeout(() => overlay.remove(), 300);
+}
 
 // ─── JOIN TEAM ────────────────────────────────────────────
 function openJoinModal() {
