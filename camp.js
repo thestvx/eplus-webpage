@@ -1,11 +1,110 @@
 /* ═══════════════════════════════════════════
-   CAMP REGISTRATION — Apps Script Only
+   CAMP — Registration + Gallery
 ════════════════════════════════════════════ */
 
+import { initializeApp }  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import {
+  getFirestore, collection, query, orderBy, onSnapshot
+} from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
+  authDomain:        "eplus-center-39.firebaseapp.com",
+  projectId:         "eplus-center-39",
+  storageBucket:     "eplus-center-39.firebasestorage.app",
+  messagingSenderId: "191532732034",
+  appId:             "1:191532732034:web:b11449a2f0595db5d02e9b"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+/* ══════════════════════════════
+   📸 CAMP GALLERY
+══════════════════════════════ */
+function loadCampGallery() {
+  const grid = document.getElementById("camp-gallery-grid");
+  if (!grid) return;
+
+  const q = query(collection(db, "campGallery"), orderBy("createdAt", "desc"));
+
+  onSnapshot(q, (snap) => {
+    if (snap.empty) {
+      grid.innerHTML = `
+        <div class="camp-gallery-empty">
+          <span>📸</span>
+          <span>سيتم نشر الصور قريباً بعد انطلاق المخيم</span>
+        </div>`;
+      return;
+    }
+
+    grid.innerHTML = "";
+    snap.forEach(doc => {
+      const data = doc.data();
+      if (!data.imageUrl) return;
+
+      const img = document.createElement("img");
+      img.src          = data.imageUrl;
+      img.alt          = "صورة من المخيم";
+      img.loading      = "lazy";
+      img.draggable    = false;
+      img.className    = "camp-gallery-img";
+      img.style.cssText = `
+        width:100%; aspect-ratio:1; object-fit:cover;
+        border-radius:14px; border:1px solid rgba(4,82,131,0.2);
+        transition:transform 0.3s, box-shadow 0.3s; cursor:zoom-in;`;
+      img.addEventListener("mouseover", () => {
+        img.style.transform  = "scale(1.03)";
+        img.style.boxShadow  = "0 8px 30px rgba(4,82,131,0.4)";
+      });
+      img.addEventListener("mouseout", () => {
+        img.style.transform  = "";
+        img.style.boxShadow  = "";
+      });
+      // lightbox بسيط
+      img.addEventListener("click", () => openLightbox(data.imageUrl));
+      grid.appendChild(img);
+    });
+  });
+}
+
+/* ══ LIGHTBOX ══ */
+function openLightbox(src) {
+  const overlay = document.createElement("div");
+  overlay.style.cssText = `
+    position:fixed; inset:0; z-index:9999;
+    background:rgba(2,9,21,0.95); backdrop-filter:blur(10px);
+    display:flex; align-items:center; justify-content:center;
+    padding:20px; cursor:zoom-out; animation:fadeIn 0.2s ease;`;
+  overlay.innerHTML = `
+    <img src="${src}" style="
+      max-width:100%; max-height:90vh;
+      border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,0.8);
+      animation:scaleIn 0.25s cubic-bezier(0.34,1.56,0.64,1);" draggable="false">
+    <button style="
+      position:absolute; top:20px; left:20px;
+      background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
+      color:#fff; font-size:22px; width:44px; height:44px; border-radius:50%;
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+      backdrop-filter:blur(8px); transition:background 0.2s;">✕</button>`;
+
+  const style = document.createElement("style");
+  style.textContent = `
+    @keyframes fadeIn  { from{opacity:0} to{opacity:1} }
+    @keyframes scaleIn { from{transform:scale(0.85)} to{transform:scale(1)} }`;
+  overlay.appendChild(style);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay || e.target.tagName === "BUTTON") overlay.remove();
+  });
+  document.body.appendChild(overlay);
+}
+
+/* ══════════════════════════════
+   📋 CAMP REGISTRATION
+══════════════════════════════ */
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzJx2NEPz7a7ntKmXQQq7i78ICeIFHiuAxTpfJyAocSkeqmbsmhx_h3YzVjbqs0eiyF/exec";
 
 function campRegister(e) {
-  // نمنع أي reload أو submit
   if (e) { e.preventDefault(); e.stopPropagation(); }
 
   const firstName   = document.getElementById("campFirstName").value.trim();
@@ -50,7 +149,7 @@ function campRegister(e) {
   submitBtn.classList.add("loading");
   submitBtn.disabled = true;
 
-  // إرسال البيانات لـ Google Sheet عبر Image (يتجاوز CORS)
+  // إرسال البيانات لـ Google Sheet
   const payload = encodeURIComponent(JSON.stringify({
     firstName, lastName, age: String(age),
     parentName, parentPhone,
@@ -58,7 +157,7 @@ function campRegister(e) {
   }));
   new Image().src = APPS_SCRIPT_URL + "?payload=" + payload;
 
-  // عرض رسالة النجاح بعد 1.5 ثانية
+  // عرض رسالة النجاح
   setTimeout(() => {
     const form = document.getElementById("camp-form");
     if (form) {
@@ -82,19 +181,14 @@ function campRegister(e) {
   return false;
 }
 
-// نربط الزر والفورم كلاهما
+/* ══ INIT ══ */
+window.campRegister = campRegister;
+
 document.addEventListener("DOMContentLoaded", () => {
+  loadCampGallery();
+
   const form      = document.getElementById("camp-form");
   const submitBtn = document.getElementById("camp-submit-btn");
-
   if (form)      form.addEventListener("submit",  campRegister);
   if (submitBtn) submitBtn.addEventListener("click", campRegister);
 });
-
-// fallback لو الصفحة محملة مسبقاً
-(function() {
-  const form      = document.getElementById("camp-form");
-  const submitBtn = document.getElementById("camp-submit-btn");
-  if (form)      form.addEventListener("submit",  campRegister);
-  if (submitBtn) submitBtn.addEventListener("click", campRegister);
-})();
