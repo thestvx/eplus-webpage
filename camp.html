@@ -144,13 +144,15 @@
       <div class="camp-section-label">الفيديو الإعلاني</div>
       <h3 class="camp-section-title">شاهد المخيم الربيعي 🎬</h3>
       <div class="camp-video-wrapper">
-        <iframe
-          src="https://player.cloudinary.com/embed/?cloud_name=dac4mwuwe&public_id=copy_688CE930-9D54-44AA-A4BD-440FBFF4BBBE_iqjtsf&controls=true&autoplay=true&loop=true&muted=true"
-          allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-          allowfullscreen
-          frameborder="0"
+        <video
+          id="camp-video"
           class="camp-video-iframe"
-        ></iframe>
+          src="https://res.cloudinary.com/dac4mwuwe/video/upload/v1773572524/copy_688CE930-9D54-44AA-A4BD-440FBFF4BBBE_iqjtsf.mp4"
+          controls
+          loop
+          playsinline
+          preload="metadata"
+        ></video>
       </div>
     </section>
 
@@ -242,6 +244,40 @@
   </footer>
 
   <script type="module" src="camp.js"></script>
+
+  <!-- ═══ VIDEO AUTOPLAY ON SCROLL ═══ -->
+  <script>
+    (function () {
+      const video = document.getElementById('camp-video');
+      if (!video) return;
+
+      let played = false;
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting && !played) {
+              played = true;
+              video.muted = false;
+              video.volume = 1;
+              const playPromise = video.play();
+              if (playPromise !== undefined) {
+                playPromise.catch(() => {
+                  // إذا رفض المتصفح التشغيل بالصوت، نشغّل بدون صوت كـ fallback
+                  video.muted = true;
+                  video.play();
+                });
+              }
+              observer.disconnect();
+            }
+          });
+        },
+        { threshold: 0.5 }
+      );
+
+      observer.observe(video);
+    })();
+  </script>
 
 </body>
 </html>
