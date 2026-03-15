@@ -1079,6 +1079,32 @@ function _renderFromData(dataArr) {
   startAnnAuto();
 }
 
+// ─── EXPOSE FUNCTIONS ─────────────────────────────────────
+window.setLang               = setLang;
+window.closeModal            = closeModal;
+window.closeModalOutside     = closeModalOutside;
+window.closeTerms            = closeTerms;
+window.closeTermsOutside     = closeTermsOutside;
+window.onTermsCheck          = onTermsCheck;
+window.proceedToRegister     = proceedToRegister;
+window.closeSuccessPopup     = closeSuccessPopup;
+window.onLangTypeChange      = onLangTypeChange;
+window.onLangLevelChange     = onLangLevelChange;
+window.onEduLevelChange      = onEduLevelChange;
+window.onCandidateTypeChange = onCandidateTypeChange;
+window.onSpecialtyChange     = onSpecialtyChange;
+window.onSubjectChange       = onSubjectChange;
+window.onTeacherChange       = onTeacherChange;
+window.onVipTypeChange       = onVipTypeChange;
+window.onVipEduLevelChange   = onVipEduLevelChange;
+window.onVipDaysCountChange  = onVipDaysCountChange;
+window.onDayChange           = onDayChange;
+window.submitForm            = submitForm;
+window.goToSlide             = goToSlide;
+window.resetAnnAuto          = resetAnnAuto;
+window.openJoinModal         = openJoinModal;
+window.closeJoinModal        = closeJoinModal;
+window.submitJoinForm        = submitJoinForm;
 
 // ─── JOIN TEAM ────────────────────────────────────────────
 function openJoinModal() {
@@ -1178,32 +1204,78 @@ function showSuccessJoinPopup() {
   requestAnimationFrame(() => overlay.classList.add('active'));
 }
 
-// ─── EXPOSE FUNCTIONS ─────────────────────────────────────
-window.setLang               = setLang;
-window.closeModal            = closeModal;
-window.closeModalOutside     = closeModalOutside;
-window.closeTerms            = closeTerms;
-window.closeTermsOutside     = closeTermsOutside;
-window.onTermsCheck          = onTermsCheck;
-window.proceedToRegister     = proceedToRegister;
-window.closeSuccessPopup     = closeSuccessPopup;
-window.onLangTypeChange      = onLangTypeChange;
-window.onLangLevelChange     = onLangLevelChange;
-window.onEduLevelChange      = onEduLevelChange;
-window.onCandidateTypeChange = onCandidateTypeChange;
-window.onSpecialtyChange     = onSpecialtyChange;
-window.onSubjectChange       = onSubjectChange;
-window.onTeacherChange       = onTeacherChange;
-window.onVipTypeChange       = onVipTypeChange;
-window.onVipEduLevelChange   = onVipEduLevelChange;
-window.onVipDaysCountChange  = onVipDaysCountChange;
-window.onDayChange           = onDayChange;
-window.submitForm            = submitForm;
-window.openJoinModal         = openJoinModal;
-window.closeJoinModal        = closeJoinModal;
-window.submitJoinForm        = submitJoinForm;
-window.goToSlide             = goToSlide;
-window.resetAnnAuto          = resetAnnAuto;
+// ─── EVENT LISTENERS ──────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+
+  // أزرار التسجيل
+  document.querySelectorAll('.reg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = btn.getAttribute('data-reg-type');
+      if (type) openModal(type);
+    });
+  });
+
+  // تغيير اللغة
+  document.getElementById('btn-ar').addEventListener('click', () => setLang('ar'));
+  document.getElementById('btn-en').addEventListener('click', () => setLang('en'));
+
+  // Modal التسجيل
+  document.getElementById('close-modal-btn').addEventListener('click', closeModal);
+  document.getElementById('modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal')) closeModal();
+  });
+
+  // Modal الشروط
+  document.getElementById('close-terms-btn').addEventListener('click', closeTerms);
+  document.getElementById('terms-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('terms-modal')) closeTerms();
+  });
+  document.getElementById('terms-checkbox').addEventListener('change', onTermsCheck);
+  document.getElementById('terms-proceed-btn').addEventListener('click', proceedToRegister);
+
+  // نموذج التسجيل
+  document.getElementById('reg-form').addEventListener('submit', submitForm);
+
+  // زر انضم لفريقنا
+  document.getElementById('join-team-btn').addEventListener('click', openJoinModal);
+  document.getElementById('close-join-btn').addEventListener('click', closeJoinModal);
+  document.getElementById('join-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('join-modal')) closeJoinModal();
+  });
+  document.getElementById('join-form').addEventListener('submit', submitJoinForm);
+
+  // join role toggle
+  document.querySelectorAll('input[name="joinRole"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const fields = document.getElementById('join-role-fields');
+      fields.style.display = 'block';
+      fields.classList.remove('field-appear');
+      void fields.offsetWidth;
+      fields.classList.add('field-appear');
+    });
+  });
+
+  // CV file name
+  document.getElementById('joinCV').addEventListener('change', function() {
+    document.getElementById('cv-file-name').textContent = this.files[0]?.name || '';
+  });
+
+  // حقول النموذج
+  document.getElementById('eduLevel').addEventListener('change', onEduLevelChange);
+  document.getElementById('specialty').addEventListener('change', onSpecialtyChange);
+  document.getElementById('subject').addEventListener('change', onSubjectChange);
+  document.getElementById('teacher').addEventListener('change', onTeacherChange);
+  document.getElementById('langType').addEventListener('change', onLangTypeChange);
+  document.getElementById('langLevel').addEventListener('change', onLangLevelChange);
+  document.getElementById('vipDaysCount').addEventListener('change', onVipDaysCountChange);
+  document.getElementById('vipEduLevel').addEventListener('change', onVipEduLevelChange);
+  document.querySelectorAll('input[name="vipType"]').forEach(r =>
+    r.addEventListener('change', onVipTypeChange));
+  document.querySelectorAll('input[name="candidateType"]').forEach(r =>
+    r.addEventListener('change', onCandidateTypeChange));
+  document.querySelectorAll('input[name="days"]').forEach(cb =>
+    cb.addEventListener('change', function() { onDayChange(this); }));
+});
 
 // ─── INIT LANG ────────────────────────────────────────────
 setLang('ar');
