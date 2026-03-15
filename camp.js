@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════
-   CAMP — Registration + Gallery
+   CAMP — Registration + Gallery + Video
 ════════════════════════════════════════════ */
 
 import { initializeApp }  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
@@ -18,6 +18,51 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
+
+/* ══════════════════════════════
+   🎬 CAMP VIDEO — Autoplay on Scroll
+══════════════════════════════ */
+function initCampVideo() {
+  const video = document.getElementById("camp-video");
+  if (!video) return;
+
+  let hasPlayed = false;
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          // الفيديو ظهر في الشاشة
+          if (!hasPlayed) {
+            hasPlayed = true;
+            video.muted  = false;
+            video.volume = 1;
+            const promise = video.play();
+            if (promise !== undefined) {
+              promise.catch(() => {
+                // fallback: تشغيل بدون صوت إذا رفض المتصفح
+                video.muted = true;
+                video.play();
+              });
+            }
+          } else {
+            // عاد للشاشة مرة أخرى — نشغّله إذا كان متوقفاً
+            if (video.paused) video.play();
+          }
+        } else {
+          // خرج من الشاشة — نوقفه ونكتم الصوت
+          if (!video.paused) {
+            video.pause();
+            video.muted = true;
+          }
+        }
+      });
+    },
+    { threshold: 0.4 }
+  );
+
+  observer.observe(video);
+}
 
 /* ══════════════════════════════
    📸 CAMP GALLERY
@@ -44,24 +89,23 @@ function loadCampGallery() {
       if (!data.imageUrl) return;
 
       const img = document.createElement("img");
-      img.src          = data.imageUrl;
-      img.alt          = "صورة من المخيم";
-      img.loading      = "lazy";
-      img.draggable    = false;
-      img.className    = "camp-gallery-img";
+      img.src           = data.imageUrl;
+      img.alt           = "صورة من المخيم";
+      img.loading       = "lazy";
+      img.draggable     = false;
+      img.className     = "camp-gallery-img";
       img.style.cssText = `
         width:100%; aspect-ratio:1; object-fit:cover;
         border-radius:14px; border:1px solid rgba(4,82,131,0.2);
         transition:transform 0.3s, box-shadow 0.3s; cursor:zoom-in;`;
       img.addEventListener("mouseover", () => {
-        img.style.transform  = "scale(1.03)";
-        img.style.boxShadow  = "0 8px 30px rgba(4,82,131,0.4)";
+        img.style.transform = "scale(1.03)";
+        img.style.boxShadow = "0 8px 30px rgba(4,82,131,0.4)";
       });
       img.addEventListener("mouseout", () => {
-        img.style.transform  = "";
-        img.style.boxShadow  = "";
+        img.style.transform = "";
+        img.style.boxShadow = "";
       });
-      // lightbox بسيط
       img.addEventListener("click", () => openLightbox(data.imageUrl));
       grid.appendChild(img);
     });
@@ -129,7 +173,6 @@ function campRegister(e) {
     }
   });
 
-  // التحقق من العمر
   const ageEl  = document.getElementById("campAge");
   const ageNum = parseInt(age);
   if (!age || isNaN(ageNum) || ageNum <= 0) {
@@ -149,7 +192,6 @@ function campRegister(e) {
   submitBtn.classList.add("loading");
   submitBtn.disabled = true;
 
-  // إرسال البيانات لـ Google Sheet
   const payload = encodeURIComponent(JSON.stringify({
     firstName, lastName, age: String(age),
     parentName, parentPhone,
@@ -157,7 +199,6 @@ function campRegister(e) {
   }));
   new Image().src = APPS_SCRIPT_URL + "?payload=" + payload;
 
-  // عرض رسالة النجاح
   setTimeout(() => {
     const form = document.getElementById("camp-form");
     if (form) {
@@ -185,6 +226,7 @@ function campRegister(e) {
 window.campRegister = campRegister;
 
 document.addEventListener("DOMContentLoaded", () => {
+  initCampVideo();
   loadCampGallery();
 
   const form      = document.getElementById("camp-form");
