@@ -796,8 +796,7 @@ function showSuccessPopup() {
   overlay.innerHTML = `
     <div class="success-popup-box" id="success-popup-box">
       <div class="success-popup-icon-wrap">
-        <div class="success-popup-ring"></div>
-        <div class="success-popup-check">✓</div>
+        <img src="3d/done.png" alt="done" class="success-popup-3d-icon" draggable="false">
       </div>
       <div class="success-popup-title">
         ${currentLang==='ar' ? '🎉 تم تسجيلك بنجاح!' : '🎉 Registration Successful!'}
@@ -964,24 +963,34 @@ function _renderFromData(dataArr) {
       } catch(e) { dateStr = ''; }
     }
 
-    card.innerHTML = `
-      ${hasImg
-        ? `<img class="ann-card-img"
+    if (hasImg) {
+      // ─ كارد بصورة كاملة Instagram 1350×1080 ─
+      card.innerHTML = `
+        <div class="ann-img-full-wrap">
+          <img class="ann-card-img-full"
                src="${d.imageUrl}"
                alt="" draggable="false"
                loading="lazy"
                onerror="this.closest('.ann-card').classList.remove('has-image');
                         this.closest('.ann-card').classList.add('text-only');
-                        this.remove();">`
-        : ''}
-      <div class="ann-card-body">
-        <div class="ann-card-badge">
-          📢 ${isRtl ? 'إعلان' : 'Announcement'}
+                        this.parentElement.remove();
+                        card.innerHTML = buildTextCard();">
         </div>
-        ${d.title ? `<div class="ann-card-title">${d.title}</div>` : ''}
-        ${d.text  ? `<div class="ann-card-text">${d.text}</div>`   : ''}
-        ${dateStr ? `<div class="ann-card-date">🗓 ${dateStr}</div>` : ''}
-      </div>`;
+        ${d.title || d.text || dateStr ? `
+        <div class="ann-card-body">
+          ${d.title ? `<div class="ann-card-title">${d.title}</div>` : ''}
+          ${d.text  ? `<div class="ann-card-text">${d.text}</div>`   : ''}
+          ${dateStr ? `<div class="ann-card-date">🗓 ${dateStr}</div>` : ''}
+        </div>` : ''}`;
+    } else {
+      card.innerHTML = `
+        <div class="ann-card-body">
+          <div class="ann-card-badge">📢 ${isRtl ? 'إعلان' : 'Announcement'}</div>
+          ${d.title ? `<div class="ann-card-title">${d.title}</div>` : ''}
+          ${d.text  ? `<div class="ann-card-text">${d.text}</div>`   : ''}
+          ${dateStr ? `<div class="ann-card-date">🗓 ${dateStr}</div>` : ''}
+        </div>`;
+    }
 
     track.appendChild(card);
 
@@ -1110,6 +1119,35 @@ function showLoadingPopup() {
     <div class="success-popup-box" style="text-align:center;padding:40px 30px;min-width:220px;">
       <div style="font-size:2.2rem;margin-bottom:14px;">⏳</div>
       <div class="success-popup-title" style="font-size:1.1rem;">
+        ${currentLang === 'ar' ? 'جارٍ الإرسال...' : 'Sending...'}
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('active'));
+}
+
+function hideLoadingPopup() {
+  const overlay = document.getElementById('loading-popup-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  setTimeout(() => overlay.remove(), 300);
+}
+
+
+// ─── LOADING POPUP ────────────────────────────────────────
+function showLoadingPopup() {
+  document.getElementById('loading-popup-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'loading-popup-overlay';
+  overlay.className = 'success-popup-overlay';
+  overlay.innerHTML = `
+    <div class="success-popup-box" style="text-align:center;padding:44px 30px;min-width:230px;">
+      <div style="margin-bottom:16px;">
+        <div style="width:52px;height:52px;border:4px solid rgba(255,255,255,0.15);
+                    border-top-color:#0a8acb;border-radius:50%;animation:spin 0.8s linear infinite;
+                    margin:0 auto;"></div>
+      </div>
+      <div class="success-popup-title" style="font-size:1.05rem;opacity:0.9;">
         ${currentLang === 'ar' ? 'جارٍ الإرسال...' : 'Sending...'}
       </div>
     </div>`;
