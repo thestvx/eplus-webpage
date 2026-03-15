@@ -33,26 +33,14 @@ function campRegister(e) {
   // التحقق من العمر
   const ageEl  = document.getElementById("campAge");
   const ageNum = parseInt(age);
-  if (!age || isNaN(ageNum)) {
+  if (!age || isNaN(ageNum) || ageNum <= 0) {
     ageEl.classList.add("error");
     ageEl.addEventListener("input", () => ageEl.classList.remove("error"), { once: true });
-    ageEl.placeholder = "أدخل العمر";
     valid = false;
-  } else if (ageNum < 8) {
+  } else if (ageNum < 8 || ageNum > 14) {
     ageEl.classList.add("error");
     ageEl.addEventListener("input", () => ageEl.classList.remove("error"), { once: true });
-    ageEl.setCustomValidity("العمر الأدنى 8 سنوات");
-    setTimeout(() => {
-      alert("⚠️ الحد الأدنى للعمر هو 8 سنوات");
-      ageEl.setCustomValidity("");
-    }, 50);
-    valid = false;
-  } else if (ageNum > 13) {
-    ageEl.classList.add("error");
-    ageEl.addEventListener("input", () => ageEl.classList.remove("error"), { once: true });
-    setTimeout(() => {
-      alert("⚠️ الحد الأقصى للعمر هو 13 سنة");
-    }, 50);
+    alert("❌ عذراً، العمر غير مسموح به للمشاركة في المخيم.\nالفئة العمرية المقبولة: 8 إلى 14 سنة.");
     valid = false;
   }
 
