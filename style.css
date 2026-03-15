@@ -941,114 +941,140 @@ textarea.form-input  { resize:vertical; min-height:90px; }
   background-clip:text;
 }
 
+
 /* ══════════════════════════════════════
-   ANN TRACK — SLIDER
+   ANN-CARD — Instagram 1350x1080 (4:5)
+   الحل: wrapper div بـ padding-top trick
+   لأن aspect-ratio على img داخل flex لا يعمل بشكل موثوق
 ══════════════════════════════════════ */
+
+/* الـ track wrapper */
 .ann-track-wrapper {
-  overflow:hidden;
-  border-radius:22px;
-  position:relative;
-  width:100%;
+  overflow: hidden;
+  border-radius: 22px;
+  position: relative;
+  width: 100%;
 }
+
 .ann-track {
-  display:flex;
-  transition:transform 0.55s cubic-bezier(0.25,0.46,0.45,0.94);
-  will-change:transform;
-  direction:ltr !important;
-  align-items:stretch;
+  display: flex;
+  transition: transform 0.55s cubic-bezier(0.25,0.46,0.45,0.94);
+  will-change: transform;
+  direction: ltr !important;
+  align-items: flex-start;  /* مهم جداً: flex-start بدل stretch */
 }
 
-/* ══════════════════════════════════════
-   ANN-CARD — Instagram 1350x1080
-══════════════════════════════════════ */
+/* البطاقة الكاملة */
 .ann-card {
-  flex:0 0 100%;
-  min-width:100%;
-  width:100%;
-  display:flex;
-  flex-direction:column;
-  border-radius:22px;
-  overflow:hidden;
-  background:linear-gradient(135deg,rgba(4,82,131,0.22),rgba(10,138,203,0.08));
-  border:1px solid rgba(10,138,203,0.35);
-  backdrop-filter:blur(18px);
-  box-shadow:0 12px 40px rgba(0,0,0,0.35);
-  user-select:none;
-  cursor:grab;
+  flex: 0 0 100%;
+  min-width: 100%;
+  width: 100%;
+  display: block;              /* نغير من flex إلى block */
+  border-radius: 22px;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(4,82,131,0.22), rgba(10,138,203,0.08));
+  border: 1px solid rgba(10,138,203,0.35);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+  user-select: none;
+  cursor: grab;
 }
-.ann-card:active { cursor:grabbing; }
+.ann-card:active { cursor: grabbing; }
 
-/* الصورة — نسبة Instagram الدقيقة 1350:1080 */
+/* ─── wrapper الصورة — padding-top trick ─── */
+/* 1080/1350 = 80% → الارتفاع = 80% من العرض */
+.ann-card.has-image::before {
+  content: '';
+  display: block;
+  width: 100%;
+  padding-top: 80%;           /* = (1080/1350) × 100% */
+  position: relative;
+}
+
+/* نحذف .ann-card::before ونستخدم wrapper div في CSS */
+/* الطريقة الأبسط والأكثر موثوقية: نستخدم .ann-img-wrap */
+
+/* لكن بما أن الـ JS يضع img مباشرة بدون wrapper، */
+/* الحل هو: نجعل .ann-card.has-image تعمل كـ position container */
+
+/* إلغاء الـ ::before وبدلاً منه نتحكم في الصورة مباشرة */
+.ann-card.has-image::before { content: none; }
+
+/* ─── الصورة — الحل النهائي ─── */
 .ann-card-img {
-  display:block;
-  width:100%;
-  /* نسبة 1350:1080 = 5:4 بمعنى الارتفاع = 80% من العرض */
-  aspect-ratio:1350 / 1080;
-  object-fit:cover;
-  object-position:center center;
-  flex-shrink:0;
-  border-radius:0;
-  opacity:0;
-  transition:opacity 0.45s ease;
-  /* نلغي أي max-height قد يقطع الصورة */
-  max-height:unset !important;
-  height:auto;
-  min-height:0;
+  display: block;
+  width: 100%;
+  height: auto;
+  /* aspect-ratio مع !important يضمن احترامه */
+  aspect-ratio: 1350 / 1080 !important;
+  object-fit: cover;
+  object-position: center center;
+  /* نلغي flex-shrink لأن الـ card أصبح block */
+  max-height: none !important;
+  min-height: unset !important;
+  opacity: 0;
+  transition: opacity 0.45s ease;
 }
-.ann-card-img.loaded { opacity:1; }
-.ann-card.text-only .ann-card-img { display:none; }
+.ann-card-img.loaded { opacity: 1; }
+.ann-card.text-only .ann-card-img { display: none; }
 
-/* معلومات البطاقة */
+/* ─── نص البطاقة ─── */
 .ann-card-body {
-  padding:16px 22px 20px;
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  background:rgba(4,14,30,0.88);
-  border-top:1px solid rgba(10,138,203,0.2);
-  flex-shrink:0;
+  padding: 16px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(4,14,30,0.88);
+  border-top: 1px solid rgba(10,138,203,0.2);
 }
 .ann-card-badge {
-  display:inline-flex; align-items:center; gap:5px;
-  padding:4px 12px; border-radius:999px;
-  background:rgba(10,138,203,0.18);
-  border:1px solid rgba(10,138,203,0.38);
-  font-size:11px; font-weight:700; color:#7cc8f0;
-  letter-spacing:0.5px; width:fit-content;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 12px; border-radius: 999px;
+  background: rgba(10,138,203,0.18);
+  border: 1px solid rgba(10,138,203,0.38);
+  font-size: 11px; font-weight: 700; color: #7cc8f0;
+  letter-spacing: 0.5px; width: fit-content;
 }
-.ann-card-title { font-size:16px; font-weight:800; color:#fff; line-height:1.45; }
-.ann-card-text  { font-size:13.5px; color:rgba(215,235,255,0.82); line-height:1.75; }
-.ann-card-date  { font-size:11.5px; color:rgba(140,190,225,0.55); font-weight:600; margin-top:2px; }
+.ann-card-title { font-size: 16px; font-weight: 800; color: #fff; line-height: 1.45; }
+.ann-card-text  { font-size: 13.5px; color: rgba(215,235,255,0.82); line-height: 1.75; }
+.ann-card-date  { font-size: 11.5px; color: rgba(140,190,225,0.55); font-weight: 600; margin-top: 2px; }
 
-/* أسهم التنقل */
+/* ─── أسهم التنقل ─── */
 .ann-arrow {
-  position:absolute;
-  top:40%;
-  transform:translateY(-50%);
-  z-index:10;
-  width:36px; height:36px; border-radius:50%;
-  border:1px solid rgba(10,138,203,0.55);
-  background:rgba(2,9,21,0.82); backdrop-filter:blur(8px);
-  color:#7cc8f0; font-size:22px; line-height:1;
-  display:flex; align-items:center; justify-content:center;
-  cursor:pointer; transition:all 0.22s ease; font-family:inherit;
+  position: absolute; top: 38%; transform: translateY(-50%);
+  z-index: 10; width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid rgba(10,138,203,0.55);
+  background: rgba(2,9,21,0.82); backdrop-filter: blur(8px);
+  color: #7cc8f0; font-size: 22px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.22s ease; font-family: inherit;
 }
 .ann-arrow:hover {
-  background:rgba(10,138,203,0.35);
-  transform:translateY(-50%) scale(1.1);
-  box-shadow:0 0 14px rgba(10,138,203,0.5);
+  background: rgba(10,138,203,0.35);
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 0 14px rgba(10,138,203,0.5);
 }
-.ann-arrow-prev { left:12px; }
-.ann-arrow-next { right:12px; }
+.ann-arrow-prev { left: 12px; }
+.ann-arrow-next { right: 12px; }
 
-/* نقاط التنقل */
-.ann-dots { display:flex; justify-content:center; gap:8px; margin-top:12px; }
+/* ─── نقاط التنقل ─── */
+.ann-dots { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
 .ann-dot {
-  width:8px; height:8px; border-radius:999px;
-  background:rgba(10,138,203,0.3); border:1px solid rgba(10,138,203,0.4);
-  cursor:pointer; transition:all 0.3s ease;
+  width: 8px; height: 8px; border-radius: 999px;
+  background: rgba(10,138,203,0.3); border: 1px solid rgba(10,138,203,0.4);
+  cursor: pointer; transition: all 0.3s ease;
 }
-.ann-dot.active { background:#0a8acb; width:22px; box-shadow:0 0 10px rgba(10,138,203,0.7); }
+.ann-dot.active { background: #0a8acb; width: 22px; box-shadow: 0 0 10px rgba(10,138,203,0.7); }
+
+/* ─── موبايل ─── */
+@media (max-width: 640px) {
+  .ann-card-body  { padding: 12px 16px 16px; }
+  .ann-card-title { font-size: 14px; }
+  .ann-card-text  { font-size: 12.5px; }
+  .ann-arrow      { width: 30px; height: 30px; font-size: 18px; }
+  .ann-arrow-prev { left: 8px; }
+  .ann-arrow-next { right: 8px; }
+}
 
 /* ══════════════════════════════════════
    WEEK CALENDAR
