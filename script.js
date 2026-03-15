@@ -100,10 +100,10 @@ const i18n = {
     subtitle:'Register for courses and educational programs',
     btn1:'Support Registration', btn2:'Language Courses', btn3:'VIP Lessons',
     btn4:'IELTS Test', btn5:'Online Courses', btn6:'Training Courses',
-    annTitle:'Academy Announcements',
+    annTitle:'Center Announcements',
     firstName:'First Name', lastName:'Last Name', birthDate:'Date of Birth',
     birthPlace:'Address', phone:'Phone Number',
-    motivation:    'What motivated you to choose E-PLUS Academy?',
+    motivation:    'What motivated you to choose E-PLUS Center?',
     motivationVip: 'What led you to choose studying through the VIP private lessons system?',
     optional:'(optional)',
     eduLevel:'Education Level', specialty:'Specialty',
@@ -118,7 +118,7 @@ const i18n = {
     vipDaysCount:'How many days per week?',
     chooseDays:'Choose Days', daysSelected:'day(s) selected',
     submitBtn:'Complete Registration ✦',
-    termsTitle:'Academy Terms & Conditions',
+    termsTitle:'Center Terms & Conditions',
     termsAgree:'I have read all terms and conditions and I agree',
     termsProceed:'Confirm Registration ✦',
     t1:'The learner is officially registered upon payment of registration fees on the specified date.',
@@ -804,7 +804,7 @@ function showSuccessPopup() {
       <div class="success-popup-msg">
         ${currentLang==='ar'
           ? 'شكراً لك! تم استلام طلب تسجيلك بنجاح.<br>سيتم التواصل معك قريباً من طرف فريق أكاديمية E-PLUS.<br><span class="success-popup-sub">✦ رحلتك نحو النجاح تبدأ من هنا ✦</span>'
-          : 'Thank you! Your registration has been received.<br>The E-PLUS Academy team will contact you soon.<br><span class="success-popup-sub">✦ Your journey to success starts here ✦</span>'}
+          : 'Thank you! Your registration has been received.<br>The E-PLUS Center team will contact you soon.<br><span class="success-popup-sub">✦ Your journey to success starts here ✦</span>'}
       </div>
       <div class="success-popup-divider"></div>
       <div class="success-popup-info">
