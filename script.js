@@ -1108,31 +1108,6 @@ window.closeJoinModal        = closeJoinModal;
 window.submitJoinForm        = submitJoinForm;
 
 
-// ─── LOADING POPUP ────────────────────────────────────────
-function showLoadingPopup() {
-  document.getElementById('loading-popup-overlay')?.remove();
-  const overlay = document.createElement('div');
-  overlay.id = 'loading-popup-overlay';
-  overlay.className = 'success-popup-overlay';
-  overlay.style.cssText = 'display:flex;align-items:center;justify-content:center;';
-  overlay.innerHTML = `
-    <div class="success-popup-box" style="text-align:center;padding:40px 30px;min-width:220px;">
-      <div style="font-size:2.2rem;margin-bottom:14px;">⏳</div>
-      <div class="success-popup-title" style="font-size:1.1rem;">
-        ${currentLang === 'ar' ? 'جارٍ الإرسال...' : 'Sending...'}
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  requestAnimationFrame(() => overlay.classList.add('active'));
-}
-
-function hideLoadingPopup() {
-  const overlay = document.getElementById('loading-popup-overlay');
-  if (!overlay) return;
-  overlay.classList.remove('active');
-  setTimeout(() => overlay.remove(), 300);
-}
-
 
 // ─── LOADING POPUP ────────────────────────────────────────
 function showLoadingPopup() {
