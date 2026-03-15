@@ -38,8 +38,8 @@ resizeCanvas();
 animateSquares();
 
 // ─── APPS SCRIPT URL ──────────────────────────────────────
-const APPS_SCRIPT_URL      = 'https://script.google.com/macros/s/AKfycbyiooCIgUPH3OHbdPJgjd23tnT1NA7IichZ28haow3Y5kf2wtGAXFFzpL1rpV2Fpnxysg/exec';
-const JOIN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzgn4f2xMMMHNiA38tUEZqHKSJMYFYNujNldojdeFZgCbAb8UryBDyGy4Idz5YYsqnN/exec';
+const APPS_SCRIPT_URL      = 'https://script.google.com/macros/s/AKfycbwEDrZFY5vq0dxVcWNhqFsw94uG1aX60TaGiWJFHNPu_VylrqYli5HoGSdKgounyQO19g/exec';
+const JOIN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLXXjXsFen0xFD0kGmMkiR_QfdL_ERXdTNkKxmh9-XpDSDYTzehiMMy4AuV7B1veTa/exec';
 
 const typeLabelsAr = {
   support: 'تسجيلات الدعم',
