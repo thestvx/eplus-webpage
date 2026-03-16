@@ -289,18 +289,14 @@ function openModal(type) {
     motivationLabel.textContent = (type === 'vip') ? t.motivationVip : t.motivation;
   }
 
-  const eduGrp     = document.getElementById('eduLevelGroup');
   const langGrp    = document.getElementById('langTypeGroup');
   const vipTypeGrp = document.getElementById('vipTypeGroup');
 
-  hideField(eduGrp,     'eduLevel');
   hideField(langGrp,    'langType');
   hideField(vipTypeGrp);
 
-  if (type === 'support') {
-    animateShow(eduGrp);
-    eduGrp.querySelector('select').setAttribute('required','required');
-  } else if (type === 'lang' || type === 'online') {
+  // support: لا نظهر شيء — ننتظر تاريخ الميلاد أولاً ثم اختيار النوع
+  if (type === 'lang' || type === 'online') {
     animateShow(langGrp);
     langGrp.querySelector('select').setAttribute('required','required');
   } else if (type === 'vip') {
@@ -332,6 +328,7 @@ function closeModalOutside(e) {
 function resetForm() {
   document.getElementById('reg-form').reset();
   const groups = [
+    'supportTypeGroup',
     'eduLevelGroup','candidateTypeGroup','specialtyGroup','subjectGroup',
     'teacherGroup','parentGroup','langTypeGroup','langLevelGroup',
     'levelTestGroup','vipTypeGroup','vipEduLevelGroup','professionGroup',
@@ -345,6 +342,7 @@ function resetForm() {
   document.querySelectorAll('input[name="vipType"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+  document.querySelectorAll('input[name="supportType"]').forEach(r => r.checked = false);
   resetDays();
   maxDaysAllowed = 2;
 
@@ -472,6 +470,47 @@ function onLangLevelChange() {
   else {
     levelTestGrp.style.display = 'none';
     document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+  }
+}
+
+// ─── SUPPORT TYPE (دعم مدرسي / دورات مدرسية) ─────────────
+function onBirthDateChange() {
+  if (currentModalType !== 'support') return;
+  const val            = document.getElementById('birthDate').value;
+  const supportTypeGrp = document.getElementById('supportTypeGroup');
+  const eduGrp         = document.getElementById('eduLevelGroup');
+
+  hideField(eduGrp, 'eduLevel');
+  hideField(document.getElementById('specialtyGroup'), 'specialty');
+  hideField(document.getElementById('subjectGroup'), 'subject');
+  hideField(document.getElementById('teacherGroup'), 'teacher');
+  hideField(document.getElementById('candidateTypeGroup'));
+  hideField(document.getElementById('parentGroup'), 'parentName', 'parentPhone');
+  document.querySelectorAll('input[name="supportType"]').forEach(r => r.checked = false);
+  document.getElementById('comingSoonNote')?.remove();
+
+  if (val) {
+    animateShow(supportTypeGrp);
+  } else {
+    supportTypeGrp.style.display = 'none';
+  }
+}
+
+function onSupportTypeChange() {
+  const selected = document.querySelector('input[name="supportType"]:checked')?.value;
+  const eduGrp   = document.getElementById('eduLevelGroup');
+
+  hideField(eduGrp, 'eduLevel');
+  hideField(document.getElementById('specialtyGroup'), 'specialty');
+  hideField(document.getElementById('subjectGroup'), 'subject');
+  hideField(document.getElementById('teacherGroup'), 'teacher');
+  hideField(document.getElementById('candidateTypeGroup'));
+  hideField(document.getElementById('parentGroup'), 'parentName', 'parentPhone');
+  document.getElementById('comingSoonNote')?.remove();
+
+  if (selected) {
+    animateShow(eduGrp);
+    eduGrp.querySelector('select').setAttribute('required', 'required');
   }
 }
 
@@ -660,6 +699,7 @@ async function submitForm(e) {
   const vipTypeVal    = document.querySelector('input[name="vipType"]:checked')?.value || '';
   const vipEduLevel   = document.getElementById('vipEduLevel')?.value  || '';
   const professionVal = document.getElementById('profession')?.value   || '';
+  const supportType   = document.querySelector('input[name="supportType"]:checked')?.value || '';
 
   const data = {
     type:          currentModalType,
@@ -670,6 +710,7 @@ async function submitForm(e) {
     phone,
     motivation:    document.getElementById('motivation').value.trim(),
     timestamp:     new Date().toISOString(),
+    supportType,
     eduLevel:      document.getElementById('eduLevel')?.value      || '',
     specialty:     document.getElementById('specialty')?.value     || '',
     subject:       document.getElementById('subject')?.value       || '',
@@ -873,7 +914,6 @@ let annCurrent   = 0;
 let annAutoSlide = null;
 let annTotalDocs = 0;
 
-// ✅ حساب اتجاه السلايدر دائماً LTR بغض النظر عن لغة الصفحة
 function getSlideDir() { return -1; }
 
 function goToSlide(idx) {
@@ -940,7 +980,6 @@ function _renderFromData(dataArr) {
   track.innerHTML  = '';
   dotsEl.innerHTML = '';
 
-  // ✅ إجبار LTR على الـ track دائماً لمنع انعكاس RTL
   track.style.direction = 'ltr';
 
   const isRtl = currentLang === 'ar';
@@ -950,7 +989,6 @@ function _renderFromData(dataArr) {
 
     const card = document.createElement('div');
     card.className = hasImg ? 'ann-card has-image' : 'ann-card text-only';
-    // ✅ محتوى الكارد يكون بالاتجاه الصحيح للغة
     card.style.direction = isRtl ? 'rtl' : 'ltr';
     card.style.textAlign = isRtl ? 'right' : 'left';
 
@@ -965,7 +1003,6 @@ function _renderFromData(dataArr) {
     }
 
     if (hasImg) {
-      // ─ كارد بصورة كاملة Instagram 1350×1080 ─
       card.innerHTML = `
         <div class="ann-img-wrap">
           <img class="ann-card-img"
@@ -1006,7 +1043,6 @@ function _renderFromData(dataArr) {
     dotsEl.appendChild(dot);
   });
 
-  // ── Arrows ──
   const wrapper = document.querySelector('.ann-track-wrapper');
   wrapper.querySelectorAll('.ann-arrow').forEach(a => a.remove());
 
@@ -1029,7 +1065,6 @@ function _renderFromData(dataArr) {
     wrapper.appendChild(next);
   }
 
-  // ── Touch Swipe ──
   let touchStartX = 0;
   track.addEventListener('touchstart', e => {
     touchStartX = e.touches[0].clientX;
@@ -1044,7 +1079,6 @@ function _renderFromData(dataArr) {
     }
   });
 
-  // ── Mouse Drag ──
   let isDragging = false, dragStartX = 0, dragDelta = 0;
   track.addEventListener('mousedown', e => {
     isDragging = true; dragStartX = e.clientX; dragDelta = 0;
@@ -1054,7 +1088,6 @@ function _renderFromData(dataArr) {
   window.addEventListener('mousemove', e => {
     if (!isDragging) return;
     dragDelta = e.clientX - dragStartX;
-    // ✅ LTR ثابت دائماً
     track.style.transform =
       `translateX(calc(${annCurrent * 100 * getSlideDir()}% + ${dragDelta}px))`;
   });
@@ -1071,8 +1104,6 @@ function _renderFromData(dataArr) {
     resetAnnAuto();
   });
 
-  // ── Init position ──
-  // ✅ LTR ثابت دائماً
   track.style.transform = `translateX(${savedIndex * 100 * getSlideDir()}%)`;
   document.querySelectorAll('.ann-dot').forEach((dot, i) =>
     dot.classList.toggle('active', i === savedIndex));
@@ -1100,14 +1131,14 @@ window.onVipTypeChange       = onVipTypeChange;
 window.onVipEduLevelChange   = onVipEduLevelChange;
 window.onVipDaysCountChange  = onVipDaysCountChange;
 window.onDayChange           = onDayChange;
+window.onBirthDateChange     = onBirthDateChange;
+window.onSupportTypeChange   = onSupportTypeChange;
 window.submitForm            = submitForm;
 window.goToSlide             = goToSlide;
 window.resetAnnAuto          = resetAnnAuto;
 window.openJoinModal         = openJoinModal;
 window.closeJoinModal        = closeJoinModal;
 window.submitJoinForm        = submitJoinForm;
-
-
 
 // ─── LOADING POPUP ────────────────────────────────────────
 function showLoadingPopup() {
@@ -1238,7 +1269,6 @@ function showSuccessJoinPopup() {
 // ─── EVENT LISTENERS ──────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
 
-  // أزرار التسجيل
   document.querySelectorAll('.reg-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const type = btn.getAttribute('data-reg-type');
@@ -1246,17 +1276,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // تغيير اللغة
   document.getElementById('btn-ar').addEventListener('click', () => setLang('ar'));
   document.getElementById('btn-en').addEventListener('click', () => setLang('en'));
 
-  // Modal التسجيل
   document.getElementById('close-modal-btn').addEventListener('click', closeModal);
   document.getElementById('modal').addEventListener('click', e => {
     if (e.target === document.getElementById('modal')) closeModal();
   });
 
-  // Modal الشروط
   document.getElementById('close-terms-btn').addEventListener('click', closeTerms);
   document.getElementById('terms-modal').addEventListener('click', e => {
     if (e.target === document.getElementById('terms-modal')) closeTerms();
@@ -1264,10 +1291,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('terms-checkbox').addEventListener('change', onTermsCheck);
   document.getElementById('terms-proceed-btn').addEventListener('click', proceedToRegister);
 
-  // نموذج التسجيل
   document.getElementById('reg-form').addEventListener('submit', submitForm);
 
-  // زر انضم لفريقنا
   document.getElementById('join-team-btn').addEventListener('click', openJoinModal);
   document.getElementById('close-join-btn').addEventListener('click', closeJoinModal);
   document.getElementById('join-modal').addEventListener('click', e => {
@@ -1275,7 +1300,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('join-form').addEventListener('submit', submitJoinForm);
 
-  // join role toggle
   document.querySelectorAll('input[name="joinRole"]').forEach(radio => {
     radio.addEventListener('change', () => {
       const fields = document.getElementById('join-role-fields');
@@ -1286,12 +1310,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // CV file name
   document.getElementById('joinCV').addEventListener('change', function() {
     document.getElementById('cv-file-name').textContent = this.files[0]?.name || '';
   });
 
-  // حقول النموذج
+  document.getElementById('birthDate').addEventListener('change', onBirthDateChange);
   document.getElementById('eduLevel').addEventListener('change', onEduLevelChange);
   document.getElementById('specialty').addEventListener('change', onSpecialtyChange);
   document.getElementById('subject').addEventListener('change', onSubjectChange);
@@ -1304,6 +1327,8 @@ document.addEventListener('DOMContentLoaded', () => {
     r.addEventListener('change', onVipTypeChange));
   document.querySelectorAll('input[name="candidateType"]').forEach(r =>
     r.addEventListener('change', onCandidateTypeChange));
+  document.querySelectorAll('input[name="supportType"]').forEach(r =>
+    r.addEventListener('change', onSupportTypeChange));
   document.querySelectorAll('input[name="days"]').forEach(cb =>
     cb.addEventListener('change', function() { onDayChange(this); }));
 });
