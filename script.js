@@ -261,6 +261,21 @@ const curriculum = {
   ],
 };
 
+
+// ─── CURRICULUM — دورات مدرسية ────────────────────────────
+const coursesCurriculum = {
+  'ثالثة ثانوي (بكالوريا)': [
+    { course: 'دورة اللغة الإنجليزية',                              teacher: 'الأستاذ كرام الصادق' },
+    { course: 'دورة اللغة الفرنسية',                               teacher: 'الأستاذة كروش شمس الهدى' },
+    { course: 'دورة اللغة العربية',                                teacher: 'الأستاذة موساوي زبيدة' },
+    { course: 'دورة العلوم الإسلامية',                             teacher: 'الأستاذ هبيتة ربيع' },
+    { course: 'دورة الفلسفة',                                      teacher: 'الأستاذة دادة نجاح سلام' },
+    { course: 'دورة التاريخ (الحرب الباردة)',                      teacher: 'الأستاذ دخان أيمن' },
+    { course: 'دورة التاريخ (الثورة الجزائرية)',                   teacher: 'الأستاذ دخان أيمن' },
+    { course: 'دورة الجغرافيا (الفصل الأول والفصل الثاني)',        teacher: 'الأستاذ دخان أيمن' },
+  ],
+};
+
 const needsParent        = ['تحضيري','أولى ابتدائي','ثانية ابتدائي','ثالثة ابتدائي','رابعة ابتدائي','خامسة ابتدائي','أولى متوسط','ثانية متوسط','ثالثة متوسط','رابعة متوسط'];
 const needsSpecialty     = ['أولى ثانوي','ثانية ثانوي','ثالثة ثانوي (بكالوريا)'];
 const needsCandidateType = ['ثالثة ثانوي (بكالوريا)'];
@@ -345,6 +360,7 @@ function resetForm() {
   document.querySelectorAll('input[name="vipType"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+  document.getElementById('coursesListGroup')?.remove();
   document.querySelectorAll('input[name="supportType"]').forEach(r => r.checked = false);
   resetDays();
   maxDaysAllowed = 2;
@@ -424,8 +440,40 @@ function showComingSoon(afterEl) {
   const note = document.createElement('div');
   note.id = 'comingSoonNote';
   note.className = 'coming-soon-note field-appear';
-  note.innerHTML = `<span>🚧</span><span>المواد والأساتذة لهذا المستوى ستُضاف قريباً</span>`;
+  note.innerHTML = `<span>🚧</span><span>الدورات لهذا المستوى ستُضاف قريباً</span>`;
   afterEl.insertAdjacentElement('afterend', note);
+}
+
+function showCoursesList(level, courses) {
+  document.getElementById('coursesListGroup')?.remove();
+  document.getElementById('comingSoonNote')?.remove();
+
+  const wrap = document.createElement('div');
+  wrap.id = 'coursesListGroup';
+  wrap.className = 'form-group field-appear';
+
+  const label = document.createElement('label');
+  label.className = 'form-label';
+  label.innerHTML = `<span>اختر الدورة</span><span>*</span>`;
+  wrap.appendChild(label);
+
+  const select = document.createElement('select');
+  select.className = 'form-input';
+  select.id = 'courseSelect';
+  select.setAttribute('required', 'required');
+  select.innerHTML = `<option value="">-- اختر الدورة --</option>`;
+
+  courses.forEach(item => {
+    const opt = document.createElement('option');
+    opt.value       = item.course + ' — ' + item.teacher;
+    opt.textContent = item.course + ' — ' + item.teacher;
+    select.appendChild(opt);
+  });
+
+  wrap.appendChild(select);
+
+  const eduGrp = document.getElementById('eduLevelGroup');
+  eduGrp.insertAdjacentElement('afterend', wrap);
 }
 function populateSubjects(key) {
   const subGrp    = document.getElementById('subjectGroup');
@@ -492,6 +540,7 @@ function onSupportTypeChange() {
   hideField(document.getElementById('candidateTypeGroup'));
   hideField(document.getElementById('parentGroup'), 'parentName', 'parentPhone');
   document.getElementById('comingSoonNote')?.remove();
+  document.getElementById('coursesListGroup')?.remove();
 
   if (selected) {
     animateShow(eduGrp);
@@ -509,8 +558,10 @@ function onEduLevelChange() {
   const candidateTypeGrp = document.getElementById('candidateTypeGroup');
   const parentName       = document.getElementById('parentName');
   const parentPhone      = document.getElementById('parentPhone');
+  const supportType      = document.querySelector('input[name="supportType"]:checked')?.value || '';
 
   document.getElementById('comingSoonNote')?.remove();
+  document.getElementById('coursesListGroup')?.remove();
   hideField(parentGrp,        'parentName','parentPhone');
   hideField(specialtyGrp,     'specialty');
   hideField(subGrp,           'subject');
@@ -521,6 +572,19 @@ function onEduLevelChange() {
   document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
 
   if (!level) return;
+
+  // ── دورات مدرسية ──
+  if (supportType === 'دورات مدرسية') {
+    const courses = coursesCurriculum[level];
+    if (!courses || courses.length === 0) {
+      showComingSoon(document.getElementById('eduLevelGroup'));
+    } else {
+      showCoursesList(level, courses);
+    }
+    return;
+  }
+
+  // ── دعم مدرسي ──
   if (needsCandidateType.includes(level)) { animateShow(candidateTypeGrp); return; }
   if (needsSpecialty.includes(level))     { showSpecialtyField(level); return; }
   populateSubjects(level);
@@ -685,6 +749,7 @@ async function submitForm(e) {
   const vipEduLevel   = document.getElementById('vipEduLevel')?.value  || '';
   const professionVal = document.getElementById('profession')?.value   || '';
   const supportType   = document.querySelector('input[name="supportType"]:checked')?.value || '';
+  const courseSelect  = document.getElementById('courseSelect')?.value || '';
 
   const data = {
     type:          currentModalType,
@@ -696,6 +761,7 @@ async function submitForm(e) {
     motivation:    document.getElementById('motivation').value.trim(),
     timestamp:     new Date().toISOString(),
     supportType,
+    courseSelect,
     eduLevel:      document.getElementById('eduLevel')?.value      || '',
     specialty:     document.getElementById('specialty')?.value     || '',
     subject:       document.getElementById('subject')?.value       || '',
