@@ -38,7 +38,7 @@ resizeCanvas();
 animateSquares();
 
 // ─── APPS SCRIPT URL ──────────────────────────────────────
-const APPS_SCRIPT_URL      = 'https://script.google.com/macros/s/AKfycbyZhDkoePINCC4M2PiPrZWZayQDvXwonJWAhnPjLd0EHIpLbym8rEQ7oreD3QeFjzVO/exec';
+const APPS_SCRIPT_URL      = 'https://script.google.com/macros/s/AKfycbyAr2aghciLdz020Dry5rta_DUoORFCLVXo8VtTALhYRSgN0aqDOOwV6R2SboRumCUmgA/exec';
 const JOIN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw9dlrKd76aX_O8CYye4UPXo2YcKFGPXpZZOAOJov7YzJtOHo8uo-gGXjMyp4NodTYj/exec';
 
 const typeLabelsAr = {
@@ -295,8 +295,11 @@ function openModal(type) {
   hideField(langGrp,    'langType');
   hideField(vipTypeGrp);
 
-  // support: لا نظهر شيء — ننتظر تاريخ الميلاد أولاً ثم اختيار النوع
-  if (type === 'lang' || type === 'online') {
+  // support: نظهر supportTypeGroup مباشرةً لاختيار النوع قبل المستوى
+  if (type === 'support') {
+    const supportTypeGrp = document.getElementById('supportTypeGroup');
+    animateShow(supportTypeGrp);
+  } else if (type === 'lang' || type === 'online') {
     animateShow(langGrp);
     langGrp.querySelector('select').setAttribute('required','required');
   } else if (type === 'vip') {
@@ -475,25 +478,7 @@ function onLangLevelChange() {
 
 // ─── SUPPORT TYPE (دعم مدرسي / دورات مدرسية) ─────────────
 function onBirthDateChange() {
-  if (currentModalType !== 'support') return;
-  const val            = document.getElementById('birthDate').value;
-  const supportTypeGrp = document.getElementById('supportTypeGroup');
-  const eduGrp         = document.getElementById('eduLevelGroup');
-
-  hideField(eduGrp, 'eduLevel');
-  hideField(document.getElementById('specialtyGroup'), 'specialty');
-  hideField(document.getElementById('subjectGroup'), 'subject');
-  hideField(document.getElementById('teacherGroup'), 'teacher');
-  hideField(document.getElementById('candidateTypeGroup'));
-  hideField(document.getElementById('parentGroup'), 'parentName', 'parentPhone');
-  document.querySelectorAll('input[name="supportType"]').forEach(r => r.checked = false);
-  document.getElementById('comingSoonNote')?.remove();
-
-  if (val) {
-    animateShow(supportTypeGrp);
-  } else {
-    supportTypeGrp.style.display = 'none';
-  }
+  // لا علاقة لتاريخ الميلاد بإظهار supportTypeGroup — هو يظهر مباشرةً عند فتح المودال
 }
 
 function onSupportTypeChange() {
