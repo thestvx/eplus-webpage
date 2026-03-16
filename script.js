@@ -38,7 +38,7 @@ resizeCanvas();
 animateSquares();
 
 // ─── APPS SCRIPT URL ──────────────────────────────────────
-const APPS_SCRIPT_URL      = 'https://script.google.com/macros/s/AKfycbyAr2aghciLdz020Dry5rta_DUoORFCLVXo8VtTALhYRSgN0aqDOOwV6R2SboRumCUmgA/exec';
+const APPS_SCRIPT_URL      = 'https://script.google.com/macros/s/AKfycbx3GtakW27rtfhxwSHgVUsUdGcJ__YVqScQcMqlglBGPgFxyRu4rW45wYjCCPSduwVRPQ/exec';
 const JOIN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw9dlrKd76aX_O8CYye4UPXo2YcKFGPXpZZOAOJov7YzJtOHo8uo-gGXjMyp4NodTYj/exec';
 
 const typeLabelsAr = {
