@@ -19,6 +19,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 
+const CAMP_MIN_AGE = 7;
+const CAMP_MAX_AGE = 15;
+
 /* ══════════════════════════════
    🎬 CAMP VIDEO — Autoplay on Scroll
 ══════════════════════════════ */
@@ -32,7 +35,6 @@ function initCampVideo() {
     (entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
-          // الفيديو ظهر في الشاشة
           if (!hasPlayed) {
             hasPlayed = true;
             video.muted  = false;
@@ -40,17 +42,14 @@ function initCampVideo() {
             const promise = video.play();
             if (promise !== undefined) {
               promise.catch(() => {
-                // fallback: تشغيل بدون صوت إذا رفض المتصفح
                 video.muted = true;
                 video.play();
               });
             }
           } else {
-            // عاد للشاشة مرة أخرى — نشغّله إذا كان متوقفاً
             if (video.paused) video.play();
           }
         } else {
-          // خرج من الشاشة — نوقفه ونكتم الصوت
           if (!video.paused) {
             video.pause();
             video.muted = true;
@@ -175,14 +174,15 @@ function campRegister(e) {
 
   const ageEl  = document.getElementById("campAge");
   const ageNum = parseInt(age);
+
   if (!age || isNaN(ageNum) || ageNum <= 0) {
     ageEl.classList.add("error");
     ageEl.addEventListener("input", () => ageEl.classList.remove("error"), { once: true });
     valid = false;
-  } else if (ageNum < 8 || ageNum > 14) {
+  } else if (ageNum < CAMP_MIN_AGE || ageNum > CAMP_MAX_AGE) {
     ageEl.classList.add("error");
     ageEl.addEventListener("input", () => ageEl.classList.remove("error"), { once: true });
-    alert("❌ عذراً، العمر غير مسموح به للمشاركة في المخيم.\nالفئة العمرية المقبولة: 8 إلى 14 سنة.");
+    alert(`❌ عذراً، العمر غير مسموح به للمشاركة في المخيم.\nالفئة العمرية المقبولة: ${CAMP_MIN_AGE} إلى ${CAMP_MAX_AGE} سنة.`);
     valid = false;
   }
 
