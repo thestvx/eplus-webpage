@@ -38,7 +38,7 @@ resizeCanvas();
 animateSquares();
 
 // ─── APPS SCRIPT URL ──────────────────────────────────────
-const APPS_SCRIPT_URL      = 'https://script.google.com/macros/s/AKfycbx3GtakW27rtfhxwSHgVUsUdGcJ__YVqScQcMqlglBGPgFxyRu4rW45wYjCCPSduwVRPQ/exec';
+const APPS_SCRIPT_URL      = 'https://script.google.com/macros/s/AKfycbwidCYkiWYlCSkMNUwbo1ZLM8XCGh8y5lWD7M_lS-J5cX35-Xd8kHhrwO4ktZiN5_vhIg/exec';
 const JOIN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw9dlrKd76aX_O8CYye4UPXo2YcKFGPXpZZOAOJov7YzJtOHo8uo-gGXjMyp4NodTYj/exec';
 
 const typeLabelsAr = {
@@ -276,6 +276,14 @@ const coursesCurriculum = {
   ],
 };
 
+
+// ─── TAKWINI OPTIONS ──────────────────────────────────────
+const takwiniOptions = [
+  '📸 تصوير بالهاتف',
+  '🎨 جرافيكس ديزاين',
+  '💻 تطوير الويب',
+];
+
 const needsParent        = ['تحضيري','أولى ابتدائي','ثانية ابتدائي','ثالثة ابتدائي','رابعة ابتدائي','خامسة ابتدائي','أولى متوسط','ثانية متوسط','ثالثة متوسط','رابعة متوسط'];
 const needsSpecialty     = ['أولى ثانوي','ثانية ثانوي','ثالثة ثانوي (بكالوريا)'];
 const needsCandidateType = ['ثالثة ثانوي (بكالوريا)'];
@@ -323,6 +331,8 @@ function openModal(type) {
     const daysCountGrp = document.getElementById('vipDaysCountGroup');
     animateShow(daysCountGrp);
     daysCountGrp.querySelector('select').setAttribute('required','required');
+  } else if (type === 'takwini') {
+    showTakwiniOptions();
   }
 
   document.getElementById('lang-toggle').classList.add('hidden');
@@ -361,6 +371,8 @@ function resetForm() {
   document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
   document.getElementById('coursesListGroup')?.remove();
+  document.getElementById('takwiniOptionsGroup')?.remove();
+  document.querySelectorAll('input[name="takwiniOption"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="supportType"]').forEach(r => r.checked = false);
   resetDays();
   maxDaysAllowed = 2;
@@ -721,6 +733,39 @@ function onVipEduLevelChange() {
   document.getElementById('vipDaysCount').setAttribute('required','required');
 }
 
+// ─── TAKWINI OPTIONS ──────────────────────────────────────
+function showTakwiniOptions() {
+  document.getElementById('takwiniOptionsGroup')?.remove();
+
+  const wrap = document.createElement('div');
+  wrap.id        = 'takwiniOptionsGroup';
+  wrap.className = 'form-group field-appear';
+
+  const label = document.createElement('label');
+  label.className = 'form-label';
+  label.innerHTML = `<span>اختر الدورة التكوينية</span><span>*</span>`;
+  wrap.appendChild(label);
+
+  const radioWrap = document.createElement('div');
+  radioWrap.className = 'check-options';
+
+  takwiniOptions.forEach(opt => {
+    const lbl = document.createElement('label');
+    lbl.className = 'check-option';
+    lbl.innerHTML = `
+      <input type="radio" name="takwiniOption" value="${opt}">
+      <span class="check-box"></span>
+      <span class="check-label">${opt}</span>`;
+    radioWrap.appendChild(lbl);
+  });
+
+  wrap.appendChild(radioWrap);
+
+  // أضفه بعد حقل تاريخ الميلاد
+  const birthGroup = document.getElementById('birthDate').closest('.form-group');
+  birthGroup.insertAdjacentElement('afterend', wrap);
+}
+
 // ─── SUBMIT FORM ──────────────────────────────────────────
 async function submitForm(e) {
   e.preventDefault();
@@ -749,7 +794,8 @@ async function submitForm(e) {
   const vipEduLevel   = document.getElementById('vipEduLevel')?.value  || '';
   const professionVal = document.getElementById('profession')?.value   || '';
   const supportType   = document.querySelector('input[name="supportType"]:checked')?.value || '';
-  const courseSelect  = document.getElementById('courseSelect')?.value || '';
+  const courseSelect    = document.getElementById('courseSelect')?.value || '';
+  const takwiniOption   = document.querySelector('input[name="takwiniOption"]:checked')?.value || '';
 
   const data = {
     type:          currentModalType,
@@ -762,6 +808,7 @@ async function submitForm(e) {
     timestamp:     new Date().toISOString(),
     supportType,
     courseSelect,
+    takwiniOption,
     eduLevel:      document.getElementById('eduLevel')?.value      || '',
     specialty:     document.getElementById('specialty')?.value     || '',
     subject:       document.getElementById('subject')?.value       || '',
