@@ -279,5 +279,62 @@
     })();
   </script>
 
+  <!-- ✅ تسجيل الزيارات — Realtime Database + Firestore ═══ -->
+  <script type="module">
+    import { initializeApp, getApps } from
+      "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import {
+      getDatabase, ref, increment, set, onValue, onDisconnect
+    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
+    import {
+      getFirestore, collection, addDoc, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+    const _cfg = {
+      apiKey:            "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
+      authDomain:        "eplus-center-39.firebaseapp.com",
+      projectId:         "eplus-center-39",
+      storageBucket:     "eplus-center-39.firebasestorage.app",
+      messagingSenderId: "191532732034",
+      appId:             "1:191532732034:web:b11449a2f0595db5d02e9b",
+      databaseURL:       "https://eplus-center-39-default-rtdb.firebaseio.com"
+    };
+
+    const visApp = getApps().find(a => a.name === "visitor-app")
+                || initializeApp(_cfg, "visitor-app");
+
+    const rtdb = getDatabase(visApp);
+    const db   = getFirestore(visApp);
+
+    // ── 1. إجمالي الزيارات ──
+    const totalRef = ref(rtdb, "visitors/total");
+    set(totalRef, increment(1));
+
+    // ── 2. حضور لحظي (presence) ──
+    const sessionId = Date.now() + "_" + Math.random().toString(36).slice(2);
+    const mySession = ref(rtdb, "visitors/sessions/" + sessionId);
+    const onlineRef = ref(rtdb, "visitors/online");
+
+    set(mySession, true);
+    onDisconnect(mySession).remove();
+
+    onValue(ref(rtdb, "visitors/sessions"), snap => {
+      const count = snap.exists() ? Object.keys(snap.val()).length : 0;
+      set(onlineRef, count);
+    });
+
+    // ── 3. تسجيل في Firestore للتحليل الزمني ──
+    try {
+      await addDoc(collection(db, "pageViews"), {
+        page:      "camp",
+        visitedAt: serverTimestamp(),
+        userAgent: navigator.userAgent.slice(0, 120),
+        lang:      navigator.language || "unknown"
+      });
+    } catch(e) {
+      console.warn("pageViews log failed:", e);
+    }
+  </script>
+
 </body>
 </html>
