@@ -201,35 +201,9 @@ const curriculum = {
     { subject:'اللغة الفرنسية',   teachers:['الأستاذة مرغني ريهام'] },
   ],
   'أولى ثانوي|علوم تجريبية':[],'أولى ثانوي|آداب ولغات':[],
-
-  // ── ثانية ثانوي — جميع التخصصات ──────────────────────────
-  'ثانية ثانوي|علوم تجريبية': [
-    { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
-    { subject:'اللغة الفرنسية',   teachers:['الأستاذة كروش شمس الهدى'] },
-  ],
-  'ثانية ثانوي|تقني رياضي': [
-    { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
-    { subject:'اللغة الفرنسية',   teachers:['الأستاذة كروش شمس الهدى'] },
-  ],
-  'ثانية ثانوي|رياضيات': [
-    { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
-    { subject:'اللغة الفرنسية',   teachers:['الأستاذة كروش شمس الهدى'] },
-  ],
-  'ثانية ثانوي|تسيير واقتصاد': [
-    { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
-    { subject:'اللغة الفرنسية',   teachers:['الأستاذة كروش شمس الهدى'] },
-  ],
-  'ثانية ثانوي|آداب وفلسفة': [
-    { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
-    { subject:'اللغة الفرنسية',   teachers:['الأستاذة كروش شمس الهدى'] },
-  ],
-  'ثانية ثانوي|لغات أجنبية': [
-    { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
-    { subject:'اللغة الفرنسية',   teachers:['الأستاذة كروش شمس الهدى'] },
-    { subject:'اللغة الإسبانية',   teachers:['الأستاذ طوالبية ابراهيم'] },
-  ],
-
-  // ── ثالثة ثانوي (بكالوريا) ────────────────────────────────
+  'ثانية ثانوي|علوم تجريبية':[],'ثانية ثانوي|تقني رياضي':[],
+  'ثانية ثانوي|رياضيات':[],'ثانية ثانوي|تسيير واقتصاد':[],
+  'ثانية ثانوي|آداب وفلسفة':[],'ثانية ثانوي|لغات أجنبية':[],
   'ثالثة ثانوي (بكالوريا)|علوم تجريبية': [
     { subject:'العلوم الفيزيائية والتكنولوجيا', teachers:['الأستاذ نمسي عبدالرحمان','الأستاذ لكموتة لمين'] },
     { subject:'الرياضيات (العلميين)',            teachers:['الأستاذة ترعة فاطمة','الأستاذ عبدالباسط نعورة'] },
@@ -287,6 +261,7 @@ const curriculum = {
   ],
 };
 
+
 // ─── CURRICULUM — دورات مدرسية ────────────────────────────
 const coursesCurriculum = {
   'ثالثة ثانوي (بكالوريا)': [
@@ -300,6 +275,7 @@ const coursesCurriculum = {
     { course: 'دورة الجغرافيا (الفصل الأول والفصل الثاني)',        teacher: 'الأستاذ دخان أيمن' },
   ],
 };
+
 
 // ─── TAKWINI OPTIONS ──────────────────────────────────────
 const takwiniOptions = [
@@ -342,6 +318,7 @@ function openModal(type) {
   hideField(langGrp,    'langType');
   hideField(vipTypeGrp);
 
+  // support: نظهر supportTypeGroup مباشرةً لاختيار النوع قبل المستوى
   if (type === 'support') {
     const supportTypeGrp = document.getElementById('supportTypeGroup');
     animateShow(supportTypeGrp);
@@ -510,7 +487,6 @@ function showCoursesList(level, courses) {
   const eduGrp = document.getElementById('eduLevelGroup');
   eduGrp.insertAdjacentElement('afterend', wrap);
 }
-
 function populateSubjects(key) {
   const subGrp    = document.getElementById('subjectGroup');
   const subSelect = document.getElementById('subject');
@@ -785,6 +761,7 @@ function showTakwiniOptions() {
 
   wrap.appendChild(radioWrap);
 
+  // أضفه بعد حقل تاريخ الميلاد
   const birthGroup = document.getElementById('birthDate').closest('.form-group');
   birthGroup.insertAdjacentElement('afterend', wrap);
 }
