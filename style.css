@@ -1,1435 +1,1192 @@
-// ─── SQUARES BACKGROUND ───────────────────────────────────
-const canvas = document.getElementById('squares-canvas');
-const ctx    = canvas.getContext('2d');
-let squares  = [];
-const squareSize = 40, squareGap = 4;
-let cols, rows;
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-function resizeCanvas() {
-  canvas.width  = window.innerWidth;
-  canvas.height = window.innerHeight;
-  cols = Math.ceil(window.innerWidth  / (squareSize + squareGap));
-  rows = Math.ceil(window.innerHeight / (squareSize + squareGap));
-  initSquares();
-}
-function initSquares() {
-  squares = [];
-  for (let i = 0; i < cols; i++)
-    for (let j = 0; j < rows; j++)
-      squares.push({
-        x: i*(squareSize+squareGap), y: j*(squareSize+squareGap),
-        opacity: Math.random()*0.3, targetOpacity: Math.random()*0.3,
-        speed: 0.005 + Math.random()*0.01
-      });
-}
-function animateSquares() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  squares.forEach(sq => {
-    if (Math.abs(sq.opacity - sq.targetOpacity) < 0.01)
-      sq.targetOpacity = Math.random()*0.4;
-    sq.opacity += (sq.targetOpacity - sq.opacity) * sq.speed;
-    ctx.fillStyle = `rgba(4,130,195,${sq.opacity})`;
-    ctx.fillRect(sq.x, sq.y, squareSize, squareSize);
-  });
-  requestAnimationFrame(animateSquares);
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-animateSquares();
-
-// ─── APPS SCRIPT URL ──────────────────────────────────────
-const APPS_SCRIPT_URL      = 'https://script.google.com/macros/s/AKfycbwidCYkiWYlCSkMNUwbo1ZLM8XCGh8y5lWD7M_lS-J5cX35-Xd8kHhrwO4ktZiN5_vhIg/exec';
-const JOIN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw9dlrKd76aX_O8CYye4UPXo2YcKFGPXpZZOAOJov7YzJtOHo8uo-gGXjMyp4NodTYj/exec';
-
-const typeLabelsAr = {
-  support: 'تسجيلات الدعم',
-  lang:    'دورات اللغات',
-  vip:     'دروس VIP',
-  ielts:   'اختبار IELTS',
-  online:  'دورات أونلاين',
-  takwini: 'دورات تكوينية',
-};
-
-// ─── LANGUAGE ─────────────────────────────────────────────
-let currentLang = 'ar';
-
-const i18n = {
-  ar: {
-    title:'EDUCATION PLUS CENTER', badge:'✦ رحلتك نحو النجاح تبدأ من هنا ✦',
-    subtitle:'التسجيل في الدورات والبرامج التعليمية',
-    btn1:'تسجيلات الدعم', btn2:'دورات اللغات', btn3:'دروس VIP',
-    btn4:'اختبار IELTS',  btn5:'دورات أونلاين', btn6:'دورات تكوينية',
-    annTitle:'إعلانات المركز التعليمي',
-    firstName:'الاسم', lastName:'اللقب', birthDate:'تاريخ الميلاد',
-    birthPlace:'العنوان', phone:'رقم الهاتف',
-    motivation:    'ما الذي دفعك إلى اختيار التسجيل في مركز E-PLUS؟',
-    motivationVip: 'ما الذي جعلك تختار الدراسة عبر نظام الدروس الخاصة VIP؟',
-    optional:'(اختياري)',
-    eduLevel:'المستوى الدراسي', specialty:'التخصص',
-    subject:'المادة', teacher:'الأستاذ/ة',
-    candidateType:'نوع المترشح', enrolled:'متمدرس', freeCandidate:'حر',
-    parentInfo:'معلومات ولي الأمر',
-    parentName:'اسم ولي الأمر', parentPhone:'هاتف ولي الأمر',
-    langType:'اختر اللغة', langLevel:'مستوى اللغة (CEFR)',
-    levelTest:'هل تريد إجراء اختبار تحديد المستوى؟',
-    yes:'نعم', no:'لا',
-    vipType:'نوع دروس VIP', vipSupport:'📚 دعم دراسي', vipLang:'🌍 لغات',
-    vipDaysCount:'كم يوم تريد الحضور في الأسبوع؟',
-    chooseDays:'اختر الأيام', daysSelected:'يوم محدد',
-    submitBtn:'إتمام التسجيل ✦',
-    termsTitle:'قوانين وشروط المركز التعليمي',
-    termsAgree:'لقد قرأت جميع القوانين والشروط وأوافق عليها',
-    termsProceed:'تأكيد التسجيل ✦',
-    t1:'يعتبر المتعلم مسجلاً بصفة رسمية بالمركز عند قيامه بتسديد رسوم التسجيل في التاريخ المحدد.',
-    t2:'يجب أن يتسم المتعلم بحسن الأخلاق والنظافة والهندام الملائم.',
-    t3:'يجب احترام جميع الأفراد في المركز التعليمي، الزملاء، المدرسين والطاقم الإداري.',
-    t4:'احترام أوقات الدراسة، وعدم الانصراف دون إذن مسبق.',
-    t5:'عدم التغيب عن الحصص إلا لأسباب ضرورية مع إعلام الإدارة مسبقاً.',
-    t6:'في حالة الغياب بدون سبب يتم إعلام الولي.',
-    t7:'لا يتم تعويض قيمة الحصص عند الغياب المتكرر أو الانقطاع عن الدراسة.',
-    t8:'في حالة التوقف عن الدراسة يتم تعويض 80% فقط من القيمة المتبقية.',
-    t9:'في حالة الغياب طويل المدى يرجى الاتصال بالإدارة لأجل تسوية الوضعية.',
-    t10:'لا يتحمل المركز ضياع أي أغراض ثمينة (نقود، هاتف، مجوهرات...).',
-    t11:'يمنع لمس أو تشغيل أدوات وأجهزة التعليم المختلفة دون إذن.',
-    t12:'أي عملية إتلاف لتجهيزات المركز تعرض صاحبها للعقوبة وتعويض الخسائر.',
-    t13:'في حالة السلوكات غير المقبولة، ينذر الولي كتابياً عند تكرر المخالفة.',
-    t14:'الموافقة على نشر صور المتعلم في شبكات التواصل الاجتماعي، ومقاطع الفيديو التربوية الخاصة بالمركز.',
-  },
-  en: {
-    title:'EDUCATION PLUS CENTER', badge:'✦ Your journey to success starts here ✦',
-    subtitle:'Register for courses and educational programs',
-    btn1:'Support Registration', btn2:'Language Courses', btn3:'VIP Lessons',
-    btn4:'IELTS Test', btn5:'Online Courses', btn6:'Training Courses',
-    annTitle:'Center Announcements',
-    firstName:'First Name', lastName:'Last Name', birthDate:'Date of Birth',
-    birthPlace:'Address', phone:'Phone Number',
-    motivation:    'What motivated you to choose E-PLUS Center?',
-    motivationVip: 'What led you to choose studying through the VIP private lessons system?',
-    optional:'(optional)',
-    eduLevel:'Education Level', specialty:'Specialty',
-    subject:'Subject', teacher:'Teacher',
-    candidateType:'Candidate Type', enrolled:'Enrolled', freeCandidate:'Independent',
-    parentInfo:'Parent / Guardian Info',
-    parentName:'Parent Name', parentPhone:'Parent Phone',
-    langType:'Choose Language', langLevel:'Language Level (CEFR)',
-    levelTest:'Would you like a level placement test?',
-    yes:'Yes', no:'No',
-    vipType:'VIP Lesson Type', vipSupport:'📚 Academic Support', vipLang:'🌍 Languages',
-    vipDaysCount:'How many days per week?',
-    chooseDays:'Choose Days', daysSelected:'day(s) selected',
-    submitBtn:'Complete Registration ✦',
-    termsTitle:'Center Terms & Conditions',
-    termsAgree:'I have read all terms and conditions and I agree',
-    termsProceed:'Confirm Registration ✦',
-    t1:'The learner is officially registered upon payment of registration fees on the specified date.',
-    t2:'The learner must demonstrate good conduct, cleanliness, and appropriate dress.',
-    t3:'All individuals at the center must be respected: peers, teachers, and administrative staff.',
-    t4:'Study schedules must be respected and leaving without prior permission is not allowed.',
-    t5:'Absence from sessions is only permitted for urgent reasons with prior notification to administration.',
-    t6:'In case of absence without reason, the guardian will be notified.',
-    t7:'Session fees are not compensated for repeated absences or discontinuation of study.',
-    t8:'In case of study discontinuation, only 80% of the remaining value will be refunded.',
-    t9:'In case of long-term absence, please contact administration to resolve the situation.',
-    t10:'The center is not responsible for loss of any valuables (money, phone, jewelry...).',
-    t11:'Touching or operating educational equipment without permission is prohibited.',
-    t12:'Any damage to center equipment will result in punishment and compensation for losses.',
-    t13:'In case of unacceptable behavior, the guardian will be formally warned upon repeated violations.',
-    t14:'Agreement to publish learner photos on social networks and educational videos related to the center.',
-  }
-};
-
-// ─── HELPER: إخفاء وإظهار اللوقو ─────────────────────────
-function hideLogo() { document.querySelector('.top-logo').style.display = 'none'; }
-function showLogo() { document.querySelector('.top-logo').style.display = 'flex'; }
-
-function setLang(lang) {
-  currentLang = lang;
-  document.documentElement.lang = lang;
-  document.documentElement.dir  = lang === 'ar' ? 'rtl' : 'ltr';
-
-  document.getElementById('btn-ar').classList.toggle('active', lang === 'ar');
-  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
-
-  const t = i18n[lang];
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.getAttribute('data-i18n');
-    if (t[key] !== undefined) el.textContent = t[key];
-  });
-
-  const warnIcon = document.getElementById('lang-warning-icon');
-  const warnText = document.getElementById('lang-warning-text');
-  if (warnIcon && warnText) {
-    if (lang === 'ar') {
-      warnIcon.textContent = '🇸🇦';
-      warnText.textContent = 'يرجى إدخال جميع المعلومات باللغة العربية فقط';
-    } else {
-      warnIcon.textContent = '🇬🇧';
-      warnText.textContent = 'Please enter all information in English only';
-    }
-  }
-
-  if (window._annCache && window._annCache.length > 0) {
-    _renderFromData(window._annCache);
-  }
+:root {
+  --primary:   #045283;
+  --primary-2: #0570b0;
+  --primary-3: #0a8acb;
+  --accent:    #f4b41a;
+  --dark:      #020915;
 }
 
-// ─── LANGUAGE VALIDATION ──────────────────────────────────
-function isArabic(text)  { return /[\u0600-\u06FF]/.test(text); }
-function isEnglish(text) { return /[a-zA-Z]/.test(text); }
-function validateLang(text) {
-  if (!text.trim()) return true;
-  if (currentLang === 'ar') return isArabic(text) && !isEnglish(text);
-  if (currentLang === 'en') return isEnglish(text) && !isArabic(text);
-  return true;
+* { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body {
+  font-family:'Cairo','Inter',sans-serif;
+  min-height:100vh; overflow-x:hidden;
+  background:var(--dark); color:#fff;
 }
 
-// ─── SPECIALTIES ──────────────────────────────────────────
-const specialties = {
-  'أولى ثانوي':             ['علوم تجريبية','آداب ولغات'],
-  'ثانية ثانوي':            ['علوم تجريبية','تقني رياضي','رياضيات','تسيير واقتصاد','آداب وفلسفة','لغات أجنبية'],
-  'ثالثة ثانوي (بكالوريا)': ['علوم تجريبية','تقني رياضي','رياضيات','تسيير واقتصاد','آداب وفلسفة','لغات أجنبية'],
-};
-
-// ─── CURRICULUM ───────────────────────────────────────────
-const curriculum = {
-  'تحضيري':[],'أولى ابتدائي':[],'ثانية ابتدائي':[],
-  'ثالثة ابتدائي':[],'رابعة ابتدائي':[],'خامسة ابتدائي':[],
-  'أولى متوسط':[],'ثانية متوسط':[],'ثالثة متوسط':[],
-  'رابعة متوسط': [
-    { subject:'رياضيات',          teachers:['الأستاذ شامي سهيل'] },
-    { subject:'اللغة الإنجليزية', teachers:['الأستاذة نصبة فاطمة'] },
-    { subject:'اللغة الفرنسية',   teachers:['الأستاذة مرغني ريهام'] },
-  ],
-  'أولى ثانوي|علوم تجريبية':[],'أولى ثانوي|آداب ولغات':[],
-  'ثانية ثانوي|علوم تجريبية':[],'ثانية ثانوي|تقني رياضي':[],
-  'ثانية ثانوي|رياضيات':[],'ثانية ثانوي|تسيير واقتصاد':[],
-  'ثانية ثانوي|آداب وفلسفة':[],'ثانية ثانوي|لغات أجنبية':[],
-  'ثالثة ثانوي (بكالوريا)|علوم تجريبية': [
-    { subject:'العلوم الفيزيائية والتكنولوجيا', teachers:['الأستاذ نمسي عبدالرحمان','الأستاذ لكموتة لمين'] },
-    { subject:'الرياضيات (العلميين)',            teachers:['الأستاذة ترعة فاطمة','الأستاذ عبدالباسط نعورة'] },
-    { subject:'العلوم الطبيعية والحياة',         teachers:['الأستاذ صحراوي شكري'] },
-    { subject:'اللغة العربية',                  teachers:['الأستاذة موساوي زبيدة'] },
-    { subject:'اللغة الفرنسية',                 teachers:['الأستاذة كروش شمس الهدى'] },
-    { subject:'اللغة الإنجليزية',               teachers:['الأستاذ كرام الصادق'] },
-    { subject:'الفلسفة',                        teachers:['الأستاذة دادة نجاح سلام'] },
-    { subject:'تاريخ وجغرافيا',                 teachers:['الأستاذ ايمن دخان'] },
-    { subject:'العلوم الإسلامية',               teachers:['الأستاذ هبيتة ربيع'] },
-  ],
-  'ثالثة ثانوي (بكالوريا)|تقني رياضي': [
-    { subject:'العلوم الفيزيائية والتكنولوجيا', teachers:['الأستاذ نمسي عبدالرحمان','الأستاذ لكموتة لمين'] },
-    { subject:'الرياضيات (العلميين)',            teachers:['الأستاذة ترعة فاطمة','الأستاذ عبدالباسط نعورة'] },
-    { subject:'اللغة العربية',                  teachers:['الأستاذة موساوي زبيدة'] },
-    { subject:'اللغة الفرنسية',                 teachers:['الأستاذة كروش شمس الهدى'] },
-    { subject:'اللغة الإنجليزية',               teachers:['الأستاذ كرام الصادق'] },
-    { subject:'العلوم الإسلامية',               teachers:['الأستاذ هبيتة ربيع'] },
-  ],
-  'ثالثة ثانوي (بكالوريا)|رياضيات': [
-    { subject:'العلوم الفيزيائية والتكنولوجيا', teachers:['الأستاذ نمسي عبدالرحمان','الأستاذ لكموتة لمين'] },
-    { subject:'الرياضيات (العلميين)',            teachers:['الأستاذة ترعة فاطمة','الأستاذ عبدالباسط نعورة'] },
-    { subject:'اللغة العربية',                  teachers:['الأستاذة موساوي زبيدة'] },
-    { subject:'اللغة الفرنسية',                 teachers:['الأستاذة كروش شمس الهدى'] },
-    { subject:'اللغة الإنجليزية',               teachers:['الأستاذ كرام الصادق'] },
-    { subject:'الفلسفة',                        teachers:['الأستاذة دادة نجاح سلام'] },
-    { subject:'العلوم الإسلامية',               teachers:['الأستاذ هبيتة ربيع'] },
-  ],
-  'ثالثة ثانوي (بكالوريا)|تسيير واقتصاد': [
-    { subject:'المحاسبة',          teachers:['الأستاذ سرهود عبدالرحمان'] },
-    { subject:'اللغة العربية',    teachers:['الأستاذة موساوي زبيدة'] },
-    { subject:'اللغة الفرنسية',   teachers:['الأستاذة كروش شمس الهدى'] },
-    { subject:'اللغة الإنجليزية',teachers:['الأستاذ كرام الصادق'] },
-    { subject:'الفلسفة',          teachers:['الأستاذة دادة نجاح سلام'] },
-    { subject:'تاريخ وجغرافيا',   teachers:['الأستاذ ايمن دخان'] },
-    { subject:'العلوم الإسلامية', teachers:['الأستاذ هبيتة ربيع'] },
-  ],
-  'ثالثة ثانوي (بكالوريا)|آداب وفلسفة': [
-    { subject:'اللغة العربية',     teachers:['الأستاذة موساوي زبيدة'] },
-    { subject:'اللغة الفرنسية',    teachers:['الأستاذة كروش شمس الهدى'] },
-    { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
-    { subject:'الفلسفة',           teachers:['الأستاذة دادة نجاح سلام'] },
-    { subject:'تاريخ وجغرافيا',    teachers:['الأستاذ ايمن دخان'] },
-    { subject:'الرياضيات (أدبيين)',teachers:['الأستاذ هبيتة ربيع'] },
-    { subject:'العلوم الإسلامية',  teachers:['الأستاذ هبيتة ربيع'] },
-  ],
-  'ثالثة ثانوي (بكالوريا)|لغات أجنبية': [
-    { subject:'اللغة الإسبانية',   teachers:['الأستاذ طوالبية ابراهيم'] },
-    { subject:'اللغة الألمانية',   teachers:['الأستاذ حمزة علالي'] },
-    { subject:'اللغة العربية',     teachers:['الأستاذة موساوي زبيدة'] },
-    { subject:'اللغة الفرنسية',    teachers:['الأستاذة كروش شمس الهدى'] },
-    { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
-    { subject:'الرياضيات (أدبيين)',teachers:['الأستاذ هبيتة ربيع'] },
-    { subject:'العلوم الإسلامية',  teachers:['الأستاذ هبيتة ربيع'] },
-  ],
-};
-
-
-// ─── CURRICULUM — دورات مدرسية ────────────────────────────
-const coursesCurriculum = {
-  'ثالثة ثانوي (بكالوريا)': [
-    { course: 'دورة اللغة الإنجليزية',                              teacher: 'الأستاذ كرام الصادق' },
-    { course: 'دورة اللغة الفرنسية',                               teacher: 'الأستاذة كروش شمس الهدى' },
-    { course: 'دورة اللغة العربية',                                teacher: 'الأستاذة موساوي زبيدة' },
-    { course: 'دورة العلوم الإسلامية',                             teacher: 'الأستاذ هبيتة ربيع' },
-    { course: 'دورة الفلسفة',                                      teacher: 'الأستاذة دادة نجاح سلام' },
-    { course: 'دورة التاريخ (الحرب الباردة)',                      teacher: 'الأستاذ دخان أيمن' },
-    { course: 'دورة التاريخ (الثورة الجزائرية)',                   teacher: 'الأستاذ دخان أيمن' },
-    { course: 'دورة الجغرافيا (الفصل الأول والفصل الثاني)',        teacher: 'الأستاذ دخان أيمن' },
-  ],
-};
-
-
-// ─── TAKWINI OPTIONS ──────────────────────────────────────
-const takwiniOptions = [
-  '📸 تصوير بالهاتف',
-  '🎨 جرافيكس ديزاين',
-  '💻 تطوير الويب',
-];
-
-const needsParent        = ['تحضيري','أولى ابتدائي','ثانية ابتدائي','ثالثة ابتدائي','رابعة ابتدائي','خامسة ابتدائي','أولى متوسط','ثانية متوسط','ثالثة متوسط','رابعة متوسط'];
-const needsSpecialty     = ['أولى ثانوي','ثانية ثانوي','ثالثة ثانوي (بكالوريا)'];
-const needsCandidateType = ['ثالثة ثانوي (بكالوريا)'];
-
-// ─── MODAL STATE ──────────────────────────────────────────
-let currentModalType = '';
-
-// ─── OPEN MODAL ───────────────────────────────────────────
-function openModal(type) {
-  currentModalType = type;
-  resetForm();
-
-  const titles = {
-    support: currentLang==='ar' ? 'تسجيل — دعم دراسي'      : 'Registration — Academic Support',
-    lang:    currentLang==='ar' ? 'تسجيل — دورات اللغات'   : 'Registration — Language Courses',
-    vip:     currentLang==='ar' ? 'تسجيل — دروس VIP'       : 'Registration — VIP Lessons',
-    ielts:   currentLang==='ar' ? 'تسجيل — اختبار IELTS'   : 'Registration — IELTS Test',
-    online:  currentLang==='ar' ? 'تسجيل — دورات أونلاين'  : 'Registration — Online Courses',
-    takwini: currentLang==='ar' ? 'تسجيل — دورات تكوينية'  : 'Registration — Training Courses',
-  };
-  document.getElementById('modal-title').textContent = titles[type] || 'نموذج التسجيل';
-
-  const motivationLabel = document.querySelector('label[for="motivation"] span[data-i18n="motivation"]');
-  if (motivationLabel) {
-    const t = i18n[currentLang];
-    motivationLabel.textContent = (type === 'vip') ? t.motivationVip : t.motivation;
-  }
-
-  const langGrp    = document.getElementById('langTypeGroup');
-  const vipTypeGrp = document.getElementById('vipTypeGroup');
-
-  hideField(langGrp,    'langType');
-  hideField(vipTypeGrp);
-
-  // support: نظهر supportTypeGroup مباشرةً لاختيار النوع قبل المستوى
-  if (type === 'support') {
-    const supportTypeGrp = document.getElementById('supportTypeGroup');
-    animateShow(supportTypeGrp);
-  } else if (type === 'lang' || type === 'online') {
-    animateShow(langGrp);
-    langGrp.querySelector('select').setAttribute('required','required');
-  } else if (type === 'vip') {
-    animateShow(vipTypeGrp);
-  } else if (type === 'ielts') {
-    const daysCountGrp = document.getElementById('vipDaysCountGroup');
-    animateShow(daysCountGrp);
-    daysCountGrp.querySelector('select').setAttribute('required','required');
-  } else if (type === 'takwini') {
-    showTakwiniOptions();
-  }
-
-  document.getElementById('lang-toggle').classList.add('hidden');
-  hideLogo();
-  document.getElementById('modal').classList.add('active');
-  document.body.style.overflow = 'hidden';
+/* ══════════════════════════════════════
+   BACKGROUND
+══════════════════════════════════════ */
+.squares-bg {
+  position:fixed; inset:0; z-index:0;
+  opacity:0.35; pointer-events:none;
+}
+.bg-animated {
+  position:fixed; inset:0; z-index:0;
+  background:
+    radial-gradient(circle at top,   rgba(4,82,131,0.55) 0,transparent 55%),
+    radial-gradient(circle at bottom,rgba(4,82,131,0.75) 0,var(--dark) 60%);
+  background-size:140% 140%;
+  animation:gradientShift 18s ease-in-out infinite;
+}
+@keyframes gradientShift {
+  0%  { background-position:0%   0%;   }
+  50% { background-position:100% 100%; }
+  100%{ background-position:0%   0%;   }
+}
+.orb {
+  position:fixed; border-radius:50%;
+  filter:blur(80px); opacity:0.18;
+  animation:orbFloat 16s ease-in-out infinite;
+  pointer-events:none; z-index:0;
+}
+.orb-1 { width:480px; height:480px; background:#045283; top:-160px; left:-120px; }
+.orb-2 { width:380px; height:380px; background:#0570b0; bottom:-120px; right:-100px; animation-delay:-5s; }
+.orb-3 { width:320px; height:320px; background:#0a8acb; top:35%; left:45%; animation-delay:-9s; }
+@keyframes orbFloat {
+  0%,100%{ transform:translate(0,0)       scale(1);    }
+  33%    { transform:translate(35px,-25px) scale(1.04); }
+  66%    { transform:translate(-25px,25px) scale(0.96); }
+}
+.grid-pattern {
+  position:fixed; inset:0; z-index:0;
+  background-image:
+    linear-gradient(rgba(4,82,131,0.10) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(4,82,131,0.10) 1px,transparent 1px);
+  background-size:60px 60px; opacity:0.5; pointer-events:none;
 }
 
-function closeModal() {
-  document.getElementById('modal').classList.remove('active');
-  document.body.style.overflow = '';
-  document.getElementById('lang-toggle').classList.remove('hidden');
-  showLogo();
-  resetForm();
+/* ══════════════════════════════════════
+   TOP LOGO — ثابت
+══════════════════════════════════════ */
+.top-logo {
+  position:fixed; top:16px; left:20px;
+  z-index:9999;
+  display:flex; align-items:center;
+  will-change:transform;
+  -webkit-transform:translateZ(0);
+  transform:translateZ(0);
+}
+.top-logo img {
+  height:70px; width:auto; object-fit:contain;
+  transition:filter 0.3s;
+  pointer-events:none; user-select:none;
 }
 
-function closeModalOutside(e) {
-  if (e.target === document.getElementById('modal')) closeModal();
+/* ══════════════════════════════════════
+   LANG TOGGLE — ثابت
+══════════════════════════════════════ */
+.lang-toggle {
+  position:fixed; top:16px; right:16px;
+  z-index:9999;
+  display:flex; gap:6px;
+  will-change:transform;
+  -webkit-transform:translateZ(0);
+  transform:translateZ(0);
+  transition:opacity 0.3s ease;
+}
+.lang-toggle.hidden {
+  opacity:0; pointer-events:none;
+}
+.lang-btn {
+  padding:5px 13px; border-radius:999px;
+  border:1px solid rgba(4,82,131,0.6);
+  background:rgba(2,9,21,0.85); backdrop-filter:blur(14px);
+  color:#e5f2fb; cursor:pointer;
+  font-size:11px; font-weight:700; letter-spacing:0.5px;
+  transition:all 0.25s ease; font-family:inherit;
+}
+.lang-btn:hover {
+  background:rgba(4,82,131,0.85);
+  border-color:#0a8acb;
+  transform:translateY(-1px);
+}
+.lang-btn.active {
+  background:linear-gradient(135deg,#045283,#0a8acb);
+  border-color:transparent;
+  box-shadow:0 0 14px rgba(4,82,131,0.6);
+  color:#fff;
 }
 
-function resetForm() {
-  document.getElementById('reg-form').reset();
-  const groups = [
-    'supportTypeGroup',
-    'eduLevelGroup','candidateTypeGroup','specialtyGroup','subjectGroup',
-    'teacherGroup','parentGroup','langTypeGroup','langLevelGroup',
-    'levelTestGroup','vipTypeGroup','vipEduLevelGroup','professionGroup',
-    'vipDaysCountGroup','daysGroup',
-  ];
-  groups.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-  });
-  document.getElementById('comingSoonNote')?.remove();
-  document.querySelectorAll('input[name="vipType"]').forEach(r => r.checked = false);
-  document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
-  document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
-  document.getElementById('coursesListGroup')?.remove();
-  document.getElementById('takwiniOptionsGroup')?.remove();
-  document.querySelectorAll('input[name="takwiniOption"]').forEach(r => r.checked = false);
-  document.querySelectorAll('input[name="supportType"]').forEach(r => r.checked = false);
-  resetDays();
-  maxDaysAllowed = 2;
+/* ══════════════════════════════════════
+   MAIN CONTENT
+══════════════════════════════════════ */
+.main-content {
+  position:relative; z-index:10; min-height:100vh;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  padding:100px 20px 40px;
+  animation:contentFadeIn 0.9s ease-out forwards; opacity:0;
+}
+@keyframes contentFadeIn {
+  from{ opacity:0; transform:translateY(20px); }
+  to  { opacity:1; transform:translateY(0);    }
+}
 
-  const motivationLabel = document.querySelector('label[for="motivation"] span[data-i18n="motivation"]');
-  if (motivationLabel) {
-    motivationLabel.textContent = i18n[currentLang].motivation;
+/* ══════════════════════════════════════
+   LOGO CONTAINER
+══════════════════════════════════════ */
+.logo-container {
+  text-align:center; margin-bottom:50px;
+  animation:fadeInDown 0.9s ease-out;
+}
+.logo-title {
+  font-size:clamp(50px,10vw,100px);
+  font-weight:900; line-height:1;
+  background:linear-gradient(135deg,#ffffff 0%,#d6e8f7 25%,#53a9df 60%,#ffffff 100%);
+  background-size:220% auto;
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  background-clip:text;
+  animation:shimmer 6s linear infinite;
+  letter-spacing:-2px; margin-bottom:10px;
+}
+@keyframes shimmer {
+  0%  { background-position:0%   center; }
+  100%{ background-position:200% center; }
+}
+.logo-badge {
+  display:inline-block; padding:5px 18px; border-radius:999px;
+  background:rgba(4,82,131,0.20);
+  border:1px solid rgba(4,82,131,0.5);
+  font-size:11px; font-weight:600; letter-spacing:2px;
+  color:#a6d2f5; margin-bottom:12px;
+  animation:pulse 3s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,100%{ box-shadow:0 0 0  0   rgba(4,82,131,0.4);  }
+  50%    { box-shadow:0 0 25px 6px rgba(4,82,131,0.25); }
+}
+.logo-subtitle {
+  font-size:clamp(14px,3vw,18px);
+  color:rgba(227,240,250,0.75); font-weight:400;
+}
+
+/* ══════════════════════════════════════
+   SPRING CAMP FLOAT BUTTON
+══════════════════════════════════════ */
+.camp-btn-wrapper {
+  display:flex; justify-content:center; padding:0 0 22px;
+  width:100%; max-width:560px; position:relative; z-index:10;
+}
+.camp-float-btn {
+  display:flex; align-items:center; gap:16px; padding:16px 28px;
+  border-radius:20px; width:100%;
+  background:linear-gradient(135deg,rgba(4,82,131,0.38) 0%,rgba(10,138,203,0.22) 50%,rgba(244,180,26,0.12) 100%);
+  border:1.5px solid rgba(244,180,26,0.5); text-decoration:none; color:#fff;
+  font-family:inherit; box-shadow:0 8px 32px rgba(0,0,0,0.4);
+  animation:campFloat 3.5s ease-in-out infinite, campGlow 3.5s ease-in-out infinite;
+  transition:transform 0.3s cubic-bezier(0.19,1,0.22,1), box-shadow 0.3s ease;
+  position:relative; overflow:hidden;
+}
+.camp-float-btn::before {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.07),transparent 60%);
+  border-radius:inherit; pointer-events:none;
+}
+.camp-float-btn:hover {
+  transform:translateY(-5px) scale(1.02) !important;
+  box-shadow:0 22px 50px rgba(0,0,0,0.5), 0 0 30px rgba(244,180,26,0.35) !important;
+  animation-play-state:paused;
+  border-color:rgba(244,180,26,0.85);
+}
+@keyframes campFloat { 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-7px); } }
+@keyframes campGlow  { 0%,100%{ box-shadow:0 8px 32px rgba(0,0,0,0.4), 0 0 0px rgba(244,180,26,0); } 50%{ box-shadow:0 16px 40px rgba(0,0,0,0.5), 0 0 24px rgba(244,180,26,0.3); } }
+.camp-float-icon-img { width:46px; height:46px; object-fit:contain; flex-shrink:0; animation:leafSway 3s ease-in-out infinite; }
+@keyframes leafSway { 0%,100%{ transform:rotate(-5deg); } 50%{ transform:rotate(5deg); } }
+.camp-float-content { display:flex; flex-direction:column; gap:3px; flex:1; }
+.camp-float-title   { font-size:16px; font-weight:800; color:#fff; line-height:1.3; }
+.camp-float-sub     { font-size:12px; color:rgba(255,235,180,0.8); font-weight:600; }
+.camp-float-badge   { background:linear-gradient(135deg,#f4b41a,#e09000); color:#020915; font-size:11px; font-weight:800; padding:4px 12px; border-radius:999px; white-space:nowrap; flex-shrink:0; box-shadow:0 2px 10px rgba(244,180,26,0.5); }
+
+/* ══════════════════════════════════════
+   BUTTONS GRID — 3×2
+══════════════════════════════════════ */
+.buttons-grid {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:16px; width:100%; max-width:560px;
+}
+.reg-btn-6 { grid-column:auto; max-width:none; justify-self:auto; }
+
+@media(min-width:900px){
+  .buttons-grid {
+    grid-template-columns:repeat(6,1fr);
+    max-width:1200px; gap:18px;
   }
 }
+.reg-btn {
+  position:relative; overflow:hidden;
+  padding:22px 16px; border-radius:18px;
+  border:1px solid rgba(4,82,131,0.4);
+  background:linear-gradient(135deg,rgba(4,82,131,0.3),rgba(10,138,203,0.15));
+  backdrop-filter:blur(22px); color:#fff; cursor:pointer;
+  font-size:14px; font-weight:700;
+  transition:all 0.35s cubic-bezier(0.19,1,0.22,1);
+  text-align:center; font-family:inherit;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:10px;
+  width:100%;
+  box-shadow:0 10px 30px rgba(0,0,0,0.3);
+  opacity:0; animation:btnFadeUp 0.6s cubic-bezier(0.19,1,0.22,1) forwards;
+}
+.reg-btn-1{ animation-delay:0.28s; }
+.reg-btn-2{ animation-delay:0.36s; }
+.reg-btn-3{
+  animation-delay:0.44s;
+  border-color:rgba(244,180,26,0.35);
+  background:linear-gradient(135deg,rgba(180,120,0,0.25),rgba(244,180,26,0.1));
+}
+.reg-btn-4{
+  animation-delay:0.52s;
+  border-color:rgba(100,200,100,0.35);
+  background:linear-gradient(135deg,rgba(0,130,90,0.25),rgba(100,200,100,0.1));
+}
+.reg-btn-5{
+  animation-delay:0.60s;
+  border-color:rgba(180,100,220,0.35);
+  background:linear-gradient(135deg,rgba(120,40,180,0.25),rgba(180,100,220,0.1));
+}
+.reg-btn-6{
+  animation-delay:0.68s;
+  border-color:rgba(220,100,100,0.35);
+  background:linear-gradient(135deg,rgba(160,40,40,0.25),rgba(220,100,100,0.1));
+}
+@keyframes btnFadeUp {
+  from{ opacity:0; transform:translateY(30px) scale(0.95); }
+  to  { opacity:1; transform:translateY(0)    scale(1);    }
+}
+.reg-btn:hover {
+  transform:translateY(-5px) scale(1.02);
+  border-color:rgba(10,138,203,0.8);
+  box-shadow:0 24px 55px rgba(4,82,131,0.55);
+  background:linear-gradient(135deg,rgba(4,82,131,0.5),rgba(10,138,203,0.3));
+}
+.reg-btn-3:hover{
+  border-color:rgba(244,180,26,0.8);
+  box-shadow:0 24px 55px rgba(244,180,26,0.25);
+  background:linear-gradient(135deg,rgba(180,120,0,0.45),rgba(244,180,26,0.2));
+}
+.reg-btn-4:hover{
+  border-color:rgba(100,200,100,0.8);
+  box-shadow:0 24px 55px rgba(100,200,100,0.25);
+  background:linear-gradient(135deg,rgba(0,130,90,0.45),rgba(100,200,100,0.2));
+}
+.reg-btn-5:hover{
+  border-color:rgba(180,100,220,0.8);
+  box-shadow:0 24px 55px rgba(180,100,220,0.25);
+  background:linear-gradient(135deg,rgba(120,40,180,0.45),rgba(180,100,220,0.2));
+}
+.reg-btn-6:hover{
+  border-color:rgba(220,100,100,0.8);
+  box-shadow:0 24px 55px rgba(220,100,100,0.25);
+  background:linear-gradient(135deg,rgba(160,40,40,0.45),rgba(220,100,100,0.2));
+}
+.reg-btn:active { transform:translateY(-1px) scale(0.98); }
 
-// ─── DAYS ─────────────────────────────────────────────────
-let maxDaysAllowed = 2;
+.btn-icon {
+  display:flex; align-items:center; justify-content:center;
+}
+.btn-icon-img {
+  width:52px; height:52px; object-fit:contain;
+  transition:transform 0.35s cubic-bezier(0.19,1,0.22,1);
+  display:block; image-rendering:auto;
+}
+.reg-btn:hover .btn-icon-img { transform:scale(1.2) rotate(-8deg); }
+.btn-content { display:flex; flex-direction:column; gap:2px; }
+.btn-label   { font-size:13px; font-weight:700; line-height:1.3; }
 
-function onDayChange(checkbox) {
-  const checked = document.querySelectorAll('input[name="days"]:checked');
-  const count   = checked.length;
-  if (count > maxDaysAllowed) { checkbox.checked = false; return; }
-  document.querySelectorAll('.day-card').forEach(card => {
-    const inp = card.querySelector('input');
-    card.classList.toggle('selected', inp.checked);
-    if (!inp.checked && count >= maxDaysAllowed) card.classList.add('disabled');
-    else card.classList.remove('disabled');
-  });
-  const countEl = document.getElementById('days-count');
-  if (countEl) countEl.textContent = Math.min(count, maxDaysAllowed);
-  const counter = document.getElementById('days-counter');
-  if (counter) counter.classList.toggle('complete', count === maxDaysAllowed);
+/* ══════════════════════════════════════
+   JOIN TEAM WRAPPER
+══════════════════════════════════════ */
+.join-team-wrapper {
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:28px 0 10px;
+  position:relative;
+  z-index:10;
+  width:100%;
+}
+.join-team-btn {
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  padding:13px 32px;
+  background:linear-gradient(135deg,#0a8acb 0%,#045283 100%);
+  border:1.5px solid rgba(10,138,203,0.55);
+  border-radius:50px;
+  color:#fff;
+  font-size:15px;
+  font-weight:800;
+  font-family:inherit;
+  cursor:pointer;
+  letter-spacing:0.4px;
+  box-shadow:0 6px 28px rgba(10,138,203,0.4),
+             0 2px 8px rgba(0,0,0,0.4);
+  transition:transform 0.25s cubic-bezier(0.19,1,0.22,1),
+             box-shadow 0.25s ease,
+             background 0.25s ease;
+  position:relative;
+  overflow:hidden;
+}
+.join-team-btn::before {
+  content:'';
+  position:absolute;
+  inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.12),transparent);
+  border-radius:inherit;
+  pointer-events:none;
+}
+.join-team-btn:hover {
+  transform:translateY(-3px) scale(1.04);
+  box-shadow:0 14px 40px rgba(10,138,203,0.6),
+             0 4px 14px rgba(0,0,0,0.5);
+  background:linear-gradient(135deg,#1099e0 0%,#0570b0 100%);
+}
+.join-team-btn:active { transform:scale(0.97); }
+.join-team-icon-img {
+  width:28px; height:28px; object-fit:contain;
+  transition:transform 0.3s ease; flex-shrink:0;
+}
+.join-team-btn:hover .join-team-icon-img { transform:scale(1.15) rotate(-8deg); }
+
+
+/* ══════════════════════════════════════
+   MODAL OVERLAY & BOX
+══════════════════════════════════════ */
+.modal-overlay {
+  position:fixed; inset:0; z-index:200;
+  background:rgba(2,9,21,0.82); backdrop-filter:blur(12px);
+  display:flex; align-items:center; justify-content:center;
+  padding:16px; opacity:0; pointer-events:none;
+  transition:opacity 0.3s ease;
+}
+.modal-overlay.active { opacity:1; pointer-events:all; }
+
+.modal-box {
+  background:radial-gradient(circle at top,rgba(13,61,97,0.75),rgba(6,21,40,0.96));
+  border:1px solid rgba(4,82,131,0.7); border-radius:26px;
+  padding:28px 24px 26px;
+  width:100%; max-width:480px; max-height:90vh;
+  overflow-y:auto;
+  transform:translateY(30px) scale(0.92); opacity:0;
+  transition:all 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  scrollbar-width:thin; scrollbar-color:rgba(4,82,131,0.6) transparent;
+}
+.modal-overlay.active .modal-box { transform:translateY(0) scale(1); opacity:1; }
+.modal-box::-webkit-scrollbar       { width:4px; }
+.modal-box::-webkit-scrollbar-track { background:transparent; }
+.modal-box::-webkit-scrollbar-thumb { background:rgba(4,82,131,0.5); border-radius:4px; }
+
+.modal-header {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:22px;
+}
+.modal-title {
+  font-size:20px; font-weight:800;
+  background:linear-gradient(135deg,#ffffff,#cfe5f7);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.close-btn {
+  width:36px; height:36px; border-radius:999px;
+  border:1px solid rgba(255,255,255,0.18);
+  background:rgba(0,0,0,0.25); color:#fff;
+  cursor:pointer; font-size:18px;
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.3s ease; font-family:inherit;
+}
+.close-btn:hover {
+  background:rgba(244,180,26,0.2);
+  border-color:var(--accent);
+  transform:rotate(90deg) scale(1.1);
 }
 
-function resetDays() {
-  document.querySelectorAll('input[name="days"]').forEach(c => c.checked = false);
-  document.querySelectorAll('.day-card').forEach(c => c.classList.remove('selected','disabled'));
-  const countEl = document.getElementById('days-count');
-  if (countEl) countEl.textContent = '0';
-  const counter = document.getElementById('days-counter');
-  if (counter) counter.classList.remove('complete');
+/* ══════════════════════════════════════
+   LANG WARNING
+══════════════════════════════════════ */
+.lang-warning {
+  display:flex; align-items:center; gap:10px;
+  padding:11px 15px; border-radius:14px; margin-bottom:18px;
+  border:1px solid rgba(10,138,203,0.4);
+  background:rgba(4,82,131,0.12);
+  font-size:13px; font-weight:600; color:rgba(180,220,255,0.9);
+}
+.lang-warning span:first-child { font-size:20px; flex-shrink:0; }
+
+/* ══════════════════════════════════════
+   FORM ELEMENTS
+══════════════════════════════════════ */
+.form-group  { margin-bottom:16px; }
+.form-label  {
+  display:block; font-size:13px; font-weight:600;
+  color:rgba(230,241,250,0.85); margin-bottom:6px;
+}
+.form-label span:last-child { color:#e86b6b; margin-inline-start:3px; }
+.form-input {
+  width:100%; padding:13px 15px; border-radius:14px;
+  border:1px solid rgba(255,255,255,0.08);
+  background:rgba(2,10,22,0.8); color:#fff;
+  font-size:14px; font-family:inherit;
+  transition:all 0.3s cubic-bezier(0.19,1,0.22,1);
+  outline:none; appearance:none;
+}
+.form-input::placeholder { color:rgba(211,227,243,0.45); }
+.form-input:focus {
+  border-color:var(--primary-3);
+  background:rgba(10,138,203,0.07);
+  box-shadow:0 0 0 1px rgba(10,138,203,0.4),0 0 22px rgba(4,82,131,0.45);
+  transform:translateY(-1px);
+}
+.form-input.error {
+  border-color:#e86b6b;
+  box-shadow:0 0 0 3px rgba(232,107,107,0.25);
+  animation:shake 0.35s ease;
+}
+.form-input option,
+.form-input optgroup { background:#071426; color:#fff; }
+textarea.form-input  { resize:vertical; min-height:90px; }
+.form-row {
+  display:grid; grid-template-columns:1fr 1fr; gap:12px;
+}
+@keyframes shake {
+  0%,100%{ transform:translateX(0);    }
+  25%    { transform:translateX(-6px); }
+  75%    { transform:translateX(6px);  }
 }
 
-// ─── VIP DAYS COUNT ───────────────────────────────────────
-function onVipDaysCountChange() {
-  const val     = parseInt(document.getElementById('vipDaysCount').value);
-  const daysGrp = document.getElementById('daysGroup');
-  resetDays();
-  if (!val) { daysGrp.style.display = 'none'; return; }
-  maxDaysAllowed = val;
-  const daysOfLbl = document.getElementById('days-of-label');
-  if (daysOfLbl) daysOfLbl.textContent = `/${val}`;
-  const chooseLbl = document.querySelector('[data-i18n="chooseDays"]');
-  if (chooseLbl) {
-    chooseLbl.textContent = currentLang === 'ar'
-      ? `اختر ${val} ${val === 1 ? 'يوم' : 'أيام'} للحضور في الأسبوع`
-      : `Choose ${val} day${val > 1 ? 's' : ''} per week`;
-  }
-  const countEl = document.getElementById('days-count');
-  if (countEl) countEl.textContent = '0';
-  animateShow(daysGrp);
+/* ══════════════════════════════════════
+   PARENT CARD
+══════════════════════════════════════ */
+.parent-card {
+  padding:16px; border-radius:16px;
+  border:1px solid rgba(244,180,26,0.3);
+  background:rgba(244,180,26,0.05);
+}
+.parent-card-title {
+  display:flex; align-items:center; gap:8px;
+  font-size:13px; font-weight:700;
+  color:rgba(244,180,26,0.9); margin-bottom:14px;
 }
 
-// ─── HELPERS ──────────────────────────────────────────────
-function animateShow(el) {
-  if (!el) return;
-  el.style.display = 'block';
-  el.classList.remove('field-appear');
-  void el.offsetWidth;
-  el.classList.add('field-appear');
+/* ══════════════════════════════════════
+   CHECK OPTIONS
+══════════════════════════════════════ */
+.check-options {
+  display:flex; gap:12px; flex-wrap:wrap;
 }
-function hideField(el, ...ids) {
-  if (!el) return;
-  el.style.display = 'none';
-  ids.forEach(id => {
-    const s = document.getElementById(id);
-    if (s) { s.removeAttribute('required'); s.value = ''; }
-  });
+.check-option {
+  display:flex; align-items:center; gap:10px;
+  padding:12px 18px; border-radius:14px;
+  border:1px solid rgba(255,255,255,0.1);
+  background:rgba(2,10,22,0.6);
+  cursor:pointer; transition:all 0.25s ease;
+  flex:1; min-width:120px;
 }
-function showComingSoon(afterEl) {
-  document.getElementById('comingSoonNote')?.remove();
-  const note = document.createElement('div');
-  note.id = 'comingSoonNote';
-  note.className = 'coming-soon-note field-appear';
-  note.innerHTML = `<span>🚧</span><span>الدورات لهذا المستوى ستُضاف قريباً</span>`;
-  afterEl.insertAdjacentElement('afterend', note);
+.check-option:hover {
+  border-color:rgba(10,138,203,0.5);
+  background:rgba(10,138,203,0.08);
 }
-
-function showCoursesList(level, courses) {
-  document.getElementById('coursesListGroup')?.remove();
-  document.getElementById('comingSoonNote')?.remove();
-
-  const wrap = document.createElement('div');
-  wrap.id = 'coursesListGroup';
-  wrap.className = 'form-group field-appear';
-
-  const label = document.createElement('label');
-  label.className = 'form-label';
-  label.innerHTML = `<span>اختر الدورة</span><span>*</span>`;
-  wrap.appendChild(label);
-
-  const select = document.createElement('select');
-  select.className = 'form-input';
-  select.id = 'courseSelect';
-  select.setAttribute('required', 'required');
-  select.innerHTML = `<option value="">-- اختر الدورة --</option>`;
-
-  courses.forEach(item => {
-    const opt = document.createElement('option');
-    opt.value       = item.course + ' — ' + item.teacher;
-    opt.textContent = item.course + ' — ' + item.teacher;
-    select.appendChild(opt);
-  });
-
-  wrap.appendChild(select);
-
-  const eduGrp = document.getElementById('eduLevelGroup');
-  eduGrp.insertAdjacentElement('afterend', wrap);
+.check-option input[type="radio"] { display:none; }
+.check-box {
+  width:20px; height:20px; border-radius:6px; flex-shrink:0;
+  border:2px solid rgba(255,255,255,0.25);
+  background:rgba(2,10,22,0.8);
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.2s ease;
 }
-function populateSubjects(key) {
-  const subGrp    = document.getElementById('subjectGroup');
-  const subSelect = document.getElementById('subject');
-  const teachGrp  = document.getElementById('teacherGroup');
-  document.getElementById('comingSoonNote')?.remove();
-  hideField(subGrp,   'subject');
-  hideField(teachGrp, 'teacher');
-  const subjects = curriculum[key] ?? [];
-  if (subjects.length === 0) {
-    const specGrp = document.getElementById('specialtyGroup');
-    const eduGrp  = document.getElementById('eduLevelGroup');
-    const afterEl = (specGrp?.style.display !== 'none') ? specGrp : eduGrp;
-    showComingSoon(afterEl);
-    return;
-  }
-  subSelect.innerHTML = `<option value="">-- اختر المادة --</option>`;
-  subjects.forEach(item => {
-    const opt = document.createElement('option');
-    opt.value = item.subject; opt.textContent = item.subject;
-    subSelect.appendChild(opt);
-  });
-  animateShow(subGrp);
-  subSelect.setAttribute('required','required');
+.check-option input[type="radio"]:checked ~ .check-box {
+  background:linear-gradient(135deg,#045283,#0a8acb);
+  border-color:transparent;
+  box-shadow:0 0 12px rgba(10,138,203,0.6);
+}
+.check-option input[type="radio"]:checked ~ .check-box::after {
+  content:'✓'; color:#fff; font-size:12px; font-weight:700;
+}
+.check-option:has(input:checked) {
+  border-color:rgba(10,138,203,0.6);
+  background:rgba(10,138,203,0.1);
+}
+.check-label {
+  font-size:14px; font-weight:600; color:rgba(220,235,250,0.8);
 }
 
-// ─── LANG TYPE ────────────────────────────────────────────
-function onLangTypeChange() {
-  const val        = document.getElementById('langType').value;
-  const langLvlGrp = document.getElementById('langLevelGroup');
-  const levelTestG = document.getElementById('levelTestGroup');
-  hideField(langLvlGrp, 'langLevel');
-  hideField(levelTestG);
-  document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
-  if (val) {
-    animateShow(langLvlGrp);
-    langLvlGrp.querySelector('select')?.setAttribute('required','required');
-  }
+/* ══════════════════════════════════════
+   VIP TYPE — ذهبي
+══════════════════════════════════════ */
+#vipTypeGroup .check-options { gap:14px; }
+#vipTypeGroup .check-option {
+  flex-direction:column; align-items:center; justify-content:center;
+  padding:18px 14px; gap:8px; text-align:center;
+  border-color:rgba(244,180,26,0.25);
+  background:rgba(244,180,26,0.04);
+}
+#vipTypeGroup .check-option:hover {
+  border-color:rgba(244,180,26,0.55);
+  background:rgba(244,180,26,0.08);
+}
+#vipTypeGroup .check-option:has(input:checked) {
+  border-color:rgba(244,180,26,0.7);
+  background:rgba(244,180,26,0.12);
+  box-shadow:0 0 18px rgba(244,180,26,0.15);
+}
+#vipTypeGroup .check-option input[type="radio"]:checked ~ .check-box {
+  background:linear-gradient(135deg,#a07000,#f4b41a);
+  box-shadow:0 0 12px rgba(244,180,26,0.6);
+}
+#vipTypeGroup .check-label {
+  font-size:15px; font-weight:800; color:rgba(255,235,180,0.9);
 }
 
-function onLangLevelChange() {
-  const val          = document.getElementById('langLevel').value;
-  const levelTestGrp = document.getElementById('levelTestGroup');
-  if (val) animateShow(levelTestGrp);
-  else {
-    levelTestGrp.style.display = 'none';
-    document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
-  }
+/* ══════════════════════════════════════
+   RADIO CARDS
+══════════════════════════════════════ */
+.radio-cards {
+  display:flex; flex-wrap:wrap; gap:10px; margin-top:8px;
+}
+.radio-card {
+  flex:1 1 calc(33% - 10px); min-width:110px;
+  display:flex; align-items:center; gap:8px;
+  background:rgba(2,10,22,0.7);
+  border:1.5px solid rgba(255,255,255,0.1);
+  border-radius:14px; padding:12px 14px;
+  cursor:pointer; transition:all 0.25s ease;
+  font-size:13px; font-weight:600;
+  color:rgba(220,235,250,0.8);
+  user-select:none;
+}
+.radio-card:hover {
+  border-color:rgba(10,138,203,0.5);
+  background:rgba(10,138,203,0.08);
+  transform:translateY(-2px);
+}
+.radio-card input[type="radio"] {
+  accent-color:#0a8acb;
+  width:16px; height:16px; flex-shrink:0;
+  cursor:pointer;
+}
+.radio-card:has(input:checked) {
+  background:rgba(10,138,203,0.15);
+  border-color:#0a8acb;
+  color:#7cc8f0;
+  box-shadow:0 0 16px rgba(10,138,203,0.25);
 }
 
-// ─── SUPPORT TYPE (دعم مدرسي / دورات مدرسية) ─────────────
-function onBirthDateChange() {
-  // لا علاقة لتاريخ الميلاد بإظهار supportTypeGroup — هو يظهر مباشرةً عند فتح المودال
+/* ══════════════════════════════════════
+   REQUIRED NOTE BOX
+══════════════════════════════════════ */
+.required-note-box {
+  display:flex; align-items:flex-start; gap:10px;
+  background:rgba(255,193,7,0.08);
+  border:1.5px solid rgba(255,193,7,0.35);
+  border-radius:14px;
+  padding:13px 16px;
+  margin:4px 0 16px;
+  font-size:13px; font-weight:600;
+  color:rgba(255,224,100,0.9);
+  line-height:1.65;
+  text-align:center;
+  justify-content:center;
 }
 
-function onSupportTypeChange() {
-  const selected = document.querySelector('input[name="supportType"]:checked')?.value;
-  const eduGrp   = document.getElementById('eduLevelGroup');
-
-  hideField(eduGrp, 'eduLevel');
-  hideField(document.getElementById('specialtyGroup'), 'specialty');
-  hideField(document.getElementById('subjectGroup'), 'subject');
-  hideField(document.getElementById('teacherGroup'), 'teacher');
-  hideField(document.getElementById('candidateTypeGroup'));
-  hideField(document.getElementById('parentGroup'), 'parentName', 'parentPhone');
-  document.getElementById('comingSoonNote')?.remove();
-  document.getElementById('coursesListGroup')?.remove();
-
-  if (selected) {
-    animateShow(eduGrp);
-    eduGrp.querySelector('select').setAttribute('required', 'required');
-  }
+/* ══════════════════════════════════════
+   DAYS GRID (WEEK CALENDAR V1)
+══════════════════════════════════════ */
+.days-grid {
+  display:grid; grid-template-columns:repeat(4,1fr);
+  gap:10px; margin-bottom:12px;
+}
+@media(max-width:400px){
+  .days-grid { grid-template-columns:repeat(3,1fr); }
+}
+.day-card {
+  position:relative; cursor:pointer;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:4px; padding:14px 8px; border-radius:16px;
+  border:1.5px solid rgba(255,255,255,0.1);
+  background:rgba(2,10,22,0.7);
+  transition:all 0.3s cubic-bezier(0.19,1,0.22,1);
+  user-select:none; overflow:hidden;
+}
+.day-card:hover {
+  border-color:rgba(10,138,203,0.5);
+  transform:translateY(-2px);
+  box-shadow:0 8px 20px rgba(0,0,0,0.4);
+}
+.day-card input[type="checkbox"] { display:none; }
+.day-card.selected {
+  border-color:#0a8acb;
+  background:rgba(10,138,203,0.12);
+  box-shadow:0 0 20px rgba(10,138,203,0.35),
+             inset 0 0 15px rgba(4,82,131,0.15);
+  transform:translateY(-3px) scale(1.03);
+}
+.day-card.selected .day-name { color:#fff; }
+.day-card.selected .day-sub  { color:#7cc8f0; }
+.day-card.disabled {
+  opacity:0.35; cursor:not-allowed;
+  transform:none !important; pointer-events:none;
+}
+.day-card.selected::after {
+  content:'✓'; position:absolute; top:6px; right:8px;
+  width:16px; height:16px; border-radius:50%;
+  background:linear-gradient(135deg,#045283,#0a8acb);
+  display:flex; align-items:center; justify-content:center;
+  font-size:10px; font-weight:800; color:#fff;
+  box-shadow:0 2px 8px rgba(4,82,131,0.6);
+}
+.day-name {
+  font-size:13px; font-weight:700;
+  color:rgba(220,235,250,0.8); position:relative; z-index:1;
+}
+.day-sub {
+  font-size:10px; font-weight:600;
+  color:rgba(150,190,220,0.6); letter-spacing:0.5px;
+  position:relative; z-index:1;
+}
+.days-counter {
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  padding:10px 16px; border-radius:12px;
+  background:rgba(4,82,131,0.1);
+  border:1px solid rgba(4,82,131,0.25);
+  font-size:13px; font-weight:700;
+  color:rgba(200,230,255,0.85);
+}
+#days-count {
+  font-size:20px; font-weight:900;
+  background:linear-gradient(135deg,#0a8acb,#ffffff);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.days-counter.complete {
+  border-color:rgba(10,200,100,0.5);
+  background:rgba(10,200,100,0.08);
+}
+.days-counter.complete #days-count {
+  background:linear-gradient(135deg,#0ac864,#ffffff);
+  -webkit-background-clip:text; background-clip:text;
 }
 
-// ─── EDU LEVEL (دعم) ──────────────────────────────────────
-function onEduLevelChange() {
-  const level            = document.getElementById('eduLevel').value;
-  const parentGrp        = document.getElementById('parentGroup');
-  const specialtyGrp     = document.getElementById('specialtyGroup');
-  const subGrp           = document.getElementById('subjectGroup');
-  const teachGrp         = document.getElementById('teacherGroup');
-  const candidateTypeGrp = document.getElementById('candidateTypeGroup');
-  const parentName       = document.getElementById('parentName');
-  const parentPhone      = document.getElementById('parentPhone');
-  const supportType      = document.querySelector('input[name="supportType"]:checked')?.value || '';
+/* ══════════════════════════════════════
+   WEEK CALENDAR V2 (New Layout)
+══════════════════════════════════════ */
+.week-calendar { border-radius:18px; border:1px solid rgba(4,82,131,0.4); background:rgba(2,10,22,0.7); overflow:hidden; margin-bottom:12px; }
+.week-cal-header { display:grid; grid-template-columns:repeat(7,1fr); background:rgba(4,82,131,0.25); border-bottom:1px solid rgba(4,82,131,0.3); }
+.week-cal-header span { text-align:center; padding:8px 4px; font-size:10px; font-weight:700; letter-spacing:0.5px; color:rgba(130,195,230,0.8); text-transform:uppercase; }
+.week-cal-body { display:grid; grid-template-columns:repeat(7,1fr); padding:10px 8px; gap:6px; }
+.week-day-cell { position:relative; cursor:pointer; display:flex; align-items:center; justify-content:center; user-select:none; }
+.week-day-cell input[type="checkbox"] { display:none; }
+.wdc-inner { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; width:100%; padding:10px 4px; border-radius:12px; border:1.5px solid rgba(255,255,255,0.08); background:rgba(4,82,131,0.05); transition:all 0.25s cubic-bezier(0.19,1,0.22,1); min-height:60px; }
+.week-day-cell:hover .wdc-inner { border-color:rgba(10,138,203,0.5); background:rgba(10,138,203,0.1); transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,0.3); }
+.week-day-cell.selected .wdc-inner { border-color:#0a8acb; background:linear-gradient(135deg,rgba(4,82,131,0.45),rgba(10,138,203,0.25)); box-shadow:0 0 18px rgba(10,138,203,0.4), inset 0 0 12px rgba(4,82,131,0.2); transform:translateY(-3px) scale(1.04); }
+.week-day-cell.disabled { opacity:0.35; cursor:not-allowed; pointer-events:none; }
+.week-day-cell.disabled .wdc-inner { transform:none !important; }
+.wdc-name  { font-size:11px; font-weight:700; color:rgba(200,225,255,0.8); text-align:center; line-height:1.3; }
+.wdc-short { font-size:9px; font-weight:600; color:rgba(130,190,230,0.55); letter-spacing:0.4px; }
+.week-day-cell.selected .wdc-name  { color:#fff; }
+.week-day-cell.selected .wdc-short { color:#7cc8f0; }
+.week-day-cell.selected .wdc-inner::after { content:'✓'; position:absolute; top:5px; right:5px; width:14px; height:14px; border-radius:50%; background:linear-gradient(135deg,#045283,#0a8acb); display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:800; color:#fff; box-shadow:0 2px 6px rgba(4,82,131,0.6); }
 
-  document.getElementById('comingSoonNote')?.remove();
-  document.getElementById('coursesListGroup')?.remove();
-  hideField(parentGrp,        'parentName','parentPhone');
-  hideField(specialtyGrp,     'specialty');
-  hideField(subGrp,           'subject');
-  hideField(teachGrp,         'teacher');
-  hideField(candidateTypeGrp);
-  parentName.removeAttribute('required');
-  parentPhone.removeAttribute('required');
-  document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
-
-  if (!level) return;
-
-  // ── دورات مدرسية ──
-  if (supportType === 'دورات مدرسية') {
-    const courses = coursesCurriculum[level];
-    if (!courses || courses.length === 0) {
-      showComingSoon(document.getElementById('eduLevelGroup'));
-    } else {
-      showCoursesList(level, courses);
-    }
-    return;
-  }
-
-  // ── دعم مدرسي ──
-  if (needsCandidateType.includes(level)) { animateShow(candidateTypeGrp); return; }
-  if (needsSpecialty.includes(level))     { showSpecialtyField(level); return; }
-  populateSubjects(level);
+/* ══════════════════════════════════════
+   COMING SOON
+══════════════════════════════════════ */
+.coming-soon-note {
+  display:flex; align-items:center; gap:10px;
+  padding:12px 15px; border-radius:14px;
+  border:1px dashed rgba(244,180,26,0.4);
+  background:rgba(244,180,26,0.06);
+  color:rgba(244,180,26,0.85);
+  font-size:13px; font-weight:600; margin-top:4px;
 }
 
-function onCandidateTypeChange() {
-  const level = document.getElementById('eduLevel').value;
-  document.getElementById('comingSoonNote')?.remove();
-  hideField(document.getElementById('specialtyGroup'), 'specialty');
-  hideField(document.getElementById('subjectGroup'),   'subject');
-  hideField(document.getElementById('teacherGroup'),   'teacher');
-  hideField(document.getElementById('parentGroup'),    'parentName','parentPhone');
-  if (!document.querySelector('input[name="candidateType"]:checked')) return;
-  showSpecialtyField(level);
+/* ══════════════════════════════════════
+   FIELD ANIMATION
+══════════════════════════════════════ */
+.field-appear {
+  animation:fieldSlideIn 0.35s cubic-bezier(0.19,1,0.22,1) both;
+}
+@keyframes fieldSlideIn {
+  from{ opacity:0; transform:translateY(12px); }
+  to  { opacity:1; transform:translateY(0);    }
 }
 
-function showSpecialtyField(level) {
-  const specialtyGrp = document.getElementById('specialtyGroup');
-  const specialtySel = document.getElementById('specialty');
-  const specs = specialties[level] || [];
-  specialtySel.innerHTML = `<option value="">-- اختر التخصص --</option>`;
-  specs.forEach(sp => {
-    const opt = document.createElement('option');
-    opt.value = sp; opt.textContent = sp;
-    specialtySel.appendChild(opt);
-  });
-  animateShow(specialtyGrp);
-  specialtySel.setAttribute('required','required');
+/* ══════════════════════════════════════
+   SUBMIT BUTTON
+══════════════════════════════════════ */
+.submit-btn {
+  width:100%; padding:15px; border-radius:16px; border:none;
+  background:linear-gradient(135deg,#045283,#0a8acb);
+  color:#fff; font-size:16px; font-weight:700;
+  cursor:pointer; font-family:inherit;
+  transition:all 0.3s ease; position:relative;
+  overflow:hidden; margin-top:6px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.55);
+  display:flex; align-items:center; justify-content:center; gap:8px;
+}
+.submit-btn:hover {
+  transform:translateY(-2px);
+  box-shadow:0 18px 40px rgba(4,82,131,0.6);
+}
+.submit-btn:active { transform:scale(0.98); }
+.submit-btn.loading { opacity:0.75; pointer-events:none; }
+.submit-btn.loading::after {
+  content:''; width:16px; height:16px;
+  border:2px solid rgba(255,255,255,0.35); border-top-color:#fff;
+  border-radius:50%;
+  animation:spin 0.7s linear infinite; flex-shrink:0;
+}
+@keyframes spin { to{ transform:rotate(360deg); } }
+
+/* ══════════════════════════════════════
+   VIP CALENDAR
+══════════════════════════════════════ */
+.vip-calendar {
+  border-radius:18px;
+  border:1px solid rgba(4,82,131,0.45);
+  background:rgba(2,10,22,0.75);
+  overflow:hidden;
+  margin-bottom:14px;
+}
+.vcal-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 16px;
+  background:rgba(4,82,131,0.28);
+  border-bottom:1px solid rgba(4,82,131,0.3);
+}
+.vcal-month-label {
+  font-size:15px; font-weight:800; color:#fff; letter-spacing:0.5px;
+}
+.vcal-nav {
+  width:32px; height:32px; border-radius:50%;
+  border:1px solid rgba(10,138,203,0.5);
+  background:rgba(2,9,21,0.7);
+  color:#7cc8f0; font-size:20px; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:all 0.22s ease; font-family:inherit;
+}
+.vcal-nav:hover {
+  background:rgba(10,138,203,0.3); transform:scale(1.1);
+  box-shadow:0 0 12px rgba(10,138,203,0.4);
+}
+.vcal-days-row {
+  display:grid; grid-template-columns:repeat(7,1fr);
+  background:rgba(4,82,131,0.15);
+  border-bottom:1px solid rgba(4,82,131,0.2);
+}
+.vcal-days-row span {
+  text-align:center; padding:8px 2px; font-size:10px; font-weight:700;
+  letter-spacing:0.4px; color:rgba(130,195,230,0.75); text-transform:uppercase;
+}
+.vcal-grid {
+  display:grid; grid-template-columns:repeat(7,1fr);
+  gap:4px; padding:10px 8px 12px;
+}
+.vcal-day {
+  aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+  border-radius:10px; font-size:13px; font-weight:600;
+  color:rgba(220,238,255,0.85); border:1.5px solid transparent;
+  background:rgba(4,82,131,0.06); cursor:pointer;
+  transition:all 0.2s ease; user-select:none;
+}
+.vcal-day:hover:not(.vcal-day-past):not(.vcal-day-empty) {
+  background:rgba(10,138,203,0.18); border-color:rgba(10,138,203,0.5);
+  transform:scale(1.08); color:#fff;
+}
+.vcal-day-empty { background:transparent; border-color:transparent; cursor:default; pointer-events:none; }
+.vcal-day-past  { color:rgba(150,180,210,0.3); cursor:not-allowed; pointer-events:none; background:rgba(2,9,21,0.4); }
+.vcal-day-today { border-color:rgba(244,180,26,0.7); background:rgba(244,180,26,0.08); color:#f4b41a; font-weight:800; }
+.vcal-day-selected {
+  background:linear-gradient(135deg,#045283,#0a8acb) !important;
+  border-color:transparent !important; color:#fff !important; font-weight:800;
+  box-shadow:0 0 18px rgba(10,138,203,0.55), inset 0 0 10px rgba(255,255,255,0.1);
+  transform:scale(1.1);
+}
+.vcal-time-row { padding:14px 16px 16px; border-top:1px solid rgba(4,82,131,0.25); background:rgba(4,82,131,0.06); }
+.vcal-time-slots { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px; }
+.vcal-slot {
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  padding:9px 6px; border-radius:12px; border:1.5px solid rgba(255,255,255,0.1);
+  background:rgba(2,10,22,0.65); cursor:pointer; transition:all 0.22s ease; user-select:none;
+}
+.vcal-slot:hover { border-color:rgba(10,138,203,0.5); background:rgba(10,138,203,0.1); transform:translateY(-1px); }
+.vcal-slot input[type="radio"] { display:none; }
+.vcal-slot span { font-size:11px; font-weight:700; color:rgba(200,228,255,0.8); letter-spacing:0.3px; text-align:center; line-height:1.3; }
+.vcal-slot:has(input:checked) { background:linear-gradient(135deg,rgba(4,82,131,0.45),rgba(10,138,203,0.25)); border-color:#0a8acb; box-shadow:0 0 14px rgba(10,138,203,0.35); }
+.vcal-slot:has(input:checked) span { color:#7cc8f0; }
+.vcal-selected-display { display:flex; align-items:center; gap:10px; margin:10px 16px 4px; padding:11px 16px; border-radius:14px; background:rgba(10,138,203,0.12); border:1.5px solid rgba(10,138,203,0.45); }
+.vcal-selected-icon { font-size:18px; flex-shrink:0; }
+.vcal-selected-text { font-size:13px; font-weight:700; color:#7cc8f0; flex:1; }
+
+/* ══════════════════════════════════════
+   JOIN TEAM MODAL
+══════════════════════════════════════ */
+.join-modal-box {
+  max-width:500px;
+  background:radial-gradient(circle at top,rgba(13,61,97,0.8),rgba(6,21,40,0.97));
+  border:1px solid rgba(10,138,203,0.55);
+}
+.join-form-section { padding:4px 0 10px; }
+.join-role-options { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:6px; }
+.join-role-card {
+  display:flex; align-items:center; gap:10px; padding:13px 14px; border-radius:14px;
+  border:1.5px solid rgba(255,255,255,0.1); background:rgba(2,10,22,0.6);
+  cursor:pointer; transition:all 0.22s ease; user-select:none;
+  font-size:13px; font-weight:600; color:rgba(220,235,250,0.85);
+}
+.join-role-card:hover { border-color:rgba(10,138,203,0.5); background:rgba(10,138,203,0.08); }
+.join-role-card input[type="radio"] { display:none; }
+.join-role-card:has(input:checked) { background:rgba(10,138,203,0.16); border-color:#0a8acb; color:#7cc8f0; box-shadow:0 0 16px rgba(10,138,203,0.25); }
+.join-role-card .check-box { width:18px; height:18px; border-radius:5px; flex-shrink:0; border:2px solid rgba(255,255,255,0.22); background:rgba(2,10,22,0.8); display:flex; align-items:center; justify-content:center; transition:all 0.2s ease; }
+.join-role-card input:checked ~ .check-box { background:linear-gradient(135deg,#045283,#0a8acb); border-color:transparent; box-shadow:0 0 10px rgba(10,138,203,0.6); }
+.join-role-card input:checked ~ .check-box::after { content:'✓'; color:#fff; font-size:11px; font-weight:800; }
+.cv-upload-label {
+  display:flex; align-items:center; gap:10px; padding:13px 15px; border-radius:14px;
+  border:1.5px dashed rgba(10,138,203,0.45); background:rgba(2,10,22,0.6);
+  cursor:pointer; transition:all 0.22s ease; color:rgba(180,220,255,0.8);
+  font-size:13px; font-weight:600;
+}
+.cv-upload-label:hover { border-color:rgba(10,138,203,0.8); background:rgba(10,138,203,0.08); }
+.cv-upload-label input[type="file"] { display:none; }
+#cv-file-name { font-size:12px; color:#7cc8f0; margin-top:5px; padding-inline-start:4px; }
+
+/* ══════════════════════════════════════
+   TERMS MODAL
+══════════════════════════════════════ */
+.terms-modal-box { max-width:560px; display:flex; flex-direction:column; padding:0; overflow:hidden; max-height:90vh; }
+.terms-modal-box .modal-header { padding:22px 24px 18px; border-bottom:1px solid rgba(4,82,131,0.25); margin-bottom:0; flex-shrink:0; }
+.terms-body { padding:20px 24px; overflow-y:auto; flex:1; min-height:0; scrollbar-width:thin; scrollbar-color:rgba(4,82,131,0.6) transparent; }
+.terms-body::-webkit-scrollbar       { width:4px; }
+.terms-body::-webkit-scrollbar-track { background:transparent; }
+.terms-body::-webkit-scrollbar-thumb { background:rgba(4,82,131,0.5); border-radius:4px; }
+.terms-list { display:flex; flex-direction:column; gap:10px; }
+.terms-item { display:flex; gap:12px; align-items:flex-start; padding:12px 14px; border-radius:12px; background:rgba(4,82,131,0.08); border:1px solid rgba(4,82,131,0.15); font-size:13.5px; line-height:1.7; color:rgba(227,240,250,0.9); transition:background 0.2s; }
+.terms-item:hover { background:rgba(4,82,131,0.15); }
+.terms-item-highlight { background:rgba(244,180,26,0.07); border-color:rgba(244,180,26,0.25); color:rgba(255,235,180,0.95); }
+.terms-item-highlight:hover { background:rgba(244,180,26,0.12); }
+.terms-num { min-width:26px; height:26px; border-radius:8px; background:linear-gradient(135deg,#045283,#0a8acb); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#fff; flex-shrink:0; margin-top:1px; }
+.terms-item-highlight .terms-num { background:linear-gradient(135deg,#a07000,#f4b41a); }
+.terms-footer { padding:18px 24px 22px; border-top:1px solid rgba(4,82,131,0.25); display:flex; flex-direction:column; gap:14px; background:rgba(6,21,40,0.6); flex-shrink:0; }
+.scroll-hint { display:flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; margin-bottom:4px; background:rgba(244,180,26,0.08); border:1px solid rgba(244,180,26,0.3); color:rgba(255,220,120,0.9); font-size:13px; font-weight:600; animation:hintPulse 2s ease-in-out infinite; }
+@keyframes hintPulse { 0%,100%{ opacity:1; } 50%{ opacity:0.6; } }
+.terms-agree-label { display:flex; align-items:center; gap:12px; cursor:pointer; font-size:14px; font-weight:600; color:rgba(220,235,250,0.9); padding:12px 16px; border-radius:14px; border:1px solid rgba(255,255,255,0.1); background:rgba(2,10,22,0.5); transition:all 0.25s ease; user-select:none; }
+.terms-agree-label:hover { border-color:rgba(10,138,203,0.5); background:rgba(10,138,203,0.08); }
+.terms-agree-label input[type="checkbox"] { display:none; }
+.terms-check-box { width:22px; height:22px; border-radius:7px; flex-shrink:0; border:2px solid rgba(255,255,255,0.3); background:rgba(2,10,22,0.8); display:flex; align-items:center; justify-content:center; transition:all 0.25s ease; }
+.terms-agree-label input:checked ~ .terms-check-box { background:linear-gradient(135deg,#045283,#0a8acb); border-color:transparent; box-shadow:0 0 14px rgba(10,138,203,0.7); }
+.terms-agree-label input:checked ~ .terms-check-box::after { content:'✓'; color:#fff; font-size:13px; font-weight:800; }
+.terms-agree-label:has(input:checked) { border-color:rgba(10,138,203,0.5); background:rgba(10,138,203,0.1); color:#fff; }
+.terms-agree-label.locked { opacity:0.45; cursor:not-allowed; pointer-events:none; }
+.terms-agree-label.unlocked { animation:unlockPop 0.5s cubic-bezier(0.19,1,0.22,1); border-color:rgba(10,138,203,0.5); }
+@keyframes unlockPop { 0%{ transform:scale(0.97); } 60%{ transform:scale(1.02); } 100%{ transform:scale(1); } }
+.terms-proceed-btn { margin-top:0; opacity:0.45; pointer-events:none; transition:all 0.3s ease; }
+.terms-proceed-btn.enabled { opacity:1; pointer-events:all; }
+
+/* ══════════════════════════════════════
+   LOADING POPUP
+══════════════════════════════════════ */
+.loading-popup-overlay {
+  position:fixed; inset:0;
+  background:rgba(0,0,0,0.75); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  z-index:99999; display:flex; align-items:center; justify-content:center;
+  padding:20px; opacity:0; transition:opacity 0.3s ease;
+}
+.loading-popup-overlay.active { opacity:1; }
+.loading-popup-box {
+  background:linear-gradient(145deg,#0a1628 0%,#0d2244 50%,#071830 100%);
+  border:1px solid rgba(4,130,195,0.35); border-radius:26px; padding:44px 48px;
+  text-align:center; display:flex; flex-direction:column; align-items:center; gap:18px;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.05), 0 30px 80px rgba(0,0,0,0.65), 0 0 70px rgba(4,130,195,0.18);
+  animation:popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+@keyframes popIn { from{ transform:scale(0.75) translateY(20px); opacity:0; } to{ transform:scale(1) translateY(0); opacity:1; } }
+.loading-spinner { width:64px; height:64px; border:5px solid rgba(4,130,195,0.2); border-top-color:#0a8acb; border-radius:50%; animation:spin 0.85s linear infinite; box-shadow:0 0 24px rgba(10,138,203,0.35); }
+.loading-popup-title { font-size:1.15rem; font-weight:800; color:#fff; font-family:inherit; line-height:1.4; }
+.loading-popup-msg   { font-size:0.9rem; color:rgba(200,225,255,0.65); font-family:inherit; }
+
+/* ══════════════════════════════════════
+   SUCCESS POPUP
+══════════════════════════════════════ */
+.success-popup-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.78);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  z-index:9999; display:flex; align-items:center; justify-content:center;
+  padding:20px; opacity:0; transition:opacity 0.35s ease;
+}
+.success-popup-overlay.active { opacity:1; }
+.success-popup-box {
+  position:relative;
+  background:linear-gradient(145deg,#0a1628 0%,#0d2244 50%,#071830 100%);
+  border:1px solid rgba(4,130,195,0.35); border-radius:26px;
+  padding:44px 36px 36px; max-width:480px; width:100%; text-align:center;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.05), 0 30px 80px rgba(0,0,0,0.65), 0 0 70px rgba(4,130,195,0.18);
+  animation:popupScaleIn 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards; overflow:hidden;
+}
+@keyframes popupScaleIn { from{ transform:scale(0.7) translateY(30px); opacity:0; } to{ transform:scale(1) translateY(0); opacity:1; } }
+.success-popup-icon-wrap { display:flex; align-items:center; justify-content:center; margin:0 auto 22px; position:relative; width:80px; height:80px; }
+.success-popup-ring { position:absolute; inset:0; border-radius:50%; border:3px solid rgba(10,138,203,0.4); animation:ringPulse 2s ease-in-out infinite; }
+@keyframes ringPulse { 0%,100%{ transform:scale(1); opacity:0.6; } 50%{ transform:scale(1.15); opacity:0.2; } }
+.success-popup-check { width:70px; height:70px; border-radius:50%; background:linear-gradient(135deg,#045283,#0a8acb); display:flex; align-items:center; justify-content:center; font-size:28px; color:#fff; font-weight:800; box-shadow:0 0 30px rgba(10,138,203,0.55); animation:checkBounce 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.1s both; }
+@keyframes checkBounce { from{ transform:scale(0.4); opacity:0; } to{ transform:scale(1); opacity:1; } }
+.success-popup-title { font-size:clamp(17px,4vw,21px); font-weight:800; color:#fff; margin:0 0 14px; letter-spacing:0.3px; line-height:1.35; }
+.success-popup-msg   { font-size:14px; color:rgba(255,255,255,0.75); line-height:1.85; margin:0 0 22px; }
+.success-popup-sub   { display:block; margin-top:12px; font-size:12px; color:rgba(83,169,223,0.8); font-style:italic; letter-spacing:0.5px; }
+.success-popup-divider { height:1px; background:linear-gradient(90deg,transparent,rgba(4,130,195,0.45),transparent); margin:0 0 18px; }
+.success-popup-info  { display:flex; justify-content:center; gap:24px; margin-bottom:26px; font-size:13px; color:rgba(255,255,255,0.55); flex-wrap:wrap; }
+.success-popup-info span { display:flex; align-items:center; gap:5px; }
+.success-popup-btn   { display:inline-block; padding:13px 34px; background:linear-gradient(135deg,#0a8acb,#045283); color:#fff; border:none; border-radius:14px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; box-shadow:0 6px 24px rgba(4,130,195,0.45); transition:transform 0.2s, box-shadow 0.2s; }
+.success-popup-btn:hover { transform:translateY(-2px); box-shadow:0 10px 32px rgba(4,130,195,0.6); }
+.success-popup-btn:active { transform:scale(0.97); }
+
+/* ══════════════════════════════════════
+   SUCCESS POPUP REG NUMBER
+══════════════════════════════════════ */
+.success-popup-reg { background:rgba(4,130,195,0.1); border:1.5px solid rgba(4,130,195,0.4); border-radius:14px; padding:14px 18px; margin:14px 0; text-align:center; }
+.success-popup-reg-label  { font-size:0.85rem; color:rgba(255,255,255,0.6); margin-bottom:6px; }
+.success-popup-reg-number { font-size:1.6rem; font-weight:800; color:#0a8ac3; letter-spacing:3px; margin-bottom:8px; }
+.success-popup-reg-warning{ font-size:0.78rem; color:#f59e0b; font-weight:600; line-height:1.5; }
+
+/* ══════════════════════════════════════
+   CONFETTI
+══════════════════════════════════════ */
+@keyframes confettiFall {
+  0%  { transform:translateY(0)     rotate(0deg)   scale(1);   opacity:1; }
+  80% { opacity:1; }
+  100%{ transform:translateY(320px) rotate(720deg) scale(0.4); opacity:0; }
+}
+.confetti {
+  position:absolute; pointer-events:none;
+  animation:confettiFall var(--dur, 1.5s) ease-in var(--delay, 0s) both;
 }
 
-function onSpecialtyChange() {
-  const level = document.getElementById('eduLevel').value;
-  const spec  = document.getElementById('specialty').value;
-  document.getElementById('comingSoonNote')?.remove();
-  hideField(document.getElementById('subjectGroup'), 'subject');
-  hideField(document.getElementById('teacherGroup'), 'teacher');
-  hideField(document.getElementById('parentGroup'),  'parentName','parentPhone');
-  if (!spec) return;
-  populateSubjects(`${level}|${spec}`);
+/* ══════════════════════════════════════
+   ANNOUNCEMENTS SECTION
+══════════════════════════════════════ */
+.announcements-section {
+  width:100%; max-width:900px;
+  margin:40px auto 0;
+  position:relative; z-index:10;
+  animation:fadeInUp 0.7s ease 0.5s both;
+  display:none;
+}
+.ann-header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:16px; padding:0 4px;
+}
+.ann-header-left { display:flex; align-items:center; gap:10px; }
+.ann-live-dot {
+  width:10px; height:10px; border-radius:50%; background:#0a8acb;
+  box-shadow:0 0 0 0 rgba(10,138,203,0.7);
+  animation:livePulse 1.8s ease-in-out infinite; flex-shrink:0;
+}
+@keyframes livePulse {
+  0%  { box-shadow:0 0 0 0  rgba(10,138,203,0.7); }
+  70% { box-shadow:0 0 0 8px rgba(10,138,203,0);   }
+  100%{ box-shadow:0 0 0 0  rgba(10,138,203,0);    }
+}
+.ann-title-text {
+  font-size:16px; font-weight:800;
+  background:linear-gradient(135deg,#ffffff,#7cc8f0);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  background-clip:text;
 }
 
-function onSubjectChange() {
-  const level      = document.getElementById('eduLevel').value;
-  const spec       = document.getElementById('specialty').value;
-  const subjectVal = document.getElementById('subject').value;
-  const teachGrp   = document.getElementById('teacherGroup');
-  const teachSel   = document.getElementById('teacher');
-
-  hideField(teachGrp, 'teacher');
-  hideField(document.getElementById('parentGroup'), 'parentName','parentPhone');
-  if (!subjectVal) return;
-
-  const key      = spec ? `${level}|${spec}` : level;
-  const subjects = curriculum[key] || [];
-  const found    = subjects.find(s => s.subject === subjectVal);
-  if (!found || !found.teachers.length) return;
-
-  teachSel.innerHTML = `<option value="">-- اختر الأستاذ/ة --</option>`;
-  found.teachers.forEach(t => {
-    const opt = document.createElement('option');
-    opt.value = t; opt.textContent = t;
-    teachSel.appendChild(opt);
-  });
-  if (found.teachers.length === 1) {
-    teachSel.value = found.teachers[0];
-    if (currentModalType === 'support') showParentIfNeeded(level);
-  }
-  animateShow(teachGrp);
-  teachSel.setAttribute('required','required');
+/* ══════════════════════════════════════
+   ANN-CARD — Instagram 1350x1080 (4:5)
+══════════════════════════════════════ */
+.ann-track-wrapper {
+  overflow: hidden;
+  border-radius: 22px;
+  position: relative;
+  width: 100%;
 }
 
-function onTeacherChange() {
-  const level    = document.getElementById('eduLevel').value;
-  const teachVal = document.getElementById('teacher').value;
-  hideField(document.getElementById('parentGroup'), 'parentName','parentPhone');
-  if (teachVal && currentModalType === 'support') showParentIfNeeded(level);
+.ann-track {
+  display: flex;
+  transition: transform 0.55s cubic-bezier(0.25,0.46,0.45,0.94);
+  will-change: transform;
+  direction: ltr !important;
+  align-items: flex-start;
 }
 
-function showParentIfNeeded(level) {
-  if (!needsParent.includes(level)) return;
-  const parentGrp   = document.getElementById('parentGroup');
-  const parentName  = document.getElementById('parentName');
-  const parentPhone = document.getElementById('parentPhone');
-  animateShow(parentGrp);
-  parentName.setAttribute('required','required');
-  parentPhone.setAttribute('required','required');
+.ann-card {
+  flex: 0 0 100%;
+  min-width: 100%;
+  width: 100%;
+  display: block;
+  border-radius: 22px;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(4,82,131,0.22), rgba(10,138,203,0.08));
+  border: 1px solid rgba(10,138,203,0.35);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+  user-select: none;
+  cursor: grab;
+}
+.ann-card:active { cursor: grabbing; }
+
+.ann-img-wrap {
+  width: 100%;
+  overflow: hidden;
+  background: rgba(0,0,0,0.2);
+  flex-shrink: 0;
+  line-height: 0;
 }
 
-// ─── VIP TYPE ─────────────────────────────────────────────
-function onVipTypeChange() {
-  const selected = document.querySelector('input[name="vipType"]:checked')?.value;
+.ann-card-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: unset;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+.ann-card-img.loaded { opacity: 1; }
+.ann-card.text-only .ann-card-img,
+.ann-card.text-only .ann-img-wrap { display: none; }
 
-  const allGroups = [
-    'vipEduLevelGroup','vipDaysCountGroup','professionGroup',
-    'daysGroup','langTypeGroup','langLevelGroup','levelTestGroup'
-  ];
-  allGroups.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-  });
-  resetDays();
-  document.getElementById('vipDaysCount').value = '';
-  document.getElementById('profession').value   = '';
-  document.getElementById('langType').value     = '';
-  document.getElementById('langLevel').value    = '';
-  document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+.ann-card-body {
+  padding: 16px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(4,14,30,0.88);
+  border-top: 1px solid rgba(10,138,203,0.2);
+}
+.ann-card-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 12px; border-radius: 999px;
+  background: rgba(10,138,203,0.18);
+  border: 1px solid rgba(10,138,203,0.38);
+  font-size: 11px; font-weight: 700; color: #7cc8f0;
+  letter-spacing: 0.5px; width: fit-content;
+}
+.ann-card-title { font-size: 16px; font-weight: 800; color: #fff; line-height: 1.45; }
+.ann-card-text  { font-size: 13.5px; color: rgba(215,235,255,0.82); line-height: 1.75; }
+.ann-card-date  { font-size: 11.5px; color: rgba(140,190,225,0.55); font-weight: 600; margin-top: 2px; }
 
-  if (selected === 'support') {
-    const vipEduGrp = document.getElementById('vipEduLevelGroup');
-    animateShow(vipEduGrp);
-    document.getElementById('vipEduLevel').setAttribute('required','required');
-  } else if (selected === 'lang') {
-    const profGrp = document.getElementById('professionGroup');
-    animateShow(profGrp);
-    document.getElementById('profession').setAttribute('required','required');
-    animateShow(document.getElementById('langTypeGroup'));
-    document.getElementById('langType').setAttribute('required','required');
-  }
+.ann-arrow {
+  position: absolute; top: 38%; transform: translateY(-50%);
+  z-index: 10; width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid rgba(10,138,203,0.55);
+  background: rgba(2,9,21,0.82); backdrop-filter: blur(8px);
+  color: #7cc8f0; font-size: 22px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.22s ease; font-family: inherit;
+}
+.ann-arrow:hover {
+  background: rgba(10,138,203,0.35);
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 0 14px rgba(10,138,203,0.5);
+}
+.ann-arrow-prev { left: 12px; }
+.ann-arrow-next { right: 12px; }
+
+.ann-dots { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
+.ann-dot {
+  width: 8px; height: 8px; border-radius: 999px;
+  background: rgba(10,138,203,0.3); border: 1px solid rgba(10,138,203,0.4);
+  cursor: pointer; transition: all 0.3s ease;
+}
+.ann-dot.active { background: #0a8acb; width: 22px; box-shadow: 0 0 10px rgba(10,138,203,0.7); }
+
+/* ══════════════════════════════════════
+   FOOTER
+══════════════════════════════════════ */
+.site-footer {
+  position:relative; z-index:20; width:100%;
+  padding:12px 24px; margin-top:24px;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  font-size:12px; color:rgba(227,240,250,0.8);
+  background:linear-gradient(to top,rgba(2,9,21,0.95),transparent);
+}
+.footer-left,.footer-center,.footer-right { display:flex; align-items:center; }
+.footer-center { text-align:center; justify-content:center; flex:1; }
+.footer-brand  { font-weight:800; color:#f4b41a; text-decoration:none; }
+.footer-brand:hover { text-decoration:underline; }
+.footer-social { display:flex; align-items:center; gap:8px; }
+.social-icon {
+  width:30px; height:30px; border-radius:999px;
+  border:1px solid rgba(4,82,131,0.6); background:rgba(2,9,21,0.85);
+  display:flex; align-items:center; justify-content:center;
+  text-decoration:none; transition:all 0.3s ease;
+  box-shadow:0 4px 12px rgba(0,0,0,0.5); overflow:hidden; padding:4px;
+}
+.social-icon img { width:100%; height:100%; object-fit:contain; }
+.social-icon:hover          { transform:translateY(-3px) scale(1.1); }
+.social-icon.fb:hover       { background:#1877f2; border-color:#1877f2; }
+.social-icon.ig:hover       { background:radial-gradient(circle at 30% 30%,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5); border-color:#d62976; }
+.social-icon.phone:hover    { background:#0f9d58; border-color:#0f9d58; }
+.social-icon.location:hover { background:#ea4335; border-color:#ea4335; }
+
+/* ══════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════ */
+@media(max-width:640px){
+  .main-content { padding:85px 14px 14px; }
+  .buttons-grid { grid-template-columns:repeat(3,1fr); gap:10px; max-width:100%; }
+  .btn-icon-img { width:38px; height:38px; }
+  .btn-label { font-size:11px; }
+  .reg-btn { padding:16px 8px; gap:7px; border-radius:14px; }
+  .announcements-section { margin:28px auto 0; }
+  .ann-card-body  { padding:12px 16px 16px; }
+  .ann-card-title { font-size:14px; }
+  .ann-card-text  { font-size:12.5px; }
+  .ann-arrow      { width:30px; height:30px; font-size:18px; }
+  .ann-arrow-prev { left:8px; }
+  .ann-arrow-next { right:8px; }
+  .site-footer { flex-direction:column; text-align:center; gap:8px; }
+  .footer-left,.footer-center,.footer-right { justify-content:center; }
+  .success-popup-box  { padding:32px 22px 28px; }
+  .success-popup-info { gap:14px; }
+  .loading-popup-box  { padding:32px 28px; }
+  .loading-spinner    { width:50px; height:50px; }
+  .modal-box          { padding:22px 16px 20px; }
+  .terms-modal-box .modal-header { padding:18px 16px 14px; }
+  .terms-body         { padding:16px; }
+  .terms-footer       { padding:14px 16px 18px; }
+  .top-logo img       { height:38px; }
+  #vipTypeGroup .check-options { flex-direction:row; }
+  #vipTypeGroup .check-option  { padding:14px 10px; }
+  #vipTypeGroup .check-label   { font-size:13px; }
+  .radio-cards  { gap:8px; }
+  .radio-card   { flex:1 1 calc(50% - 8px); min-width:100px; padding:10px 10px; font-size:12px; }
+  .vcal-time-slots { grid-template-columns:repeat(2,1fr); }
+  .vcal-day    { font-size:11px; }
+  .join-role-options { grid-template-columns:1fr; }
+  .join-team-btn { font-size:13px; padding:11px 24px; }
 }
 
-// ─── VIP EDU LEVEL ────────────────────────────────────────
-function onVipEduLevelChange() {
-  const level        = document.getElementById('vipEduLevel').value;
-  const daysCountGrp = document.getElementById('vipDaysCountGroup');
-  const daysGrp      = document.getElementById('daysGroup');
+/* ══════════════════════════════════════
+   KEYFRAMES UTILITIES
+══════════════════════════════════════ */
+@keyframes fadeInDown { from{ opacity:0; transform:translateY(-24px); } to{ opacity:1; transform:translateY(0); } }
+@keyframes fadeInUp   { from{ opacity:0; transform:translateY(24px);  } to{ opacity:1; transform:translateY(0); } }
 
-  hideField(daysCountGrp);
-  hideField(daysGrp);
-  resetDays();
-  document.getElementById('vipDaysCount').value = '';
+/* ══════════════════════════════════════
+   SCROLLBAR GLOBAL
+══════════════════════════════════════ */
+::-webkit-scrollbar       { width:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(4,82,131,0.7); border-radius:3px; }
 
-  if (!level) return;
-  animateShow(daysCountGrp);
-  document.getElementById('vipDaysCount').setAttribute('required','required');
+/* ══════════════════════════════════════
+   POPUP 3D ICONS
+══════════════════════════════════════ */
+.loading-popup-icon-wrap,
+.success-popup-icon-wrap {
+  display:flex; align-items:center; justify-content:center; margin:0 auto;
 }
-
-// ─── TAKWINI OPTIONS ──────────────────────────────────────
-function showTakwiniOptions() {
-  document.getElementById('takwiniOptionsGroup')?.remove();
-
-  const wrap = document.createElement('div');
-  wrap.id        = 'takwiniOptionsGroup';
-  wrap.className = 'form-group field-appear';
-
-  const label = document.createElement('label');
-  label.className = 'form-label';
-  label.innerHTML = `<span>اختر الدورة التكوينية</span><span>*</span>`;
-  wrap.appendChild(label);
-
-  const radioWrap = document.createElement('div');
-  radioWrap.className = 'check-options';
-
-  takwiniOptions.forEach(opt => {
-    const lbl = document.createElement('label');
-    lbl.className = 'check-option';
-    lbl.innerHTML = `
-      <input type="radio" name="takwiniOption" value="${opt}">
-      <span class="check-box"></span>
-      <span class="check-label">${opt}</span>`;
-    radioWrap.appendChild(lbl);
-  });
-
-  wrap.appendChild(radioWrap);
-
-  // أضفه بعد حقل تاريخ الميلاد
-  const birthGroup = document.getElementById('birthDate').closest('.form-group');
-  birthGroup.insertAdjacentElement('afterend', wrap);
+.loading-popup-3d-icon,
+.success-popup-3d-icon {
+  width:80px; height:80px; object-fit:contain;
+  animation:iconFloat 3s ease-in-out infinite;
 }
-
-// ─── SUBMIT FORM ──────────────────────────────────────────
-async function submitForm(e) {
-  e.preventDefault();
-
-  const firstName  = document.getElementById('firstName').value.trim();
-  const lastName   = document.getElementById('lastName').value.trim();
-  const birthDate  = document.getElementById('birthDate').value;
-  const birthPlace = document.getElementById('birthPlace')?.value?.trim() || '';
-  const phone      = document.getElementById('phone').value.trim();
-
-  let hasError = false;
-  [firstName, lastName].forEach((val, i) => {
-    const ids = ['firstName','lastName'];
-    if (!validateLang(val)) {
-      document.getElementById(ids[i]).classList.add('error');
-      setTimeout(() => document.getElementById(ids[i]).classList.remove('error'), 1500);
-      hasError = true;
-    }
-  });
-  if (hasError) return;
-
-  const selectedDays = [...document.querySelectorAll('input[name="days"]:checked')]
-    .map(c => c.value).join('، ');
-
-  const vipTypeVal    = document.querySelector('input[name="vipType"]:checked')?.value || '';
-  const vipEduLevel   = document.getElementById('vipEduLevel')?.value  || '';
-  const professionVal = document.getElementById('profession')?.value   || '';
-  const supportType   = document.querySelector('input[name="supportType"]:checked')?.value || '';
-  const courseSelect    = document.getElementById('courseSelect')?.value || '';
-  const takwiniOption   = document.querySelector('input[name="takwiniOption"]:checked')?.value || '';
-
-  const data = {
-    type:          currentModalType,
-    firstName,
-    lastName,
-    birthDate,
-    birthPlace,
-    phone,
-    motivation:    document.getElementById('motivation').value.trim(),
-    timestamp:     new Date().toISOString(),
-    supportType,
-    courseSelect,
-    takwiniOption,
-    eduLevel:      document.getElementById('eduLevel')?.value      || '',
-    specialty:     document.getElementById('specialty')?.value     || '',
-    subject:       document.getElementById('subject')?.value       || '',
-    teacher:       document.getElementById('teacher')?.value       || '',
-    candidateType: document.querySelector('input[name="candidateType"]:checked')?.value || '',
-    parentName:    document.getElementById('parentName')?.value    || '',
-    parentPhone:   document.getElementById('parentPhone')?.value   || '',
-    langType:      document.getElementById('langType')?.value      || '',
-    langLevel:     document.getElementById('langLevel')?.value     || '',
-    levelTest:     document.querySelector('input[name="levelTest"]:checked')?.value || '',
-    vipType:       vipTypeVal,
-    vipEduLevel,
-    profession:    professionVal,
-    days:          selectedDays,
-    daysCount:     document.getElementById('vipDaysCount')?.value  || '',
-  };
-
-  openTermsForSubmit(data);
+@keyframes iconFloat {
+  0%,100%{ transform:translateY(0);    }
+  50%    { transform:translateY(-8px); }
 }
-
-// ─── PENDING FORM DATA ────────────────────────────────────
-let pendingFormData = null;
-
-// ─── TERMS ────────────────────────────────────────────────
-function openTermsForSubmit(data) {
-  pendingFormData = data;
-
-  const checkbox = document.getElementById('terms-checkbox');
-  checkbox.checked  = false;
-  checkbox.disabled = true;
-  const label = document.getElementById('terms-agree-label');
-  if (label) { label.classList.add('locked'); label.classList.remove('unlocked'); }
-  const tpb = document.getElementById('terms-proceed-btn');
-  if (tpb)  { tpb.disabled = true; tpb.classList.remove('enabled'); }
-
-  const tbody = document.querySelector('.terms-body');
-  if (tbody) {
-    tbody.scrollTop = 0;
-    tbody.onscroll = function() {
-      const reached = tbody.scrollTop + tbody.clientHeight >= tbody.scrollHeight - 20;
-      if (reached) {
-        tbody.onscroll = null;
-        checkbox.disabled = false;
-        if (label) { label.classList.remove('locked'); label.classList.add('unlocked'); }
-        document.getElementById('scroll-hint')?.remove();
-      }
-    };
-  }
-
-  document.getElementById('scroll-hint')?.remove();
-  const hint = document.createElement('div');
-  hint.id = 'scroll-hint';
-  hint.className = 'scroll-hint';
-  hint.innerHTML = `<span>⬇</span><span>${
-    currentLang === 'ar' ? 'اقرأ القوانين كاملاً للمتابعة' : 'Scroll down to read all terms'
-  }</span>`;
-  const footer = document.querySelector('.terms-footer');
-  if (footer) footer.insertBefore(hint, footer.firstChild);
-
-  document.getElementById('modal').classList.remove('active');
-  document.getElementById('terms-modal').classList.add('active');
-}
-
-function closeTerms() {
-  const tbody = document.querySelector('.terms-body');
-  if (tbody) tbody.onscroll = null;
-  document.getElementById('scroll-hint')?.remove();
-  document.getElementById('terms-modal').classList.remove('active');
-  document.body.style.overflow = '';
-  document.getElementById('lang-toggle')?.classList.remove('hidden');
-  showLogo();
-  pendingFormData = null;
-}
-
-function closeTermsOutside(e) {
-  if (e.target === document.getElementById('terms-modal')) closeTerms();
-}
-
-function onTermsCheck() {
-  const checkbox = document.getElementById('terms-checkbox');
-  if (checkbox.disabled) return;
-  const btn = document.getElementById('terms-proceed-btn');
-  btn.disabled = !checkbox.checked;
-  btn.classList.toggle('enabled', checkbox.checked);
-}
-
-async function proceedToRegister() {
-  if (!pendingFormData) return;
-  const tbody = document.querySelector('.terms-body');
-  if (tbody) tbody.onscroll = null;
-  document.getElementById('scroll-hint')?.remove();
-  document.getElementById('terms-modal').classList.remove('active');
-
-  const btn = document.getElementById('terms-proceed-btn');
-  btn.classList.add('loading');
-
-  try {
-    await fetch(APPS_SCRIPT_URL, {
-      method:  'POST',
-      mode:    'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(pendingFormData)
-    });
-    btn.classList.remove('loading');
-    pendingFormData = null;
-    showSuccessPopup();
-  } catch(err) {
-    btn.classList.remove('loading');
-    console.error(err);
-    document.getElementById('terms-modal').classList.add('active');
-    alert(currentLang === 'ar'
-      ? 'حدث خطأ أثناء الإرسال، تحقق من اتصالك بالإنترنت.'
-      : 'A network error occurred. Please check your connection.');
-  }
-}
-
-// ─── SUCCESS POPUP ────────────────────────────────────────
-function showSuccessPopup() {
-  document.getElementById('success-popup-overlay')?.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'success-popup-overlay';
-  overlay.className = 'success-popup-overlay';
-  overlay.innerHTML = `
-    <div class="success-popup-box" id="success-popup-box">
-      <div class="success-popup-icon-wrap">
-        <img src="3d/done.png" alt="done" class="success-popup-3d-icon" draggable="false">
-      </div>
-      <div class="success-popup-title">
-        ${currentLang==='ar' ? '🎉 تم تسجيلك بنجاح!' : '🎉 Registration Successful!'}
-      </div>
-      <div class="success-popup-msg">
-        ${currentLang==='ar'
-          ? 'شكراً لك! تم استلام طلب تسجيلك بنجاح.<br>سيتم التواصل معك قريباً من طرف فريق أكاديمية E-PLUS.<br><span class="success-popup-sub">✦ رحلتك نحو النجاح تبدأ من هنا ✦</span>'
-          : 'Thank you! Your registration has been received.<br>The E-PLUS Center team will contact you soon.<br><span class="success-popup-sub">✦ Your journey to success starts here ✦</span>'}
-      </div>
-      <div class="success-popup-divider"></div>
-      <div class="success-popup-info">
-        <span>📋 ${typeLabelsAr[currentModalType] || currentModalType}</span>
-        <span>🕐 ${new Date().toLocaleDateString(currentLang==='ar'?'ar-DZ':'en-GB',{year:'numeric',month:'long',day:'numeric'})}</span>
-      </div>
-      <button class="success-popup-btn" onclick="closeSuccessPopup()">
-        ${currentLang==='ar' ? 'حسناً، شكراً!' : 'OK, Thank you!'}
-      </button>
-    </div>`;
-  document.body.appendChild(overlay);
-  spawnConfetti(overlay);
-  requestAnimationFrame(() => overlay.classList.add('active'));
-}
-
-function closeSuccessPopup() {
-  const overlay = document.getElementById('success-popup-overlay');
-  if (!overlay) return;
-  overlay.classList.remove('active');
-  setTimeout(() => overlay.remove(), 400);
-  document.body.style.overflow = '';
-  document.getElementById('lang-toggle')?.classList.remove('hidden');
-  showLogo();
-}
-
-function spawnConfetti(parent) {
-  const colors = ['#0a8acb','#045283','#f4b41a','#ffffff','#53a9df'];
-  for (let i = 0; i < 38; i++) {
-    const c = document.createElement('div');
-    c.className = 'confetti';
-    c.style.cssText = `
-      left:${Math.random()*100}%;
-      top:${-10 - Math.random()*30}px;
-      width:${6 + Math.random()*8}px;
-      height:${6 + Math.random()*8}px;
-      background:${colors[Math.floor(Math.random()*colors.length)]};
-      border-radius:${Math.random()>0.5?'50%':'2px'};
-      animation-duration:${1.2+Math.random()*1.2}s;
-      animation-delay:${Math.random()*0.6}s;
-    `;
-    parent.appendChild(c);
-  }
-}
-
-// ─── FIREBASE ─────────────────────────────────────────────
-import { initializeApp }                        from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-import { getFirestore, collection, query,
-         orderBy, onSnapshot }                  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
-
-const firebaseConfig = {
-  apiKey:            "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
-  authDomain:        "eplus-center-39.firebaseapp.com",
-  projectId:         "eplus-center-39",
-  storageBucket:     "eplus-center-39.firebasestorage.app",
-  messagingSenderId: "191532732034",
-  appId:             "1:191532732034:web:b11449a2f0595db5d02e9b",
-  measurementId:     "G-L8KVV0MEKT"
-};
-
-const _app = initializeApp(firebaseConfig);
-const _db  = getFirestore(_app);
-
-// ─── ANNOUNCEMENTS STATE ──────────────────────────────────
-let annCurrent   = 0;
-let annAutoSlide = null;
-let annTotalDocs = 0;
-
-function getSlideDir() { return -1; }
-
-function goToSlide(idx) {
-  annCurrent = idx;
-  const track = document.getElementById('ann-track');
-  if (track) {
-    track.style.transform = `translateX(${idx * 100 * getSlideDir()}%)`;
-  }
-  document.querySelectorAll('.ann-dot').forEach((dot, i) =>
-    dot.classList.toggle('active', i === idx));
-}
-
-function startAnnAuto() {
-  if (annTotalDocs <= 1) return;
-  annAutoSlide = setInterval(
-    () => goToSlide((annCurrent + 1) % annTotalDocs),
-    8000
-  );
-}
-function resetAnnAuto() {
-  clearInterval(annAutoSlide);
-  startAnnAuto();
-}
-
-// ─── FIREBASE LISTENER ────────────────────────────────────
-onSnapshot(
-  query(collection(_db, 'announcements'), orderBy('createdAt', 'desc')),
-  snap => {
-    window._annCache = snap.docs
-      .map(doc => {
-        const d = doc.data();
-        return {
-          title:     d.title     || '',
-          text:      d.text      || '',
-          imageUrl:  d.imageUrl  || '',
-          createdAt: d.createdAt || null,
-          hidden:    d.hidden    || false,
-        };
-      })
-      .filter(d => d.hidden !== true);
-
-    _renderFromData(window._annCache);
-  }
-);
-
-// ─── RENDER ANNOUNCEMENTS ─────────────────────────────────
-function _renderFromData(dataArr) {
-  const section = document.getElementById('announcements-section');
-  const track   = document.getElementById('ann-track');
-  const dotsEl  = document.getElementById('ann-dots');
-
-  if (!dataArr || dataArr.length === 0) {
-    section.style.display = 'none';
-    clearInterval(annAutoSlide);
-    return;
-  }
-
-  clearInterval(annAutoSlide);
-  annTotalDocs = dataArr.length;
-  const savedIndex = (annCurrent < dataArr.length) ? annCurrent : 0;
-  annCurrent = savedIndex;
-
-  section.style.display = 'block';
-  track.innerHTML  = '';
-  dotsEl.innerHTML = '';
-
-  track.style.direction = 'ltr';
-
-  const isRtl = currentLang === 'ar';
-
-  dataArr.forEach((d, i) => {
-    const hasImg = d.imageUrl && d.imageUrl.startsWith('https');
-
-    const card = document.createElement('div');
-    card.className = hasImg ? 'ann-card has-image' : 'ann-card text-only';
-    card.style.direction = isRtl ? 'rtl' : 'ltr';
-    card.style.textAlign = isRtl ? 'right' : 'left';
-
-    let dateStr = '';
-    if (d.createdAt?.toDate) {
-      try {
-        dateStr = d.createdAt.toDate().toLocaleDateString(
-          isRtl ? 'ar-DZ' : 'en-GB',
-          { year:'numeric', month:'long', day:'numeric' }
-        );
-      } catch(e) { dateStr = ''; }
-    }
-
-    if (hasImg) {
-      card.innerHTML = `
-        <div class="ann-img-wrap">
-          <img class="ann-card-img"
-               src="${d.imageUrl}"
-               alt="" draggable="false"
-               loading="lazy"
-               onerror="this.closest('.ann-card').classList.remove('has-image');
-                        this.closest('.ann-card').classList.add('text-only');
-                        this.parentElement.remove();">
-        </div>
-        ${d.title || d.text || dateStr ? `
-        <div class="ann-card-body">
-          ${d.title ? `<div class="ann-card-title">${d.title}</div>` : ''}
-          ${d.text  ? `<div class="ann-card-text">${d.text}</div>`   : ''}
-          ${dateStr ? `<div class="ann-card-date">🗓 ${dateStr}</div>` : ''}
-        </div>` : ''}`;
-    } else {
-      card.innerHTML = `
-        <div class="ann-card-body">
-          <div class="ann-card-badge">📢 ${isRtl ? 'إعلان' : 'Announcement'}</div>
-          ${d.title ? `<div class="ann-card-title">${d.title}</div>` : ''}
-          ${d.text  ? `<div class="ann-card-text">${d.text}</div>`   : ''}
-          ${dateStr ? `<div class="ann-card-date">🗓 ${dateStr}</div>` : ''}
-        </div>`;
-    }
-
-    track.appendChild(card);
-
-    const img = card.querySelector('.ann-card-img');
-    if (img) {
-      img.addEventListener('load', () => img.classList.add('loaded'));
-      if (img.complete) img.classList.add('loaded');
-    }
-
-    const dot = document.createElement('div');
-    dot.className = 'ann-dot' + (i === 0 ? ' active' : '');
-    dot.addEventListener('click', () => { goToSlide(i); resetAnnAuto(); });
-    dotsEl.appendChild(dot);
-  });
-
-  const wrapper = document.querySelector('.ann-track-wrapper');
-  wrapper.querySelectorAll('.ann-arrow').forEach(a => a.remove());
-
-  if (dataArr.length > 1) {
-    const prev = document.createElement('button');
-    prev.className = 'ann-arrow ann-arrow-prev';
-    prev.innerHTML = '‹';
-    prev.addEventListener('click', () => {
-      goToSlide((annCurrent - 1 + dataArr.length) % dataArr.length);
-      resetAnnAuto();
-    });
-    const next = document.createElement('button');
-    next.className = 'ann-arrow ann-arrow-next';
-    next.innerHTML = '›';
-    next.addEventListener('click', () => {
-      goToSlide((annCurrent + 1) % dataArr.length);
-      resetAnnAuto();
-    });
-    wrapper.appendChild(prev);
-    wrapper.appendChild(next);
-  }
-
-  let touchStartX = 0;
-  track.addEventListener('touchstart', e => {
-    touchStartX = e.touches[0].clientX;
-  }, { passive:true });
-  track.addEventListener('touchend', e => {
-    const diff = e.changedTouches[0].clientX - touchStartX;
-    if (Math.abs(diff) > 50) {
-      goToSlide(diff > 0
-        ? (annCurrent - 1 + dataArr.length) % dataArr.length
-        : (annCurrent + 1) % dataArr.length);
-      resetAnnAuto();
-    }
-  });
-
-  let isDragging = false, dragStartX = 0, dragDelta = 0;
-  track.addEventListener('mousedown', e => {
-    isDragging = true; dragStartX = e.clientX; dragDelta = 0;
-    track.style.transition = 'none';
-    track.style.cursor = 'grabbing';
-  });
-  window.addEventListener('mousemove', e => {
-    if (!isDragging) return;
-    dragDelta = e.clientX - dragStartX;
-    track.style.transform =
-      `translateX(calc(${annCurrent * 100 * getSlideDir()}% + ${dragDelta}px))`;
-  });
-  window.addEventListener('mouseup', () => {
-    if (!isDragging) return;
-    isDragging = false;
-    track.style.transition = '';
-    track.style.cursor = '';
-    goToSlide(Math.abs(dragDelta) > 60
-      ? (dragDelta > 0
-          ? (annCurrent - 1 + dataArr.length) % dataArr.length
-          : (annCurrent + 1) % dataArr.length)
-      : annCurrent);
-    resetAnnAuto();
-  });
-
-  track.style.transform = `translateX(${savedIndex * 100 * getSlideDir()}%)`;
-  document.querySelectorAll('.ann-dot').forEach((dot, i) =>
-    dot.classList.toggle('active', i === savedIndex));
-
-  startAnnAuto();
-}
-
-// ─── EXPOSE FUNCTIONS ─────────────────────────────────────
-window.setLang               = setLang;
-window.closeModal            = closeModal;
-window.closeModalOutside     = closeModalOutside;
-window.closeTerms            = closeTerms;
-window.closeTermsOutside     = closeTermsOutside;
-window.onTermsCheck          = onTermsCheck;
-window.proceedToRegister     = proceedToRegister;
-window.closeSuccessPopup     = closeSuccessPopup;
-window.onLangTypeChange      = onLangTypeChange;
-window.onLangLevelChange     = onLangLevelChange;
-window.onEduLevelChange      = onEduLevelChange;
-window.onCandidateTypeChange = onCandidateTypeChange;
-window.onSpecialtyChange     = onSpecialtyChange;
-window.onSubjectChange       = onSubjectChange;
-window.onTeacherChange       = onTeacherChange;
-window.onVipTypeChange       = onVipTypeChange;
-window.onVipEduLevelChange   = onVipEduLevelChange;
-window.onVipDaysCountChange  = onVipDaysCountChange;
-window.onDayChange           = onDayChange;
-window.onBirthDateChange     = onBirthDateChange;
-window.onSupportTypeChange   = onSupportTypeChange;
-window.submitForm            = submitForm;
-window.goToSlide             = goToSlide;
-window.resetAnnAuto          = resetAnnAuto;
-window.openJoinModal         = openJoinModal;
-window.closeJoinModal        = closeJoinModal;
-window.submitJoinForm        = submitJoinForm;
-
-// ─── LOADING POPUP ────────────────────────────────────────
-function showLoadingPopup() {
-  document.getElementById('loading-popup-overlay')?.remove();
-  const overlay = document.createElement('div');
-  overlay.id = 'loading-popup-overlay';
-  overlay.className = 'success-popup-overlay';
-  overlay.innerHTML = `
-    <div class="success-popup-box" style="text-align:center;padding:44px 30px;min-width:230px;">
-      <div style="margin-bottom:16px;">
-        <div style="width:52px;height:52px;border:4px solid rgba(255,255,255,0.15);
-                    border-top-color:#0a8acb;border-radius:50%;animation:spin 0.8s linear infinite;
-                    margin:0 auto;"></div>
-      </div>
-      <div class="success-popup-title" style="font-size:1.05rem;opacity:0.9;">
-        ${currentLang === 'ar' ? 'جارٍ الإرسال...' : 'Sending...'}
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  requestAnimationFrame(() => overlay.classList.add('active'));
-}
-
-function hideLoadingPopup() {
-  const overlay = document.getElementById('loading-popup-overlay');
-  if (!overlay) return;
-  overlay.classList.remove('active');
-  setTimeout(() => overlay.remove(), 300);
-}
-
-// ─── JOIN TEAM ────────────────────────────────────────────
-function openJoinModal() {
-  document.getElementById('join-modal').classList.add('active');
-  document.body.style.overflow = 'hidden';
-  document.getElementById('lang-toggle').classList.add('hidden');
-  hideLogo();
-}
-
-function closeJoinModal() {
-  document.getElementById('join-modal').classList.remove('active');
-  document.body.style.overflow = '';
-  document.getElementById('lang-toggle').classList.remove('hidden');
-  showLogo();
-  document.getElementById('join-form').reset();
-  document.getElementById('join-role-fields').style.display = 'none';
-  document.getElementById('cv-file-name').textContent = '';
-}
-
-async function submitJoinForm(e) {
-  e.preventDefault();
-
-  const firstName  = document.getElementById('joinFirstName').value.trim();
-  const lastName   = document.getElementById('joinLastName').value.trim();
-  const phone      = document.getElementById('joinPhone').value.trim();
-  const email      = document.getElementById('joinEmail').value.trim();
-  const role       = document.querySelector('input[name="joinRole"]:checked')?.value || '-';
-  const specialty  = document.getElementById('joinSpecialty').value.trim();
-  const experience = document.getElementById('joinExperience').value.trim();
-
-  if (!firstName || !lastName || !phone || !email || role === '-') {
-    alert(currentLang === 'ar'
-      ? '⚠️ يرجى تعبئة جميع الحقول الإلزامية.'
-      : 'Please fill in all required fields.');
-    return;
-  }
-
-  const data = {
-    firstName, lastName, phone, email,
-    role, specialty, experience,
-    timestamp: new Date().toISOString(),
-  };
-
-  const btn = document.getElementById('join-submit-btn');
-  btn.disabled = true;
-  showLoadingPopup();
-
-  try {
-    const formData = new FormData();
-    formData.append('payload', JSON.stringify(data));
-    await fetch(JOIN_APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode:   'no-cors',
-      body:   formData
-    });
-    hideLoadingPopup();
-    closeJoinModal();
-    showSuccessJoinPopup();
-  } catch(err) {
-    hideLoadingPopup();
-    btn.disabled = false;
-    alert(currentLang === 'ar'
-      ? '❌ خطأ في الإرسال، تحقق من الاتصال.'
-      : 'Error, check your connection.');
-  }
-}
-
-function showSuccessJoinPopup() {
-  const overlay = document.createElement('div');
-  overlay.id        = 'success-popup-overlay';
-  overlay.className = 'success-popup-overlay';
-  overlay.innerHTML = `
-    <div class="success-popup-box">
-      <div class="success-popup-icon-wrap">
-        <img src="3d/done.png" alt="done" class="success-popup-3d-icon">
-      </div>
-      <div class="success-popup-title">
-        ${currentLang === 'ar' ? '🎉 تم إرسال طلبك!' : '🎉 Request Sent!'}
-      </div>
-      <div class="success-popup-msg">
-        ${currentLang === 'ar'
-          ? 'شكراً على اهتمامك! سيتواصل معك فريق E-PLUS في أقرب وقت.'
-          : 'Thank you for your interest! The E-PLUS team will contact you soon.'}
-      </div>
-      <button class="success-popup-btn" id="close-success-join-btn">
-        ${currentLang === 'ar' ? 'حسناً، شكراً!' : 'OK, Thank you!'}
-      </button>
-    </div>`;
-  document.body.appendChild(overlay);
-  overlay.querySelector('#close-success-join-btn').addEventListener('click', () => {
-    overlay.classList.remove('active');
-    setTimeout(() => overlay.remove(), 400);
-    document.getElementById('lang-toggle')?.classList.remove('hidden');
-    showLogo();
-  });
-  spawnConfetti(overlay);
-  requestAnimationFrame(() => overlay.classList.add('active'));
-}
-
-// ─── EVENT LISTENERS ──────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-
-  document.querySelectorAll('.reg-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const type = btn.getAttribute('data-reg-type');
-      if (type) openModal(type);
-    });
-  });
-
-  document.getElementById('btn-ar').addEventListener('click', () => setLang('ar'));
-  document.getElementById('btn-en').addEventListener('click', () => setLang('en'));
-
-  document.getElementById('close-modal-btn').addEventListener('click', closeModal);
-  document.getElementById('modal').addEventListener('click', e => {
-    if (e.target === document.getElementById('modal')) closeModal();
-  });
-
-  document.getElementById('close-terms-btn').addEventListener('click', closeTerms);
-  document.getElementById('terms-modal').addEventListener('click', e => {
-    if (e.target === document.getElementById('terms-modal')) closeTerms();
-  });
-  document.getElementById('terms-checkbox').addEventListener('change', onTermsCheck);
-  document.getElementById('terms-proceed-btn').addEventListener('click', proceedToRegister);
-
-  document.getElementById('reg-form').addEventListener('submit', submitForm);
-
-  document.getElementById('join-team-btn').addEventListener('click', openJoinModal);
-  document.getElementById('close-join-btn').addEventListener('click', closeJoinModal);
-  document.getElementById('join-modal').addEventListener('click', e => {
-    if (e.target === document.getElementById('join-modal')) closeJoinModal();
-  });
-  document.getElementById('join-form').addEventListener('submit', submitJoinForm);
-
-  document.querySelectorAll('input[name="joinRole"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      const fields = document.getElementById('join-role-fields');
-      fields.style.display = 'block';
-      fields.classList.remove('field-appear');
-      void fields.offsetWidth;
-      fields.classList.add('field-appear');
-    });
-  });
-
-  document.getElementById('joinCV').addEventListener('change', function() {
-    document.getElementById('cv-file-name').textContent = this.files[0]?.name || '';
-  });
-
-  document.getElementById('birthDate').addEventListener('change', onBirthDateChange);
-  document.getElementById('eduLevel').addEventListener('change', onEduLevelChange);
-  document.getElementById('specialty').addEventListener('change', onSpecialtyChange);
-  document.getElementById('subject').addEventListener('change', onSubjectChange);
-  document.getElementById('teacher').addEventListener('change', onTeacherChange);
-  document.getElementById('langType').addEventListener('change', onLangTypeChange);
-  document.getElementById('langLevel').addEventListener('change', onLangLevelChange);
-  document.getElementById('vipDaysCount').addEventListener('change', onVipDaysCountChange);
-  document.getElementById('vipEduLevel').addEventListener('change', onVipEduLevelChange);
-  document.querySelectorAll('input[name="vipType"]').forEach(r =>
-    r.addEventListener('change', onVipTypeChange));
-  document.querySelectorAll('input[name="candidateType"]').forEach(r =>
-    r.addEventListener('change', onCandidateTypeChange));
-  document.querySelectorAll('input[name="supportType"]').forEach(r =>
-    r.addEventListener('change', onSupportTypeChange));
-  document.querySelectorAll('input[name="days"]').forEach(cb =>
-    cb.addEventListener('change', function() { onDayChange(this); }));
-});
-
-// ─── INIT LANG ────────────────────────────────────────────
-setLang('ar');
