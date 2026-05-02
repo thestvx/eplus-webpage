@@ -963,6 +963,7 @@ function onTermsCheck() {
   btn.classList.toggle('enabled', checkbox.checked);
 }
 
+// ─── ✅ FIX: proceedToRegister — no-cors + FormData ───────
 async function proceedToRegister() {
   if (!pendingFormData) return;
 
@@ -980,11 +981,15 @@ async function proceedToRegister() {
   );
 
   try {
+    const formData = new FormData();
+    Object.entries(pendingFormData).forEach(([key, value]) => {
+      formData.append(key, value ?? '');
+    });
+
     await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(pendingFormData)
+      mode:   'no-cors',
+      body:   formData
     });
 
     const regTypeLabel = typeLabelsAr[pendingFormData.type] || 'الخدمة المطلوبة';
@@ -1063,10 +1068,10 @@ function showSuccessModal(title, message, regNumber = null) {
   const modal = document.getElementById('success-popup');
   if (!modal) return;
 
-  const titleEl   = document.getElementById('success-popup-title');
-  const msgEl     = document.getElementById('success-popup-msg');
-  const regWrap   = document.getElementById('success-popup-reg');
-  const regNumEl  = document.getElementById('success-popup-reg-number');
+  const titleEl  = document.getElementById('success-popup-title');
+  const msgEl    = document.getElementById('success-popup-msg');
+  const regWrap  = document.getElementById('success-popup-reg');
+  const regNumEl = document.getElementById('success-popup-reg-number');
 
   if (titleEl) titleEl.textContent = title || (currentLang === 'ar' ? 'تم بنجاح' : 'Success');
   if (msgEl)   msgEl.textContent   = message || (currentLang === 'ar' ? 'تم تنفيذ العملية بنجاح.' : 'The operation completed successfully.');
@@ -1144,6 +1149,7 @@ function fileToBase64(file) {
   });
 }
 
+// ─── ✅ FIX: submitJoinForm — FormData + no-cors ──────────
 async function submitJoinForm(e) {
   e.preventDefault();
 
@@ -1179,50 +1185,38 @@ async function submitJoinForm(e) {
       originalFileName = file.name;
     }
 
-    const payload = {
-      firstName,
-      lastName,
-      fullName: `${firstName} ${lastName}`.trim(),
-      phone,
-      email,
-      role,
-      specialty,
-      experience,
-      base64,
-      mimeType,
-      originalFileName,
-      timestamp: new Date().toISOString()
-    };
+    const formData = new FormData();
+    formData.append('firstName', firstName);
+    formData.append('lastName', lastName);
+    formData.append('fullName', `${firstName} ${lastName}`.trim());
+    formData.append('phone', phone);
+    formData.append('email', email);
+    formData.append('role', role);
+    formData.append('specialty', specialty);
+    formData.append('experience', experience);
+    formData.append('base64', base64);
+    formData.append('mimeType', mimeType);
+    formData.append('originalFileName', originalFileName);
+    formData.append('timestamp', new Date().toISOString());
 
-    const response = await fetch(JOIN_APPS_SCRIPT_URL, {
+    await fetch(JOIN_APPS_SCRIPT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      mode:   'no-cors',
+      body:   formData
     });
-
-    let result = {};
-    try {
-      result = await response.json();
-    } catch {
-      result = { success: response.ok };
-    }
 
     submitBtn?.classList.remove('loading');
     if (submitBtn) submitBtn.disabled = false;
     hideLoadingPopup();
 
-    if (result.success || response.ok) {
-      closeJoinModal();
-      showSuccessModal(
-        currentLang === 'ar' ? 'تم إرسال الطلب بنجاح' : 'Request sent successfully',
-        currentLang === 'ar'
-          ? 'تم استلام طلب الانضمام إلى الفريق، وسيتم مراجعة ملفك والتواصل معك قريباً.'
-          : 'Your team join request has been received successfully. We will review your application and contact you soon.'
-      );
-    } else {
-      console.error(result);
-      alert(currentLang === 'ar' ? 'حدث خطأ أثناء إرسال الطلب.' : 'An error occurred while sending the request.');
-    }
+    closeJoinModal();
+    showSuccessModal(
+      currentLang === 'ar' ? 'تم إرسال الطلب بنجاح' : 'Request sent successfully',
+      currentLang === 'ar'
+        ? 'تم استلام طلب الانضمام إلى الفريق، وسيتم مراجعة ملفك والتواصل معك قريباً.'
+        : 'Your team join request has been received successfully. We will review your application and contact you soon.'
+    );
+
   } catch (err) {
     submitBtn?.classList.remove('loading');
     if (submitBtn) submitBtn.disabled = false;
@@ -1249,7 +1243,7 @@ function buildAnnouncementCard(item) {
     ? (item.bodyAr || item.textAr || item.body || item.text || '')
     : (item.bodyEn || item.textEn || item.bodyAr || item.textAr || item.body || item.text || '');
 
-  const date = item.date || item.createdAt || '';
+  const date  = item.date || item.createdAt || '';
   const image = item.imageUrl || item.image || '';
 
   if (!image) card.classList.add('text-only');
@@ -1270,7 +1264,7 @@ function buildAnnouncementCard(item) {
 
   const img = card.querySelector('.ann-card-img');
   if (img) {
-    img.addEventListener('load', () => img.classList.add('loaded'));
+    img.addEventListener('load',  () => img.classList.add('loaded'));
     img.addEventListener('error', () => card.classList.add('text-only'));
   }
 
@@ -1285,7 +1279,7 @@ function renderAnnouncementSlider(items) {
   if (!section || !track || !dots) return;
 
   track.innerHTML = '';
-  dots.innerHTML = '';
+  dots.innerHTML  = '';
 
   if (!items || items.length === 0) {
     section.style.display = 'none';
@@ -1351,9 +1345,14 @@ function _renderFromData(items) {
   renderAnnouncementSlider(window._annCache);
 }
 
+// ─── ✅ FIX: loadAnnouncements — no-cors safe ─────────────
 async function loadAnnouncements() {
   try {
-    const res = await fetch(`${APPS_SCRIPT_URL}?action=getAnnouncements`);
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=getAnnouncements`, {
+      method: 'GET',
+      mode:   'cors'
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
     const items =
@@ -1364,7 +1363,7 @@ async function loadAnnouncements() {
 
     _renderFromData(items);
   } catch (error) {
-    console.error('Announcements load error:', error);
+    console.warn('Announcements load error:', error);
     _renderFromData([]);
   }
 }
@@ -1378,11 +1377,10 @@ function bindStaticEvents() {
   document.getElementById('join-form')?.addEventListener('submit', submitJoinForm);
 
   document.getElementById('terms-checkbox')?.addEventListener('change', onTermsCheck);
-
   document.getElementById('terms-proceed-btn')?.addEventListener('click', proceedToRegister);
 
   document.getElementById('joinCV')?.addEventListener('change', function () {
-    const file = this.files?.[0];
+    const file     = this.files?.[0];
     const fileName = document.getElementById('cv-file-name');
     if (fileName) fileName.textContent = file ? file.name : '';
   });
