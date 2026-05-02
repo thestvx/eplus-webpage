@@ -148,9 +148,6 @@ const i18n = {
 };
 
 // ─── HELPERS عامة ─────────────────────────────────────────
-function $(selector, root = document) { return root.querySelector(selector); }
-function $all(selector, root = document) { return [...root.querySelectorAll(selector)]; }
-
 function hideLogo() {
   const el = document.querySelector('.top-logo');
   if (el) el.style.display = 'none';
@@ -187,7 +184,7 @@ function setLang(lang) {
   }
 
   if (window._annCache && window._annCache.length > 0) {
-    _renderFromData(window._annCache);
+    renderAnnouncementSlider(window._annCache);
   }
 }
 
@@ -482,6 +479,7 @@ function animateShow(el) {
   void el.offsetWidth;
   el.classList.add('field-appear');
 }
+
 function hideField(el, ...ids) {
   if (!el) return;
   el.style.display = 'none';
@@ -493,6 +491,7 @@ function hideField(el, ...ids) {
     }
   });
 }
+
 function showComingSoon(afterEl) {
   if (!afterEl) return;
   document.getElementById('comingSoonNote')?.remove();
@@ -555,7 +554,7 @@ function populateSubjects(key) {
   subSelect.innerHTML = `<option value="">${currentLang === 'ar' ? '-- اختر المادة --' : '-- Choose subject --'}</option>`;
   subjects.forEach(item => {
     const opt = document.createElement('option');
-    opt.value = item.subject;
+    opt.value       = item.subject;
     opt.textContent = item.subject;
     subSelect.appendChild(opt);
   });
@@ -672,7 +671,7 @@ function showSpecialtyField(level) {
   specialtySel.innerHTML = `<option value="">${currentLang === 'ar' ? '-- اختر التخصص --' : '-- Choose specialty --'}</option>`;
   specs.forEach(sp => {
     const opt = document.createElement('option');
-    opt.value = sp;
+    opt.value       = sp;
     opt.textContent = sp;
     specialtySel.appendChild(opt);
   });
@@ -711,7 +710,7 @@ function onSubjectChange() {
   teachSel.innerHTML = `<option value="">${currentLang === 'ar' ? '-- اختر الأستاذ/ة --' : '-- Choose teacher --'}</option>`;
   found.teachers.forEach(t => {
     const opt = document.createElement('option');
-    opt.value = t;
+    opt.value       = t;
     opt.textContent = t;
     teachSel.appendChild(opt);
   });
@@ -845,11 +844,11 @@ async function submitForm(e) {
   const selectedDays = [...document.querySelectorAll('input[name="days"]:checked')]
     .map(c => c.value).join('، ');
 
-  const vipTypeVal    = document.querySelector('input[name="vipType"]:checked')?.value || '';
-  const vipEduLevel   = document.getElementById('vipEduLevel')?.value  || '';
-  const professionVal = document.getElementById('profession')?.value   || '';
+  const vipTypeVal    = document.querySelector('input[name="vipType"]:checked')?.value    || '';
+  const vipEduLevel   = document.getElementById('vipEduLevel')?.value   || '';
+  const professionVal = document.getElementById('profession')?.value    || '';
   const supportType   = document.querySelector('input[name="supportType"]:checked')?.value || '';
-  const courseSelect  = document.getElementById('courseSelect')?.value || '';
+  const courseSelect  = document.getElementById('courseSelect')?.value  || '';
   const takwiniOption = document.querySelector('input[name="takwiniOption"]:checked')?.value || '';
 
   const data = {
@@ -963,7 +962,7 @@ function onTermsCheck() {
   btn.classList.toggle('enabled', checkbox.checked);
 }
 
-// ─── ✅ FIX: proceedToRegister — no-cors + FormData ───────
+// ─── PROCEED TO REGISTER ──────────────────────────────────
 async function proceedToRegister() {
   if (!pendingFormData) return;
 
@@ -977,7 +976,7 @@ async function proceedToRegister() {
 
   showLoadingPopup(
     currentLang === 'ar' ? 'جاري إرسال التسجيل...' : 'Submitting registration...',
-    currentLang === 'ar' ? 'يرجى الانتظار قليلاً' : 'Please wait a moment'
+    currentLang === 'ar' ? 'يرجى الانتظار قليلاً'  : 'Please wait a moment'
   );
 
   try {
@@ -1029,8 +1028,8 @@ function showLoadingPopup(title, message) {
   const titleEl = document.getElementById('loading-popup-title');
   const msgEl   = document.getElementById('loading-popup-msg');
 
-  if (titleEl) titleEl.textContent = title || (currentLang === 'ar' ? 'جاري المعالجة...' : 'Processing...');
-  if (msgEl)   msgEl.textContent   = message || (currentLang === 'ar' ? 'يرجى الانتظار' : 'Please wait');
+  if (titleEl) titleEl.textContent = title   || (currentLang === 'ar' ? 'جاري المعالجة...' : 'Processing...');
+  if (msgEl)   msgEl.textContent   = message || (currentLang === 'ar' ? 'يرجى الانتظار'   : 'Please wait');
 
   overlay.classList.add('active');
   document.body.style.overflow = 'hidden';
@@ -1051,15 +1050,15 @@ function createConfetti(container, count = 18) {
   for (let i = 0; i < count; i++) {
     const c = document.createElement('span');
     c.className = 'confetti';
-    c.style.left = `${Math.random() * 100}%`;
-    c.style.top = `${Math.random() * 25}px`;
-    c.style.width = `${6 + Math.random() * 6}px`;
-    c.style.height = `${10 + Math.random() * 10}px`;
+    c.style.left       = `${Math.random() * 100}%`;
+    c.style.top        = `${Math.random() * 25}px`;
+    c.style.width      = `${6 + Math.random() * 6}px`;
+    c.style.height     = `${10 + Math.random() * 10}px`;
     c.style.background = colors[Math.floor(Math.random() * colors.length)];
     c.style.borderRadius = `${1 + Math.random() * 4}px`;
-    c.style.setProperty('--dur', `${1.5 + Math.random() * 1.2}s`);
+    c.style.setProperty('--dur',   `${1.5 + Math.random() * 1.2}s`);
     c.style.setProperty('--delay', `${Math.random() * 0.35}s`);
-    c.style.transform = `rotate(${Math.random() * 360}deg)`;
+    c.style.transform  = `rotate(${Math.random() * 360}deg)`;
     container.appendChild(c);
   }
 }
@@ -1073,16 +1072,16 @@ function showSuccessModal(title, message, regNumber = null) {
   const regWrap  = document.getElementById('success-popup-reg');
   const regNumEl = document.getElementById('success-popup-reg-number');
 
-  if (titleEl) titleEl.textContent = title || (currentLang === 'ar' ? 'تم بنجاح' : 'Success');
+  if (titleEl) titleEl.textContent = title   || (currentLang === 'ar' ? 'تم بنجاح' : 'Success');
   if (msgEl)   msgEl.textContent   = message || (currentLang === 'ar' ? 'تم تنفيذ العملية بنجاح.' : 'The operation completed successfully.');
 
   if (regWrap && regNumEl) {
     if (regNumber) {
-      regNumEl.textContent = regNumber;
+      regNumEl.textContent  = regNumber;
       regWrap.style.display = 'block';
     } else {
       regWrap.style.display = 'none';
-      regNumEl.textContent = '';
+      regNumEl.textContent  = '';
     }
   }
 
@@ -1128,28 +1127,26 @@ function closeJoinModalOutside(e) {
   if (e.target === document.getElementById('join-modal')) closeJoinModal();
 }
 
+// ─── FILE TO BASE64 ───────────────────────────────────────
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = function() {
       const result = String(reader.result || '');
-      const parts = result.split(',');
+      const parts  = result.split(',');
       const mimeMatch = parts[0].match(/(.*);base64/);
       if (!mimeMatch || !parts[1]) {
         reject(new Error('Invalid file format'));
         return;
       }
-      resolve({
-        mimeType: mimeMatch[1],
-        base64: parts[1]
-      });
+      resolve({ mimeType: mimeMatch[1], base64: parts[1] });
     };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
 }
 
-// ─── ✅ FIX: submitJoinForm — FormData + no-cors ──────────
+// ─── SUBMIT JOIN FORM ─────────────────────────────────────
 async function submitJoinForm(e) {
   e.preventDefault();
 
@@ -1161,43 +1158,43 @@ async function submitJoinForm(e) {
 
   showLoadingPopup(
     currentLang === 'ar' ? 'جاري إرسال طلب الانضمام...' : 'Submitting join request...',
-    currentLang === 'ar' ? 'يرجى الانتظار قليلاً' : 'Please wait a moment'
+    currentLang === 'ar' ? 'يرجى الانتظار قليلاً'        : 'Please wait a moment'
   );
 
   try {
-    const firstName  = document.getElementById('joinFirstName')?.value.trim() || '';
-    const lastName   = document.getElementById('joinLastName')?.value.trim() || '';
-    const phone      = document.getElementById('joinPhone')?.value.trim() || '';
-    const email      = document.getElementById('joinEmail')?.value.trim() || '';
-    const role       = document.querySelector('input[name="joinRole"]:checked')?.value || '';
-    const specialty  = document.getElementById('joinSpecialty')?.value.trim() || '';
-    const experience = document.getElementById('joinExperience')?.value.trim() || '';
-    const file       = document.getElementById('joinCV')?.files?.[0] || null;
+    const firstName      = document.getElementById('joinFirstName')?.value.trim()  || '';
+    const lastName       = document.getElementById('joinLastName')?.value.trim()   || '';
+    const phone          = document.getElementById('joinPhone')?.value.trim()      || '';
+    const email          = document.getElementById('joinEmail')?.value.trim()      || '';
+    const role           = document.querySelector('input[name="joinRole"]:checked')?.value || '';
+    const specialty      = document.getElementById('joinSpecialty')?.value.trim()  || '';
+    const experience     = document.getElementById('joinExperience')?.value.trim() || '';
+    const file           = document.getElementById('joinCV')?.files?.[0]           || null;
 
-    let base64 = '';
-    let mimeType = '';
+    let base64           = '';
+    let mimeType         = '';
     let originalFileName = '';
 
     if (file) {
-      const converted = await fileToBase64(file);
-      base64 = converted.base64;
-      mimeType = converted.mimeType;
+      const converted  = await fileToBase64(file);
+      base64           = converted.base64;
+      mimeType         = converted.mimeType;
       originalFileName = file.name;
     }
 
     const formData = new FormData();
-    formData.append('firstName', firstName);
-    formData.append('lastName', lastName);
-    formData.append('fullName', `${firstName} ${lastName}`.trim());
-    formData.append('phone', phone);
-    formData.append('email', email);
-    formData.append('role', role);
-    formData.append('specialty', specialty);
-    formData.append('experience', experience);
-    formData.append('base64', base64);
-    formData.append('mimeType', mimeType);
+    formData.append('firstName',        firstName);
+    formData.append('lastName',         lastName);
+    formData.append('fullName',         `${firstName} ${lastName}`.trim());
+    formData.append('phone',            phone);
+    formData.append('email',            email);
+    formData.append('role',             role);
+    formData.append('specialty',        specialty);
+    formData.append('experience',       experience);
+    formData.append('base64',           base64);
+    formData.append('mimeType',         mimeType);
     formData.append('originalFileName', originalFileName);
-    formData.append('timestamp', new Date().toISOString());
+    formData.append('timestamp',        new Date().toISOString());
 
     await fetch(JOIN_APPS_SCRIPT_URL, {
       method: 'POST',
@@ -1208,8 +1205,8 @@ async function submitJoinForm(e) {
     submitBtn?.classList.remove('loading');
     if (submitBtn) submitBtn.disabled = false;
     hideLoadingPopup();
-
     closeJoinModal();
+
     showSuccessModal(
       currentLang === 'ar' ? 'تم إرسال الطلب بنجاح' : 'Request sent successfully',
       currentLang === 'ar'
@@ -1226,10 +1223,19 @@ async function submitJoinForm(e) {
   }
 }
 
+// ─── CV FILE NAME DISPLAY ─────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('joinCV')?.addEventListener('change', function () {
+    const file    = this.files?.[0];
+    const cvName  = document.getElementById('cv-file-name');
+    if (cvName) cvName.textContent = file ? file.name : '';
+  });
+});
+
 // ─── ANNOUNCEMENTS ────────────────────────────────────────
-window._annCache = [];
-let annCurrentIndex = 0;
-let annAutoTimer = null;
+window._annCache     = [];
+let annCurrentIndex  = 0;
+let annAutoTimer     = null;
 
 function buildAnnouncementCard(item) {
   const card = document.createElement('div');
@@ -1240,11 +1246,11 @@ function buildAnnouncementCard(item) {
     : (item.titleEn || item.titleAr || item.title || '');
 
   const text = currentLang === 'ar'
-    ? (item.bodyAr || item.textAr || item.body || item.text || '')
-    : (item.bodyEn || item.textEn || item.bodyAr || item.textAr || item.body || item.text || '');
+    ? (item.bodyAr  || item.textAr  || item.body  || item.text  || '')
+    : (item.bodyEn  || item.textEn  || item.bodyAr || item.textAr || item.body || item.text || '');
 
-  const date  = item.date || item.createdAt || '';
-  const image = item.imageUrl || item.image || '';
+  const date  = item.date  || item.createdAt || '';
+  const image = item.imageUrl || item.image  || '';
 
   if (!image) card.classList.add('text-only');
 
@@ -1330,7 +1336,7 @@ function prevAnnouncement() {
 function startAnnouncementAutoPlay() {
   stopAnnouncementAutoPlay();
   if (window._annCache.length <= 1) return;
-  annAutoTimer = setInterval(nextAnnouncement, 5000);
+  annAutoTimer = setInterval(() => nextAnnouncement(), 5000);
 }
 
 function stopAnnouncementAutoPlay() {
@@ -1340,61 +1346,21 @@ function stopAnnouncementAutoPlay() {
   }
 }
 
-function _renderFromData(items) {
-  window._annCache = Array.isArray(items) ? items : [];
-  renderAnnouncementSlider(window._annCache);
-}
-
-// ─── ✅ FIX: loadAnnouncements — no-cors safe ─────────────
 async function loadAnnouncements() {
   try {
-    const res = await fetch(`${APPS_SCRIPT_URL}?action=getAnnouncements`, {
-      method: 'GET',
-      mode:   'cors'
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const res  = await fetch(APPS_SCRIPT_URL + '?action=getAnnouncements');
     const data = await res.json();
-
-    const items =
-      data.items ||
-      data.announcements ||
-      data.data ||
-      (Array.isArray(data) ? data : []);
-
-    _renderFromData(items);
-  } catch (error) {
-    console.warn('Announcements load error:', error);
-    _renderFromData([]);
+    window._annCache = Array.isArray(data.items) ? data.items : [];
+    renderAnnouncementSlider(window._annCache);
+  } catch (err) {
+    console.warn('Failed to load announcements:', err);
+    const section = document.getElementById('announcements-section');
+    if (section) section.style.display = 'none';
   }
 }
 
-// ─── EVENT BINDINGS ───────────────────────────────────────
-function bindStaticEvents() {
-  document.getElementById('btn-ar')?.addEventListener('click', () => setLang('ar'));
-  document.getElementById('btn-en')?.addEventListener('click', () => setLang('en'));
-
-  document.getElementById('reg-form')?.addEventListener('submit', submitForm);
-  document.getElementById('join-form')?.addEventListener('submit', submitJoinForm);
-
-  document.getElementById('terms-checkbox')?.addEventListener('change', onTermsCheck);
-  document.getElementById('terms-proceed-btn')?.addEventListener('click', proceedToRegister);
-
-  document.getElementById('joinCV')?.addEventListener('change', function () {
-    const file     = this.files?.[0];
-    const fileName = document.getElementById('cv-file-name');
-    if (fileName) fileName.textContent = file ? file.name : '';
-  });
-
-  document.getElementById('ann-prev')?.addEventListener('click', prevAnnouncement);
-  document.getElementById('ann-next')?.addEventListener('click', nextAnnouncement);
-
-  document.getElementById('ann-track')?.addEventListener('mouseenter', stopAnnouncementAutoPlay);
-  document.getElementById('ann-track')?.addEventListener('mouseleave', startAnnouncementAutoPlay);
-}
-
-// ─── INIT ─────────────────────────────────────────────────
+// ─── DOM CONTENT LOADED ───────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   setLang('ar');
-  bindStaticEvents();
   loadAnnouncements();
 });
