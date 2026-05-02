@@ -1,11 +1,12 @@
 // ─── SQUARES BACKGROUND ───────────────────────────────────
 const canvas = document.getElementById('squares-canvas');
-const ctx    = canvas.getContext('2d');
+const ctx    = canvas ? canvas.getContext('2d') : null;
 let squares  = [];
 const squareSize = 40, squareGap = 4;
 let cols, rows;
 
 function resizeCanvas() {
+  if (!canvas || !ctx) return;
   canvas.width  = window.innerWidth;
   canvas.height = window.innerHeight;
   cols = Math.ceil(window.innerWidth  / (squareSize + squareGap));
@@ -14,19 +15,25 @@ function resizeCanvas() {
 }
 function initSquares() {
   squares = [];
-  for (let i = 0; i < cols; i++)
-    for (let j = 0; j < rows; j++)
+  for (let i = 0; i < cols; i++) {
+    for (let j = 0; j < rows; j++) {
       squares.push({
-        x: i*(squareSize+squareGap), y: j*(squareSize+squareGap),
-        opacity: Math.random()*0.3, targetOpacity: Math.random()*0.3,
-        speed: 0.005 + Math.random()*0.01
+        x: i * (squareSize + squareGap),
+        y: j * (squareSize + squareGap),
+        opacity: Math.random() * 0.3,
+        targetOpacity: Math.random() * 0.3,
+        speed: 0.005 + Math.random() * 0.01
       });
+    }
+  }
 }
 function animateSquares() {
+  if (!canvas || !ctx) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   squares.forEach(sq => {
-    if (Math.abs(sq.opacity - sq.targetOpacity) < 0.01)
-      sq.targetOpacity = Math.random()*0.4;
+    if (Math.abs(sq.opacity - sq.targetOpacity) < 0.01) {
+      sq.targetOpacity = Math.random() * 0.4;
+    }
     sq.opacity += (sq.targetOpacity - sq.opacity) * sq.speed;
     ctx.fillStyle = `rgba(4,130,195,${sq.opacity})`;
     ctx.fillRect(sq.x, sq.y, squareSize, squareSize);
@@ -34,12 +41,14 @@ function animateSquares() {
   requestAnimationFrame(animateSquares);
 }
 window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-animateSquares();
+if (canvas && ctx) {
+  resizeCanvas();
+  animateSquares();
+}
 
 // ─── APPS SCRIPT URL ──────────────────────────────────────
 const APPS_SCRIPT_URL      = 'https://script.google.com/macros/s/AKfycbwidCYkiWYlCSkMNUwbo1ZLM8XCGh8y5lWD7M_lS-J5cX35-Xd8kHhrwO4ktZiN5_vhIg/exec';
-const JOIN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw9dlrKd76aX_O8CYye4UPXo2YcKFGPXpZZOAOJov7YzJtOHo8uo-gGXjMyp4NodTYj/exec';
+const JOIN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyjgcCKvoZ5oNbfKwYnQnlou1f_ZVmHZOi8NyZOZ9rn6UDWh8m-wQycCtT4kg46g8It/exec';
 
 const typeLabelsAr = {
   support: 'تسجيلات الدعم',
@@ -138,17 +147,26 @@ const i18n = {
   }
 };
 
-// ─── HELPER: إخفاء وإظهار اللوقو ─────────────────────────
-function hideLogo() { document.querySelector('.top-logo').style.display = 'none'; }
-function showLogo() { document.querySelector('.top-logo').style.display = 'flex'; }
+// ─── HELPERS عامة ─────────────────────────────────────────
+function $(selector, root = document) { return root.querySelector(selector); }
+function $all(selector, root = document) { return [...root.querySelectorAll(selector)]; }
+
+function hideLogo() {
+  const el = document.querySelector('.top-logo');
+  if (el) el.style.display = 'none';
+}
+function showLogo() {
+  const el = document.querySelector('.top-logo');
+  if (el) el.style.display = 'flex';
+}
 
 function setLang(lang) {
   currentLang = lang;
   document.documentElement.lang = lang;
   document.documentElement.dir  = lang === 'ar' ? 'rtl' : 'ltr';
 
-  document.getElementById('btn-ar').classList.toggle('active', lang === 'ar');
-  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  document.getElementById('btn-ar')?.classList.toggle('active', lang === 'ar');
+  document.getElementById('btn-en')?.classList.toggle('active', lang === 'en');
 
   const t = i18n[lang];
   document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -233,49 +251,47 @@ const curriculum = {
     { subject:'العلوم الإسلامية',               teachers:['الأستاذ هبيتة ربيع'] },
   ],
   'ثالثة ثانوي (بكالوريا)|تسيير واقتصاد': [
-    { subject:'المحاسبة',          teachers:['الأستاذ سرهود عبدالرحمان'] },
-    { subject:'اللغة العربية',    teachers:['الأستاذة موساوي زبيدة'] },
-    { subject:'اللغة الفرنسية',   teachers:['الأستاذة كروش شمس الهدى'] },
-    { subject:'اللغة الإنجليزية',teachers:['الأستاذ كرام الصادق'] },
-    { subject:'الفلسفة',          teachers:['الأستاذة دادة نجاح سلام'] },
-    { subject:'تاريخ وجغرافيا',   teachers:['الأستاذ ايمن دخان'] },
-    { subject:'العلوم الإسلامية', teachers:['الأستاذ هبيتة ربيع'] },
+    { subject:'المحاسبة',           teachers:['الأستاذ سرهود عبدالرحمان'] },
+    { subject:'اللغة العربية',      teachers:['الأستاذة موساوي زبيدة'] },
+    { subject:'اللغة الفرنسية',     teachers:['الأستاذة كروش شمس الهدى'] },
+    { subject:'اللغة الإنجليزية',   teachers:['الأستاذ كرام الصادق'] },
+    { subject:'الفلسفة',            teachers:['الأستاذة دادة نجاح سلام'] },
+    { subject:'تاريخ وجغرافيا',     teachers:['الأستاذ ايمن دخان'] },
+    { subject:'العلوم الإسلامية',   teachers:['الأستاذ هبيتة ربيع'] },
   ],
   'ثالثة ثانوي (بكالوريا)|آداب وفلسفة': [
-    { subject:'اللغة العربية',     teachers:['الأستاذة موساوي زبيدة'] },
-    { subject:'اللغة الفرنسية',    teachers:['الأستاذة كروش شمس الهدى'] },
-    { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
-    { subject:'الفلسفة',           teachers:['الأستاذة دادة نجاح سلام'] },
-    { subject:'تاريخ وجغرافيا',    teachers:['الأستاذ ايمن دخان'] },
-    { subject:'الرياضيات (أدبيين)',teachers:['الأستاذ هبيتة ربيع'] },
-    { subject:'العلوم الإسلامية',  teachers:['الأستاذ هبيتة ربيع'] },
+    { subject:'اللغة العربية',      teachers:['الأستاذة موساوي زبيدة'] },
+    { subject:'اللغة الفرنسية',     teachers:['الأستاذة كروش شمس الهدى'] },
+    { subject:'اللغة الإنجليزية',   teachers:['الأستاذ كرام الصادق'] },
+    { subject:'الفلسفة',            teachers:['الأستاذة دادة نجاح سلام'] },
+    { subject:'تاريخ وجغرافيا',     teachers:['الأستاذ ايمن دخان'] },
+    { subject:'الرياضيات (أدبيين)', teachers:['الأستاذ هبيتة ربيع'] },
+    { subject:'العلوم الإسلامية',   teachers:['الأستاذ هبيتة ربيع'] },
   ],
   'ثالثة ثانوي (بكالوريا)|لغات أجنبية': [
-    { subject:'اللغة الإسبانية',   teachers:['الأستاذ طوالبية ابراهيم'] },
-    { subject:'اللغة الألمانية',   teachers:['الأستاذ حمزة علالي'] },
-    { subject:'اللغة العربية',     teachers:['الأستاذة موساوي زبيدة'] },
-    { subject:'اللغة الفرنسية',    teachers:['الأستاذة كروش شمس الهدى'] },
-    { subject:'اللغة الإنجليزية', teachers:['الأستاذ كرام الصادق'] },
-    { subject:'الرياضيات (أدبيين)',teachers:['الأستاذ هبيتة ربيع'] },
-    { subject:'العلوم الإسلامية',  teachers:['الأستاذ هبيتة ربيع'] },
+    { subject:'اللغة الإسبانية',    teachers:['الأستاذ طوالبية ابراهيم'] },
+    { subject:'اللغة الألمانية',    teachers:['الأستاذ حمزة علالي'] },
+    { subject:'اللغة العربية',      teachers:['الأستاذة موساوي زبيدة'] },
+    { subject:'اللغة الفرنسية',     teachers:['الأستاذة كروش شمس الهدى'] },
+    { subject:'اللغة الإنجليزية',   teachers:['الأستاذ كرام الصادق'] },
+    { subject:'الرياضيات (أدبيين)', teachers:['الأستاذ هبيتة ربيع'] },
+    { subject:'العلوم الإسلامية',   teachers:['الأستاذ هبيتة ربيع'] },
   ],
 };
-
 
 // ─── CURRICULUM — دورات مدرسية ────────────────────────────
 const coursesCurriculum = {
   'ثالثة ثانوي (بكالوريا)': [
-    { course: 'دورة اللغة الإنجليزية',                              teacher: 'الأستاذ كرام الصادق' },
-    { course: 'دورة اللغة الفرنسية',                               teacher: 'الأستاذة كروش شمس الهدى' },
-    { course: 'دورة اللغة العربية',                                teacher: 'الأستاذة موساوي زبيدة' },
-    { course: 'دورة العلوم الإسلامية',                             teacher: 'الأستاذ هبيتة ربيع' },
-    { course: 'دورة الفلسفة',                                      teacher: 'الأستاذة دادة نجاح سلام' },
-    { course: 'دورة التاريخ (الحرب الباردة)',                      teacher: 'الأستاذ دخان أيمن' },
-    { course: 'دورة التاريخ (الثورة الجزائرية)',                   teacher: 'الأستاذ دخان أيمن' },
-    { course: 'دورة الجغرافيا (الفصل الأول والفصل الثاني)',        teacher: 'الأستاذ دخان أيمن' },
+    { course: 'دورة اللغة الإنجليزية',                       teacher: 'الأستاذ كرام الصادق' },
+    { course: 'دورة اللغة الفرنسية',                         teacher: 'الأستاذة كروش شمس الهدى' },
+    { course: 'دورة اللغة العربية',                          teacher: 'الأستاذة موساوي زبيدة' },
+    { course: 'دورة العلوم الإسلامية',                       teacher: 'الأستاذ هبيتة ربيع' },
+    { course: 'دورة الفلسفة',                                teacher: 'الأستاذة دادة نجاح سلام' },
+    { course: 'دورة التاريخ (الحرب الباردة)',                teacher: 'الأستاذ دخان أيمن' },
+    { course: 'دورة التاريخ (الثورة الجزائرية)',             teacher: 'الأستاذ دخان أيمن' },
+    { course: 'دورة الجغرافيا (الفصل الأول والفصل الثاني)',  teacher: 'الأستاذ دخان أيمن' },
   ],
 };
-
 
 // ─── TAKWINI OPTIONS ──────────────────────────────────────
 const takwiniOptions = [
@@ -304,7 +320,8 @@ function openModal(type) {
     online:  currentLang==='ar' ? 'تسجيل — دورات أونلاين'  : 'Registration — Online Courses',
     takwini: currentLang==='ar' ? 'تسجيل — دورات تكوينية'  : 'Registration — Training Courses',
   };
-  document.getElementById('modal-title').textContent = titles[type] || 'نموذج التسجيل';
+  const modalTitle = document.getElementById('modal-title');
+  if (modalTitle) modalTitle.textContent = titles[type] || 'نموذج التسجيل';
 
   const motivationLabel = document.querySelector('label[for="motivation"] span[data-i18n="motivation"]');
   if (motivationLabel) {
@@ -315,36 +332,34 @@ function openModal(type) {
   const langGrp    = document.getElementById('langTypeGroup');
   const vipTypeGrp = document.getElementById('vipTypeGroup');
 
-  hideField(langGrp,    'langType');
+  hideField(langGrp, 'langType');
   hideField(vipTypeGrp);
 
-  // support: نظهر supportTypeGroup مباشرةً لاختيار النوع قبل المستوى
   if (type === 'support') {
-    const supportTypeGrp = document.getElementById('supportTypeGroup');
-    animateShow(supportTypeGrp);
+    animateShow(document.getElementById('supportTypeGroup'));
   } else if (type === 'lang' || type === 'online') {
     animateShow(langGrp);
-    langGrp.querySelector('select').setAttribute('required','required');
+    langGrp?.querySelector('select')?.setAttribute('required','required');
   } else if (type === 'vip') {
     animateShow(vipTypeGrp);
   } else if (type === 'ielts') {
     const daysCountGrp = document.getElementById('vipDaysCountGroup');
     animateShow(daysCountGrp);
-    daysCountGrp.querySelector('select').setAttribute('required','required');
+    daysCountGrp?.querySelector('select')?.setAttribute('required','required');
   } else if (type === 'takwini') {
     showTakwiniOptions();
   }
 
-  document.getElementById('lang-toggle').classList.add('hidden');
+  document.getElementById('lang-toggle')?.classList.add('hidden');
   hideLogo();
-  document.getElementById('modal').classList.add('active');
+  document.getElementById('modal')?.classList.add('active');
   document.body.style.overflow = 'hidden';
 }
 
 function closeModal() {
-  document.getElementById('modal').classList.remove('active');
+  document.getElementById('modal')?.classList.remove('active');
   document.body.style.overflow = '';
-  document.getElementById('lang-toggle').classList.remove('hidden');
+  document.getElementById('lang-toggle')?.classList.remove('hidden');
   showLogo();
   resetForm();
 }
@@ -354,7 +369,9 @@ function closeModalOutside(e) {
 }
 
 function resetForm() {
-  document.getElementById('reg-form').reset();
+  const regForm = document.getElementById('reg-form');
+  if (regForm) regForm.reset();
+
   const groups = [
     'supportTypeGroup',
     'eduLevelGroup','candidateTypeGroup','specialtyGroup','subjectGroup',
@@ -366,21 +383,30 @@ function resetForm() {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
+
   document.getElementById('comingSoonNote')?.remove();
+  document.getElementById('coursesListGroup')?.remove();
+  document.getElementById('takwiniOptionsGroup')?.remove();
+
   document.querySelectorAll('input[name="vipType"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
-  document.getElementById('coursesListGroup')?.remove();
-  document.getElementById('takwiniOptionsGroup')?.remove();
   document.querySelectorAll('input[name="takwiniOption"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="supportType"]').forEach(r => r.checked = false);
+
+  ['langType','langLevel','eduLevel','specialty','subject','teacher','vipDaysCount','vipEduLevel','profession'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.removeAttribute('required');
+      el.value = '';
+    }
+  });
+
   resetDays();
   maxDaysAllowed = 2;
 
   const motivationLabel = document.querySelector('label[for="motivation"] span[data-i18n="motivation"]');
-  if (motivationLabel) {
-    motivationLabel.textContent = i18n[currentLang].motivation;
-  }
+  if (motivationLabel) motivationLabel.textContent = i18n[currentLang].motivation;
 }
 
 // ─── DAYS ─────────────────────────────────────────────────
@@ -389,15 +415,22 @@ let maxDaysAllowed = 2;
 function onDayChange(checkbox) {
   const checked = document.querySelectorAll('input[name="days"]:checked');
   const count   = checked.length;
-  if (count > maxDaysAllowed) { checkbox.checked = false; return; }
+
+  if (count > maxDaysAllowed) {
+    checkbox.checked = false;
+    return;
+  }
+
   document.querySelectorAll('.day-card').forEach(card => {
     const inp = card.querySelector('input');
-    card.classList.toggle('selected', inp.checked);
-    if (!inp.checked && count >= maxDaysAllowed) card.classList.add('disabled');
+    card.classList.toggle('selected', !!inp?.checked);
+    if (!inp?.checked && count >= maxDaysAllowed) card.classList.add('disabled');
     else card.classList.remove('disabled');
   });
+
   const countEl = document.getElementById('days-count');
-  if (countEl) countEl.textContent = Math.min(count, maxDaysAllowed);
+  if (countEl) countEl.textContent = String(Math.min(count, maxDaysAllowed));
+
   const counter = document.getElementById('days-counter');
   if (counter) counter.classList.toggle('complete', count === maxDaysAllowed);
 }
@@ -405,29 +438,39 @@ function onDayChange(checkbox) {
 function resetDays() {
   document.querySelectorAll('input[name="days"]').forEach(c => c.checked = false);
   document.querySelectorAll('.day-card').forEach(c => c.classList.remove('selected','disabled'));
+
   const countEl = document.getElementById('days-count');
   if (countEl) countEl.textContent = '0';
+
   const counter = document.getElementById('days-counter');
   if (counter) counter.classList.remove('complete');
 }
 
 // ─── VIP DAYS COUNT ───────────────────────────────────────
 function onVipDaysCountChange() {
-  const val     = parseInt(document.getElementById('vipDaysCount').value);
+  const val     = parseInt(document.getElementById('vipDaysCount')?.value || '0', 10);
   const daysGrp = document.getElementById('daysGroup');
+
   resetDays();
-  if (!val) { daysGrp.style.display = 'none'; return; }
+  if (!val) {
+    if (daysGrp) daysGrp.style.display = 'none';
+    return;
+  }
+
   maxDaysAllowed = val;
   const daysOfLbl = document.getElementById('days-of-label');
   if (daysOfLbl) daysOfLbl.textContent = `/${val}`;
+
   const chooseLbl = document.querySelector('[data-i18n="chooseDays"]');
   if (chooseLbl) {
     chooseLbl.textContent = currentLang === 'ar'
       ? `اختر ${val} ${val === 1 ? 'يوم' : 'أيام'} للحضور في الأسبوع`
       : `Choose ${val} day${val > 1 ? 's' : ''} per week`;
   }
+
   const countEl = document.getElementById('days-count');
   if (countEl) countEl.textContent = '0';
+
   animateShow(daysGrp);
 }
 
@@ -444,15 +487,19 @@ function hideField(el, ...ids) {
   el.style.display = 'none';
   ids.forEach(id => {
     const s = document.getElementById(id);
-    if (s) { s.removeAttribute('required'); s.value = ''; }
+    if (s) {
+      s.removeAttribute('required');
+      if ('value' in s) s.value = '';
+    }
   });
 }
 function showComingSoon(afterEl) {
+  if (!afterEl) return;
   document.getElementById('comingSoonNote')?.remove();
   const note = document.createElement('div');
   note.id = 'comingSoonNote';
   note.className = 'coming-soon-note field-appear';
-  note.innerHTML = `<span>🚧</span><span>الدورات لهذا المستوى ستُضاف قريباً</span>`;
+  note.innerHTML = `<span>🚧</span><span>${currentLang === 'ar' ? 'الدورات لهذا المستوى ستُضاف قريباً' : 'Courses for this level will be added soon'}</span>`;
   afterEl.insertAdjacentElement('afterend', note);
 }
 
@@ -466,14 +513,14 @@ function showCoursesList(level, courses) {
 
   const label = document.createElement('label');
   label.className = 'form-label';
-  label.innerHTML = `<span>اختر الدورة</span><span>*</span>`;
+  label.innerHTML = `<span>${currentLang === 'ar' ? 'اختر الدورة' : 'Choose course'}</span><span>*</span>`;
   wrap.appendChild(label);
 
   const select = document.createElement('select');
   select.className = 'form-input';
   select.id = 'courseSelect';
   select.setAttribute('required', 'required');
-  select.innerHTML = `<option value="">-- اختر الدورة --</option>`;
+  select.innerHTML = `<option value="">${currentLang === 'ar' ? '-- اختر الدورة --' : '-- Choose course --'}</option>`;
 
   courses.forEach(item => {
     const opt = document.createElement('option');
@@ -483,17 +530,18 @@ function showCoursesList(level, courses) {
   });
 
   wrap.appendChild(select);
-
-  const eduGrp = document.getElementById('eduLevelGroup');
-  eduGrp.insertAdjacentElement('afterend', wrap);
+  document.getElementById('eduLevelGroup')?.insertAdjacentElement('afterend', wrap);
 }
+
 function populateSubjects(key) {
   const subGrp    = document.getElementById('subjectGroup');
   const subSelect = document.getElementById('subject');
   const teachGrp  = document.getElementById('teacherGroup');
+
   document.getElementById('comingSoonNote')?.remove();
-  hideField(subGrp,   'subject');
+  hideField(subGrp, 'subject');
   hideField(teachGrp, 'teacher');
+
   const subjects = curriculum[key] ?? [];
   if (subjects.length === 0) {
     const specGrp = document.getElementById('specialtyGroup');
@@ -502,44 +550,49 @@ function populateSubjects(key) {
     showComingSoon(afterEl);
     return;
   }
-  subSelect.innerHTML = `<option value="">-- اختر المادة --</option>`;
+
+  if (!subSelect) return;
+  subSelect.innerHTML = `<option value="">${currentLang === 'ar' ? '-- اختر المادة --' : '-- Choose subject --'}</option>`;
   subjects.forEach(item => {
     const opt = document.createElement('option');
-    opt.value = item.subject; opt.textContent = item.subject;
+    opt.value = item.subject;
+    opt.textContent = item.subject;
     subSelect.appendChild(opt);
   });
+
   animateShow(subGrp);
   subSelect.setAttribute('required','required');
 }
 
 // ─── LANG TYPE ────────────────────────────────────────────
 function onLangTypeChange() {
-  const val        = document.getElementById('langType').value;
+  const val        = document.getElementById('langType')?.value;
   const langLvlGrp = document.getElementById('langLevelGroup');
   const levelTestG = document.getElementById('levelTestGroup');
+
   hideField(langLvlGrp, 'langLevel');
   hideField(levelTestG);
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
+
   if (val) {
     animateShow(langLvlGrp);
-    langLvlGrp.querySelector('select')?.setAttribute('required','required');
+    langLvlGrp?.querySelector('select')?.setAttribute('required','required');
   }
 }
 
 function onLangLevelChange() {
-  const val          = document.getElementById('langLevel').value;
+  const val          = document.getElementById('langLevel')?.value;
   const levelTestGrp = document.getElementById('levelTestGroup');
-  if (val) animateShow(levelTestGrp);
-  else {
+  if (val) {
+    animateShow(levelTestGrp);
+  } else if (levelTestGrp) {
     levelTestGrp.style.display = 'none';
     document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
   }
 }
 
-// ─── SUPPORT TYPE (دعم مدرسي / دورات مدرسية) ─────────────
-function onBirthDateChange() {
-  // لا علاقة لتاريخ الميلاد بإظهار supportTypeGroup — هو يظهر مباشرةً عند فتح المودال
-}
+// ─── SUPPORT TYPE ─────────────────────────────────────────
+function onBirthDateChange() {}
 
 function onSupportTypeChange() {
   const selected = document.querySelector('input[name="supportType"]:checked')?.value;
@@ -556,13 +609,13 @@ function onSupportTypeChange() {
 
   if (selected) {
     animateShow(eduGrp);
-    eduGrp.querySelector('select').setAttribute('required', 'required');
+    eduGrp?.querySelector('select')?.setAttribute('required', 'required');
   }
 }
 
-// ─── EDU LEVEL (دعم) ──────────────────────────────────────
+// ─── EDU LEVEL ────────────────────────────────────────────
 function onEduLevelChange() {
-  const level            = document.getElementById('eduLevel').value;
+  const level            = document.getElementById('eduLevel')?.value;
   const parentGrp        = document.getElementById('parentGroup');
   const specialtyGrp     = document.getElementById('specialtyGroup');
   const subGrp           = document.getElementById('subjectGroup');
@@ -574,36 +627,33 @@ function onEduLevelChange() {
 
   document.getElementById('comingSoonNote')?.remove();
   document.getElementById('coursesListGroup')?.remove();
-  hideField(parentGrp,        'parentName','parentPhone');
-  hideField(specialtyGrp,     'specialty');
-  hideField(subGrp,           'subject');
-  hideField(teachGrp,         'teacher');
+
+  hideField(parentGrp, 'parentName','parentPhone');
+  hideField(specialtyGrp, 'specialty');
+  hideField(subGrp, 'subject');
+  hideField(teachGrp, 'teacher');
   hideField(candidateTypeGrp);
-  parentName.removeAttribute('required');
-  parentPhone.removeAttribute('required');
+
+  parentName?.removeAttribute('required');
+  parentPhone?.removeAttribute('required');
   document.querySelectorAll('input[name="candidateType"]').forEach(r => r.checked = false);
 
   if (!level) return;
 
-  // ── دورات مدرسية ──
   if (supportType === 'دورات مدرسية') {
     const courses = coursesCurriculum[level];
-    if (!courses || courses.length === 0) {
-      showComingSoon(document.getElementById('eduLevelGroup'));
-    } else {
-      showCoursesList(level, courses);
-    }
+    if (!courses || courses.length === 0) showComingSoon(document.getElementById('eduLevelGroup'));
+    else showCoursesList(level, courses);
     return;
   }
 
-  // ── دعم مدرسي ──
   if (needsCandidateType.includes(level)) { animateShow(candidateTypeGrp); return; }
   if (needsSpecialty.includes(level))     { showSpecialtyField(level); return; }
   populateSubjects(level);
 }
 
 function onCandidateTypeChange() {
-  const level = document.getElementById('eduLevel').value;
+  const level = document.getElementById('eduLevel')?.value;
   document.getElementById('comingSoonNote')?.remove();
   hideField(document.getElementById('specialtyGroup'), 'specialty');
   hideField(document.getElementById('subjectGroup'),   'subject');
@@ -617,19 +667,23 @@ function showSpecialtyField(level) {
   const specialtyGrp = document.getElementById('specialtyGroup');
   const specialtySel = document.getElementById('specialty');
   const specs = specialties[level] || [];
-  specialtySel.innerHTML = `<option value="">-- اختر التخصص --</option>`;
+
+  if (!specialtySel) return;
+  specialtySel.innerHTML = `<option value="">${currentLang === 'ar' ? '-- اختر التخصص --' : '-- Choose specialty --'}</option>`;
   specs.forEach(sp => {
     const opt = document.createElement('option');
-    opt.value = sp; opt.textContent = sp;
+    opt.value = sp;
+    opt.textContent = sp;
     specialtySel.appendChild(opt);
   });
+
   animateShow(specialtyGrp);
   specialtySel.setAttribute('required','required');
 }
 
 function onSpecialtyChange() {
-  const level = document.getElementById('eduLevel').value;
-  const spec  = document.getElementById('specialty').value;
+  const level = document.getElementById('eduLevel')?.value;
+  const spec  = document.getElementById('specialty')?.value;
   document.getElementById('comingSoonNote')?.remove();
   hideField(document.getElementById('subjectGroup'), 'subject');
   hideField(document.getElementById('teacherGroup'), 'teacher');
@@ -639,38 +693,41 @@ function onSpecialtyChange() {
 }
 
 function onSubjectChange() {
-  const level      = document.getElementById('eduLevel').value;
-  const spec       = document.getElementById('specialty').value;
-  const subjectVal = document.getElementById('subject').value;
+  const level      = document.getElementById('eduLevel')?.value;
+  const spec       = document.getElementById('specialty')?.value;
+  const subjectVal = document.getElementById('subject')?.value;
   const teachGrp   = document.getElementById('teacherGroup');
   const teachSel   = document.getElementById('teacher');
 
   hideField(teachGrp, 'teacher');
   hideField(document.getElementById('parentGroup'), 'parentName','parentPhone');
-  if (!subjectVal) return;
+  if (!subjectVal || !teachSel) return;
 
   const key      = spec ? `${level}|${spec}` : level;
   const subjects = curriculum[key] || [];
   const found    = subjects.find(s => s.subject === subjectVal);
   if (!found || !found.teachers.length) return;
 
-  teachSel.innerHTML = `<option value="">-- اختر الأستاذ/ة --</option>`;
+  teachSel.innerHTML = `<option value="">${currentLang === 'ar' ? '-- اختر الأستاذ/ة --' : '-- Choose teacher --'}</option>`;
   found.teachers.forEach(t => {
     const opt = document.createElement('option');
-    opt.value = t; opt.textContent = t;
+    opt.value = t;
+    opt.textContent = t;
     teachSel.appendChild(opt);
   });
+
   if (found.teachers.length === 1) {
     teachSel.value = found.teachers[0];
     if (currentModalType === 'support') showParentIfNeeded(level);
   }
+
   animateShow(teachGrp);
   teachSel.setAttribute('required','required');
 }
 
 function onTeacherChange() {
-  const level    = document.getElementById('eduLevel').value;
-  const teachVal = document.getElementById('teacher').value;
+  const level    = document.getElementById('eduLevel')?.value;
+  const teachVal = document.getElementById('teacher')?.value;
   hideField(document.getElementById('parentGroup'), 'parentName','parentPhone');
   if (teachVal && currentModalType === 'support') showParentIfNeeded(level);
 }
@@ -681,8 +738,8 @@ function showParentIfNeeded(level) {
   const parentName  = document.getElementById('parentName');
   const parentPhone = document.getElementById('parentPhone');
   animateShow(parentGrp);
-  parentName.setAttribute('required','required');
-  parentPhone.setAttribute('required','required');
+  parentName?.setAttribute('required','required');
+  parentPhone?.setAttribute('required','required');
 }
 
 // ─── VIP TYPE ─────────────────────────────────────────────
@@ -697,40 +754,39 @@ function onVipTypeChange() {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
+
   resetDays();
-  document.getElementById('vipDaysCount').value = '';
-  document.getElementById('profession').value   = '';
-  document.getElementById('langType').value     = '';
-  document.getElementById('langLevel').value    = '';
+  if (document.getElementById('vipDaysCount')) document.getElementById('vipDaysCount').value = '';
+  if (document.getElementById('profession'))   document.getElementById('profession').value   = '';
+  if (document.getElementById('langType'))     document.getElementById('langType').value     = '';
+  if (document.getElementById('langLevel'))    document.getElementById('langLevel').value    = '';
   document.querySelectorAll('input[name="levelTest"]').forEach(r => r.checked = false);
 
   if (selected === 'support') {
-    const vipEduGrp = document.getElementById('vipEduLevelGroup');
-    animateShow(vipEduGrp);
-    document.getElementById('vipEduLevel').setAttribute('required','required');
+    animateShow(document.getElementById('vipEduLevelGroup'));
+    document.getElementById('vipEduLevel')?.setAttribute('required','required');
   } else if (selected === 'lang') {
-    const profGrp = document.getElementById('professionGroup');
-    animateShow(profGrp);
-    document.getElementById('profession').setAttribute('required','required');
+    animateShow(document.getElementById('professionGroup'));
+    document.getElementById('profession')?.setAttribute('required','required');
     animateShow(document.getElementById('langTypeGroup'));
-    document.getElementById('langType').setAttribute('required','required');
+    document.getElementById('langType')?.setAttribute('required','required');
   }
 }
 
 // ─── VIP EDU LEVEL ────────────────────────────────────────
 function onVipEduLevelChange() {
-  const level        = document.getElementById('vipEduLevel').value;
+  const level        = document.getElementById('vipEduLevel')?.value;
   const daysCountGrp = document.getElementById('vipDaysCountGroup');
   const daysGrp      = document.getElementById('daysGroup');
 
   hideField(daysCountGrp);
   hideField(daysGrp);
   resetDays();
-  document.getElementById('vipDaysCount').value = '';
+  if (document.getElementById('vipDaysCount')) document.getElementById('vipDaysCount').value = '';
 
   if (!level) return;
   animateShow(daysCountGrp);
-  document.getElementById('vipDaysCount').setAttribute('required','required');
+  document.getElementById('vipDaysCount')?.setAttribute('required','required');
 }
 
 // ─── TAKWINI OPTIONS ──────────────────────────────────────
@@ -743,7 +799,7 @@ function showTakwiniOptions() {
 
   const label = document.createElement('label');
   label.className = 'form-label';
-  label.innerHTML = `<span>اختر الدورة التكوينية</span><span>*</span>`;
+  label.innerHTML = `<span>${currentLang === 'ar' ? 'اختر الدورة التكوينية' : 'Choose training course'}</span><span>*</span>`;
   wrap.appendChild(label);
 
   const radioWrap = document.createElement('div');
@@ -760,28 +816,27 @@ function showTakwiniOptions() {
   });
 
   wrap.appendChild(radioWrap);
-
-  // أضفه بعد حقل تاريخ الميلاد
-  const birthGroup = document.getElementById('birthDate').closest('.form-group');
-  birthGroup.insertAdjacentElement('afterend', wrap);
+  const birthInput = document.getElementById('birthDate');
+  const birthGroup = birthInput?.closest('.form-group');
+  birthGroup?.insertAdjacentElement('afterend', wrap);
 }
 
 // ─── SUBMIT FORM ──────────────────────────────────────────
 async function submitForm(e) {
   e.preventDefault();
 
-  const firstName  = document.getElementById('firstName').value.trim();
-  const lastName   = document.getElementById('lastName').value.trim();
-  const birthDate  = document.getElementById('birthDate').value;
+  const firstName  = document.getElementById('firstName')?.value.trim() || '';
+  const lastName   = document.getElementById('lastName')?.value.trim() || '';
+  const birthDate  = document.getElementById('birthDate')?.value || '';
   const birthPlace = document.getElementById('birthPlace')?.value?.trim() || '';
-  const phone      = document.getElementById('phone').value.trim();
+  const phone      = document.getElementById('phone')?.value.trim() || '';
 
   let hasError = false;
   [firstName, lastName].forEach((val, i) => {
     const ids = ['firstName','lastName'];
     if (!validateLang(val)) {
-      document.getElementById(ids[i]).classList.add('error');
-      setTimeout(() => document.getElementById(ids[i]).classList.remove('error'), 1500);
+      document.getElementById(ids[i])?.classList.add('error');
+      setTimeout(() => document.getElementById(ids[i])?.classList.remove('error'), 1500);
       hasError = true;
     }
   });
@@ -794,8 +849,8 @@ async function submitForm(e) {
   const vipEduLevel   = document.getElementById('vipEduLevel')?.value  || '';
   const professionVal = document.getElementById('profession')?.value   || '';
   const supportType   = document.querySelector('input[name="supportType"]:checked')?.value || '';
-  const courseSelect    = document.getElementById('courseSelect')?.value || '';
-  const takwiniOption   = document.querySelector('input[name="takwiniOption"]:checked')?.value || '';
+  const courseSelect  = document.getElementById('courseSelect')?.value || '';
+  const takwiniOption = document.querySelector('input[name="takwiniOption"]:checked')?.value || '';
 
   const data = {
     type:          currentModalType,
@@ -804,26 +859,26 @@ async function submitForm(e) {
     birthDate,
     birthPlace,
     phone,
-    motivation:    document.getElementById('motivation').value.trim(),
+    motivation:    document.getElementById('motivation')?.value.trim() || '',
     timestamp:     new Date().toISOString(),
     supportType,
     courseSelect,
     takwiniOption,
-    eduLevel:      document.getElementById('eduLevel')?.value      || '',
-    specialty:     document.getElementById('specialty')?.value     || '',
-    subject:       document.getElementById('subject')?.value       || '',
-    teacher:       document.getElementById('teacher')?.value       || '',
+    eduLevel:      document.getElementById('eduLevel')?.value || '',
+    specialty:     document.getElementById('specialty')?.value || '',
+    subject:       document.getElementById('subject')?.value || '',
+    teacher:       document.getElementById('teacher')?.value || '',
     candidateType: document.querySelector('input[name="candidateType"]:checked')?.value || '',
-    parentName:    document.getElementById('parentName')?.value    || '',
-    parentPhone:   document.getElementById('parentPhone')?.value   || '',
-    langType:      document.getElementById('langType')?.value      || '',
-    langLevel:     document.getElementById('langLevel')?.value     || '',
+    parentName:    document.getElementById('parentName')?.value || '',
+    parentPhone:   document.getElementById('parentPhone')?.value || '',
+    langType:      document.getElementById('langType')?.value || '',
+    langLevel:     document.getElementById('langLevel')?.value || '',
     levelTest:     document.querySelector('input[name="levelTest"]:checked')?.value || '',
     vipType:       vipTypeVal,
     vipEduLevel,
     profession:    professionVal,
     days:          selectedDays,
-    daysCount:     document.getElementById('vipDaysCount')?.value  || '',
+    daysCount:     document.getElementById('vipDaysCount')?.value || '',
   };
 
   openTermsForSubmit(data);
@@ -837,12 +892,22 @@ function openTermsForSubmit(data) {
   pendingFormData = data;
 
   const checkbox = document.getElementById('terms-checkbox');
-  checkbox.checked  = false;
-  checkbox.disabled = true;
+  if (checkbox) {
+    checkbox.checked  = false;
+    checkbox.disabled = true;
+  }
+
   const label = document.getElementById('terms-agree-label');
-  if (label) { label.classList.add('locked'); label.classList.remove('unlocked'); }
+  if (label) {
+    label.classList.add('locked');
+    label.classList.remove('unlocked');
+  }
+
   const tpb = document.getElementById('terms-proceed-btn');
-  if (tpb)  { tpb.disabled = true; tpb.classList.remove('enabled'); }
+  if (tpb) {
+    tpb.disabled = true;
+    tpb.classList.remove('enabled');
+  }
 
   const tbody = document.querySelector('.terms-body');
   if (tbody) {
@@ -851,8 +916,11 @@ function openTermsForSubmit(data) {
       const reached = tbody.scrollTop + tbody.clientHeight >= tbody.scrollHeight - 20;
       if (reached) {
         tbody.onscroll = null;
-        checkbox.disabled = false;
-        if (label) { label.classList.remove('locked'); label.classList.add('unlocked'); }
+        if (checkbox) checkbox.disabled = false;
+        if (label) {
+          label.classList.remove('locked');
+          label.classList.add('unlocked');
+        }
         document.getElementById('scroll-hint')?.remove();
       }
     };
@@ -862,21 +930,20 @@ function openTermsForSubmit(data) {
   const hint = document.createElement('div');
   hint.id = 'scroll-hint';
   hint.className = 'scroll-hint';
-  hint.innerHTML = `<span>⬇</span><span>${
-    currentLang === 'ar' ? 'اقرأ القوانين كاملاً للمتابعة' : 'Scroll down to read all terms'
-  }</span>`;
+  hint.innerHTML = `<span>⬇</span><span>${currentLang === 'ar' ? 'اقرأ القوانين كاملاً للمتابعة' : 'Scroll down to read all terms'}</span>`;
+
   const footer = document.querySelector('.terms-footer');
   if (footer) footer.insertBefore(hint, footer.firstChild);
 
-  document.getElementById('modal').classList.remove('active');
-  document.getElementById('terms-modal').classList.add('active');
+  document.getElementById('modal')?.classList.remove('active');
+  document.getElementById('terms-modal')?.classList.add('active');
 }
 
 function closeTerms() {
   const tbody = document.querySelector('.terms-body');
   if (tbody) tbody.onscroll = null;
   document.getElementById('scroll-hint')?.remove();
-  document.getElementById('terms-modal').classList.remove('active');
+  document.getElementById('terms-modal')?.classList.remove('active');
   document.body.style.overflow = '';
   document.getElementById('lang-toggle')?.classList.remove('hidden');
   showLogo();
@@ -889,547 +956,445 @@ function closeTermsOutside(e) {
 
 function onTermsCheck() {
   const checkbox = document.getElementById('terms-checkbox');
-  if (checkbox.disabled) return;
+  if (checkbox?.disabled) return;
   const btn = document.getElementById('terms-proceed-btn');
+  if (!btn) return;
   btn.disabled = !checkbox.checked;
   btn.classList.toggle('enabled', checkbox.checked);
 }
 
 async function proceedToRegister() {
   if (!pendingFormData) return;
+
   const tbody = document.querySelector('.terms-body');
   if (tbody) tbody.onscroll = null;
   document.getElementById('scroll-hint')?.remove();
-  document.getElementById('terms-modal').classList.remove('active');
+  document.getElementById('terms-modal')?.classList.remove('active');
 
   const btn = document.getElementById('terms-proceed-btn');
-  btn.classList.add('loading');
+  btn?.classList.add('loading');
+
+  showLoadingPopup(
+    currentLang === 'ar' ? 'جاري إرسال التسجيل...' : 'Submitting registration...',
+    currentLang === 'ar' ? 'يرجى الانتظار قليلاً' : 'Please wait a moment'
+  );
 
   try {
     await fetch(APPS_SCRIPT_URL, {
-      method:  'POST',
-      mode:    'no-cors',
+      method: 'POST',
+      mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(pendingFormData)
+      body: JSON.stringify(pendingFormData)
     });
-    btn.classList.remove('loading');
+
+    const regTypeLabel = typeLabelsAr[pendingFormData.type] || 'الخدمة المطلوبة';
+
+    btn?.classList.remove('loading');
+    hideLoadingPopup();
+
     pendingFormData = null;
-    showSuccessPopup();
-  } catch(err) {
-    btn.classList.remove('loading');
-    console.error(err);
-    document.getElementById('terms-modal').classList.add('active');
-    alert(currentLang === 'ar'
-      ? 'حدث خطأ أثناء الإرسال، تحقق من اتصالك بالإنترنت.'
-      : 'A network error occurred. Please check your connection.');
+    document.body.style.overflow = '';
+    document.getElementById('lang-toggle')?.classList.remove('hidden');
+    showLogo();
+    resetForm();
+
+    showSuccessModal(
+      currentLang === 'ar' ? 'تم التسجيل بنجاح' : 'Registration completed successfully',
+      currentLang === 'ar'
+        ? `تم استلام طلبك في ${regTypeLabel} بنجاح، وسيتم التواصل معك قريباً.`
+        : 'Your registration request has been received successfully. We will contact you soon.',
+      null
+    );
+  } catch (error) {
+    btn?.classList.remove('loading');
+    hideLoadingPopup();
+    console.error('Registration submit error:', error);
+    alert(currentLang === 'ar' ? 'حدث خطأ أثناء الإرسال، حاول مرة أخرى.' : 'An error occurred while submitting, please try again.');
+    document.getElementById('lang-toggle')?.classList.remove('hidden');
+    showLogo();
+    document.body.style.overflow = '';
   }
 }
-
-// ─── SUCCESS POPUP ────────────────────────────────────────
-function showSuccessPopup() {
-  document.getElementById('success-popup-overlay')?.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'success-popup-overlay';
-  overlay.className = 'success-popup-overlay';
-  overlay.innerHTML = `
-    <div class="success-popup-box" id="success-popup-box">
-      <div class="success-popup-icon-wrap">
-        <img src="3d/done.png" alt="done" class="success-popup-3d-icon" draggable="false">
-      </div>
-      <div class="success-popup-title">
-        ${currentLang==='ar' ? '🎉 تم تسجيلك بنجاح!' : '🎉 Registration Successful!'}
-      </div>
-      <div class="success-popup-msg">
-        ${currentLang==='ar'
-          ? 'شكراً لك! تم استلام طلب تسجيلك بنجاح.<br>سيتم التواصل معك قريباً من طرف فريق أكاديمية E-PLUS.<br><span class="success-popup-sub">✦ رحلتك نحو النجاح تبدأ من هنا ✦</span>'
-          : 'Thank you! Your registration has been received.<br>The E-PLUS Center team will contact you soon.<br><span class="success-popup-sub">✦ Your journey to success starts here ✦</span>'}
-      </div>
-      <div class="success-popup-divider"></div>
-      <div class="success-popup-info">
-        <span>📋 ${typeLabelsAr[currentModalType] || currentModalType}</span>
-        <span>🕐 ${new Date().toLocaleDateString(currentLang==='ar'?'ar-DZ':'en-GB',{year:'numeric',month:'long',day:'numeric'})}</span>
-      </div>
-      <button class="success-popup-btn" onclick="closeSuccessPopup()">
-        ${currentLang==='ar' ? 'حسناً، شكراً!' : 'OK, Thank you!'}
-      </button>
-    </div>`;
-  document.body.appendChild(overlay);
-  spawnConfetti(overlay);
-  requestAnimationFrame(() => overlay.classList.add('active'));
-}
-
-function closeSuccessPopup() {
-  const overlay = document.getElementById('success-popup-overlay');
-  if (!overlay) return;
-  overlay.classList.remove('active');
-  setTimeout(() => overlay.remove(), 400);
-  document.body.style.overflow = '';
-  document.getElementById('lang-toggle')?.classList.remove('hidden');
-  showLogo();
-}
-
-function spawnConfetti(parent) {
-  const colors = ['#0a8acb','#045283','#f4b41a','#ffffff','#53a9df'];
-  for (let i = 0; i < 38; i++) {
-    const c = document.createElement('div');
-    c.className = 'confetti';
-    c.style.cssText = `
-      left:${Math.random()*100}%;
-      top:${-10 - Math.random()*30}px;
-      width:${6 + Math.random()*8}px;
-      height:${6 + Math.random()*8}px;
-      background:${colors[Math.floor(Math.random()*colors.length)]};
-      border-radius:${Math.random()>0.5?'50%':'2px'};
-      animation-duration:${1.2+Math.random()*1.2}s;
-      animation-delay:${Math.random()*0.6}s;
-    `;
-    parent.appendChild(c);
-  }
-}
-
-// ─── FIREBASE ─────────────────────────────────────────────
-import { initializeApp }                        from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-import { getFirestore, collection, query,
-         orderBy, onSnapshot }                  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
-
-const firebaseConfig = {
-  apiKey:            "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
-  authDomain:        "eplus-center-39.firebaseapp.com",
-  projectId:         "eplus-center-39",
-  storageBucket:     "eplus-center-39.firebasestorage.app",
-  messagingSenderId: "191532732034",
-  appId:             "1:191532732034:web:b11449a2f0595db5d02e9b",
-  measurementId:     "G-L8KVV0MEKT"
-};
-
-const _app = initializeApp(firebaseConfig);
-const _db  = getFirestore(_app);
-
-// ─── ANNOUNCEMENTS STATE ──────────────────────────────────
-let annCurrent   = 0;
-let annAutoSlide = null;
-let annTotalDocs = 0;
-
-function getSlideDir() { return -1; }
-
-function goToSlide(idx) {
-  annCurrent = idx;
-  const track = document.getElementById('ann-track');
-  if (track) {
-    track.style.transform = `translateX(${idx * 100 * getSlideDir()}%)`;
-  }
-  document.querySelectorAll('.ann-dot').forEach((dot, i) =>
-    dot.classList.toggle('active', i === idx));
-}
-
-function startAnnAuto() {
-  if (annTotalDocs <= 1) return;
-  annAutoSlide = setInterval(
-    () => goToSlide((annCurrent + 1) % annTotalDocs),
-    8000
-  );
-}
-function resetAnnAuto() {
-  clearInterval(annAutoSlide);
-  startAnnAuto();
-}
-
-// ─── FIREBASE LISTENER ────────────────────────────────────
-onSnapshot(
-  query(collection(_db, 'announcements'), orderBy('createdAt', 'desc')),
-  snap => {
-    window._annCache = snap.docs
-      .map(doc => {
-        const d = doc.data();
-        return {
-          title:     d.title     || '',
-          text:      d.text      || '',
-          imageUrl:  d.imageUrl  || '',
-          createdAt: d.createdAt || null,
-          hidden:    d.hidden    || false,
-        };
-      })
-      .filter(d => d.hidden !== true);
-
-    _renderFromData(window._annCache);
-  }
-);
-
-// ─── RENDER ANNOUNCEMENTS ─────────────────────────────────
-function _renderFromData(dataArr) {
-  const section = document.getElementById('announcements-section');
-  const track   = document.getElementById('ann-track');
-  const dotsEl  = document.getElementById('ann-dots');
-
-  if (!dataArr || dataArr.length === 0) {
-    section.style.display = 'none';
-    clearInterval(annAutoSlide);
-    return;
-  }
-
-  clearInterval(annAutoSlide);
-  annTotalDocs = dataArr.length;
-  const savedIndex = (annCurrent < dataArr.length) ? annCurrent : 0;
-  annCurrent = savedIndex;
-
-  section.style.display = 'block';
-  track.innerHTML  = '';
-  dotsEl.innerHTML = '';
-
-  track.style.direction = 'ltr';
-
-  const isRtl = currentLang === 'ar';
-
-  dataArr.forEach((d, i) => {
-    const hasImg = d.imageUrl && d.imageUrl.startsWith('https');
-
-    const card = document.createElement('div');
-    card.className = hasImg ? 'ann-card has-image' : 'ann-card text-only';
-    card.style.direction = isRtl ? 'rtl' : 'ltr';
-    card.style.textAlign = isRtl ? 'right' : 'left';
-
-    let dateStr = '';
-    if (d.createdAt?.toDate) {
-      try {
-        dateStr = d.createdAt.toDate().toLocaleDateString(
-          isRtl ? 'ar-DZ' : 'en-GB',
-          { year:'numeric', month:'long', day:'numeric' }
-        );
-      } catch(e) { dateStr = ''; }
-    }
-
-    if (hasImg) {
-      card.innerHTML = `
-        <div class="ann-img-wrap">
-          <img class="ann-card-img"
-               src="${d.imageUrl}"
-               alt="" draggable="false"
-               loading="lazy"
-               onerror="this.closest('.ann-card').classList.remove('has-image');
-                        this.closest('.ann-card').classList.add('text-only');
-                        this.parentElement.remove();">
-        </div>
-        ${d.title || d.text || dateStr ? `
-        <div class="ann-card-body">
-          ${d.title ? `<div class="ann-card-title">${d.title}</div>` : ''}
-          ${d.text  ? `<div class="ann-card-text">${d.text}</div>`   : ''}
-          ${dateStr ? `<div class="ann-card-date">🗓 ${dateStr}</div>` : ''}
-        </div>` : ''}`;
-    } else {
-      card.innerHTML = `
-        <div class="ann-card-body">
-          <div class="ann-card-badge">📢 ${isRtl ? 'إعلان' : 'Announcement'}</div>
-          ${d.title ? `<div class="ann-card-title">${d.title}</div>` : ''}
-          ${d.text  ? `<div class="ann-card-text">${d.text}</div>`   : ''}
-          ${dateStr ? `<div class="ann-card-date">🗓 ${dateStr}</div>` : ''}
-        </div>`;
-    }
-
-    track.appendChild(card);
-
-    const img = card.querySelector('.ann-card-img');
-    if (img) {
-      img.addEventListener('load', () => img.classList.add('loaded'));
-      if (img.complete) img.classList.add('loaded');
-    }
-
-    const dot = document.createElement('div');
-    dot.className = 'ann-dot' + (i === 0 ? ' active' : '');
-    dot.addEventListener('click', () => { goToSlide(i); resetAnnAuto(); });
-    dotsEl.appendChild(dot);
-  });
-
-  const wrapper = document.querySelector('.ann-track-wrapper');
-  wrapper.querySelectorAll('.ann-arrow').forEach(a => a.remove());
-
-  if (dataArr.length > 1) {
-    const prev = document.createElement('button');
-    prev.className = 'ann-arrow ann-arrow-prev';
-    prev.innerHTML = '‹';
-    prev.addEventListener('click', () => {
-      goToSlide((annCurrent - 1 + dataArr.length) % dataArr.length);
-      resetAnnAuto();
-    });
-    const next = document.createElement('button');
-    next.className = 'ann-arrow ann-arrow-next';
-    next.innerHTML = '›';
-    next.addEventListener('click', () => {
-      goToSlide((annCurrent + 1) % dataArr.length);
-      resetAnnAuto();
-    });
-    wrapper.appendChild(prev);
-    wrapper.appendChild(next);
-  }
-
-  let touchStartX = 0;
-  track.addEventListener('touchstart', e => {
-    touchStartX = e.touches[0].clientX;
-  }, { passive:true });
-  track.addEventListener('touchend', e => {
-    const diff = e.changedTouches[0].clientX - touchStartX;
-    if (Math.abs(diff) > 50) {
-      goToSlide(diff > 0
-        ? (annCurrent - 1 + dataArr.length) % dataArr.length
-        : (annCurrent + 1) % dataArr.length);
-      resetAnnAuto();
-    }
-  });
-
-  let isDragging = false, dragStartX = 0, dragDelta = 0;
-  track.addEventListener('mousedown', e => {
-    isDragging = true; dragStartX = e.clientX; dragDelta = 0;
-    track.style.transition = 'none';
-    track.style.cursor = 'grabbing';
-  });
-  window.addEventListener('mousemove', e => {
-    if (!isDragging) return;
-    dragDelta = e.clientX - dragStartX;
-    track.style.transform =
-      `translateX(calc(${annCurrent * 100 * getSlideDir()}% + ${dragDelta}px))`;
-  });
-  window.addEventListener('mouseup', () => {
-    if (!isDragging) return;
-    isDragging = false;
-    track.style.transition = '';
-    track.style.cursor = '';
-    goToSlide(Math.abs(dragDelta) > 60
-      ? (dragDelta > 0
-          ? (annCurrent - 1 + dataArr.length) % dataArr.length
-          : (annCurrent + 1) % dataArr.length)
-      : annCurrent);
-    resetAnnAuto();
-  });
-
-  track.style.transform = `translateX(${savedIndex * 100 * getSlideDir()}%)`;
-  document.querySelectorAll('.ann-dot').forEach((dot, i) =>
-    dot.classList.toggle('active', i === savedIndex));
-
-  startAnnAuto();
-}
-
-// ─── EXPOSE FUNCTIONS ─────────────────────────────────────
-window.setLang               = setLang;
-window.closeModal            = closeModal;
-window.closeModalOutside     = closeModalOutside;
-window.closeTerms            = closeTerms;
-window.closeTermsOutside     = closeTermsOutside;
-window.onTermsCheck          = onTermsCheck;
-window.proceedToRegister     = proceedToRegister;
-window.closeSuccessPopup     = closeSuccessPopup;
-window.onLangTypeChange      = onLangTypeChange;
-window.onLangLevelChange     = onLangLevelChange;
-window.onEduLevelChange      = onEduLevelChange;
-window.onCandidateTypeChange = onCandidateTypeChange;
-window.onSpecialtyChange     = onSpecialtyChange;
-window.onSubjectChange       = onSubjectChange;
-window.onTeacherChange       = onTeacherChange;
-window.onVipTypeChange       = onVipTypeChange;
-window.onVipEduLevelChange   = onVipEduLevelChange;
-window.onVipDaysCountChange  = onVipDaysCountChange;
-window.onDayChange           = onDayChange;
-window.onBirthDateChange     = onBirthDateChange;
-window.onSupportTypeChange   = onSupportTypeChange;
-window.submitForm            = submitForm;
-window.goToSlide             = goToSlide;
-window.resetAnnAuto          = resetAnnAuto;
-window.openJoinModal         = openJoinModal;
-window.closeJoinModal        = closeJoinModal;
-window.submitJoinForm        = submitJoinForm;
 
 // ─── LOADING POPUP ────────────────────────────────────────
-function showLoadingPopup() {
-  document.getElementById('loading-popup-overlay')?.remove();
-  const overlay = document.createElement('div');
-  overlay.id = 'loading-popup-overlay';
-  overlay.className = 'success-popup-overlay';
-  overlay.innerHTML = `
-    <div class="success-popup-box" style="text-align:center;padding:44px 30px;min-width:230px;">
-      <div style="margin-bottom:16px;">
-        <div style="width:52px;height:52px;border:4px solid rgba(255,255,255,0.15);
-                    border-top-color:#0a8acb;border-radius:50%;animation:spin 0.8s linear infinite;
-                    margin:0 auto;"></div>
-      </div>
-      <div class="success-popup-title" style="font-size:1.05rem;opacity:0.9;">
-        ${currentLang === 'ar' ? 'جارٍ الإرسال...' : 'Sending...'}
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  requestAnimationFrame(() => overlay.classList.add('active'));
+function showLoadingPopup(title, message) {
+  const overlay = document.getElementById('loading-popup');
+  if (!overlay) return;
+
+  const titleEl = document.getElementById('loading-popup-title');
+  const msgEl   = document.getElementById('loading-popup-msg');
+
+  if (titleEl) titleEl.textContent = title || (currentLang === 'ar' ? 'جاري المعالجة...' : 'Processing...');
+  if (msgEl)   msgEl.textContent   = message || (currentLang === 'ar' ? 'يرجى الانتظار' : 'Please wait');
+
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
 }
 
 function hideLoadingPopup() {
-  const overlay = document.getElementById('loading-popup-overlay');
-  if (!overlay) return;
-  overlay.classList.remove('active');
-  setTimeout(() => overlay.remove(), 300);
+  const overlay = document.getElementById('loading-popup');
+  if (overlay) overlay.classList.remove('active');
+  document.body.style.overflow = '';
 }
 
-// ─── JOIN TEAM ────────────────────────────────────────────
-function openJoinModal() {
-  document.getElementById('join-modal').classList.add('active');
+// ─── SUCCESS POPUP ────────────────────────────────────────
+function createConfetti(container, count = 18) {
+  if (!container) return;
+  container.querySelectorAll('.confetti').forEach(el => el.remove());
+
+  const colors = ['#0a8acb', '#53a9df', '#f4b41a', '#ffffff'];
+  for (let i = 0; i < count; i++) {
+    const c = document.createElement('span');
+    c.className = 'confetti';
+    c.style.left = `${Math.random() * 100}%`;
+    c.style.top = `${Math.random() * 25}px`;
+    c.style.width = `${6 + Math.random() * 6}px`;
+    c.style.height = `${10 + Math.random() * 10}px`;
+    c.style.background = colors[Math.floor(Math.random() * colors.length)];
+    c.style.borderRadius = `${1 + Math.random() * 4}px`;
+    c.style.setProperty('--dur', `${1.5 + Math.random() * 1.2}s`);
+    c.style.setProperty('--delay', `${Math.random() * 0.35}s`);
+    c.style.transform = `rotate(${Math.random() * 360}deg)`;
+    container.appendChild(c);
+  }
+}
+
+function showSuccessModal(title, message, regNumber = null) {
+  const modal = document.getElementById('success-popup');
+  if (!modal) return;
+
+  const titleEl   = document.getElementById('success-popup-title');
+  const msgEl     = document.getElementById('success-popup-msg');
+  const regWrap   = document.getElementById('success-popup-reg');
+  const regNumEl  = document.getElementById('success-popup-reg-number');
+
+  if (titleEl) titleEl.textContent = title || (currentLang === 'ar' ? 'تم بنجاح' : 'Success');
+  if (msgEl)   msgEl.textContent   = message || (currentLang === 'ar' ? 'تم تنفيذ العملية بنجاح.' : 'The operation completed successfully.');
+
+  if (regWrap && regNumEl) {
+    if (regNumber) {
+      regNumEl.textContent = regNumber;
+      regWrap.style.display = 'block';
+    } else {
+      regWrap.style.display = 'none';
+      regNumEl.textContent = '';
+    }
+  }
+
+  modal.classList.add('active');
   document.body.style.overflow = 'hidden';
-  document.getElementById('lang-toggle').classList.add('hidden');
+
+  const box = modal.querySelector('.success-popup-box');
+  createConfetti(box);
+}
+
+function closeSuccessModal() {
+  const modal = document.getElementById('success-popup');
+  if (modal) modal.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+function closeSuccessOutside(e) {
+  if (e.target === document.getElementById('success-popup')) closeSuccessModal();
+}
+
+// ─── JOIN TEAM MODAL ──────────────────────────────────────
+function openJoinModal() {
+  document.getElementById('join-modal')?.classList.add('active');
+  document.getElementById('lang-toggle')?.classList.add('hidden');
   hideLogo();
+  document.body.style.overflow = 'hidden';
 }
 
 function closeJoinModal() {
-  document.getElementById('join-modal').classList.remove('active');
-  document.body.style.overflow = '';
-  document.getElementById('lang-toggle').classList.remove('hidden');
+  document.getElementById('join-modal')?.classList.remove('active');
+  document.getElementById('lang-toggle')?.classList.remove('hidden');
   showLogo();
-  document.getElementById('join-form').reset();
-  document.getElementById('join-role-fields').style.display = 'none';
-  document.getElementById('cv-file-name').textContent = '';
+  document.body.style.overflow = '';
+
+  const form = document.getElementById('join-form');
+  if (form) form.reset();
+
+  const fileName = document.getElementById('cv-file-name');
+  if (fileName) fileName.textContent = '';
+}
+
+function closeJoinModalOutside(e) {
+  if (e.target === document.getElementById('join-modal')) closeJoinModal();
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = function() {
+      const result = String(reader.result || '');
+      const parts = result.split(',');
+      const mimeMatch = parts[0].match(/(.*);base64/);
+      if (!mimeMatch || !parts[1]) {
+        reject(new Error('Invalid file format'));
+        return;
+      }
+      resolve({
+        mimeType: mimeMatch[1],
+        base64: parts[1]
+      });
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 async function submitJoinForm(e) {
   e.preventDefault();
 
-  const firstName  = document.getElementById('joinFirstName').value.trim();
-  const lastName   = document.getElementById('joinLastName').value.trim();
-  const phone      = document.getElementById('joinPhone').value.trim();
-  const email      = document.getElementById('joinEmail').value.trim();
-  const role       = document.querySelector('input[name="joinRole"]:checked')?.value || '-';
-  const specialty  = document.getElementById('joinSpecialty').value.trim();
-  const experience = document.getElementById('joinExperience').value.trim();
+  const submitBtn = document.getElementById('join-submit-btn');
+  if (submitBtn) {
+    submitBtn.classList.add('loading');
+    submitBtn.disabled = true;
+  }
 
-  if (!firstName || !lastName || !phone || !email || role === '-') {
-    alert(currentLang === 'ar'
-      ? '⚠️ يرجى تعبئة جميع الحقول الإلزامية.'
-      : 'Please fill in all required fields.');
+  showLoadingPopup(
+    currentLang === 'ar' ? 'جاري إرسال طلب الانضمام...' : 'Submitting join request...',
+    currentLang === 'ar' ? 'يرجى الانتظار قليلاً' : 'Please wait a moment'
+  );
+
+  try {
+    const firstName  = document.getElementById('joinFirstName')?.value.trim() || '';
+    const lastName   = document.getElementById('joinLastName')?.value.trim() || '';
+    const phone      = document.getElementById('joinPhone')?.value.trim() || '';
+    const email      = document.getElementById('joinEmail')?.value.trim() || '';
+    const role       = document.querySelector('input[name="joinRole"]:checked')?.value || '';
+    const specialty  = document.getElementById('joinSpecialty')?.value.trim() || '';
+    const experience = document.getElementById('joinExperience')?.value.trim() || '';
+    const file       = document.getElementById('joinCV')?.files?.[0] || null;
+
+    let base64 = '';
+    let mimeType = '';
+    let originalFileName = '';
+
+    if (file) {
+      const converted = await fileToBase64(file);
+      base64 = converted.base64;
+      mimeType = converted.mimeType;
+      originalFileName = file.name;
+    }
+
+    const payload = {
+      firstName,
+      lastName,
+      fullName: `${firstName} ${lastName}`.trim(),
+      phone,
+      email,
+      role,
+      specialty,
+      experience,
+      base64,
+      mimeType,
+      originalFileName,
+      timestamp: new Date().toISOString()
+    };
+
+    const response = await fetch(JOIN_APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    let result = {};
+    try {
+      result = await response.json();
+    } catch {
+      result = { success: response.ok };
+    }
+
+    submitBtn?.classList.remove('loading');
+    if (submitBtn) submitBtn.disabled = false;
+    hideLoadingPopup();
+
+    if (result.success || response.ok) {
+      closeJoinModal();
+      showSuccessModal(
+        currentLang === 'ar' ? 'تم إرسال الطلب بنجاح' : 'Request sent successfully',
+        currentLang === 'ar'
+          ? 'تم استلام طلب الانضمام إلى الفريق، وسيتم مراجعة ملفك والتواصل معك قريباً.'
+          : 'Your team join request has been received successfully. We will review your application and contact you soon.'
+      );
+    } else {
+      console.error(result);
+      alert(currentLang === 'ar' ? 'حدث خطأ أثناء إرسال الطلب.' : 'An error occurred while sending the request.');
+    }
+  } catch (err) {
+    submitBtn?.classList.remove('loading');
+    if (submitBtn) submitBtn.disabled = false;
+    hideLoadingPopup();
+    console.error('Join submit error:', err);
+    alert(currentLang === 'ar' ? 'تعذر الاتصال. تحقق من الإنترنت ثم حاول مجدداً.' : 'Connection failed. Check your internet and try again.');
+  }
+}
+
+// ─── ANNOUNCEMENTS ────────────────────────────────────────
+window._annCache = [];
+let annCurrentIndex = 0;
+let annAutoTimer = null;
+
+function buildAnnouncementCard(item) {
+  const card = document.createElement('div');
+  card.className = 'ann-card';
+
+  const title = currentLang === 'ar'
+    ? (item.titleAr || item.title || '')
+    : (item.titleEn || item.titleAr || item.title || '');
+
+  const text = currentLang === 'ar'
+    ? (item.bodyAr || item.textAr || item.body || item.text || '')
+    : (item.bodyEn || item.textEn || item.bodyAr || item.textAr || item.body || item.text || '');
+
+  const date = item.date || item.createdAt || '';
+  const image = item.imageUrl || item.image || '';
+
+  if (!image) card.classList.add('text-only');
+
+  card.innerHTML = `
+    ${image ? `
+      <div class="ann-img-wrap">
+        <img class="ann-card-img" src="${image}" alt="${title}">
+      </div>
+    ` : ''}
+    <div class="ann-card-body">
+      <span class="ann-card-badge">${currentLang === 'ar' ? 'إعلان' : 'Announcement'}</span>
+      <div class="ann-card-title">${title}</div>
+      <div class="ann-card-text">${text}</div>
+      ${date ? `<div class="ann-card-date">${date}</div>` : ''}
+    </div>
+  `;
+
+  const img = card.querySelector('.ann-card-img');
+  if (img) {
+    img.addEventListener('load', () => img.classList.add('loaded'));
+    img.addEventListener('error', () => card.classList.add('text-only'));
+  }
+
+  return card;
+}
+
+function renderAnnouncementSlider(items) {
+  const section = document.getElementById('announcements-section');
+  const track   = document.getElementById('ann-track');
+  const dots    = document.getElementById('ann-dots');
+
+  if (!section || !track || !dots) return;
+
+  track.innerHTML = '';
+  dots.innerHTML = '';
+
+  if (!items || items.length === 0) {
+    section.style.display = 'none';
     return;
   }
 
-  const data = {
-    firstName, lastName, phone, email,
-    role, specialty, experience,
-    timestamp: new Date().toISOString(),
-  };
+  section.style.display = 'block';
 
-  const btn = document.getElementById('join-submit-btn');
-  btn.disabled = true;
-  showLoadingPopup();
+  items.forEach((item, index) => {
+    const card = buildAnnouncementCard(item);
+    track.appendChild(card);
 
-  try {
-    const formData = new FormData();
-    formData.append('payload', JSON.stringify(data));
-    await fetch(JOIN_APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode:   'no-cors',
-      body:   formData
-    });
-    hideLoadingPopup();
-    closeJoinModal();
-    showSuccessJoinPopup();
-  } catch(err) {
-    hideLoadingPopup();
-    btn.disabled = false;
-    alert(currentLang === 'ar'
-      ? '❌ خطأ في الإرسال، تحقق من الاتصال.'
-      : 'Error, check your connection.');
+    const dot = document.createElement('button');
+    dot.className = 'ann-dot' + (index === 0 ? ' active' : '');
+    dot.type = 'button';
+    dot.addEventListener('click', () => goToAnnouncement(index));
+    dots.appendChild(dot);
+  });
+
+  annCurrentIndex = 0;
+  updateAnnouncementSlider();
+  startAnnouncementAutoPlay();
+}
+
+function updateAnnouncementSlider() {
+  const track = document.getElementById('ann-track');
+  const dots  = [...document.querySelectorAll('.ann-dot')];
+  if (!track) return;
+
+  track.style.transform = `translateX(-${annCurrentIndex * 100}%)`;
+  dots.forEach((dot, i) => dot.classList.toggle('active', i === annCurrentIndex));
+}
+
+function goToAnnouncement(index) {
+  if (!window._annCache.length) return;
+  annCurrentIndex = (index + window._annCache.length) % window._annCache.length;
+  updateAnnouncementSlider();
+}
+
+function nextAnnouncement() {
+  goToAnnouncement(annCurrentIndex + 1);
+}
+
+function prevAnnouncement() {
+  goToAnnouncement(annCurrentIndex - 1);
+}
+
+function startAnnouncementAutoPlay() {
+  stopAnnouncementAutoPlay();
+  if (window._annCache.length <= 1) return;
+  annAutoTimer = setInterval(nextAnnouncement, 5000);
+}
+
+function stopAnnouncementAutoPlay() {
+  if (annAutoTimer) {
+    clearInterval(annAutoTimer);
+    annAutoTimer = null;
   }
 }
 
-function showSuccessJoinPopup() {
-  const overlay = document.createElement('div');
-  overlay.id        = 'success-popup-overlay';
-  overlay.className = 'success-popup-overlay';
-  overlay.innerHTML = `
-    <div class="success-popup-box">
-      <div class="success-popup-icon-wrap">
-        <img src="3d/done.png" alt="done" class="success-popup-3d-icon">
-      </div>
-      <div class="success-popup-title">
-        ${currentLang === 'ar' ? '🎉 تم إرسال طلبك!' : '🎉 Request Sent!'}
-      </div>
-      <div class="success-popup-msg">
-        ${currentLang === 'ar'
-          ? 'شكراً على اهتمامك! سيتواصل معك فريق E-PLUS في أقرب وقت.'
-          : 'Thank you for your interest! The E-PLUS team will contact you soon.'}
-      </div>
-      <button class="success-popup-btn" id="close-success-join-btn">
-        ${currentLang === 'ar' ? 'حسناً، شكراً!' : 'OK, Thank you!'}
-      </button>
-    </div>`;
-  document.body.appendChild(overlay);
-  overlay.querySelector('#close-success-join-btn').addEventListener('click', () => {
-    overlay.classList.remove('active');
-    setTimeout(() => overlay.remove(), 400);
-    document.getElementById('lang-toggle')?.classList.remove('hidden');
-    showLogo();
-  });
-  spawnConfetti(overlay);
-  requestAnimationFrame(() => overlay.classList.add('active'));
+function _renderFromData(items) {
+  window._annCache = Array.isArray(items) ? items : [];
+  renderAnnouncementSlider(window._annCache);
 }
 
-// ─── EVENT LISTENERS ──────────────────────────────────────
+async function loadAnnouncements() {
+  try {
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=getAnnouncements`);
+    const data = await res.json();
+
+    const items =
+      data.items ||
+      data.announcements ||
+      data.data ||
+      (Array.isArray(data) ? data : []);
+
+    _renderFromData(items);
+  } catch (error) {
+    console.error('Announcements load error:', error);
+    _renderFromData([]);
+  }
+}
+
+// ─── EVENT BINDINGS ───────────────────────────────────────
+function bindStaticEvents() {
+  document.getElementById('btn-ar')?.addEventListener('click', () => setLang('ar'));
+  document.getElementById('btn-en')?.addEventListener('click', () => setLang('en'));
+
+  document.getElementById('reg-form')?.addEventListener('submit', submitForm);
+  document.getElementById('join-form')?.addEventListener('submit', submitJoinForm);
+
+  document.getElementById('terms-checkbox')?.addEventListener('change', onTermsCheck);
+
+  document.getElementById('joinCV')?.addEventListener('change', function () {
+    const file = this.files?.[0];
+    const fileName = document.getElementById('cv-file-name');
+    if (fileName) fileName.textContent = file ? file.name : '';
+  });
+
+  document.getElementById('ann-prev')?.addEventListener('click', prevAnnouncement);
+  document.getElementById('ann-next')?.addEventListener('click', nextAnnouncement);
+
+  document.getElementById('ann-track')?.addEventListener('mouseenter', stopAnnouncementAutoPlay);
+  document.getElementById('ann-track')?.addEventListener('mouseleave', startAnnouncementAutoPlay);
+}
+
+// ─── INIT ─────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-
-  document.querySelectorAll('.reg-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const type = btn.getAttribute('data-reg-type');
-      if (type) openModal(type);
-    });
-  });
-
-  document.getElementById('btn-ar').addEventListener('click', () => setLang('ar'));
-  document.getElementById('btn-en').addEventListener('click', () => setLang('en'));
-
-  document.getElementById('close-modal-btn').addEventListener('click', closeModal);
-  document.getElementById('modal').addEventListener('click', e => {
-    if (e.target === document.getElementById('modal')) closeModal();
-  });
-
-  document.getElementById('close-terms-btn').addEventListener('click', closeTerms);
-  document.getElementById('terms-modal').addEventListener('click', e => {
-    if (e.target === document.getElementById('terms-modal')) closeTerms();
-  });
-  document.getElementById('terms-checkbox').addEventListener('change', onTermsCheck);
-  document.getElementById('terms-proceed-btn').addEventListener('click', proceedToRegister);
-
-  document.getElementById('reg-form').addEventListener('submit', submitForm);
-
-  document.getElementById('join-team-btn').addEventListener('click', openJoinModal);
-  document.getElementById('close-join-btn').addEventListener('click', closeJoinModal);
-  document.getElementById('join-modal').addEventListener('click', e => {
-    if (e.target === document.getElementById('join-modal')) closeJoinModal();
-  });
-  document.getElementById('join-form').addEventListener('submit', submitJoinForm);
-
-  document.querySelectorAll('input[name="joinRole"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      const fields = document.getElementById('join-role-fields');
-      fields.style.display = 'block';
-      fields.classList.remove('field-appear');
-      void fields.offsetWidth;
-      fields.classList.add('field-appear');
-    });
-  });
-
-  document.getElementById('joinCV').addEventListener('change', function() {
-    document.getElementById('cv-file-name').textContent = this.files[0]?.name || '';
-  });
-
-  document.getElementById('birthDate').addEventListener('change', onBirthDateChange);
-  document.getElementById('eduLevel').addEventListener('change', onEduLevelChange);
-  document.getElementById('specialty').addEventListener('change', onSpecialtyChange);
-  document.getElementById('subject').addEventListener('change', onSubjectChange);
-  document.getElementById('teacher').addEventListener('change', onTeacherChange);
-  document.getElementById('langType').addEventListener('change', onLangTypeChange);
-  document.getElementById('langLevel').addEventListener('change', onLangLevelChange);
-  document.getElementById('vipDaysCount').addEventListener('change', onVipDaysCountChange);
-  document.getElementById('vipEduLevel').addEventListener('change', onVipEduLevelChange);
-  document.querySelectorAll('input[name="vipType"]').forEach(r =>
-    r.addEventListener('change', onVipTypeChange));
-  document.querySelectorAll('input[name="candidateType"]').forEach(r =>
-    r.addEventListener('change', onCandidateTypeChange));
-  document.querySelectorAll('input[name="supportType"]').forEach(r =>
-    r.addEventListener('change', onSupportTypeChange));
-  document.querySelectorAll('input[name="days"]').forEach(cb =>
-    cb.addEventListener('change', function() { onDayChange(this); }));
+  setLang('ar');
+  bindStaticEvents();
+  loadAnnouncements();
 });
-
-// ─── INIT LANG ────────────────────────────────────────────
-setLang('ar');
