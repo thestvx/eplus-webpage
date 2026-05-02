@@ -48,7 +48,7 @@ if (canvas && ctx) {
 
 // ─── APPS SCRIPT URL ──────────────────────────────────────
 const APPS_SCRIPT_URL      = 'https://script.google.com/macros/s/AKfycbwidCYkiWYlCSkMNUwbo1ZLM8XCGh8y5lWD7M_lS-J5cX35-Xd8kHhrwO4ktZiN5_vhIg/exec';
-const JOIN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyjgcCKvoZ5oNbfKwYnQnlou1f_ZVmHZOi8NyZOZ9rn6UDWh8m-wQycCtT4kg46g8It/exec';
+const JOIN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyU1bKFQ4VjiFcQjFmuT9T2Xv27pbmZKQ_iy5ZO9vOhZcuZvAIAZi1NRc6FnuhRAXx2/exec';
 
 const typeLabelsAr = {
   support: 'تسجيلات الدعم',
@@ -1128,15 +1128,14 @@ function fileToBase64(file) {
     const reader = new FileReader();
     reader.onload = function() {
       const result = String(reader.result || '');
-      const parts = result.split(',');
-      const mimeMatch = parts[0].match(/(.*);base64/);
-      if (!mimeMatch || !parts[1]) {
+      const match = result.match(/^data:(.*?);base64,(.*)$/);
+      if (!match) {
         reject(new Error('Invalid file format'));
         return;
       }
       resolve({
-        mimeType: mimeMatch[1],
-        base64: parts[1]
+        mimeType: match[1],
+        base64: match[2]
       });
     };
     reader.onerror = reject;
@@ -1179,25 +1178,23 @@ async function submitJoinForm(e) {
       originalFileName = file.name;
     }
 
-    const payload = {
-      firstName,
-      lastName,
-      fullName: `${firstName} ${lastName}`.trim(),
-      phone,
-      email,
-      role,
-      specialty,
-      experience,
-      base64,
-      mimeType,
-      originalFileName,
-      timestamp: new Date().toISOString()
-    };
+    const formData = new URLSearchParams();
+    formData.append('firstName', firstName);
+    formData.append('lastName', lastName);
+    formData.append('fullName', `${firstName} ${lastName}`.trim());
+    formData.append('phone', phone);
+    formData.append('email', email);
+    formData.append('role', role);
+    formData.append('specialty', specialty);
+    formData.append('experience', experience);
+    formData.append('base64', base64);
+    formData.append('mimeType', mimeType);
+    formData.append('originalFileName', originalFileName);
+    formData.append('timestamp', new Date().toISOString());
 
     const response = await fetch(JOIN_APPS_SCRIPT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: formData
     });
 
     let result = {};
@@ -1228,7 +1225,7 @@ async function submitJoinForm(e) {
     if (submitBtn) submitBtn.disabled = false;
     hideLoadingPopup();
     console.error('Join submit error:', err);
-    alert(currentLang === 'ar' ? 'تعذر الاتصال. تحقق من الإنترنت ثم حاول مجدداً.' : 'Connection failed. Check your internet and try again.');
+    alert(currentLang === 'ar' ? 'تعذر إرسال الطلب. تأكد من رابط Apps Script وصلاحية النشر.' : 'Failed to send request. Check Apps Script URL and deployment access.');
   }
 }
 
