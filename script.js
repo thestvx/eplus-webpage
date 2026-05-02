@@ -48,7 +48,7 @@ if (canvas && ctx) {
 
 // ─── APPS SCRIPT URL ──────────────────────────────────────
 const APPS_SCRIPT_URL      = 'https://script.google.com/macros/s/AKfycbwidCYkiWYlCSkMNUwbo1ZLM8XCGh8y5lWD7M_lS-J5cX35-Xd8kHhrwO4ktZiN5_vhIg/exec';
-const JOIN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyU1bKFQ4VjiFcQjFmuT9T2Xv27pbmZKQ_iy5ZO9vOhZcuZvAIAZi1NRc6FnuhRAXx2/exec';
+const JOIN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyjgcCKvoZ5oNbfKwYnQnlou1f_ZVmHZOi8NyZOZ9rn6UDWh8m-wQycCtT4kg46g8It/exec';
 
 const typeLabelsAr = {
   support: 'تسجيلات الدعم',
@@ -1126,20 +1126,19 @@ function closeJoinModalOutside(e) {
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-
     reader.onload = function() {
       const result = String(reader.result || '');
-      const match = result.match(/^(.*?);base64,(.*)$/);
-      if (!match) {
+      const parts = result.split(',');
+      const mimeMatch = parts[0].match(/(.*);base64/);
+      if (!mimeMatch || !parts[1]) {
         reject(new Error('Invalid file format'));
         return;
       }
       resolve({
-        mimeType: match[1],
-        base64: match[2]
+        mimeType: mimeMatch[1],
+        base64: parts[1]
       });
     };
-
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
@@ -1180,41 +1179,39 @@ async function submitJoinForm(e) {
       originalFileName = file.name;
     }
 
-    const formBody = new URLSearchParams();
-    formBody.append('firstName', firstName);
-    formBody.append('lastName', lastName);
-    formBody.append('fullName', `${firstName} ${lastName}`.trim());
-    formBody.append('phone', phone);
-    formBody.append('email', email);
-    formBody.append('role', role);
-    formBody.append('specialty', specialty);
-    formBody.append('experience', experience);
-    formBody.append('base64', base64);
-    formBody.append('mimeType', mimeType);
-    formBody.append('originalFileName', originalFileName);
-    formBody.append('timestamp', new Date().toISOString());
+    const payload = {
+      firstName,
+      lastName,
+      fullName: `${firstName} ${lastName}`.trim(),
+      phone,
+      email,
+      role,
+      specialty,
+      experience,
+      base64,
+      mimeType,
+      originalFileName,
+      timestamp: new Date().toISOString()
+    };
 
     const response = await fetch(JOIN_APPS_SCRIPT_URL, {
       method: 'POST',
-      redirect: 'follow',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-      },
-      body: formBody.toString()
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
 
-    let result = null;
+    let result = {};
     try {
       result = await response.json();
-    } catch (_) {
-      result = null;
+    } catch {
+      result = { success: response.ok };
     }
 
     submitBtn?.classList.remove('loading');
     if (submitBtn) submitBtn.disabled = false;
     hideLoadingPopup();
 
-    if ((result && result.success) || response.ok) {
+    if (result.success || response.ok) {
       closeJoinModal();
       showSuccessModal(
         currentLang === 'ar' ? 'تم إرسال الطلب بنجاح' : 'Request sent successfully',
@@ -1223,23 +1220,15 @@ async function submitJoinForm(e) {
           : 'Your team join request has been received successfully. We will review your application and contact you soon.'
       );
     } else {
-      console.error('Join response error:', result);
-      alert(
-        currentLang === 'ar'
-          ? 'فشل إرسال الطلب. تأكد من نشر Apps Script كـ Web App بصلاحية Anyone.'
-          : 'Request failed. Make sure the Apps Script is deployed as a Web App with Anyone access.'
-      );
+      console.error(result);
+      alert(currentLang === 'ar' ? 'حدث خطأ أثناء إرسال الطلب.' : 'An error occurred while sending the request.');
     }
   } catch (err) {
     submitBtn?.classList.remove('loading');
     if (submitBtn) submitBtn.disabled = false;
     hideLoadingPopup();
     console.error('Join submit error:', err);
-    alert(
-      currentLang === 'ar'
-        ? 'تعذر الاتصال. تحقق من رابط Apps Script وإعدادات النشر ثم حاول مجددًا.'
-        : 'Connection failed. Check the Apps Script URL and deployment settings, then try again.'
-    );
+    alert(currentLang === 'ar' ? 'تعذر الاتصال. تحقق من الإنترنت ثم حاول مجدداً.' : 'Connection failed. Check your internet and try again.');
   }
 }
 
@@ -1389,6 +1378,8 @@ function bindStaticEvents() {
   document.getElementById('join-form')?.addEventListener('submit', submitJoinForm);
 
   document.getElementById('terms-checkbox')?.addEventListener('change', onTermsCheck);
+
+  document.getElementById('terms-proceed-btn')?.addEventListener('click', proceedToRegister);
 
   document.getElementById('joinCV')?.addEventListener('change', function () {
     const file = this.files?.[0];
