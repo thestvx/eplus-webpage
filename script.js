@@ -48,7 +48,7 @@ if (canvas && ctx) {
 
 // ─── APPS SCRIPT URL ──────────────────────────────────────
 const APPS_SCRIPT_URL      = 'https://script.google.com/macros/s/AKfycbwidCYkiWYlCSkMNUwbo1ZLM8XCGh8y5lWD7M_lS-J5cX35-Xd8kHhrwO4ktZiN5_vhIg/exec';
-const JOIN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyjgcCKvoZ5oNbfKwYnQnlou1f_ZVmHZOi8NyZOZ9rn6UDWh8m-wQycCtT4kg46g8It/exec';
+const JOIN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzo7_3ElBeyt88Cv6PsTDEp_DMu5i_PO-t54t8WAdRitoUf7HLzx9VF_GyEHPs9QcQx/exec';
 
 const typeLabelsAr = {
   support: 'تسجيلات الدعم',
