@@ -889,7 +889,6 @@ let pendingFormData = null;
 // ─── TERMS ────────────────────────────────────────────────
 function openTermsForSubmit(data) {
   pendingFormData = data;
-
   const checkbox = document.getElementById('terms-checkbox');
   if (checkbox) {
     checkbox.checked  = false;
@@ -979,17 +978,21 @@ async function proceedToRegister() {
     currentLang === 'ar' ? 'يرجى الانتظار قليلاً'  : 'Please wait a moment'
   );
 
+  console.log("🚀 جاري إرسال بيانات التسجيل:", pendingFormData);
+
   try {
     const formData = new FormData();
     Object.entries(pendingFormData).forEach(([key, value]) => {
       formData.append(key, value ?? '');
     });
 
-    await fetch(APPS_SCRIPT_URL, {
+    const response = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       mode:   'no-cors',
       body:   formData
     });
+
+    console.log("✅ تم إرسال طلب التسجيل (no-cors mode لا يمكن قراءة الاستجابة)");
 
     const regTypeLabel = typeLabelsAr[pendingFormData.type] || 'الخدمة المطلوبة';
 
@@ -1010,9 +1013,9 @@ async function proceedToRegister() {
       null
     );
   } catch (error) {
+    console.error('❌ خطأ أثناء إرسال بيانات التسجيل:', error);
     btn?.classList.remove('loading');
     hideLoadingPopup();
-    console.error('Registration submit error:', error);
     alert(currentLang === 'ar' ? 'حدث خطأ أثناء الإرسال، حاول مرة أخرى.' : 'An error occurred while submitting, please try again.');
     document.getElementById('lang-toggle')?.classList.remove('hidden');
     showLogo();
@@ -1118,7 +1121,7 @@ function closeJoinModal() {
 
   const form = document.getElementById('join-form');
   if (form) form.reset();
-
+  
   const fileName = document.getElementById('cv-file-name');
   if (fileName) fileName.textContent = '';
 }
@@ -1134,14 +1137,23 @@ function fileToBase64(file) {
     reader.onload = function() {
       const result = String(reader.result || '');
       const parts  = result.split(',');
-      const mimeMatch = parts[0].match(/(.*);base64/);
-      if (!mimeMatch || !parts[1]) {
-        reject(new Error('Invalid file format'));
+      // تحسين استخراج الـ mimeType والـ base64
+      let mimeType = '';
+      if (parts[0]) {
+        const mimeMatch = parts[0].match(/data:(.*);base64/);
+        if (mimeMatch) mimeType = mimeMatch[1];
+      }
+      
+      if (!parts[1]) {
+        reject(new Error('Invalid file format or could not extract base64 string.'));
         return;
       }
-      resolve({ mimeType: mimeMatch[1], base64: parts[1] });
+      resolve({ mimeType: mimeType, base64: parts[1] });
     };
-    reader.onerror = reject;
+    reader.onerror = (error) => {
+      console.error("❌ FileReader Error:", error);
+      reject(error);
+    };
     reader.readAsDataURL(file);
   });
 }
@@ -1176,10 +1188,12 @@ async function submitJoinForm(e) {
     let originalFileName = '';
 
     if (file) {
+      console.log(`📄 تحويل ملف السيرة الذاتية: ${file.name} (${file.size} bytes)`);
       const converted  = await fileToBase64(file);
       base64           = converted.base64;
       mimeType         = converted.mimeType;
       originalFileName = file.name;
+      console.log(`✅ تم التحويل للـ Base64 بنجاح. نوع الملف: ${mimeType}`);
     }
 
     const formData = new FormData();
@@ -1196,11 +1210,23 @@ async function submitJoinForm(e) {
     formData.append('originalFileName', originalFileName);
     formData.append('timestamp',        new Date().toISOString());
 
+    // طباعة البيانات للتأكد قبل الإرسال
+    console.log("🚀 جاري إرسال بيانات الانضمام:");
+    for (let [key, value] of formData.entries()) {
+      if (key === 'base64' && value) {
+        console.log(`${key}: [BASE64 STRING LENGTH: ${value.length}]`);
+      } else {
+        console.log(`${key}:`, value);
+      }
+    }
+
     await fetch(JOIN_APPS_SCRIPT_URL, {
       method: 'POST',
       mode:   'no-cors',
       body:   formData
     });
+
+    console.log("✅ تم إرسال طلب الانضمام (no-cors mode لا يمكن قراءة الاستجابة)");
 
     submitBtn?.classList.remove('loading');
     if (submitBtn) submitBtn.disabled = false;
@@ -1215,10 +1241,10 @@ async function submitJoinForm(e) {
     );
 
   } catch (err) {
+    console.error('❌ خطأ أثناء إرسال طلب الانضمام:', err);
     submitBtn?.classList.remove('loading');
     if (submitBtn) submitBtn.disabled = false;
     hideLoadingPopup();
-    console.error('Join submit error:', err);
     alert(currentLang === 'ar' ? 'تعذر الاتصال. تحقق من الإنترنت ثم حاول مجدداً.' : 'Connection failed. Check your internet and try again.');
   }
 }
@@ -1230,6 +1256,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const cvName  = document.getElementById('cv-file-name');
     if (cvName) cvName.textContent = file ? file.name : '';
   });
+  
+  // ربط الـ Forms مع الدوال
+  const joinForm = document.getElementById('join-form');
+  if (joinForm) joinForm.addEventListener('submit', submitJoinForm);
 });
 
 // ─── ANNOUNCEMENTS ────────────────────────────────────────
