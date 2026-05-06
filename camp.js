@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════
-   SUMMER SCHOOL — Registration + Gallery + Video
+   SUMMER SCHOOL — Advanced Registration + Gallery + Video
 ════════════════════════════════════════════ */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
@@ -33,7 +33,7 @@ const APPS_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbzJx2NEPz7a7ntKmXQQq7i78ICeIFHiuAxTpfJyAocSkeqmbsmhx_h3YzVjbqs0eiyF/exec";
 
 /* ─────────────────────────────────────────
-   SQUARES BACKGROUND
+   1. SQUARES BACKGROUND (Animated)
 ───────────────────────────────────────── */
 const canvas = document.getElementById("squares-canvas");
 const ctx = canvas ? canvas.getContext("2d") : null;
@@ -91,7 +91,7 @@ function initSquaresBackground() {
 }
 
 /* ─────────────────────────────────────────
-   VIDEO
+   2. VIDEO LOGIC
 ───────────────────────────────────────── */
 function initCampVideo() {
   const video = document.getElementById("camp-video");
@@ -133,7 +133,7 @@ function initCampVideo() {
 }
 
 /* ─────────────────────────────────────────
-   REVEAL ANIMATION
+   3. 3D TILT EFFECT & REVEAL ANIMATION
 ───────────────────────────────────────── */
 function injectRevealStyles() {
   if (document.getElementById("summer-reveal-style")) return;
@@ -141,177 +141,141 @@ function injectRevealStyles() {
   const style = document.createElement("style");
   style.id = "summer-reveal-style";
   style.textContent = `
-    .reveal-on-scroll{
-      opacity:0;
-      transform:translateY(30px);
-      transition:opacity .7s ease, transform .7s ease;
-      will-change:opacity, transform;
+    /* Reveal Animation */
+    .reveal-on-scroll {
+      opacity: 0;
+      transform: translateY(40px) scale(0.98);
+      transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+      will-change: opacity, transform;
     }
-    .reveal-on-scroll.revealed{
-      opacity:1;
-      transform:translateY(0);
+    .reveal-on-scroll.revealed {
+      opacity: 1;
+      transform: translateY(0) scale(1);
     }
-    .camp-gallery-item{
-      position:relative;
-      overflow:hidden;
-      border-radius:20px;
-      border:1px solid rgba(255,255,255,.14);
-      background:rgba(255,255,255,.06);
-      box-shadow:0 12px 28px rgba(0,0,0,.14);
-      cursor:zoom-in;
-      transition:transform .28s ease, box-shadow .28s ease, border-color .28s ease;
+    
+    /* Form Errors */
+    .camp-input-error {
+      border-color: #ff4757 !important;
+      box-shadow: 0 0 0 4px rgba(255, 71, 87, 0.15) !important;
+      animation: shakeError 0.4s ease;
     }
-    .camp-gallery-item:hover{
-      transform:translateY(-4px) scale(1.01);
-      box-shadow:0 18px 38px rgba(0,0,0,.18);
-      border-color:rgba(255,255,255,.22);
+    @keyframes shakeError {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-8px); }
+      75% { transform: translateX(8px); }
     }
-    .camp-gallery-img{
-      width:100%;
-      aspect-ratio:1 / 1;
-      object-fit:cover;
-      display:block;
+
+    /* Gallery Items */
+    .camp-gallery-item {
+      position: relative;
+      overflow: hidden;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,.15);
+      background: rgba(255,255,255,.05);
+      box-shadow: 0 12px 28px rgba(0,0,0,.15);
+      cursor: zoom-in;
+      transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
     }
-    .camp-gallery-overlay{
-      position:absolute;
-      inset:auto 0 0 0;
-      padding:14px;
-      background:linear-gradient(180deg, transparent, rgba(3,15,35,.78));
-      color:#fff;
-      font-size:.92rem;
-      font-weight:700;
-      opacity:.98;
+    .camp-gallery-item:hover {
+      transform: translateY(-5px) scale(1.02);
+      box-shadow: 0 20px 40px rgba(0,0,0,.25);
+      border-color: rgba(255,255,255,.3);
     }
-    .camp-input-error{
-      border-color:rgba(255, 120, 120, .95) !important;
-      box-shadow:0 0 0 4px rgba(255, 120, 120, .12) !important;
-      background:rgba(255,255,255,.12) !important;
+    .camp-gallery-img {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      display: block;
     }
-    .camp-success-box{
-      text-align:center;
-      padding:30px 10px;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      gap:16px;
-      animation:summerSuccessIn .45s ease;
+    .camp-gallery-overlay {
+      position: absolute;
+      inset: auto 0 0 0;
+      padding: 15px;
+      background: linear-gradient(180deg, transparent, rgba(3,15,35,.85));
+      color: #fff;
+      font-size: .95rem;
+      font-weight: 700;
     }
-    .camp-success-icon{
-      font-size:56px;
-      line-height:1;
-      filter:drop-shadow(0 10px 22px rgba(0,0,0,.16));
+
+    /* Success Modal */
+    .success-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(3, 15, 45, 0.85); backdrop-filter: blur(15px);
+      animation: fadeIn 0.3s ease;
     }
-    .camp-success-title{
-      font-size:1.2rem;
-      font-weight:900;
-      color:#fff;
+    .success-card {
+      background: linear-gradient(145deg, #0a3d73, #03152f);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 40px; border-radius: 36px; text-align: center;
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+      animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      max-width: 90%; width: 450px;
     }
-    .camp-success-text{
-      font-size:.96rem;
-      line-height:1.95;
-      color:rgba(230,245,255,.86);
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    /* Lightbox */
+    .summer-lightbox {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(2,9,21,.92); backdrop-filter: blur(10px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px; cursor: zoom-out; animation: fadeIn .25s ease;
     }
-    .camp-success-name{
-      color:#ffe08a;
-      font-weight:900;
+    .summer-lightbox-box { position: relative; max-width: min(1100px, 100%); max-height: 90vh; }
+    .summer-lightbox-img {
+      display: block; max-width: 100%; max-height: 90vh; border-radius: 20px;
+      box-shadow: 0 24px 60px rgba(0,0,0,.55); animation: popIn .3s cubic-bezier(.34,1.56,.64,1);
     }
-    .camp-success-note{
-      color:rgba(255,220,120,.92);
-      font-size:.9rem;
-      font-weight:800;
+    .summer-lightbox-close {
+      position: absolute; top: 14px; left: 14px; width: 46px; height: 46px;
+      border: none; border-radius: 50%; background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.25); color: #fff; font-size: 22px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: .25s ease;
     }
-    .camp-submit-btn.loading{
-      position:relative;
-      pointer-events:none;
-      opacity:.92;
-    }
-    .camp-submit-btn.loading span{
-      opacity:0;
-    }
-    .camp-submit-btn.loading::after{
-      content:"جاري إرسال التسجيل...";
-      position:absolute;
-      inset:0;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      color:#08223e;
-      font-weight:1000;
-    }
-    .summer-lightbox{
-      position:fixed;
-      inset:0;
-      z-index:9999;
-      background:rgba(2,9,21,.92);
-      backdrop-filter:blur(10px);
-      -webkit-backdrop-filter:blur(10px);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:24px;
-      cursor:zoom-out;
-      animation:summerFadeIn .22s ease;
-    }
-    .summer-lightbox-box{
-      position:relative;
-      max-width:min(1100px, 100%);
-      max-height:90vh;
-    }
-    .summer-lightbox-img{
-      display:block;
-      max-width:100%;
-      max-height:90vh;
-      border-radius:20px;
-      box-shadow:0 24px 60px rgba(0,0,0,.55);
-      animation:summerScaleIn .25s cubic-bezier(.34,1.56,.64,1);
-    }
-    .summer-lightbox-close{
-      position:absolute;
-      top:14px;
-      left:14px;
-      width:46px;
-      height:46px;
-      border:none;
-      border-radius:50%;
-      background:rgba(255,255,255,.12);
-      border:1px solid rgba(255,255,255,.18);
-      color:#fff;
-      font-size:22px;
-      cursor:pointer;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      box-shadow:0 10px 28px rgba(0,0,0,.18);
-      transition:.22s ease;
-    }
-    .summer-lightbox-close:hover{
-      background:rgba(255,255,255,.20);
-      transform:scale(1.05);
-    }
-    @keyframes summerFadeIn{
-      from{opacity:0}
-      to{opacity:1}
-    }
-    @keyframes summerScaleIn{
-      from{transform:scale(.88)}
-      to{transform:scale(1)}
-    }
-    @keyframes summerSuccessIn{
-      from{opacity:0;transform:translateY(18px)}
-      to{opacity:1;transform:translateY(0)}
-    }
+    .summer-lightbox-close:hover { background: rgba(255,255,255,.25); transform: scale(1.1); }
   `;
   document.head.appendChild(style);
+}
+
+function initTiltEffect() {
+  if (window.matchMedia("(max-width: 768px)").matches) return;
+
+  const cards = document.querySelectorAll(".camp-workshop-card, .camp-info-card, .summer-journey-card");
+  
+  cards.forEach((card) => {
+    card.addEventListener("mousemove", (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      
+      const rotateX = ((y - centerY) / centerY) * -8;
+      const rotateY = ((x - centerX) / centerX) * 8;
+      
+      card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+    });
+
+    card.addEventListener("mouseleave", () => {
+      card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
+    });
+  });
 }
 
 function initRevealOnScroll() {
   injectRevealStyles();
 
   const targets = document.querySelectorAll(
-    ".camp-section, .camp-workshop-card, .summer-strip-item, .summer-journey-card, .camp-info-card"
+    ".camp-section, .camp-workshop-card, .summer-strip-item, .summer-journey-card, .camp-info-card, .form-group"
   );
 
-  targets.forEach((el) => el.classList.add("reveal-on-scroll"));
+  targets.forEach((el, index) => {
+    el.classList.add("reveal-on-scroll");
+    // إضافة تأخير للظهور المتدرج للعناصر المجاورة
+    el.style.transitionDelay = `${(index % 4) * 0.1}s`;
+  });
 
   const observer = new IntersectionObserver(
     (entries, obs) => {
@@ -321,64 +285,22 @@ function initRevealOnScroll() {
         obs.unobserve(entry.target);
       });
     },
-    { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
+    { threshold: 0.1, rootMargin: "0px 0px -40px 0px" }
   );
 
   targets.forEach((el) => observer.observe(el));
 }
 
 /* ─────────────────────────────────────────
-   GALLERY
+   4. GALLERY
 ───────────────────────────────────────── */
 function buildGalleryEmptyState() {
   return `
-    <div class="camp-gallery-empty">
-      <span>📸</span>
+    <div class="camp-gallery-empty" style="grid-column: 1 / -1;">
+      <span style="font-size:30px;">📸</span>
       <span>سيتم نشر الصور واللحظات المميزة بعد انطلاق المدرسة الصيفية</span>
     </div>
   `;
-}
-
-function buildGalleryItem(data) {
-  if (!data?.imageUrl) return null;
-
-  const item = document.createElement("div");
-  item.className = "camp-gallery-item reveal-on-scroll";
-
-  const img = document.createElement("img");
-  img.src = data.imageUrl;
-  img.alt = data.caption || "صورة من المدرسة الصيفية";
-  img.loading = "lazy";
-  img.draggable = false;
-  img.className = "camp-gallery-img";
-
-  const overlay = document.createElement("div");
-  overlay.className = "camp-gallery-overlay";
-  overlay.textContent = data.caption || "Summer School";
-
-  item.appendChild(img);
-  item.appendChild(overlay);
-  item.addEventListener("click", () => openLightbox(data.imageUrl, data.caption || "Summer School"));
-
-  return item;
-}
-
-function observeRevealElements(scope = document) {
-  const els = scope.querySelectorAll(".reveal-on-scroll:not(.revealed)");
-  if (!els.length) return;
-
-  const observer = new IntersectionObserver(
-    (entries, obs) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        entry.target.classList.add("revealed");
-        obs.unobserve(entry.target);
-      });
-    },
-    { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
-  );
-
-  els.forEach((el) => observer.observe(el));
 }
 
 function loadCampGallery() {
@@ -397,13 +319,34 @@ function loadCampGallery() {
 
       grid.innerHTML = "";
 
-      snap.forEach((docSnap) => {
+      snap.forEach((docSnap, index) => {
         const data = docSnap.data();
-        const item = buildGalleryItem(data);
-        if (item) grid.appendChild(item);
-      });
+        if (!data.imageUrl) return;
 
-      observeRevealElements(grid);
+        const item = document.createElement("div");
+        item.className = "camp-gallery-item reveal-on-scroll";
+        item.style.transitionDelay = `${(index % 3) * 0.1}s`;
+
+        const img = document.createElement("img");
+        img.src = data.imageUrl;
+        img.alt = data.caption || "Summer School";
+        img.loading = "lazy";
+        img.draggable = false;
+        img.className = "camp-gallery-img";
+
+        const overlay = document.createElement("div");
+        overlay.className = "camp-gallery-overlay";
+        overlay.textContent = data.caption || "Summer School";
+
+        item.appendChild(img);
+        item.appendChild(overlay);
+        item.addEventListener("click", () => openLightbox(data.imageUrl, data.caption));
+
+        grid.appendChild(item);
+        
+        // تفعيل الظهور مباشرة للصور
+        setTimeout(() => item.classList.add("revealed"), 50);
+      });
     },
     () => {
       grid.innerHTML = buildGalleryEmptyState();
@@ -411,9 +354,6 @@ function loadCampGallery() {
   );
 }
 
-/* ─────────────────────────────────────────
-   LIGHTBOX
-───────────────────────────────────────── */
 function openLightbox(src, alt = "Summer School") {
   const old = document.querySelector(".summer-lightbox");
   if (old) old.remove();
@@ -449,7 +389,7 @@ function openLightbox(src, alt = "Summer School") {
 }
 
 /* ─────────────────────────────────────────
-   REGISTRATION
+   5. REGISTRATION LOGIC
 ───────────────────────────────────────── */
 function getField(id) {
   return document.getElementById(id);
@@ -460,9 +400,7 @@ function markInvalid(el) {
   el.classList.add("camp-input-error");
   el.addEventListener(
     "input",
-    () => {
-      el.classList.remove("camp-input-error");
-    },
+    () => { el.classList.remove("camp-input-error"); },
     { once: true }
   );
 }
@@ -529,8 +467,9 @@ function campRegister(e) {
 
   const submitBtn = getField("camp-submit-btn");
   if (submitBtn) {
-    submitBtn.classList.add("loading");
-    submitBtn.disabled = true;
+    submitBtn.innerHTML = "جاري الحجز... ⏳";
+    submitBtn.style.pointerEvents = "none";
+    submitBtn.style.opacity = "0.8";
   }
 
   const payload = encodeURIComponent(
@@ -547,39 +486,37 @@ function campRegister(e) {
 
   new Image().src = `${APPS_SCRIPT_URL}?payload=${payload}`;
 
+  // إظهار بطاقة النجاح الفاخرة
   setTimeout(() => {
-    const form = getField("camp-form");
-    if (form) {
-      form.innerHTML = `
-        <div class="camp-success-box">
-          <div class="camp-success-icon">☀️</div>
-          <div class="camp-success-title">تم تسجيل طلبكم بنجاح!</div>
-          <div class="camp-success-text">
-            أهلاً <span class="camp-success-name">${firstName} ${lastName}</span><br>
-            تم استلام طلب التسجيل في <strong>Summer School</strong> بنجاح.<br>
-            سيتم التواصل معكم قريباً عبر رقم ولي الأمر لتأكيد التفاصيل.
-          </div>
-          <div class="camp-success-note">
-            نتمنى لكم تجربة صيفية ممتعة، مليئة بالتعلّم والطاقة والذكريات الجميلة 🌊✨
-          </div>
-        </div>
-      `;
-    }
-  }, 1400);
+    const overlay = document.createElement("div");
+    overlay.className = "success-overlay";
+    overlay.innerHTML = `
+      <div class="success-card">
+        <div style="font-size:70px; margin-bottom:15px; filter:drop-shadow(0 10px 20px rgba(0,0,0,0.3));">✨🌊</div>
+        <h2 style="color:#fff; margin-bottom:15px; font-size:26px; font-weight:900;">تم حجز المقعد بنجاح!</h2>
+        <p style="color:#c9e7f8; font-size:17px; line-height:1.8; margin-bottom:25px;">
+          أهلاً بالمبدع <strong style="color:#f4b41a; font-size:20px;">${firstName} ${lastName}</strong><br>
+          تم استلام طلب التسجيل في <strong>Summer School</strong> بنجاح.<br>
+          سنتواصل معكم قريباً عبر رقم ولي الأمر.
+        </p>
+        <button onclick="location.reload()" style="padding:14px 35px; border-radius:20px; border:none; background:linear-gradient(135deg, #ffc849, #ff9f1d); color:#03152f; font-weight:900; font-size:16px; cursor:pointer; box-shadow:0 15px 30px rgba(255,159,29,0.3); transition:0.3s;">العودة للصفحة</button>
+      </div>`;
+    document.body.appendChild(overlay);
+  }, 1500);
 
   return false;
 }
 
 /* ─────────────────────────────────────────
-   INIT
+   6. INIT
 ───────────────────────────────────────── */
 window.campRegister = campRegister;
 
 document.addEventListener("DOMContentLoaded", () => {
-  injectRevealStyles();
   initSquaresBackground();
-  initCampVideo();
   initRevealOnScroll();
+  initTiltEffect();
+  initCampVideo();
   loadCampGallery();
 
   const form = document.getElementById("camp-form");
