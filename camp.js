@@ -54,27 +54,61 @@ function initPricingTabs() {
       const panel    = document.getElementById(targetId);
       if (!panel) return;
 
-      panel.offsetHeight; // force reflow
+      // لإعادة تشغيل الأنيميشن
+      panel.offsetHeight;
       panel.style.animation = "";
       panel.classList.add("active");
-
-      setTimeout(() => {
-        panel.querySelectorAll(".reveal-on-scroll:not(.revealed)").forEach(el => {
-          el.classList.add("revealed");
-        });
-      }, 60);
     });
   });
 }
 
-/* selectPackage — نستعمله من HTML */
+/* ─────────────────────────────────────────
+   0. REGISTER MODAL OPEN/CLOSE
+───────────────────────────────────────── */
+function initRegisterModal() {
+  const openModalBtn  = document.getElementById("open-register-modal");
+  const modal         = document.getElementById("camp-register-modal");
+  const closeModalBtn = document.getElementById("close-register-modal");
+
+  const openModal = () => {
+    if (!modal) return;
+    modal.classList.add("active");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  };
+
+  const closeModal = () => {
+    if (!modal) return;
+    modal.classList.remove("active");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+  };
+
+  if (openModalBtn)  openModalBtn.addEventListener("click", openModal);
+  if (closeModalBtn) closeModalBtn.addEventListener("click", closeModal);
+
+  if (modal) {
+    modal.addEventListener("click", e => {
+      if (e.target.classList.contains("camp-register-modal-backdrop")) {
+        closeModal();
+      }
+    });
+  }
+
+  // نحتاجه في selectPackage
+  return { openModal };
+}
+
+/* selectPackage — يُستعمل من HTML */
 window.selectPackage = function (packageName) {
   const selectEl = document.getElementById("campSelectedPackage");
   if (selectEl) {
     selectEl.value = packageName;
 
-    selectEl.style.transition  = "box-shadow 0.4s cubic-bezier(0.34,1.56,0.64,1), border-color 0.4s ease";
-    selectEl.style.boxShadow   = "0 0 0 4px rgba(244,180,26,0.5), 0 0 20px rgba(244,180,26,0.2)";
+    selectEl.style.transition  =
+      "box-shadow 0.4s cubic-bezier(0.34,1.56,0.64,1), border-color 0.4s ease";
+    selectEl.style.boxShadow   =
+      "0 0 0 4px rgba(244,180,26,0.5), 0 0 20px rgba(244,180,26,0.2)";
     selectEl.style.borderColor = "rgba(244,180,26,0.8)";
     setTimeout(() => {
       selectEl.style.boxShadow   = "";
@@ -82,8 +116,13 @@ window.selectPackage = function (packageName) {
     }, 2500);
   }
 
-  const formSection = document.getElementById("camp-register");
-  if (formSection) formSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  // فتح المودال بدلاً من التمرير للقسم
+  const modal = document.getElementById("camp-register-modal");
+  if (modal && !modal.classList.contains("active")) {
+    modal.classList.add("active");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  }
 };
 
 /* ─────────────────────────────────────────
@@ -142,22 +181,23 @@ function initSquaresBackground() {
 }
 
 /* ─────────────────────────────────────────
-   2. VIDEO LOGIC
+   2. VIDEO LOGIC (Cloudinary Player)
 ───────────────────────────────────────── */
-/* خففنا المنطق: فقط نوقف الفيديو لما يطلع من الشاشة */
 function initCampVideo() {
-  const video = document.getElementById("camp-video");
-  if (!video) return;
+  const container = document.getElementById("player");
+  if (!container || !window.cloudinary) return;
 
-  const observer = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (!entry.isIntersecting && !video.paused) {
-        video.pause();
-      }
-    });
-  }, { threshold: 0.3 });
+  const cld = cloudinary.Cloudinary.new({ cloud_name: "dac4mwuwe" });
+  const player = cld.videoPlayer("player", {
+    fluid: true,
+    controls: true,
+    autoplay: false,
+    muted: false
+  });
 
-  observer.observe(video);
+  player.source(
+    "AQNIgfMOr7nMCThf_vUxbNnUVytNft9bYO2pREdCOan1yhKd9x_cnM1bvez380yQe9LapvImGxcAKYy4ZzAjMQ9ZhMrVESjroQlZ-nI_z6m24m"
+  );
 }
 
 /* ─────────────────────────────────────────
@@ -565,6 +605,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initTiltEffect();
   initCampVideo();
   loadCampGallery();
+  initRegisterModal();
 
   const form      = document.getElementById("camp-form");
   const submitBtn = document.getElementById("camp-submit-btn");
