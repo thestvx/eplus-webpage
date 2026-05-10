@@ -67,7 +67,7 @@ function initPricingTabs() {
   });
 }
 
-/* selectPackage — يستدعى من HTML */
+/* selectPackage — نستعمله من HTML */
 window.selectPackage = function (packageName) {
   const selectEl = document.getElementById("campSelectedPackage");
   if (selectEl) {
@@ -144,37 +144,18 @@ function initSquaresBackground() {
 /* ─────────────────────────────────────────
    2. VIDEO LOGIC
 ───────────────────────────────────────── */
+/* خففنا المنطق: فقط نوقف الفيديو لما يطلع من الشاشة */
 function initCampVideo() {
   const video = document.getElementById("camp-video");
   if (!video) return;
 
-  let hasPlayed = false;
-
   const observer = new IntersectionObserver(entries => {
     entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        if (!hasPlayed) {
-          hasPlayed     = true;
-          video.muted   = false;
-          video.volume  = 1;
-          const p = video.play();
-          if (p !== undefined) {
-            p.catch(() => {
-              video.muted = true;
-              video.play().catch(() => {});
-            });
-          }
-        } else if (video.paused) {
-          video.play().catch(() => {});
-        }
-      } else {
-        if (!video.paused) {
-          video.pause();
-          video.muted = true;
-        }
+      if (!entry.isIntersecting && !video.paused) {
+        video.pause();
       }
     });
-  }, { threshold: 0.4 });
+  }, { threshold: 0.3 });
 
   observer.observe(video);
 }
@@ -448,7 +429,7 @@ function validatePhone(phone) {
 }
 
 function buildSuccessModal(firstName, lastName, selectedPackage) {
-  const shortName = selectedPackage.split(" - ")[0].trim();
+  const shortName = selectedPackage.split(" — ")[0].trim();
   const ageGroup  = selectedPackage.match(/\(([^)]+)\)/)?.[1] || "";
 
   const overlay = document.createElement("div");
