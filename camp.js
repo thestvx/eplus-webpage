@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════
+═══════════════════════════════════════════
    SUMMER SCHOOL — Advanced Registration + Gallery + Packages
 ════════════════════════════════════════════ */
 
@@ -24,7 +24,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const db  = getFirestore(app);
 
 const CAMP_MIN_AGE = 5;
 const CAMP_MAX_AGE = 18;
@@ -33,68 +33,77 @@ const APPS_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbzJx2NEPz7a7ntKmXQQq7i78ICeIFHiuAxTpfJyAocSkeqmbsmhx_h3YzVjbqs0eiyF/exec";
 
 /* ─────────────────────────────────────────
-   PRICING TABS & PACKAGE SELECTION
+   PRICING TABS
 ───────────────────────────────────────── */
 function initPricingTabs() {
-  const tabs = document.querySelectorAll(".pricing-tab");
+  const tabs     = document.querySelectorAll(".pricing-tab");
   const contents = document.querySelectorAll(".pricing-content");
 
   tabs.forEach(tab => {
     tab.addEventListener("click", () => {
       tabs.forEach(t => t.classList.remove("active"));
-      contents.forEach(c => c.classList.remove("active"));
+      contents.forEach(c => {
+        c.classList.remove("active");
+        c.style.animation = "none";
+      });
 
       tab.classList.add("active");
-      const targetId = tab.getAttribute("data-target");
-      const targetContent = document.getElementById(targetId);
-      if (targetContent) targetContent.classList.add("active");
 
-      // إعادة تشغيل الـ reveal للبطاقات الجديدة الظاهرة
+      const targetId = tab.getAttribute("data-target");
+      const panel    = document.getElementById(targetId);
+      if (!panel) return;
+
+      // force reflow so CSS animation re-fires
+      panel.offsetHeight; // eslint-disable-line no-unused-expressions
+      panel.style.animation = "";
+      panel.classList.add("active");
+
+      // reveal any un-revealed cards inside the newly shown panel
       setTimeout(() => {
-        targetContent?.querySelectorAll(".pricing-card.reveal-on-scroll:not(.revealed)").forEach(card => {
-          card.classList.add("revealed");
+        panel.querySelectorAll(".reveal-on-scroll:not(.revealed)").forEach(el => {
+          el.classList.add("revealed");
         });
-      }, 50);
+      }, 60);
     });
   });
 }
 
-window.selectPackage = function(packageName) {
+/* selectPackage — called from HTML onclick buttons */
+window.selectPackage = function (packageName) {
   const selectEl = document.getElementById("campSelectedPackage");
   if (selectEl) {
     selectEl.value = packageName;
-    selectEl.style.transition = "0.4s cubic-bezier(0.34, 1.56, 0.64, 1)";
-    selectEl.style.boxShadow = "0 0 0 4px rgba(244,180,26,0.5), 0 0 20px rgba(244,180,26,0.2)";
-    selectEl.style.borderColor = "rgba(244,180,26,0.8)";
+
+    // gold glow feedback
+    selectEl.style.transition    = "box-shadow 0.4s cubic-bezier(0.34,1.56,0.64,1), border-color 0.4s ease";
+    selectEl.style.boxShadow     = "0 0 0 4px rgba(244,180,26,0.5), 0 0 20px rgba(244,180,26,0.2)";
+    selectEl.style.borderColor   = "rgba(244,180,26,0.8)";
     setTimeout(() => {
-      selectEl.style.boxShadow = "";
+      selectEl.style.boxShadow   = "";
       selectEl.style.borderColor = "";
     }, 2500);
   }
 
   const formSection = document.getElementById("camp-register");
-  if (formSection) {
-    formSection.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+  if (formSection) formSection.scrollIntoView({ behavior: "smooth", block: "start" });
 };
 
 /* ─────────────────────────────────────────
    1. SQUARES BACKGROUND
 ───────────────────────────────────────── */
-const canvas = document.getElementById("squares-canvas");
-const ctx = canvas ? canvas.getContext("2d") : null;
-let squares = [];
-const squareSize = 40;
-const squareGap = 4;
-let cols = 0;
-let rows = 0;
+const canvas  = document.getElementById("squares-canvas");
+const ctx     = canvas ? canvas.getContext("2d") : null;
+let squares   = [];
+const SQ_SIZE = 40;
+const SQ_GAP  = 4;
+let cols = 0, rows = 0;
 
 function resizeCanvas() {
   if (!canvas || !ctx) return;
-  canvas.width = window.innerWidth;
+  canvas.width  = window.innerWidth;
   canvas.height = window.innerHeight;
-  cols = Math.ceil(window.innerWidth / (squareSize + squareGap));
-  rows = Math.ceil(window.innerHeight / (squareSize + squareGap));
+  cols = Math.ceil(window.innerWidth  / (SQ_SIZE + SQ_GAP));
+  rows = Math.ceil(window.innerHeight / (SQ_SIZE + SQ_GAP));
   initSquares();
 }
 
@@ -103,11 +112,11 @@ function initSquares() {
   for (let i = 0; i < cols; i++) {
     for (let j = 0; j < rows; j++) {
       squares.push({
-        x: i * (squareSize + squareGap),
-        y: j * (squareSize + squareGap),
-        opacity: Math.random() * 0.22,
+        x:             i * (SQ_SIZE + SQ_GAP),
+        y:             j * (SQ_SIZE + SQ_GAP),
+        opacity:       Math.random() * 0.22,
         targetOpacity: Math.random() * 0.28,
-        speed: 0.004 + Math.random() * 0.008
+        speed:         0.004 + Math.random() * 0.008
       });
     }
   }
@@ -122,7 +131,7 @@ function animateSquares() {
     }
     sq.opacity += (sq.targetOpacity - sq.opacity) * sq.speed;
     ctx.fillStyle = `rgba(83, 204, 255, ${sq.opacity})`;
-    ctx.fillRect(sq.x, sq.y, squareSize, squareSize);
+    ctx.fillRect(sq.x, sq.y, SQ_SIZE, SQ_SIZE);
   });
   requestAnimationFrame(animateSquares);
 }
@@ -143,51 +152,50 @@ function initCampVideo() {
 
   let hasPlayed = false;
 
-  const observer = new IntersectionObserver(
-    entries => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          if (!hasPlayed) {
-            hasPlayed = true;
-            video.muted = false;
-            video.volume = 1;
-            const playPromise = video.play();
-            if (playPromise !== undefined) {
-              playPromise.catch(() => {
-                video.muted = true;
-                video.play().catch(() => {});
-              });
-            }
-          } else if (video.paused) {
-            video.play().catch(() => {});
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        if (!hasPlayed) {
+          hasPlayed     = true;
+          video.muted   = false;
+          video.volume  = 1;
+          const p = video.play();
+          if (p !== undefined) {
+            p.catch(() => {
+              video.muted = true;
+              video.play().catch(() => {});
+            });
           }
-        } else {
-          if (!video.paused) {
-            video.pause();
-            video.muted = true;
-          }
+        } else if (video.paused) {
+          video.play().catch(() => {});
         }
-      });
-    },
-    { threshold: 0.4 }
-  );
+      } else {
+        if (!video.paused) {
+          video.pause();
+          video.muted = true;
+        }
+      }
+    });
+  }, { threshold: 0.4 });
 
   observer.observe(video);
 }
 
 /* ─────────────────────────────────────────
-   3. TILT EFFECT & REVEAL ANIMATION
+   3. REVEAL & TILT
 ───────────────────────────────────────── */
 function injectRevealStyles() {
   if (document.getElementById("summer-reveal-style")) return;
 
   const style = document.createElement("style");
-  style.id = "summer-reveal-style";
+  style.id    = "summer-reveal-style";
   style.textContent = `
+    /* ── Reveal ── */
     .reveal-on-scroll {
       opacity: 0;
       transform: translateY(40px) scale(0.98);
-      transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: opacity 0.75s cubic-bezier(0.34,1.56,0.64,1),
+                  transform 0.75s cubic-bezier(0.34,1.56,0.64,1);
       will-change: opacity, transform;
     }
     .reveal-on-scroll.revealed {
@@ -195,26 +203,31 @@ function injectRevealStyles() {
       transform: translateY(0) scale(1);
     }
 
+    /* Premium card keeps its own scale */
+    .pricing-card.premium.reveal-on-scroll         { transform: translateY(40px) scale(1); }
+    .pricing-card.premium.reveal-on-scroll.revealed { transform: translateY(0)   scale(1); }
+    .pricing-card.premium:hover                     { transform: translateY(-6px) !important; }
+
+    /* ── Input error ── */
     .camp-input-error {
       border-color: #ff4757 !important;
-      box-shadow: 0 0 0 4px rgba(255, 71, 87, 0.15) !important;
+      box-shadow: 0 0 0 4px rgba(255,71,87,0.15) !important;
       animation: shakeError 0.4s ease;
     }
     @keyframes shakeError {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-8px); }
-      75% { transform: translateX(8px); }
+      0%,100% { transform: translateX(0); }
+      25%      { transform: translateX(-8px); }
+      75%      { transform: translateX(8px); }
     }
 
-    /* Gallery */
+    /* ── Gallery ── */
     .camp-gallery-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
       gap: 16px;
     }
     .camp-gallery-item {
-      position: relative;
-      overflow: hidden;
+      position: relative; overflow: hidden;
       border-radius: 20px;
       border: 1px solid rgba(255,255,255,.15);
       background: rgba(255,255,255,.05);
@@ -228,94 +241,68 @@ function injectRevealStyles() {
       border-color: rgba(255,255,255,.3);
     }
     .camp-gallery-img {
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      object-fit: cover;
-      display: block;
+      width: 100%; aspect-ratio: 1/1;
+      object-fit: cover; display: block;
     }
     .camp-gallery-overlay {
-      position: absolute;
-      inset: auto 0 0 0;
+      position: absolute; inset: auto 0 0 0;
       padding: 15px;
       background: linear-gradient(180deg, transparent, rgba(3,15,35,.85));
-      color: #fff;
-      font-size: .95rem;
-      font-weight: 700;
+      color: #fff; font-size: .95rem; font-weight: 700;
     }
     .camp-gallery-empty {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-      padding: 50px 20px;
-      text-align: center;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 12px;
+      padding: 50px 20px; text-align: center;
       color: rgba(201,231,248,0.7);
-      font-size: 1.05rem;
-      font-weight: 700;
+      font-size: 1.05rem; font-weight: 700;
     }
 
-    /* Success Modal */
+    /* ── Success Modal ── */
     .success-overlay {
       position: fixed; inset: 0; z-index: 9999;
       display: flex; align-items: center; justify-content: center;
-      background: rgba(3, 15, 45, 0.88);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
+      background: rgba(3,15,45,0.88);
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
       animation: soFadeIn 0.3s ease;
     }
     .success-card {
       background: linear-gradient(145deg, rgba(10,61,115,0.95), rgba(3,21,47,0.98));
       border: 1px solid rgba(255,255,255,0.18);
-      padding: 44px 40px;
-      border-radius: 36px;
-      text-align: center;
+      padding: 44px 40px; border-radius: 36px; text-align: center;
       box-shadow: 0 40px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.2);
-      animation: soPopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-      max-width: 90%;
-      width: 460px;
-      position: relative;
-      overflow: hidden;
+      animation: soPopIn 0.5s cubic-bezier(0.34,1.56,0.64,1);
+      max-width: 90%; width: 460px;
+      position: relative; overflow: hidden;
     }
     .success-card::before {
       content: "";
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
       background: linear-gradient(90deg, transparent, #f4b41a, #ffd86b, #f4b41a, transparent);
     }
-    @keyframes soFadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes soPopIn {
-      from { transform: scale(0.8) translateY(30px); opacity: 0; }
-      to   { transform: scale(1) translateY(0); opacity: 1; }
-    }
 
-    /* Lightbox */
+    /* ── Lightbox ── */
     .summer-lightbox {
       position: fixed; inset: 0; z-index: 9999;
       background: rgba(2,9,21,.92);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
       display: flex; align-items: center; justify-content: center;
       padding: 24px; cursor: zoom-out;
       animation: soFadeIn .25s ease;
     }
     .summer-lightbox-box {
       position: relative;
-      max-width: min(1100px, 100%);
-      max-height: 90vh;
+      max-width: min(1100px, 100%); max-height: 90vh;
     }
     .summer-lightbox-img {
-      display: block;
-      max-width: 100%;
-      max-height: 90vh;
+      display: block; max-width: 100%; max-height: 90vh;
       border-radius: 20px;
       box-shadow: 0 24px 60px rgba(0,0,0,.55);
       animation: soPopIn .3s cubic-bezier(.34,1.56,.64,1);
     }
     .summer-lightbox-close {
       position: absolute; top: 14px; left: 14px;
-      width: 46px; height: 46px;
-      border-radius: 50%;
+      width: 46px; height: 46px; border-radius: 50%;
       background: rgba(255,255,255,.15);
       border: 1px solid rgba(255,255,255,.25);
       color: #fff; font-size: 22px; cursor: pointer;
@@ -323,46 +310,16 @@ function injectRevealStyles() {
       transition: .25s ease;
     }
     .summer-lightbox-close:hover {
-      background: rgba(255,255,255,.25);
-      transform: scale(1.1);
+      background: rgba(255,255,255,.25); transform: scale(1.1);
     }
 
-    /* Pricing card reveal: الكارد المميز لا يتأثر بـ scale من reveal */
-    .pricing-card.premium.reveal-on-scroll {
-      transform: translateY(40px) scale(1.0);
-    }
-    .pricing-card.premium.reveal-on-scroll.revealed {
-      transform: translateY(0) scale(1.0);
-    }
-    .pricing-card.premium:hover {
-      transform: translateY(-6px) !important;
+    @keyframes soFadeIn { from { opacity:0; } to { opacity:1; } }
+    @keyframes soPopIn {
+      from { transform: scale(0.8) translateY(30px); opacity:0; }
+      to   { transform: scale(1)   translateY(0);    opacity:1; }
     }
   `;
   document.head.appendChild(style);
-}
-
-function initTiltEffect() {
-  if (window.matchMedia("(max-width: 768px)").matches) return;
-
-  const cards = document.querySelectorAll(
-    ".camp-workshop-card, .camp-info-card, .summer-journey-card"
-  );
-
-  cards.forEach(card => {
-    card.addEventListener("mousemove", e => {
-      const rect = card.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const cx = rect.width / 2;
-      const cy = rect.height / 2;
-      const rotX = ((y - cy) / cy) * -8;
-      const rotY = ((x - cx) / cx) * 8;
-      card.style.transform = `perspective(1000px) rotateX(${rotX}deg) rotateY(${rotY}deg) scale3d(1.02,1.02,1.02)`;
-    });
-    card.addEventListener("mouseleave", () => {
-      card.style.transform = "perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1,1,1)";
-    });
-  });
 }
 
 function initRevealOnScroll() {
@@ -373,35 +330,53 @@ function initRevealOnScroll() {
     ".summer-journey-card, .camp-info-card, .pricing-card, .form-group"
   );
 
-  targets.forEach((el, index) => {
+  targets.forEach((el, i) => {
     el.classList.add("reveal-on-scroll");
-    el.style.transitionDelay = `${(index % 4) * 0.1}s`;
+    el.style.transitionDelay = `${(i % 4) * 0.08}s`;
   });
 
-  const observer = new IntersectionObserver(
-    (entries, obs) => {
-      entries.forEach(entry => {
-        if (!entry.isIntersecting) return;
-        entry.target.classList.add("revealed");
-        obs.unobserve(entry.target);
-      });
-    },
-    { threshold: 0.08, rootMargin: "0px 0px -30px 0px" }
-  );
+  const obs = new IntersectionObserver((entries, observer) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add("revealed");
+      observer.unobserve(entry.target);
+    });
+  }, { threshold: 0.07, rootMargin: "0px 0px -25px 0px" });
 
-  targets.forEach(el => observer.observe(el));
+  targets.forEach(el => obs.observe(el));
+}
+
+function initTiltEffect() {
+  if (window.matchMedia("(max-width: 768px)").matches) return;
+
+  document.querySelectorAll(
+    ".camp-workshop-card, .camp-info-card, .summer-journey-card"
+  ).forEach(card => {
+    card.addEventListener("mousemove", e => {
+      const r  = card.getBoundingClientRect();
+      const x  = e.clientX - r.left;
+      const y  = e.clientY - r.top;
+      const rx = ((y - r.height / 2) / (r.height / 2)) * -8;
+      const ry = ((x - r.width  / 2) / (r.width  / 2)) *  8;
+      card.style.transform =
+        `perspective(1000px) rotateX(${rx}deg) rotateY(${ry}deg) scale3d(1.02,1.02,1.02)`;
+    });
+    card.addEventListener("mouseleave", () => {
+      card.style.transform =
+        "perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1,1,1)";
+    });
+  });
 }
 
 /* ─────────────────────────────────────────
    4. GALLERY
 ───────────────────────────────────────── */
-function buildGalleryEmptyState() {
+function buildGalleryEmpty() {
   return `
     <div class="camp-gallery-empty" style="grid-column:1/-1;">
       <span style="font-size:34px;">📸</span>
       <span>سيتم نشر الصور واللحظات المميزة بعد انطلاق المدرسة الصيفية</span>
-    </div>
-  `;
+    </div>`;
 }
 
 function loadCampGallery() {
@@ -410,52 +385,41 @@ function loadCampGallery() {
 
   const q = query(collection(db, "campGallery"), orderBy("createdAt", "desc"));
 
-  onSnapshot(
-    q,
-    snap => {
-      if (snap.empty) {
-        grid.innerHTML = buildGalleryEmptyState();
-        return;
-      }
+  onSnapshot(q, snap => {
+    if (snap.empty) { grid.innerHTML = buildGalleryEmpty(); return; }
 
-      grid.innerHTML = "";
+    grid.innerHTML = "";
+    snap.forEach((docSnap, index) => {
+      const data = docSnap.data();
+      if (!data.imageUrl) return;
 
-      snap.forEach((docSnap, index) => {
-        const data = docSnap.data();
-        if (!data.imageUrl) return;
+      const item = document.createElement("div");
+      item.className = "camp-gallery-item reveal-on-scroll";
+      item.style.transitionDelay = `${(index % 3) * 0.1}s`;
 
-        const item = document.createElement("div");
-        item.className = "camp-gallery-item reveal-on-scroll";
-        item.style.transitionDelay = `${(index % 3) * 0.1}s`;
+      const img    = document.createElement("img");
+      img.src      = data.imageUrl;
+      img.alt      = data.caption || "Summer School";
+      img.loading  = "lazy";
+      img.draggable = false;
+      img.className = "camp-gallery-img";
 
-        const img = document.createElement("img");
-        img.src = data.imageUrl;
-        img.alt = data.caption || "Summer School";
-        img.loading = "lazy";
-        img.draggable = false;
-        img.className = "camp-gallery-img";
+      const overlay  = document.createElement("div");
+      overlay.className = "camp-gallery-overlay";
+      overlay.textContent = data.caption || "Summer School";
 
-        const overlay = document.createElement("div");
-        overlay.className = "camp-gallery-overlay";
-        overlay.textContent = data.caption || "Summer School";
+      item.appendChild(img);
+      item.appendChild(overlay);
+      item.addEventListener("click", () => openLightbox(data.imageUrl, data.caption));
+      grid.appendChild(item);
 
-        item.appendChild(img);
-        item.appendChild(overlay);
-        item.addEventListener("click", () => openLightbox(data.imageUrl, data.caption));
-        grid.appendChild(item);
-
-        setTimeout(() => item.classList.add("revealed"), 50 + index * 60);
-      });
-    },
-    () => {
-      grid.innerHTML = buildGalleryEmptyState();
-    }
-  );
+      setTimeout(() => item.classList.add("revealed"), 50 + index * 60);
+    });
+  }, () => { grid.innerHTML = buildGalleryEmpty(); });
 }
 
 function openLightbox(src, alt = "Summer School") {
-  const old = document.querySelector(".summer-lightbox");
-  if (old) old.remove();
+  document.querySelector(".summer-lightbox")?.remove();
 
   const overlay = document.createElement("div");
   overlay.className = "summer-lightbox";
@@ -463,26 +427,23 @@ function openLightbox(src, alt = "Summer School") {
     <div class="summer-lightbox-box">
       <img src="${src}" alt="${alt}" class="summer-lightbox-img" draggable="false">
       <button type="button" class="summer-lightbox-close" aria-label="إغلاق">✕</button>
-    </div>
-  `;
+    </div>`;
 
   const close = () => overlay.remove();
   overlay.addEventListener("click", e => {
     if (e.target === overlay || e.target.closest(".summer-lightbox-close")) close();
   });
-  document.addEventListener("keydown", function escH(e) {
-    if (e.key === "Escape") { close(); document.removeEventListener("keydown", escH); }
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") close();
   }, { once: true });
 
   document.body.appendChild(overlay);
 }
 
 /* ─────────────────────────────────────────
-   5. REGISTRATION LOGIC
+   5. REGISTRATION
 ───────────────────────────────────────── */
-function getField(id) {
-  return document.getElementById(id);
-}
+function getField(id) { return document.getElementById(id); }
 
 function markInvalid(el) {
   if (!el) return;
@@ -491,31 +452,79 @@ function markInvalid(el) {
 }
 
 function validatePhone(phone) {
-  const cleaned = phone.replace(/\s+/g, "");
-  return /^[+0-9]{8,18}$/.test(cleaned);
+  return /^[+0-9]{8,18}$/.test(phone.replace(/\s+/g, ""));
+}
+
+function buildSuccessModal(firstName, lastName, selectedPackage) {
+  const shortName = selectedPackage.split(" - ")[0].trim();
+  const ageGroup  = selectedPackage.match(/\(([^)]+)\)/)?.[1] || "";
+
+  const overlay = document.createElement("div");
+  overlay.className = "success-overlay";
+  overlay.innerHTML = `
+    <div class="success-card">
+      <div style="font-size:64px;margin-bottom:16px;
+                  filter:drop-shadow(0 10px 20px rgba(0,0,0,.3))">🎉</div>
+      <h2 style="color:#fff;margin-bottom:10px;font-size:24px;
+                 font-weight:950;line-height:1.3;">تم تسجيل المقعد بنجاح!</h2>
+      <p style="color:#c9e7f8;font-size:16px;line-height:1.9;margin-bottom:8px;">
+        مرحباً بالمبدع
+        <strong style="color:#ffd86b;font-size:19px;"> ${firstName} ${lastName}</strong>
+      </p>
+      <div style="
+        display:inline-flex;align-items:center;gap:8px;
+        padding:10px 20px;border-radius:14px;margin:12px 0 20px;
+        background:rgba(244,180,26,0.15);border:1px solid rgba(244,180,26,0.3);
+        color:#ffe090;font-weight:800;font-size:15px;
+      ">✦ ${shortName}${ageGroup ? ` — ${ageGroup}` : ""}</div>
+      <p style="color:rgba(201,231,248,0.75);font-size:14px;
+                line-height:1.8;margin-bottom:26px;">
+        سيتم التواصل معكم قريباً عبر رقم ولي الأمر<br>
+        لتأكيد الحجز وإتمام عملية الدفع.
+      </p>
+      <button
+        onclick="location.reload()"
+        style="
+          position:relative;overflow:hidden;
+          padding:14px 36px;border-radius:18px;border:none;
+          background:linear-gradient(135deg,#ffc849,#ff9f1d);
+          color:#03152f;font-weight:900;font-size:15px;
+          cursor:pointer;box-shadow:0 15px 30px rgba(255,159,29,.35);
+          transition:0.3s cubic-bezier(0.34,1.56,0.64,1);
+          font-family:inherit;
+        "
+        onmouseover="this.style.transform='translateY(-3px)';
+                     this.style.boxShadow='0 20px 40px rgba(255,159,29,.45)'"
+        onmouseout="this.style.transform='';
+                    this.style.boxShadow='0 15px 30px rgba(255,159,29,.35)'"
+      >العودة للصفحة ✦</button>
+    </div>`;
+  return overlay;
 }
 
 function campRegister(e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
 
-  const packageEl    = getField("campSelectedPackage");
-  const firstNameEl  = getField("campFirstName");
-  const lastNameEl   = getField("campLastName");
-  const ageEl        = getField("campAge");
-  const parentNameEl = getField("campParentName");
+  const packageEl     = getField("campSelectedPackage");
+  const firstNameEl   = getField("campFirstName");
+  const lastNameEl    = getField("campLastName");
+  const ageEl         = getField("campAge");
+  const parentNameEl  = getField("campParentName");
   const parentPhoneEl = getField("campParentPhone");
 
-  if (!packageEl || !firstNameEl || !lastNameEl || !ageEl || !parentNameEl || !parentPhoneEl) return false;
+  if (!packageEl || !firstNameEl || !lastNameEl ||
+      !ageEl || !parentNameEl || !parentPhoneEl) return false;
 
   const selectedPackage = packageEl.value.trim();
-  const firstName   = firstNameEl.value.trim();
-  const lastName    = lastNameEl.value.trim();
-  const age         = ageEl.value.trim();
-  const parentName  = parentNameEl.value.trim();
-  const parentPhone = parentPhoneEl.value.trim();
+  const firstName       = firstNameEl.value.trim();
+  const lastName        = lastNameEl.value.trim();
+  const age             = ageEl.value.trim();
+  const parentName      = parentNameEl.value.trim();
+  const parentPhone     = parentPhoneEl.value.trim();
 
   let valid = true;
 
+  // required fields
   [
     { el: packageEl,     val: selectedPackage },
     { el: firstNameEl,   val: firstName },
@@ -526,6 +535,7 @@ function campRegister(e) {
     if (!f.val) { markInvalid(f.el); valid = false; }
   });
 
+  // age validation
   const ageNum = parseInt(age, 10);
   if (!age || Number.isNaN(ageNum) || ageNum <= 0) {
     markInvalid(ageEl);
@@ -536,6 +546,7 @@ function campRegister(e) {
     valid = false;
   }
 
+  // phone validation
   if (parentPhone && !validatePhone(parentPhone)) {
     markInvalid(parentPhoneEl);
     alert("❌ يرجى إدخال رقم هاتف صحيح لولي الأمر.");
@@ -544,78 +555,32 @@ function campRegister(e) {
 
   if (!valid) return false;
 
+  // disable button
   const submitBtn = getField("camp-submit-btn");
   if (submitBtn) {
-    submitBtn.innerHTML = '<span>جاري الحجز...</span> <span style="animation:floatY 0.8s ease-in-out infinite;display:inline-block;">⏳</span>';
+    submitBtn.innerHTML =
+      '<span>جاري الحجز...</span> ' +
+      '<span style="animation:floatY 0.8s ease-in-out infinite;display:inline-block;">⏳</span>';
     submitBtn.style.pointerEvents = "none";
-    submitBtn.style.opacity = "0.8";
+    submitBtn.style.opacity       = "0.8";
   }
 
-  const payload = encodeURIComponent(
-    JSON.stringify({
-      program: "Summer Academy 2026",
-      selectedPackage,
-      firstName,
-      lastName,
-      age: String(ageNum),
-      parentName,
-      parentPhone,
-      timestamp: new Date().toISOString()
-    })
-  );
-
+  // send data via Apps Script (fire-and-forget)
+  const payload = encodeURIComponent(JSON.stringify({
+    program:         "Summer Academy 2026",
+    selectedPackage,
+    firstName,
+    lastName,
+    age:             String(ageNum),
+    parentName,
+    parentPhone,
+    timestamp:       new Date().toISOString()
+  }));
   new Image().src = `${APPS_SCRIPT_URL}?payload=${payload}`;
 
+  // show success modal after short delay
   setTimeout(() => {
-    // اسم مختصر للباقة: نأخذ الجزء قبل "-" الأول
-    const shortPackageName = selectedPackage.split(" - ")[0].trim();
-    // نأخذ الفئة العمرية بين الأقواس
-    const ageGroup = selectedPackage.includes("(")
-      ? selectedPackage.match(/\(([^)]+)\)/)?.[1] || ""
-      : "";
-
-    const overlay = document.createElement("div");
-    overlay.className = "success-overlay";
-    overlay.innerHTML = `
-      <div class="success-card">
-        <div style="font-size:64px;margin-bottom:16px;filter:drop-shadow(0 10px 20px rgba(0,0,0,.3))">🎉</div>
-        <h2 style="color:#fff;margin-bottom:10px;font-size:24px;font-weight:950;line-height:1.3;">
-          تم تسجيل المقعد بنجاح!
-        </h2>
-        <p style="color:#c9e7f8;font-size:16px;line-height:1.9;margin-bottom:8px;">
-          مرحباً بالمبدع
-          <strong style="color:#ffd86b;font-size:19px;"> ${firstName} ${lastName}</strong>
-        </p>
-        <div style="
-          display:inline-flex;align-items:center;gap:8px;
-          padding:10px 20px;border-radius:14px;margin:12px 0 20px;
-          background:rgba(244,180,26,0.15);border:1px solid rgba(244,180,26,0.3);
-          color:#ffe090;font-weight:800;font-size:15px;
-        ">
-          ✦ ${shortPackageName}${ageGroup ? ` — ${ageGroup}` : ""}
-        </div>
-        <p style="color:rgba(201,231,248,0.75);font-size:14px;line-height:1.8;margin-bottom:26px;">
-          سيتم التواصل معكم قريباً عبر رقم ولي الأمر<br>لتأكيد الحجز وإتمام عملية الدفع.
-        </p>
-        <button
-          onclick="location.reload()"
-          style="
-            position:relative;overflow:hidden;
-            padding:14px 36px;border-radius:18px;border:none;
-            background:linear-gradient(135deg,#ffc849,#ff9f1d);
-            color:#03152f;font-weight:900;font-size:15px;
-            cursor:pointer;box-shadow:0 15px 30px rgba(255,159,29,.35);
-            transition:0.3s cubic-bezier(0.34,1.56,0.64,1);
-            font-family:inherit;
-          "
-          onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 20px 40px rgba(255,159,29,.45)'"
-          onmouseout="this.style.transform='';this.style.boxShadow='0 15px 30px rgba(255,159,29,.35)'"
-        >
-          العودة للصفحة ✦
-        </button>
-      </div>
-    `;
-    document.body.appendChild(overlay);
+    document.body.appendChild(buildSuccessModal(firstName, lastName, selectedPackage));
   }, 1500);
 
   return false;
@@ -637,6 +602,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const form      = document.getElementById("camp-form");
   const submitBtn = document.getElementById("camp-submit-btn");
 
-  if (form)      form.addEventListener("submit", campRegister);
+  if (form)      form.addEventListener("submit",  campRegister);
   if (submitBtn) submitBtn.addEventListener("click", campRegister);
 });
