@@ -1,7 +1,8 @@
-═══════════════════════════════════════════
+/* ═══════════════════════════════════════════
    SUMMER SCHOOL — Advanced Registration + Gallery + Packages
 ════════════════════════════════════════════ */
 
+/* استيراد Firebase (نسخة الموديول) */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import {
   getFirestore,
@@ -53,12 +54,10 @@ function initPricingTabs() {
       const panel    = document.getElementById(targetId);
       if (!panel) return;
 
-      // force reflow so CSS animation re-fires
-      panel.offsetHeight; // eslint-disable-line no-unused-expressions
+      panel.offsetHeight; // force reflow
       panel.style.animation = "";
       panel.classList.add("active");
 
-      // reveal any un-revealed cards inside the newly shown panel
       setTimeout(() => {
         panel.querySelectorAll(".reveal-on-scroll:not(.revealed)").forEach(el => {
           el.classList.add("revealed");
@@ -68,16 +67,15 @@ function initPricingTabs() {
   });
 }
 
-/* selectPackage — called from HTML onclick buttons */
+/* selectPackage — يستدعى من HTML */
 window.selectPackage = function (packageName) {
   const selectEl = document.getElementById("campSelectedPackage");
   if (selectEl) {
     selectEl.value = packageName;
 
-    // gold glow feedback
-    selectEl.style.transition    = "box-shadow 0.4s cubic-bezier(0.34,1.56,0.64,1), border-color 0.4s ease";
-    selectEl.style.boxShadow     = "0 0 0 4px rgba(244,180,26,0.5), 0 0 20px rgba(244,180,26,0.2)";
-    selectEl.style.borderColor   = "rgba(244,180,26,0.8)";
+    selectEl.style.transition  = "box-shadow 0.4s cubic-bezier(0.34,1.56,0.64,1), border-color 0.4s ease";
+    selectEl.style.boxShadow   = "0 0 0 4px rgba(244,180,26,0.5), 0 0 20px rgba(244,180,26,0.2)";
+    selectEl.style.borderColor = "rgba(244,180,26,0.8)";
     setTimeout(() => {
       selectEl.style.boxShadow   = "";
       selectEl.style.borderColor = "";
@@ -190,7 +188,6 @@ function injectRevealStyles() {
   const style = document.createElement("style");
   style.id    = "summer-reveal-style";
   style.textContent = `
-    /* ── Reveal ── */
     .reveal-on-scroll {
       opacity: 0;
       transform: translateY(40px) scale(0.98);
@@ -203,12 +200,10 @@ function injectRevealStyles() {
       transform: translateY(0) scale(1);
     }
 
-    /* Premium card keeps its own scale */
     .pricing-card.premium.reveal-on-scroll         { transform: translateY(40px) scale(1); }
     .pricing-card.premium.reveal-on-scroll.revealed { transform: translateY(0)   scale(1); }
     .pricing-card.premium:hover                     { transform: translateY(-6px) !important; }
 
-    /* ── Input error ── */
     .camp-input-error {
       border-color: #ff4757 !important;
       box-shadow: 0 0 0 4px rgba(255,71,87,0.15) !important;
@@ -220,7 +215,6 @@ function injectRevealStyles() {
       75%      { transform: translateX(8px); }
     }
 
-    /* ── Gallery ── */
     .camp-gallery-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -258,7 +252,6 @@ function injectRevealStyles() {
       font-size: 1.05rem; font-weight: 700;
     }
 
-    /* ── Success Modal ── */
     .success-overlay {
       position: fixed; inset: 0; z-index: 9999;
       display: flex; align-items: center; justify-content: center;
@@ -281,7 +274,6 @@ function injectRevealStyles() {
       background: linear-gradient(90deg, transparent, #f4b41a, #ffd86b, #f4b41a, transparent);
     }
 
-    /* ── Lightbox ── */
     .summer-lightbox {
       position: fixed; inset: 0; z-index: 9999;
       background: rgba(2,9,21,.92);
@@ -524,7 +516,6 @@ function campRegister(e) {
 
   let valid = true;
 
-  // required fields
   [
     { el: packageEl,     val: selectedPackage },
     { el: firstNameEl,   val: firstName },
@@ -535,7 +526,6 @@ function campRegister(e) {
     if (!f.val) { markInvalid(f.el); valid = false; }
   });
 
-  // age validation
   const ageNum = parseInt(age, 10);
   if (!age || Number.isNaN(ageNum) || ageNum <= 0) {
     markInvalid(ageEl);
@@ -546,7 +536,6 @@ function campRegister(e) {
     valid = false;
   }
 
-  // phone validation
   if (parentPhone && !validatePhone(parentPhone)) {
     markInvalid(parentPhoneEl);
     alert("❌ يرجى إدخال رقم هاتف صحيح لولي الأمر.");
@@ -555,7 +544,6 @@ function campRegister(e) {
 
   if (!valid) return false;
 
-  // disable button
   const submitBtn = getField("camp-submit-btn");
   if (submitBtn) {
     submitBtn.innerHTML =
@@ -565,7 +553,6 @@ function campRegister(e) {
     submitBtn.style.opacity       = "0.8";
   }
 
-  // send data via Apps Script (fire-and-forget)
   const payload = encodeURIComponent(JSON.stringify({
     program:         "Summer Academy 2026",
     selectedPackage,
@@ -578,7 +565,6 @@ function campRegister(e) {
   }));
   new Image().src = `${APPS_SCRIPT_URL}?payload=${payload}`;
 
-  // show success modal after short delay
   setTimeout(() => {
     document.body.appendChild(buildSuccessModal(firstName, lastName, selectedPackage));
   }, 1500);
