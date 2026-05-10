@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════
-   SUMMER SCHOOL — Advanced Registration + Gallery + Video
+   SUMMER SCHOOL — Advanced Registration + Gallery + Packages
 ════════════════════════════════════════════ */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
@@ -26,11 +26,52 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const CAMP_MIN_AGE = 7;
-const CAMP_MAX_AGE = 15;
+// تحديث العمر حسب الباقات الجديدة
+const CAMP_MIN_AGE = 5;
+const CAMP_MAX_AGE = 18;
 
 const APPS_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbzJx2NEPz7a7ntKmXQQq7i78ICeIFHiuAxTpfJyAocSkeqmbsmhx_h3YzVjbqs0eiyF/exec";
+
+/* ─────────────────────────────────────────
+   PRICING TABS & PACKAGE SELECTION (NEW)
+───────────────────────────────────────── */
+function initPricingTabs() {
+  const tabs = document.querySelectorAll(".pricing-tab");
+  const contents = document.querySelectorAll(".pricing-content");
+
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      // إزالة الكلاس النشط
+      tabs.forEach(t => t.classList.remove("active"));
+      contents.forEach(c => c.classList.remove("active"));
+
+      // تفعيل الكلاس للتاب والمحتوى المطلوب
+      tab.classList.add("active");
+      const targetId = tab.getAttribute("data-target");
+      const targetContent = document.getElementById(targetId);
+      if (targetContent) targetContent.classList.add("active");
+    });
+  });
+}
+
+// تنقل الزائر للنموذج وتختار باقته تلقائياً
+window.selectPackage = function(packageName) {
+  const selectEl = document.getElementById("campSelectedPackage");
+  if (selectEl) {
+    selectEl.value = packageName;
+    // تأثير بصري للفت انتباه المستخدم
+    selectEl.style.transition = "0.3s";
+    selectEl.style.boxShadow = "0 0 0 4px rgba(244,180,26,0.5)";
+    setTimeout(() => selectEl.style.boxShadow = "", 2000);
+  }
+  
+  const formSection = document.getElementById("camp-register");
+  if (formSection) {
+    formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+};
+
 
 /* ─────────────────────────────────────────
    1. SQUARES BACKGROUND (Animated)
@@ -268,12 +309,12 @@ function initRevealOnScroll() {
   injectRevealStyles();
 
   const targets = document.querySelectorAll(
-    ".camp-section, .camp-workshop-card, .summer-strip-item, .summer-journey-card, .camp-info-card, .form-group"
+    ".camp-section, .camp-workshop-card, .summer-strip-item, .summer-journey-card, .camp-info-card, .pricing-card, .form-group"
   );
 
   targets.forEach((el, index) => {
     el.classList.add("reveal-on-scroll");
-    // إضافة تأخير للظهور المتدرج للعناصر المجاورة
+    // إضافة تأخير للظهور المتدرج
     el.style.transitionDelay = `${(index % 4) * 0.1}s`;
   });
 
@@ -389,7 +430,7 @@ function openLightbox(src, alt = "Summer School") {
 }
 
 /* ─────────────────────────────────────────
-   5. REGISTRATION LOGIC
+   5. REGISTRATION LOGIC (Updated for Packages)
 ───────────────────────────────────────── */
 function getField(id) {
   return document.getElementById(id);
@@ -416,14 +457,16 @@ function campRegister(e) {
     e.stopPropagation();
   }
 
+  const packageEl = getField("campSelectedPackage"); // الحقل الجديد
   const firstNameEl = getField("campFirstName");
   const lastNameEl = getField("campLastName");
   const ageEl = getField("campAge");
   const parentNameEl = getField("campParentName");
   const parentPhoneEl = getField("campParentPhone");
 
-  if (!firstNameEl || !lastNameEl || !ageEl || !parentNameEl || !parentPhoneEl) return false;
+  if (!packageEl || !firstNameEl || !lastNameEl || !ageEl || !parentNameEl || !parentPhoneEl) return false;
 
+  const selectedPackage = packageEl.value.trim();
   const firstName = firstNameEl.value.trim();
   const lastName = lastNameEl.value.trim();
   const age = ageEl.value.trim();
@@ -433,6 +476,7 @@ function campRegister(e) {
   let valid = true;
 
   [
+    { el: packageEl, val: selectedPackage },
     { el: firstNameEl, val: firstName },
     { el: lastNameEl, val: lastName },
     { el: parentNameEl, val: parentName },
@@ -472,9 +516,11 @@ function campRegister(e) {
     submitBtn.style.opacity = "0.8";
   }
 
+  // تضمين حقل الباقة المختارة مع البيانات المُرسلة إلى Google Sheets
   const payload = encodeURIComponent(
     JSON.stringify({
-      program: "Summer School",
+      program: "Summer Academy 2026",
+      selectedPackage: selectedPackage,
       firstName,
       lastName,
       age: String(ageNum),
@@ -486,17 +532,21 @@ function campRegister(e) {
 
   new Image().src = `${APPS_SCRIPT_URL}?payload=${payload}`;
 
-  // إظهار بطاقة النجاح الفاخرة
+  // إظهار بطاقة النجاح الفاخرة مع اسم الباقة
   setTimeout(() => {
     const overlay = document.createElement("div");
     overlay.className = "success-overlay";
+    
+    // استخراج اسم الباقة بدون الأعمار للرسالة (مثلاً: الباقة الأساسية)
+    const shortPackageName = selectedPackage.split('-')[0].trim();
+    
     overlay.innerHTML = `
       <div class="success-card">
-        <div style="font-size:70px; margin-bottom:15px; filter:drop-shadow(0 10px 20px rgba(0,0,0,0.3));">✨🌊</div>
+        <div style="font-size:70px; margin-bottom:15px; filter:drop-shadow(0 10px 20px rgba(0,0,0,0.3));">✨🚀</div>
         <h2 style="color:#fff; margin-bottom:15px; font-size:26px; font-weight:900;">تم حجز المقعد بنجاح!</h2>
         <p style="color:#c9e7f8; font-size:17px; line-height:1.8; margin-bottom:25px;">
           أهلاً بالمبدع <strong style="color:#f4b41a; font-size:20px;">${firstName} ${lastName}</strong><br>
-          تم استلام طلب التسجيل في <strong>Summer School</strong> بنجاح.<br>
+          تم حجز <strong>${shortPackageName}</strong> بنجاح.<br>
           سنتواصل معكم قريباً عبر رقم ولي الأمر.
         </p>
         <button onclick="location.reload()" style="padding:14px 35px; border-radius:20px; border:none; background:linear-gradient(135deg, #ffc849, #ff9f1d); color:#03152f; font-weight:900; font-size:16px; cursor:pointer; box-shadow:0 15px 30px rgba(255,159,29,0.3); transition:0.3s;">العودة للصفحة</button>
@@ -513,6 +563,7 @@ function campRegister(e) {
 window.campRegister = campRegister;
 
 document.addEventListener("DOMContentLoaded", () => {
+  initPricingTabs(); // تشغيل نظام تبويبات الأسعار
   initSquaresBackground();
   initRevealOnScroll();
   initTiltEffect();
