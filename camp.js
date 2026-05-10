@@ -95,8 +95,8 @@ function initRegisterModal() {
     });
   }
 
-  // نحتاجه في selectPackage
-  return { openModal };
+  // نرجّع الدوال لو حبيت تستعملها لاحقاً
+  return { openModal, closeModal };
 }
 
 /* selectPackage — يُستعمل من HTML */
