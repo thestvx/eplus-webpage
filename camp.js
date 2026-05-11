@@ -2,7 +2,6 @@
    SUMMER SCHOOL — Advanced Registration + Gallery + Packages
 ════════════════════════════════════════════ */
 
-/* استيراد Firebase (نسخة الموديول) */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import {
   getFirestore,
@@ -34,6 +33,52 @@ const APPS_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbzJx2NEPz7a7ntKmXQQq7i78ICeIFHiuAxTpfJyAocSkeqmbsmhx_h3YzVjbqs0eiyF/exec";
 
 /* ─────────────────────────────────────────
+   الباقات التي تحتوي على لغة
+───────────────────────────────────────── */
+const LANGUAGE_PACKAGES = [
+  "باقة الأساس (5–10)",
+  "باقة النخبة (5–10)",
+  "باقة الأساس (11–14)",
+  "باقة النخبة (11–14)",
+  "باقة اللغات (15–18)",
+  "باقة القادة (15–18)"
+];
+
+function packageHasLanguage(packageValue) {
+  return LANGUAGE_PACKAGES.some(name => packageValue.includes(name));
+}
+
+/* ─────────────────────────────────────────
+   إظهار/إخفاء حقل اللغة
+───────────────────────────────────────── */
+function initLanguageField() {
+  const packageEl  = document.getElementById("campSelectedPackage");
+  const langGroup  = document.getElementById("campLanguageGroup");
+  const langEl     = document.getElementById("campLanguage");
+
+  if (!packageEl || !langGroup) return;
+
+  const toggle = () => {
+    const val        = packageEl.value;
+    const needsLang  = val && packageHasLanguage(val);
+
+    if (needsLang) {
+      langGroup.classList.add("lang-visible");
+      if (langEl) langEl.setAttribute("required", "true");
+    } else {
+      langGroup.classList.remove("lang-visible");
+      if (langEl) {
+        langEl.removeAttribute("required");
+        langEl.value = "";
+      }
+    }
+  };
+
+  packageEl.addEventListener("change", toggle);
+  toggle(); // تطبيق فوري عند تحميل الصفحة
+}
+
+/* ─────────────────────────────────────────
    PRICING TABS
 ───────────────────────────────────────── */
 function initPricingTabs() {
@@ -54,7 +99,6 @@ function initPricingTabs() {
       const panel    = document.getElementById(targetId);
       if (!panel) return;
 
-      // لإعادة تشغيل الأنيميشن
       panel.offsetHeight;
       panel.style.animation = "";
       panel.classList.add("active");
@@ -63,7 +107,7 @@ function initPricingTabs() {
 }
 
 /* ─────────────────────────────────────────
-   0. REGISTER MODAL OPEN/CLOSE
+   REGISTER MODAL OPEN/CLOSE
 ───────────────────────────────────────── */
 function initRegisterModal() {
   const openModalBtn  = document.getElementById("open-register-modal");
@@ -89,13 +133,10 @@ function initRegisterModal() {
 
   if (modal) {
     modal.addEventListener("click", e => {
-      if (e.target.classList.contains("camp-register-modal-backdrop")) {
-        closeModal();
-      }
+      if (e.target.classList.contains("camp-register-modal-backdrop")) closeModal();
     });
   }
 
-  // نرجّع الدوال لو حبيت تستعملها لاحقاً
   return { openModal, closeModal };
 }
 
@@ -104,6 +145,9 @@ window.selectPackage = function (packageName) {
   const selectEl = document.getElementById("campSelectedPackage");
   if (selectEl) {
     selectEl.value = packageName;
+
+    // تشغيل حقل اللغة بعد تغيير القيمة برمجياً
+    selectEl.dispatchEvent(new Event("change"));
 
     selectEl.style.transition  =
       "box-shadow 0.4s cubic-bezier(0.34,1.56,0.64,1), border-color 0.4s ease";
@@ -116,7 +160,6 @@ window.selectPackage = function (packageName) {
     }, 2500);
   }
 
-  // فتح المودال بدلاً من التمرير للقسم
   const modal = document.getElementById("camp-register-modal");
   if (modal && !modal.classList.contains("active")) {
     modal.classList.add("active");
@@ -126,7 +169,7 @@ window.selectPackage = function (packageName) {
 };
 
 /* ─────────────────────────────────────────
-   1. SQUARES BACKGROUND
+   SQUARES BACKGROUND
 ───────────────────────────────────────── */
 const canvas  = document.getElementById("squares-canvas");
 const ctx     = canvas ? canvas.getContext("2d") : null;
@@ -181,18 +224,18 @@ function initSquaresBackground() {
 }
 
 /* ─────────────────────────────────────────
-   2. VIDEO LOGIC (Cloudinary Player)
+   VIDEO LOGIC (Cloudinary Player)
 ───────────────────────────────────────── */
 function initCampVideo() {
   const container = document.getElementById("player");
   if (!container || !window.cloudinary) return;
 
-  const cld = cloudinary.Cloudinary.new({ cloud_name: "dac4mwuwe" });
+  const cld    = cloudinary.Cloudinary.new({ cloud_name: "dac4mwuwe" });
   const player = cld.videoPlayer("player", {
-    fluid: true,
-    controls: true,
-    autoplay: false,
-    muted: false
+    fluid:     true,
+    controls:  true,
+    autoplay:  false,
+    muted:     false
   });
 
   player.source(
@@ -201,7 +244,7 @@ function initCampVideo() {
 }
 
 /* ─────────────────────────────────────────
-   3. REVEAL & TILT
+   REVEAL & TILT
 ───────────────────────────────────────── */
 function injectRevealStyles() {
   if (document.getElementById("summer-reveal-style")) return;
@@ -382,7 +425,7 @@ function initTiltEffect() {
 }
 
 /* ─────────────────────────────────────────
-   4. GALLERY
+   GALLERY
 ───────────────────────────────────────── */
 function buildGalleryEmpty() {
   return `
@@ -410,14 +453,14 @@ function loadCampGallery() {
       item.className = "camp-gallery-item reveal-on-scroll";
       item.style.transitionDelay = `${(index % 3) * 0.1}s`;
 
-      const img    = document.createElement("img");
-      img.src      = data.imageUrl;
-      img.alt      = data.caption || "Summer School";
-      img.loading  = "lazy";
+      const img     = document.createElement("img");
+      img.src       = data.imageUrl;
+      img.alt       = data.caption || "Summer School";
+      img.loading   = "lazy";
       img.draggable = false;
       img.className = "camp-gallery-img";
 
-      const overlay  = document.createElement("div");
+      const overlay     = document.createElement("div");
       overlay.className = "camp-gallery-overlay";
       overlay.textContent = data.caption || "Summer School";
 
@@ -454,7 +497,7 @@ function openLightbox(src, alt = "Summer School") {
 }
 
 /* ─────────────────────────────────────────
-   5. REGISTRATION
+   REGISTRATION
 ───────────────────────────────────────── */
 function getField(id) { return document.getElementById(id); }
 
@@ -468,7 +511,7 @@ function validatePhone(phone) {
   return /^[+0-9]{8,18}$/.test(phone.replace(/\s+/g, ""));
 }
 
-function buildSuccessModal(firstName, lastName, selectedPackage) {
+function buildSuccessModal(firstName, lastName, selectedPackage, language) {
   const shortName = selectedPackage.split(" — ")[0].trim();
   const ageGroup  = selectedPackage.match(/\(([^)]+)\)/)?.[1] || "";
 
@@ -486,10 +529,17 @@ function buildSuccessModal(firstName, lastName, selectedPackage) {
       </p>
       <div style="
         display:inline-flex;align-items:center;gap:8px;
-        padding:10px 20px;border-radius:14px;margin:12px 0 20px;
+        padding:10px 20px;border-radius:14px;margin:12px 0 6px;
         background:rgba(244,180,26,0.15);border:1px solid rgba(244,180,26,0.3);
         color:#ffe090;font-weight:800;font-size:15px;
       ">✦ ${shortName}${ageGroup ? ` — ${ageGroup}` : ""}</div>
+      ${language ? `
+      <div style="
+        display:inline-flex;align-items:center;gap:8px;
+        padding:8px 18px;border-radius:14px;margin:0 0 20px;
+        background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.25);
+        color:#bae6fd;font-weight:800;font-size:14px;
+      ">🌐 اللغة المختارة: ${language}</div>` : '<div style="margin-bottom:20px;"></div>'}
       <p style="color:rgba(201,231,248,0.75);font-size:14px;
                 line-height:1.8;margin-bottom:26px;">
         سيتم التواصل معكم قريباً عبر رقم ولي الأمر<br>
@@ -524,6 +574,7 @@ function campRegister(e) {
   const ageEl         = getField("campAge");
   const parentNameEl  = getField("campParentName");
   const parentPhoneEl = getField("campParentPhone");
+  const langEl        = getField("campLanguage");
 
   if (!packageEl || !firstNameEl || !lastNameEl ||
       !ageEl || !parentNameEl || !parentPhoneEl) return false;
@@ -534,6 +585,8 @@ function campRegister(e) {
   const age             = ageEl.value.trim();
   const parentName      = parentNameEl.value.trim();
   const parentPhone     = parentPhoneEl.value.trim();
+  const language        = langEl ? langEl.value.trim() : "";
+  const needsLang       = selectedPackage && packageHasLanguage(selectedPackage);
 
   let valid = true;
 
@@ -546,6 +599,12 @@ function campRegister(e) {
   ].forEach(f => {
     if (!f.val) { markInvalid(f.el); valid = false; }
   });
+
+  // التحقق من اللغة إذا كانت الباقة تستوجبها
+  if (needsLang && !language) {
+    if (langEl) markInvalid(langEl);
+    valid = false;
+  }
 
   const ageNum = parseInt(age, 10);
   if (!age || Number.isNaN(ageNum) || ageNum <= 0) {
@@ -577,6 +636,7 @@ function campRegister(e) {
   const payload = encodeURIComponent(JSON.stringify({
     program:         "Summer Academy 2026",
     selectedPackage,
+    language:        needsLang ? language : "—",
     firstName,
     lastName,
     age:             String(ageNum),
@@ -587,14 +647,16 @@ function campRegister(e) {
   new Image().src = `${APPS_SCRIPT_URL}?payload=${payload}`;
 
   setTimeout(() => {
-    document.body.appendChild(buildSuccessModal(firstName, lastName, selectedPackage));
+    document.body.appendChild(
+      buildSuccessModal(firstName, lastName, selectedPackage, needsLang ? language : "")
+    );
   }, 1500);
 
   return false;
 }
 
 /* ─────────────────────────────────────────
-   6. INIT
+   INIT
 ───────────────────────────────────────── */
 window.campRegister = campRegister;
 
@@ -606,6 +668,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initCampVideo();
   loadCampGallery();
   initRegisterModal();
+  initLanguageField();   // ← جديد
 
   const form      = document.getElementById("camp-form");
   const submitBtn = document.getElementById("camp-submit-btn");
