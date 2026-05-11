@@ -44,8 +44,10 @@ const LANGUAGE_PACKAGES = [
   "باقة القادة (15–18)"
 ];
 
-// الباقات التي تشمل الإسبانية (15–18 فقط)
+// الباقات التي تشمل الإسبانية (11–14 و 15–18)
 const SPANISH_PACKAGES = [
+  "باقة الأساس (11–14)",
+  "باقة النخبة (11–14)",
   "باقة اللغات (15–18)",
   "باقة القادة (15–18)"
 ];
@@ -92,7 +94,7 @@ function initLanguageField() {
   };
 
   packageEl.addEventListener("change", toggle);
-  toggle(); // تطبيق فوري عند تحميل الصفحة
+  toggle();
 }
 
 /* ─────────────────────────────────────────
@@ -163,7 +165,6 @@ window.selectPackage = function (packageName) {
   if (selectEl) {
     selectEl.value = packageName;
 
-    // تشغيل حقل اللغة بعد تغيير القيمة برمجياً
     selectEl.dispatchEvent(new Event("change"));
 
     selectEl.style.transition  =
@@ -447,8 +448,14 @@ function initTiltEffect() {
 function buildGalleryEmpty() {
   return `
     <div class="camp-gallery-empty" style="grid-column:1/-1;">
-      <span style="font-size:34px;">📸</span>
-      <span>سيتم نشر الصور واللحظات المميزة بعد انطلاق المدرسة الصيفية</span>
+      <span style="font-size:42px;">🏕️</span>
+      <span style="font-size:1.1rem;font-weight:800;color:rgba(201,231,248,0.9);">
+        قريباً — سنكون معكم!
+      </span>
+      <span style="font-size:0.95rem;color:rgba(201,231,248,0.6);max-width:380px;line-height:1.8;">
+        سيتم نشر صور وأبرز لحظات المخيم الصيفي فور انطلاقه.<br>
+        ترقّبوا التجربة الصيفية المميزة ✦
+      </span>
     </div>`;
 }
 
@@ -456,39 +463,8 @@ function loadCampGallery() {
   const grid = document.getElementById("camp-gallery-grid");
   if (!grid) return;
 
-  const q = query(collection(db, "campGallery"), orderBy("createdAt", "desc"));
-
-  onSnapshot(q, snap => {
-    if (snap.empty) { grid.innerHTML = buildGalleryEmpty(); return; }
-
-    grid.innerHTML = "";
-    snap.forEach((docSnap, index) => {
-      const data = docSnap.data();
-      if (!data.imageUrl) return;
-
-      const item = document.createElement("div");
-      item.className = "camp-gallery-item reveal-on-scroll";
-      item.style.transitionDelay = `${(index % 3) * 0.1}s`;
-
-      const img     = document.createElement("img");
-      img.src       = data.imageUrl;
-      img.alt       = data.caption || "Summer School";
-      img.loading   = "lazy";
-      img.draggable = false;
-      img.className = "camp-gallery-img";
-
-      const overlay     = document.createElement("div");
-      overlay.className = "camp-gallery-overlay";
-      overlay.textContent = data.caption || "Summer School";
-
-      item.appendChild(img);
-      item.appendChild(overlay);
-      item.addEventListener("click", () => openLightbox(data.imageUrl, data.caption));
-      grid.appendChild(item);
-
-      setTimeout(() => item.classList.add("revealed"), 50 + index * 60);
-    });
-  }, () => { grid.innerHTML = buildGalleryEmpty(); });
+  // عرض رسالة الترقّب دائماً بغض النظر عن Firestore
+  grid.innerHTML = buildGalleryEmpty();
 }
 
 function openLightbox(src, alt = "Summer School") {
@@ -617,7 +593,6 @@ function campRegister(e) {
     if (!f.val) { markInvalid(f.el); valid = false; }
   });
 
-  // التحقق من اللغة إذا كانت الباقة تستوجبها
   if (needsLang && !language) {
     if (langEl) markInvalid(langEl);
     valid = false;
