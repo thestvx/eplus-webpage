@@ -44,33 +44,50 @@ const LANGUAGE_PACKAGES = [
   "باقة القادة (15–18)"
 ];
 
+// الباقات التي تشمل الإسبانية (15–18 فقط)
+const SPANISH_PACKAGES = [
+  "باقة اللغات (15–18)",
+  "باقة القادة (15–18)"
+];
+
 function packageHasLanguage(packageValue) {
   return LANGUAGE_PACKAGES.some(name => packageValue.includes(name));
 }
 
+function packageHasSpanish(packageValue) {
+  return SPANISH_PACKAGES.some(name => packageValue.includes(name));
+}
+
 /* ─────────────────────────────────────────
-   إظهار/إخفاء حقل اللغة
+   إظهار/إخفاء حقل اللغة + ضبط الخيارات
 ───────────────────────────────────────── */
 function initLanguageField() {
-  const packageEl  = document.getElementById("campSelectedPackage");
-  const langGroup  = document.getElementById("campLanguageGroup");
-  const langEl     = document.getElementById("campLanguage");
+  const packageEl = document.getElementById("campSelectedPackage");
+  const langGroup = document.getElementById("campLanguageGroup");
+  const langEl    = document.getElementById("campLanguage");
 
-  if (!packageEl || !langGroup) return;
+  if (!packageEl || !langGroup || !langEl) return;
 
   const toggle = () => {
     const val        = packageEl.value;
     const needsLang  = val && packageHasLanguage(val);
+    const hasSpanish = val && packageHasSpanish(val);
+
+    // بناء خيارات اللغة ديناميكياً حسب الباقة
+    langEl.innerHTML = `
+      <option value="">-- اختر اللغة --</option>
+      <option value="الإنجليزية">🇬🇧 الإنجليزية</option>
+      <option value="الفرنسية">🇫🇷 الفرنسية</option>
+      ${hasSpanish ? `<option value="الإسبانية">🇪🇸 الإسبانية</option>` : ""}
+    `;
 
     if (needsLang) {
       langGroup.classList.add("lang-visible");
-      if (langEl) langEl.setAttribute("required", "true");
+      langEl.setAttribute("required", "true");
     } else {
       langGroup.classList.remove("lang-visible");
-      if (langEl) {
-        langEl.removeAttribute("required");
-        langEl.value = "";
-      }
+      langEl.removeAttribute("required");
+      langEl.value = "";
     }
   };
 
@@ -668,7 +685,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initCampVideo();
   loadCampGallery();
   initRegisterModal();
-  initLanguageField();   // ← جديد
+  initLanguageField();
 
   const form      = document.getElementById("camp-form");
   const submitBtn = document.getElementById("camp-submit-btn");
