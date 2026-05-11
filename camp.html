@@ -10,6 +10,34 @@
   <link rel="stylesheet" href="camp.css">
   <!-- Cloudinary Player CSS -->
   <link rel="stylesheet" href="https://unpkg.com/cloudinary-video-player@1.9.10/dist/cld-video-player.min.css">
+
+  <!-- ═══ تكبير لوقو المخيم ═══ -->
+  <style>
+    .camp-hero-logo {
+      width: min(320px, 65vw);
+      margin: 0 auto 28px;
+      filter: drop-shadow(0 22px 45px rgba(0,0,0,0.38));
+      animation: floatY 6s ease-in-out infinite;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* أنيميشن اختيار اللغة */
+    #campLanguageGroup {
+      overflow: hidden;
+      transition: max-height 0.4s cubic-bezier(0.34,1.56,0.64,1),
+                  opacity 0.35s ease,
+                  transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+      max-height: 0;
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    #campLanguageGroup.lang-visible {
+      max-height: 140px;
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
 </head>
 <body class="camp-page summer-school-page">
 
@@ -38,7 +66,7 @@
 
     <!-- HERO -->
     <section class="camp-hero">
-      <!-- شعار المخيم الصيفي -->
+      <!-- ═══ لوقو المخيم (مُكبَّر) ═══ -->
       <img src="images/summer-logo.png" alt="Summer School Logo" class="camp-hero-logo" draggable="false">
 
       <div class="summer-hero-mini-badge">برنامج صيفي تعليمي من E-PLUS</div>
@@ -51,7 +79,7 @@
       <p class="camp-hero-sub">
         مخيم صيفي تعليمي يجمع بين اللغات، التكنولوجيا، المهارات الحياتية والأنشطة التفاعلية في بيئة مهنية وآمنة تلائم مختلف المراحل العمرية.
       </p>
-      
+
       <div class="camp-hero-badges-row">
         <div class="camp-badge-pill">ورش لغات وتكنولوجيا</div>
         <div class="camp-badge-pill">باقات لمدة شهرين</div>
@@ -64,7 +92,6 @@
           <span>استعراض باقات الاشتراك</span>
           <span class="camp-cta-arrow">↓</span>
         </a>
-        <!-- زر التسجيل يفتح المودال -->
         <button type="button" class="camp-hero-cta camp-hero-cta-secondary" id="open-register-modal">
           <span>التسجيل في المخيم الآن</span>
           <span style="font-size:1.2rem;">✦</span>
@@ -98,7 +125,7 @@
     <section class="camp-section" id="camp-pricing">
       <div class="camp-section-label">باقات الاشتراك</div>
       <h3 class="camp-section-title">اختر الباقة الأنسب لعمر ومستوى ابنك</h3>
-      
+
       <!-- Tabs -->
       <div class="pricing-tabs-container">
         <button class="pricing-tab active" data-target="age-5-10">
@@ -470,14 +497,11 @@
       </div>
     </section>
 
-    <!-- VIDEO (Cloudinary Player container) -->
+    <!-- VIDEO -->
     <section class="camp-section" id="camp-video-section">
       <div class="camp-section-label">الفيديو التعريفي</div>
-      <h3 class="camp-section-title">
-        لمحة عن أجواء المخيم الصيفي
-      </h3>
+      <h3 class="camp-section-title">لمحة عن أجواء المخيم الصيفي</h3>
       <div class="camp-video-wrapper" style="max-width:780px;margin:0 auto;">
-        <!-- مهم: عنصر VIDEO وليس DIV عشان الكلاودينري بلاير -->
         <video id="player" class="camp-video-iframe" playsinline></video>
       </div>
     </section>
@@ -486,14 +510,14 @@
     <section class="camp-section" id="camp-gallery-section">
       <div class="camp-section-label">معرض الصور</div>
       <h3 class="camp-section-title">صور ولقطات من أنشطة المركز</h3>
-      <div class="camp-gallery-grid" id="camp-gallery-grid">
-        <!-- يتم جلب الصور من الجافاسكربت -->
-      </div>
+      <div class="camp-gallery-grid" id="camp-gallery-grid"></div>
     </section>
 
   </div><!-- end camp-page-wrap -->
 
-  <!-- REGISTER MODAL -->
+  <!-- ═══════════════════════════════════════
+       REGISTER MODAL
+  ════════════════════════════════════════ -->
   <div class="camp-register-modal" id="camp-register-modal" aria-hidden="true">
     <div class="camp-register-modal-backdrop"></div>
     <div class="camp-register-modal-box" role="dialog" aria-modal="true">
@@ -505,9 +529,11 @@
       <div class="camp-form-box">
         <form id="camp-form" novalidate>
 
+          <!-- ══ الباقة ══ -->
           <div class="form-group">
             <label class="form-label" for="campSelectedPackage">الباقة المختارة <span>*</span></label>
-            <select class="form-input" id="campSelectedPackage" required style="background-color: rgba(255,228,145,.10); border-color: var(--summer-gold);">
+            <select class="form-input" id="campSelectedPackage" required
+                    style="background-color:rgba(255,228,145,.10);border-color:var(--summer-gold);">
               <option value="">-- اختر الباقة المناسبة من الجدول أعلاه --</option>
               <optgroup label="الفئة 5 – 10 سنوات">
                 <option value="باقة الأساس (5–10) — 7,000 د.ج">باقة الأساس (5–10) — 7,000 د.ج</option>
@@ -525,33 +551,56 @@
             </select>
           </div>
 
+          <!-- ══ اختيار اللغة (يظهر فقط للباقات اللغوية) ══ -->
+          <div class="form-group" id="campLanguageGroup">
+            <label class="form-label" for="campLanguage">
+              اللغة المراد دراستها <span>*</span>
+            </label>
+            <select class="form-input" id="campLanguage"
+                    style="background-color:rgba(56,189,248,.08);border-color:rgba(56,189,248,.5);">
+              <option value="">-- اختر اللغة --</option>
+              <option value="الإنجليزية">🇬🇧 الإنجليزية</option>
+              <option value="الفرنسية">🇫🇷 الفرنسية</option>
+              <option value="الإسبانية">🇪🇸 الإسبانية</option>
+            </select>
+            <div class="camp-age-hint" style="color:rgba(125,211,252,0.85);">
+              اختر اللغة الأجنبية التي يرغب المتدرب في دراستها خلال المخيم.
+            </div>
+          </div>
+
+          <!-- ══ الاسم واللقب ══ -->
           <div class="form-row">
             <div class="form-group">
               <label class="form-label" for="campFirstName">الاسم <span>*</span></label>
-              <input class="form-input" type="text" id="campFirstName" placeholder="الاسم الأول للمتدرب" required autocomplete="off">
+              <input class="form-input" type="text" id="campFirstName"
+                     placeholder="الاسم الأول للمتدرب" required autocomplete="off">
             </div>
             <div class="form-group">
               <label class="form-label" for="campLastName">اللقب <span>*</span></label>
-              <input class="form-input" type="text" id="campLastName" placeholder="اللقب العائلي" required autocomplete="off">
+              <input class="form-input" type="text" id="campLastName"
+                     placeholder="اللقب العائلي" required autocomplete="off">
             </div>
           </div>
 
+          <!-- ══ العمر ══ -->
           <div class="form-group">
             <label class="form-label" for="campAge">العمر <span>*</span></label>
             <input class="form-input" type="number" id="campAge"
-                   placeholder="عمر المتدرب"
-                   min="5" max="18" required>
+                   placeholder="عمر المتدرب" min="5" max="18" required>
             <div class="camp-age-hint">الفئة العمرية المقبولة للتسجيل: من 5 إلى 18 سنة.</div>
           </div>
 
+          <!-- ══ ولي الأمر ══ -->
           <div class="form-group">
             <label class="form-label" for="campParentName">اسم ولي الأمر <span>*</span></label>
-            <input class="form-input" type="text" id="campParentName" placeholder="الاسم الكامل لولي الأمر" required autocomplete="off">
+            <input class="form-input" type="text" id="campParentName"
+                   placeholder="الاسم الكامل لولي الأمر" required autocomplete="off">
           </div>
 
           <div class="form-group">
             <label class="form-label" for="campParentPhone">رقم هاتف ولي الأمر <span>*</span></label>
-            <input class="form-input" type="tel" id="campParentPhone" placeholder="+213..." required dir="ltr" style="text-align: right;">
+            <input class="form-input" type="tel" id="campParentPhone"
+                   placeholder="+213..." required dir="ltr" style="text-align:right;">
           </div>
 
           <div class="required-note-box">
@@ -601,9 +650,11 @@
 
   <!-- Firebase Realtime visitors -->
   <script type="module">
-    import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-    import { getDatabase, ref, increment, set, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import { initializeApp, getApps }   from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import { getDatabase, ref, increment, set, onValue, onDisconnect }
+                                         from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
+    import { getFirestore, collection, addDoc, serverTimestamp }
+                                         from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
     const _cfg = {
       apiKey:            "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
@@ -615,13 +666,13 @@
       databaseURL:       "https://eplus-center-39-default-rtdb.firebaseio.com"
     };
 
-    const visApp = getApps().find(a => a.name === "visitor-app") || initializeApp(_cfg, "visitor-app");
+    const visApp = getApps().find(a => a.name === "visitor-app")
+                || initializeApp(_cfg, "visitor-app");
 
     const rtdb = getDatabase(visApp);
     const db   = getFirestore(visApp);
 
-    const totalRef = ref(rtdb, "visitors/total");
-    set(totalRef, increment(1));
+    set(ref(rtdb, "visitors/total"), increment(1));
 
     const sessionId = Date.now() + "_" + Math.random().toString(36).slice(2);
     const mySession = ref(rtdb, "visitors/sessions/" + sessionId);
