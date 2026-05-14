@@ -27,7 +27,7 @@ const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 
 const CAMP_MIN_AGE = 5;
-const CAMP_MAX_AGE = 18;
+const CAMP_MAX_AGE = 99; // ✅ لا حد أقصى للعمر بعد إضافة فئة +18
 
 const APPS_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbzJx2NEPz7a7ntKmXQQq7i78ICeIFHiuAxTpfJyAocSkeqmbsmhx_h3YzVjbqs0eiyF/exec";
@@ -41,15 +41,19 @@ const LANGUAGE_PACKAGES = [
   "باقة الأساس (11–14)",
   "باقة النخبة (11–14)",
   "باقة اللغات (15–18)",
-  "باقة القادة (15–18)"
+  "باقة القادة (15–18)",
+  "باقة البالغين (+18)",          // ✅ فئة جديدة
+  "باقة البالغين المتقدمة (+18)"  // ✅ فئة جديدة
 ];
 
-// الباقات التي تشمل الإسبانية (11–14 و 15–18)
+// الباقات التي تشمل الإسبانية
 const SPANISH_PACKAGES = [
   "باقة الأساس (11–14)",
   "باقة النخبة (11–14)",
   "باقة اللغات (15–18)",
-  "باقة القادة (15–18)"
+  "باقة القادة (15–18)",
+  "باقة البالغين (+18)",          // ✅ فئة جديدة
+  "باقة البالغين المتقدمة (+18)"  // ✅ فئة جديدة
 ];
 
 function packageHasLanguage(packageValue) {
@@ -75,7 +79,6 @@ function initLanguageField() {
     const needsLang  = val && packageHasLanguage(val);
     const hasSpanish = val && packageHasSpanish(val);
 
-    // بناء خيارات اللغة ديناميكياً حسب الباقة
     langEl.innerHTML = `
       <option value="">-- اختر اللغة --</option>
       <option value="الإنجليزية">🇬🇧 الإنجليزية</option>
@@ -463,7 +466,6 @@ function loadCampGallery() {
   const grid = document.getElementById("camp-gallery-grid");
   if (!grid) return;
 
-  // عرض رسالة الترقّب دائماً بغض النظر عن Firestore
   grid.innerHTML = buildGalleryEmpty();
 }
 
@@ -602,9 +604,10 @@ function campRegister(e) {
   if (!age || Number.isNaN(ageNum) || ageNum <= 0) {
     markInvalid(ageEl);
     valid = false;
-  } else if (ageNum < CAMP_MIN_AGE || ageNum > CAMP_MAX_AGE) {
+  } else if (ageNum < CAMP_MIN_AGE) {
+    // ✅ تعديل: فقط حد أدنى، لا حد أقصى
     markInvalid(ageEl);
-    alert(`❌ عذراً، العمر غير مناسب للتسجيل.\nالفئة العمرية المسموح بها: من ${CAMP_MIN_AGE} إلى ${CAMP_MAX_AGE} سنة.`);
+    alert(`❌ عذراً، العمر غير مناسب للتسجيل.\nالحد الأدنى للعمر: ${CAMP_MIN_AGE} سنوات.`);
     valid = false;
   }
 
