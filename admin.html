@@ -8,156 +8,323 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg-deep: #020813;
-      --bg-card: rgba(8, 20, 36, 0.45);
-      --bg-card-hover: rgba(12, 28, 48, 0.6);
+      --bg-deep: #020617;
+      --bg-card: rgba(15, 23, 42, 0.55);
+      --bg-card-hover: rgba(15, 23, 42, 0.75);
       --primary: #1e8cf5;
-      --primary-soft: rgba(30, 140, 245, 0.1);
-      --text-main: #f0f6fc;
-      --text-muted: #8ba3b8;
-      --border-light: rgba(255, 255, 255, 0.08);
+      --primary-soft: rgba(30, 140, 245, 0.12);
+      --primary-glow: rgba(30, 140, 245, 0.25);
+      --gold: #fbbf24;
+      --gold-soft: rgba(251, 191, 36, 0.12);
+      --gold-glow: rgba(251, 191, 36, 0.3);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-light: rgba(255, 255, 255, 0.06);
+      --border-hover: rgba(255, 255, 255, 0.12);
       --danger: #ef4444;
       --danger-soft: rgba(239, 68, 68, 0.1);
       --success: #22c55e;
       --warning: #f59e0b;
+      --purple: #a855f7;
     }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: 'Cairo', sans-serif;
       background: var(--bg-deep);
       color: var(--text-main);
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+      overflow-x: hidden;
     }
 
-    .bg-glow {
+    /* ═══════════════════════ BACKGROUND EFFECTS ═══════════════════════ */
+    .bg-animated {
       position: fixed;
       inset: 0;
       z-index: 0;
-      background: radial-gradient(circle at 50% 0%, rgba(30, 140, 245, 0.08) 0%, var(--bg-deep) 60%);
+      background:
+        radial-gradient(circle at 20% 30%, rgba(30, 140, 245, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(251, 191, 36, 0.06) 0%, transparent 50%),
+        radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.04) 0%, transparent 60%);
+      animation: bgShift 20s ease-in-out infinite;
       pointer-events: none;
     }
 
-    /* ══ LOGIN SCREEN ══ */
+    @keyframes bgShift {
+      0%, 100% { transform: scale(1) translate(0, 0); }
+      33% { transform: scale(1.05) translate(-1%, 1%); }
+      66% { transform: scale(0.95) translate(1%, -1%); }
+    }
+
+    .grid-pattern {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 80%);
+    }
+
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.5;
+    }
+    .orb-1 { width: 400px; height: 400px; background: rgba(30, 140, 245, 0.15); top: -10%; right: -5%; animation: orbFloat1 15s ease-in-out infinite; }
+    .orb-2 { width: 300px; height: 300px; background: rgba(251, 191, 36, 0.12); bottom: 10%; left: -5%; animation: orbFloat2 18s ease-in-out infinite; }
+    .orb-3 { width: 250px; height: 250px; background: rgba(168, 85, 247, 0.1); top: 40%; left: 30%; animation: orbFloat3 12s ease-in-out infinite; }
+
+    @keyframes orbFloat1 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-30px, 40px); } }
+    @keyframes orbFloat2 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(40px, -30px); } }
+    @keyframes orbFloat3 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-20px, -20px); } }
+
+    /* ═══════════════════════ PARTICLES CANVAS ═══════════════════════ */
+    #particles-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ═══════════════════════ LOGIN SCREEN ═══════════════════════ */
     .login-screen {
       position: fixed;
       inset: 0;
       z-index: 9999;
-      background: var(--bg-deep);
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 20px;
+      background: rgba(2, 6, 23, 0.85);
+      backdrop-filter: blur(20px);
+      transition: opacity 0.6s ease, visibility 0.6s ease;
+    }
+
+    .login-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
     }
 
     .login-box {
-      background: var(--bg-card);
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.8), rgba(8, 16, 32, 0.9));
       border: 1px solid var(--border-light);
-      border-radius: 24px;
-      padding: 48px 36px;
+      border-radius: 28px;
+      padding: 48px 40px;
       width: 100%;
-      max-width: 420px;
+      max-width: 440px;
       text-align: center;
       backdrop-filter: blur(24px);
-      box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+      box-shadow:
+        0 40px 80px rgba(0,0,0,0.5),
+        0 0 0 1px rgba(255,255,255,0.05),
+        inset 0 1px 0 rgba(255,255,255,0.05);
       position: relative;
+      overflow: hidden;
+      animation: loginSlide 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    @keyframes loginSlide {
+      from { opacity: 0; transform: translateY(40px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .login-box::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.4), transparent);
+    }
+
+    .login-box::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(30, 140, 245, 0.06) 0%, transparent 60%);
+      animation: glowRotate 8s linear infinite;
+      pointer-events: none;
+    }
+
+    @keyframes glowRotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .login-logo-wrap {
+      position: relative;
+      display: inline-block;
+      margin-bottom: 28px;
     }
 
     .login-logo {
-      height: 50px;
-      margin-bottom: 24px;
+      height: 56px;
+      object-fit: contain;
+      position: relative;
+      z-index: 1;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+    }
+
+    .login-logo-ring {
+      position: absolute;
+      inset: -12px;
+      border-radius: 50%;
+      border: 2px solid rgba(251, 191, 36, 0.2);
+      animation: ringPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes ringPulse {
+      0%, 100% { transform: scale(1); opacity: 0.5; }
+      50% { transform: scale(1.1); opacity: 0; }
     }
 
     .login-title {
-      font-size: 24px;
-      font-weight: 800;
+      font-size: 26px;
+      font-weight: 900;
       margin-bottom: 8px;
+      background: linear-gradient(135deg, #fff 0%, var(--gold) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      position: relative;
+      z-index: 1;
     }
 
     .login-sub {
       font-size: 14px;
       color: var(--text-muted);
-      margin-bottom: 32px;
+      margin-bottom: 36px;
+      position: relative;
+      z-index: 1;
     }
 
     .inp {
       width: 100%;
-      padding: 14px 18px;
-      border-radius: 12px;
+      padding: 16px 20px;
+      border-radius: 14px;
       border: 1px solid var(--border-light);
-      background: rgba(0,0,0,0.2);
+      background: rgba(0,0,0,0.25);
       color: var(--text-main);
-      font-size: 14px;
+      font-size: 15px;
       font-family: inherit;
       outline: none;
       margin-bottom: 16px;
       transition: all 0.3s ease;
+      position: relative;
+      z-index: 1;
     }
+
+    .inp::placeholder { color: rgba(148, 163, 184, 0.5); }
 
     .inp:focus {
       border-color: var(--primary);
-      background: rgba(30, 140, 245, 0.05);
-      box-shadow: 0 0 0 2px rgba(30, 140, 245, 0.2);
+      background: rgba(30, 140, 245, 0.06);
+      box-shadow: 0 0 0 3px var(--primary-soft), 0 0 20px rgba(30, 140, 245, 0.1);
     }
 
     .btn-login {
       width: 100%;
-      padding: 14px;
+      padding: 16px;
       border: none;
-      border-radius: 12px;
-      background: var(--primary);
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--primary), #0ea5e9);
       color: #fff;
-      font-size: 15px;
-      font-weight: 700;
+      font-size: 16px;
+      font-weight: 800;
       font-family: inherit;
       cursor: pointer;
       transition: all 0.3s ease;
       margin-top: 8px;
+      position: relative;
+      z-index: 1;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(30, 140, 245, 0.3);
+    }
+
+    .btn-login::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s ease;
     }
 
     .btn-login:hover {
-      background: #1472d0;
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(30, 140, 245, 0.3);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 32px rgba(30, 140, 245, 0.4);
     }
+
+    .btn-login:hover::before { left: 100%; }
+
+    .btn-login:active { transform: translateY(-1px); }
 
     .login-error {
-      color: var(--danger);
+      color: #fca5a5;
       font-size: 13px;
-      margin-top: 14px;
+      margin-top: 16px;
       display: none;
-      background: var(--danger-soft);
-      padding: 8px;
-      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      position: relative;
+      z-index: 1;
+      animation: shake 0.5s ease;
     }
 
-    /* ══ DASHBOARD ══ */
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-8px); }
+      75% { transform: translateX(8px); }
+    }
+
+    /* ═══════════════════════ DASHBOARD ═══════════════════════ */
     .dashboard {
       display: none;
       flex-direction: column;
       position: relative;
       z-index: 10;
       min-height: 100vh;
+      animation: dashFade 0.6s ease;
+    }
+
+    @keyframes dashFade {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .topbar {
-      background: rgba(4, 12, 22, 0.85);
+      background: rgba(2, 6, 23, 0.7);
       border-bottom: 1px solid var(--border-light);
-      padding: 16px 24px;
+      padding: 16px 28px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       position: sticky;
       top: 0;
       z-index: 100;
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(20px);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.2);
     }
 
     .topbar-title {
@@ -165,12 +332,13 @@
       font-weight: 800;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
     }
 
     .topbar-title img {
-      height: 28px;
+      height: 32px;
       object-fit: contain;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3));
     }
 
     .topbar-right {
@@ -181,69 +349,106 @@
 
     .admin-badge {
       font-size: 12px;
-      font-weight: 600;
-      color: var(--text-muted);
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid var(--border-light);
-    }
-
-    .btn-icon {
+      font-weight: 700;
+      color: var(--gold);
       padding: 8px 16px;
       border-radius: 999px;
-      border: 1px solid var(--border-light);
-      background: transparent;
-      color: var(--text-main);
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 600;
-      font-family: inherit;
-      transition: all 0.25s;
-      text-decoration: none;
+      background: var(--gold-soft);
+      border: 1px solid rgba(251, 191, 36, 0.2);
       display: flex;
       align-items: center;
       gap: 6px;
     }
 
-    .btn-icon:hover {
-      background: rgba(255,255,255,0.05);
-      border-color: rgba(255,255,255,0.2);
+    .admin-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--gold);
+      box-shadow: 0 0 8px var(--gold);
     }
 
+    .btn-icon {
+      padding: 10px 20px;
+      border-radius: 12px;
+      border: 1px solid var(--border-light);
+      background: rgba(255,255,255,0.03);
+      color: var(--text-main);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: inherit;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-icon::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.05), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .btn-icon:hover {
+      border-color: var(--border-hover);
+      background: rgba(255,255,255,0.06);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+
+    .btn-icon:hover::before { opacity: 1; }
+
     .btn-logout {
-      border-color: rgba(239, 68, 68, 0.3);
-      color: #fc8181;
+      border-color: rgba(239, 68, 68, 0.25);
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.05);
     }
 
     .btn-logout:hover {
       background: rgba(239, 68, 68, 0.1);
-      border-color: var(--danger);
+      border-color: rgba(239, 68, 68, 0.4);
+      box-shadow: 0 8px 24px rgba(239, 68, 68, 0.15);
     }
 
     .dashboard-body {
       flex: 1;
-      padding: 32px 24px;
-      max-width: 1000px;
+      padding: 40px 28px;
+      max-width: 1100px;
       margin: 0 auto;
       width: 100%;
     }
 
-    /* ══ MAINTENANCE TOGGLE ══ */
+    /* ═══════════════════════ MAINTENANCE TOGGLE ═══════════════════════ */
     .maintenance-card {
-      background: var(--bg-card);
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.7), rgba(8, 16, 32, 0.8));
       border: 1px solid var(--border-light);
-      border-radius: 20px;
-      padding: 24px 28px;
-      margin-bottom: 32px;
+      border-radius: 24px;
+      padding: 28px 32px;
+      margin-bottom: 40px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 20px;
+      gap: 24px;
       flex-wrap: wrap;
-      transition: all 0.3s ease;
+      transition: all 0.4s ease;
       position: relative;
       overflow: hidden;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      animation: cardSlide 0.6s ease 0.1s both;
+    }
+
+    @keyframes cardSlide {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .maintenance-card::before {
@@ -253,148 +458,244 @@
       top: 0;
       bottom: 0;
       width: 4px;
-      background: var(--success);
-      transition: background 0.3s ease;
+      background: linear-gradient(180deg, var(--success), #16a34a);
+      transition: background 0.4s ease;
+      border-radius: 24px 0 0 24px;
     }
 
     .maintenance-card.is-on {
-      border-color: rgba(239, 68, 68, 0.4);
-      background: rgba(239, 68, 68, 0.05);
+      border-color: rgba(239, 68, 68, 0.3);
+      background: linear-gradient(145deg, rgba(40, 10, 10, 0.6), rgba(20, 5, 5, 0.7));
+      box-shadow: 0 8px 32px rgba(239, 68, 68, 0.15);
     }
 
     .maintenance-card.is-on::before {
-      background: var(--danger);
+      background: linear-gradient(180deg, var(--danger), #b91c1c);
     }
 
     .maintenance-info h3 {
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 800;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
     .maintenance-status {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 13px;
+      gap: 10px;
+      font-size: 14px;
       color: var(--text-muted);
       font-weight: 600;
     }
 
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background: var(--success);
-      box-shadow: 0 0 8px var(--success);
+      box-shadow: 0 0 12px var(--success), 0 0 24px rgba(34, 197, 94, 0.3);
+      transition: all 0.4s ease;
+      position: relative;
+    }
+
+    .status-dot::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 2px solid rgba(34, 197, 94, 0.3);
+      animation: dotRipple 2s ease-out infinite;
     }
 
     .is-on .status-dot {
       background: var(--danger);
-      box-shadow: 0 0 8px var(--danger);
-      animation: pulse-red 1.5s infinite;
+      box-shadow: 0 0 12px var(--danger), 0 0 24px rgba(239, 68, 68, 0.3);
     }
 
-    @keyframes pulse-red {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+    .is-on .status-dot::after {
+      border-color: rgba(239, 68, 68, 0.3);
+      animation: dotRippleRed 1.5s ease-out infinite;
+    }
+
+    @keyframes dotRipple {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(2.5); opacity: 0; }
+    }
+
+    @keyframes dotRippleRed {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(2.5); opacity: 0; }
     }
 
     .btn-toggle {
-      padding: 12px 24px;
-      border-radius: 12px;
-      border: 1px solid rgba(239, 68, 68, 0.5);
-      background: rgba(239, 68, 68, 0.1);
+      padding: 14px 28px;
+      border-radius: 14px;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
       color: #fca5a5;
-      font-size: 14px;
-      font-weight: 700;
+      font-size: 15px;
+      font-weight: 800;
       font-family: inherit;
       cursor: pointer;
       transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+      white-space: nowrap;
     }
 
     .btn-toggle:hover {
-      background: rgba(239, 68, 68, 0.2);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 28px rgba(239, 68, 68, 0.2);
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(239, 68, 68, 0.1));
     }
 
     .is-on .btn-toggle {
-      border-color: rgba(34, 197, 94, 0.5);
-      background: rgba(34, 197, 94, 0.1);
+      border-color: rgba(34, 197, 94, 0.4);
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.05));
       color: #86efac;
     }
 
     .is-on .btn-toggle:hover {
-      background: rgba(34, 197, 94, 0.2);
+      box-shadow: 0 12px 28px rgba(34, 197, 94, 0.2);
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(34, 197, 94, 0.1));
     }
 
-    /* ══ STATS ══ */
+    /* ═══════════════════════ STATS ═══════════════════════ */
     .section-head {
-      font-size: 15px;
+      font-size: 16px;
       font-weight: 800;
-      margin-bottom: 16px;
+      margin-bottom: 20px;
       color: #fff;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 12px;
+      animation: cardSlide 0.6s ease 0.2s both;
     }
 
     .section-head::after {
       content: '';
       flex: 1;
       height: 1px;
-      background: var(--border-light);
+      background: linear-gradient(90deg, var(--border-light), transparent);
       margin-inline-start: 12px;
+    }
+
+    .section-head-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: var(--primary-soft);
+      border: 1px solid rgba(30, 140, 245, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
     }
 
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 16px;
-      margin-bottom: 32px;
+      margin-bottom: 40px;
     }
 
-    @media(min-width: 600px) {
+    @media(min-width: 768px) {
       .stats-grid { grid-template-columns: repeat(4, 1fr); }
     }
 
     .stat-card {
-      background: var(--bg-card);
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.6), rgba(8, 16, 32, 0.7));
       border: 1px solid var(--border-light);
-      border-radius: 16px;
-      padding: 20px 16px;
+      border-radius: 20px;
+      padding: 24px 16px;
       text-align: center;
-      transition: transform 0.25s, border-color 0.25s;
+      transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(8px);
+      animation: cardSlide 0.6s ease both;
+    }
+
+    .stat-card:nth-child(1) { animation-delay: 0.15s; }
+    .stat-card:nth-child(2) { animation-delay: 0.2s; }
+    .stat-card:nth-child(3) { animation-delay: 0.25s; }
+    .stat-card:nth-child(4) { animation-delay: 0.3s; }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--primary), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
     }
 
     .stat-card:hover {
-      transform: translateY(-3px);
-      border-color: var(--primary);
-      background: var(--bg-card-hover);
+      transform: translateY(-6px);
+      border-color: var(--border-hover);
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.8), rgba(8, 16, 32, 0.9));
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);
+    }
+
+    .stat-card:hover::before { opacity: 1; }
+
+    .stat-icon {
+      font-size: 28px;
+      margin-bottom: 8px;
+      display: block;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
     }
 
     .stat-num {
-      font-size: 28px;
-      font-weight: 800;
+      font-size: 32px;
+      font-weight: 900;
       color: #fff;
       margin: 8px 0 4px;
+      line-height: 1;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
 
     .stat-label {
-      font-size: 12px;
+      font-size: 13px;
       color: var(--text-muted);
       font-weight: 600;
     }
 
-    /* ══ TABS ══ */
-    .tabs {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 24px;
-      border-bottom: 1px solid var(--border-light);
+    .stat-trend {
+      font-size: 11px;
+      font-weight: 700;
+      margin-top: 6px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .trend-up {
+      color: var(--success);
+      background: rgba(34, 197, 94, 0.1);
+    }
+
+    /* ═══════════════════════ TABS ═══════════════════════ */
+    .tabs-wrap {
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.5), rgba(8, 16, 32, 0.6));
+      border: 1px solid var(--border-light);
+      border-radius: 20px;
+      padding: 8px;
+      margin-bottom: 32px;
+      display: inline-flex;
+      gap: 4px;
+      backdrop-filter: blur(12px);
+      animation: cardSlide 0.6s ease 0.35s both;
     }
 
     .tab-btn {
-      padding: 12px 24px;
+      padding: 12px 28px;
       border: none;
       background: transparent;
       color: var(--text-muted);
@@ -402,106 +703,458 @@
       font-weight: 700;
       font-family: inherit;
       cursor: pointer;
-      border-bottom: 3px solid transparent;
+      border-radius: 14px;
       transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
     }
 
     .tab-btn:hover {
       color: #fff;
-      background: rgba(255,255,255,0.02);
+      background: rgba(255,255,255,0.03);
     }
 
     .tab-btn.active {
-      color: var(--primary);
-      border-bottom-color: var(--primary);
-      background: var(--primary-soft);
+      color: #fff;
+      background: linear-gradient(135deg, var(--primary-soft), rgba(30, 140, 245, 0.2));
+      box-shadow: 0 4px 16px rgba(30, 140, 245, 0.2), inset 0 1px 0 rgba(255,255,255,0.1);
     }
 
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; animation: fadeIn 0.4s ease; }
+    .tab-panel {
+      display: none;
+      animation: panelSlide 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
 
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .tab-panel.active { display: block; }
 
-    /* ══ PANEL CARDS & FORMS ══ */
+    @keyframes panelSlide {
+      from { opacity: 0; transform: translateY(20px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ═══════════════════════ PANEL CARDS ═══════════════════════ */
     .panel {
-      background: var(--bg-card);
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.6), rgba(8, 16, 32, 0.7));
       border: 1px solid var(--border-light);
-      border-radius: 20px;
-      padding: 28px;
+      border-radius: 24px;
+      padding: 32px;
       margin-bottom: 24px;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(8px);
+      transition: all 0.4s ease;
+      animation: cardSlide 0.6s ease both;
     }
 
-    .form-group { margin-bottom: 20px; }
-    .form-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
+    .panel:hover {
+      border-color: var(--border-hover);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.3);
+    }
 
-    textarea.inp { min-height: 120px; resize: vertical; }
+    .panel::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+    }
+
+    .panel-title {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .panel-title-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      background: var(--gold-soft);
+      border: 1px solid rgba(251, 191, 36, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .form-group { margin-bottom: 24px; }
+
+    .form-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .form-label span.required {
+      color: var(--danger);
+      margin-inline-start: 4px;
+    }
+
+    textarea.inp {
+      min-height: 140px;
+      resize: vertical;
+      line-height: 1.7;
+    }
 
     .btn-submit {
       width: 100%;
-      padding: 14px;
-      border-radius: 12px;
+      padding: 16px;
+      border-radius: 14px;
       border: none;
-      background: var(--primary);
+      background: linear-gradient(135deg, var(--primary), #0ea5e9);
       color: #fff;
-      font-size: 15px;
-      font-weight: 700;
+      font-size: 16px;
+      font-weight: 800;
       font-family: inherit;
       cursor: pointer;
-      transition: all 0.3s;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(30, 140, 245, 0.3);
     }
 
-    .btn-submit:hover { background: #1472d0; transform: translateY(-2px); }
-    .btn-submit:disabled { opacity: 0.5; pointer-events: none; }
+    .btn-submit::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s ease;
+    }
 
-    /* ══ ANN LIST ══ */
-    .ann-list { display: flex; flex-direction: column; gap: 12px; }
+    .btn-submit:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 32px rgba(30, 140, 245, 0.4);
+    }
+
+    .btn-submit:hover::before { left: 100%; }
+
+    .btn-submit:disabled {
+      opacity: 0.5;
+      pointer-events: none;
+      transform: none;
+    }
+
+    /* ═══════════════════════ ANN LIST ═══════════════════════ */
+    .ann-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
     .ann-item {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: rgba(0,0,0,0.2);
+      background: linear-gradient(145deg, rgba(0,0,0,0.2), rgba(0,0,0,0.1));
       border: 1px solid var(--border-light);
-      border-radius: 14px;
-      padding: 16px;
+      border-radius: 16px;
+      padding: 18px 20px;
+      gap: 16px;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .ann-item::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--gold);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .ann-item:hover {
+      border-color: var(--border-hover);
+      transform: translateX(-4px);
+      background: linear-gradient(145deg, rgba(0,0,0,0.3), rgba(0,0,0,0.15));
+    }
+
+    .ann-item:hover::before { opacity: 1; }
+
+    .ann-item.hidden-item {
+      opacity: 0.5;
+    }
+
+    .ann-item.hidden-item::before {
+      opacity: 1;
+      background: var(--text-muted);
+    }
+
+    .ann-info { flex: 1; min-width: 0; }
+
+    .ann-info h4 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ann-badge {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: var(--gold-soft);
+      color: var(--gold);
+      border: 1px solid rgba(251, 191, 36, 0.2);
+    }
+
+    .ann-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ann-meta-dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+
+    .ann-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .btn-action {
+      padding: 10px 18px;
+      border-radius: 10px;
+      border: 1px solid var(--border-light);
+      background: rgba(255,255,255,0.03);
+      color: var(--text-main);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: inherit;
+    }
+
+    .btn-action:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: var(--border-hover);
+      transform: translateY(-2px);
+    }
+
+    .btn-action.del {
+      border-color: rgba(239,68,68,0.25);
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.05);
+    }
+
+    .btn-action.del:hover {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.4);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+    }
+
+    .btn-action.toggle {
+      border-color: rgba(245, 158, 11, 0.25);
+      color: #fcd34d;
+      background: rgba(245, 158, 11, 0.05);
+    }
+
+    .btn-action.toggle:hover {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.4);
+    }
+
+    /* ═══════════════════════ EMPTY STATE ═══════════════════════ */
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-state h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 8px;
+    }
+
+    .empty-state p {
+      font-size: 14px;
+    }
+
+    /* ═══════════════════════ SETTINGS PANEL ═══════════════════════ */
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr;
       gap: 16px;
     }
 
-    .ann-info h4 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
-    .ann-meta { font-size: 12px; color: var(--text-muted); }
+    @media(min-width: 640px) {
+      .settings-grid { grid-template-columns: repeat(2, 1fr); }
+    }
 
-    .btn-action {
-      padding: 8px 16px;
-      border-radius: 8px;
+    .setting-card {
+      background: rgba(0,0,0,0.15);
       border: 1px solid var(--border-light);
-      background: transparent;
-      color: var(--text-main);
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
+      border-radius: 16px;
+      padding: 24px;
+      transition: all 0.3s ease;
     }
-    .btn-action.del { border-color: rgba(239,68,68,0.3); color: #fca5a5; }
-    .btn-action.del:hover { background: rgba(239,68,68,0.1); }
 
-    /* ══ MODALS & TOASTS ══ */
-    .toast {
-      position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 100px);
-      background: #fff; color: #000; padding: 12px 24px; border-radius: 12px;
-      font-size: 14px; font-weight: 700; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-      transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); z-index: 9999;
+    .setting-card:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-3px);
     }
+
+    .setting-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: var(--primary-soft);
+      border: 1px solid rgba(30, 140, 245, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 14px;
+    }
+
+    .setting-title {
+      font-size: 15px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .setting-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .setting-tag {
+      display: inline-block;
+      margin-top: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.05);
+      color: var(--text-muted);
+      border: 1px solid var(--border-light);
+    }
+
+    /* ═══════════════════════ TOAST ═══════════════════════ */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translate(-50%, 120px);
+      background: linear-gradient(135deg, #fff, #f1f5f9);
+      color: #0f172a;
+      padding: 14px 28px;
+      border-radius: 16px;
+      font-size: 14px;
+      font-weight: 800;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1);
+      transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
     .toast.show { transform: translate(-50%, 0); }
 
+    .toast-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--success);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .toast.error .toast-icon { background: var(--danger); }
+
+    /* ═══════════════════════ LOADING SKELETON ═══════════════════════ */
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 75%);
+      background-size: 200% 100%;
+      animation: skeletonShine 1.5s infinite;
+      border-radius: 12px;
+    }
+
+    @keyframes skeletonShine {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ═══════════════════════ SCROLLBAR ═══════════════════════ */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+    /* ═══════════════════════ RESPONSIVE ═══════════════════════ */
+    @media (max-width: 640px) {
+      .login-box { padding: 36px 24px; }
+      .login-title { font-size: 22px; }
+      .dashboard-body { padding: 24px 16px; }
+      .maintenance-card { padding: 20px; flex-direction: column; text-align: center; }
+      .maintenance-info h3 { justify-content: center; }
+      .maintenance-status { justify-content: center; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .ann-item { flex-direction: column; text-align: center; }
+      .ann-actions { width: 100%; justify-content: center; }
+      .topbar { padding: 12px 16px; }
+      .topbar-title span { display: none; }
+      .btn-icon { padding: 8px 12px; font-size: 12px; }
+      .tabs-wrap { width: 100%; }
+      .tab-btn { flex: 1; padding: 10px 16px; font-size: 13px; }
+    }
   </style>
 </head>
 <body>
 
-<div class="bg-glow"></div>
+<!-- ═══════════════════════ BACKGROUND ═══════════════════════ -->
+<canvas id="particles-canvas"></canvas>
+<div class="bg-animated"></div>
+<div class="grid-pattern"></div>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
 
-<!-- ══ LOGIN ══ -->
+<!-- ═══════════════════════ LOGIN SCREEN ═══════════════════════ -->
 <div class="login-screen" id="login-screen">
   <div class="login-box">
-    <img src="images/eplus-logo.png" alt="E-PLUS" class="login-logo" onerror="this.src='https://via.placeholder.com/150x40?text=E-PLUS'">
+    <div class="login-logo-wrap">
+      <div class="login-logo-ring"></div>
+      <img src="images/eplus-logo.png" alt="E-PLUS" class="login-logo" onerror="this.style.display='none'">
+    </div>
     <div class="login-title">لوحة الإدارة</div>
     <div class="login-sub">الوصول مقتصر على الإدارة فقط</div>
 
@@ -513,17 +1166,17 @@
   </div>
 </div>
 
-<!-- ══ DASHBOARD ══ -->
+<!-- ═══════════════════════ DASHBOARD ═══════════════════════ -->
 <div class="dashboard" id="dashboard">
   <div class="topbar">
     <div class="topbar-title">
-      <img src="images/eplus-logo.png" alt="E-PLUS" onerror="this.src='https://via.placeholder.com/100x30?text=Logo'">
-      <span>الإدارة</span>
+      <img src="images/eplus-logo.png" alt="E-PLUS" onerror="this.style.display='none'">
+      <span>لوحة التحكم</span>
     </div>
     <div class="topbar-right">
       <span class="admin-badge" id="admin-name">Admin</span>
-      <a href="index.html" class="btn-icon">الموقع</a>
-      <button class="btn-icon btn-logout" onclick="doLogout()">خروج</button>
+      <a href="index.html" class="btn-icon">🏠 الموقع</a>
+      <button class="btn-icon btn-logout" onclick="doLogout()">🚪 خروج</button>
     </div>
   </div>
 
@@ -532,7 +1185,7 @@
     <!-- ══ MAINTENANCE TOGGLE ══ -->
     <div class="maintenance-card" id="maintenance-card">
       <div class="maintenance-info">
-        <h3>حالة المنصة (وضع الصيانة)</h3>
+        <h3>🔧 حالة المنصة</h3>
         <div class="maintenance-status">
           <div class="status-dot" id="status-dot"></div>
           <span id="status-text">المنصة تعمل ومتاحة للزوار</span>
@@ -543,82 +1196,134 @@
       </button>
     </div>
 
-    <!-- ══ STATS ══ -->
-    <div class="section-head">إحصائيات التسجيلات والزوار</div>
+    <!-- ══ STATS: REGISTRATIONS ══ -->
+    <div class="section-head">
+      <div class="section-head-icon">📊</div>
+      إحصائيات التسجيلات
+    </div>
     <div class="stats-grid">
       <div class="stat-card">
+        <span class="stat-icon">📋</span>
         <div class="stat-num" id="stat-total">0</div>
         <div class="stat-label">إجمالي التسجيلات</div>
+        <div class="stat-trend trend-up">+12% هذا الشهر</div>
       </div>
       <div class="stat-card">
-        <div class="stat-num" id="stat-support" style="color:#22c55e;">0</div>
+        <span class="stat-icon" style="color:var(--success)">📚</span>
+        <div class="stat-num" id="stat-support" style="color:var(--success)">0</div>
         <div class="stat-label">تسجيلات الدعم</div>
       </div>
       <div class="stat-card">
-        <div class="stat-num" id="stat-lang" style="color:#3b82f6;">0</div>
+        <span class="stat-icon" style="color:var(--primary)">🌍</span>
+        <div class="stat-num" id="stat-lang" style="color:var(--primary)">0</div>
         <div class="stat-label">دورات اللغات</div>
       </div>
       <div class="stat-card">
-        <div class="stat-num" id="stat-vip" style="color:#f59e0b;">0</div>
+        <span class="stat-icon" style="color:var(--gold)">⭐</span>
+        <div class="stat-num" id="stat-vip" style="color:var(--gold)">0</div>
         <div class="stat-label">دروس VIP</div>
       </div>
     </div>
 
+    <!-- ══ STATS: VISITORS ══ -->
+    <div class="section-head">
+      <div class="section-head-icon">👁️</div>
+      إحصائيات الزوار
+    </div>
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-num" id="vis-online" style="color:#22c55e;">0</div>
+        <span class="stat-icon" style="color:var(--success)">🟢</span>
+        <div class="stat-num" id="vis-online" style="color:var(--success)">0</div>
         <div class="stat-label">متصل الآن</div>
       </div>
       <div class="stat-card">
+        <span class="stat-icon">📅</span>
         <div class="stat-num" id="vis-24h">0</div>
         <div class="stat-label">زوار 24 ساعة</div>
       </div>
       <div class="stat-card">
+        <span class="stat-icon">📆</span>
         <div class="stat-num" id="vis-week">0</div>
         <div class="stat-label">زوار هذا الأسبوع</div>
       </div>
       <div class="stat-card">
+        <span class="stat-icon">🌐</span>
         <div class="stat-num" id="vis-total">0</div>
         <div class="stat-label">إجمالي الزيارات</div>
       </div>
     </div>
 
     <!-- ══ TABS ══ -->
-    <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('announcements')" id="tab-btn-announcements">إدارة الإعلانات</button>
-      <button class="tab-btn" onclick="switchTab('settings')" id="tab-btn-settings">إعدادات إضافية</button>
+    <div class="tabs-wrap">
+      <button class="tab-btn active" onclick="switchTab('announcements')" id="tab-btn-announcements">📢 إدارة الإعلانات</button>
+      <button class="tab-btn" onclick="switchTab('settings')" id="tab-btn-settings">⚙️ الإعدادات</button>
     </div>
 
     <!-- TAB 1: ANNOUNCEMENTS -->
     <div class="tab-panel active" id="tab-announcements">
       <div class="panel">
-        <div class="section-head" style="margin-bottom:24px;">نشر إعلان جديد</div>
+        <div class="panel-title">
+          <div class="panel-title-icon">✨</div>
+          نشر إعلان جديد
+        </div>
         <div class="form-group">
-          <label class="form-label">عنوان الإعلان</label>
+          <label class="form-label">عنوان الإعلان <span class="required">*</span></label>
           <input class="inp" type="text" id="ann-title" placeholder="مثال: دورات جديدة قريباً...">
         </div>
         <div class="form-group">
           <label class="form-label">نص الإعلان (اختياري)</label>
           <textarea class="inp" id="ann-text" placeholder="اكتب تفاصيل الإعلان هنا..."></textarea>
         </div>
-        <button class="btn-submit" id="submit-ann-btn" onclick="publishAnnouncement()">نشر الإعلان بالموقع</button>
+        <button class="btn-submit" id="submit-ann-btn" onclick="publishAnnouncement()">🚀 نشر الإعلان بالموقع</button>
       </div>
 
       <div class="panel">
-        <div class="section-head" style="margin-bottom:24px;">الإعلانات النشطة</div>
+        <div class="panel-title">
+          <div class="panel-title-icon" style="background:rgba(30,140,245,0.1);border-color:rgba(30,140,245,0.2);">📋</div>
+          الإعلانات النشطة
+        </div>
         <div class="ann-list" id="admin-ann-list">
-          <div style="color:var(--text-muted); font-size:14px; text-align:center;">جاري التحميل...</div>
+          <div class="empty-state">
+            <div class="empty-state-icon">⏳</div>
+            <h3>جاري التحميل...</h3>
+            <p>يتم جلب الإعلانات من قاعدة البيانات</p>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- TAB 2: SETTINGS (Placeholder for Future Expansion) -->
+    <!-- TAB 2: SETTINGS -->
     <div class="tab-panel" id="tab-settings">
       <div class="panel">
-        <div style="text-align:center; padding:40px 0; color:var(--text-muted);">
-          <div style="font-size:40px; margin-bottom:16px;">⚙️</div>
-          <h3>قسم الإعدادات الإضافية</h3>
-          <p style="font-size:14px; margin-top:8px;">سيتم تفعيل رفع الصور الخاصة بالمعرض الربيعي وإعدادات التخصيص لاحقاً.</p>
+        <div class="panel-title">
+          <div class="panel-title-icon" style="background:rgba(168,85,247,0.1);border-color:rgba(168,85,247,0.2);">⚙️</div>
+          الإعدادات الإضافية
+        </div>
+        <div class="settings-grid">
+          <div class="setting-card">
+            <div class="setting-icon">🖼️</div>
+            <div class="setting-title">المعرض الربيعي</div>
+            <div class="setting-desc">رفع وإدارة الصور الخاصة بمعرض الأنشطة والفعاليات الربيعية للمركز.</div>
+            <span class="setting-tag">قريباً</span>
+          </div>
+          <div class="setting-card">
+            <div class="setting-icon" style="background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.2);">📧</div>
+            <div class="setting-title">قوالب البريد</div>
+            <div class="setting-desc">تخصيص قوالب رسائل التأكيد والتنبيهات المرسلة للطلاب وأولياء الأمور.</div>
+            <span class="setting-tag">قريباً</span>
+          </div>
+          <div class="setting-card">
+            <div class="setting-icon" style="background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.2);">🔒</div>
+            <div class="setting-title">الأمان والصلاحيات</div>
+            <div class="setting-desc">إدارة حسابات المشرفين ومستويات الوصول لأقسام لوحة التحكم.</div>
+            <span class="setting-tag">قريباً</span>
+          </div>
+          <div class="setting-card">
+            <div class="setting-icon" style="background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.2);">🎨</div>
+            <div class="setting-title">تخصيص المظهر</div>
+            <div class="setting-desc">تغيير الألوان الرئيسية والشعار والخلفية للموقع بضغطة واحدة.</div>
+            <span class="setting-tag">قريباً</span>
+          </div>
         </div>
       </div>
     </div>
@@ -626,16 +1331,19 @@
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<!-- ═══════════════════════ TOAST ═══════════════════════ -->
+<div class="toast" id="toast">
+  <div class="toast-icon">✓</div>
+  <span id="toast-msg"></span>
+</div>
 
-<!-- ══ SCRIPT & FIREBASE ══ -->
+<!-- ═══════════════════════ SCRIPT & FIREBASE ═══════════════════════ -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
   import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, setDoc, getDoc, query, orderBy, where, onSnapshot, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
   import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
 
-  // نفس إعدادات الفايربيس من ملفك
   const firebaseConfig = {
     apiKey:            "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
     authDomain:        "eplus-center-39.firebaseapp.com",
@@ -654,16 +1362,20 @@
   /* ══ AUTH ══ */
   onAuthStateChanged(auth, user => {
     if (user) {
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('dashboard').style.display    = 'flex';
-      document.getElementById('admin-name').textContent     = user.email.split('@')[0];
+      const loginScreen = document.getElementById('login-screen');
+      loginScreen.classList.add('hidden');
+      setTimeout(() => { loginScreen.style.display = 'none'; }, 600);
+      document.getElementById('dashboard').style.display = 'flex';
+      document.getElementById('admin-name').textContent = user.email.split('@')[0];
       loadRegistrations();
       loadVisitorStats();
       loadMaintenanceStatus();
       loadAnnouncements();
     } else {
-      document.getElementById('login-screen').style.display = 'flex';
-      document.getElementById('dashboard').style.display    = 'none';
+      const loginScreen = document.getElementById('login-screen');
+      loginScreen.style.display = 'flex';
+      loginScreen.classList.remove('hidden');
+      document.getElementById('dashboard').style.display = 'none';
     }
   });
 
@@ -698,14 +1410,13 @@
     const snap = await getDoc(doc(db, 'settings', 'maintenance'));
     const isOn = snap.exists() && snap.data().active === true;
 
-    // تأكيد قبل التفعيل
     if(confirm(isOn ? "هل أنت متأكد من إعادة فتح الموقع للزوار؟" : "هل أنت متأكد من تفعيل وضع الصيانة وإغلاق الموقع؟")) {
       try {
         await setDoc(doc(db,'settings','maintenance'), { active: !isOn, updatedAt: serverTimestamp() });
         updateMaintenanceUI(!isOn);
         showToast(!isOn ? 'تم تفعيل وضع الصيانة بنجاح' : 'تم إعادة فتح الموقع بنجاح');
       } catch(e) {
-        showToast('خطأ: ' + e.message);
+        showToast('خطأ: ' + e.message, true);
       }
     }
   };
@@ -716,23 +1427,33 @@
     const btn  = document.getElementById('btn-maintenance');
     if (isOn) {
       card.classList.add('is-on');
-      text.textContent = 'المنصة مغلقة (وضع الصيانة مفعل)';
-      btn.textContent = 'إعادة فتح المنصة';
+      text.textContent = '⚠️ المنصة مغلقة (وضع الصيانة مفعل)';
+      btn.textContent = '🔓 إعادة فتح المنصة';
     } else {
       card.classList.remove('is-on');
-      text.textContent = 'المنصة تعمل ومتاحة للزوار';
-      btn.textContent = 'إغلاق المنصة للصيانة';
+      text.textContent = '✅ المنصة تعمل ومتاحة للزوار';
+      btn.textContent = '🔒 إغلاق المنصة للصيانة';
     }
   }
 
   /* ══ TOAST ══ */
-  window.showToast = (msg) => {
+  window.showToast = (msg, isError = false) => {
     const t = document.getElementById('toast');
-    t.textContent = msg; t.classList.add('show');
+    const msgEl = document.getElementById('toast-msg');
+    const icon = t.querySelector('.toast-icon');
+    msgEl.textContent = msg;
+    if (isError) {
+      t.classList.add('error');
+      icon.textContent = '!';
+    } else {
+      t.classList.remove('error');
+      icon.textContent = '✓';
+    }
+    t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 3000);
   };
 
-  /* ══ BASIC STATS LOADING ══ */
+  /* ══ STATS ══ */
   function loadRegistrations() {
     const q = query(collection(db, 'registrations'), orderBy('timestamp', 'desc'));
     onSnapshot(q, snap => {
@@ -748,7 +1469,6 @@
     onValue(ref(rtdb, 'visitors/total'), snap => { document.getElementById('vis-total').textContent = snap.val() || 0; });
     onValue(ref(rtdb, 'visitors/online'), snap => { document.getElementById('vis-online').textContent = snap.val() || 0; });
 
-    // Firestore pageViews for 24h & 7d
     const now = Timestamp.now();
     const t24h = Timestamp.fromMillis(now.toMillis() - 24 * 3600000);
     const t7d  = Timestamp.fromMillis(now.toMillis() - 7 * 24 * 3600000);
@@ -760,41 +1480,54 @@
   window.publishAnnouncement = async () => {
     const title = document.getElementById('ann-title').value.trim();
     const text  = document.getElementById('ann-text').value.trim();
-    if (!title) { showToast('يرجى كتابة عنوان الإعلان'); return; }
+    if (!title) { showToast('يرجى كتابة عنوان الإعلان', true); return; }
 
     const btn = document.getElementById('submit-ann-btn');
-    btn.disabled = true; btn.textContent = 'جاري النشر...';
+    btn.disabled = true; btn.textContent = '⏳ جاري النشر...';
 
     try {
       await addDoc(collection(db,'announcements'),{ title, text, hidden:false, createdAt:serverTimestamp() });
-      showToast('تم النشر بنجاح!');
+      showToast('✨ تم النشر بنجاح!');
       document.getElementById('ann-title').value = '';
       document.getElementById('ann-text').value  = '';
-    } catch(err) { showToast('خطأ: ' + err.message); }
-    btn.disabled = false; btn.textContent = 'نشر الإعلان بالموقع';
+    } catch(err) { showToast('خطأ: ' + err.message, true); }
+    btn.disabled = false; btn.textContent = '🚀 نشر الإعلان بالموقع';
   };
 
   function loadAnnouncements() {
     const q = query(collection(db,'announcements'), orderBy('createdAt','desc'));
     onSnapshot(q, snap => {
       const listEl = document.getElementById('admin-ann-list');
-      if (snap.empty) { listEl.innerHTML = '<div style="color:var(--text-muted); font-size:14px; text-align:center;">لا توجد إعلانات حالياً</div>'; return; }
+      if (snap.empty) {
+        listEl.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📭</div>
+            <h3>لا توجد إعلانات</h3>
+            <p>ابدأ بنشر أول إعلان الآن</p>
+          </div>`;
+        return;
+      }
       listEl.innerHTML = '';
       snap.forEach(d => {
         const data = d.data();
         const dateStr = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleDateString('ar-DZ') : '';
         const item = document.createElement('div');
-        item.className = 'ann-item';
-        if(data.hidden) item.style.opacity = '0.5';
+        item.className = 'ann-item' + (data.hidden ? ' hidden-item' : '');
 
         item.innerHTML = `
           <div class="ann-info">
-            <h4>${data.title} ${data.hidden ? '(مخفي)' : ''}</h4>
-            <div class="ann-meta">${dateStr}</div>
+            <h4>
+              ${data.title}
+              ${data.hidden ? '<span class="ann-badge">مخفي</span>' : '<span class="ann-badge" style="background:rgba(34,197,94,0.1);color:var(--success);border-color:rgba(34,197,94,0.2);">نشط</span>'}
+            </h4>
+            <div class="ann-meta">
+              <span>${dateStr}</span>
+              ${data.text ? '<span class="ann-meta-dot"></span><span>يحتوي على نص</span>' : ''}
+            </div>
           </div>
-          <div style="display:flex; gap:8px;">
-            <button class="btn-action" onclick="toggleAnn('${d.id}', ${data.hidden})">${data.hidden ? 'إظهار' : 'إخفاء'}</button>
-            <button class="btn-action del" onclick="delAnn('${d.id}')">حذف</button>
+          <div class="ann-actions">
+            <button class="btn-action toggle" onclick="toggleAnn('${d.id}', ${data.hidden})">${data.hidden ? '👁️ إظهار' : '🙈 إخفاء'}</button>
+            <button class="btn-action del" onclick="delAnn('${d.id}')">🗑️ حذف</button>
           </div>
         `;
         listEl.appendChild(item);
@@ -808,12 +1541,73 @@
   };
 
   window.delAnn = async (id) => {
-    if(confirm('تأكيد الحذف نهائياً؟')) {
+    if(confirm('⚠️ تأكيد الحذف نهائياً؟')) {
       await deleteDoc(doc(db,'announcements',id));
-      showToast('تم الحذف');
+      showToast('🗑️ تم الحذف');
     }
   };
 
+  /* ══ PARTICLES ══ */
+  (function initParticles() {
+    const canvas = document.getElementById('particles-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    let w, h;
+
+    function resize() {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    for (let i = 0; i < 60; i++) {
+      particles.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        size: Math.random() * 2 + 0.5,
+        alpha: Math.random() * 0.5 + 0.1
+      });
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, w, h);
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0) p.x = w;
+        if (p.x > w) p.x = 0;
+        if (p.y < 0) p.y = h;
+        if (p.y > h) p.y = 0;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(251, 191, 36, ${p.alpha})`;
+        ctx.fill();
+      });
+
+      // Draw connections
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 120) {
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = `rgba(30, 140, 245, ${0.08 * (1 - dist / 120)})`;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          }
+        }
+      }
+      requestAnimationFrame(draw);
+    }
+    draw();
+  })();
 </script>
 </body>
 </html>
