@@ -31,6 +31,7 @@ const VIDEO_FALLBACK_SRC =
 
 let isSubmitting = false;
 let successOverlayShown = false;
+let registerModalApi = null;
 
 /* ─────────────────────────────────────────
    HELPERS
@@ -103,21 +104,37 @@ function extractPackageNameFromInline(button) {
   return normalizeText(match[2]);
 }
 
+function buildLanguageOptionsMarkup(includeSpanish = true) {
+  return `
+    <option value="">-- اختر اللغة --</option>
+    <option value="الإنجليزية" data-lang="english">🇬🇧 الإنجليزية</option>
+    <option value="الفرنسية" data-lang="french">🇫🇷 الفرنسية</option>
+    ${includeSpanish ? '<option value="الإسبانية" data-lang="spanish">🇪🇸 الإسبانية</option>' : ""}
+  `;
+}
+
+function safelyRemoveNode(node) {
+  if (node && node.parentNode) {
+    node.parentNode.removeChild(node);
+  }
+}
+
 /* ─────────────────────────────────────────
    PACKAGE RULES
 ───────────────────────────────────────── */
 function isBacPackage(packageValue) {
-  return normalizeText(packageValue).includes("15,000");
+  const value = normalizeText(packageValue);
+  return value.includes("تحضير البكالوريا") || value.includes("15,000");
 }
 
 function isITAdvancedPackage(packageValue) {
   const value = normalizeText(packageValue);
-  return value.includes("12,000") || value.includes("البالغين المتقدمة");
+  return value.includes("البالغين المتقدمة") || value.includes("Adults Advanced") || value.includes("12,000");
 }
 
 function isAdultBasicPackage(packageValue) {
   const value = normalizeText(packageValue);
-  return value.includes("باقة البالغين — 8,000");
+  return value.includes("باقة البالغين — 8,000") || value.includes("Adults Basic");
 }
 
 function isSpecialPackage(packageValue) {
@@ -137,8 +154,7 @@ function isFiveToTenPackage(packageValue) {
 
 function needsSingleLanguage(packageValue) {
   const value = normalizeText(packageValue);
-  if (!value || isBacPackage(value) || isITAdvancedPackage(value)) return false;
-  if (isSpecialPackage(value)) return false;
+  if (!value || isBacPackage(value) || isITAdvancedPackage(value) || isSpecialPackage(value)) return false;
 
   return (
     value.includes("5–10") ||
@@ -155,33 +171,13 @@ function updateLanguageOptionsByPackage(packageValue) {
   const langEl = getField("campLanguage");
   if (!langEl) return;
 
-  const hideSpanish = isFiveToTenPackage(packageValue);
-  const options = Array.from(langEl.options);
+  const previousValue = normalizeText(langEl.value);
+  const allowSpanish = !isFiveToTenPackage(packageValue);
 
-  options.forEach(option => {
-    const optionText = normalizeText(option.textContent).toLowerCase();
-    const optionValue = normalizeText(option.value).toLowerCase();
-    const dataLang = normalizeText(option.dataset.lang).toLowerCase();
+  langEl.innerHTML = buildLanguageOptionsMarkup(allowSpanish);
 
-    const isSpanishOption =
-      dataLang === "spanish" ||
-      optionText.includes("الإسبانية") ||
-      optionText.includes("اسبانية") ||
-      optionText.includes("spanish") ||
-      optionText.includes("español") ||
-      optionValue.includes("الإسبانية") ||
-      optionValue.includes("اسبانية") ||
-      optionValue.includes("spanish") ||
-      optionValue.includes("español");
-
-    option.hidden = hideSpanish && isSpanishOption;
-    option.disabled = hideSpanish && isSpanishOption;
-  });
-
-  const selectedOption = langEl.options[langEl.selectedIndex];
-  if (selectedOption && (selectedOption.hidden || selectedOption.disabled)) {
-    langEl.value = "";
-  }
+  const allowedValues = [...langEl.options].map(option => normalizeText(option.value));
+  langEl.value = allowedValues.includes(previousValue) ? previousValue : "";
 }
 
 /* ─────────────────────────────────────────
@@ -202,6 +198,7 @@ function initDynamicFields() {
     bacLangBoxes.forEach(box => {
       box.checked = false;
       box.classList.remove("camp-input-error");
+      box.closest(".choice-checkbox-label")?.classList.remove("camp-choice-error");
     });
   };
 
@@ -209,6 +206,7 @@ function initDynamicFields() {
     itTrackBoxes.forEach(box => {
       box.checked = false;
       box.classList.remove("camp-input-error");
+      box.closest(".choice-checkbox-label")?.classList.remove("camp-choice-error");
     });
   };
 
@@ -251,13 +249,20 @@ function initDynamicFields() {
       if (checked.length > 2) {
         box.checked = false;
       }
-      bacLangBoxes.forEach(item => item.classList.remove("camp-input-error"));
+
+      bacLangBoxes.forEach(item => {
+        item.classList.remove("camp-input-error");
+        item.closest(".choice-checkbox-label")?.classList.remove("camp-choice-error");
+      });
     });
   });
 
   itTrackBoxes.forEach(box => {
     box.addEventListener("change", () => {
-      itTrackBoxes.forEach(item => item.classList.remove("camp-input-error"));
+      itTrackBoxes.forEach(item => {
+        item.classList.remove("camp-input-error");
+        item.closest(".choice-checkbox-label")?.classList.remove("camp-choice-error");
+      });
     });
   });
 
@@ -280,6 +285,9 @@ function initPricingTabs() {
   if (!tabs.length || !contents.length) return;
 
   tabs.forEach(tab => {
+    if (tab.dataset.tabBound === "true") return;
+    tab.dataset.tabBound = "true";
+
     tab.addEventListener("click", () => {
       tabs.forEach(t => t.classList.remove("active"));
       contents.forEach(c => {
@@ -308,6 +316,7 @@ function initRegisterModal() {
   const modal = getField("camp-register-modal");
   const closeModalBtn = getField("close-register-modal");
   const modalBox = modal ? modal.querySelector(".camp-register-modal-box") : null;
+  const backdrop = modal ? modal.querySelector(".camp-register-modal-backdrop") : null;
 
   if (!modal) {
     return {
@@ -317,39 +326,47 @@ function initRegisterModal() {
   }
 
   const openModal = () => {
-    modal.classList.add("open");
-    modal.classList.add("active");
+    modal.classList.add("open", "active");
     modal.setAttribute("aria-hidden", "false");
     setBodyModalState(true);
   };
 
   const closeModal = () => {
-    modal.classList.remove("open");
-    modal.classList.remove("active");
+    modal.classList.remove("open", "active");
     modal.setAttribute("aria-hidden", "true");
     setBodyModalState(false);
   };
 
-  if (openModalBtn) openModalBtn.addEventListener("click", openModal);
-  if (closeModalBtn) closeModalBtn.addEventListener("click", closeModal);
+  if (openModalBtn && openModalBtn.dataset.modalBound !== "true") {
+    openModalBtn.dataset.modalBound = "true";
+    openModalBtn.addEventListener("click", openModal);
+  }
 
-  modal.addEventListener("click", e => {
-    if (e.target.classList.contains("camp-register-modal-backdrop")) {
-      closeModal();
-    }
-  });
+  if (closeModalBtn && closeModalBtn.dataset.modalBound !== "true") {
+    closeModalBtn.dataset.modalBound = "true";
+    closeModalBtn.addEventListener("click", closeModal);
+  }
 
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && modal.classList.contains("open")) {
+  if (backdrop && backdrop.dataset.modalBound !== "true") {
+    backdrop.dataset.modalBound = "true";
+    backdrop.addEventListener("click", closeModal);
+  }
+
+  if (modalBox && modalBox.dataset.modalBound !== "true") {
+    modalBox.dataset.modalBound = "true";
+    modalBox.addEventListener("click", e => {
+      e.stopPropagation();
+    });
+  }
+
+  if (modal.dataset.escBound !== "true") {
+    modal.dataset.escBound = "true";
+    document.addEventListener("keydown", e => {
+      if (e.key !== "Escape") return;
+      if (!modal.classList.contains("open") && !modal.classList.contains("active")) return;
       if (document.querySelector(".success-overlay")) return;
       if (document.querySelector(".summer-lightbox")) return;
       closeModal();
-    }
-  });
-
-  if (modalBox) {
-    modalBox.addEventListener("click", e => {
-      e.stopPropagation();
     });
   }
 
@@ -361,7 +378,6 @@ function initRegisterModal() {
 ───────────────────────────────────────── */
 function selectPackageImpl(packageName) {
   const selectEl = getField("campSelectedPackage");
-  const modal = getField("camp-register-modal");
 
   if (selectEl) {
     const wanted = normalizeText(packageName);
@@ -382,14 +398,18 @@ function selectPackageImpl(packageName) {
     setTimeout(() => {
       selectEl.style.boxShadow = "";
       selectEl.style.borderColor = "";
-    }, 2500);
+    }, 2200);
   }
 
-  if (modal && !modal.classList.contains("open") && !modal.classList.contains("active")) {
-    modal.classList.add("open");
-    modal.classList.add("active");
-    modal.setAttribute("aria-hidden", "false");
-    setBodyModalState(true);
+  if (registerModalApi && typeof registerModalApi.openModal === "function") {
+    registerModalApi.openModal();
+  } else {
+    const modal = getField("camp-register-modal");
+    if (modal) {
+      modal.classList.add("open", "active");
+      modal.setAttribute("aria-hidden", "false");
+      setBodyModalState(true);
+    }
   }
 }
 
@@ -398,9 +418,12 @@ function initPackageButtons() {
 
   buttons.forEach(button => {
     const packageName = extractPackageNameFromInline(button);
+
     if (packageName && !button.dataset.packageName) {
       button.dataset.packageName = packageName;
     }
+
+    button.removeAttribute("onclick");
 
     if (button.dataset.packageBound === "true") return;
     button.dataset.packageBound = "true";
@@ -429,6 +452,7 @@ const SQ_GAP = 4;
 let cols = 0;
 let rows = 0;
 let squareAnimationId = null;
+let squaresResizeBound = false;
 
 function setupCanvasRefs() {
   canvas = getField("squares-canvas");
@@ -446,8 +470,8 @@ function resizeCanvas() {
 
 function initSquares() {
   squares = [];
-  for (let i = 0; i < cols; i++) {
-    for (let j = 0; j < rows; j++) {
+  for (let i = 0; i < cols; i += 1) {
+    for (let j = 0; j < rows; j += 1) {
       squares.push({
         x: i * (SQ_SIZE + SQ_GAP),
         y: j * (SQ_SIZE + SQ_GAP),
@@ -478,118 +502,145 @@ function animateSquares() {
 function initSquaresBackground() {
   setupCanvasRefs();
   if (!canvas || !ctx) return;
+
   resizeCanvas();
-  if (squareAnimationId) cancelAnimationFrame(squareAnimationId);
+
+  if (squareAnimationId) {
+    cancelAnimationFrame(squareAnimationId);
+  }
+
   animateSquares();
-  window.addEventListener("resize", resizeCanvas, { passive: true });
+
+  if (!squaresResizeBound) {
+    squaresResizeBound = true;
+    window.addEventListener("resize", resizeCanvas, { passive: true });
+  }
 }
 
 /* ─────────────────────────────────────────
    VIDEO LOGIC
 ───────────────────────────────────────── */
-function startFallbackVideo(playerEl) {
+function applyDirectVideoFallback(playerEl) {
   if (!playerEl) return;
-  if (playerEl.dataset.videoReady === "true" && playerEl.dataset.videoMode === "fallback") return;
 
-  playerEl.classList.add("cld-video-player", "cld-fluid");
+  const currentMode = playerEl.dataset.videoMode;
+  const currentSrc = playerEl.getAttribute("src") || playerEl.currentSrc || "";
+
+  if (currentMode === "fallback" && currentSrc.includes(VIDEO_PUBLIC_ID)) {
+    playerEl.dataset.videoReady = "true";
+    return;
+  }
+
+  try {
+    playerEl.pause?.();
+  } catch (error) {
+    console.error("Video pause before fallback failed:", error);
+  }
+
+  playerEl.innerHTML = "";
+  playerEl.classList.add("camp-video-iframe", "cld-video-player", "cld-fluid");
   playerEl.setAttribute("playsinline", "true");
   playerEl.setAttribute("controls", "true");
   playerEl.setAttribute("preload", "metadata");
-  playerEl.innerHTML = `<source src="${VIDEO_FALLBACK_SRC}" type="video/mp4">`;
+  playerEl.setAttribute("src", VIDEO_FALLBACK_SRC);
   playerEl.load();
+
   playerEl.dataset.videoReady = "true";
   playerEl.dataset.videoMode = "fallback";
 }
 
 function tryInitCloudinaryPlayer(playerEl) {
   if (!playerEl) return false;
-
-  playerEl.classList.add("cld-video-player", "cld-fluid");
-  playerEl.setAttribute("playsinline", "true");
-  playerEl.setAttribute("controls", "true");
-  playerEl.setAttribute("preload", "metadata");
-
-  const cloudinaryGlobal = window.cloudinary;
-
-  if (!cloudinaryGlobal) return false;
-
-  try {
-    if (typeof cloudinaryGlobal.videoPlayer === "function") {
-      const player = cloudinaryGlobal.videoPlayer("player", {
-        cloudName: VIDEO_CLOUD_NAME,
-        publicId: VIDEO_PUBLIC_ID,
-        secure: true,
-        controls: true,
-        muted: false,
-        fluid: true,
-        autoplayMode: "never",
-        preload: "metadata",
-        sourceTypes: ["mp4"]
-      });
-
-      if (player && typeof player.source === "function") {
-        player.source({
-          publicId: VIDEO_PUBLIC_ID,
-          sourceTypes: ["mp4"]
-        });
-      }
-
-      playerEl.dataset.videoReady = "true";
-      playerEl.dataset.videoMode = "cloudinary";
-      return true;
-    }
-
-    if (cloudinaryGlobal.Cloudinary && typeof cloudinaryGlobal.Cloudinary.new === "function") {
-      const cld = cloudinaryGlobal.Cloudinary.new({
-        cloud_name: VIDEO_CLOUD_NAME,
-        secure: true
-      });
-
-      cld.videoPlayer(playerEl, {
-        publicId: VIDEO_PUBLIC_ID,
-        controls: true,
-        muted: false,
-        fluid: true,
-        preload: "metadata",
-        sourceTypes: ["mp4"]
-      });
-
-      playerEl.dataset.videoReady = "true";
-      playerEl.dataset.videoMode = "cloudinary";
-      return true;
-    }
-  } catch (error) {
-    console.error("Cloudinary player init failed:", error);
+  if (playerEl.dataset.videoMode === "cloudinary" && playerEl.dataset.videoReady === "true") {
+    return true;
   }
 
-  return false;
+  const cloudinaryGlobal = window.cloudinary;
+  if (!cloudinaryGlobal || typeof cloudinaryGlobal.videoPlayer !== "function") {
+    return false;
+  }
+
+  try {
+    const playerId = playerEl.id || "player";
+    if (!playerEl.id) playerEl.id = playerId;
+
+    playerEl.classList.add("camp-video-iframe", "cld-video-player", "cld-fluid");
+    playerEl.setAttribute("playsinline", "true");
+    playerEl.setAttribute("controls", "true");
+    playerEl.setAttribute("preload", "metadata");
+
+    const player = cloudinaryGlobal.videoPlayer(playerId, {
+      cloudName: VIDEO_CLOUD_NAME,
+      controls: true,
+      fluid: true,
+      autoplayMode: "never",
+      muted: false,
+      secure: true
+    });
+
+    if (player && typeof player.source === "function") {
+      player.source({
+        publicId: VIDEO_PUBLIC_ID,
+        sourceTypes: ["mp4"]
+      });
+    }
+
+    playerEl.dataset.videoReady = "true";
+    playerEl.dataset.videoMode = "cloudinary";
+
+    setTimeout(() => {
+      const hasSource =
+        Boolean(playerEl.currentSrc) ||
+        Boolean(playerEl.getAttribute("src")) ||
+        Boolean(playerEl.querySelector("source")) ||
+        Boolean(document.querySelector("#player source"));
+
+      if (!hasSource && playerEl.dataset.videoMode !== "fallback") {
+        applyDirectVideoFallback(playerEl);
+      }
+    }, 1500);
+
+    return true;
+  } catch (error) {
+    console.error("Cloudinary player init failed:", error);
+    return false;
+  }
 }
 
 function initCampVideo() {
   const playerEl = getField("player");
   if (!playerEl) return;
 
+  if (playerEl.dataset.videoInitialized === "true") return;
+  playerEl.dataset.videoInitialized = "true";
+
+  playerEl.classList.add("camp-video-iframe", "cld-video-player", "cld-fluid");
+  playerEl.setAttribute("playsinline", "true");
+  playerEl.setAttribute("controls", "true");
+  playerEl.setAttribute("preload", "metadata");
+
   playerEl.addEventListener("error", () => {
-    startFallbackVideo(playerEl);
+    applyDirectVideoFallback(playerEl);
   }, { once: true });
 
   let attempts = 0;
-  const maxAttempts = 24;
+  const maxAttempts = 16;
 
-  const timer = setInterval(() => {
+  const boot = () => {
     attempts += 1;
 
-    const ok = tryInitCloudinaryPlayer(playerEl);
-    if (ok) {
-      clearInterval(timer);
+    const started = tryInitCloudinaryPlayer(playerEl);
+    if (started) return;
+
+    if (attempts >= maxAttempts) {
+      applyDirectVideoFallback(playerEl);
       return;
     }
 
-    if (attempts >= maxAttempts) {
-      clearInterval(timer);
-      startFallbackVideo(playerEl);
-    }
-  }, 250);
+    setTimeout(boot, 250);
+  };
+
+  boot();
 }
 
 /* ─────────────────────────────────────────
@@ -641,7 +692,8 @@ function injectRevealStyles() {
       gap: 16px;
     }
     .camp-gallery-item {
-      position: relative; overflow: hidden;
+      position: relative;
+      overflow: hidden;
       border-radius: 20px;
       border: 1px solid rgba(255,255,255,.15);
       background: rgba(255,255,255,.05);
@@ -655,75 +707,115 @@ function injectRevealStyles() {
       border-color: rgba(255,255,255,.3);
     }
     .camp-gallery-img {
-      width: 100%; aspect-ratio: 1/1;
-      object-fit: cover; display: block;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      display: block;
     }
     .camp-gallery-overlay {
-      position: absolute; inset: auto 0 0 0;
+      position: absolute;
+      inset: auto 0 0 0;
       padding: 15px;
       background: linear-gradient(180deg, transparent, rgba(3,15,35,.85));
-      color: #fff; font-size: .95rem; font-weight: 700;
+      color: #fff;
+      font-size: .95rem;
+      font-weight: 700;
     }
     .camp-gallery-empty {
-      display: flex; flex-direction: column;
-      align-items: center; gap: 12px;
-      padding: 50px 20px; text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 50px 20px;
+      text-align: center;
       color: rgba(201,231,248,0.7);
-      font-size: 1.05rem; font-weight: 700;
+      font-size: 1.05rem;
+      font-weight: 700;
     }
 
     .success-overlay {
-      position: fixed; inset: 0; z-index: 9999;
-      display: flex; align-items: center; justify-content: center;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       background: rgba(3,15,45,0.88);
-      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
       animation: soFadeIn 0.3s ease;
       padding: 18px;
     }
     .success-card {
       background: linear-gradient(145deg, rgba(10,61,115,0.95), rgba(3,21,47,0.98));
       border: 1px solid rgba(255,255,255,0.18);
-      padding: 44px 40px; border-radius: 36px; text-align: center;
+      padding: 44px 40px;
+      border-radius: 36px;
+      text-align: center;
       box-shadow: 0 40px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.2);
       animation: soPopIn 0.5s cubic-bezier(0.34,1.56,0.64,1);
-      max-width: 90%; width: 460px;
-      position: relative; overflow: hidden;
+      max-width: 90%;
+      width: 460px;
+      position: relative;
+      overflow: hidden;
     }
     .success-card::before {
       content: "";
-      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
       background: linear-gradient(90deg, transparent, #f4b41a, #ffd86b, #f4b41a, transparent);
     }
 
     .summer-lightbox {
-      position: fixed; inset: 0; z-index: 9999;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
       background: rgba(2,9,21,.92);
-      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-      display: flex; align-items: center; justify-content: center;
-      padding: 24px; cursor: zoom-out;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      cursor: zoom-out;
       animation: soFadeIn .25s ease;
     }
     .summer-lightbox-box {
       position: relative;
-      max-width: min(1100px, 100%); max-height: 90vh;
+      max-width: min(1100px, 100%);
+      max-height: 90vh;
     }
     .summer-lightbox-img {
-      display: block; max-width: 100%; max-height: 90vh;
+      display: block;
+      max-width: 100%;
+      max-height: 90vh;
       border-radius: 20px;
       box-shadow: 0 24px 60px rgba(0,0,0,.55);
       animation: soPopIn .3s cubic-bezier(.34,1.56,.64,1);
     }
     .summer-lightbox-close {
-      position: absolute; top: 14px; left: 14px;
-      width: 46px; height: 46px; border-radius: 50%;
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
       background: rgba(255,255,255,.15);
       border: 1px solid rgba(255,255,255,.25);
-      color: #fff; font-size: 22px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+      font-size: 22px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       transition: .25s ease;
     }
     .summer-lightbox-close:hover {
-      background: rgba(255,255,255,.25); transform: scale(1.1);
+      background: rgba(255,255,255,.25);
+      transform: scale(1.1);
     }
 
     @keyframes soFadeIn { from { opacity:0; } to { opacity:1; } }
@@ -818,16 +910,22 @@ function openLightbox(src, alt = "Summer School") {
       <button type="button" class="summer-lightbox-close" aria-label="إغلاق">✕</button>
     </div>`;
 
-  const close = () => overlay.remove();
+  const close = () => {
+    safelyRemoveNode(overlay);
+  };
 
   overlay.addEventListener("click", e => {
     if (e.target === overlay || e.target.closest(".summer-lightbox-close")) close();
   });
 
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape") close();
-  }, { once: true });
+  const escHandler = e => {
+    if (e.key === "Escape") {
+      close();
+      document.removeEventListener("keydown", escHandler);
+    }
+  };
 
+  document.addEventListener("keydown", escHandler);
   document.body.appendChild(overlay);
 }
 
@@ -854,6 +952,17 @@ function markChoiceInvalid(elements) {
 
 function validatePhone(phone) {
   return /^[+0-9]{8,18}$/.test(normalizePhone(phone));
+}
+
+function resetSubmitButton() {
+  const submitBtn = getField("camp-submit-btn");
+  if (!submitBtn) return;
+
+  submitBtn.disabled = false;
+  submitBtn.style.pointerEvents = "";
+  submitBtn.style.opacity = "1";
+  submitBtn.style.background = "linear-gradient(135deg,#ffc849,#ff9f1d)";
+  submitBtn.innerHTML = "<span>إرسال طلب التسجيل</span>";
 }
 
 function buildSuccessModal(firstName, lastName, selectedPackage, languageText) {
@@ -899,22 +1008,36 @@ function buildSuccessModal(firstName, lastName, selectedPackage, languageText) {
       >العودة للصفحة ✦</button>
     </div>`;
 
+  const closeOverlay = () => {
+    safelyRemoveNode(overlay);
+    successOverlayShown = false;
+    isSubmitting = false;
+    resetSubmitButton();
+  };
+
   const button = overlay.querySelector("#success-close-btn");
   if (button) {
     button.addEventListener("mouseenter", () => {
       button.style.transform = "translateY(-3px)";
       button.style.boxShadow = "0 20px 40px rgba(255,159,29,.45)";
     });
+
     button.addEventListener("mouseleave", () => {
       button.style.transform = "";
       button.style.boxShadow = "0 15px 30px rgba(255,159,29,.35)";
     });
-    button.addEventListener("click", () => {
-      overlay.remove();
-      successOverlayShown = false;
-      window.location.reload();
-    });
+
+    button.addEventListener("click", closeOverlay);
   }
+
+  const escHandler = e => {
+    if (e.key === "Escape") {
+      closeOverlay();
+      document.removeEventListener("keydown", escHandler);
+    }
+  };
+
+  document.addEventListener("keydown", escHandler);
 
   return overlay;
 }
@@ -975,7 +1098,6 @@ async function campRegister(e) {
   const langEl = getField("campLanguage");
   const form = getField("camp-form");
   const submitBtn = getField("camp-submit-btn");
-  const modal = getField("camp-register-modal");
 
   const bacLangBoxes = document.querySelectorAll('input[name="bacLang"]');
   const itTrackBoxes = document.querySelectorAll('input[name="itTrack"]');
@@ -1018,6 +1140,12 @@ async function campRegister(e) {
 
   if (showLang && !language) {
     markInvalid(langEl);
+    valid = false;
+  }
+
+  if (showLang && isFiveToTenPackage(selectedPackage) && language === "الإسبانية") {
+    markInvalid(langEl);
+    alert("❌ اللغة الإسبانية غير متاحة لفئة 5–10 سنوات.");
     valid = false;
   }
 
@@ -1089,20 +1217,21 @@ async function campRegister(e) {
 
     updateLanguageOptionsByPackage("");
 
-    if (submitBtn) {
-      submitBtn.innerHTML = "<span>تم الحجز بنجاح!</span>";
-      submitBtn.style.background = "linear-gradient(135deg,#16a34a,#15803d)";
-      submitBtn.style.opacity = "1";
-    }
-
-    if (modal) {
-      modal.classList.remove("open");
-      modal.classList.remove("active");
-      modal.setAttribute("aria-hidden", "true");
-      setBodyModalState(false);
+    if (registerModalApi && typeof registerModalApi.closeModal === "function") {
+      registerModalApi.closeModal();
+    } else {
+      const modal = getField("camp-register-modal");
+      if (modal) {
+        modal.classList.remove("open", "active");
+        modal.setAttribute("aria-hidden", "true");
+        setBodyModalState(false);
+      }
     }
 
     const chosenDetails = getChosenDetails(selectedPackage, language, bacLanguages, itTrack);
+
+    resetSubmitButton();
+    isSubmitting = false;
 
     setTimeout(() => {
       if (successOverlayShown) return;
@@ -1110,7 +1239,7 @@ async function campRegister(e) {
       document.body.appendChild(
         buildSuccessModal(firstName, lastName, selectedPackage, chosenDetails)
       );
-    }, 500);
+    }, 350);
 
   } catch (error) {
     console.error("Form submit error:", error);
@@ -1147,11 +1276,12 @@ document.addEventListener("DOMContentLoaded", () => {
   initTiltEffect();
   initCampVideo();
   loadCampGallery();
-  initRegisterModal();
+  registerModalApi = initRegisterModal();
   initDynamicFields();
 
   const form = getField("camp-form");
-  if (form) {
+  if (form && form.dataset.submitBound !== "true") {
+    form.dataset.submitBound = "true";
     form.addEventListener("submit", campRegister);
   }
 });
