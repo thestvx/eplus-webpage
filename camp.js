@@ -77,16 +77,54 @@ function isSpecialPackage(packageValue) {
   return value.includes("E-Plus Special") || value.includes("English Communication Class");
 }
 
+function isFiveToTenPackage(packageValue) {
+  const value = normalizeText(packageValue);
+  return value.includes("5–10") || value.includes("5-10");
+}
+
 function needsSingleLanguage(packageValue) {
   const value = normalizeText(packageValue);
   if (!value || isBacPackage(value) || isITAdvancedPackage(value)) return false;
   if (isSpecialPackage(value)) return false;
   return (
     value.includes("5–10") ||
+    value.includes("5-10") ||
     value.includes("11–14") ||
+    value.includes("11-14") ||
     value.includes("15–18") ||
+    value.includes("15-18") ||
     isAdultBasicPackage(value)
   );
+}
+
+function updateLanguageOptionsByPackage(packageValue) {
+  const langEl = getField("campLanguage");
+  if (!langEl) return;
+
+  const hideSpanish = isFiveToTenPackage(packageValue);
+  const options = [...langEl.options];
+
+  options.forEach(option => {
+    const optionText = normalizeText(option.textContent).toLowerCase();
+    const optionValue = normalizeText(option.value).toLowerCase();
+
+    const isSpanishOption =
+      optionText.includes("الإسبانية") ||
+      optionText.includes("اسبانية") ||
+      optionText.includes("spanish") ||
+      optionText.includes("español") ||
+      optionValue.includes("الإسبانية") ||
+      optionValue.includes("اسبانية") ||
+      optionValue.includes("spanish") ||
+      optionValue.includes("español");
+
+    option.hidden = hideSpanish && isSpanishOption;
+  });
+
+  const selectedOption = langEl.options[langEl.selectedIndex];
+  if (selectedOption?.hidden) {
+    langEl.value = "";
+  }
 }
 
 /* ─────────────────────────────────────────
@@ -129,6 +167,8 @@ function initDynamicFields() {
     const showBac = isBacPackage(val);
     const showLang = needsSingleLanguage(val);
     const showIT = isITAdvancedPackage(val);
+
+    updateLanguageOptionsByPackage(val);
 
     comboGroup?.classList.toggle("choice-visible", showBac);
     langGroup?.classList.toggle("lang-visible", showLang);
@@ -905,70 +945,4 @@ async function campRegister(e) {
 
     form?.reset();
 
-    getField("campLanguageGroup")?.classList.remove("lang-visible");
-    getField("campPackageChoiceGroup")?.classList.remove("choice-visible");
-    getField("campITChoiceGroup")?.classList.remove("it-visible");
-
-    if (submitBtn) {
-      submitBtn.innerHTML = "<span>تم الحجز بنجاح!</span>";
-      submitBtn.style.background = "linear-gradient(135deg,#16a34a,#15803d)";
-      submitBtn.style.opacity = "1";
-    }
-
-    if (modal) {
-      modal.classList.remove("open");
-      modal.classList.remove("active");
-      modal.setAttribute("aria-hidden", "true");
-      setBodyModalState(false);
-    }
-
-    const chosenDetails = getChosenDetails(selectedPackage, language, bacLanguages, itTrack);
-
-    setTimeout(() => {
-      if (successOverlayShown) return;
-      successOverlayShown = true;
-      document.body.appendChild(
-        buildSuccessModal(firstName, lastName, selectedPackage, chosenDetails)
-      );
-    }, 500);
-
-  } catch (error) {
-    console.error("Form submit error:", error);
-
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = "<span>حدث خطأ، أعد المحاولة</span>";
-      submitBtn.style.pointerEvents = "";
-      submitBtn.style.opacity = "1";
-      submitBtn.style.background = "linear-gradient(135deg,#dc2626,#b91c1c)";
-    }
-
-    alert("❌ حدث خطأ أثناء إرسال التسجيل. يرجى إعادة المحاولة.");
-    isSubmitting = false;
-    return false;
-  }
-
-  return false;
-}
-
-/* ─────────────────────────────────────────
-   INIT
-───────────────────────────────────────── */
-window.campRegister = campRegister;
-window.openLightbox = openLightbox;
-
-document.addEventListener("DOMContentLoaded", () => {
-  initPricingTabs();
-  initSquaresBackground();
-  initRevealOnScroll();
-  initTiltEffect();
-  initCampVideo();
-  loadCampGallery();
-  initRegisterModal();
-  initDynamicFields();
-
-  const form = getField("camp-form");
-  if (form) {
-    form.addEventListener("submit", campRegister);
-  }
-});
+    getField("campLanguageGroup")?.classList.remove("lang-vis
