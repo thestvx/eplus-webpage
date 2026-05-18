@@ -24,6 +24,11 @@ const CAMP_MIN_AGE = 5;
 const APPS_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbyoKNiPcaPBIYUTb1l_WXIlDmG2N-iPqSrx9r93Lpiio3_vKdOgCtwMTZQmq9cpQt6FWA/exec";
 
+const VIDEO_PUBLIC_ID = "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab";
+const VIDEO_CLOUD_NAME = "dac4mwuwe";
+const VIDEO_FALLBACK_SRC =
+  `https://res.cloudinary.com/${VIDEO_CLOUD_NAME}/video/upload/q_auto,f_auto/${VIDEO_PUBLIC_ID}.mp4`;
+
 let isSubmitting = false;
 let successOverlayShown = false;
 
@@ -55,6 +60,49 @@ function setBodyModalState(isOpen) {
   document.body.style.overflow = isOpen ? "hidden" : "";
 }
 
+function normalizeDash(value) {
+  return normalizeText(value).replaceAll("-", "–");
+}
+
+function simplifyPackageValue(value) {
+  return normalizeDash(value)
+    .replace(/\s+/g, " ")
+    .replace(/\u200f|\u200e/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function findMatchingPackageOption(selectEl, packageName) {
+  if (!selectEl) return null;
+
+  const wanted = simplifyPackageValue(packageName);
+  const options = [...selectEl.options];
+
+  let exact = options.find(option => simplifyPackageValue(option.value) === wanted);
+  if (exact) return exact;
+
+  exact = options.find(option => simplifyPackageValue(option.textContent) === wanted);
+  if (exact) return exact;
+
+  const loose = options.find(option => {
+    const optionValue = simplifyPackageValue(option.value);
+    return optionValue.includes(wanted) || wanted.includes(optionValue);
+  });
+
+  return loose || null;
+}
+
+function extractPackageNameFromInline(button) {
+  if (!button) return "";
+  if (button.dataset.packageName) return button.dataset.packageName;
+
+  const onclickValue = button.getAttribute("onclick") || "";
+  const match = onclickValue.match(/selectPackage\\((['"`])([\s\S]*?)\1\\)/);
+
+  if (!match) return "";
+  return normalizeText(match[2]);
+}
+
 /* ─────────────────────────────────────────
    PACKAGE RULES
 ───────────────────────────────────────── */
@@ -69,12 +117,17 @@ function isITAdvancedPackage(packageValue) {
 
 function isAdultBasicPackage(packageValue) {
   const value = normalizeText(packageValue);
-  return value.includes("باقة البالغين") || value.includes("8,000");
+  return value.includes("باقة البالغين — 8,000");
 }
 
 function isSpecialPackage(packageValue) {
   const value = normalizeText(packageValue);
-  return value.includes("E-Plus Special") || value.includes("English Communication Class");
+  return (
+    value.includes("E-Plus Special") ||
+    value.includes("English Communication Class") ||
+    value.includes("English for Specific Purposes") ||
+    value.includes("IELTS Preparation")
+  );
 }
 
 function isFiveToTenPackage(packageValue) {
@@ -108,8 +161,10 @@ function updateLanguageOptionsByPackage(packageValue) {
   options.forEach(option => {
     const optionText = normalizeText(option.textContent).toLowerCase();
     const optionValue = normalizeText(option.value).toLowerCase();
+    const dataLang = normalizeText(option.dataset.lang).toLowerCase();
 
     const isSpanishOption =
+      dataLang === "spanish" ||
       optionText.includes("الإسبانية") ||
       optionText.includes("اسبانية") ||
       optionText.includes("spanish") ||
@@ -301,16 +356,16 @@ function initRegisterModal() {
   return { openModal, closeModal };
 }
 
-/* selectPackage — يُستعمل من HTML */
-window.selectPackage = function (packageName) {
+/* ─────────────────────────────────────────
+   PACKAGE BUTTONS
+───────────────────────────────────────── */
+function selectPackageImpl(packageName) {
   const selectEl = getField("campSelectedPackage");
   const modal = getField("camp-register-modal");
 
   if (selectEl) {
     const wanted = normalizeText(packageName);
-    const matchedOption = [...selectEl.options].find(
-      option => normalizeText(option.value) === wanted
-    );
+    const matchedOption = findMatchingPackageOption(selectEl, wanted);
 
     if (matchedOption) {
       selectEl.value = matchedOption.value;
@@ -336,19 +391,49 @@ window.selectPackage = function (packageName) {
     modal.setAttribute("aria-hidden", "false");
     setBodyModalState(true);
   }
-};
+}
+
+function initPackageButtons() {
+  const buttons = document.querySelectorAll(".pc-btn");
+
+  buttons.forEach(button => {
+    const packageName = extractPackageNameFromInline(button);
+    if (packageName && !button.dataset.packageName) {
+      button.dataset.packageName = packageName;
+    }
+
+    if (button.dataset.packageBound === "true") return;
+    button.dataset.packageBound = "true";
+
+    button.addEventListener("click", e => {
+      const wanted = button.dataset.packageName || extractPackageNameFromInline(button);
+      if (!wanted) return;
+      e.preventDefault();
+      selectPackageImpl(wanted);
+    });
+  });
+}
+
+/* expose globals for inline onclick */
+window.selectPackage = selectPackageImpl;
+globalThis.selectPackage = selectPackageImpl;
 
 /* ─────────────────────────────────────────
    SQUARES BACKGROUND
 ───────────────────────────────────────── */
-const canvas = document.getElementById("squares-canvas");
-const ctx = canvas ? canvas.getContext("2d") : null;
+let canvas = null;
+let ctx = null;
 let squares = [];
 const SQ_SIZE = 40;
 const SQ_GAP = 4;
 let cols = 0;
 let rows = 0;
 let squareAnimationId = null;
+
+function setupCanvasRefs() {
+  canvas = getField("squares-canvas");
+  ctx = canvas ? canvas.getContext("2d") : null;
+}
 
 function resizeCanvas() {
   if (!canvas || !ctx) return;
@@ -391,6 +476,7 @@ function animateSquares() {
 }
 
 function initSquaresBackground() {
+  setupCanvasRefs();
   if (!canvas || !ctx) return;
   resizeCanvas();
   if (squareAnimationId) cancelAnimationFrame(squareAnimationId);
@@ -401,30 +487,75 @@ function initSquaresBackground() {
 /* ─────────────────────────────────────────
    VIDEO LOGIC
 ───────────────────────────────────────── */
-function tryInitCloudinaryPlayer() {
-  const playerEl = getField("player");
-  if (!playerEl) return true;
+function startFallbackVideo(playerEl) {
+  if (!playerEl) return;
+  if (playerEl.dataset.videoReady === "true" && playerEl.dataset.videoMode === "fallback") return;
 
-  const cld = window.cloudinary;
-  if (!cld) return false;
+  playerEl.classList.add("cld-video-player", "cld-fluid");
+  playerEl.setAttribute("playsinline", "true");
+  playerEl.setAttribute("controls", "true");
+  playerEl.setAttribute("preload", "metadata");
+  playerEl.innerHTML = `<source src="${VIDEO_FALLBACK_SRC}" type="video/mp4">`;
+  playerEl.load();
+  playerEl.dataset.videoReady = "true";
+  playerEl.dataset.videoMode = "fallback";
+}
+
+function tryInitCloudinaryPlayer(playerEl) {
+  if (!playerEl) return false;
+
+  playerEl.classList.add("cld-video-player", "cld-fluid");
+  playerEl.setAttribute("playsinline", "true");
+  playerEl.setAttribute("controls", "true");
+  playerEl.setAttribute("preload", "metadata");
+
+  const cloudinaryGlobal = window.cloudinary;
+
+  if (!cloudinaryGlobal) return false;
 
   try {
-    if (typeof cld.videoPlayer === "function") {
-      cld.videoPlayer("player", {
-        cloudName: "dac4mwuwe",
+    if (typeof cloudinaryGlobal.videoPlayer === "function") {
+      const player = cloudinaryGlobal.videoPlayer("player", {
+        cloudName: VIDEO_CLOUD_NAME,
+        publicId: VIDEO_PUBLIC_ID,
+        secure: true,
         controls: true,
         muted: false,
+        fluid: true,
         autoplayMode: "never",
-        fluid: true
-      }).source("copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab");
+        preload: "metadata",
+        sourceTypes: ["mp4"]
+      });
+
+      if (player && typeof player.source === "function") {
+        player.source({
+          publicId: VIDEO_PUBLIC_ID,
+          sourceTypes: ["mp4"]
+        });
+      }
+
+      playerEl.dataset.videoReady = "true";
+      playerEl.dataset.videoMode = "cloudinary";
       return true;
     }
 
-    if (typeof cld.player === "function") {
-      cld.player("player", {
-        cloudName: "dac4mwuwe",
-        publicId: "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab"
+    if (cloudinaryGlobal.Cloudinary && typeof cloudinaryGlobal.Cloudinary.new === "function") {
+      const cld = cloudinaryGlobal.Cloudinary.new({
+        cloud_name: VIDEO_CLOUD_NAME,
+        secure: true
       });
+
+      cld.videoPlayer(playerEl, {
+        publicId: VIDEO_PUBLIC_ID,
+        controls: true,
+        muted: false,
+        fluid: true,
+        preload: "metadata",
+        sourceTypes: ["mp4"]
+      });
+
+      playerEl.dataset.videoReady = "true";
+      playerEl.dataset.videoMode = "cloudinary";
       return true;
     }
   } catch (error) {
@@ -438,33 +569,25 @@ function initCampVideo() {
   const playerEl = getField("player");
   if (!playerEl) return;
 
-  let attempts = 0;
-  const maxAttempts = 30;
+  playerEl.addEventListener("error", () => {
+    startFallbackVideo(playerEl);
+  }, { once: true });
 
-  const startFallbackVideo = () => {
-    if (playerEl.dataset.videoReady === "true") return;
-    playerEl.setAttribute("controls", "true");
-    playerEl.setAttribute("preload", "metadata");
-    playerEl.setAttribute("playsinline", "true");
-    playerEl.innerHTML = `
-      <source src="https://res.cloudinary.com/dac4mwuwe/video/upload/q_auto,f_auto/copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab.mp4" type="video/mp4">
-    `;
-    playerEl.dataset.videoReady = "true";
-  };
+  let attempts = 0;
+  const maxAttempts = 24;
 
   const timer = setInterval(() => {
     attempts += 1;
-    const ok = tryInitCloudinaryPlayer();
 
+    const ok = tryInitCloudinaryPlayer(playerEl);
     if (ok) {
-      playerEl.dataset.videoReady = "true";
       clearInterval(timer);
       return;
     }
 
     if (attempts >= maxAttempts) {
       clearInterval(timer);
-      startFallbackVideo();
+      startFallbackVideo(playerEl);
     }
   }, 250);
 }
@@ -1013,8 +1136,11 @@ async function campRegister(e) {
 ───────────────────────────────────────── */
 window.campRegister = campRegister;
 window.openLightbox = openLightbox;
+globalThis.campRegister = campRegister;
+globalThis.openLightbox = openLightbox;
 
 document.addEventListener("DOMContentLoaded", () => {
+  initPackageButtons();
   initPricingTabs();
   initSquaresBackground();
   initRevealOnScroll();
