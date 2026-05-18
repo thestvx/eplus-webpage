@@ -4,11 +4,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import {
-  getFirestore,
-  collection,
-  query,
-  orderBy,
-  onSnapshot
+  getFirestore
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
 /* ─────────────────────────────────────────
@@ -24,87 +20,102 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+getFirestore(app);
 
 const CAMP_MIN_AGE = 5;
-const CAMP_MAX_AGE = 99; // ✅ لا حد أقصى للعمر بعد إضافة فئة +18
 
 const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzJx2NEPz7a7ntKmXQQq7i78ICeIFHiuAxTpfJyAocSkeqmbsmhx_h3YzVjbqs0eiyF/exec";
+  "https://script.google.com/macros/s/AKfycbzm4dU6vSfNs3jOHlsfjPvBEGFK2rbeM_FcOf5anhEcmI5_TNTHxep7rkVxQsOVrU_LkQ/exec";
 
 /* ─────────────────────────────────────────
-   الباقات التي تحتوي على لغة
+   PACKAGE RULES
 ───────────────────────────────────────── */
-const LANGUAGE_PACKAGES = [
-  "باقة الأساس (5–10)",
-  "باقة النخبة (5–10)",
-  "باقة الأساس (11–14)",
-  "باقة النخبة (11–14)",
-  "باقة اللغات (15–18)",
-  "باقة القادة (15–18)",
-  "باقة البالغين (+18)",          // ✅ فئة جديدة
-  "باقة البالغين المتقدمة (+18)"  // ✅ فئة جديدة
+const SINGLE_LANGUAGE_PACKAGE_KEYS = [
+  "5–10",
+  "11–14",
+  "15–18",
+  "8,000",
+  "10,000"
 ];
 
-// الباقات التي تشمل الإسبانية
-const SPANISH_PACKAGES = [
-  "باقة الأساس (11–14)",
-  "باقة النخبة (11–14)",
-  "باقة اللغات (15–18)",
-  "باقة القادة (15–18)",
-  "باقة البالغين (+18)",          // ✅ فئة جديدة
-  "باقة البالغين المتقدمة (+18)"  // ✅ فئة جديدة
-];
-
-function packageHasLanguage(packageValue) {
-  return LANGUAGE_PACKAGES.some(name => packageValue.includes(name));
+function isBacPackage(packageValue) {
+  return packageValue.includes("15,000");
 }
 
-function packageHasSpanish(packageValue) {
-  return SPANISH_PACKAGES.some(name => packageValue.includes(name));
+function isITAdvancedPackage(packageValue) {
+  return packageValue.includes("12,000");
+}
+
+function needsSingleLanguage(packageValue) {
+  if (!packageValue || isBacPackage(packageValue)) return false;
+  return SINGLE_LANGUAGE_PACKAGE_KEYS.some(key => packageValue.includes(key));
 }
 
 /* ─────────────────────────────────────────
-   إظهار/إخفاء حقل اللغة + ضبط الخيارات
+   DYNAMIC FIELDS
 ───────────────────────────────────────── */
-function initLanguageField() {
+function initDynamicFields() {
   const packageEl = document.getElementById("campSelectedPackage");
   const langGroup = document.getElementById("campLanguageGroup");
-  const langEl    = document.getElementById("campLanguage");
+  const langEl = document.getElementById("campLanguage");
+  const comboGroup = document.getElementById("campPackageChoiceGroup");
+  const itGroup = document.getElementById("campITChoiceGroup");
+  const bacLangBoxes = document.querySelectorAll('input[name="bacLang"]');
+  const itTrackBoxes = document.querySelectorAll('input[name="itTrack"]');
 
-  if (!packageEl || !langGroup || !langEl) return;
+  if (!packageEl) return;
 
-  const toggle = () => {
-    const val        = packageEl.value;
-    const needsLang  = val && packageHasLanguage(val);
-    const hasSpanish = val && packageHasSpanish(val);
+  const toggleFields = () => {
+    const val = packageEl.value.trim();
+    const showBac = isBacPackage(val);
+    const showLang = needsSingleLanguage(val);
+    const showIT = isITAdvancedPackage(val);
 
-    langEl.innerHTML = `
-      <option value="">-- اختر اللغة --</option>
-      <option value="الإنجليزية">🇬🇧 الإنجليزية</option>
-      <option value="الفرنسية">🇫🇷 الفرنسية</option>
-      ${hasSpanish ? `<option value="الإسبانية">🇪🇸 الإسبانية</option>` : ""}
-    `;
+    if (comboGroup) comboGroup.classList.toggle("choice-visible", showBac);
+    if (langGroup) langGroup.classList.toggle("lang-visible", showLang);
+    if (itGroup) itGroup.classList.toggle("it-visible", showIT);
 
-    if (needsLang) {
-      langGroup.classList.add("lang-visible");
-      langEl.setAttribute("required", "true");
-    } else {
-      langGroup.classList.remove("lang-visible");
-      langEl.removeAttribute("required");
-      langEl.value = "";
+    if (langEl) {
+      if (showLang) {
+        langEl.setAttribute("required", "true");
+      } else {
+        langEl.removeAttribute("required");
+        langEl.value = "";
+      }
+    }
+
+    if (!showBac) {
+      bacLangBoxes.forEach(box => {
+        box.checked = false;
+      });
+    }
+
+    if (!showIT) {
+      itTrackBoxes.forEach(box => {
+        box.checked = false;
+      });
     }
   };
 
-  packageEl.addEventListener("change", toggle);
-  toggle();
+  packageEl.addEventListener("change", toggleFields);
+
+  bacLangBoxes.forEach(box => {
+    box.addEventListener("change", () => {
+      const checked = [...bacLangBoxes].filter(item => item.checked);
+      if (checked.length > 2) {
+        box.checked = false;
+      }
+    });
+  });
+
+  toggleFields();
 }
 
 /* ─────────────────────────────────────────
    PRICING TABS
 ───────────────────────────────────────── */
 function initPricingTabs() {
-  const tabs     = document.querySelectorAll(".pricing-tab");
+  const tabs = document.querySelectorAll(".pricing-tab");
   const contents = document.querySelectorAll(".pricing-content");
 
   tabs.forEach(tab => {
@@ -118,7 +129,7 @@ function initPricingTabs() {
       tab.classList.add("active");
 
       const targetId = tab.getAttribute("data-target");
-      const panel    = document.getElementById(targetId);
+      const panel = document.getElementById(targetId);
       if (!panel) return;
 
       panel.offsetHeight;
@@ -132,25 +143,26 @@ function initPricingTabs() {
    REGISTER MODAL OPEN/CLOSE
 ───────────────────────────────────────── */
 function initRegisterModal() {
-  const openModalBtn  = document.getElementById("open-register-modal");
-  const modal         = document.getElementById("camp-register-modal");
+  const openModalBtn = document.getElementById("open-register-modal");
+  const modal = document.getElementById("camp-register-modal");
   const closeModalBtn = document.getElementById("close-register-modal");
 
   const openModal = () => {
     if (!modal) return;
-    modal.classList.add("active");
+    modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
   };
 
   const closeModal = () => {
     if (!modal) return;
+    modal.classList.remove("open");
     modal.classList.remove("active");
     modal.setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
   };
 
-  if (openModalBtn)  openModalBtn.addEventListener("click", openModal);
+  if (openModalBtn) openModalBtn.addEventListener("click", openModal);
   if (closeModalBtn) closeModalBtn.addEventListener("click", closeModal);
 
   if (modal) {
@@ -165,25 +177,32 @@ function initRegisterModal() {
 /* selectPackage — يُستعمل من HTML */
 window.selectPackage = function (packageName) {
   const selectEl = document.getElementById("campSelectedPackage");
+  const modal = document.getElementById("camp-register-modal");
+
   if (selectEl) {
-    selectEl.value = packageName;
+    for (const option of selectEl.options) {
+      if (option.value === packageName) {
+        selectEl.value = packageName;
+        break;
+      }
+    }
 
     selectEl.dispatchEvent(new Event("change"));
 
-    selectEl.style.transition  =
+    selectEl.style.transition =
       "box-shadow 0.4s cubic-bezier(0.34,1.56,0.64,1), border-color 0.4s ease";
-    selectEl.style.boxShadow   =
+    selectEl.style.boxShadow =
       "0 0 0 4px rgba(244,180,26,0.5), 0 0 20px rgba(244,180,26,0.2)";
     selectEl.style.borderColor = "rgba(244,180,26,0.8)";
+
     setTimeout(() => {
-      selectEl.style.boxShadow   = "";
+      selectEl.style.boxShadow = "";
       selectEl.style.borderColor = "";
     }, 2500);
   }
 
-  const modal = document.getElementById("camp-register-modal");
-  if (modal && !modal.classList.contains("active")) {
-    modal.classList.add("active");
+  if (modal && !modal.classList.contains("open") && !modal.classList.contains("active")) {
+    modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
   }
@@ -192,18 +211,18 @@ window.selectPackage = function (packageName) {
 /* ─────────────────────────────────────────
    SQUARES BACKGROUND
 ───────────────────────────────────────── */
-const canvas  = document.getElementById("squares-canvas");
-const ctx     = canvas ? canvas.getContext("2d") : null;
-let squares   = [];
+const canvas = document.getElementById("squares-canvas");
+const ctx = canvas ? canvas.getContext("2d") : null;
+let squares = [];
 const SQ_SIZE = 40;
-const SQ_GAP  = 4;
+const SQ_GAP = 4;
 let cols = 0, rows = 0;
 
 function resizeCanvas() {
   if (!canvas || !ctx) return;
-  canvas.width  = window.innerWidth;
+  canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
-  cols = Math.ceil(window.innerWidth  / (SQ_SIZE + SQ_GAP));
+  cols = Math.ceil(window.innerWidth / (SQ_SIZE + SQ_GAP));
   rows = Math.ceil(window.innerHeight / (SQ_SIZE + SQ_GAP));
   initSquares();
 }
@@ -213,11 +232,11 @@ function initSquares() {
   for (let i = 0; i < cols; i++) {
     for (let j = 0; j < rows; j++) {
       squares.push({
-        x:             i * (SQ_SIZE + SQ_GAP),
-        y:             j * (SQ_SIZE + SQ_GAP),
-        opacity:       Math.random() * 0.22,
+        x: i * (SQ_SIZE + SQ_GAP),
+        y: j * (SQ_SIZE + SQ_GAP),
+        opacity: Math.random() * 0.22,
         targetOpacity: Math.random() * 0.28,
-        speed:         0.004 + Math.random() * 0.008
+        speed: 0.004 + Math.random() * 0.008
       });
     }
   }
@@ -226,6 +245,7 @@ function initSquares() {
 function animateSquares() {
   if (!canvas || !ctx) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
   squares.forEach(sq => {
     if (Math.abs(sq.opacity - sq.targetOpacity) < 0.01) {
       sq.targetOpacity = Math.random() * 0.32;
@@ -234,6 +254,7 @@ function animateSquares() {
     ctx.fillStyle = `rgba(83, 204, 255, ${sq.opacity})`;
     ctx.fillRect(sq.x, sq.y, SQ_SIZE, SQ_SIZE);
   });
+
   requestAnimationFrame(animateSquares);
 }
 
@@ -245,23 +266,16 @@ function initSquaresBackground() {
 }
 
 /* ─────────────────────────────────────────
-   VIDEO LOGIC (Cloudinary Player)
+   VIDEO LOGIC
 ───────────────────────────────────────── */
 function initCampVideo() {
   const container = document.getElementById("player");
   if (!container || !window.cloudinary) return;
 
-  const cld    = cloudinary.Cloudinary.new({ cloud_name: "dac4mwuwe" });
-  const player = cld.videoPlayer("player", {
-    fluid:     true,
-    controls:  true,
-    autoplay:  false,
-    muted:     false
+  cloudinary.player("player", {
+    cloudName: "dac4mwuwe",
+    publicId: "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab"
   });
-
-  player.source(
-    "AQNIgfMOr7nMCThf_vUxbNnUVytNft9bYO2pREdCOan1yhKd9x_cnM1bvez380yQe9LapvImGxcAKYy4ZzAjMQ9ZhMrVESjroQlZ-nI_z6m24m"
-  );
 }
 
 /* ─────────────────────────────────────────
@@ -271,7 +285,7 @@ function injectRevealStyles() {
   if (document.getElementById("summer-reveal-style")) return;
 
   const style = document.createElement("style");
-  style.id    = "summer-reveal-style";
+  style.id = "summer-reveal-style";
   style.textContent = `
     .reveal-on-scroll {
       opacity: 0;
@@ -285,9 +299,9 @@ function injectRevealStyles() {
       transform: translateY(0) scale(1);
     }
 
-    .pricing-card.premium.reveal-on-scroll         { transform: translateY(40px) scale(1); }
-    .pricing-card.premium.reveal-on-scroll.revealed { transform: translateY(0)   scale(1); }
-    .pricing-card.premium:hover                     { transform: translateY(-6px) !important; }
+    .pricing-card.premium.reveal-on-scroll { transform: translateY(40px) scale(1); }
+    .pricing-card.premium.reveal-on-scroll.revealed { transform: translateY(0) scale(1); }
+    .pricing-card.premium:hover { transform: translateY(-6px) !important; }
 
     .camp-input-error {
       border-color: #ff4757 !important;
@@ -296,8 +310,8 @@ function injectRevealStyles() {
     }
     @keyframes shakeError {
       0%,100% { transform: translateX(0); }
-      25%      { transform: translateX(-8px); }
-      75%      { transform: translateX(8px); }
+      25% { transform: translateX(-8px); }
+      75% { transform: translateX(8px); }
     }
 
     .camp-gallery-grid {
@@ -393,7 +407,7 @@ function injectRevealStyles() {
     @keyframes soFadeIn { from { opacity:0; } to { opacity:1; } }
     @keyframes soPopIn {
       from { transform: scale(0.8) translateY(30px); opacity:0; }
-      to   { transform: scale(1)   translateY(0);    opacity:1; }
+      to   { transform: scale(1) translateY(0); opacity:1; }
     }
   `;
   document.head.appendChild(style);
@@ -430,14 +444,15 @@ function initTiltEffect() {
     ".camp-workshop-card, .camp-info-card, .summer-journey-card"
   ).forEach(card => {
     card.addEventListener("mousemove", e => {
-      const r  = card.getBoundingClientRect();
-      const x  = e.clientX - r.left;
-      const y  = e.clientY - r.top;
+      const r = card.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
       const rx = ((y - r.height / 2) / (r.height / 2)) * -8;
-      const ry = ((x - r.width  / 2) / (r.width  / 2)) *  8;
+      const ry = ((x - r.width / 2) / (r.width / 2)) * 8;
       card.style.transform =
         `perspective(1000px) rotateX(${rx}deg) rotateY(${ry}deg) scale3d(1.02,1.02,1.02)`;
     });
+
     card.addEventListener("mouseleave", () => {
       card.style.transform =
         "perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1,1,1)";
@@ -465,7 +480,6 @@ function buildGalleryEmpty() {
 function loadCampGallery() {
   const grid = document.getElementById("camp-gallery-grid");
   if (!grid) return;
-
   grid.innerHTML = buildGalleryEmpty();
 }
 
@@ -481,9 +495,11 @@ function openLightbox(src, alt = "Summer School") {
     </div>`;
 
   const close = () => overlay.remove();
+
   overlay.addEventListener("click", e => {
     if (e.target === overlay || e.target.closest(".summer-lightbox-close")) close();
   });
+
   document.addEventListener("keydown", e => {
     if (e.key === "Escape") close();
   }, { once: true });
@@ -494,12 +510,15 @@ function openLightbox(src, alt = "Summer School") {
 /* ─────────────────────────────────────────
    REGISTRATION
 ───────────────────────────────────────── */
-function getField(id) { return document.getElementById(id); }
+function getField(id) {
+  return document.getElementById(id);
+}
 
 function markInvalid(el) {
   if (!el) return;
   el.classList.add("camp-input-error");
   el.addEventListener("input", () => el.classList.remove("camp-input-error"), { once: true });
+  el.addEventListener("change", () => el.classList.remove("camp-input-error"), { once: true });
 }
 
 function validatePhone(phone) {
@@ -507,27 +526,22 @@ function validatePhone(phone) {
 }
 
 function buildSuccessModal(firstName, lastName, selectedPackage, language) {
-  const shortName = selectedPackage.split(" — ")[0].trim();
-  const ageGroup  = selectedPackage.match(/\(([^)]+)\)/)?.[1] || "";
-
   const overlay = document.createElement("div");
   overlay.className = "success-overlay";
   overlay.innerHTML = `
     <div class="success-card">
-      <div style="font-size:64px;margin-bottom:16px;
-                  filter:drop-shadow(0 10px 20px rgba(0,0,0,.3))">🎉</div>
-      <h2 style="color:#fff;margin-bottom:10px;font-size:24px;
-                 font-weight:950;line-height:1.3;">تم تسجيل المقعد بنجاح!</h2>
+      <div style="font-size:64px;margin-bottom:16px;filter:drop-shadow(0 10px 20px rgba(0,0,0,.3))">🎉</div>
+      <h2 style="color:#fff;margin-bottom:10px;font-size:24px;font-weight:950;line-height:1.3;">تم تسجيل المقعد بنجاح!</h2>
       <p style="color:#c9e7f8;font-size:16px;line-height:1.9;margin-bottom:8px;">
-        مرحباً بالمبدع
-        <strong style="color:#ffd86b;font-size:19px;"> ${firstName} ${lastName}</strong>
+        مرحباً
+        <strong style="color:#ffd86b;font-size:19px;">${firstName} ${lastName}</strong>
       </p>
       <div style="
         display:inline-flex;align-items:center;gap:8px;
-        padding:10px 20px;border-radius:14px;margin:12px 0 6px;
+        padding:10px 20px;border-radius:14px;margin:12px 0 8px;
         background:rgba(244,180,26,0.15);border:1px solid rgba(244,180,26,0.3);
         color:#ffe090;font-weight:800;font-size:15px;
-      ">✦ ${shortName}${ageGroup ? ` — ${ageGroup}` : ""}</div>
+      ">✦ ${selectedPackage}</div>
       ${language ? `
       <div style="
         display:inline-flex;align-items:center;gap:8px;
@@ -535,12 +549,12 @@ function buildSuccessModal(firstName, lastName, selectedPackage, language) {
         background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.25);
         color:#bae6fd;font-weight:800;font-size:14px;
       ">🌐 اللغة المختارة: ${language}</div>` : '<div style="margin-bottom:20px;"></div>'}
-      <p style="color:rgba(201,231,248,0.75);font-size:14px;
-                line-height:1.8;margin-bottom:26px;">
-        سيتم التواصل معكم قريباً عبر رقم ولي الأمر<br>
-        لتأكيد الحجز وإتمام عملية الدفع.
+      <p style="color:rgba(201,231,248,0.75);font-size:14px;line-height:1.8;margin-bottom:26px;">
+        تم إرسال بيانات التسجيل بنجاح.<br>
+        سيتم التواصل معكم قريباً عبر رقم ولي الأمر.
       </p>
       <button
+        type="button"
         onclick="location.reload()"
         style="
           position:relative;overflow:hidden;
@@ -551,63 +565,85 @@ function buildSuccessModal(firstName, lastName, selectedPackage, language) {
           transition:0.3s cubic-bezier(0.34,1.56,0.64,1);
           font-family:inherit;
         "
-        onmouseover="this.style.transform='translateY(-3px)';
-                     this.style.boxShadow='0 20px 40px rgba(255,159,29,.45)'"
-        onmouseout="this.style.transform='';
-                    this.style.boxShadow='0 15px 30px rgba(255,159,29,.35)'"
+        onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 20px 40px rgba(255,159,29,.45)'"
+        onmouseout="this.style.transform='';this.style.boxShadow='0 15px 30px rgba(255,159,29,.35)'"
       >العودة للصفحة ✦</button>
     </div>`;
   return overlay;
 }
 
-function campRegister(e) {
-  if (e) { e.preventDefault(); e.stopPropagation(); }
+async function campRegister(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
 
-  const packageEl     = getField("campSelectedPackage");
-  const firstNameEl   = getField("campFirstName");
-  const lastNameEl    = getField("campLastName");
-  const ageEl         = getField("campAge");
-  const parentNameEl  = getField("campParentName");
+  const packageEl = getField("campSelectedPackage");
+  const firstNameEl = getField("campFirstName");
+  const lastNameEl = getField("campLastName");
+  const ageEl = getField("campAge");
+  const parentNameEl = getField("campParentName");
   const parentPhoneEl = getField("campParentPhone");
-  const langEl        = getField("campLanguage");
+  const langEl = getField("campLanguage");
+  const bacLangBoxes = document.querySelectorAll('input[name="bacLang"]');
+  const itTrackChosen = document.querySelector('input[name="itTrack"]:checked');
 
-  if (!packageEl || !firstNameEl || !lastNameEl ||
-      !ageEl || !parentNameEl || !parentPhoneEl) return false;
+  if (!packageEl || !firstNameEl || !lastNameEl || !ageEl || !parentNameEl || !parentPhoneEl) {
+    return false;
+  }
 
   const selectedPackage = packageEl.value.trim();
-  const firstName       = firstNameEl.value.trim();
-  const lastName        = lastNameEl.value.trim();
-  const age             = ageEl.value.trim();
-  const parentName      = parentNameEl.value.trim();
-  const parentPhone     = parentPhoneEl.value.trim();
-  const language        = langEl ? langEl.value.trim() : "";
-  const needsLang       = selectedPackage && packageHasLanguage(selectedPackage);
+  const firstName = firstNameEl.value.trim();
+  const lastName = lastNameEl.value.trim();
+  const age = ageEl.value.trim();
+  const parentName = parentNameEl.value.trim();
+  const parentPhone = parentPhoneEl.value.trim();
+  const language = langEl ? langEl.value.trim() : "";
+  const bacSelected = [...bacLangBoxes].filter(box => box.checked).map(box => box.value);
+  const bacLanguages = bacSelected.join(" + ");
+  const itTrack = itTrackChosen ? itTrackChosen.value.trim() : "";
+
+  const showBac = isBacPackage(selectedPackage);
+  const showLang = needsSingleLanguage(selectedPackage);
+  const showIT = isITAdvancedPackage(selectedPackage);
 
   let valid = true;
 
   [
-    { el: packageEl,     val: selectedPackage },
-    { el: firstNameEl,   val: firstName },
-    { el: lastNameEl,    val: lastName },
-    { el: parentNameEl,  val: parentName },
+    { el: packageEl, val: selectedPackage },
+    { el: firstNameEl, val: firstName },
+    { el: lastNameEl, val: lastName },
+    { el: ageEl, val: age },
+    { el: parentNameEl, val: parentName },
     { el: parentPhoneEl, val: parentPhone }
-  ].forEach(f => {
-    if (!f.val) { markInvalid(f.el); valid = false; }
+  ].forEach(field => {
+    if (!field.val) {
+      markInvalid(field.el);
+      valid = false;
+    }
   });
 
-  if (needsLang && !language) {
+  if (showLang && !language) {
     if (langEl) markInvalid(langEl);
     valid = false;
   }
 
-  const ageNum = parseInt(age, 10);
-  if (!age || Number.isNaN(ageNum) || ageNum <= 0) {
-    markInvalid(ageEl);
+  if (showBac && bacSelected.length !== 2) {
+    bacLangBoxes.forEach(box => markInvalid(box));
+    alert("❌ يرجى اختيار لغتين في باقة البكالوريا.");
     valid = false;
-  } else if (ageNum < CAMP_MIN_AGE) {
-    // ✅ تعديل: فقط حد أدنى، لا حد أقصى
+  }
+
+  if (showIT && !itTrack) {
+    document.querySelectorAll('input[name="itTrack"]').forEach(box => markInvalid(box));
+    alert("❌ يرجى اختيار مسار الإعلام الآلي.");
+    valid = false;
+  }
+
+  const ageNum = parseInt(age, 10);
+  if (!age || Number.isNaN(ageNum) || ageNum < CAMP_MIN_AGE) {
     markInvalid(ageEl);
-    alert(`❌ عذراً، العمر غير مناسب للتسجيل.\nالحد الأدنى للعمر: ${CAMP_MIN_AGE} سنوات.`);
+    alert(`❌ الحد الأدنى للعمر هو ${CAMP_MIN_AGE} سنوات.`);
     valid = false;
   }
 
@@ -621,31 +657,69 @@ function campRegister(e) {
 
   const submitBtn = getField("camp-submit-btn");
   if (submitBtn) {
+    submitBtn.disabled = true;
     submitBtn.innerHTML =
-      '<span>جاري الحجز...</span> ' +
-      '<span style="animation:floatY 0.8s ease-in-out infinite;display:inline-block;">⏳</span>';
+      '<span>جاري الحجز...</span> <span style="animation:floatY 0.8s ease-in-out infinite;display:inline-block;">⏳</span>';
     submitBtn.style.pointerEvents = "none";
-    submitBtn.style.opacity       = "0.8";
+    submitBtn.style.opacity = "0.8";
   }
 
-  const payload = encodeURIComponent(JSON.stringify({
-    program:         "Summer Academy 2026",
-    selectedPackage,
-    language:        needsLang ? language : "—",
+  const payload = {
+    timestamp: new Date().toLocaleString("ar-DZ"),
+    package: selectedPackage,
+    bacLanguages: showBac ? bacLanguages : "",
+    itTrack: showIT ? itTrack : "",
+    language: showLang ? language : "",
     firstName,
     lastName,
-    age:             String(ageNum),
+    age: String(ageNum),
     parentName,
-    parentPhone,
-    timestamp:       new Date().toISOString()
-  }));
-  new Image().src = `${APPS_SCRIPT_URL}?payload=${payload}`;
+    parentPhone
+  };
 
-  setTimeout(() => {
-    document.body.appendChild(
-      buildSuccessModal(firstName, lastName, selectedPackage, needsLang ? language : "")
-    );
-  }, 1500);
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const form = document.getElementById("camp-form");
+    if (form) form.reset();
+
+    const langGroup = document.getElementById("campLanguageGroup");
+    const comboGroup = document.getElementById("campPackageChoiceGroup");
+    const itGroup = document.getElementById("campITChoiceGroup");
+
+    langGroup?.classList.remove("lang-visible");
+    comboGroup?.classList.remove("choice-visible");
+    itGroup?.classList.remove("it-visible");
+
+    if (submitBtn) {
+      submitBtn.innerHTML = "<span>تم الحجز بنجاح!</span>";
+      submitBtn.style.background = "linear-gradient(135deg,#16a34a,#15803d)";
+    }
+
+    setTimeout(() => {
+      document.body.appendChild(
+        buildSuccessModal(firstName, lastName, selectedPackage, showLang ? language : "")
+      );
+    }, 700);
+
+  } catch (error) {
+    console.error("Form submit error:", error);
+
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = "<span>حدث خطأ، أعد المحاولة</span>";
+      submitBtn.style.pointerEvents = "";
+      submitBtn.style.opacity = "1";
+      submitBtn.style.background = "linear-gradient(135deg,#dc2626,#b91c1c)";
+    }
+  }
 
   return false;
 }
@@ -654,6 +728,7 @@ function campRegister(e) {
    INIT
 ───────────────────────────────────────── */
 window.campRegister = campRegister;
+window.openLightbox = openLightbox;
 
 document.addEventListener("DOMContentLoaded", () => {
   initPricingTabs();
@@ -663,11 +738,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initCampVideo();
   loadCampGallery();
   initRegisterModal();
-  initLanguageField();
+  initDynamicFields();
 
-  const form      = document.getElementById("camp-form");
-  const submitBtn = document.getElementById("camp-submit-btn");
-
-  if (form)      form.addEventListener("submit",  campRegister);
-  if (submitBtn) submitBtn.addEventListener("click", campRegister);
+  const form = document.getElementById("camp-form");
+  if (form) form.addEventListener("submit", campRegister);
 });
