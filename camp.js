@@ -22,7 +22,7 @@ getFirestore(app);
 
 const CAMP_MIN_AGE = 5;
 const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzm4dU6vSfNs3jOHlsfjPvBEGFK2rbeM_FcOf5anhEcmI5_TNTHxep7rkVxQsOVrU_LkQ/exec";
+  "https://script.google.com/macros/s/AKfycbwms_MZkbTI4bmdU4aXMQ-dHtILg-DrP586DUcDBxL3o8aBnVa8NWtptvxyf8I4VIYlAQ/exec";
 
 let isSubmitting = false;
 let successOverlayShown = false;
