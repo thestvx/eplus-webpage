@@ -25,9 +25,37 @@
       border-color: #7c3aed !important;
     }
 
+    .top-logo {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 18px 16px 8px;
+      position: relative;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .top-logo img {
+      width: clamp(110px, 16vw, 190px) !important;
+      max-width: 190px !important;
+      height: auto !important;
+      max-height: 90px !important;
+      object-fit: contain;
+      display: block;
+      filter: drop-shadow(0 10px 24px rgba(0,0,0,0.22));
+    }
+
+    .camp-hero {
+      position: relative;
+      z-index: 2;
+      overflow: hidden;
+    }
+
     .camp-hero-logo {
-      width: clamp(110px, 18vw, 180px);
-      max-width: 100%;
+      width: clamp(110px, 18vw, 180px) !important;
+      max-width: min(180px, 42vw) !important;
+      height: auto !important;
       margin: 0 auto 20px;
       filter: drop-shadow(0 14px 28px rgba(0,0,0,0.28));
       animation: floatY 6s ease-in-out infinite;
@@ -36,8 +64,19 @@
     }
 
     @media (max-width: 768px) {
+      .top-logo {
+        padding: 14px 12px 6px;
+      }
+
+      .top-logo img {
+        width: clamp(90px, 28vw, 130px) !important;
+        max-width: 130px !important;
+        max-height: 64px !important;
+      }
+
       .camp-hero-logo {
-        width: clamp(95px, 28vw, 135px);
+        width: clamp(95px, 28vw, 135px) !important;
+        max-width: min(135px, 46vw) !important;
         margin-bottom: 16px;
       }
     }
@@ -875,203 +914,6 @@
 
   <script src="https://unpkg.com/cloudinary-video-player@1.9.10/dist/cld-video-player.min.js"></script>
   <script type="module" src="camp.js"></script>
-
-  <script>
-    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID_HERE/exec";
-
-    document.querySelectorAll('.pricing-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.pricing-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.pricing-content').forEach(c => c.classList.remove('active'));
-        tab.classList.add('active');
-        document.getElementById(tab.dataset.target).classList.add('active');
-      });
-    });
-
-    const modal = document.getElementById('camp-register-modal');
-    const openBtn = document.getElementById('open-register-modal');
-    const closeBtn = document.getElementById('close-register-modal');
-    const backdrop = modal.querySelector('.camp-register-modal-backdrop');
-
-    function openModal() {
-      modal.classList.add('open');
-      modal.setAttribute('aria-hidden', 'false');
-      document.body.style.overflow = 'hidden';
-    }
-
-    function closeModal() {
-      modal.classList.remove('open');
-      modal.setAttribute('aria-hidden', 'true');
-      document.body.style.overflow = '';
-    }
-
-    openBtn.addEventListener('click', openModal);
-    closeBtn.addEventListener('click', closeModal);
-    backdrop.addEventListener('click', closeModal);
-
-    window.selectPackage = function(pkgName) {
-      const sel = document.getElementById('campSelectedPackage');
-      for (let opt of sel.options) {
-        if (opt.value === pkgName) {
-          sel.value = pkgName;
-          break;
-        }
-      }
-      sel.dispatchEvent(new Event('change'));
-      openModal();
-      setTimeout(() => sel.scrollIntoView({ behavior: 'smooth', block: 'center' }), 320);
-    };
-
-    const packageSel = document.getElementById('campSelectedPackage');
-    const langGroup = document.getElementById('campLanguageGroup');
-    const comboGroup = document.getElementById('campPackageChoiceGroup');
-    const itGroup = document.getElementById('campITChoiceGroup');
-    const bacLangBoxes = document.querySelectorAll('input[name="bacLang"]');
-
-    const SINGLE_LANG_PACKAGES = [
-      '5–10',
-      '11–14',
-      'الباقة الأساسية (15–18)',
-      'باقة النخبة (15–18)',
-      'باقة البالغين',
-      'باقة البالغين المتقدمة',
-      'English Communication Class'
-    ];
-
-    packageSel.addEventListener('change', () => {
-      const val = packageSel.value;
-
-      const isBac = val.includes('البكالوريا');
-      comboGroup.classList.toggle('choice-visible', isBac);
-
-      const isSpecialSingleLang =
-        val.includes('English Communication Class') ||
-        val.includes('IELTS Preparation');
-
-      const needsSingleLang = !isBac && (
-        SINGLE_LANG_PACKAGES.some(p => val.includes(p)) || isSpecialSingleLang
-      );
-
-      langGroup.classList.toggle('lang-visible', needsSingleLang);
-
-      const isAdvanced = val.includes('البالغين المتقدمة');
-      itGroup.classList.toggle('it-visible', isAdvanced);
-
-      if (!isBac) {
-        bacLangBoxes.forEach(b => b.checked = false);
-      }
-
-      if (!isAdvanced) {
-        document.querySelectorAll('input[name="itTrack"]').forEach(r => r.checked = false);
-      }
-
-      if (!needsSingleLang) {
-        document.getElementById('campLanguage').value = '';
-      }
-    });
-
-    bacLangBoxes.forEach(cb => {
-      cb.addEventListener('change', () => {
-        const checked = [...bacLangBoxes].filter(c => c.checked);
-        if (checked.length > 2) cb.checked = false;
-      });
-    });
-
-    document.getElementById('camp-form').addEventListener('submit', async function(e) {
-      e.preventDefault();
-
-      const pkg = packageSel.value.trim();
-      const lang = document.getElementById('campLanguage').value.trim();
-      const firstName = document.getElementById('campFirstName').value.trim();
-      const lastName = document.getElementById('campLastName').value.trim();
-      const age = document.getElementById('campAge').value.trim();
-      const parent = document.getElementById('campParentName').value.trim();
-      const phone = document.getElementById('campParentPhone').value.trim();
-
-      if (!pkg || !firstName || !lastName || !age || !parent || !phone) {
-        alert('⚠️ الرجاء ملء جميع الحقول الإلزامية.');
-        return;
-      }
-
-      const requiresLanguage =
-        langGroup.classList.contains('lang-visible');
-
-      if (requiresLanguage && !lang) {
-        alert('⚠️ الرجاء اختيار اللغة.');
-        return;
-      }
-
-      let bacLangsSelected = '';
-      if (pkg.includes('البكالوريا')) {
-        const checked = [...bacLangBoxes].filter(c => c.checked);
-        if (checked.length !== 2) {
-          alert('⚠️ الرجاء اختيار لغتين بالضبط لباقة تحضير البكالوريا.');
-          return;
-        }
-        bacLangsSelected = checked.map(c => c.value).join(' + ');
-      }
-
-      let itTrack = '';
-      if (pkg.includes('البالغين المتقدمة')) {
-        const chosen = document.querySelector('input[name="itTrack"]:checked');
-        if (!chosen) {
-          alert('⚠️ الرجاء اختيار مسار الإعلام الآلي.');
-          return;
-        }
-        itTrack = chosen.value;
-      }
-
-      const submitBtn = document.getElementById('camp-submit-btn');
-      submitBtn.disabled = true;
-      submitBtn.querySelector('span').textContent = '⏳ جاري الإرسال...';
-
-      const payload = {
-        timestamp: new Date().toLocaleString('ar-DZ'),
-        package: pkg,
-        bacLanguages: bacLangsSelected || '—',
-        itTrack: itTrack || '—',
-        language: lang || '—',
-        firstName,
-        lastName,
-        age,
-        parentName: parent,
-        parentPhone: phone
-      };
-
-      try {
-        await fetch(GOOGLE_SHEETS_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        submitBtn.querySelector('span').textContent = '✅ تم الإرسال بنجاح!';
-        submitBtn.style.background = 'linear-gradient(135deg,#16a34a,#15803d)';
-        document.getElementById('camp-form').reset();
-        langGroup.classList.remove('lang-visible');
-        comboGroup.classList.remove('choice-visible');
-        itGroup.classList.remove('it-visible');
-
-        setTimeout(() => {
-          closeModal();
-          submitBtn.disabled = false;
-          submitBtn.querySelector('span').textContent = 'إرسال طلب التسجيل';
-          submitBtn.style.background = '';
-        }, 2800);
-
-      } catch (err) {
-        console.error('Form submit error:', err);
-        submitBtn.querySelector('span').textContent = '❌ حدث خطأ، حاول مجدداً';
-        submitBtn.style.background = 'linear-gradient(135deg,#dc2626,#b91c1c)';
-        setTimeout(() => {
-          submitBtn.disabled = false;
-          submitBtn.querySelector('span').textContent = 'إرسال طلب التسجيل';
-          submitBtn.style.background = '';
-        }, 3000);
-      }
-    });
-  </script>
 
   <script type="module">
     import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
