@@ -911,59 +911,163 @@
         <a href="tel:0676431474" class="social-icon phone">
           <img src="icons/phone.png" alt="Phone" draggable="false">
         </a>
-        <a href="https://maps.app.goo.gl/Ei4duDb9QJZHgYFq9" class="social-icon location" target="_blank" rel="noopener noreferrer">
+        <a href="https://maps.app.goo.gl/Ei4duDb9QJZHgYFq9" class="social-icon map" target="_blank" rel="noopener noreferrer">
           <img src="icons/location.png" alt="Location" draggable="false">
         </a>
       </div>
     </div>
   </footer>
 
-  <script src="https://unpkg.com/cloudinary-video-player@1.9.10/dist/cld-video-player.min.js"></script>
-  <script type="module" src="camp.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cloudinary-video-player/dist/cld-video-player.min.js"></script>
 
-  <script type="module">
-    import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-    import { getDatabase, ref, increment, set, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+  <script>
+    (function () {
+      const VIDEO_CLOUD_NAME = "dac4mwuwe";
+      const VIDEO_PUBLIC_ID = "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab";
+      const VIDEO_FALLBACK_SRC = `https://res.cloudinary.com/${VIDEO_CLOUD_NAME}/video/upload/q_auto,f_auto/${VIDEO_PUBLIC_ID}.mp4`;
 
-    const _cfg = {
-      apiKey: "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
-      authDomain: "eplus-center-39.firebaseapp.com",
-      projectId: "eplus-center-39",
-      storageBucket: "eplus-center-39.firebasestorage.app",
-      messagingSenderId: "191532732034",
-      appId: "1:191532732034:web:b11449a2f0595db5d02e9b",
-      databaseURL: "https://eplus-center-39-default-rtdb.firebaseio.com"
-    };
+      function normalizeText(value) {
+        return String(value || "").trim();
+      }
 
-    const visApp = getApps().find(a => a.name === "visitor-app") || initializeApp(_cfg, "visitor-app");
-    const rtdb = getDatabase(visApp);
-    const db = getFirestore(visApp);
+      function simplifyText(value) {
+        return normalizeText(value)
+          .replaceAll("-", "–")
+          .replace(/\s+/g, " ")
+          .toLowerCase();
+      }
 
-    set(ref(rtdb, "visitors/total"), increment(1));
+      function openRegisterModal() {
+        const modal = document.getElementById("camp-register-modal");
+        if (!modal) return;
+        modal.classList.add("open", "active");
+        modal.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+      }
 
-    const sessionId = Date.now() + "_" + Math.random().toString(36).slice(2);
-    const mySession = ref(rtdb, "visitors/sessions/" + sessionId);
-    const onlineRef = ref(rtdb, "visitors/online");
+      function buildLanguageOptions(includeSpanish) {
+        return `
+          <option value="">-- اختر اللغة --</option>
+          <option value="الإنجليزية" data-lang="english">🇬🇧 الإنجليزية</option>
+          <option value="الفرنسية" data-lang="french">🇫🇷 الفرنسية</option>
+          ${includeSpanish ? '<option value="الإسبانية" data-lang="spanish">🇪🇸 الإسبانية</option>' : ""}
+        `;
+      }
 
-    set(mySession, true);
-    onDisconnect(mySession).remove();
+      function syncCampLanguageOptions() {
+        const packageEl = document.getElementById("campSelectedPackage");
+        const langEl = document.getElementById("campLanguage");
+        if (!packageEl || !langEl) return;
 
-    onValue(ref(rtdb, "visitors/sessions"), snap => {
-      const count = snap.exists() ? Object.keys(snap.val()).length : 0;
-      set(onlineRef, count);
-    });
+        const selectedPackage = normalizeText(packageEl.value);
+        const currentLang = normalizeText(langEl.value);
+        const isFiveToTen = selectedPackage.includes("5–10") || selectedPackage.includes("5-10");
 
-    try {
-      await addDoc(collection(db, "pageViews"), {
-        page: "summer-camp",
-        visitedAt: serverTimestamp(),
-        userAgent: navigator.userAgent.slice(0, 120),
-        lang: navigator.language || "unknown"
+        langEl.innerHTML = buildLanguageOptions(!isFiveToTen);
+
+        const allowedValues = [...langEl.options].map(option => normalizeText(option.value));
+        langEl.value = allowedValues.includes(currentLang) ? currentLang : "";
+      }
+
+      function setDirectVideoFallback(playerEl) {
+        if (!playerEl) return;
+
+        playerEl.classList.add("camp-video-iframe", "cld-video-player", "cld-fluid");
+        playerEl.setAttribute("playsinline", "true");
+        playerEl.setAttribute("controls", "true");
+        playerEl.setAttribute("preload", "metadata");
+        playerEl.setAttribute("src", VIDEO_FALLBACK_SRC);
+        playerEl.load();
+      }
+
+      function initCampVideoFallback() {
+        const playerEl = document.getElementById("player");
+        if (!playerEl) return;
+
+        playerEl.classList.add("camp-video-iframe", "cld-video-player", "cld-fluid");
+        playerEl.setAttribute("playsinline", "true");
+        playerEl.setAttribute("controls", "true");
+        playerEl.setAttribute("preload", "metadata");
+
+        try {
+          if (window.cloudinary && typeof window.cloudinary.videoPlayer === "function") {
+            const player = window.cloudinary.videoPlayer("player", {
+              cloudName: VIDEO_CLOUD_NAME,
+              controls: true,
+              fluid: true,
+              autoplayMode: "never",
+              muted: false
+            });
+
+            if (player && typeof player.source === "function") {
+              player.source({
+                publicId: VIDEO_PUBLIC_ID,
+                sourceTypes: ["mp4"]
+              });
+            }
+
+            setTimeout(() => {
+              if (!playerEl.currentSrc && !playerEl.src) {
+                setDirectVideoFallback(playerEl);
+              }
+            }, 1200);
+
+            return;
+          }
+        } catch (error) {
+          console.error("Cloudinary inline init failed:", error);
+        }
+
+        setDirectVideoFallback(playerEl);
+      }
+
+      window.selectPackage = function (packageName) {
+        const selectEl = document.getElementById("campSelectedPackage");
+        if (!selectEl) {
+          openRegisterModal();
+          return;
+        }
+
+        const wanted = simplifyText(packageName);
+        const options = [...selectEl.options];
+
+        const match = options.find(option => simplifyText(option.value) === wanted)
+          || options.find(option => simplifyText(option.textContent) === wanted)
+          || options.find(option => {
+            const value = simplifyText(option.value);
+            return value.includes(wanted) || wanted.includes(value);
+          });
+
+        if (match) {
+          selectEl.value = match.value;
+        }
+
+        selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+        syncCampLanguageOptions();
+        openRegisterModal();
+
+        selectEl.style.transition = "box-shadow 0.4s ease, border-color 0.4s ease";
+        selectEl.style.boxShadow = "0 0 0 4px rgba(244,180,26,0.5), 0 0 20px rgba(244,180,26,0.2)";
+        selectEl.style.borderColor = "rgba(244,180,26,0.8)";
+
+        setTimeout(() => {
+          selectEl.style.boxShadow = "";
+          selectEl.style.borderColor = "";
+        }, 2200);
+      };
+
+      document.addEventListener("DOMContentLoaded", function () {
+        const packageEl = document.getElementById("campSelectedPackage");
+        if (packageEl) {
+          syncCampLanguageOptions();
+          packageEl.addEventListener("change", syncCampLanguageOptions);
+        }
+
+        initCampVideoFallback();
       });
-    } catch (e) {
-      console.warn("pageViews log failed:", e);
-    }
+    })();
   </script>
+
+  <script type="module" src="camp.js"></script>
 </body>
 </html>
