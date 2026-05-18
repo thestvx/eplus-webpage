@@ -69,7 +69,7 @@ function isITAdvancedPackage(packageValue) {
 
 function isAdultBasicPackage(packageValue) {
   const value = normalizeText(packageValue);
-  return value.includes("باقة البالغين — 8,000");
+  return value.includes("باقة البالغين") || value.includes("8,000");
 }
 
 function isSpecialPackage(packageValue) {
@@ -86,6 +86,7 @@ function needsSingleLanguage(packageValue) {
   const value = normalizeText(packageValue);
   if (!value || isBacPackage(value) || isITAdvancedPackage(value)) return false;
   if (isSpecialPackage(value)) return false;
+
   return (
     value.includes("5–10") ||
     value.includes("5-10") ||
@@ -102,7 +103,7 @@ function updateLanguageOptionsByPackage(packageValue) {
   if (!langEl) return;
 
   const hideSpanish = isFiveToTenPackage(packageValue);
-  const options = [...langEl.options];
+  const options = Array.from(langEl.options);
 
   options.forEach(option => {
     const optionText = normalizeText(option.textContent).toLowerCase();
@@ -119,10 +120,11 @@ function updateLanguageOptionsByPackage(packageValue) {
       optionValue.includes("español");
 
     option.hidden = hideSpanish && isSpanishOption;
+    option.disabled = hideSpanish && isSpanishOption;
   });
 
   const selectedOption = langEl.options[langEl.selectedIndex];
-  if (selectedOption?.hidden) {
+  if (selectedOption && (selectedOption.hidden || selectedOption.disabled)) {
     langEl.value = "";
   }
 }
@@ -170,14 +172,16 @@ function initDynamicFields() {
 
     updateLanguageOptionsByPackage(val);
 
-    comboGroup?.classList.toggle("choice-visible", showBac);
-    langGroup?.classList.toggle("lang-visible", showLang);
-    itGroup?.classList.toggle("it-visible", showIT);
+    if (comboGroup) comboGroup.classList.toggle("choice-visible", showBac);
+    if (langGroup) langGroup.classList.toggle("lang-visible", showLang);
+    if (itGroup) itGroup.classList.toggle("it-visible", showIT);
 
-    if (showLang && langEl) {
-      langEl.setAttribute("required", "true");
-    } else {
-      clearLang();
+    if (langEl) {
+      if (showLang) {
+        langEl.setAttribute("required", "true");
+      } else {
+        clearLang();
+      }
     }
 
     if (!showBac) clearBac();
@@ -202,9 +206,11 @@ function initDynamicFields() {
     });
   });
 
-  langEl?.addEventListener("change", () => {
-    langEl.classList.remove("camp-input-error");
-  });
+  if (langEl) {
+    langEl.addEventListener("change", () => {
+      langEl.classList.remove("camp-input-error");
+    });
+  }
 
   toggleFields();
 }
@@ -215,6 +221,7 @@ function initDynamicFields() {
 function initPricingTabs() {
   const tabs = document.querySelectorAll(".pricing-tab");
   const contents = document.querySelectorAll(".pricing-content");
+
   if (!tabs.length || !contents.length) return;
 
   tabs.forEach(tab => {
@@ -245,7 +252,7 @@ function initRegisterModal() {
   const openModalBtn = getField("open-register-modal");
   const modal = getField("camp-register-modal");
   const closeModalBtn = getField("close-register-modal");
-  const modalBox = modal?.querySelector(".camp-register-modal-box");
+  const modalBox = modal ? modal.querySelector(".camp-register-modal-box") : null;
 
   if (!modal) {
     return {
@@ -268,8 +275,8 @@ function initRegisterModal() {
     setBodyModalState(false);
   };
 
-  openModalBtn?.addEventListener("click", openModal);
-  closeModalBtn?.addEventListener("click", closeModal);
+  if (openModalBtn) openModalBtn.addEventListener("click", openModal);
+  if (closeModalBtn) closeModalBtn.addEventListener("click", closeModal);
 
   modal.addEventListener("click", e => {
     if (e.target.classList.contains("camp-register-modal-backdrop")) {
@@ -285,9 +292,11 @@ function initRegisterModal() {
     }
   });
 
-  modalBox?.addEventListener("click", e => {
-    e.stopPropagation();
-  });
+  if (modalBox) {
+    modalBox.addEventListener("click", e => {
+      e.stopPropagation();
+    });
+  }
 
   return { openModal, closeModal };
 }
@@ -768,19 +777,21 @@ function buildSuccessModal(firstName, lastName, selectedPackage, languageText) {
     </div>`;
 
   const button = overlay.querySelector("#success-close-btn");
-  button?.addEventListener("mouseenter", () => {
-    button.style.transform = "translateY(-3px)";
-    button.style.boxShadow = "0 20px 40px rgba(255,159,29,.45)";
-  });
-  button?.addEventListener("mouseleave", () => {
-    button.style.transform = "";
-    button.style.boxShadow = "0 15px 30px rgba(255,159,29,.35)";
-  });
-  button?.addEventListener("click", () => {
-    overlay.remove();
-    successOverlayShown = false;
-    window.location.reload();
-  });
+  if (button) {
+    button.addEventListener("mouseenter", () => {
+      button.style.transform = "translateY(-3px)";
+      button.style.boxShadow = "0 20px 40px rgba(255,159,29,.45)";
+    });
+    button.addEventListener("mouseleave", () => {
+      button.style.transform = "";
+      button.style.boxShadow = "0 15px 30px rgba(255,159,29,.35)";
+    });
+    button.addEventListener("click", () => {
+      overlay.remove();
+      successOverlayShown = false;
+      window.location.reload();
+    });
+  }
 
   return overlay;
 }
@@ -857,7 +868,7 @@ async function campRegister(e) {
   const age = normalizeText(ageEl.value);
   const parentName = normalizeText(parentNameEl.value);
   const parentPhone = normalizePhone(parentPhoneEl.value);
-  const language = normalizeText(langEl?.value);
+  const language = normalizeText(langEl ? langEl.value : "");
   const bacSelected = [...bacLangBoxes].filter(box => box.checked).map(box => normalizeText(box.value));
   const bacLanguages = bacSelected.join(" + ");
   const itTrack = itTrackChosen ? normalizeText(itTrackChosen.value) : "";
@@ -943,6 +954,78 @@ async function campRegister(e) {
   try {
     await submitWithFallback(payload);
 
-    form?.reset();
+    if (form) form.reset();
 
-    getField("campLanguageGroup")?.classList.remove("lang-vis
+    const langGroup = getField("campLanguageGroup");
+    const comboGroup = getField("campPackageChoiceGroup");
+    const itGroup = getField("campITChoiceGroup");
+
+    if (langGroup) langGroup.classList.remove("lang-visible");
+    if (comboGroup) comboGroup.classList.remove("choice-visible");
+    if (itGroup) itGroup.classList.remove("it-visible");
+
+    updateLanguageOptionsByPackage("");
+
+    if (submitBtn) {
+      submitBtn.innerHTML = "<span>تم الحجز بنجاح!</span>";
+      submitBtn.style.background = "linear-gradient(135deg,#16a34a,#15803d)";
+      submitBtn.style.opacity = "1";
+    }
+
+    if (modal) {
+      modal.classList.remove("open");
+      modal.classList.remove("active");
+      modal.setAttribute("aria-hidden", "true");
+      setBodyModalState(false);
+    }
+
+    const chosenDetails = getChosenDetails(selectedPackage, language, bacLanguages, itTrack);
+
+    setTimeout(() => {
+      if (successOverlayShown) return;
+      successOverlayShown = true;
+      document.body.appendChild(
+        buildSuccessModal(firstName, lastName, selectedPackage, chosenDetails)
+      );
+    }, 500);
+
+  } catch (error) {
+    console.error("Form submit error:", error);
+
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = "<span>حدث خطأ، أعد المحاولة</span>";
+      submitBtn.style.pointerEvents = "";
+      submitBtn.style.opacity = "1";
+      submitBtn.style.background = "linear-gradient(135deg,#dc2626,#b91c1c)";
+    }
+
+    alert("❌ حدث خطأ أثناء إرسال التسجيل. يرجى إعادة المحاولة.");
+    isSubmitting = false;
+    return false;
+  }
+
+  return false;
+}
+
+/* ─────────────────────────────────────────
+   INIT
+───────────────────────────────────────── */
+window.campRegister = campRegister;
+window.openLightbox = openLightbox;
+
+document.addEventListener("DOMContentLoaded", () => {
+  initPricingTabs();
+  initSquaresBackground();
+  initRevealOnScroll();
+  initTiltEffect();
+  initCampVideo();
+  loadCampGallery();
+  initRegisterModal();
+  initDynamicFields();
+
+  const form = getField("camp-form");
+  if (form) {
+    form.addEventListener("submit", campRegister);
+  }
+});
