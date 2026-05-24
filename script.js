@@ -1605,12 +1605,20 @@ function animateCounters() {
   const joinBtn = document.getElementById('join-team-btn') || document.getElementById('nav-join-btn');
   if (joinBtn) joinBtn.addEventListener('click', () => typeof openJoinModal === 'function' && openJoinModal());
 
-  // Loader hide
+  // Loader hide — multiple fallbacks so it never gets stuck
   const loader = document.getElementById('ep-loader');
   if (loader) {
-    window.addEventListener('load', () => {
-      setTimeout(() => loader.classList.add('hidden'), 1800);
-    });
+    function hideLoader() {
+      loader.classList.add('hidden');
+    }
+    // Always hide after bar animation completes (2s), regardless of images
+    setTimeout(hideLoader, 2000);
+    // Also on window load if it fires first
+    if (document.readyState === 'complete') {
+      setTimeout(hideLoader, 1800);
+    } else {
+      window.addEventListener('load', () => setTimeout(hideLoader, 1800));
+    }
   }
 
   // Custom cursor
