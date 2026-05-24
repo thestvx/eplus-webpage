@@ -462,20 +462,24 @@ function openModal(type) {
   currentModalType = type;
   resetForm();
   const titles = {
-    support: currentLang === 'ar' ? 'تسجيل — دعم دراسي' : 'Registration — Academic Support',
-    lang: currentLang === 'ar' ? 'تسجيل — دورات اللغات' : 'Registration — Language Courses',
-    vip: currentLang === 'ar' ? 'تسجيل — دروس VIP' : 'Registration — VIP Lessons',
-    ielts: currentLang === 'ar' ? 'تسجيل — اختبار IELTS' : 'Registration — IELTS Test',
-    online: currentLang === 'ar' ? 'تسجيل — دورات أونلاين' : 'Registration — Online Courses',
+    support: currentLang === 'ar' ? 'تسجيل — دعم دراسي'     : 'Registration — Academic Support',
+    lang:    currentLang === 'ar' ? 'تسجيل — دورات اللغات'  : 'Registration — Language Courses',
+    vip:     currentLang === 'ar' ? 'تسجيل — دروس VIP'      : 'Registration — VIP Lessons',
+    ielts:   currentLang === 'ar' ? 'تسجيل — اختبار IELTS'  : 'Registration — IELTS Test',
+    online:  currentLang === 'ar' ? 'تسجيل — دورات أونلاين' : 'Registration — Online Courses',
     takwini: currentLang === 'ar' ? 'تسجيل — دورات تكوينية' : 'Registration — Training Courses'
   };
-  const modalTitle = byId('modal-title');
+  const modalTitle = byId('program-modal-title');
   if (modalTitle) modalTitle.textContent = titles[type] || 'نموذج التسجيل';
   const motivationLabel = $('label[for="motivation"] span[data-i18n="motivation"]');
   if (motivationLabel) {
-    const t = i18n[currentLang];
-    motivationLabel.textContent = type === 'vip' ? t.motivationVip : t.motivation;
+    motivationLabel.textContent = type === 'vip' ? i18n[currentLang].motivationVip : i18n[currentLang].motivation;
   }
+  // Show lang warning
+  const langWarn = byId('lang-warning');
+  if (langWarn) langWarn.style.display = 'flex';
+  setLang(currentLang);
+
   const langGrp    = byId('langTypeGroup');
   const vipTypeGrp = byId('vipTypeGroup');
   hideField(langGrp, 'langType');
@@ -494,22 +498,22 @@ function openModal(type) {
   } else if (type === 'takwini') {
     showTakwiniOptions();
   }
-  byId('lang-toggle')?.classList.add('hidden');
-  hideLogo();
-  byId('modal')?.classList.add('active');
+  const modal = byId('program-modal');
+  if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
   lockPageScroll();
 }
 
 function closeModal() {
-  byId('modal')?.classList.remove('active');
+  const modal = byId('program-modal');
+  if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
+  const langWarn = byId('lang-warning');
+  if (langWarn) langWarn.style.display = 'none';
   unlockPageScroll();
-  byId('lang-toggle')?.classList.remove('hidden');
-  showLogo();
   resetForm();
 }
 
 function closeModalOutside(e) {
-  if (e.target === byId('modal')) closeModal();
+  if (e.target === byId('program-modal')) closeModal();
 }
 
 /* ──────────────────────────────────────────────────────────
@@ -1018,18 +1022,19 @@ function openTermsForSubmit(data) {
   `;
   const footer = $('.terms-footer');
   if (footer) footer.insertBefore(hint, footer.firstChild);
-  byId('modal')?.classList.remove('active');
-  byId('terms-modal')?.classList.add('active');
+  const regModal = byId('program-modal');
+  if (regModal) { regModal.style.display = 'none'; regModal.classList.remove('active'); }
+  const termsModal = byId('terms-modal');
+  if (termsModal) { termsModal.style.display = 'flex'; termsModal.classList.add('active'); }
 }
 
 function closeTerms() {
   const tbody = $('.terms-body');
   if (tbody) tbody.onscroll = null;
   byId('scroll-hint')?.remove();
-  byId('terms-modal')?.classList.remove('active');
+  const termsModal = byId('terms-modal');
+  if (termsModal) { termsModal.style.display = 'none'; termsModal.classList.remove('active'); }
   unlockPageScroll();
-  byId('lang-toggle')?.classList.remove('hidden');
-  showLogo();
   pendingFormData = null;
 }
 
@@ -1054,7 +1059,8 @@ async function proceedToRegister() {
   const tbody = $('.terms-body');
   if (tbody) tbody.onscroll = null;
   byId('scroll-hint')?.remove();
-  byId('terms-modal')?.classList.remove('active');
+  const termsModal = byId('terms-modal');
+  if (termsModal) { termsModal.style.display = 'none'; termsModal.classList.remove('active'); }
   const btn = byId('terms-proceed-btn');
   btn?.classList.add('loading');
   showLoadingPopup(
@@ -1066,21 +1072,14 @@ async function proceedToRegister() {
     Object.entries(pendingFormData).forEach(([key, value]) => {
       formData.append(key, value ?? '');
     });
-    await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: formData
-    });
-    const regTypeLabel =
-      currentLang === 'ar'
-        ? (typeLabelsAr[pendingFormData.type] || 'الخدمة المطلوبة')
-        : (typeLabelsEn[pendingFormData.type] || 'Requested service');
+    await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formData });
+    const regTypeLabel = currentLang === 'ar'
+      ? (typeLabelsAr[pendingFormData.type] || 'الخدمة المطلوبة')
+      : (typeLabelsEn[pendingFormData.type] || 'Requested service');
     btn?.classList.remove('loading');
     hideLoadingPopup();
     pendingFormData = null;
     unlockPageScroll();
-    byId('lang-toggle')?.classList.remove('hidden');
-    showLogo();
     resetForm();
     showSuccessModal(
       currentLang === 'ar' ? 'تم التسجيل بنجاح' : 'Registration completed successfully',
@@ -1093,13 +1092,7 @@ async function proceedToRegister() {
     console.error('❌ Registration error:', error);
     btn?.classList.remove('loading');
     hideLoadingPopup();
-    alert(
-      currentLang === 'ar'
-        ? 'حدث خطأ أثناء الإرسال، حاول مرة أخرى.'
-        : 'An error occurred while submitting, please try again.'
-    );
-    byId('lang-toggle')?.classList.remove('hidden');
-    showLogo();
+    alert(currentLang === 'ar' ? 'حدث خطأ أثناء الإرسال، حاول مرة أخرى.' : 'An error occurred, please try again.');
     unlockPageScroll();
   }
 }
@@ -1153,76 +1146,51 @@ function createConfetti(container, count = 18) {
 }
 
 function showSuccessModal(title, message, regNumber = null) {
-  const modal =
-    byId('success-popup') ||
-    byId('success-modal');
+  const modal = byId('success-popup');
   if (!modal) return;
-  const titleEl =
-    byId('success-popup-title') ||
-    $('.success-popup-title', modal);
-  const msgEl =
-    byId('success-popup-msg') ||
-    byId('success-message') ||
-    $('.success-popup-msg', modal);
+  const titleEl  = byId('success-popup-title');
+  const msgEl    = byId('success-popup-msg');
   const regWrap  = byId('success-popup-reg');
   const regNumEl = byId('success-popup-reg-number');
-  if (titleEl) {
-    titleEl.textContent = title || (currentLang === 'ar' ? 'تم بنجاح' : 'Success');
-  }
-  if (msgEl) {
-    msgEl.textContent =
-      message || (currentLang === 'ar' ? 'تم تنفيذ العملية بنجاح.' : 'The operation completed successfully.');
-  }
+  if (titleEl) titleEl.textContent = title   || (currentLang === 'ar' ? 'تم بنجاح' : 'Success');
+  if (msgEl)   msgEl.textContent   = message || (currentLang === 'ar' ? 'تم تنفيذ العملية بنجاح.' : 'Operation completed successfully.');
   if (regWrap && regNumEl) {
-    if (regNumber) {
-      regNumEl.textContent = regNumber;
-      regWrap.style.display = 'block';
-    } else {
-      regWrap.style.display = 'none';
-      regNumEl.textContent = '';
-    }
+    regWrap.style.display = regNumber ? 'block' : 'none';
+    regNumEl.textContent  = regNumber || '';
   }
+  modal.style.display = 'flex';
   modal.classList.add('active');
   lockPageScroll();
-  const box = $('.success-popup-box', modal);
+  const box = modal.querySelector('.success-popup-box');
   createConfetti(box);
 }
 
 function closeSuccessModal() {
-  const modal =
-    byId('success-popup') ||
-    byId('success-modal');
-  if (modal) modal.classList.remove('active');
+  const modal = byId('success-popup');
+  if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
   unlockPageScroll();
 }
 
 function closeSuccessOutside(e) {
-  const modal =
-    byId('success-popup') ||
-    byId('success-modal');
-  if (e.target === modal) closeSuccessModal();
+  if (e.target === byId('success-popup')) closeSuccessModal();
 }
 
 /* ──────────────────────────────────────────────────────────
    JOIN TEAM MODAL
 ────────────────────────────────────────────────────────── */
 function openJoinModal() {
-  byId('join-modal')?.classList.add('active');
-  byId('lang-toggle')?.classList.add('hidden');
-  hideLogo();
+  const modal = byId('join-modal');
+  if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
   lockPageScroll();
 }
 
 function closeJoinModal() {
-  byId('join-modal')?.classList.remove('active');
-  byId('lang-toggle')?.classList.remove('hidden');
-  showLogo();
+  const modal = byId('join-modal');
+  if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
   unlockPageScroll();
   byId('join-form')?.reset();
   const fileName = byId('cv-file-name');
   if (fileName) fileName.textContent = '';
-  const roleFields = byId('join-role-fields');
-  if (roleFields) roleFields.style.display = 'none';
 }
 
 function closeJoinModalOutside(e) {
