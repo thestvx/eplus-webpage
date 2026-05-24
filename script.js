@@ -1486,6 +1486,15 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
+
+  /* ── LOADER HIDE ── guaranteed to run after DOM is ready ── */
+  const epLoader = byId('ep-loader');
+  if (epLoader) {
+    // Hide after bar animation (1.8s) — hard timeout, no dependency on images
+    setTimeout(() => {
+      epLoader.classList.add('hidden');
+    }, 2000);
+  }
 });
 
 /* ──────────────────────────────────────────────────────────
@@ -1604,22 +1613,6 @@ function animateCounters() {
   // Join team button
   const joinBtn = document.getElementById('join-team-btn') || document.getElementById('nav-join-btn');
   if (joinBtn) joinBtn.addEventListener('click', () => typeof openJoinModal === 'function' && openJoinModal());
-
-  // Loader hide — multiple fallbacks so it never gets stuck
-  const loader = document.getElementById('ep-loader');
-  if (loader) {
-    function hideLoader() {
-      loader.classList.add('hidden');
-    }
-    // Always hide after bar animation completes (2s), regardless of images
-    setTimeout(hideLoader, 2000);
-    // Also on window load if it fires first
-    if (document.readyState === 'complete') {
-      setTimeout(hideLoader, 1800);
-    } else {
-      window.addEventListener('load', () => setTimeout(hideLoader, 1800));
-    }
-  }
 
   // Custom cursor
   const dot = document.getElementById('cursor-dot');
