@@ -1487,14 +1487,105 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  /* ── LOADER HIDE ── guaranteed to run after DOM is ready ── */
+  /* ── LOADER HIDE ── */
   const epLoader = byId('ep-loader');
   if (epLoader) {
-    // Hide after bar animation (1.8s) — hard timeout, no dependency on images
-    setTimeout(() => {
-      epLoader.classList.add('hidden');
-    }, 2000);
+    setTimeout(() => { epLoader.classList.add('hidden'); }, 2000);
   }
+
+  /* ── REVEAL ON SCROLL ── */
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        revealObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+  /* ── NAVBAR SCROLL ── */
+  const navbar = byId('ep-navbar');
+  window.addEventListener('scroll', () => {
+    if (navbar) navbar.classList.toggle('scrolled', window.scrollY > 50);
+    const btn = document.querySelector('.ep-back-to-top');
+    if (btn) btn.classList.toggle('visible', window.scrollY > 400);
+  }, { passive: true });
+
+  /* ── BACK TO TOP ── */
+  const backBtn = document.querySelector('.ep-back-to-top');
+  if (backBtn) backBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
+  /* ── HAMBURGER ── */
+  const hamburger = byId('ep-hamburger');
+  const mobileMenu = byId('ep-mobile-menu');
+  if (hamburger && mobileMenu) {
+    hamburger.addEventListener('click', () => {
+      mobileMenu.classList.toggle('open');
+      hamburger.classList.toggle('open');
+    });
+  }
+
+  /* ── FAQ ACCORDION ── */
+  document.querySelectorAll('.ep-faq-q').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = btn.closest('.ep-faq-item');
+      const isOpen = item.classList.contains('open');
+      document.querySelectorAll('.ep-faq-item.open').forEach(el => el.classList.remove('open'));
+      if (!isOpen) item.classList.add('open');
+    });
+  });
+
+  /* ── JOIN TEAM BTN ── */
+  const joinTeamBtn = byId('join-team-btn');
+  const navJoinBtn  = byId('nav-join-btn');
+  if (joinTeamBtn) joinTeamBtn.addEventListener('click', () => typeof openJoinModal === 'function' && openJoinModal());
+  if (navJoinBtn)  navJoinBtn.addEventListener('click',  () => typeof openJoinModal === 'function' && openJoinModal());
+
+  /* ── TESTIMONIALS SLIDER ── */
+  const testTrack = byId('testimonials-track');
+  const testNav   = byId('testimonial-nav');
+  if (testTrack && testNav) {
+    let testCurrent = 0;
+    const getDots = () => [...testNav.querySelectorAll('.ep-testimonial-dot')];
+    const getCards = () => [...testTrack.querySelectorAll('.ep-testimonial-card')];
+    function testGoTo(index) {
+      const c = getCards();
+      if (!c.length) return;
+      testCurrent = (index + c.length) % c.length;
+      testTrack.scrollTo({ left: testCurrent * testTrack.offsetWidth, behavior: 'smooth' });
+      getDots().forEach((d, i) => d.classList.toggle('active', i === testCurrent));
+    }
+    getDots().forEach((dot, i) => dot.addEventListener('click', () => testGoTo(i)));
+    let testTimer = setInterval(() => testGoTo(testCurrent + 1), 6000);
+    testTrack.addEventListener('mouseenter', () => clearInterval(testTimer));
+    testTrack.addEventListener('mouseleave', () => { testTimer = setInterval(() => testGoTo(testCurrent + 1), 6000); });
+    // swipe
+    let swipeStartX = 0;
+    testTrack.addEventListener('touchstart', e => { swipeStartX = e.touches[0].clientX; }, { passive: true });
+    testTrack.addEventListener('touchend', e => {
+      const diff = swipeStartX - e.changedTouches[0].clientX;
+      if (Math.abs(diff) > 50) testGoTo(testCurrent + (diff > 0 ? 1 : -1));
+    });
+  }
+
+  /* ── CUSTOM CURSOR ── */
+  const cursorDot     = byId('cursor-dot');
+  const cursorOutline = byId('cursor-outline');
+  if (cursorDot && cursorOutline && window.matchMedia('(pointer: fine)').matches) {
+    document.addEventListener('mousemove', e => {
+      cursorDot.style.left     = e.clientX + 'px';
+      cursorDot.style.top      = e.clientY + 'px';
+      cursorOutline.style.left = e.clientX + 'px';
+      cursorOutline.style.top  = e.clientY + 'px';
+    });
+  }
+
+  /* ── CLOSE MOBILE MENU ON LINK CLICK ── */
+  window.closeMobileMenu = function() {
+    byId('ep-mobile-menu')?.classList.remove('open');
+    byId('ep-hamburger')?.classList.remove('open');
+  };
 });
 
 /* ──────────────────────────────────────────────────────────
