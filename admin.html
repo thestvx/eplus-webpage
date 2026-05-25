@@ -829,50 +829,68 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
         QR            → x=1820 y=730 بحجم 190×190
     */
 
-    const RX = W - 30;          /* نقطة ارتكاز النص (يمين) */
+    const RX = W - 38;   /* نقطة ارتكاز النص من اليمين — هامش 38px */
 
-    /* حجم الخط بالنسبة لارتفاع التذكرة */
-    const fzLarge  = Math.round(H * 0.068);   /* ~72px — الاسم */
-    const fzMedium = Math.round(H * 0.060);   /* ~64px — باقي الحقول */
-    const fzReceipt= Math.round(H * 0.058);   /* ~62px — رقم الوصل بلون مميز */
+    /*
+      التذكرة: 2480 × 1063 px
+      منطقة البيانات (يمين): x من 1960 إلى 2442
+      عرض المنطقة: ~482px
 
-    /* لون النص الداكن المناسب للخلفية البيضاء للتذكرة */
-    const clrMain    = '#0d2a5e';   /* أزرق داكن */
-    const clrReceipt = '#c2410c';   /* برتقالي داكن لرقم الوصل */
+      الحقول والأسطر (محسوبة بدقة بناءً على PSD):
+        تسميات "الاسم الكامل:" وغيرها موجودة في الصورة
+        نحن نكتب القيم فقط تحت كل تسمية أو بجانبها
+
+        الحقل         Y (px)    textBaseline=middle
+        ─────────────────────────────────────────
+        الاسم         285
+        الباقة         415
+        المبلغ         543
+        التاريخ (قيمة) 645   x مختلف — بعد "التاريخ:"
+        رقم الوصل     763
+        QR            y=730  x=1835  185×185 px
+
+      حجم الخط: 40px كأقصى حد لضمان عدم التراكب
+      الفرق بين كل سطر: ~128px — كافٍ لخط 40px
+    */
+
+    const fzName    = 40;   /* الاسم */
+    const fzMedium  = 36;   /* الباقة والمبلغ والوصل */
+    const fzDate    = 32;   /* التاريخ — أصغر لأن النص أطول */
+
+    const clrMain    = '#0d2a5e';
+    const clrReceipt = '#c2410c';
 
     /* --- الاسم الكامل --- */
-    ctx.font      = `900 ${fzLarge}px ${ff}`;
+    ctx.font      = `900 ${fzName}px ${ff}`;
     ctx.fillStyle = clrMain;
-    ctx.fillText(data.name, RX, H * 0.432);
+    ctx.fillText(data.name, RX, 285);
 
     /* --- اسم الباقة --- */
     ctx.font      = `800 ${fzMedium}px ${ff}`;
     ctx.fillStyle = clrMain;
-    ctx.fillText(data.pack, RX, H * 0.490);
+    ctx.fillText(data.pack, RX, 415);
 
     /* --- المبلغ --- */
     ctx.font      = `800 ${fzMedium}px ${ff}`;
     ctx.fillStyle = clrMain;
-    ctx.fillText(Number(data.amount).toLocaleString('ar-DZ') + ' دج', RX, H * 0.550);
+    ctx.fillText(Number(data.amount).toLocaleString('ar-DZ') + ' دج', RX, 543);
 
-    /* --- التاريخ ---
-       التسمية "التاريخ:" موجودة في الصورة، نكتب القيمة فقط بجوارها
-       نحسب عرض التسمية تقريباً ونضع النص بعدها بهامش */
-    ctx.font      = `700 ${Math.round(H * 0.054)}px ${ff}`;
+    /* --- التاريخ: نكتب القيمة فقط — التسمية موجودة في الصورة ---
+       textAlign لا يزال 'right' لكن نغير نقطة X لتبدأ من منتصف المنطقة */
+    ctx.font      = `700 ${fzDate}px ${ff}`;
     ctx.fillStyle = clrMain;
-    /* نضع التاريخ على يسار منتصف المنطقة — نقطة x=2030 تضعه بعد "التاريخ:" */
-    ctx.fillText(data.dateFormatted, W * 0.820, H * 0.610);
+    ctx.fillText(data.dateFormatted, W - 38, 645);
 
     /* --- رقم الوصل --- */
-    ctx.font      = `900 ${fzReceipt}px ${ff}`;
+    ctx.font      = `900 ${fzMedium}px ${ff}`;
     ctx.fillStyle = clrReceipt;
-    ctx.fillText(data.receipt, RX, H * 0.668);
+    ctx.fillText(data.receipt, RX, 763);
 
     /* --- QR Code --- */
     if (qrCanvas) {
-      const qrSize = Math.round(H * 0.245);          /* ~260px */
-      const qrX    = Math.round(W  * 0.745);          /* ~1848 */
-      const qrY    = Math.round(H  * 0.700);          /* ~744  */
+      const qrSize = 185;
+      const qrX    = 1835;
+      const qrY    = 730;
 
       /* خلفية بيضاء مع حواف دائرية */
       ctx.fillStyle = '#ffffff';
