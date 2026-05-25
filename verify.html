@@ -275,6 +275,40 @@
       .verify-wrap { max-width: 100%; }
       .result-banner, .ticket-detail { padding: 20px; }
     }
+
+    /* ── PIN OVERLAY ── */
+    .pin-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      background: rgba(2,6,23,0.92);
+      backdrop-filter: blur(16px);
+    }
+    .pin-overlay.hidden { display: none; }
+    .pin-box {
+      background: linear-gradient(145deg, rgba(15,23,42,0.9), rgba(8,16,32,0.95));
+      border: 1px solid rgba(249,115,22,0.3);
+      border-radius: 28px;
+      padding: 44px 36px;
+      width: 100%; max-width: 400px;
+      text-align: center;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.6), 0 0 60px rgba(249,115,22,0.08);
+      animation: fadeUp 0.5s cubic-bezier(0.2,0.8,0.2,1);
+      position: relative; overflow: hidden;
+    }
+    .pin-box::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--summer), var(--gold), transparent);
+    }
+    .pin-icon { font-size: 48px; margin-bottom: 12px; display: block; }
+    .pin-title { font-size: 20px; font-weight: 900; margin-bottom: 6px; }
+    .pin-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; line-height: 1.6; }
+    .pin-error { color: #fca5a5; font-size: 13px; margin-top: 14px; display: none;
+      background: rgba(239,68,68,0.1); padding: 10px 16px; border-radius: 10px;
+      border: 1px solid rgba(239,68,68,0.2); }
+
+    /* used/locked ticket */
+    .result-card.used { border-color: rgba(239,68,68,0.4); box-shadow: 0 40px 80px rgba(0,0,0,0.5), 0 0 60px rgba(239,68,68,0.1); }
   </style>
 </head>
 <body>
@@ -283,6 +317,20 @@
 <div class="grid-pattern"></div>
 <div class="orb orb-1"></div>
 <div class="orb orb-2"></div>
+
+<!-- PIN OVERLAY -->
+<div class="pin-overlay hidden" id="pin-overlay">
+  <div class="pin-box">
+    <span class="pin-icon">🔐</span>
+    <div class="pin-title">تأكيد صلاحية الإدارة</div>
+    <div class="pin-sub">هذه العملية مقتصرة على إدارة الأكاديمية.<br>أدخل كود PIN للمتابعة.</div>
+    <input class="inp" type="password" id="pin-input" placeholder="••••"
+      style="text-align:center;letter-spacing:8px;font-size:22px;"
+      onkeydown="if(event.key==='Enter') confirmPin()">
+    <button class="btn-search" onclick="confirmPin()">✅ تأكيد</button>
+    <div class="pin-error" id="pin-error">❌ الكود غير صحيح، حاول مجدداً</div>
+  </div>
+</div>
 
 <div class="verify-wrap">
 
@@ -369,7 +417,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-import { getFirestore, collection, query, where, getDocs }
+import { getFirestore, collection, query, where, getDocs, doc, updateDoc }
   from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
 const app = initializeApp({
@@ -383,19 +431,23 @@ const app = initializeApp({
 });
 const db = getFirestore(app);
 
-/* ── الحصول على رقم الوصل من URL ── */
+const ADMIN_PIN = '2019';
+
+/* ── رقم الوصل من URL ── */
 const params  = new URLSearchParams(window.location.search);
 const receipt = params.get('r');
+
+let pendingDocId  = null;   // معرّف المستند في Firestore
+let pendingData   = null;   // بيانات التذكرة المنتظرة التأكيد
 
 if (receipt) {
   lookupTicket(receipt.trim().toUpperCase());
 } else {
-  // عرض حقل البحث اليدوي
   hide('loading-card');
   show('search-card');
 }
 
-/* ── البحث عن التذكرة في Firestore ── */
+/* ── البحث عن التذكرة ── */
 async function lookupTicket(code) {
   show('loading-card');
   hide('result-card');
@@ -409,48 +461,99 @@ async function lookupTicket(code) {
     hide('loading-card');
 
     if (snap.empty) {
-      // لم يُعثر على التذكرة
       document.getElementById('notfound-code').textContent = code;
       show('notfound-card');
       return;
     }
 
-    const data = snap.docs[0].data();
-    renderResult(data);
+    const docSnap = snap.docs[0];
+    const data    = docSnap.data();
+
+    /* ── إذا التذكرة مُستخدمة مسبقاً ── */
+    if (data.used === true) {
+      renderUsed(data);
+      return;
+    }
+
+    /* ── إذا حالة pending → اعرض النتيجة مباشرة بدون تفعيل ── */
+    if (data.status !== 'paid') {
+      renderResult(data);
+      return;
+    }
+
+    /* ── إذا paid + لم تُستخدم → اطلب PIN لتأكيدها رسمياً ── */
+    pendingDocId = docSnap.id;
+    pendingData  = data;
+    showPinOverlay();
 
   } catch (e) {
     hide('loading-card');
-    // خطأ صلاحيات Firestore — الحل: غيّر Rules لـ summerTickets إلى allow read: if true;
     const isPermErr = e.code === 'permission-denied' || (e.message && e.message.toLowerCase().includes('permission'));
     document.getElementById('notfound-title').textContent = isPermErr ? '⚠️ خطأ في الصلاحيات' : 'خطأ في التحقق';
     document.getElementById('notfound-sub').innerHTML = isPermErr
-      ? 'يجب تفعيل قراءة مجموعة <b>summerTickets</b> في Firestore Rules.<br><small style="color:#fca5a5">اذهب إلى Firebase Console → Firestore → Rules وأضف:<br><code style="font-size:11px;letter-spacing:0">match /summerTickets/{id} { allow read: if true; }</code></small>'
+      ? 'يجب تفعيل قراءة مجموعة <b>summerTickets</b> في Firestore Rules.'
       : 'خطأ: ' + e.message;
     show('notfound-card');
   }
 }
 
+/* ── عرض PIN overlay ── */
+function showPinOverlay() {
+  document.getElementById('pin-overlay').classList.remove('hidden');
+  setTimeout(() => document.getElementById('pin-input').focus(), 100);
+}
+
+/* ── التحقق من PIN ── */
+window.confirmPin = async () => {
+  const entered = document.getElementById('pin-input').value.trim();
+  const errEl   = document.getElementById('pin-error');
+
+  if (entered !== ADMIN_PIN) {
+    errEl.style.display = 'block';
+    document.getElementById('pin-input').value = '';
+    document.getElementById('pin-input').focus();
+    return;
+  }
+
+  /* PIN صحيح → أغلق الـ overlay وفعّل التذكرة */
+  document.getElementById('pin-overlay').classList.add('hidden');
+  errEl.style.display = 'none';
+
+  /* سجّل في Firestore أن التذكرة استُخدمت */
+  try {
+    await updateDoc(doc(db, 'summerTickets', pendingDocId), {
+      used: true,
+      usedAt: new Date().toISOString()
+    });
+  } catch(e) {
+    console.warn('تعذّر تحديث حالة الاستخدام:', e.message);
+  }
+
+  /* اعرض التذكرة كمؤكدة وسارية */
+  renderResult({ ...pendingData, used: true });
+};
+
 /* ── عرض نتيجة التذكرة ── */
 function renderResult(x) {
-  const isPaid    = x.status === 'paid';
-  const card      = document.getElementById('result-card');
-  const banner    = document.getElementById('result-banner');
+  const isPaid = x.status === 'paid';
+  const isUsed = x.used === true;
+  const card   = document.getElementById('result-card');
+  const banner = document.getElementById('result-banner');
 
-  // ألوان حسب حالة الدفع
-  if (isPaid) {
+  if (isPaid && isUsed) {
     card.className  = 'result-card valid';
     banner.style.setProperty('--accent-color', 'var(--success)');
     banner.style.setProperty('--accent-glow',  'rgba(34,197,94,0.4)');
     document.getElementById('result-icon').textContent  = '✅';
-    document.getElementById('result-title').textContent = 'تذكرة موثّقة ومدفوعة';
-    document.getElementById('result-sub').textContent   = 'هذه التذكرة صالحة — تم الدفع بالكامل';
+    document.getElementById('result-title').textContent = 'تذكرة موثّقة وسارية';
+    document.getElementById('result-sub').textContent   = 'تم التحقق رسمياً — التذكرة فعّالة ومؤكدة';
   } else {
     card.className  = 'result-card pending';
     banner.style.setProperty('--accent-color', 'var(--warning)');
     banner.style.setProperty('--accent-glow',  'rgba(245,158,11,0.4)');
     document.getElementById('result-icon').textContent  = '⏳';
-    document.getElementById('result-title').textContent = 'تذكرة قيد المتابعة';
-    document.getElementById('result-sub').textContent   = 'المبلغ لم يُكتمل بعد — تواصل مع الإدارة';
+    document.getElementById('result-title').textContent = 'تذكرة قيد الانتظار';
+    document.getElementById('result-sub').textContent   = 'لم يتم تفعيل هذه التذكرة بعد — تواصل مع الإدارة';
   }
 
   document.getElementById('result-receipt').textContent = x.receipt || '—';
@@ -461,12 +564,39 @@ function renderResult(x) {
   document.getElementById('d-date').textContent   = x.date
     ? new Date(x.date).toLocaleDateString('ar', { year:'numeric', month:'long', day:'numeric' }) : '—';
 
-  document.getElementById('d-status').innerHTML = isPaid
-    ? '<span class="badge-paid">✓ تم الدفع بالكامل</span>'
-    : '<span class="badge-pending">⏳ قيد المتابعة</span>';
+  document.getElementById('d-status').innerHTML = (isPaid && isUsed)
+    ? '<span class="badge-paid">✓ مؤكدة وفعّالة</span>'
+    : '<span class="badge-pending">⏳ قيد الانتظار</span>';
 
   document.getElementById('d-created').textContent = x.createdAt?.toDate
     ? x.createdAt.toDate().toLocaleDateString('ar', { year:'numeric', month:'long', day:'numeric' })
+    : '—';
+
+  show('result-card');
+}
+
+/* ── عرض تذكرة مُستخدمة مسبقاً ── */
+function renderUsed(x) {
+  const card   = document.getElementById('result-card');
+  const banner = document.getElementById('result-banner');
+
+  card.className  = 'result-card used';
+  banner.style.setProperty('--accent-color', 'var(--danger)');
+  banner.style.setProperty('--accent-glow',  'rgba(239,68,68,0.4)');
+  document.getElementById('result-icon').textContent  = '🚫';
+  document.getElementById('result-title').textContent = 'تذكرة مُستخدمة';
+  document.getElementById('result-sub').textContent   = 'تم تفعيل هذه التذكرة من قبل — لا يمكن استخدامها مجدداً';
+
+  document.getElementById('result-receipt').textContent = x.receipt || '—';
+  document.getElementById('d-name').textContent   = x.name   || '—';
+  document.getElementById('d-pack').textContent   = x.pack   || '—';
+  document.getElementById('d-amount').textContent = x.amount
+    ? Number(x.amount).toLocaleString('ar-DZ') + ' دج' : '—';
+  document.getElementById('d-date').textContent   = x.date
+    ? new Date(x.date).toLocaleDateString('ar', { year:'numeric', month:'long', day:'numeric' }) : '—';
+  document.getElementById('d-status').innerHTML = '<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 14px;border-radius:999px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;font-size:12px;font-weight:800;">🚫 مُستخدمة سابقاً</span>';
+  document.getElementById('d-created').textContent = x.usedAt
+    ? new Date(x.usedAt).toLocaleDateString('ar', { year:'numeric', month:'long', day:'numeric' })
     : '—';
 
   show('result-card');
