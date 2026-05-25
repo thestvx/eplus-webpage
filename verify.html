@@ -340,8 +340,8 @@
   <!-- NOT FOUND -->
   <div class="notfound-card" id="notfound-card">
     <span class="notfound-icon">❌</span>
-    <div class="notfound-title">تذكرة غير صالحة</div>
-    <div class="notfound-sub">
+    <div class="notfound-title" id="notfound-title">تذكرة غير صالحة</div>
+    <div class="notfound-sub" id="notfound-sub">
       لم يتم العثور على هذه التذكرة في قاعدة البيانات.<br>
       قد تكون مزوّرة أو تم حذفها.
     </div>
@@ -420,7 +420,12 @@ async function lookupTicket(code) {
 
   } catch (e) {
     hide('loading-card');
-    document.getElementById('notfound-code').textContent = 'خطأ: ' + e.message;
+    // خطأ صلاحيات Firestore — الحل: غيّر Rules لـ summerTickets إلى allow read: if true;
+    const isPermErr = e.code === 'permission-denied' || (e.message && e.message.toLowerCase().includes('permission'));
+    document.getElementById('notfound-title').textContent = isPermErr ? '⚠️ خطأ في الصلاحيات' : 'خطأ في التحقق';
+    document.getElementById('notfound-sub').innerHTML = isPermErr
+      ? 'يجب تفعيل قراءة مجموعة <b>summerTickets</b> في Firestore Rules.<br><small style="color:#fca5a5">اذهب إلى Firebase Console → Firestore → Rules وأضف:<br><code style="font-size:11px;letter-spacing:0">match /summerTickets/{id} { allow read: if true; }</code></small>'
+      : 'خطأ: ' + e.message;
     show('notfound-card');
   }
 }
