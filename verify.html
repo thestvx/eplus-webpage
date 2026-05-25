@@ -382,6 +382,21 @@
       </div>
     </div>
 
+    <!-- زر التفعيل — يظهر فقط عند حالة قيد المراجعة -->
+    <div id="activate-section" style="display:none; padding: 0 28px 24px;">
+      <button id="activate-btn" onclick="activateTicket()" style="
+        width:100%; padding:16px; border:none; border-radius:14px;
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        color:#fff; font-size:16px; font-weight:800; font-family:inherit;
+        cursor:pointer; transition:all 0.3s ease;
+        box-shadow:0 8px 24px rgba(34,197,94,0.3);
+        letter-spacing:1px;
+      " onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 12px 32px rgba(34,197,94,0.45)'"
+         onmouseout="this.style.transform='';this.style.boxShadow='0 8px 24px rgba(34,197,94,0.3)'">
+        🚀 تفعيل التذكرة
+      </button>
+    </div>
+
     <div class="result-footer">E+ EDUCATION PLUS CENTER — SUMMER PLUS 2026</div>
   </div>
 
@@ -437,8 +452,8 @@ const ADMIN_PIN = '2019';
 const params  = new URLSearchParams(window.location.search);
 const receipt = params.get('r');
 
-let pendingDocId  = null;   // معرّف المستند في Firestore
-let pendingData   = null;   // بيانات التذكرة المنتظرة التأكيد
+let pendingDocId = null;   // معرّف المستند في Firestore
+let pendingData  = null;   // بيانات التذكرة
 
 if (receipt) {
   lookupTicket(receipt.trim().toUpperCase());
@@ -469,19 +484,7 @@ async function lookupTicket(code) {
     const docSnap = snap.docs[0];
     const data    = docSnap.data();
 
-    /* ── إذا التذكرة مُستخدمة مسبقاً ── */
-    if (data.used === true) {
-      renderUsed(data);
-      return;
-    }
-
-    /* ── إذا حالة pending → اعرض النتيجة مباشرة بدون تفعيل ── */
-    if (data.status !== 'paid') {
-      renderResult(data);
-      return;
-    }
-
-    /* ── إذا paid + لم تُستخدم → اطلب PIN لتأكيدها رسمياً ── */
+    /* ── دائماً اطلب PIN أولاً بغض النظر عن الحالة ── */
     pendingDocId = docSnap.id;
     pendingData  = data;
     showPinOverlay();
@@ -515,45 +518,72 @@ window.confirmPin = async () => {
     return;
   }
 
-  /* PIN صحيح → أغلق الـ overlay وفعّل التذكرة */
+  /* PIN صحيح → أغلق الـ overlay واعرض التذكرة حسب حالتها */
   document.getElementById('pin-overlay').classList.add('hidden');
   errEl.style.display = 'none';
+  document.getElementById('pin-input').value = '';
 
-  /* سجّل في Firestore أن التذكرة استُخدمت */
+  /* اعرض حالة التذكرة الحالية */
+  renderResult(pendingData);
+};
+
+/* ── تفعيل التذكرة ── */
+window.activateTicket = async () => {
+  const btn = document.getElementById('activate-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري التفعيل...';
+
   try {
     await updateDoc(doc(db, 'summerTickets', pendingDocId), {
-      used: true,
-      usedAt: new Date().toISOString()
+      status: 'paid',
+      activatedAt: new Date().toISOString()
     });
+    /* حدّث البيانات المحلية وأعد الرسم */
+    pendingData = { ...pendingData, status: 'paid' };
+    renderResult(pendingData);
   } catch(e) {
-    console.warn('تعذّر تحديث حالة الاستخدام:', e.message);
+    btn.disabled = false;
+    btn.textContent = '🚀 تفعيل التذكرة';
+    console.warn('تعذّر تفعيل التذكرة:', e.message);
+    alert('حدث خطأ أثناء التفعيل: ' + e.message);
   }
-
-  /* اعرض التذكرة كمؤكدة وسارية */
-  renderResult({ ...pendingData, used: true });
 };
 
 /* ── عرض نتيجة التذكرة ── */
 function renderResult(x) {
-  const isPaid = x.status === 'paid';
-  const isUsed = x.used === true;
+  const isActivated = x.status === 'paid';
   const card   = document.getElementById('result-card');
   const banner = document.getElementById('result-banner');
 
-  if (isPaid && isUsed) {
+  if (isActivated) {
+    /* ── مفعّلة ── */
     card.className  = 'result-card valid';
     banner.style.setProperty('--accent-color', 'var(--success)');
     banner.style.setProperty('--accent-glow',  'rgba(34,197,94,0.4)');
     document.getElementById('result-icon').textContent  = '✅';
-    document.getElementById('result-title').textContent = 'تذكرة موثّقة وسارية';
-    document.getElementById('result-sub').textContent   = 'تم التحقق رسمياً — التذكرة فعّالة ومؤكدة';
+    document.getElementById('result-title').textContent = 'تذكرة مفعّلة';
+    document.getElementById('result-sub').textContent   = 'التذكرة فعّالة ومؤكدة — الدخول مسموح';
+    document.getElementById('d-status').innerHTML = '<span class="badge-paid">✓ مفعّلة</span>';
+    /* إخفاء زر التفعيل */
+    const activateSection = document.getElementById('activate-section');
+    if (activateSection) activateSection.style.display = 'none';
   } else {
+    /* ── قيد المراجعة ── */
     card.className  = 'result-card pending';
     banner.style.setProperty('--accent-color', 'var(--warning)');
     banner.style.setProperty('--accent-glow',  'rgba(245,158,11,0.4)');
     document.getElementById('result-icon').textContent  = '⏳';
-    document.getElementById('result-title').textContent = 'تذكرة قيد الانتظار';
-    document.getElementById('result-sub').textContent   = 'لم يتم تفعيل هذه التذكرة بعد — تواصل مع الإدارة';
+    document.getElementById('result-title').textContent = 'قيد المراجعة';
+    document.getElementById('result-sub').textContent   = 'التذكرة لم يتم تفعيلها بعد';
+    document.getElementById('d-status').innerHTML = '<span class="badge-pending">⏳ قيد المراجعة</span>';
+    /* إظهار زر التفعيل */
+    const activateSection = document.getElementById('activate-section');
+    if (activateSection) {
+      activateSection.style.display = 'block';
+      const btn = document.getElementById('activate-btn');
+      btn.disabled = false;
+      btn.textContent = '🚀 تفعيل التذكرة';
+    }
   }
 
   document.getElementById('result-receipt').textContent = x.receipt || '—';
@@ -564,40 +594,9 @@ function renderResult(x) {
   document.getElementById('d-date').textContent   = x.date
     ? new Date(x.date).toLocaleDateString('ar', { year:'numeric', month:'long', day:'numeric' }) : '—';
 
-  document.getElementById('d-status').innerHTML = (isPaid && isUsed)
-    ? '<span class="badge-paid">✓ مؤكدة وفعّالة</span>'
-    : '<span class="badge-pending">⏳ قيد الانتظار</span>';
-
   document.getElementById('d-created').textContent = x.createdAt?.toDate
     ? x.createdAt.toDate().toLocaleDateString('ar', { year:'numeric', month:'long', day:'numeric' })
-    : '—';
-
-  show('result-card');
-}
-
-/* ── عرض تذكرة مُستخدمة مسبقاً ── */
-function renderUsed(x) {
-  const card   = document.getElementById('result-card');
-  const banner = document.getElementById('result-banner');
-
-  card.className  = 'result-card used';
-  banner.style.setProperty('--accent-color', 'var(--danger)');
-  banner.style.setProperty('--accent-glow',  'rgba(239,68,68,0.4)');
-  document.getElementById('result-icon').textContent  = '🚫';
-  document.getElementById('result-title').textContent = 'تذكرة مُستخدمة';
-  document.getElementById('result-sub').textContent   = 'تم تفعيل هذه التذكرة من قبل — لا يمكن استخدامها مجدداً';
-
-  document.getElementById('result-receipt').textContent = x.receipt || '—';
-  document.getElementById('d-name').textContent   = x.name   || '—';
-  document.getElementById('d-pack').textContent   = x.pack   || '—';
-  document.getElementById('d-amount').textContent = x.amount
-    ? Number(x.amount).toLocaleString('ar-DZ') + ' دج' : '—';
-  document.getElementById('d-date').textContent   = x.date
-    ? new Date(x.date).toLocaleDateString('ar', { year:'numeric', month:'long', day:'numeric' }) : '—';
-  document.getElementById('d-status').innerHTML = '<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 14px;border-radius:999px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;font-size:12px;font-weight:800;">🚫 مُستخدمة سابقاً</span>';
-  document.getElementById('d-created').textContent = x.usedAt
-    ? new Date(x.usedAt).toLocaleDateString('ar', { year:'numeric', month:'long', day:'numeric' })
-    : '—';
+    : (x.activatedAt ? new Date(x.activatedAt).toLocaleDateString('ar', { year:'numeric', month:'long', day:'numeric' }) : '—');
 
   show('result-card');
 }
