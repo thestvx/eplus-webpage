@@ -261,8 +261,24 @@
     @media print{
       body *{visibility:hidden}
       #print-area,#print-area *{visibility:visible}
-      #print-area{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#fff}
-      #print-area img{max-width:100%;max-height:100%}
+      #print-area{
+        position:fixed;inset:0;
+        background:#fff;
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:space-evenly;
+        padding:6mm;
+        box-sizing:border-box;
+        gap:4mm;
+      }
+      #print-area img{
+        width:100%;
+        max-width:195mm;
+        height:auto;
+        display:block;
+      }
+      @page{size:A4 portrait;margin:0}
     }
   </style>
 </head>
@@ -276,7 +292,9 @@
 <div class="orb orb-3"></div>
 
 <div id="print-area" style="display:none">
-  <img id="print-img" src="" alt="ticket">
+  <img id="print-img-1" src="" alt="ticket">
+  <img id="print-img-2" src="" alt="ticket">
+  <img id="print-img-3" src="" alt="ticket">
 </div>
 
 <div id="qr-gen-hidden" style="position:absolute;visibility:hidden;width:0;height:0;overflow:hidden"></div>
@@ -444,17 +462,35 @@
           </div>
           <div class="form-group">
             <label class="form-label">اسم الباقة <span class="required">*</span></label>
-            <select class="inp" id="sc-pack">
+            <select class="inp" id="sc-pack" onchange="autoFillAmount(this.value)">
               <option value="" disabled selected style="color:#4a5568">— اختر الباقة —</option>
-              <option value="باقة الأساسي">باقة الأساسي</option>
-              <option value="باقة المتكامل">باقة المتكامل</option>
-              <option value="باقة البريميوم">باقة البريميوم</option>
-              <option value="باقة VIP">باقة VIP</option>
+              <optgroup label="الفئة 5–10 سنوات">
+                <option value="الباقة الأساسية (5–10) — Kids Basic">الباقة الأساسية (5–10) — Kids Basic — 8,000 دج</option>
+                <option value="باقة النخبة (5–10) — Kids Elite">باقة النخبة (5–10) — Kids Elite — 10,000 دج</option>
+              </optgroup>
+              <optgroup label="الفئة 11–14 سنة">
+                <option value="الباقة الأساسية (11–14) — Junior Basic">الباقة الأساسية (11–14) — Junior Basic — 8,000 دج</option>
+                <option value="باقة النخبة (11–14) — Junior Elite">باقة النخبة (11–14) — Junior Elite — 10,000 دج</option>
+              </optgroup>
+              <optgroup label="الفئة 15–18 سنة">
+                <option value="الباقة الأساسية (15–18) — Teens Basic">الباقة الأساسية (15–18) — Teens Basic — 8,000 دج</option>
+                <option value="باقة النخبة (15–18) — Teens Elite">باقة النخبة (15–18) — Teens Elite — 10,000 دج</option>
+                <option value="باقة تحضير البكالوريا (15–18) — Bac Prep">باقة تحضير البكالوريا (15–18) — Bac Prep — 15,000 دج</option>
+              </optgroup>
+              <optgroup label="فئة الكبار">
+                <option value="باقة البالغين — Adults Basic">باقة البالغين — Adults Basic — 8,000 دج</option>
+                <option value="باقة البالغين المتقدمة — Adults Advanced">باقة البالغين المتقدمة — Adults Advanced — 12,000 دج</option>
+              </optgroup>
+              <optgroup label="✦ E-Plus Special">
+                <option value="English Communication Class — E-Plus Special">English Communication Class — E-Plus Special — 8,000 دج</option>
+                <option value="English for Specific Purposes (ESP) — E-Plus Special">English for Specific Purposes (ESP) — E-Plus Special</option>
+                <option value="IELTS Preparation — E-Plus Special">IELTS Preparation — E-Plus Special</option>
+              </optgroup>
             </select>
           </div>
           <div class="form-group">
             <label class="form-label">المبلغ المدفوع (دج) <span class="required">*</span></label>
-            <input class="inp" type="number" id="sc-amount" placeholder="مثال: 15000">
+            <input class="inp" type="number" id="sc-amount" placeholder="مثال: 8000">
           </div>
           <div class="form-group">
             <label class="form-label">تاريخ الدفع</label>
@@ -747,6 +783,26 @@ function genReceiptNum() {
   return 'SP26-' + String(Math.floor(Math.random() * 90000) + 10000);
 }
 
+/* أسعار الباقات — تعبئة تلقائية للمبلغ */
+const PACK_PRICES = {
+  'الباقة الأساسية (5–10) — Kids Basic':            8000,
+  'باقة النخبة (5–10) — Kids Elite':                10000,
+  'الباقة الأساسية (11–14) — Junior Basic':          8000,
+  'باقة النخبة (11–14) — Junior Elite':             10000,
+  'الباقة الأساسية (15–18) — Teens Basic':           8000,
+  'باقة النخبة (15–18) — Teens Elite':              10000,
+  'باقة تحضير البكالوريا (15–18) — Bac Prep':      15000,
+  'باقة البالغين — Adults Basic':                    8000,
+  'باقة البالغين المتقدمة — Adults Advanced':       12000,
+  'English Communication Class — E-Plus Special':    8000,
+};
+window.autoFillAmount = (val) => {
+  const price = PACK_PRICES[val];
+  const amtEl = document.getElementById('sc-amount');
+  if (price) amtEl.value = price;
+  else amtEl.value = '';
+};
+
 window.generateTicket = () => {
   const name   = document.getElementById('sc-name').value.trim();
   const pack   = document.getElementById('sc-pack').value;
@@ -941,7 +997,9 @@ window.downloadTicket = () => {
 window.printTicketCanvas = () => {
   const canvas = document.getElementById('ticket-canvas');
   const dataURL = canvas.toDataURL('image/png');
-  document.getElementById('print-img').src = dataURL;
+  document.getElementById('print-img-1').src = dataURL;
+  document.getElementById('print-img-2').src = dataURL;
+  document.getElementById('print-img-3').src = dataURL;
   const printArea = document.getElementById('print-area');
   printArea.style.display = 'flex';
   window.print();
