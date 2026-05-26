@@ -342,7 +342,7 @@ const i18n = {
     sec_programs_desc: 'Select the program that matches your level and goal, and start an organized and clear educational journey.',
     prog1_name: 'Language Courses', prog1_desc: 'Learn English, French and more through progressive levels and continuous practice.',
     prog2_name: 'Academic Support', prog2_desc: 'Tutoring and review sessions with organization, follow-up, and core subject strengthening.',
-    prog3_name: 'VIP Lessons', prog3_desc: 'Individual or small-group teaching with full focus on the student's needs.',
+    prog3_name: 'VIP Lessons', prog3_desc: 'Individual or small-group teaching with full focus on the student needs.',
     prog4_name: 'IELTS', prog4_desc: 'Specialized program to strengthen the four skills and understand the test structure.',
     prog5_name: 'Online Courses', prog5_desc: 'Learn from anywhere via live sessions and organized digital content.',
     prog6_name: 'Training Programs', prog6_desc: 'Skill and professional development programs for academic and career growth.',
