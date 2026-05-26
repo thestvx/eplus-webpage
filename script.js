@@ -101,8 +101,44 @@ const typeLabelsEn = {
 };
 
 /* ──────────────────────────────────────────────────────────
-   LANGUAGE
+   THEME (DARK / LIGHT MODE)
 ────────────────────────────────────────────────────────── */
+const LOGO_DARK  = 'images/education-plus-center-logo.png';
+const LOGO_LIGHT = 'images/education-plus-center-logo---b.png';
+
+function applyTheme(mode) {
+  const isLight = mode === 'light';
+  document.documentElement.classList.toggle('light-mode', isLight);
+
+  const icon = isLight ? '☀️' : '🌙';
+  const toggleBtn    = byId('ep-theme-toggle');
+  const toggleBtnMob = byId('ep-theme-toggle-mob');
+  if (toggleBtn)    toggleBtn.textContent    = icon;
+  if (toggleBtnMob) toggleBtnMob.textContent = icon;
+
+  const logoSrc = isLight ? LOGO_LIGHT : LOGO_DARK;
+  const navLogo    = byId('nav-logo-img');
+  const footerLogo = byId('footer-logo-img');
+  if (navLogo)    navLogo.src    = logoSrc;
+  if (footerLogo) footerLogo.src = logoSrc;
+
+  localStorage.setItem('ep-theme', mode);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.classList.contains('light-mode') ? 'light' : 'dark';
+  applyTheme(current === 'light' ? 'dark' : 'light');
+}
+
+window.toggleTheme = toggleTheme;
+
+/* ── Restore saved theme on load ── */
+(function() {
+  const saved = localStorage.getItem('ep-theme') || 'dark';
+  applyTheme(saved);
+})();
+
+
 let currentLang = 'ar';
 
 const i18n = {
@@ -244,6 +280,9 @@ function setLang(lang) {
   byId('btn-en')?.classList.toggle('active', lang === 'en');
   byId('btn-ar-old')?.classList.toggle('active', lang === 'ar');
   byId('btn-en-old')?.classList.toggle('active', lang === 'en');
+  byId('btn-ar-mob')?.classList.toggle('active', lang === 'ar');
+  byId('btn-en-mob')?.classList.toggle('active', lang === 'en');
+  localStorage.setItem('ep-lang', lang);
   const t = i18n[lang];
   $$('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
@@ -1419,7 +1458,17 @@ async function loadAnnouncements() {
    GLOBAL EVENTS / DOM READY
 ────────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
-  setLang('ar');
+  /* ── RESTORE LANGUAGE ── */
+  const savedLang = localStorage.getItem('ep-lang') || 'ar';
+  setLang(savedLang);
+
+  /* ── WIRE LANG BUTTONS ── */
+  byId('btn-ar')?.addEventListener('click', () => setLang('ar'));
+  byId('btn-en')?.addEventListener('click', () => setLang('en'));
+
+  /* ── WIRE THEME TOGGLE ── */
+  byId('ep-theme-toggle')?.addEventListener('click', toggleTheme);
+
   loadAnnouncements();
   byId('joinCV')?.addEventListener('change', function () {
     const file = this.files?.[0];
@@ -1515,26 +1564,42 @@ document.addEventListener('DOMContentLoaded', () => {
   const testNav   = byId('testimonial-nav');
   if (testTrack && testNav) {
     let testCurrent = 0;
-    const getDots = () => [...testNav.querySelectorAll('.ep-testimonial-dot')];
+    let testTimer   = null;
+    const getDots  = () => [...testNav.querySelectorAll('.ep-testimonial-dot')];
     const getCards = () => [...testTrack.querySelectorAll('.ep-testimonial-card')];
+
     function testGoTo(index) {
-      const c = getCards();
-      if (!c.length) return;
-      testCurrent = (index + c.length) % c.length;
-      testTrack.scrollTo({ left: testCurrent * testTrack.offsetWidth, behavior: 'smooth' });
+      const cards = getCards();
+      if (!cards.length) return;
+      testCurrent = ((index % cards.length) + cards.length) % cards.length;
+      const card  = cards[testCurrent];
+      testTrack.scrollTo({ left: card.offsetLeft - testTrack.offsetLeft, behavior: 'smooth' });
       getDots().forEach((d, i) => d.classList.toggle('active', i === testCurrent));
     }
-    getDots().forEach((dot, i) => dot.addEventListener('click', () => testGoTo(i)));
-    let testTimer = setInterval(() => testGoTo(testCurrent + 1), 6000);
-    testTrack.addEventListener('mouseenter', () => clearInterval(testTimer));
-    testTrack.addEventListener('mouseleave', () => { testTimer = setInterval(() => testGoTo(testCurrent + 1), 6000); });
-    // swipe
+
+    function startTestTimer() {
+      stopTestTimer();
+      testTimer = setInterval(() => testGoTo(testCurrent + 1), 5000);
+    }
+    function stopTestTimer() {
+      if (testTimer) { clearInterval(testTimer); testTimer = null; }
+    }
+
+    getDots().forEach((dot, i) => dot.addEventListener('click', () => { testGoTo(i); startTestTimer(); }));
+    startTestTimer();
+    testTrack.addEventListener('mouseenter', stopTestTimer);
+    testTrack.addEventListener('mouseleave', startTestTimer);
+
+    /* swipe */
     let swipeStartX = 0;
-    testTrack.addEventListener('touchstart', e => { swipeStartX = e.touches[0].clientX; }, { passive: true });
+    testTrack.addEventListener('touchstart', e => { swipeStartX = e.touches[0].clientX; stopTestTimer(); }, { passive: true });
     testTrack.addEventListener('touchend', e => {
       const diff = swipeStartX - e.changedTouches[0].clientX;
       if (Math.abs(diff) > 50) testGoTo(testCurrent + (diff > 0 ? 1 : -1));
+      startTestTimer();
     });
+    /* initialize first dot */
+    testGoTo(0);
   }
 
   /* ── CUSTOM CURSOR ── */
