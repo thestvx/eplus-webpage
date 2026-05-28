@@ -1655,6 +1655,32 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
   document.querySelectorAll('.stagger-item').forEach(el => staggerObserver.observe(el));
+  /* ── COUNTER ANIMATION — count up when visible ── */
+  const counterObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const el = entry.target;
+      const target = parseInt(el.getAttribute('data-target'), 10);
+      if (!target || el.dataset.counted) return;
+      el.dataset.counted = '1';
+      const duration = 1800;
+      const start = performance.now();
+      function tick(now) {
+        const elapsed = now - start;
+        const progress = Math.min(elapsed / duration, 1);
+        // ease-out cubic
+        const eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = Math.round(eased * target).toLocaleString('ar');
+        if (progress < 1) requestAnimationFrame(tick);
+        else el.textContent = target.toLocaleString('ar') + (target >= 100 ? '+' : '');
+      }
+      requestAnimationFrame(tick);
+      counterObserver.unobserve(el);
+    });
+  }, { threshold: 0.5 });
+  document.querySelectorAll('.ep-stat-num[data-target]').forEach(el => counterObserver.observe(el));
+
+
 
   /* ── SMOOTH MAGNETIC BUTTONS ── */
   document.querySelectorAll('.magnetic-btn').forEach(btn => {
