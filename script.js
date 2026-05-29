@@ -1739,3 +1739,62 @@ window.loadAnnouncements = loadAnnouncements;
 window.nextAnnouncement = nextAnnouncement;
 window.prevAnnouncement = prevAnnouncement;
 window.goToAnnouncement = goToAnnouncement;
+
+/* ══════════════════════════════════════════════════════════
+   GALLERY LIGHTBOX
+══════════════════════════════════════════════════════════ */
+(function initGallery() {
+  const items    = document.querySelectorAll('.ep-gallery-item');
+  const lightbox = document.getElementById('ep-lightbox');
+  const lbImg    = document.getElementById('ep-lb-img');
+  const lbClose  = document.getElementById('ep-lb-close');
+  const lbPrev   = document.getElementById('ep-lb-prev');
+  const lbNext   = document.getElementById('ep-lb-next');
+  const lbCounter= document.getElementById('ep-lb-counter');
+
+  if (!lightbox || !items.length) return;
+
+  const photos = Array.from(items).map(el => ({
+    src: el.querySelector('img').src,
+    alt: el.querySelector('img').alt
+  }));
+
+  let current = 0;
+
+  function openLightbox(index) {
+    current = ((index % photos.length) + photos.length) % photos.length;
+    lbImg.src = photos[current].src;
+    lbImg.alt = photos[current].alt;
+    lbCounter.textContent = (current + 1) + ' / ' + photos.length;
+    lightbox.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeLightbox() {
+    lightbox.classList.remove('open');
+    document.body.style.overflow = '';
+    lbImg.src = '';
+  }
+
+  function showPrev() { openLightbox(current - 1); }
+  function showNext() { openLightbox(current + 1); }
+
+  items.forEach((item, i) => {
+    item.addEventListener('click', () => openLightbox(i));
+  });
+
+  lbClose.addEventListener('click', closeLightbox);
+  lbPrev.addEventListener('click', showPrev);
+  lbNext.addEventListener('click', showNext);
+
+  lightbox.addEventListener('click', e => {
+    if (e.target === lightbox) closeLightbox();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (!lightbox.classList.contains('open')) return;
+    if (e.key === 'Escape')     closeLightbox();
+    if (e.key === 'ArrowLeft')  showNext();
+    if (e.key === 'ArrowRight') showPrev();
+  });
+})();
