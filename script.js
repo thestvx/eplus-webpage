@@ -1744,7 +1744,7 @@ window.goToAnnouncement = goToAnnouncement;
    GALLERY LIGHTBOX
 ══════════════════════════════════════════════════════════ */
 (function initGallery() {
-  const items    = document.querySelectorAll('.ep-gallery-item');
+  const items    = document.querySelectorAll('.ep-gallery-mosaic .ep-gi');
   const lightbox = document.getElementById('ep-lightbox');
   const lbImg    = document.getElementById('ep-lb-img');
   const lbClose  = document.getElementById('ep-lb-close');
