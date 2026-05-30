@@ -826,3 +826,12 @@ if (document.readyState === "loading") {
 } else {
   init();
 }
+
+
+/* redesign micro-interactions */
+document.addEventListener("DOMContentLoaded", () => {
+  const nav = document.querySelector(".top-nav-redesign");
+  const onScroll = () => { if(!nav) return; nav.classList.toggle("scrolled", window.scrollY > 24); };
+  onScroll();
+  window.addEventListener("scroll", onScroll, { passive: true });
+});
