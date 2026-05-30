@@ -1,40 +1,22 @@
 /*
-  camp.js — يتوافق مع camp.html (Navy/Gold theme — E-PLUS)
-  ─────────────────────────────────────────────────────────
-  يتعامل مع:
-    ✔ Pricing Tabs
-    ✔ Modals (open / close / ESC)
-    ✔ Dynamic Form Fields (collapsible groups)
-    ✔ Input Sanitizers (phone / age)
-    ✔ Main Camp Form (validate + submit → Google Sheets)
-    ✔ Special Program Form (validate + submit → Google Sheets)
-    ✔ Success Overlay
-    ✔ Cloudinary Video Player
-    ✔ Cloudinary Gallery + Lightbox
-    ✔ Scroll Reveal (كارت pricing / journey / workshop / info / gallery)
-    ✔ Subtle Tilt Effect on Pricing Cards
-
-  ملاحظة: هذا الملف يُستدعى بعد الـ HTML كـ <script type="module" src="camp.js">
-  ← window.selectPackage و window.openModal مُصدَّران للـ onclick في الـ HTML
+  camp.js — يتوافق مع camp.html
+  يعالج: Pricing Tabs, Modals, Gallery, Video, Scroll Reveal, Tilt, Forms
 */
 
 /* ═══════════════════════════════════════════
    CONFIG
 ════════════════════════════════════════════ */
 const CAMP_MIN_AGE = 5;
-
-// ← استبدل بـ URL الـ Apps Script الصحيح
 const APPS_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbyoKNiPcaPBIYUTb1l_WXIlDmG2N-iPqSrx9r93Lpiio3_vKdOgCtwMTZQmq9cpQt6FWA/exec";
 
-// Cloudinary
-const VIDEO_PUBLIC_ID  = "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab";
-const VIDEO_CLOUD_NAME = "dac4mwuwe";
+const VIDEO_PUBLIC_ID   = "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab";
+const VIDEO_CLOUD_NAME  = "dac4mwuwe";
 const VIDEO_FALLBACK_SRC =
   `https://res.cloudinary.com/${VIDEO_CLOUD_NAME}/video/upload/q_auto,f_auto/${VIDEO_PUBLIC_ID}.mp4`;
 
-const GALLERY_FOLDER = "eplus-gallery";
-const GALLERY_MAX    = 24;
+const GALLERY_FOLDER  = "eplus-gallery";
+const GALLERY_MAX     = 24;
 
 const prefersReducedMotion =
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
@@ -47,11 +29,18 @@ let successOverlayShown = false;
 ════════════════════════════════════════════ */
 const $ = id => document.getElementById(id);
 
-function norm(v)      { return String(v ?? "").trim(); }
+function norm(v)  { return String(v ?? "").trim(); }
 function normPhone(v) { return norm(v).replace(/\s+/g, ""); }
 
-function markInvalid(el) { el?.classList.add("input-error"); }
-function clearInvalid(el) { el?.classList.remove("input-error"); }
+function markInvalid(el) {
+  if (!el) return;
+  el.classList.add("input-error");
+}
+
+function clearInvalid(el) {
+  if (!el) return;
+  el.classList.remove("input-error");
+}
 
 function clearChoiceError(name) {
   document.querySelectorAll(`input[name="${name}"]`).forEach(inp => {
@@ -78,7 +67,6 @@ function buildTimestamp() {
   return new Date().toLocaleString("ar-DZ");
 }
 
-/* ─── Submit Button State Helpers ─── */
 function setSubmitLoading(btnId, msg) {
   const btn = $(btnId);
   if (!btn) return;
@@ -111,14 +99,14 @@ function resetSubmitBtn(btnId, resetMsg) {
   if (span) span.textContent = resetMsg;
 }
 
-/* ─── Fetch Wrapper ─── */
 async function submitPayload(payload) {
-  return fetch(APPS_SCRIPT_URL, {
+  const resp = await fetch(APPS_SCRIPT_URL, {
     method: "POST",
     mode: "no-cors",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
+  return resp;
 }
 
 /* ═══════════════════════════════════════════
@@ -157,11 +145,12 @@ function buildSuccessOverlay(firstName, lastName, pkg, details) {
 }
 
 /* ═══════════════════════════════════════════
-   PRICING TABS
+   PRICING TABS — يعمل مع .ptab / .pricing-pane
 ════════════════════════════════════════════ */
 function initPricingTabs() {
-  const tabs  = document.querySelectorAll(".ptab");
-  const panes = document.querySelectorAll(".pricing-pane");
+  const tabs   = document.querySelectorAll(".ptab");
+  const panes  = document.querySelectorAll(".pricing-pane");
+
   if (!tabs.length) return;
 
   tabs.forEach(tab => {
@@ -181,30 +170,33 @@ function initPricingTabs() {
       tab.classList.add("active");
       tab.setAttribute("aria-selected", "true");
 
-      const pane = $(tab.dataset.target);
-      if (pane) {
-        pane.classList.add("active");
-        pane.setAttribute("aria-hidden", "false");
+      const target = tab.dataset.target;
+      if (target) {
+        const pane = $(target);
+        if (pane) {
+          pane.classList.add("active");
+          pane.setAttribute("aria-hidden", "false");
+        }
       }
     });
 
-    // Arrow key navigation
+    // Arrow key nav
     tab.addEventListener("keydown", e => {
       const list = [...tabs];
       const idx  = list.indexOf(tab);
       let next   = idx;
-      if      (e.key === "ArrowRight") next = (idx + 1) % list.length;
-      else if (e.key === "ArrowLeft")  next = (idx - 1 + list.length) % list.length;
+      if (e.key === "ArrowRight") next = (idx + 1) % list.length;
+      else if (e.key === "ArrowLeft") next = (idx - 1 + list.length) % list.length;
       else return;
       e.preventDefault();
-      list[next].click();
       focusEl(list[next]);
+      list[next].click();
     });
   });
 }
 
 /* ═══════════════════════════════════════════
-   MODALS
+   MODALS — يعمل مع .modal-overlay / .modal-backdrop / .modal-close
 ════════════════════════════════════════════ */
 function openModal(id) {
   const modal = $(id);
@@ -214,6 +206,7 @@ function openModal(id) {
   modal.classList.add("open");
   document.body.style.overflow = "hidden";
 
+  // Focus first focusable
   const focusable = modal.querySelectorAll(
     'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href]'
   );
@@ -231,16 +224,14 @@ function closeModal(id) {
   }
 }
 
-// تصدير للـ onclick في الـ HTML
-window.openModal  = openModal;
-window.closeModal = closeModal;
-
 function initModals() {
+  // Camp Register Modal
   $("open-register-modal")?.addEventListener("click", () => openModal("camp-register-modal"));
   $("close-register-modal")?.addEventListener("click", () => closeModal("camp-register-modal"));
   $("camp-register-modal")?.querySelector(".modal-backdrop")
     ?.addEventListener("click", () => closeModal("camp-register-modal"));
 
+  // Special Register Modal
   $("open-special-register-modal")?.addEventListener("click", () => openModal("special-register-modal"));
   $("close-special-register-modal")?.addEventListener("click", () => closeModal("special-register-modal"));
   $("special-register-modal")?.querySelector(".modal-backdrop")
@@ -270,7 +261,8 @@ window.selectPackage = function(pkgName) {
 };
 
 /* ═══════════════════════════════════════════
-   DYNAMIC FORM FIELDS (Collapsible Groups)
+   DYNAMIC FORM FIELDS
+   يتعامل مع collapsible-group / langGroup510 / langGroupPlus / bacGroup / itGroup / adultLevelGroup / adultTestGroup
 ════════════════════════════════════════════ */
 const FIELD_HEIGHTS = {
   langGroup510:    "220px",
@@ -309,33 +301,45 @@ function resetGroup(id, selector) {
 }
 
 function updateFormFields(val) {
-  const is510        = val.includes("5–10") || val.includes("5-10");
-  const is1114       = val.includes("11–14") || val.includes("11-14");
-  const is1518basic  = val.includes("الباقة الأساسية (15–18)");
-  const is1518elite  = val.includes("باقة النخبة (15–18)");
-  const isBac        = val.includes("البكالوريا") || val.toLowerCase().includes("bac prep");
-  const isAdultBasic = val.includes("باقة البالغين") && !val.includes("المتقدمة");
-  const isAdultAdv   = val.includes("البالغين المتقدمة");
-  const isCommClass  = val.toLowerCase().includes("communication class");
+  const is510       = val.includes("5–10") || val.includes("5-10");
+  const is1114      = val.includes("11–14") || val.includes("11-14");
+  const is1518basic = val.includes("الباقة الأساسية (15–18)");
+  const is1518elite = val.includes("باقة النخبة (15–18)");
+  const isBac       = val.includes("البكالوريا") || val.toLowerCase().includes("bac prep");
+  const isAdultBasic= val.includes("باقة البالغين") && !val.includes("المتقدمة");
+  const isAdultAdv  = val.includes("البالغين المتقدمة");
+  const isCommClass = val.toLowerCase().includes("communication class");
 
-  // langGroup510 — EN + FR فقط
-  if (is510) showGroup("langGroup510");
-  else resetGroup("langGroup510", 'input[name="lang510"]');
+  // langGroup510 — EN + FR only
+  if (is510) {
+    showGroup("langGroup510");
+  } else {
+    resetGroup("langGroup510", 'input[name="lang510"]');
+  }
 
   // langGroupPlus — EN + FR + ES
   const needsPlus = is1114 || is1518basic || is1518elite || isAdultBasic || isAdultAdv || isCommClass;
-  if (needsPlus) showGroup("langGroupPlus");
-  else resetGroup("langGroupPlus", 'input[name="langPlus"]');
+  if (needsPlus) {
+    showGroup("langGroupPlus");
+  } else {
+    resetGroup("langGroupPlus", 'input[name="langPlus"]');
+  }
 
   // bacGroup
-  if (isBac) showGroup("bacGroup");
-  else resetGroup("bacGroup", 'input[name="bacLang"]');
+  if (isBac) {
+    showGroup("bacGroup");
+  } else {
+    resetGroup("bacGroup", 'input[name="bacLang"]');
+  }
 
-  // itGroup — للبالغين المتقدمة فقط
-  if (isAdultAdv) showGroup("itGroup");
-  else resetGroup("itGroup", 'input[name="itTrack"]');
+  // itGroup (adults advanced only)
+  if (isAdultAdv) {
+    showGroup("itGroup");
+  } else {
+    resetGroup("itGroup", 'input[name="itTrack"]');
+  }
 
-  // adultLevelGroup
+  // Adult level
   const isAdult = isAdultBasic || isAdultAdv;
   if (isAdult) {
     showGroup("adultLevelGroup");
@@ -344,6 +348,48 @@ function updateFormFields(val) {
     hideGroup("adultTestGroup");
     document.querySelectorAll('input[name="adultTest"]').forEach(r => r.checked = false);
   }
+}
+
+function initDynamicFields() {
+  const packageSel = $("campSelectedPackage");
+  if (!packageSel || packageSel.dataset.dynBound === "true") return;
+  packageSel.dataset.dynBound = "true";
+
+  packageSel.addEventListener("change", () => {
+    updateFormFields(packageSel.value || "");
+    clearInvalid(packageSel);
+  });
+
+  // Adult level → show test group
+  const adultLvl = $("campAdultLevel");
+  if (adultLvl) {
+    adultLvl.addEventListener("change", function() {
+      if (this.value) showGroup("adultTestGroup");
+      else hideGroup("adultTestGroup");
+      clearInvalid(this);
+    });
+  }
+
+  // Checkbox limits
+  limitCheckboxes("lang510", 2);
+  limitCheckboxes("langPlus", 2);
+  limitCheckboxes("bacLang", 2);
+
+  // Clear error on change
+  ["campFirstName","campLastName","campAge","campParentName","campParentPhone"].forEach(id => {
+    $(id)?.addEventListener("input", function() { clearInvalid(this); });
+  });
+
+  document.querySelectorAll('input[name="bacLang"], input[name="itTrack"], input[name="adultTest"]')
+    .forEach(inp => {
+      inp.addEventListener("change", () => {
+        clearChoiceError(inp.name);
+        clearInvalid(inp);
+      });
+    });
+
+  // Init state
+  updateFormFields(packageSel.value || "");
 }
 
 function limitCheckboxes(name, max) {
@@ -357,50 +403,8 @@ function limitCheckboxes(name, max) {
   });
 }
 
-function initDynamicFields() {
-  const packageSel = $("campSelectedPackage");
-  if (!packageSel || packageSel.dataset.dynBound === "true") return;
-  packageSel.dataset.dynBound = "true";
-
-  packageSel.addEventListener("change", () => {
-    updateFormFields(packageSel.value || "");
-    clearInvalid(packageSel);
-  });
-
-  // مستوى البالغين → يظهر حقل الاختبار
-  const adultLvl = $("campAdultLevel");
-  if (adultLvl) {
-    adultLvl.addEventListener("change", function() {
-      if (this.value) showGroup("adultTestGroup");
-      else hideGroup("adultTestGroup");
-      clearInvalid(this);
-    });
-  }
-
-  // حدود الاختيارات
-  limitCheckboxes("lang510", 2);
-  limitCheckboxes("langPlus", 2);
-  limitCheckboxes("bacLang", 2);
-
-  // مسح الخطأ عند الكتابة
-  ["campFirstName","campLastName","campAge","campParentName","campParentPhone"].forEach(id => {
-    $(id)?.addEventListener("input", function() { clearInvalid(this); });
-  });
-
-  document.querySelectorAll('input[name="bacLang"], input[name="itTrack"], input[name="adultTest"]')
-    .forEach(inp => {
-      inp.addEventListener("change", () => {
-        clearChoiceError(inp.name);
-        clearInvalid(inp);
-      });
-    });
-
-  // حالة ابتدائية
-  updateFormFields(packageSel.value || "");
-}
-
 /* ═══════════════════════════════════════════
-   INPUT SANITIZERS
+   PHONE / AGE SANITIZERS
 ════════════════════════════════════════════ */
 function initInputSanitizers() {
   ["campParentPhone", "specialParentPhone"].forEach(id => {
@@ -436,11 +440,9 @@ function validateMainForm() {
   const phone     = normPhone($("campParentPhone")?.value);
 
   let firstBad = null;
+
   const req = el => {
-    if (!el || !norm(el.value)) {
-      markInvalid(el);
-      if (!firstBad) firstBad = el;
-    }
+    if (!el || !norm(el.value)) { markInvalid(el); if (!firstBad) firstBad = el; }
   };
 
   req($("campSelectedPackage"));
@@ -451,13 +453,11 @@ function validateMainForm() {
   req($("campParentPhone"));
 
   if (age && Number(age) < CAMP_MIN_AGE) {
-    markInvalid($("campAge"));
-    if (!firstBad) firstBad = $("campAge");
+    markInvalid($("campAge")); if (!firstBad) firstBad = $("campAge");
   }
 
   if (phone && !validatePhone(phone)) {
-    markInvalid($("campParentPhone"));
-    if (!firstBad) firstBad = $("campParentPhone");
+    markInvalid($("campParentPhone")); if (!firstBad) firstBad = $("campParentPhone");
   }
 
   if (firstBad) {
@@ -466,29 +466,33 @@ function validateMainForm() {
     return null;
   }
 
-  // اللغات
+  // Collect languages
   let langs = "";
   const is510 = pkg.includes("5–10") || pkg.includes("5-10");
   const isBac = pkg.toLowerCase().includes("بكالوريا") || pkg.toLowerCase().includes("bac prep");
 
   if (is510) {
     const sel = [...document.querySelectorAll('input[name="lang510"]:checked')];
-    if (!sel.length) { alert("⚠️ الرجاء اختيار لغة واحدة على الأقل."); return null; }
+    if (!sel.length) {
+      alert("⚠️ الرجاء اختيار لغة واحدة على الأقل."); return null;
+    }
     langs = sel.map(c => c.value).join(" + ");
   } else if (isBac) {
     const sel = [...document.querySelectorAll('input[name="bacLang"]:checked')];
-    if (sel.length !== 2) { alert("⚠️ الرجاء اختيار لغتين بالضبط لباقة البكالوريا."); return null; }
+    if (sel.length !== 2) {
+      alert("⚠️ الرجاء اختيار لغتين بالضبط لباقة البكالوريا."); return null;
+    }
     langs = sel.map(c => c.value).join(" + ");
   } else {
     const sel = [...document.querySelectorAll('input[name="langPlus"]:checked')];
-    const g   = $("langGroupPlus");
+    const g = $("langGroupPlus");
     if (g?.classList.contains("visible") && !sel.length) {
       alert("⚠️ الرجاء اختيار لغة واحدة على الأقل."); return null;
     }
     langs = sel.map(c => c.value).join(" + ") || "—";
   }
 
-  // مسار الإعلام الآلي
+  // IT track
   let itTrack = "—";
   if (pkg.includes("البالغين المتقدمة")) {
     const chosen = document.querySelector('input[name="itTrack"]:checked');
@@ -496,14 +500,13 @@ function validateMainForm() {
     itTrack = chosen.value;
   }
 
-  // مستوى البالغين
+  // Adult
   const adultLevel = norm($("campAdultLevel")?.value);
   const adultTest  = document.querySelector('input[name="adultTest"]:checked')?.value || "—";
-  if (pkg.includes("باقة البالغين") && !adultLevel) {
+  if ((pkg.includes("باقة البالغين")) && !adultLevel) {
     markInvalid($("campAdultLevel"));
     scrollTo($("adultLevelGroup"));
-    alert("⚠️ الرجاء اختيار مستوى اللغة.");
-    return null;
+    alert("⚠️ الرجاء اختيار مستوى اللغة."); return null;
   }
 
   return { pkg, langs, itTrack, adultLevel, adultTest, firstName, lastName, age, parent, phone };
@@ -516,7 +519,6 @@ function resetMainForm() {
   clearChoiceError("bacLang");
   clearChoiceError("itTrack");
   clearChoiceError("adultTest");
-  // إعادة تهيئة الحقول الديناميكية
   $("campSelectedPackage")?.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
@@ -536,21 +538,21 @@ function initMainForm() {
     setSubmitLoading("camp-submit-btn", "⏳ جاري الإرسال...");
 
     const payload = {
-      timestamp:           buildTimestamp(),
-      page:                "summer-camp",
-      formType:            "camp-package",
-      package:             data.pkg,
-      languages:           data.langs,
-      itTrack:             data.itTrack,
-      adultLanguageLevel:  data.adultLevel || "—",
-      adultTestPreference: data.adultTest  || "—",
-      firstName:           data.firstName,
-      lastName:            data.lastName,
-      age:                 data.age,
-      parentName:          data.parent,
-      parentPhone:         data.phone,
-      userAgent:           navigator.userAgent.slice(0, 180),
-      lang:                navigator.language || "unknown"
+      timestamp: buildTimestamp(),
+      page: "summer-camp",
+      formType: "camp-package",
+      package:  data.pkg,
+      languages: data.langs,
+      itTrack: data.itTrack,
+      adultLanguageLevel: data.adultLevel || "—",
+      adultTestPreference: data.adultTest || "—",
+      firstName: data.firstName,
+      lastName:  data.lastName,
+      age: data.age,
+      parentName:  data.parent,
+      parentPhone: data.phone,
+      userAgent: navigator.userAgent.slice(0, 180),
+      lang: navigator.language || "unknown"
     };
 
     try {
@@ -573,22 +575,22 @@ function initMainForm() {
    SPECIAL PROGRAM FORM
 ════════════════════════════════════════════ */
 function validateSpecialForm() {
-  const programs    = [...document.querySelectorAll('input[name="specialProgramType"]:checked')].map(el => el.value);
+  const programs = [...document.querySelectorAll('input[name="specialProgramType"]:checked')].map(el => el.value);
   const firstName   = norm($("specialFirstName")?.value);
   const lastName    = norm($("specialLastName")?.value);
   const age         = norm($("specialAge")?.value);
   const parentName  = norm($("specialParentName")?.value);
   const parentPhone = normPhone($("specialParentPhone")?.value);
 
-  if (!programs.length) {
-    alert("⚠️ الرجاء اختيار نوع البرنامج.");
-    return null;
-  }
-
   let firstBad = null;
   const req = el => {
     if (!el || !norm(el.value)) { markInvalid(el); if (!firstBad) firstBad = el; }
   };
+
+  if (!programs.length) {
+    alert("⚠️ الرجاء اختيار نوع البرنامج.");
+    return null;
+  }
 
   req($("specialFirstName"));
   req($("specialLastName"));
@@ -597,13 +599,11 @@ function validateSpecialForm() {
   req($("specialParentPhone"));
 
   if (age && Number(age) < CAMP_MIN_AGE) {
-    markInvalid($("specialAge"));
-    if (!firstBad) firstBad = $("specialAge");
+    markInvalid($("specialAge")); if (!firstBad) firstBad = $("specialAge");
   }
 
   if (parentPhone && !validatePhone(parentPhone)) {
-    markInvalid($("specialParentPhone"));
-    if (!firstBad) firstBad = $("specialParentPhone");
+    markInvalid($("specialParentPhone")); if (!firstBad) firstBad = $("specialParentPhone");
   }
 
   if (firstBad) {
@@ -626,11 +626,6 @@ function initSpecialForm() {
   if (!form || form.dataset.bound === "true") return;
   form.dataset.bound = "true";
 
-  // مسح الخطأ عند التغيير
-  ["specialFirstName","specialLastName","specialAge","specialParentName","specialParentPhone"].forEach(id => {
-    $(id)?.addEventListener("input", function() { clearInvalid(this); });
-  });
-
   form.addEventListener("submit", async e => {
     e.preventDefault();
     if (isSubmitting || successOverlayShown) return;
@@ -642,17 +637,17 @@ function initSpecialForm() {
     setSubmitLoading("special-submit-btn", "⏳ جاري الإرسال...");
 
     const payload = {
-      timestamp:       buildTimestamp(),
-      page:            "summer-camp",
-      formType:        "special-program",
+      timestamp: buildTimestamp(),
+      page: "summer-camp",
+      formType: "special-program",
       specialPrograms: data.programs.join(" + "),
-      firstName:       data.firstName,
-      lastName:        data.lastName,
-      age:             data.age,
-      parentName:      data.parentName,
-      parentPhone:     data.parentPhone,
-      userAgent:       navigator.userAgent.slice(0, 180),
-      lang:            navigator.language || "unknown"
+      firstName: data.firstName,
+      lastName:  data.lastName,
+      age: data.age,
+      parentName:  data.parentName,
+      parentPhone: data.parentPhone,
+      userAgent: navigator.userAgent.slice(0, 180),
+      lang: navigator.language || "unknown"
     };
 
     try {
@@ -681,10 +676,10 @@ function initCampVideo() {
   try {
     if (typeof cloudinary !== "undefined") {
       const player = cloudinary.videoPlayer("player", {
-        cloudName:   VIDEO_CLOUD_NAME,
-        fluid:       true,
-        controls:    true,
-        preload:     "metadata",
+        cloudName: VIDEO_CLOUD_NAME,
+        fluid: true,
+        controls: true,
+        preload: "metadata",
         sourceTypes: ["mp4", "webm"],
         transformation: { quality: "auto", fetch_format: "auto" }
       });
@@ -711,7 +706,7 @@ async function loadCampGallery() {
     );
     if (!res.ok) throw new Error("Gallery fetch failed");
 
-    const data      = await res.json();
+    const data = await res.json();
     const resources = (data.resources || []).slice(0, GALLERY_MAX);
 
     if (!resources.length) {
@@ -723,14 +718,13 @@ async function loadCampGallery() {
     resources.forEach(r => {
       const item = document.createElement("div");
       item.className = "gallery-item reveal";
-      const src  = `https://res.cloudinary.com/${VIDEO_CLOUD_NAME}/image/upload/c_fill,w_480,h_360,q_auto,f_auto/${r.public_id}`;
+      const src = `https://res.cloudinary.com/${VIDEO_CLOUD_NAME}/image/upload/c_fill,w_480,h_360,q_auto,f_auto/${r.public_id}`;
       const full = `https://res.cloudinary.com/${VIDEO_CLOUD_NAME}/image/upload/q_auto,f_auto/${r.public_id}`;
       item.innerHTML = `<img src="${src}" alt="صورة من المخيم" loading="lazy" decoding="async">`;
       item.addEventListener("click", () => openLightbox(full));
       container.appendChild(item);
     });
 
-    // تفعيل الـ reveal على الصور الجديدة
     initRevealOnScroll();
   } catch (err) {
     console.warn("Gallery load error:", err);
@@ -758,7 +752,7 @@ function openLightbox(src) {
 }
 
 /* ═══════════════════════════════════════════
-   SCROLL REVEAL — يعمل على البطاقات والعناصر
+   SCROLL REVEAL
 ════════════════════════════════════════════ */
 function initRevealOnScroll() {
   if (prefersReducedMotion) return;
@@ -766,18 +760,22 @@ function initRevealOnScroll() {
   const targets = document.querySelectorAll(
     ".pc, .journey-card, .workshop-card, .info-card, .gallery-item:not(.visible)"
   );
+
   if (!targets.length) return;
 
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry, i) => {
-      if (!entry.isIntersecting) return;
-      const delay = (i % 6) * 80;
-      setTimeout(() => {
-        entry.target.classList.add("reveal", "visible");
-      }, delay);
-      observer.unobserve(entry.target);
-    });
-  }, { threshold: 0.1, rootMargin: "0px 0px -40px 0px" });
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry, i) => {
+        if (!entry.isIntersecting) return;
+        const delay = (i % 6) * 80;
+        setTimeout(() => {
+          entry.target.classList.add("reveal", "visible");
+        }, delay);
+        observer.unobserve(entry.target);
+      });
+    },
+    { threshold: 0.1, rootMargin: "0px 0px -40px 0px" }
+  );
 
   targets.forEach(el => {
     if (!el.classList.contains("visible")) {
@@ -788,7 +786,7 @@ function initRevealOnScroll() {
 }
 
 /* ═══════════════════════════════════════════
-   TILT EFFECT على بطاقات الأسعار
+   SUBTLE TILT ON PRICING CARDS
 ════════════════════════════════════════════ */
 function initTiltEffect() {
   if (prefersReducedMotion) return;
@@ -798,13 +796,11 @@ function initTiltEffect() {
       const rect = card.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width  - 0.5;
       const y = (e.clientY - rect.top)  / rect.height - 0.5;
-      card.style.transform = `translateY(-6px) rotateX(${-y * 6}deg) rotateY(${x * 6}deg)`;
-      card.classList.add("tilt-active");
+      card.style.transform = `translateY(-4px) rotateX(${-y * 6}deg) rotateY(${x * 6}deg)`;
     });
 
     card.addEventListener("mouseleave", () => {
       card.style.transform = "";
-      card.classList.remove("tilt-active");
     });
   });
 }
