@@ -107,9 +107,11 @@ function syncBodyModalState() {
     const el = getField(id);
     return Boolean(
       el &&
-        (el.classList.contains("open") ||
-          el.classList.contains("active") ||
-          el.getAttribute("aria-hidden") === "false")
+      (
+        el.classList.contains("open") ||
+        el.classList.contains("active") ||
+        el.getAttribute("aria-hidden") === "false"
+      )
     );
   });
 
@@ -269,7 +271,9 @@ function isESPPackage(packageValue) {
   return (
     value.includes("english for specific purposes") ||
     value.includes("english for special purposes") ||
-    value.includes(" esp ")
+    value.includes(" esp ") ||
+    value.startsWith("esp") ||
+    value.endsWith("esp")
   );
 }
 
@@ -301,6 +305,8 @@ function needsLanguageChoices(packageValue) {
   if (!normalizeText(packageValue)) return false;
   if (isBacPackage(packageValue)) return false;
   if (isESPPackage(packageValue)) return false;
+  if (isITAdvancedPackage(packageValue)) return false;
+
   return (
     isFiveToTenPackage(packageValue) ||
     isElevenToFourteenPackage(packageValue) ||
@@ -660,6 +666,16 @@ function initRegisterModals() {
     openIds: ["open-special-register-modal"],
     closeIds: ["close-special-register-modal"]
   });
+
+  window.openCampRegisterModal = () => registerModalApi?.openModal?.();
+  window.closeCampRegisterModal = () => registerModalApi?.closeModal?.();
+  window.openSpecialRegisterModal = () => specialRegisterModalApi?.openModal?.();
+  window.closeSpecialRegisterModal = () => specialRegisterModalApi?.closeModal?.();
+
+  globalThis.openCampRegisterModal = window.openCampRegisterModal;
+  globalThis.closeCampRegisterModal = window.closeCampRegisterModal;
+  globalThis.openSpecialRegisterModal = window.openSpecialRegisterModal;
+  globalThis.closeSpecialRegisterModal = window.closeSpecialRegisterModal;
 }
 
 /* =========================
@@ -722,6 +738,9 @@ function inferPackageNameFromCard(button) {
   const explicit = normalizeText(card.dataset.package);
   if (explicit) return explicit;
 
+  const explicitBtnPackage = normalizeText(button.dataset.packageName);
+  if (explicitBtnPackage) return explicitBtnPackage;
+
   const nameEl = card.querySelector(".pc-name");
   const titleSpan = nameEl?.querySelector("span");
   const priceEl = card.querySelector(".pc-price");
@@ -729,9 +748,9 @@ function inferPackageNameFromCard(button) {
 
   const rawTitle = nameEl
     ? [...nameEl.childNodes]
-        .filter((node) => node.nodeType === Node.TEXT_NODE)
-        .map((node) => node.textContent)
-        .join(" ")
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+      .map((node) => node.textContent)
+      .join(" ")
     : "";
 
   const titleText = normalizeText(rawTitle || nameEl?.textContent);
