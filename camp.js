@@ -8,13 +8,13 @@
 ════════════════════════════════════════════ */
 const CAMP_MIN_AGE = 5;
 
-// URL حق باقات المخيم الصيفي
+// URL حق باقات المخيم الصيفي — SummerPlus
 const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbyoKNiPcaPBIYUTb1l_WXIlDmG2N-iPqSrx9r93Lpiio3_vKdOgCtwMTZQmq9cpQt6FWA/exec";
+  "https://script.google.com/macros/s/AKfycbx_ppdwE_rDnoUiGr7h_Vdz9Ox5FnakAerHbFwa_0igArGXiPt0BqBweoSeH7PIKpXWlw/exec";
 
-// URL حق البرامج الخاصة (تحسين الخط / الحساب الذهني / البرمجة)
+// URL حق البرامج الخاصة — programsummerschool
 const SPECIAL_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbz0O_yBe3JzJyWHV8OJgkhPkScMKBAsBMOnw8kgzCoipnW5ArwrbF5k3rPKYjZqv21NaQ/exec";
+  "https://script.google.com/macros/s/AKfycbz7dWGL35sIFP4H4ASsRPKBC_LKMFMwUIcC6hXMfSi8P59QIxhTOFbm6ZFpN1So40iyGA/exec";
 
 const VIDEO_PUBLIC_ID   = "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab";
 const VIDEO_CLOUD_NAME  = "dac4mwuwe";
