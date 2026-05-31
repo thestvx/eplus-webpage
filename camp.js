@@ -8,7 +8,7 @@
 ════════════════════════════════════════════ */
 const CAMP_MIN_AGE = 5;
 const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbyoKNiPcaPBIYUTb1l_WXIlDmG2N-iPqSrx9r93Lpiio3vKdOgCtwMTZQmq9cpQt6FWA/exec";
+  "https://script.google.com/macros/s/AKfycbyoKNiPcaPBIYUTb1l_WXIlDmG2N-iPqSrx9r93Lpiio3_vKdOgCtwMTZQmq9cpQt6FWA/exec";
 
 const VIDEO_PUBLIC_ID   = "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab";
 const VIDEO_CLOUD_NAME  = "dac4mwuwe";
@@ -310,12 +310,14 @@ function updateFormFields(val) {
   const isAdultAdv  = val.includes("البالغين المتقدمة");
   const isCommClass = val.toLowerCase().includes("communication class");
 
+  // langGroup510 — EN + FR only
   if (is510) {
     showGroup("langGroup510");
   } else {
     resetGroup("langGroup510", 'input[name="lang510"]');
   }
 
+  // langGroupPlus — EN + FR + ES
   const needsPlus = is1114 || is1518basic || is1518elite || isAdultBasic || isAdultAdv || isCommClass;
   if (needsPlus) {
     showGroup("langGroupPlus");
@@ -323,18 +325,21 @@ function updateFormFields(val) {
     resetGroup("langGroupPlus", 'input[name="langPlus"]');
   }
 
+  // bacGroup
   if (isBac) {
     showGroup("bacGroup");
   } else {
     resetGroup("bacGroup", 'input[name="bacLang"]');
   }
 
+  // itGroup (adults advanced only)
   if (isAdultAdv) {
     showGroup("itGroup");
   } else {
     resetGroup("itGroup", 'input[name="itTrack"]');
   }
 
+  // Adult level
   const isAdult = isAdultBasic || isAdultAdv;
   if (isAdult) {
     showGroup("adultLevelGroup");
@@ -350,11 +355,12 @@ function initDynamicFields() {
   if (!packageSel || packageSel.dataset.dynBound === "true") return;
   packageSel.dataset.dynBound = "true";
 
-  packageSel?.addEventListener("change", () => {
+  packageSel.addEventListener("change", () => {
     updateFormFields(packageSel.value || "");
     clearInvalid(packageSel);
   });
 
+  // Adult level → show test group
   const adultLvl = $("campAdultLevel");
   if (adultLvl) {
     adultLvl?.addEventListener("change", function() {
@@ -364,10 +370,12 @@ function initDynamicFields() {
     });
   }
 
+  // Checkbox limits
   limitCheckboxes("lang510", 2);
   limitCheckboxes("langPlus", 2);
   limitCheckboxes("bacLang", 2);
 
+  // Clear error on change
   ["campFirstName","campLastName","campAge","campParentName","campParentPhone"].forEach(id => {
     $(id)?.addEventListener("input", function() { clearInvalid(this); });
   });
@@ -380,6 +388,7 @@ function initDynamicFields() {
       });
     });
 
+  // Init state
   updateFormFields(packageSel.value || "");
 }
 
@@ -425,7 +434,7 @@ function initInputSanitizers() {
 function validateMainForm() {
   const pkg       = norm($("campSelectedPackage")?.value);
   const firstName = norm($("campFirstName")?.value);
-  const lastName   = norm($("campLastName")?.value);
+  const lastName  = norm($("campLastName")?.value);
   const age       = norm($("campAge")?.value);
   const parent    = norm($("campParentName")?.value);
   const phone     = normPhone($("campParentPhone")?.value);
@@ -457,6 +466,7 @@ function validateMainForm() {
     return null;
   }
 
+  // Collect languages
   let langs = "";
   const is510 = pkg.includes("5–10") || pkg.includes("5-10");
   const isBac = pkg.toLowerCase().includes("بكالوريا") || pkg.toLowerCase().includes("bac prep");
@@ -482,6 +492,7 @@ function validateMainForm() {
     langs = sel.map(c => c.value).join(" + ") || "—";
   }
 
+  // IT track
   let itTrack = "—";
   if (pkg.includes("البالغين المتقدمة")) {
     const chosen = document.querySelector('input[name="itTrack"]:checked');
@@ -489,6 +500,7 @@ function validateMainForm() {
     itTrack = chosen.value;
   }
 
+  // Adult
   const adultLevel = norm($("campAdultLevel")?.value);
   const adultTest  = document.querySelector('input[name="adultTest"]:checked')?.value || "—";
   if ((pkg.includes("باقة البالغين")) && !adultLevel) {
@@ -515,7 +527,7 @@ function initMainForm() {
   if (!form || form.dataset.bound === "true") return;
   form.dataset.bound = "true";
 
-  form?.addEventListener("submit", async e => {
+  form.addEventListener("submit", async e => {
     e.preventDefault();
     if (isSubmitting || successOverlayShown) return;
 
@@ -614,7 +626,7 @@ function initSpecialForm() {
   if (!form || form.dataset.bound === "true") return;
   form.dataset.bound = "true";
 
-  form?.addEventListener("submit", async e => {
+  form.addEventListener("submit", async e => {
     e.preventDefault();
     if (isSubmitting || successOverlayShown) return;
 
@@ -814,3 +826,17 @@ if (document.readyState === "loading") {
 } else {
   init();
 }
+
+
+/* emergency visibility safeguard */
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.reveal, .reveal-left, .reveal-scale').forEach(el => {
+    el.classList.add('visible');
+    el.style.opacity = '1';
+    el.style.transform = 'none';
+  });
+  const panes = document.querySelectorAll('.pricing-pane');
+  if (panes.length && !document.querySelector('.pricing-pane.active')) {
+    panes[0].classList.add('active');
+  }
+});
