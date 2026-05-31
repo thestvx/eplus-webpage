@@ -133,7 +133,7 @@ function buildSuccessOverlay(firstName, lastName, pkg, details) {
     </div>
   `;
 
-  el.querySelector(".success-close-btn")?.addEventListener("click", () => {
+  el.querySelector(".success-close-btn").addEventListener("click", () => {
     el.remove();
     isSubmitting = false;
     successOverlayShown = false;
@@ -157,7 +157,7 @@ function initPricingTabs() {
     if (tab.dataset.tabBound === "true") return;
     tab.dataset.tabBound = "true";
 
-    tab?.addEventListener("click", () => {
+    tab.addEventListener("click", () => {
       tabs.forEach(t => {
         t.classList.remove("active");
         t.setAttribute("aria-selected", "false");
@@ -181,7 +181,7 @@ function initPricingTabs() {
     });
 
     // Arrow key nav
-    tab?.addEventListener("keydown", e => {
+    tab.addEventListener("keydown", e => {
       const list = [...tabs];
       const idx  = list.indexOf(tab);
       let next   = idx;
@@ -363,7 +363,7 @@ function initDynamicFields() {
   // Adult level → show test group
   const adultLvl = $("campAdultLevel");
   if (adultLvl) {
-    adultLvl?.addEventListener("change", function() {
+    adultLvl.addEventListener("change", function() {
       if (this.value) showGroup("adultTestGroup");
       else hideGroup("adultTestGroup");
       clearInvalid(this);
@@ -382,7 +382,7 @@ function initDynamicFields() {
 
   document.querySelectorAll('input[name="bacLang"], input[name="itTrack"], input[name="adultTest"]')
     .forEach(inp => {
-      inp?.addEventListener("change", () => {
+      inp.addEventListener("change", () => {
         clearChoiceError(inp.name);
         clearInvalid(inp);
       });
@@ -396,7 +396,7 @@ function limitCheckboxes(name, max) {
   document.querySelectorAll(`input[name="${name}"]`).forEach(cb => {
     if (cb.dataset.limitBound === "true") return;
     cb.dataset.limitBound = "true";
-    cb?.addEventListener("change", () => {
+    cb.addEventListener("change", () => {
       const checked = [...document.querySelectorAll(`input[name="${name}"]:checked`)];
       if (checked.length > max) cb.checked = false;
     });
@@ -411,7 +411,7 @@ function initInputSanitizers() {
     const el = $(id);
     if (!el || el.dataset.phoneBound === "true") return;
     el.dataset.phoneBound = "true";
-    el?.addEventListener("input", () => {
+    el.addEventListener("input", () => {
       el.value = el.value.replace(/[^\d+\s]/g, "");
       clearInvalid(el);
     });
@@ -421,7 +421,7 @@ function initInputSanitizers() {
     const el = $(id);
     if (!el || el.dataset.ageBound === "true") return;
     el.dataset.ageBound = "true";
-    el?.addEventListener("input", () => {
+    el.addEventListener("input", () => {
       el.value = el.value.replace(/[^\d]/g, "");
       clearInvalid(el);
     });
@@ -721,7 +721,7 @@ async function loadCampGallery() {
       const src = `https://res.cloudinary.com/${VIDEO_CLOUD_NAME}/image/upload/c_fill,w_480,h_360,q_auto,f_auto/${r.public_id}`;
       const full = `https://res.cloudinary.com/${VIDEO_CLOUD_NAME}/image/upload/q_auto,f_auto/${r.public_id}`;
       item.innerHTML = `<img src="${src}" alt="صورة من المخيم" loading="lazy" decoding="async">`;
-      item?.addEventListener("click", () => openLightbox(full));
+      item.addEventListener("click", () => openLightbox(full));
       container.appendChild(item);
     });
 
@@ -741,8 +741,8 @@ function openLightbox(src) {
   `;
 
   const close = () => { lb.remove(); document.body.style.overflow = ""; };
-  lb.querySelector(".gallery-lightbox-close")?.addEventListener("click", close);
-  lb?.addEventListener("click", e => { if (e.target === lb) close(); });
+  lb.querySelector(".gallery-lightbox-close").addEventListener("click", close);
+  lb.addEventListener("click", e => { if (e.target === lb) close(); });
   document.addEventListener("keydown", function esc(e) {
     if (e.key === "Escape") { close(); document.removeEventListener("keydown", esc); }
   });
@@ -792,14 +792,14 @@ function initTiltEffect() {
   if (prefersReducedMotion) return;
 
   document.querySelectorAll(".pc").forEach(card => {
-    card?.addEventListener("mousemove", e => {
+    card.addEventListener("mousemove", e => {
       const rect = card.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width  - 0.5;
       const y = (e.clientY - rect.top)  / rect.height - 0.5;
       card.style.transform = `translateY(-4px) rotateX(${-y * 6}deg) rotateY(${x * 6}deg)`;
     });
 
-    card?.addEventListener("mouseleave", () => {
+    card.addEventListener("mouseleave", () => {
       card.style.transform = "";
     });
   });
@@ -828,15 +828,19 @@ if (document.readyState === "loading") {
 }
 
 
-/* emergency visibility safeguard */
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.reveal, .reveal-left, .reveal-scale').forEach(el => {
-    el.classList.add('visible');
-    el.style.opacity = '1';
-    el.style.transform = 'none';
+/* ─── redesign scroll & nav polish ─── */
+document.addEventListener("DOMContentLoaded", () => {
+  // nav scroll shadow
+  const nav = document.querySelector(".top-nav-redesign");
+  const tick = () => {
+    if (!nav) return;
+    nav.classList.toggle("scrolled", window.scrollY > 20);
+  };
+  tick();
+  window.addEventListener("scroll", tick, { passive: true });
+
+  // stagger hero chips animation delay
+  document.querySelectorAll(".hero-float-chip, .hero-info-card").forEach((el, i) => {
+    el.style.animationDelay = `${(i * 0.4).toFixed(1)}s`;
   });
-  const panes = document.querySelectorAll('.pricing-pane');
-  if (panes.length && !document.querySelector('.pricing-pane.active')) {
-    panes[0].classList.add('active');
-  }
 });
