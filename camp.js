@@ -828,10 +828,19 @@ if (document.readyState === "loading") {
 }
 
 
-/* redesign micro-interactions */
+/* ─── redesign scroll & nav polish ─── */
 document.addEventListener("DOMContentLoaded", () => {
+  // nav scroll shadow
   const nav = document.querySelector(".top-nav-redesign");
-  const onScroll = () => { if(!nav) return; nav.classList.toggle("scrolled", window.scrollY > 24); };
-  onScroll();
-  window.addEventListener("scroll", onScroll, { passive: true });
+  const tick = () => {
+    if (!nav) return;
+    nav.classList.toggle("scrolled", window.scrollY > 20);
+  };
+  tick();
+  window.addEventListener("scroll", tick, { passive: true });
+
+  // stagger hero chips animation delay
+  document.querySelectorAll(".hero-float-chip, .hero-info-card").forEach((el, i) => {
+    el.style.animationDelay = `${(i * 0.4).toFixed(1)}s`;
+  });
 });
