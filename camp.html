@@ -2067,6 +2067,86 @@ document.addEventListener('DOMContentLoaded', function() {
 }); // end DOMContentLoaded
 </script>
 
+<script>
+// ─── SPECIAL PROGRAM FORM → GOOGLE SHEETS ───
+(function() {
+  const SHEET_URL = 'https://script.google.com/macros/s/AKfycbz0O_yBe3JzJyWHV8OJgkhPkScMKBAsBMOnw8kgzCoipnW5ArwrbF5k3rPKYjZqv21NaQ/exec';
+
+  const form      = document.getElementById('special-program-form');
+  const submitBtn = document.getElementById('special-submit-btn');
+  if (!form) return;
+
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    // ── تحقق من اختيار برنامج واحد على الأقل
+    const checked = [...document.querySelectorAll('input[name="specialProgramType"]:checked')];
+    if (checked.length === 0) {
+      alert('⚠️ الرجاء اختيار برنامج واحد على الأقل.');
+      return;
+    }
+
+    // ── تحقق من الحقول المطلوبة
+    const firstName  = document.getElementById('specialFirstName').value.trim();
+    const lastName   = document.getElementById('specialLastName').value.trim();
+    const age        = document.getElementById('specialAge').value.trim();
+    const parentName = document.getElementById('specialParentName').value.trim();
+    const phone      = document.getElementById('specialParentPhone').value.trim();
+
+    if (!firstName || !lastName || !age || !parentName || !phone) {
+      alert('⚠️ الرجاء ملء جميع الحقول المطلوبة.');
+      return;
+    }
+
+    // ── تجهيز البيانات
+    const payload = {
+      program:    checked.map(c => c.value).join(' + '),
+      firstName:  firstName,
+      lastName:   lastName,
+      age:        age,
+      parentName: parentName,
+      phone:      phone
+    };
+
+    // ── تغيير حالة الزر
+    submitBtn.disabled = true;
+    submitBtn.querySelector('span').textContent = '⏳ جارٍ الإرسال...';
+
+    try {
+      await fetch(SHEET_URL, {
+        method: 'POST',
+        mode:   'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body:   JSON.stringify(payload)
+      });
+
+      // ── نجاح
+      submitBtn.querySelector('span').textContent = '✅ تم إرسال طلبك بنجاح!';
+      submitBtn.style.background = '#16a34a';
+      form.reset();
+
+      setTimeout(() => {
+        const modal = document.getElementById('special-register-modal');
+        if (modal) modal.classList.remove('open');
+        submitBtn.disabled = false;
+        submitBtn.querySelector('span').textContent = 'إرسال طلب التسجيل';
+        submitBtn.style.background = '';
+      }, 2800);
+
+    } catch (err) {
+      console.error('Sheet error:', err);
+      submitBtn.querySelector('span').textContent = '❌ حدث خطأ، حاول مجدداً';
+      submitBtn.style.background = '#dc2626';
+      setTimeout(() => {
+        submitBtn.disabled = false;
+        submitBtn.querySelector('span').textContent = 'إرسال طلب التسجيل';
+        submitBtn.style.background = '';
+      }, 3000);
+    }
+  });
+})();
+</script>
+
 <script type="module">
   import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
   import { getDatabase, ref, increment, set, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
