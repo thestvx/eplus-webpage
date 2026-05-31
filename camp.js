@@ -319,13 +319,15 @@ function updateFormFields(val) {
   const isAdultAdv  = val.includes("البالغين المتقدمة");
   const isCommClass = val.toLowerCase().includes("communication class");
 
-  if (is510) {
+  // فئة 5-10 أو Communication Class → langGroup510 (إنجليزية فقط)
+  if (is510 || isCommClass) {
     showGroup("langGroup510");
   } else {
     resetGroup("langGroup510", 'input[name="lang510"]');
   }
 
-  const needsPlus = is1114 || is1518basic || is1518elite || isAdultBasic || isAdultAdv || isCommClass;
+  // باقات أخرى → langGroupPlus (إنجليزية + فرنسية + إسبانية)
+  const needsPlus = is1114 || is1518basic || is1518elite || isAdultBasic || isAdultAdv;
   if (needsPlus) {
     showGroup("langGroupPlus");
   } else {
@@ -467,10 +469,11 @@ function validateMainForm() {
   }
 
   let langs = "";
-  const is510 = pkg.includes("5–10") || pkg.includes("5-10");
-  const isBac = pkg.toLowerCase().includes("بكالوريا") || pkg.toLowerCase().includes("bac prep");
+  const is510       = pkg.includes("5–10") || pkg.includes("5-10");
+  const isCommClass = pkg.toLowerCase().includes("communication class");
+  const isBac       = pkg.toLowerCase().includes("بكالوريا") || pkg.toLowerCase().includes("bac prep");
 
-  if (is510) {
+  if (is510 || isCommClass) {
     const sel = [...document.querySelectorAll('input[name="lang510"]:checked')];
     if (!sel.length) { alert("⚠️ الرجاء اختيار لغة واحدة على الأقل."); return null; }
     langs = sel.map(c => c.value).join(" + ");
