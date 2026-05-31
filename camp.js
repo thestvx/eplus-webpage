@@ -8,7 +8,7 @@
 ════════════════════════════════════════════ */
 const CAMP_MIN_AGE = 5;
 const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbyoKNiPcaPBIYUTb1l_WXIlDmG2N-iPqSrx9r93Lpiio3_vKdOgCtwMTZQmq9cpQt6FWA/exec";
+  "https://script.google.com/macros/s/AKfycbyoKNiPcaPBIYUTb1l_WXIlDmG2N-iPqSrx9r93Lpiio3vKdOgCtwMTZQmq9cpQt6FWA/exec";
 
 const VIDEO_PUBLIC_ID   = "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab";
 const VIDEO_CLOUD_NAME  = "dac4mwuwe";
@@ -133,7 +133,7 @@ function buildSuccessOverlay(firstName, lastName, pkg, details) {
     </div>
   `;
 
-  el.querySelector(".success-close-btn").addEventListener("click", () => {
+  el.querySelector(".success-close-btn")?.addEventListener("click", () => {
     el.remove();
     isSubmitting = false;
     successOverlayShown = false;
@@ -157,7 +157,7 @@ function initPricingTabs() {
     if (tab.dataset.tabBound === "true") return;
     tab.dataset.tabBound = "true";
 
-    tab.addEventListener("click", () => {
+    tab?.addEventListener("click", () => {
       tabs.forEach(t => {
         t.classList.remove("active");
         t.setAttribute("aria-selected", "false");
@@ -181,7 +181,7 @@ function initPricingTabs() {
     });
 
     // Arrow key nav
-    tab.addEventListener("keydown", e => {
+    tab?.addEventListener("keydown", e => {
       const list = [...tabs];
       const idx  = list.indexOf(tab);
       let next   = idx;
@@ -310,14 +310,12 @@ function updateFormFields(val) {
   const isAdultAdv  = val.includes("البالغين المتقدمة");
   const isCommClass = val.toLowerCase().includes("communication class");
 
-  // langGroup510 — EN + FR only
   if (is510) {
     showGroup("langGroup510");
   } else {
     resetGroup("langGroup510", 'input[name="lang510"]');
   }
 
-  // langGroupPlus — EN + FR + ES
   const needsPlus = is1114 || is1518basic || is1518elite || isAdultBasic || isAdultAdv || isCommClass;
   if (needsPlus) {
     showGroup("langGroupPlus");
@@ -325,21 +323,18 @@ function updateFormFields(val) {
     resetGroup("langGroupPlus", 'input[name="langPlus"]');
   }
 
-  // bacGroup
   if (isBac) {
     showGroup("bacGroup");
   } else {
     resetGroup("bacGroup", 'input[name="bacLang"]');
   }
 
-  // itGroup (adults advanced only)
   if (isAdultAdv) {
     showGroup("itGroup");
   } else {
     resetGroup("itGroup", 'input[name="itTrack"]');
   }
 
-  // Adult level
   const isAdult = isAdultBasic || isAdultAdv;
   if (isAdult) {
     showGroup("adultLevelGroup");
@@ -355,40 +350,36 @@ function initDynamicFields() {
   if (!packageSel || packageSel.dataset.dynBound === "true") return;
   packageSel.dataset.dynBound = "true";
 
-  packageSel.addEventListener("change", () => {
+  packageSel?.addEventListener("change", () => {
     updateFormFields(packageSel.value || "");
     clearInvalid(packageSel);
   });
 
-  // Adult level → show test group
   const adultLvl = $("campAdultLevel");
   if (adultLvl) {
-    adultLvl.addEventListener("change", function() {
+    adultLvl?.addEventListener("change", function() {
       if (this.value) showGroup("adultTestGroup");
       else hideGroup("adultTestGroup");
       clearInvalid(this);
     });
   }
 
-  // Checkbox limits
   limitCheckboxes("lang510", 2);
   limitCheckboxes("langPlus", 2);
   limitCheckboxes("bacLang", 2);
 
-  // Clear error on change
   ["campFirstName","campLastName","campAge","campParentName","campParentPhone"].forEach(id => {
     $(id)?.addEventListener("input", function() { clearInvalid(this); });
   });
 
   document.querySelectorAll('input[name="bacLang"], input[name="itTrack"], input[name="adultTest"]')
     .forEach(inp => {
-      inp.addEventListener("change", () => {
+      inp?.addEventListener("change", () => {
         clearChoiceError(inp.name);
         clearInvalid(inp);
       });
     });
 
-  // Init state
   updateFormFields(packageSel.value || "");
 }
 
@@ -396,7 +387,7 @@ function limitCheckboxes(name, max) {
   document.querySelectorAll(`input[name="${name}"]`).forEach(cb => {
     if (cb.dataset.limitBound === "true") return;
     cb.dataset.limitBound = "true";
-    cb.addEventListener("change", () => {
+    cb?.addEventListener("change", () => {
       const checked = [...document.querySelectorAll(`input[name="${name}"]:checked`)];
       if (checked.length > max) cb.checked = false;
     });
@@ -411,7 +402,7 @@ function initInputSanitizers() {
     const el = $(id);
     if (!el || el.dataset.phoneBound === "true") return;
     el.dataset.phoneBound = "true";
-    el.addEventListener("input", () => {
+    el?.addEventListener("input", () => {
       el.value = el.value.replace(/[^\d+\s]/g, "");
       clearInvalid(el);
     });
@@ -421,7 +412,7 @@ function initInputSanitizers() {
     const el = $(id);
     if (!el || el.dataset.ageBound === "true") return;
     el.dataset.ageBound = "true";
-    el.addEventListener("input", () => {
+    el?.addEventListener("input", () => {
       el.value = el.value.replace(/[^\d]/g, "");
       clearInvalid(el);
     });
@@ -434,7 +425,7 @@ function initInputSanitizers() {
 function validateMainForm() {
   const pkg       = norm($("campSelectedPackage")?.value);
   const firstName = norm($("campFirstName")?.value);
-  const lastName  = norm($("campLastName")?.value);
+  const lastName   = norm($("campLastName")?.value);
   const age       = norm($("campAge")?.value);
   const parent    = norm($("campParentName")?.value);
   const phone     = normPhone($("campParentPhone")?.value);
@@ -466,7 +457,6 @@ function validateMainForm() {
     return null;
   }
 
-  // Collect languages
   let langs = "";
   const is510 = pkg.includes("5–10") || pkg.includes("5-10");
   const isBac = pkg.toLowerCase().includes("بكالوريا") || pkg.toLowerCase().includes("bac prep");
@@ -492,7 +482,6 @@ function validateMainForm() {
     langs = sel.map(c => c.value).join(" + ") || "—";
   }
 
-  // IT track
   let itTrack = "—";
   if (pkg.includes("البالغين المتقدمة")) {
     const chosen = document.querySelector('input[name="itTrack"]:checked');
@@ -500,7 +489,6 @@ function validateMainForm() {
     itTrack = chosen.value;
   }
 
-  // Adult
   const adultLevel = norm($("campAdultLevel")?.value);
   const adultTest  = document.querySelector('input[name="adultTest"]:checked')?.value || "—";
   if ((pkg.includes("باقة البالغين")) && !adultLevel) {
@@ -527,7 +515,7 @@ function initMainForm() {
   if (!form || form.dataset.bound === "true") return;
   form.dataset.bound = "true";
 
-  form.addEventListener("submit", async e => {
+  form?.addEventListener("submit", async e => {
     e.preventDefault();
     if (isSubmitting || successOverlayShown) return;
 
@@ -626,7 +614,7 @@ function initSpecialForm() {
   if (!form || form.dataset.bound === "true") return;
   form.dataset.bound = "true";
 
-  form.addEventListener("submit", async e => {
+  form?.addEventListener("submit", async e => {
     e.preventDefault();
     if (isSubmitting || successOverlayShown) return;
 
@@ -721,7 +709,7 @@ async function loadCampGallery() {
       const src = `https://res.cloudinary.com/${VIDEO_CLOUD_NAME}/image/upload/c_fill,w_480,h_360,q_auto,f_auto/${r.public_id}`;
       const full = `https://res.cloudinary.com/${VIDEO_CLOUD_NAME}/image/upload/q_auto,f_auto/${r.public_id}`;
       item.innerHTML = `<img src="${src}" alt="صورة من المخيم" loading="lazy" decoding="async">`;
-      item.addEventListener("click", () => openLightbox(full));
+      item?.addEventListener("click", () => openLightbox(full));
       container.appendChild(item);
     });
 
@@ -741,8 +729,8 @@ function openLightbox(src) {
   `;
 
   const close = () => { lb.remove(); document.body.style.overflow = ""; };
-  lb.querySelector(".gallery-lightbox-close").addEventListener("click", close);
-  lb.addEventListener("click", e => { if (e.target === lb) close(); });
+  lb.querySelector(".gallery-lightbox-close")?.addEventListener("click", close);
+  lb?.addEventListener("click", e => { if (e.target === lb) close(); });
   document.addEventListener("keydown", function esc(e) {
     if (e.key === "Escape") { close(); document.removeEventListener("keydown", esc); }
   });
@@ -792,14 +780,14 @@ function initTiltEffect() {
   if (prefersReducedMotion) return;
 
   document.querySelectorAll(".pc").forEach(card => {
-    card.addEventListener("mousemove", e => {
+    card?.addEventListener("mousemove", e => {
       const rect = card.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width  - 0.5;
       const y = (e.clientY - rect.top)  / rect.height - 0.5;
       card.style.transform = `translateY(-4px) rotateX(${-y * 6}deg) rotateY(${x * 6}deg)`;
     });
 
-    card.addEventListener("mouseleave", () => {
+    card?.addEventListener("mouseleave", () => {
       card.style.transform = "";
     });
   });
@@ -826,21 +814,3 @@ if (document.readyState === "loading") {
 } else {
   init();
 }
-
-
-/* ─── redesign scroll & nav polish ─── */
-document.addEventListener("DOMContentLoaded", () => {
-  // nav scroll shadow
-  const nav = document.querySelector(".top-nav-redesign");
-  const tick = () => {
-    if (!nav) return;
-    nav.classList.toggle("scrolled", window.scrollY > 20);
-  };
-  tick();
-  window.addEventListener("scroll", tick, { passive: true });
-
-  // stagger hero chips animation delay
-  document.querySelectorAll(".hero-float-chip, .hero-info-card").forEach((el, i) => {
-    el.style.animationDelay = `${(i * 0.4).toFixed(1)}s`;
-  });
-});
