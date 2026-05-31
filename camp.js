@@ -7,8 +7,14 @@
    CONFIG
 ════════════════════════════════════════════ */
 const CAMP_MIN_AGE = 5;
+
+// URL حق باقات المخيم الصيفي
 const APPS_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbyoKNiPcaPBIYUTb1l_WXIlDmG2N-iPqSrx9r93Lpiio3_vKdOgCtwMTZQmq9cpQt6FWA/exec";
+
+// URL حق البرامج الخاصة (تحسين الخط / الحساب الذهني / البرمجة)
+const SPECIAL_SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbz0O_yBe3JzJyWHV8OJgkhPkScMKBAsBMOnw8kgzCoipnW5ArwrbF5k3rPKYjZqv21NaQ/exec";
 
 const VIDEO_PUBLIC_ID   = "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab";
 const VIDEO_CLOUD_NAME  = "dac4mwuwe";
@@ -99,14 +105,24 @@ function resetSubmitBtn(btnId, resetMsg) {
   if (span) span.textContent = resetMsg;
 }
 
+// يرسل للجدول الكبير (باقات المخيم)
 async function submitPayload(payload) {
-  const resp = await fetch(APPS_SCRIPT_URL, {
+  return await fetch(APPS_SCRIPT_URL, {
     method: "POST",
     mode: "no-cors",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "text/plain" },
     body: JSON.stringify(payload)
   });
-  return resp;
+}
+
+// يرسل للجدول الخاص بالبرامج الخاصة
+async function submitSpecialPayload(payload) {
+  return await fetch(SPECIAL_SCRIPT_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(payload)
+  });
 }
 
 /* ═══════════════════════════════════════════
@@ -145,7 +161,7 @@ function buildSuccessOverlay(firstName, lastName, pkg, details) {
 }
 
 /* ═══════════════════════════════════════════
-   PRICING TABS — يعمل مع .ptab / .pricing-pane
+   PRICING TABS
 ════════════════════════════════════════════ */
 function initPricingTabs() {
   const tabs   = document.querySelectorAll(".ptab");
@@ -180,7 +196,6 @@ function initPricingTabs() {
       }
     });
 
-    // Arrow key nav
     tab.addEventListener("keydown", e => {
       const list = [...tabs];
       const idx  = list.indexOf(tab);
@@ -196,7 +211,7 @@ function initPricingTabs() {
 }
 
 /* ═══════════════════════════════════════════
-   MODALS — يعمل مع .modal-overlay / .modal-backdrop / .modal-close
+   MODALS
 ════════════════════════════════════════════ */
 function openModal(id) {
   const modal = $(id);
@@ -206,7 +221,6 @@ function openModal(id) {
   modal.classList.add("open");
   document.body.style.overflow = "hidden";
 
-  // Focus first focusable
   const focusable = modal.querySelectorAll(
     'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href]'
   );
@@ -225,19 +239,16 @@ function closeModal(id) {
 }
 
 function initModals() {
-  // Camp Register Modal
   $("open-register-modal")?.addEventListener("click", () => openModal("camp-register-modal"));
   $("close-register-modal")?.addEventListener("click", () => closeModal("camp-register-modal"));
   $("camp-register-modal")?.querySelector(".modal-backdrop")
     ?.addEventListener("click", () => closeModal("camp-register-modal"));
 
-  // Special Register Modal
   $("open-special-register-modal")?.addEventListener("click", () => openModal("special-register-modal"));
   $("close-special-register-modal")?.addEventListener("click", () => closeModal("special-register-modal"));
   $("special-register-modal")?.querySelector(".modal-backdrop")
     ?.addEventListener("click", () => closeModal("special-register-modal"));
 
-  // ESC key
   document.addEventListener("keydown", e => {
     if (e.key !== "Escape") return;
     closeModal("camp-register-modal");
@@ -247,7 +258,6 @@ function initModals() {
 
 /* ═══════════════════════════════════════════
    SELECT PACKAGE FROM CARD BUTTON
-   (يُستدعى من onclick في الـ HTML)
 ════════════════════════════════════════════ */
 window.selectPackage = function(pkgName) {
   const sel = $("campSelectedPackage");
@@ -262,7 +272,6 @@ window.selectPackage = function(pkgName) {
 
 /* ═══════════════════════════════════════════
    DYNAMIC FORM FIELDS
-   يتعامل مع collapsible-group / langGroup510 / langGroupPlus / bacGroup / itGroup / adultLevelGroup / adultTestGroup
 ════════════════════════════════════════════ */
 const FIELD_HEIGHTS = {
   langGroup510:    "220px",
@@ -310,14 +319,12 @@ function updateFormFields(val) {
   const isAdultAdv  = val.includes("البالغين المتقدمة");
   const isCommClass = val.toLowerCase().includes("communication class");
 
-  // langGroup510 — EN + FR only
   if (is510) {
     showGroup("langGroup510");
   } else {
     resetGroup("langGroup510", 'input[name="lang510"]');
   }
 
-  // langGroupPlus — EN + FR + ES
   const needsPlus = is1114 || is1518basic || is1518elite || isAdultBasic || isAdultAdv || isCommClass;
   if (needsPlus) {
     showGroup("langGroupPlus");
@@ -325,21 +332,18 @@ function updateFormFields(val) {
     resetGroup("langGroupPlus", 'input[name="langPlus"]');
   }
 
-  // bacGroup
   if (isBac) {
     showGroup("bacGroup");
   } else {
     resetGroup("bacGroup", 'input[name="bacLang"]');
   }
 
-  // itGroup (adults advanced only)
   if (isAdultAdv) {
     showGroup("itGroup");
   } else {
     resetGroup("itGroup", 'input[name="itTrack"]');
   }
 
-  // Adult level
   const isAdult = isAdultBasic || isAdultAdv;
   if (isAdult) {
     showGroup("adultLevelGroup");
@@ -360,7 +364,6 @@ function initDynamicFields() {
     clearInvalid(packageSel);
   });
 
-  // Adult level → show test group
   const adultLvl = $("campAdultLevel");
   if (adultLvl) {
     adultLvl.addEventListener("change", function() {
@@ -370,12 +373,10 @@ function initDynamicFields() {
     });
   }
 
-  // Checkbox limits
   limitCheckboxes("lang510", 2);
   limitCheckboxes("langPlus", 2);
   limitCheckboxes("bacLang", 2);
 
-  // Clear error on change
   ["campFirstName","campLastName","campAge","campParentName","campParentPhone"].forEach(id => {
     $(id)?.addEventListener("input", function() { clearInvalid(this); });
   });
@@ -388,7 +389,6 @@ function initDynamicFields() {
       });
     });
 
-  // Init state
   updateFormFields(packageSel.value || "");
 }
 
@@ -466,22 +466,17 @@ function validateMainForm() {
     return null;
   }
 
-  // Collect languages
   let langs = "";
   const is510 = pkg.includes("5–10") || pkg.includes("5-10");
   const isBac = pkg.toLowerCase().includes("بكالوريا") || pkg.toLowerCase().includes("bac prep");
 
   if (is510) {
     const sel = [...document.querySelectorAll('input[name="lang510"]:checked')];
-    if (!sel.length) {
-      alert("⚠️ الرجاء اختيار لغة واحدة على الأقل."); return null;
-    }
+    if (!sel.length) { alert("⚠️ الرجاء اختيار لغة واحدة على الأقل."); return null; }
     langs = sel.map(c => c.value).join(" + ");
   } else if (isBac) {
     const sel = [...document.querySelectorAll('input[name="bacLang"]:checked')];
-    if (sel.length !== 2) {
-      alert("⚠️ الرجاء اختيار لغتين بالضبط لباقة البكالوريا."); return null;
-    }
+    if (sel.length !== 2) { alert("⚠️ الرجاء اختيار لغتين بالضبط لباقة البكالوريا."); return null; }
     langs = sel.map(c => c.value).join(" + ");
   } else {
     const sel = [...document.querySelectorAll('input[name="langPlus"]:checked')];
@@ -492,7 +487,6 @@ function validateMainForm() {
     langs = sel.map(c => c.value).join(" + ") || "—";
   }
 
-  // IT track
   let itTrack = "—";
   if (pkg.includes("البالغين المتقدمة")) {
     const chosen = document.querySelector('input[name="itTrack"]:checked');
@@ -500,7 +494,6 @@ function validateMainForm() {
     itTrack = chosen.value;
   }
 
-  // Adult
   const adultLevel = norm($("campAdultLevel")?.value);
   const adultTest  = document.querySelector('input[name="adultTest"]:checked')?.value || "—";
   if ((pkg.includes("باقة البالغين")) && !adultLevel) {
@@ -538,6 +531,7 @@ function initMainForm() {
     setSubmitLoading("camp-submit-btn", "⏳ جاري الإرسال...");
 
     const payload = {
+      source: "camp-packages",
       timestamp: buildTimestamp(),
       page: "summer-camp",
       formType: "camp-package",
@@ -636,11 +630,13 @@ function initSpecialForm() {
     isSubmitting = true;
     setSubmitLoading("special-submit-btn", "⏳ جاري الإرسال...");
 
+    // ✅ يرسل للـ URL الخاص بالبرامج الخاصة فقط
     const payload = {
+      source: "special-programs",
       timestamp: buildTimestamp(),
       page: "summer-camp",
       formType: "special-program",
-      specialPrograms: data.programs.join(" + "),
+      program: data.programs.join(" + "),
       firstName: data.firstName,
       lastName:  data.lastName,
       age: data.age,
@@ -651,7 +647,7 @@ function initSpecialForm() {
     };
 
     try {
-      await submitPayload(payload);
+      await submitSpecialPayload(payload);  // ✅ يستخدم SPECIAL_SCRIPT_URL
       successOverlayShown = true;
       closeModal("special-register-modal");
       resetSpecialForm();
@@ -827,10 +823,8 @@ if (document.readyState === "loading") {
   init();
 }
 
-
 /* ─── redesign scroll & nav polish ─── */
 document.addEventListener("DOMContentLoaded", () => {
-  // nav scroll shadow
   const nav = document.querySelector(".top-nav-redesign");
   const tick = () => {
     if (!nav) return;
@@ -839,7 +833,6 @@ document.addEventListener("DOMContentLoaded", () => {
   tick();
   window.addEventListener("scroll", tick, { passive: true });
 
-  // stagger hero chips animation delay
   document.querySelectorAll(".hero-float-chip, .hero-info-card").forEach((el, i) => {
     el.style.animationDelay = `${(i * 0.4).toFixed(1)}s`;
   });
