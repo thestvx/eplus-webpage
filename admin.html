@@ -1085,7 +1085,7 @@ window.generateTicket = async () => {
 
 function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
   const canvas = document.getElementById('ticket-canvas');
-  // Actual ticket image dimensions: 2480 × 1063
+  // Actual ticket image: 2480 × 1063 px
   const W = 2480, H = 1063;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -1095,70 +1095,63 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
   img.onload = () => {
     ctx.drawImage(img, 0, 0, W, H);
 
-    // ── Layout analysis (all values in px at 2480×1063) ──
-    // Right panel: x from 1660 → 2460  (white area, RTL)
-    // Dashed divider at x ≈ 1640
-    // QR zone (bottom-left of right panel): x≈1660–1960, y≈680–960
-    //
-    // Field rows (label y, value y):
-    //  الاسم الكامل  →  label y=300,  value y=360
-    //  اسم الباقة    →  label y=420,  value y=480
-    //  المبلغ        →  label y=540,  value y=600
-    //  التاريخ       →  label y=640,  value y=700
-    //  رقم الوصل    →  label y=750,  value y=810
-    //  التوقيع row  →  y ≈ 890
-    //
-    // Text is right-aligned; anchor x = 2440
+    // ─────────────────────────────────────────────────
+    // MEASURED COORDINATES (from Python pixel analysis)
+    // White panel: x 1850 → 2460 (right-aligned at 2440)
+    // Labels already printed in image at:
+    //   الاسم الكامل  label bottom ≈ y=310
+    //   اسم الباقة    label bottom ≈ y=393
+    //   المبلغ        label bottom ≈ y=468
+    //   التاريخ       label bottom ≈ y=542
+    //   رقم الوصل    label bottom ≈ y=622
+    // Values (green lines) sit BETWEEN each label pair:
+    //   name  value  y=355
+    //   pack  value  y=435
+    //   amount value y=510
+    //   date  value  y=585
+    //   receipt y=665
+    // QR zone: x=1858–2088, y=730–960
+    // ─────────────────────────────────────────────────
 
-    const R = 2440;                      // right anchor
-    const LABEL_CLR  = '#1A3A8F';        // dark navy (matches ticket labels)
-    const VALUE_CLR  = '#0D2080';        // slightly deeper navy
-    const RECEIPT_CLR = '#1A3A8F';
+    const R   = 2440;          // right anchor (RTL text end)
+    const CLR = '#0D2080';     // dark navy value colour
 
     ctx.textAlign = 'right';
     ctx.direction = 'rtl';
-
-    // ── Helper ──
-    const label = (txt, y) => {
-      ctx.fillStyle = LABEL_CLR;
-      ctx.font = 'bold 38px Tajawal, Arial';
-      ctx.fillText(txt, R, y);
-    };
-    const value = (txt, y, color) => {
-      ctx.fillStyle = color || VALUE_CLR;
-      ctx.font = 'bold 44px Tajawal, Arial';
-      ctx.fillText(txt || '—', R, y);
-    };
+    ctx.font      = 'bold 32px Tajawal, Arial';
+    ctx.fillStyle = CLR;
 
     // الاسم الكامل
-    value(data.name,   360);
+    ctx.fillText(data.name || '—', R, 355);
 
-    // اسم الباقة
-    value(data.pack,   480);
+    // اسم الباقة  (might be long — clip to panel width ~590px)
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(1855, 400, 590, 50);
+    ctx.clip();
+    ctx.fillText(data.pack || '—', R, 435);
+    ctx.restore();
 
     // المبلغ
-    value(Number(data.amount || 0).toLocaleString('ar-DZ') + ' دج',  600);
+    ctx.fillText(Number(data.amount || 0).toLocaleString('ar-DZ') + ' دج', R, 510);
 
     // التاريخ
-    value(data.dateFormatted || '—',  700);
+    ctx.fillText(data.dateFormatted || '—', R, 585);
 
-    // رقم الوصل
-    ctx.fillStyle = RECEIPT_CLR;
-    ctx.font = 'bold 42px monospace';
-    ctx.fillText(data.receipt || '—', R, 810);
+    // رقم الوصل  — monospace, slightly smaller
+    ctx.font = 'bold 30px monospace';
+    ctx.fillStyle = '#1A3A8F';
+    ctx.fillText(data.receipt || '—', R, 665);
 
-    // ── QR code ──
-    // Position: bottom area of right panel, centred between divider and text
-    // x: 1680–1960 → centre at 1820
-    // y: 680–940  → centre at 810
+    // ── QR code ──────────────────────────────────────
     if (qrCanvas) {
-      const qrSize = 240;
-      const qrX    = 1680;
-      const qrY    = 680;
-      // White background
+      const qrSize = 220;
+      const qrX    = 1860;   // left edge (measured blue box x=1850)
+      const qrY    = 740;    // top edge
+      // white background
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.roundRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16, 14);
+      ctx.roundRect(qrX - 6, qrY - 6, qrSize + 12, qrSize + 12, 10);
       ctx.fill();
       ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
     }
@@ -1173,10 +1166,10 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
     const grad = ctx.createLinearGradient(0,0,W,H);
     grad.addColorStop(0,'#1a0533'); grad.addColorStop(1,'#0f1a3d');
     ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
-    ctx.fillStyle='#fff'; ctx.font='bold 40px Arial'; ctx.textAlign='right';
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 40px Arial'; ctx.textAlign = 'right';
     ctx.fillText('⚠️ صورة التذكرة غير موجودة', W-60, 120);
     ctx.fillText('images/ticket summer arabic.jpg', W-60, 180);
-    ctx.fillStyle='#A78BFA'; ctx.font='bold 50px Arial';
+    ctx.fillStyle = '#A78BFA'; ctx.font = 'bold 50px Arial';
     ctx.fillText(data.name, W-60, 300);
     if (qrCanvas) ctx.drawImage(qrCanvas, 60, 200, 220, 220);
     document.getElementById('ticket-empty').style.display = 'none';
