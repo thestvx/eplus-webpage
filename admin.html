@@ -668,9 +668,43 @@
             </div>
 
             <input type="hidden" id="sc-pack" value="">
+
+            <!-- ══ حقل المبلغ اليدوي ══ -->
             <div class="form-group">
               <label class="form-label">المبلغ المدفوع (دج) <span class="required">*</span></label>
-              <input class="inp" type="number" id="sc-amount" placeholder="مثال: 8000">
+              <div style="display:flex;gap:8px;align-items:center">
+                <input class="inp" type="number" id="sc-amount" placeholder="مثال: 8000" style="flex:1" oninput="onAmountChange()">
+                <button type="button" onclick="toggleManualAmount()" id="manual-amount-btn" title="إدخال المبلغ يدوياً" style="flex-shrink:0;padding:12px 16px;border-radius:12px;border:2px dashed var(--border-2);background:var(--primary-light);color:var(--primary);font-size:13px;font-weight:800;font-family:'Tajawal',sans-serif;cursor:pointer;white-space:nowrap;transition:all 0.25s ease">✏️ يدوي</button>
+              </div>
+              <div id="manual-amount-note" style="display:none;margin-top:6px;font-size:12px;color:var(--primary);font-weight:600;background:var(--primary-light);padding:8px 12px;border-radius:10px;border:1px solid var(--border-2)">
+                📝 أدخل المبلغ يدوياً في الحقل أعلاه — سيُسجَّل في التذكرة كما كتبته
+              </div>
+            </div>
+
+            <!-- ══ حاسبة المبلغ المتبقي ══ -->
+            <div class="form-group" style="background:linear-gradient(135deg,rgba(245,158,11,0.06),rgba(249,115,22,0.06));border:2px solid rgba(245,158,11,0.25);border-radius:16px;padding:18px;position:relative">
+              <div style="font-size:13px;font-weight:800;color:var(--text-2);margin-bottom:12px;display:flex;align-items:center;gap:8px">
+                <span style="width:30px;height:30px;border-radius:10px;background:rgba(245,158,11,0.15);display:inline-flex;align-items:center;justify-content:center;font-size:16px">🧮</span>
+                حاسبة المبلغ المتبقي
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+                <div>
+                  <label class="form-label" style="font-size:12px">سعر الباقة الكامل (دج)</label>
+                  <input class="inp" type="number" id="sc-full-price" placeholder="مثال: 8000" oninput="calcRemaining()" style="font-size:14px">
+                </div>
+                <div>
+                  <label class="form-label" style="font-size:12px">المبلغ الذي دفعه الطالب (دج)</label>
+                  <input class="inp" type="number" id="sc-paid-amount" placeholder="مثال: 6000" oninput="calcRemaining()" style="font-size:14px">
+                </div>
+              </div>
+              <div id="remaining-result" style="display:none;padding:14px;border-radius:12px;background:white;border:1px solid var(--border);text-align:center">
+                <div style="font-size:12px;color:var(--text-muted);font-weight:600;margin-bottom:4px">المبلغ المتبقي على الطالب</div>
+                <div id="remaining-value" style="font-size:26px;font-weight:900;color:var(--danger)">0 دج</div>
+                <div id="remaining-note" style="font-size:12px;color:var(--text-muted);margin-top:4px"></div>
+                <button type="button" onclick="applyRemainingToTicket()" id="apply-remaining-btn" style="margin-top:10px;padding:9px 20px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--summer),#EA580C);color:white;font-size:13px;font-weight:800;font-family:'Tajawal',sans-serif;cursor:pointer;width:100%">
+                  📋 تسجيل هذا المبلغ في التذكرة
+                </button>
+              </div>
             </div>
             <div class="form-group">
               <label class="form-label">تاريخ الدفع</label>
@@ -720,14 +754,15 @@
                   <th>رقم الوصل</th>
                   <th>الاسم الكامل</th>
                   <th>الباقة</th>
-                  <th>المبلغ</th>
+                  <th>المدفوع</th>
+                  <th>المتبقي</th>
                   <th>التاريخ</th>
                   <th>الحالة</th>
                   <th>إجراء</th>
                 </tr>
               </thead>
               <tbody id="tickets-tbody">
-                <tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-muted)">⏳ جاري تحميل التذاكر...</td></tr>
+                <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">⏳ جاري تحميل التذاكر...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1047,6 +1082,78 @@ window.resetSelection = () => {
 window.resetProgram = window.resetSelection;
 window.autoFillAmount = () => {};
 
+// ══ إدخال المبلغ يدوياً ══
+let manualAmountMode = false;
+window.toggleManualAmount = () => {
+  manualAmountMode = !manualAmountMode;
+  const btn = document.getElementById("manual-amount-btn");
+  const note = document.getElementById("manual-amount-note");
+  const inp = document.getElementById("sc-amount");
+  if (manualAmountMode) {
+    btn.style.background = "var(--primary)";
+    btn.style.color = "white";
+    btn.style.borderStyle = "solid";
+    btn.textContent = "✏️ يدوي ✔";
+    note.style.display = "block";
+    inp.removeAttribute("readonly");
+    inp.focus();
+    inp.select();
+    showToast("✏️ وضع الإدخال اليدوي — اكتب المبلغ كما تريد");
+  } else {
+    btn.style.background = "var(--primary-light)";
+    btn.style.color = "var(--primary)";
+    btn.style.borderStyle = "dashed";
+    btn.textContent = "✏️ يدوي";
+    note.style.display = "none";
+  }
+};
+
+window.onAmountChange = () => {
+  const paidField = document.getElementById("sc-paid-amount");
+  if (!paidField.value) {
+    paidField.value = document.getElementById("sc-amount").value;
+  }
+  calcRemaining();
+};
+
+// ══ حاسبة المبلغ المتبقي ══
+window.calcRemaining = () => {
+  const full = parseFloat(document.getElementById("sc-full-price").value) || 0;
+  const paid = parseFloat(document.getElementById("sc-paid-amount").value) || 0;
+  const resultBox = document.getElementById("remaining-result");
+  if (!full && !paid) { resultBox.style.display = "none"; return; }
+  resultBox.style.display = "block";
+  const remaining = full - paid;
+  const remVal = document.getElementById("remaining-value");
+  const remNote = document.getElementById("remaining-note");
+  const applyBtn = document.getElementById("apply-remaining-btn");
+  if (remaining > 0) {
+    remVal.textContent = remaining.toLocaleString("ar-DZ") + " دج";
+    remVal.style.color = "var(--danger)";
+    remNote.textContent = "دفع " + paid.toLocaleString("ar-DZ") + " دج من أصل " + full.toLocaleString("ar-DZ") + " دج";
+    applyBtn.style.display = "block";
+  } else if (remaining === 0) {
+    remVal.textContent = "✅ المبلغ مكتمل";
+    remVal.style.color = "var(--success)";
+    remNote.textContent = "دُفع كامل مبلغ " + full.toLocaleString("ar-DZ") + " دج";
+    applyBtn.style.display = "none";
+  } else {
+    remVal.textContent = "⚠️ المبلغ المدفوع أكبر من سعر الباقة";
+    remVal.style.color = "var(--warning)";
+    remNote.textContent = "فرق: " + Math.abs(remaining).toLocaleString("ar-DZ") + " دج";
+    applyBtn.style.display = "none";
+  }
+};
+
+window.applyRemainingToTicket = () => {
+  const full = parseFloat(document.getElementById("sc-full-price").value) || 0;
+  const paid = parseFloat(document.getElementById("sc-paid-amount").value) || 0;
+  if (paid <= 0) return;
+  document.getElementById("sc-amount").value = paid;
+  const remaining = full - paid;
+  showToast("✅ تم تسجيل " + paid.toLocaleString("ar-DZ") + " دج — المتبقي: " + remaining.toLocaleString("ar-DZ") + " دج");
+};
+
 let currentReceipt = null;
 
 function generateReceiptNumber() {
@@ -1077,7 +1184,10 @@ window.generateTicket = async () => {
   setTimeout(async () => {
     const qrCanvas = qrContainer.querySelector('canvas');
     try {
-      await addDoc(collection(db,'summerTickets'), { name, pack, amount: Number(amount), date: dateRaw, status, receipt, verifyURL, createdAt: serverTimestamp() });
+      const fullPrice = parseFloat(document.getElementById('sc-full-price').value) || 0;
+      const paidCalc = parseFloat(document.getElementById('sc-paid-amount').value) || 0;
+      const remainingAmount = fullPrice > 0 ? Math.max(0, fullPrice - paidCalc) : 0;
+      await addDoc(collection(db,'summerTickets'), { name, pack, amount: Number(amount), fullPrice: fullPrice || Number(amount), remainingAmount, date: dateRaw, status, receipt, verifyURL, createdAt: serverTimestamp() });
       drawTicketOnCanvas({ name, pack, amount, dateRaw, dateFormatted, status, receipt }, qrCanvas, btn, verifyURL);
     } catch(e) { showToast('خطأ في الحفظ: ' + e.message, true); btn.disabled = false; btn.textContent = '🎟️ توليد التذكرة وحفظها'; }
   }, 400);
@@ -1204,7 +1314,7 @@ function loadTickets() {
     const tbody = document.getElementById('tickets-tbody');
     tbody.innerHTML = '';
     if (snap.empty) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-muted)">📭 لم يتم إصدار أي تذاكر بعد</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">📭 لم يتم إصدار أي تذاكر بعد</td></tr>`;
       updateSummerStats(0,0,0); return;
     }
     snap.forEach(d => {
@@ -1218,6 +1328,7 @@ function loadTickets() {
         <td style="font-weight:700;color:var(--text)">${x.name || '—'}</td>
         <td><span class="pack-chip">${x.pack || '—'}</span></td>
         <td><span class="amount-badge">${Number(x.amount || 0).toLocaleString('ar-DZ')} دج</span></td>
+        <td>${x.remainingAmount > 0 ? '<span style="font-size:12px;font-weight:800;padding:4px 10px;border-radius:99px;background:rgba(239,68,68,0.1);color:#DC2626">' + Number(x.remainingAmount).toLocaleString('ar-DZ') + ' دج</span>' : '<span style="font-size:12px;font-weight:800;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,0.1);color:#059669">✅ مكتمل</span>'}</td>
         <td style="color:var(--text-muted)">${dateStr}</td>
         <td>${statusHtml}</td>
         <td style="display:flex;gap:6px">
@@ -1253,6 +1364,12 @@ window.previewFromDB = async (id) => {
     document.getElementById('sc-amount').value = x.amount || '';
     document.getElementById('sc-date').value   = x.date   || '';
     document.getElementById('sc-status').value = x.status || 'paid';
+    // تحميل بيانات الحاسبة إن وجدت
+    if (x.fullPrice) document.getElementById('sc-full-price').value = x.fullPrice;
+    if (x.remainingAmount !== undefined) {
+      document.getElementById('sc-paid-amount').value = x.amount || '';
+      calcRemaining();
+    }
     // Show pack info in program UI
     if (x.pack) {
       document.getElementById('program-group').style.display = 'none';
