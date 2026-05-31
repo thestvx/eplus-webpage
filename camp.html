@@ -1934,20 +1934,7 @@ body.camp-redesign {
 <script type="module" src="camp.js"></script>
 
 <script>
-  // ─── PRICING TABS ───
-  document.querySelectorAll('.ptab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.pricing-pane').forEach(c => c.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById(tab.dataset.target).classList.add('active');
-    });
-  });
-
-  // second open-register button
-  document.getElementById('open-register-modal-2')?.addEventListener('click', () => openModal('camp-register-modal'));
-
-  // ─── MODAL HELPERS ───
+  // ─── MODAL HELPERS (inline fallback — camp.js قد يعرّفها أيضاً) ───
   function openModal(id) {
     const m = document.getElementById(id);
     if (!m) return;
@@ -1965,13 +1952,26 @@ body.camp-redesign {
     document.body.style.overflow = '';
   }
 
-  document.getElementById('open-register-modal').addEventListener('click', () => openModal('camp-register-modal'));
-  document.getElementById('close-register-modal').addEventListener('click', () => closeModal('camp-register-modal'));
-  document.querySelector('#camp-register-modal .modal-backdrop').addEventListener('click', () => closeModal('camp-register-modal'));
+document.addEventListener('DOMContentLoaded', function() {
 
-  document.getElementById('open-special-register-modal').addEventListener('click', () => openModal('special-register-modal'));
-  document.getElementById('close-special-register-modal').addEventListener('click', () => closeModal('special-register-modal'));
-  document.querySelector('#special-register-modal .modal-backdrop').addEventListener('click', () => closeModal('special-register-modal'));
+  // ─── PRICING TABS ───
+  document.querySelectorAll('.ptab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.pricing-pane').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      const pane = document.getElementById(tab.dataset.target);
+      if (pane) pane.classList.add('active');
+    });
+  });
+
+  // ─── MODAL BUTTONS (safe — كل واحد مع optional chaining) ───
+  document.getElementById('open-register-modal-2')?.addEventListener('click', () => openModal('camp-register-modal'));
+  document.getElementById('close-register-modal')?.addEventListener('click', () => closeModal('camp-register-modal'));
+  document.querySelector('#camp-register-modal .modal-backdrop')?.addEventListener('click', () => closeModal('camp-register-modal'));
+  document.getElementById('open-special-register-modal')?.addEventListener('click', () => openModal('special-register-modal'));
+  document.getElementById('close-special-register-modal')?.addEventListener('click', () => closeModal('special-register-modal'));
+  document.querySelector('#special-register-modal .modal-backdrop')?.addEventListener('click', () => closeModal('special-register-modal'));
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { closeModal('camp-register-modal'); closeModal('special-register-modal'); }
@@ -2185,9 +2185,12 @@ body.camp-redesign {
 
   // ─── NAV SCROLL ───
   (function() {
-    const nav = document.querySelector('.top-nav');
+    const nav = document.querySelector('.top-nav-redesign') || document.querySelector('.top-nav');
+    if (!nav) return;
     window.addEventListener('scroll', () => { nav.classList.toggle('scrolled', window.scrollY > 60); }, { passive: true });
   })();
+
+}); // end DOMContentLoaded
 
   // ─── COUNTDOWN ───
   (function() {
