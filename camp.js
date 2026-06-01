@@ -274,7 +274,7 @@ window.selectPackage = function(pkgName) {
    DYNAMIC FORM FIELDS
 ════════════════════════════════════════════ */
 const FIELD_HEIGHTS = {
-  langGroup510:    "220px",
+  langGroup510:    "260px",   // إنجليزية + فرنسية + ملاحظة
   langGroupPlus:   "280px",
   bacGroup:        "280px",
   itGroup:         "180px",
@@ -319,7 +319,7 @@ function updateFormFields(val) {
   const isAdultAdv  = val.includes("البالغين المتقدمة");
   const isCommClass = val.toLowerCase().includes("communication class");
 
-  // فئة 5-10 أو Communication Class → langGroup510 (إنجليزية فقط)
+  // فئة 5-10 أو Communication Class → langGroup510 (إنجليزية أو فرنسية أو كلتاهما)
   if (is510 || isCommClass) {
     showGroup("langGroup510");
   } else {
@@ -475,7 +475,7 @@ function validateMainForm() {
 
   if (is510 || isCommClass) {
     const sel = [...document.querySelectorAll('input[name="lang510"]:checked')];
-    if (!sel.length) { alert("⚠️ الرجاء اختيار لغة واحدة على الأقل."); return null; }
+    if (!sel.length) { alert("⚠️ الرجاء اختيار لغة واحدة على الأقل (الإنجليزية أو الفرنسية أو كلتاهما)."); return null; }
     langs = sel.map(c => c.value).join(" + ");
   } else if (isBac) {
     const sel = [...document.querySelectorAll('input[name="bacLang"]:checked')];
