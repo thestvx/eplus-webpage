@@ -1248,12 +1248,13 @@ window.onPackSelect = (val) => {
   selectedProgram = null;
 
   const PRICES = {
-    'الباقة الأساسية (5-10)':7000,'باقة النخبة (5-10)':10000,
-    'الباقة الأساسية (11-14)':7000,'باقة النخبة (11-14)':10000,
-    'الباقة الأساسية (15-18)':7000,'باقة النخبة (15-18)':10000,
-    'باقة تحضير البكالوريا (15-18)':12000,
-    'باقة البالغين':8000,'باقة البالغين المتقدمة':11000,
-    'English Communication Class':9000,'English for Specific Purposes (ESP)':9000,'IELTS Preparation':12000
+    'الباقة الأساسية (5-10)':8000,'باقة النخبة (5-10)':10000,
+    'الباقة الأساسية (11-14)':8000,'باقة النخبة (11-14)':10000,
+    'الباقة الأساسية (15-18)':8000,'باقة النخبة (15-18)':10000,
+    'باقة تحضير البكالوريا (15-18)':15000,
+    'باقة البالغين':8000,'باقة البالغين المتقدمة':12000,
+    'English Communication Class':8000
+    // English for Specific Purposes و IELTS Preparation: سعر بالتواصل — لا يُعبأ تلقائياً
   };
   if (PRICES[val]) document.getElementById('sc-amount').value = PRICES[val];
 };
@@ -1417,7 +1418,7 @@ window.generateTicket = async () => {
       const paidCalc = parseFloat(document.getElementById('sc-paid-amount').value) || 0;
       const remainingAmount = fullPrice > 0 ? Math.max(0, fullPrice - paidCalc) : 0;
       await addDoc(collection(db,'summerTickets'), { name, pack, amount: Number(amount), fullPrice: fullPrice || Number(amount), remainingAmount, date: dateRaw, status, receipt, verifyURL, createdAt: serverTimestamp() });
-      drawTicketOnCanvas({ name, pack, amount, dateRaw, dateFormatted, status, receipt }, qrCanvas, btn, verifyURL);
+      drawTicketOnCanvas({ name, pack, amount, dateRaw, dateFormatted, status, receipt, remainingAmount }, qrCanvas, btn, verifyURL);
     } catch(e) { showToast('خطأ في الحفظ: ' + e.message, true); btn.disabled = false; btn.textContent = '🎟️ توليد التذكرة وحفظها'; }
   }, 400);
 };
@@ -1478,6 +1479,28 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
     val(Number(data.amount || 0).toLocaleString('ar-DZ') + ' دج', 599);
     val(data.dateFormatted || '—',                                  692);
     val(data.receipt || '—',                                        772, 'bold 26px monospace');
+
+    // ── المبلغ المتبقي ──
+    const remainingAmtDraw = data.remainingAmount !== undefined
+      ? data.remainingAmount
+      : (() => {
+          const full = parseFloat(document.getElementById('sc-full-price').value) || 0;
+          const paid = parseFloat(document.getElementById('sc-paid-amount').value) || 0;
+          return full > 0 ? Math.max(0, full - paid) : 0;
+        })();
+    const remainingTxt = remainingAmtDraw > 0
+      ? Number(remainingAmtDraw).toLocaleString('ar-DZ') + ' دج'
+      : (remainingAmtDraw === 0 && (data.remainingAmount !== undefined || (parseFloat(document.getElementById('sc-full-price').value) || 0) > 0) ? '✅ مكتمل' : '—');
+    ctx.save();
+    ctx.font = 'bold 26px Tajawal, Arial';
+    ctx.fillStyle = remainingAmtDraw > 0 ? '#DC2626' : (remainingAmtDraw === 0 ? '#059669' : CLR);
+    ctx.textAlign = 'right';
+    ctx.direction = 'rtl';
+    ctx.beginPath();
+    ctx.rect(1852, 836, 592, 40);
+    ctx.clip();
+    ctx.fillText(remainingTxt, R, 866);
+    ctx.restore();
 
     // ── QR code ──────────────────────────────────────────
     // Exact position from Photoshop Info panel: X=2007, Y=846
@@ -1614,7 +1637,7 @@ window.previewFromDB = async (id) => {
     setTimeout(() => {
       const qrCanvas = qrContainer.querySelector('canvas');
       const dateFormatted = x.date ? new Date(x.date).toLocaleDateString('ar-DZ',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) : '—';
-      drawTicketOnCanvas({ name: x.name, pack: x.pack, amount: x.amount, dateRaw: x.date, dateFormatted, status: x.status, receipt: x.receipt }, qrCanvas, btn, x.verifyURL);
+      drawTicketOnCanvas({ name: x.name, pack: x.pack, amount: x.amount, dateRaw: x.date, dateFormatted, status: x.status, receipt: x.receipt, remainingAmount: x.remainingAmount }, qrCanvas, btn, x.verifyURL);
       document.getElementById('ticket-canvas').scrollIntoView({ behavior:'smooth', block:'start' });
     }, 400);
   } catch(e) { showToast('خطأ في عرض التذكرة: ' + e.message, true); }
