@@ -17,6 +17,43 @@
   <link rel="stylesheet" href="fonts/fonts.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="style.css" />
+  <style>
+    /* ── Hero title forced visibility in light mode ── */
+    .ep-hero-title { color: #fff !important; text-shadow: 0 2px 20px rgba(0,0,0,0.5); }
+    body.light-mode .ep-hero-title { color: #fff !important; }
+    /* ── Nav logo — no text ── */
+    .ep-nav-logo-text, .ep-footer-logo-text { display: none !important; }
+    /* ── Nav logo bigger ── */
+    #nav-logo-img { height: 52px !important; max-width: 220px !important; object-fit: contain !important; }
+    #footer-logo-img { height: 56px !important; max-width: 240px !important; object-fit: contain !important; }
+
+    /* ── Announcements — filter strip ── */
+    .ep-ann-filter-strip { display: flex !important; }
+    .ep-ann-filt { padding: 6px 16px; border-radius: 99px; border: 1.5px solid rgba(255,255,255,0.18); background: transparent; color: rgba(255,255,255,0.75); font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Tajawal', sans-serif; transition: all 0.25s; }
+    .ep-ann-filt:hover { background: rgba(255,255,255,0.12); color: #fff; }
+    .ep-ann-filt.active { background: var(--gold, #c8a84b); color: #000; border-color: var(--gold, #c8a84b); }
+
+    /* ── Announcement card with image ── */
+    .ann-card-img { width: 100%; height: 160px; object-fit: cover; border-radius: 14px 14px 0 0; display: block; margin-bottom: 0; }
+    .ann-card-img-wrap { border-radius: 14px 14px 0 0; overflow: hidden; }
+    .ann-type-front-badge { display: inline-block; font-size: 10px; font-weight: 800; padding: 3px 10px; border-radius: 99px; margin-bottom: 8px; }
+    .ann-type-front-badge.general { background: rgba(124,58,237,0.15); color: #a78bfa; }
+    .ann-type-front-badge.event   { background: rgba(245,158,11,0.15); color: #fbbf24; }
+    .ann-type-front-badge.urgent  { background: rgba(239,68,68,0.15); color: #f87171; }
+    .ann-type-front-badge.offer   { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+    .ann-type-front-badge.news    { background: rgba(59,130,246,0.15); color: #93c5fd; }
+    .ann-card-link-btn { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; font-size: 12px; font-weight: 700; color: var(--gold, #c8a84b); text-decoration: none; }
+    .ann-card-link-btn:hover { text-decoration: underline; }
+
+    /* ── Training course cards ── */
+    .training-course-card:hover { border-color: var(--gold, #c8a84b) !important; background: rgba(200,168,75,0.07) !important; transform: translateY(-2px); }
+    .training-course-card.selected { border-color: var(--gold, #c8a84b) !important; background: rgba(200,168,75,0.12) !important; box-shadow: 0 4px 16px rgba(200,168,75,0.2); }
+    .training-course-card.selected span:first-of-type { filter: drop-shadow(0 0 6px rgba(200,168,75,0.6)); }
+
+    /* ── CEFR hint box ── */
+    #cefr-hint { display: none; }
+    #cefr-hint.show { display: flex !important; }
+  </style>
 </head>
 <body>
   <div class="ep-loader" id="ep-loader">
@@ -42,8 +79,7 @@
 
   <nav class="ep-navbar" id="ep-navbar">
     <a class="ep-nav-logo" href="#home">
-      <img src="images/education-plus-center-logo.png" alt="E-PLUS" draggable="false" id="nav-logo-img" />
-      <span class="ep-nav-logo-text">E-PLUS</span>
+      <img src="images/education-plus-center-logo.png" alt="Education Plus Center" draggable="false" id="nav-logo-img" style="height:52px;max-width:220px;object-fit:contain;" />
     </a>
 
     <ul class="ep-nav-links" id="ep-nav-links">
@@ -587,12 +623,20 @@
           <span class="ann-live-pulse"></span>
           <span class="ep-ann-live-text">آخر الإعلانات والتحديثات</span>
         </div>
+        <div class="ep-ann-filter-strip" id="ep-ann-filter-strip" style="display:none;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px;">
+          <button class="ep-ann-filt active" data-filter="all" onclick="filterFrontAnn('all',this)" type="button">الكل</button>
+          <button class="ep-ann-filt" data-filter="general" onclick="filterFrontAnn('general',this)" type="button">📢 عام</button>
+          <button class="ep-ann-filt" data-filter="event" onclick="filterFrontAnn('event',this)" type="button">🎉 فعالية</button>
+          <button class="ep-ann-filt" data-filter="urgent" onclick="filterFrontAnn('urgent',this)" type="button">🚨 عاجل</button>
+          <button class="ep-ann-filt" data-filter="offer" onclick="filterFrontAnn('offer',this)" type="button">🎁 عرض</button>
+          <button class="ep-ann-filt" data-filter="news" onclick="filterFrontAnn('news',this)" type="button">📰 خبر</button>
+        </div>
       </div>
 
       <div class="ann-track-wrapper">
         <button class="ann-arrow" id="ann-prev" type="button">‹</button>
         <div class="ann-track" id="ann-track">
-          <div id="ann-placeholder">سيتم عرض أحدث الإعلانات هنا.</div>
+          <div id="ann-placeholder" style="color:var(--text-muted);font-size:14px;padding:32px;text-align:center;opacity:0.6;">⏳ جاري تحميل الإعلانات...</div>
         </div>
         <button class="ann-arrow" id="ann-next" type="button">›</button>
       </div>
@@ -875,8 +919,7 @@
   <footer class="ep-footer">
     <div class="ep-footer-inner">
       <a class="ep-footer-logo" href="#home">
-        <img src="images/education-plus-center-logo.png" alt="E-PLUS" id="footer-logo-img" />
-        <span class="ep-footer-logo-text">E-PLUS</span>
+        <img src="images/education-plus-center-logo.png" alt="Education Plus Center" id="footer-logo-img" style="height:56px;max-width:240px;object-fit:contain;" />
       </a>
 
       <div class="ep-footer-copy">
@@ -960,6 +1003,91 @@
                 <input id="vipTypeLang" name="vipType" type="radio" value="lang" onchange="onVipTypeChange()" />
                 <span class="check-box"></span>
                 <span class="check-label">VIP لغات</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- ══ TRAINING FIELDS ══ -->
+          <div class="form-group" id="trainingCourseGroup" style="display:none;">
+            <label class="form-label">الدورة التكوينية <span>*</span></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="training-cards-grid">
+              <label class="training-course-card" style="border:2px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.25s;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;background:rgba(255,255,255,0.03)">
+                <input type="radio" name="trainingCourse" value="تصميم جرافيكي" onchange="onTrainingCourseChange(this)" style="display:none">
+                <span style="font-size:28px">🎨</span>
+                <span style="font-size:13px;font-weight:700;color:var(--text)">التصميم الجرافيكي</span>
+                <span style="font-size:11px;color:var(--text-muted)">Photoshop · Illustrator · Canva</span>
+              </label>
+              <label class="training-course-card" style="border:2px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.25s;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;background:rgba(255,255,255,0.03)">
+                <input type="radio" name="trainingCourse" value="برمجة" onchange="onTrainingCourseChange(this)" style="display:none">
+                <span style="font-size:28px">💻</span>
+                <span style="font-size:13px;font-weight:700;color:var(--text)">البرمجة</span>
+                <span style="font-size:11px;color:var(--text-muted)">Python · Web · Scratch</span>
+              </label>
+              <label class="training-course-card" style="border:2px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.25s;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;background:rgba(255,255,255,0.03)">
+                <input type="radio" name="trainingCourse" value="مهارات التواصل" onchange="onTrainingCourseChange(this)" style="display:none">
+                <span style="font-size:28px">🗣️</span>
+                <span style="font-size:13px;font-weight:700;color:var(--text)">مهارات التواصل</span>
+                <span style="font-size:11px;color:var(--text-muted)">التعبير · الإلقاء · القيادة</span>
+              </label>
+              <label class="training-course-card" style="border:2px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.25s;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;background:rgba(255,255,255,0.03)">
+                <input type="radio" name="trainingCourse" value="محاسبة وإدارة" onchange="onTrainingCourseChange(this)" style="display:none">
+                <span style="font-size:28px">📊</span>
+                <span style="font-size:13px;font-weight:700;color:var(--text)">المحاسبة والإدارة</span>
+                <span style="font-size:11px;color:var(--text-muted)">Excel · تسيير · مالية</span>
+              </label>
+              <label class="training-course-card" style="border:2px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.25s;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;background:rgba(255,255,255,0.03)">
+                <input type="radio" name="trainingCourse" value="تسويق رقمي" onchange="onTrainingCourseChange(this)" style="display:none">
+                <span style="font-size:28px">📱</span>
+                <span style="font-size:13px;font-weight:700;color:var(--text)">التسويق الرقمي</span>
+                <span style="font-size:11px;color:var(--text-muted)">إعلانات · محتوى · سوشيال</span>
+              </label>
+              <label class="training-course-card" style="border:2px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.25s;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;background:rgba(255,255,255,0.03)">
+                <input type="radio" name="trainingCourse" value="أخرى" onchange="onTrainingCourseChange(this)" style="display:none">
+                <span style="font-size:28px">✨</span>
+                <span style="font-size:13px;font-weight:700;color:var(--text)">أخرى</span>
+                <span style="font-size:11px;color:var(--text-muted)">اذكرها في الملاحظات</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group" id="trainingLevelGroup" style="display:none;">
+            <label class="form-label">مستواك في الدورة</label>
+            <div class="check-options">
+              <label class="check-option">
+                <input name="trainingLevel" type="radio" value="مبتدئ" />
+                <span class="check-box"></span>
+                <span class="check-label">🔰 مبتدئ</span>
+              </label>
+              <label class="check-option">
+                <input name="trainingLevel" type="radio" value="متوسط" />
+                <span class="check-box"></span>
+                <span class="check-label">📈 لدي بعض الأساس</span>
+              </label>
+              <label class="check-option">
+                <input name="trainingLevel" type="radio" value="متقدم" />
+                <span class="check-box"></span>
+                <span class="check-label">🚀 متقدم — أريد التعمق أكثر</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group" id="trainingModeGroup" style="display:none;">
+            <label class="form-label">طريقة التعلم المفضلة</label>
+            <div class="check-options">
+              <label class="check-option">
+                <input name="trainingMode" type="radio" value="حضوري" />
+                <span class="check-box"></span>
+                <span class="check-label">🏫 حضوري في المركز</span>
+              </label>
+              <label class="check-option">
+                <input name="trainingMode" type="radio" value="أونلاين" />
+                <span class="check-box"></span>
+                <span class="check-label">💻 أونلاين عن بعد</span>
+              </label>
+              <label class="check-option">
+                <input name="trainingMode" type="radio" value="مختلط" />
+                <span class="check-box"></span>
+                <span class="check-label">🔄 مختلط (حضوري + أونلاين)</span>
               </label>
             </div>
           </div>
@@ -1074,31 +1202,38 @@
           </div>
 
           <div class="form-group" id="langLevelGroup" style="display:none;">
-            <label class="form-label" for="langLevel">المستوى اللغوي CEFR <span>*</span></label>
-            <select class="form-input" id="langLevel">
-              <option value="">-- اختر المستوى --</option>
-              <option value="A0">A0 — مبتدئ جداً</option>
-              <option value="A1">A1 — مبتدئ</option>
-              <option value="A2">A2 — أساسي</option>
-              <option value="B1">B1 — متوسط</option>
-              <option value="B2">B2 — فوق المتوسط</option>
-              <option value="C1">C1 — متقدم</option>
-              <option value="C2">C2 — إتقان</option>
+            <label class="form-label" for="langLevel">مستواك الحالي في اللغة (CEFR) <span>*</span></label>
+            <select class="form-input" id="langLevel" onchange="onLangLevelChange()">
+              <option value="">-- اختر مستواك --</option>
+              <option value="A0">🔰 A0 — مبتدئ كلياً (بدون أي معرفة سابقة)</option>
+              <option value="A1">🟢 A1 — مبتدئ (مفردات وجمل أساسية)</option>
+              <option value="A2">🟡 A2 — أساسي (تواصل بسيط)</option>
+              <option value="B1">🔵 B1 — متوسط (فهم المواضيع المألوفة)</option>
+              <option value="B2">🟠 B2 — فوق المتوسط (تدفق جيد)</option>
+              <option value="C1">🔴 C1 — متقدم (إنتاج لغوي واسع)</option>
+              <option value="C2">⭐ C2 — إتقان (كالناطق الأصلي)</option>
             </select>
+            <div style="margin-top:8px;padding:10px 14px;border-radius:12px;background:rgba(124,58,237,0.07);border:1px solid rgba(124,58,237,0.15);font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:8px;" id="cefr-hint" style="display:none;">
+              <span style="font-size:18px;">💡</span>
+              <span id="cefr-hint-text">اختر المستوى المناسب — يمكننا مساعدتك باختبار تحديد المستوى إن لم تكن متأكداً</span>
+            </div>
           </div>
 
           <div class="form-group" id="levelTestGroup" style="display:none;">
-            <label class="form-label">هل تحتاج اختبار تحديد مستوى؟</label>
+            <label class="form-label">هل تريد إجراء اختبار تحديد المستوى؟</label>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;padding:8px 12px;border-radius:10px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);">
+              🧪 الاختبار يستغرق ~15 دقيقة ويساعدنا على وضعك في المجموعة المناسبة تماماً
+            </div>
             <div class="check-options">
               <label class="check-option">
                 <input name="levelTest" type="radio" value="yes" />
                 <span class="check-box"></span>
-                <span class="check-label">نعم</span>
+                <span class="check-label">✅ نعم، أريد إجراء الاختبار</span>
               </label>
               <label class="check-option">
                 <input name="levelTest" type="radio" value="no" />
                 <span class="check-box"></span>
-                <span class="check-label">لا</span>
+                <span class="check-label">❌ لا، أنا متأكد من مستواي</span>
               </label>
             </div>
           </div>
@@ -1245,6 +1380,167 @@
   </div>
 
   <script src="script.js"></script>
+  <script>
+  // ── Training course card selection ──
+  // ── Patch openModal to show training fields ──
+  const _origOpenModal = window.openModal;
+  window.openModal = function(type) {
+    if (_origOpenModal) _origOpenModal(type);
+    // Show/hide training-specific groups
+    const tg  = document.getElementById('trainingCourseGroup');
+    const tlg = document.getElementById('trainingLevelGroup');
+    const tmg = document.getElementById('trainingModeGroup');
+    if (type === 'training') {
+      if (tg)  tg.style.display  = 'block';
+      if (tlg) tlg.style.display = 'none';
+      if (tmg) tmg.style.display = 'none';
+      // Reset selections
+      document.querySelectorAll('.training-course-card').forEach(c => c.classList.remove('selected'));
+      document.querySelectorAll('input[name="trainingCourse"]').forEach(r => r.checked = false);
+      document.querySelectorAll('input[name="trainingLevel"]').forEach(r => r.checked = false);
+      document.querySelectorAll('input[name="trainingMode"]').forEach(r => r.checked = false);
+    } else {
+      if (tg)  tg.style.display  = 'none';
+      if (tlg) tlg.style.display = 'none';
+      if (tmg) tmg.style.display = 'none';
+    }
+    // Show/hide lang level group — langLevelGroup controlled by onLangTypeChange in script.js
+    // but we also show levelTestGroup on lang change — handled by onLangLevelChange above
+  };
+
+  window.onTrainingCourseChange = function(radio) {
+    document.querySelectorAll('.training-course-card').forEach(c => c.classList.remove('selected'));
+    if (radio.parentElement) radio.parentElement.classList.add('selected');
+    const lvlG = document.getElementById('trainingLevelGroup');
+    const modeG = document.getElementById('trainingModeGroup');
+    if (lvlG) lvlG.style.display = 'block';
+    if (modeG) modeG.style.display = 'block';
+  };
+
+  // ── CEFR hint on level select change ──
+  window.onLangLevelChange = function() {
+    const val = document.getElementById('langLevel')?.value;
+    const hint = document.getElementById('cefr-hint');
+    const ltg = document.getElementById('levelTestGroup');
+    const msgs = {
+      'A0': 'لا مشكلة! نبدأ من الصفر — ستتعلم الأساسيات بطريقة ممتعة ومنظمة.',
+      'A1': 'ممتاز! مستوى مبتدئ — سنبني لك أساساً متيناً خطوة بخطوة.',
+      'A2': 'جيد! لديك أساس — سنطور مهاراتك في التواصل اليومي.',
+      'B1': 'رائع! مستوى متوسط — سنعمل على الطلاقة وتوسيع المفردات.',
+      'B2': 'ممتاز! مستوى متقدم — سنركز على الدقة والتعبير الاحترافي.',
+      'C1': 'مميز! مستوى متقدم جداً — سنصقل لغتك لتصل للاحتراف.',
+      'C2': 'احترافي! سنعمل على التخصص — IELTS, Business English, إلخ.',
+    };
+    if (hint && val) { hint.querySelector('#cefr-hint-text').textContent = msgs[val] || ''; hint.classList.add('show'); }
+    else if (hint) hint.classList.remove('show');
+    if (ltg && val) ltg.style.display = 'block';
+  };
+
+  // ── Announcements: Firebase sync with image + type support ──
+  (function loadFrontAnnouncements() {
+    if (typeof firebase === 'undefined' && typeof initializeApp === 'undefined') {
+      // Firebase not loaded yet, wait
+      setTimeout(loadFrontAnnouncements, 800);
+      return;
+    }
+    try {
+      // Try to use existing db from script.js
+      if (typeof db !== 'undefined' && typeof onSnapshot !== 'undefined' && typeof collection !== 'undefined' && typeof query !== 'undefined' && typeof orderBy !== 'undefined') {
+        buildAnnListener();
+      } else {
+        setTimeout(loadFrontAnnouncements, 800);
+      }
+    } catch(e) { console.warn('ann init:', e); }
+  })();
+
+  let allFrontAnns = [];
+  let frontAnnFilter = 'all';
+
+  function buildAnnListener() {
+    try {
+      onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt','desc')), snap => {
+        allFrontAnns = snap.docs
+          .map(d => ({id: d.id, ...d.data()}))
+          .filter(x => !x.hidden);
+        if (allFrontAnns.length > 0) {
+          const strip = document.getElementById('ep-ann-filter-strip');
+          if (strip) strip.style.display = 'flex';
+        }
+        renderFrontAnns();
+      });
+    } catch(e) { console.warn('ann listener:', e); }
+  }
+
+  window.filterFrontAnn = function(filter, btn) {
+    frontAnnFilter = filter;
+    document.querySelectorAll('.ep-ann-filt').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    renderFrontAnns();
+  };
+
+  const ANN_TYPE_INFO = {
+    general: { label: 'عام', emoji: '📢' },
+    event:   { label: 'فعالية', emoji: '🎉' },
+    urgent:  { label: 'عاجل', emoji: '🚨' },
+    offer:   { label: 'عرض', emoji: '🎁' },
+    news:    { label: 'خبر', emoji: '📰' },
+  };
+
+  function renderFrontAnns() {
+    const track = document.getElementById('ann-track');
+    const dotsEl = document.getElementById('ann-dots');
+    if (!track) return;
+    let filtered = allFrontAnns;
+    if (frontAnnFilter !== 'all') filtered = allFrontAnns.filter(x => x.type === frontAnnFilter);
+    if (!filtered.length) {
+      track.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:14px;padding:32px;text-align:center;">📭 لا توجد إعلانات في هذه الفئة</div>';
+      if (dotsEl) dotsEl.innerHTML = '';
+      return;
+    }
+    track.innerHTML = '';
+    filtered.forEach(x => {
+      const dateStr = x.createdAt?.toDate ? x.createdAt.toDate().toLocaleDateString('ar-DZ') : '';
+      const typeInfo = ANN_TYPE_INFO[x.type] || ANN_TYPE_INFO.general;
+      const card = document.createElement('div');
+      card.className = 'ann-card';
+      let imgHtml = '';
+      if (x.imageBase64) {
+        imgHtml = '<div class="ann-card-img-wrap"><img class="ann-card-img" src="' + x.imageBase64 + '" alt="صورة الإعلان" loading="lazy"></div>';
+      }
+      const linkHtml = x.link ? '<a href="' + x.link + '" target="_blank" rel="noopener" class="ann-card-link-btn">🔗 اقرأ المزيد</a>' : '';
+      card.innerHTML = imgHtml +
+        '<div style="padding:16px 18px">' +
+        '<span class="ann-type-front-badge ' + (x.type || 'general') + '">' + typeInfo.emoji + ' ' + typeInfo.label + '</span>' +
+        '<div style="font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:8px;">📅 ' + dateStr + '</div>' +
+        '<h3 style="font-size:15px;font-weight:800;color:#fff;margin-bottom:6px;line-height:1.5">' + (x.title || '') + '</h3>' +
+        (x.text ? '<p style="font-size:13px;color:rgba(255,255,255,0.65);line-height:1.7;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">' + x.text + '</p>' : '') +
+        linkHtml +
+        '</div>';
+      track.appendChild(card);
+    });
+    // rebuild dots
+    if (dotsEl) {
+      dotsEl.innerHTML = '';
+      filtered.forEach((_, i) => {
+        const dot = document.createElement('button');
+        dot.type = 'button';
+        dot.className = 'ann-dot' + (i === 0 ? ' active' : '');
+        dot.onclick = () => scrollAnnTo(i);
+        dotsEl.appendChild(dot);
+      });
+    }
+    // reset scroll
+    track.scrollLeft = 0;
+  }
+
+  function scrollAnnTo(idx) {
+    const track = document.getElementById('ann-track');
+    if (!track) return;
+    const card = track.children[idx];
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+    document.querySelectorAll('.ann-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+  }
+  </script>
 
   <script>document.addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;const h=a.getAttribute('href')||'';if(h==='/camp.html')return;},true);</script>
 </body>
