@@ -1387,19 +1387,18 @@ function buildAnnouncementCard(item) {
 }
 
 function renderAnnouncementSlider(items) {
-  const section = byId('announcements-section');
+  // id="announcements" في الـ HTML (وليس "announcements-section")
+  const section = byId('announcements') || document.querySelector('.ep-ann-section');
   const track   = byId('ann-track');
   const dots    = byId('ann-dots');
   const placeholder = byId('ann-placeholder');
-  if (!section || !track || !dots) return;
+  if (!track || !dots) return;
   track.innerHTML = '';
   dots.innerHTML  = '';
   if (!items || items.length === 0) {
-    section.style.display = 'none';
-    if (placeholder) placeholder.style.display = 'block';
+    if (placeholder) { placeholder.style.display = 'block'; }
     return;
   }
-  section.style.display = 'block';
   if (placeholder) placeholder.style.display = 'none';
   items.forEach((item, index) => {
     const card = buildAnnouncementCard(item);
@@ -1419,7 +1418,12 @@ function updateAnnouncementSlider() {
   const track = byId('ann-track');
   const dots  = $$('.ann-dot');
   if (!track) return;
-  track.style.transform = `translateX(-${annCurrentIndex * 100}%)`;
+  const cards = [...track.querySelectorAll('.ann-card')];
+  if (cards.length > 0) {
+    const card = cards[annCurrentIndex];
+    const offset = card.offsetLeft - track.offsetLeft;
+    track.scrollTo({ left: offset, behavior: 'smooth' });
+  }
   dots.forEach((dot, i) => dot.classList.toggle('active', i === annCurrentIndex));
 }
 
@@ -1458,9 +1462,7 @@ async function loadAnnouncements() {
     renderAnnouncementSlider(window._annCache);
   } catch (err) {
     console.warn('Failed to load announcements:', err);
-    const section = byId('announcements-section');
     const placeholder = byId('ann-placeholder');
-    if (section) section.style.display = 'none';
     if (placeholder) placeholder.style.display = 'block';
   }
 }
@@ -1507,6 +1509,7 @@ document.addEventListener('DOMContentLoaded', () => {
       closeTerms();
       closeJoinModal();
       closeSuccessModal();
+      // summerModalOverlay اختياري — موجود في صفحة المخيم الصيفي فقط
       const summerModal = byId('summerModalOverlay');
       if (summerModal?.classList.contains('active')) {
         summerModal.classList.remove('active');
@@ -1545,12 +1548,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const navbar = byId('ep-navbar');
   window.addEventListener('scroll', () => {
     if (navbar) navbar.classList.toggle('scrolled', window.scrollY > 50);
-    const btn = document.querySelector('.ep-back-to-top');
-    if (btn) btn.classList.toggle('visible', window.scrollY > 400);
+    const topBtn = document.querySelector('.ep-back-to-top');
+    if (topBtn) topBtn.classList.toggle('visible', window.scrollY > 400);
   }, { passive: true });
 
-  /* ── BACK TO TOP ── */
-  const backBtn = document.querySelector('.ep-back-to-top');
+  /* ── BACK TO TOP — أنشئه ديناميكياً إذا ما موجود في HTML ── */
+  let backBtn = document.querySelector('.ep-back-to-top');
+  if (!backBtn) {
+    backBtn = document.createElement('button');
+    backBtn.className = 'ep-back-to-top';
+    backBtn.setAttribute('aria-label', 'العودة للأعلى');
+    backBtn.innerHTML = '↑';
+    document.body.appendChild(backBtn);
+  }
   if (backBtn) backBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 
   /* ── HAMBURGER ── */
@@ -1574,10 +1584,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   /* ── JOIN TEAM BTN ── */
-  const joinTeamBtn = byId('join-team-btn');
+  const joinTeamBtn = byId('join-team-btn') || document.querySelector('[onclick*="openJoinModal"]');
   const navJoinBtn  = byId('nav-join-btn');
-  if (joinTeamBtn) joinTeamBtn.addEventListener('click', () => typeof openJoinModal === 'function' && openJoinModal());
-  if (navJoinBtn)  navJoinBtn.addEventListener('click',  () => typeof openJoinModal === 'function' && openJoinModal());
+  if (joinTeamBtn && !joinTeamBtn.hasAttribute('onclick')) {
+    joinTeamBtn.addEventListener('click', () => typeof openJoinModal === 'function' && openJoinModal());
+  }
+  if (navJoinBtn) navJoinBtn.addEventListener('click', () => typeof openJoinModal === 'function' && openJoinModal());
 
   /* ── TESTIMONIALS SLIDER ── */
   const testTrack = byId('testimonials-track');
