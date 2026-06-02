@@ -529,7 +529,7 @@ function initMainForm() {
       closeModal("camp-register-modal");
       resetMainForm();
       document.body.appendChild(
-        buildSuccessOverlay(data.firstName, data.lastName, data.pkg, data.langs !== "—" ? data.langs : "")
+        buildSuccessOverlay(data.firstName, data.lastName, data.pkgVal, data.langs !== "—" ? data.langs : "")
       );
     } catch (err) {
       console.error("Camp form error:", err);
@@ -610,7 +610,7 @@ function initSpecialForm() {
       timestamp: buildTimestamp(),
       page: "summer-camp",
       formType: "special-program",
-      program: data.programs.join(" + "),
+      specialPrograms: data.programs.join(" + "),
       firstName: data.firstName,
       lastName:  data.lastName,
       age: data.age,
