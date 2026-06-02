@@ -1811,18 +1811,40 @@ function applyStudentData(name, pack, langCount, totalPrice, paid, remaining, ra
   const finalTotal = sheetTotalNum > 0 ? sheetTotalNum : totalPrice;
 
   if (pack) {
+    console.log('📦 قيمة الباقة من الشيت:', JSON.stringify(pack));
     const sel = document.getElementById('sc-pack-select');
-    // مطابقة كاملة أولاً
+
+    // دالة تنظيف للمقارنة: تزيل الأقواس والمسافات الزائدة وتوحّد الأرقام
+    const norm = s => String(s).trim()
+      .replace(/[()（）\-–—]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+
+    const packNorm = norm(pack);
     let found = false;
+
+    // 1) مطابقة كاملة
     for (const opt of sel.options) {
-      if (opt.value === pack) { sel.value = pack; found = true; break; }
+      if (!opt.value) continue;
+      if (opt.value === pack) { sel.value = opt.value; found = true; break; }
     }
-    // مطابقة جزئية إن لم تُوجد
+    // 2) مطابقة بعد التنظيف
     if (!found) {
       for (const opt of sel.options) {
-        if (opt.value && pack.includes(opt.value)) { sel.value = opt.value; found = true; break; }
+        if (!opt.value) continue;
+        if (norm(opt.value) === packNorm) { sel.value = opt.value; found = true; break; }
       }
     }
+    // 3) مطابقة جزئية: الـ option موجود داخل قيمة الشيت
+    if (!found) {
+      for (const opt of sel.options) {
+        if (!opt.value) continue;
+        if (packNorm.includes(norm(opt.value))) { sel.value = opt.value; found = true; break; }
+      }
+    }
+
+    console.log(found ? '✅ تم تحديد الباقة: ' + sel.value : '❌ لم تُوجد الباقة في القائمة — تحقق من الكونسول');
+
     // احفظ القيمة الكاملة (مع اللغات) في الحقل المخفي
     document.getElementById('sc-pack').value = pack;
   }
