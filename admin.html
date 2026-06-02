@@ -1610,40 +1610,48 @@ const PACK_BASE_PRICES = {
 // سعر كل لغة إضافية — عدّل حسب نظامك
 const PRICE_PER_LANG = 2000;
 
+// ══════════════════════════════════════════════════════════════
+// ⚡ APPS SCRIPT PROXY — الحل الوحيد لمشكلة CORS
+//
+// خطوات الإعداد (مرة واحدة فقط):
+//  1. افتح: https://script.google.com/  → New Project
+//  2. احذف الكود الموجود والصق هذا الكود:
+//
+//     function doGet(e) {
+//       var id   = e.parameter.id;
+//       var name = e.parameter.sheet;
+//       var ss   = SpreadsheetApp.openById(id);
+//       var sh   = ss.getSheetByName(name);
+//       var data = sh.getDataRange().getValues();
+//       var keys = data[0];
+//       var rows = data.slice(1).map(function(r){
+//         var obj = {};
+//         keys.forEach(function(k,i){ obj[k] = r[i] === undefined ? '' : String(r[i]); });
+//         return obj;
+//       });
+//       return ContentService
+//         .createTextOutput(JSON.stringify(rows))
+//         .setMimeType(ContentService.MimeType.JSON);
+//     }
+//
+//  3. Deploy → New Deployment → Web App
+//     - Execute as: Me
+//     - Who has access: Anyone
+//  4. انسخ الـ URL وضعه في APPS_SCRIPT_URL أدناه
+// ══════════════════════════════════════════════════════════════
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwzTUAA620VFJwlJZOaPXF48AQmzmEiRTca3Js4nOWDYPJrSVYTvJaOEcqF5GhGhhs1bQ/exec'; // ← ضع الرابط هنا
+
 async function fetchSheetData(sheetId, sheetName) {
-  // نستخدم CSV export بدلاً من gviz/tq لتجنّب مشكلة CORS
-  // ⚠️ تأكّد أن الشيت منشور للعموم: File > Share > Publish to web > CSV
-  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') {
+    console.warn('⚠️ APPS_SCRIPT_URL غير مُعيَّن');
+    return [];
+  }
   try {
-    const res = await fetch(url, { mode: 'cors' });
+    const url = `${APPS_SCRIPT_URL}?action=sheet&id=${encodeURIComponent(sheetId)}&sheet=${encodeURIComponent(sheetName)}`;
+    const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
-
-    // تحليل CSV مع مراعاة الأعمدة التي تحتوي على فواصل
-    function parseCSVLine(line) {
-      const result = [];
-      let cur = '', inQ = false;
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === '"') {
-          if (inQ && line[i+1] === '"') { cur += '"'; i++; }
-          else inQ = !inQ;
-        } else if (ch === ',' && !inQ) {
-          result.push(cur.trim()); cur = '';
-        } else { cur += ch; }
-      }
-      result.push(cur.trim());
-      return result;
-    }
-
-    const lines = text.trim().split('\n').filter(l => l.trim());
-    if (!lines.length) return [];
-    const cols = parseCSVLine(lines[0]).map(c => c.replace(/^"|"$/g,''));
-    const rows = lines.slice(1).map(line => {
-      const vals = parseCSVLine(line).map(v => v.replace(/^"|"$/g,''));
-      return Object.fromEntries(cols.map((c, i) => [c, vals[i] ?? '']));
-    }).filter(r => Object.values(r).some(v => v !== ''));
-    return rows;
+    const data = await res.json();
+    return Array.isArray(data.rows) ? data.rows : [];
   } catch(e) {
     console.warn('خطأ في جلب الشيت:', sheetId, e);
     return [];
