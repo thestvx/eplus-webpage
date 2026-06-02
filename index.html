@@ -33,6 +33,27 @@
     .ep-ann-filt:hover { background: rgba(255,255,255,0.12); color: #fff; }
     .ep-ann-filt.active { background: var(--gold, #c8a84b); color: #000; border-color: var(--gold, #c8a84b); }
 
+    /* ── Announcements section improved layout ── */
+    .ep-ann-section { padding: 60px 0; }
+    .ep-ann-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+    .ep-ann-head { text-align: center; margin-bottom: 32px; }
+    .ep-ann-head h2 { font-size: 28px; font-weight: 800; color: #fff; margin-bottom: 6px; }
+    .ep-ann-live { display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 99px; padding: 6px 16px; margin-bottom: 16px; }
+    .ann-live-pulse { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: pulse-dot 1.5s infinite; flex-shrink: 0; }
+    @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.4)} }
+
+    /* ── Announcement track & cards ── */
+    .ann-track-wrapper { position: relative; display: flex; align-items: center; gap: 12px; }
+    .ann-track { display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; padding: 8px 4px 16px; flex: 1; -ms-overflow-style: none; scrollbar-width: none; }
+    .ann-track::-webkit-scrollbar { display: none; }
+    .ann-card { flex: 0 0 300px; scroll-snap-align: start; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; overflow: hidden; transition: border-color 0.25s, transform 0.25s; }
+    .ann-card:hover { border-color: var(--gold, #c8a84b); transform: translateY(-3px); }
+    .ann-arrow { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.2s; }
+    .ann-arrow:hover { background: rgba(200,168,75,0.2); border-color: var(--gold,#c8a84b); }
+    .ann-dots { display: flex; justify-content: center; gap: 6px; margin-top: 16px; }
+    .ann-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.25); border: none; cursor: pointer; padding: 0; transition: all 0.2s; }
+    .ann-dot.active { background: var(--gold, #c8a84b); width: 20px; border-radius: 99px; }
+
     /* ── Announcement card with image ── */
     .ann-card-img { width: 100%; height: 160px; object-fit: cover; border-radius: 14px 14px 0 0; display: block; margin-bottom: 0; }
     .ann-card-img-wrap { border-radius: 14px 14px 0 0; overflow: hidden; }
@@ -44,6 +65,9 @@
     .ann-type-front-badge.news    { background: rgba(59,130,246,0.15); color: #93c5fd; }
     .ann-card-link-btn { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; font-size: 12px; font-weight: 700; color: var(--gold, #c8a84b); text-decoration: none; }
     .ann-card-link-btn:hover { text-decoration: underline; }
+    /* ── Empty state ── */
+    .ann-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 24px; color: rgba(255,255,255,0.4); font-size: 14px; gap: 12px; width: 100%; }
+    .ann-empty-state .ann-empty-icon { font-size: 36px; opacity: 0.5; }
 
     /* ── Training course cards ── */
     .training-course-card:hover { border-color: var(--gold, #c8a84b) !important; background: rgba(200,168,75,0.07) !important; transform: translateY(-2px); }
@@ -625,7 +649,9 @@
           <span class="ann-live-pulse"></span>
           <span class="ep-ann-live-text">آخر الإعلانات والتحديثات</span>
         </div>
-        <div class="ep-ann-filter-strip" id="ep-ann-filter-strip" style="display:none;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px;">
+        <h2 style="font-size:26px;font-weight:800;color:#fff;margin:10px 0 6px;">الإعلانات</h2>
+        <p style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:0;">تابع آخر أخبار وعروض المركز</p>
+        <div class="ep-ann-filter-strip" id="ep-ann-filter-strip" style="display:none;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:16px;">
           <button class="ep-ann-filt active" data-filter="all" onclick="filterFrontAnn('all',this)" type="button">الكل</button>
           <button class="ep-ann-filt" data-filter="general" onclick="filterFrontAnn('general',this)" type="button">📢 عام</button>
           <button class="ep-ann-filt" data-filter="event" onclick="filterFrontAnn('event',this)" type="button">🎉 فعالية</button>
@@ -636,11 +662,14 @@
       </div>
 
       <div class="ann-track-wrapper">
-        <button class="ann-arrow" id="ann-prev" type="button">‹</button>
+        <button class="ann-arrow" id="ann-prev" onclick="annScroll(-1)" type="button">‹</button>
         <div class="ann-track" id="ann-track">
-          <div id="ann-placeholder" style="color:var(--text-muted);font-size:14px;padding:32px;text-align:center;opacity:0.6;">⏳ جاري تحميل الإعلانات...</div>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;color:rgba(255,255,255,0.4);font-size:14px;gap:12px;width:100%;">
+            <span style="font-size:36px;opacity:0.5;">⏳</span>
+            <span>جاري تحميل الإعلانات...</span>
+          </div>
         </div>
-        <button class="ann-arrow" id="ann-next" type="button">›</button>
+        <button class="ann-arrow" id="ann-next" onclick="annScroll(1)" type="button">›</button>
       </div>
 
       <div class="ann-dots" id="ann-dots"></div>
@@ -851,8 +880,8 @@
           </p>
 
           <div class="ep-contact-actions">
-            <a class="ep-btn-primary" href="tel:+213000000000">اتصال مباشر</a>
-            <a class="ep-btn-ghost" href="https://wa.me/213000000000" target="_blank" rel="noopener">واتساب</a>
+            <a class="ep-btn-primary" href="tel:+213676431474">اتصال مباشر</a>
+            <a class="ep-btn-ghost" href="https://wa.me/213676431474" target="_blank" rel="noopener">واتساب</a>
           </div>
 
           <div class="ep-contact-list">
@@ -860,7 +889,7 @@
               <div class="ep-contact-icon"><i class="fa-solid fa-location-dot"></i></div>
               <div>
                 <strong>العنوان</strong>
-                <span>قمار، ولاية الوادي — الجزائر</span>
+                <span>حي الشهداء، مقابل الطريق الوطني رقم 48 — قمار، الوادي، الجزائر</span>
               </div>
             </div>
 
@@ -868,7 +897,7 @@
               <div class="ep-contact-icon"><i class="fa-solid fa-phone"></i></div>
               <div>
                 <strong>الهاتف</strong>
-                <span>يرجى إضافة الرقم الرسمي</span>
+                <a href="tel:+213676431474" style="color:inherit;text-decoration:none;">+213 676 431 474</a>
               </div>
             </div>
 
@@ -876,7 +905,7 @@
               <div class="ep-contact-icon"><i class="fa-solid fa-envelope"></i></div>
               <div>
                 <strong>البريد</strong>
-                <span>يرجى إضافة البريد الرسمي</span>
+                <a href="mailto:epluscenter.dz@gmail.com" style="color:inherit;text-decoration:none;">epluscenter.dz@gmail.com</a>
               </div>
             </div>
           </div>
@@ -885,18 +914,33 @@
         <aside class="ep-contact-panel">
           <h3 class="ep-contact-panel-title">أوقات العمل</h3>
 
-          <div class="ep-hours-list">
-            <div class="ep-hours-item"><span>السبت</span><span>09:00 - 18:00</span></div>
-            <div class="ep-hours-item"><span>الأحد</span><span>09:00 - 18:00</span></div>
-            <div class="ep-hours-item"><span>الإثنين</span><span>09:00 - 18:00</span></div>
-            <div class="ep-hours-item"><span>الثلاثاء</span><span>09:00 - 18:00</span></div>
-            <div class="ep-hours-item"><span>الأربعاء</span><span>09:00 - 18:00</span></div>
-            <div class="ep-hours-item"><span>الخميس</span><span>09:00 - 18:00</span></div>
-            <div class="ep-hours-item"><span>الجمعة</span><span>مغلق / حسب البرنامج</span></div>
+          <div style="margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <span style="font-size:16px;">🌅</span>
+              <span style="font-size:12px;font-weight:800;color:var(--gold,#c8a84b);letter-spacing:0.5px;">الفترة الصباحية</span>
+            </div>
+            <div class="ep-hours-list">
+              <div class="ep-hours-item"><span>السبت — الخميس</span><span>08:00 - 12:00</span></div>
+              <div class="ep-hours-item" style="opacity:0.5;"><span>الجمعة</span><span>مغلق</span></div>
+            </div>
           </div>
 
-          <div class="ep-note-box">
-            يرجى تحديث معلومات الهاتف، البريد، والتوقيت الرسمي حسب بيانات المركز المعتمدة.
+          <div style="height:1px;background:rgba(255,255,255,0.08);margin:14px 0;"></div>
+
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <span style="font-size:16px;">🌆</span>
+              <span style="font-size:12px;font-weight:800;color:var(--gold,#c8a84b);letter-spacing:0.5px;">الفترة المسائية</span>
+            </div>
+            <div class="ep-hours-list">
+              <div class="ep-hours-item"><span>السبت — الخميس</span><span>17:00 - 21:00</span></div>
+              <div class="ep-hours-item" style="opacity:0.5;"><span>الجمعة</span><span>مغلق</span></div>
+            </div>
+          </div>
+
+          <div class="ep-note-box" style="margin-top:16px;">
+            <i class="fa-solid fa-circle-info" style="color:var(--gold,#c8a84b);margin-left:6px;"></i>
+            يُرجى الحضور خلال أوقات العمل الرسمية للاستفسار والتسجيل.
           </div>
         </aside>
       </div>
@@ -1495,7 +1539,7 @@
     let filtered = allFrontAnns;
     if (frontAnnFilter !== 'all') filtered = allFrontAnns.filter(x => x.type === frontAnnFilter);
     if (!filtered.length) {
-      track.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:14px;padding:32px;text-align:center;">📭 لا توجد إعلانات في هذه الفئة</div>';
+      track.innerHTML = '<div class="ann-empty-state"><span class="ann-empty-icon">📭</span><span>لا توجد إعلانات في هذه الفئة</span></div>';
       if (dotsEl) dotsEl.innerHTML = '';
       return;
     }
@@ -1509,11 +1553,11 @@
       if (x.imageBase64) {
         imgHtml = '<div class="ann-card-img-wrap"><img class="ann-card-img" src="' + x.imageBase64 + '" alt="صورة الإعلان" loading="lazy"></div>';
       }
-      const linkHtml = x.link ? '<a href="' + x.link + '" target="_blank" rel="noopener" class="ann-card-link-btn">🔗 اقرأ المزيد</a>' : '';
+      const linkHtml = x.link ? '<a href="' + x.link + '" target="_blank" rel="noopener" class="ann-card-link-btn"><i class="fa-solid fa-arrow-up-right-from-square" style="font-size:10px"></i> اقرأ المزيد</a>' : '';
       card.innerHTML = imgHtml +
         '<div style="padding:16px 18px">' +
         '<span class="ann-type-front-badge ' + (x.type || 'general') + '">' + typeInfo.emoji + ' ' + typeInfo.label + '</span>' +
-        '<div style="font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:8px;">📅 ' + dateStr + '</div>' +
+        '<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:8px;display:flex;align-items:center;gap:4px;">📅 ' + dateStr + '</div>' +
         '<h3 style="font-size:15px;font-weight:800;color:#fff;margin-bottom:6px;line-height:1.5">' + (x.title || '') + '</h3>' +
         (x.text ? '<p style="font-size:13px;color:rgba(255,255,255,0.65);line-height:1.7;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">' + x.text + '</p>' : '') +
         linkHtml +
@@ -1533,6 +1577,18 @@
     }
     // reset scroll
     track.scrollLeft = 0;
+  }
+
+  function annScroll(dir) {
+    const track = document.getElementById('ann-track');
+    if (!track) return;
+    const cardWidth = track.children[0]?.offsetWidth || 316;
+    track.scrollBy({ left: dir * (cardWidth + 16) * (document.dir === 'rtl' ? -1 : 1), behavior: 'smooth' });
+    // update dots based on scroll after animation
+    setTimeout(() => {
+      const idx = Math.round(track.scrollLeft / (cardWidth + 16));
+      document.querySelectorAll('.ann-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+    }, 350);
   }
 
   function scrollAnnTo(idx) {
