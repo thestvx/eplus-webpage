@@ -10,7 +10,7 @@ const CAMP_MIN_AGE = 5;
 
 // URL حق باقات المخيم الصيفي — SummerPlus
 const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzajcQXvsVkQEgpBttUmoD1ECSVJ5mJiT3X8oafy6m6uNNfLSzwfl8xxVcTeTU5q3D8lg/exec";
+  "https://script.google.com/macros/s/AKfycbymn3NG4tGZdBkH-2gOyUSpSId4n9_MQ4JuK5AJxoPXktjJZR2NaID3FURXML00YEi_kw/exec";
 
 // URL حق البرامج الخاصة — programsummerschool
 const SPECIAL_SCRIPT_URL =
