@@ -274,12 +274,14 @@ window.selectPackage = function(pkgName) {
    DYNAMIC FORM FIELDS
 ════════════════════════════════════════════ */
 const FIELD_HEIGHTS = {
-  langGroup510:    "260px",   // إنجليزية + فرنسية + ملاحظة
-  langGroupPlus:   "280px",
-  bacGroup:        "280px",
-  itGroup:         "180px",
-  adultLevelGroup: "130px",
-  adultTestGroup:  "180px",
+  langGroup510:      "260px",
+  langGroupPlus:     "280px",
+  bacGroup:          "280px",
+  adultLangGroup:    "300px",
+  adultAdvLangGroup: "280px",
+  itGroup:           "180px",
+  adultLevelGroup:   "130px",
+  adultTestGroup:    "180px",
 };
 
 function showGroup(id) {
@@ -310,18 +312,36 @@ function resetGroup(id, selector) {
 }
 
 function updateFormFields(val) {
-  const is510 = val.includes("5-10") || val.includes("comm-class");
-  const is1114 = val.includes("11-14");
+  const is510       = val.includes("5-10") || val.includes("comm-class");
+  const is1114      = val.includes("11-14");
   const is1518basic = val === "basic-15-18";
   const is1518elite = val === "elite-15-18";
-  const isBac = val.includes("bac");
+  const isBac       = val.includes("bac");
   const isAdultBasic = val === "basic-adults";
-  const isAdultAdv = val === "advanced-adults";
+  const isAdultAdv   = val === "advanced-adults";
 
+  // 5-10: إنجليزية أو فرنسية فقط
   if (is510) showGroup("langGroup510"); else resetGroup("langGroup510", `input[name="lang510"]`);
-  if (is1114 || is1518basic || is1518elite || isBac) showGroup("langGroupPlus"); else resetGroup("langGroupPlus", `input[name="langPlus"]`);
+
+  // 11-14 وباقات 15-18 (بدون بكالوريا): لغة أو لغتين أو ثلاثة
+  if (is1114 || is1518basic || is1518elite) showGroup("langGroupPlus"); else resetGroup("langGroupPlus", `input[name="langPlus"]`);
+
+  // بكالوريا: لغتان من ثلاثة
+  if (isBac) showGroup("bacGroup"); else resetGroup("bacGroup", `input[name="bacLang"]`);
+
+  // بالغين أساسية: لغة واحدة أو اثنتين أو الثلاثة
   if (isAdultBasic) showGroup("adultLangGroup"); else resetGroup("adultLangGroup", `input[name="adultLang"]`);
-  if (isAdultAdv) showGroup("officeGroup"); else resetGroup("officeGroup", `input[name="officeTrack"]`);
+
+  // بالغين متقدمة: لغة واحدة فقط (radio) + مسار الإعلام الآلي
+  if (isAdultAdv) { showGroup("adultAdvLangGroup"); showGroup("itGroup"); }
+  else { resetGroup("adultAdvLangGroup", `input[name="adultAdvLang"]`); resetGroup("itGroup", `input[name="itTrack"]`); }
+
+  // مستوى اللغة وفضول الاختبار: للبالغين فقط
+  if (isAdultBasic || isAdultAdv) showGroup("adultLevelGroup");
+  else resetGroup("adultLevelGroup");
+
+  // إخفاء مجموعة الاختبار دائماً عند تغيير الباقة (تُعاد عند اختيار مستوى)
+  resetGroup("adultTestGroup", `input[name="adultTest"]`);
 }
 
 function initDynamicFields() {
@@ -347,12 +367,14 @@ function initDynamicFields() {
   limitCheckboxes("lang510", 2);
   limitCheckboxes("langPlus", 2);
   limitCheckboxes("bacLang", 2);
+  // adultLang: بدون حد (يمكن الثلاثة)
+  // adultAdvLang: radio — لا يحتاج تقييد
 
   ["campFirstName","campLastName","campAge","campParentName","campParentPhone"].forEach(id => {
     $(id)?.addEventListener("input", function() { clearInvalid(this); });
   });
 
-  document.querySelectorAll('input[name="bacLang"], input[name="itTrack"], input[name="adultTest"]')
+  document.querySelectorAll('input[name="bacLang"], input[name="itTrack"], input[name="adultTest"], input[name="adultLang"], input[name="adultAdvLang"]')
     .forEach(inp => {
       inp.addEventListener("change", () => {
         clearChoiceError(inp.name);
@@ -434,9 +456,14 @@ function validateMainForm() {
     if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
     langs = sel.join(" + ");
   } else if (isAdultAdv) {
-    const sel = [...document.querySelectorAll(`input[name="officeTrack"]:checked`)].map(c => c.value);
-    if (!sel.length) { alert("يرجى اختيار مسار واحد على الأقل"); return null; }
-    itTrack = sel.join(" + ");
+    // لغة واحدة إجبارية (radio)
+    const selLang = document.querySelector(`input[name="adultAdvLang"]:checked`)?.value || "";
+    if (!selLang) { alert("يرجى اختيار لغة واحدة للباقة المتقدمة"); return null; }
+    langs = selLang;
+    // مسار الإعلام الآلي إجباري
+    const selTrack = document.querySelector(`input[name="itTrack"]:checked`)?.value || "";
+    if (!selTrack) { alert("يرجى اختيار مسار الإعلام الآلي"); return null; }
+    itTrack = selTrack;
   } else if (is510) {
     const sel = [...document.querySelectorAll(`input[name="lang510"]:checked`)].map(c => c.value);
     if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
@@ -451,13 +478,14 @@ function validateMainForm() {
 }
 
 function resetMainForm() {
-
   $("camp-form")?.reset();
   ["campSelectedPackage","campFirstName","campLastName","campAge","campParentName","campParentPhone","campAdultLevel"]
     .forEach(id => clearInvalid($(id)));
   clearChoiceError("bacLang");
   clearChoiceError("itTrack");
   clearChoiceError("adultTest");
+  clearChoiceError("adultLang");
+  clearChoiceError("adultAdvLang");
   $("campSelectedPackage")?.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
@@ -481,7 +509,7 @@ function initMainForm() {
       timestamp: buildTimestamp(),
       page: "summer-camp",
       formType: "camp-package",
-      package:  data.pkg,
+      package:  data.pkgVal,
       languages: data.langs,
       itTrack: data.itTrack,
       adultLanguageLevel: data.adultLevel || "—",
