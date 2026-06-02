@@ -10,7 +10,7 @@ const CAMP_MIN_AGE = 5;
 
 // URL حق باقات المخيم الصيفي — SummerPlus
 const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbx5oEOCcQnhlDP6k2xF0oLaICfBhMI1PIu-szQKyU0EJhjlbD8B7P3YiMdZsnoGgCSL0A/exec";
+  "https://script.google.com/macros/s/AKfycbzajcQXvsVkQEgpBttUmoD1ECSVJ5mJiT3X8oafy6m6uNNfLSzwfl8xxVcTeTU5q3D8lg/exec";
 
 // URL حق البرامج الخاصة — programsummerschool
 const SPECIAL_SCRIPT_URL =
@@ -310,53 +310,34 @@ function resetGroup(id, selector) {
 }
 
 function updateFormFields(val) {
-  const is510       = val.includes("5–10") || val.includes("5-10");
-  const is1114      = val.includes("11–14") || val.includes("11-14");
-  const is1518basic = val.includes("الباقة الأساسية (15–18)");
-  const is1518elite = val.includes("باقة النخبة (15–18)");
-  const isBac       = val.includes("البكالوريا") || val.toLowerCase().includes("bac prep");
-  const isAdultBasic= val.includes("باقة البالغين") && !val.includes("المتقدمة");
-  const isAdultAdv  = val.includes("البالغين المتقدمة");
-  const isCommClass = val.toLowerCase().includes("communication class");
+  const is510 = val.includes("5-10") || val.includes("comm-class");
+  const is1114 = val.includes("11-14");
+  const is1518basic = val === "basic-15-18";
+  const is1518elite = val === "elite-15-18";
+  const isBac = val.includes("bac");
+  const isAdultBasic = val === "basic-adults";
+  const isAdultAdv = val === "advanced-adults";
+  const isCommClass = val.includes("comm-class");
 
-  // فئة 5-10 أو Communication Class → langGroup510 (إنجليزية أو فرنسية أو كلتاهما)
-  if (is510 || isCommClass) {
-    showGroup("langGroup510");
-  } else {
-    resetGroup("langGroup510", 'input[name="lang510"]');
-  }
+  if (is510 || isCommClass) showGroup("langGroup510");
+  else resetGroup("langGroup510", `input[name="lang510"]`);
 
-  // باقات أخرى → langGroupPlus (إنجليزية + فرنسية + إسبانية)
-  const needsPlus = is1114 || is1518basic || is1518elite || isAdultBasic || isAdultAdv;
-  if (needsPlus) {
-    showGroup("langGroupPlus");
-  } else {
-    resetGroup("langGroupPlus", 'input[name="langPlus"]');
-  }
+  const needsPlus = is1114 || is1518basic || is1518elite;
+  if (needsPlus) showGroup("langGroupPlus");
+  else resetGroup("langGroupPlus", `input[name="langPlus"]`);
 
-  if (isBac) {
-    showGroup("bacGroup");
-  } else {
-    resetGroup("bacGroup", 'input[name="bacLang"]');
-  }
+  if (isBac) showGroup("bacGroup");
+  else resetGroup("bacGroup", `input[name="bacLang"]`);
 
-  if (isAdultAdv) {
-    showGroup("itGroup");
-  } else {
-    resetGroup("itGroup", 'input[name="itTrack"]');
-  }
+  if (isAdultBasic) showGroup("adultLangGroup");
+  else resetGroup("adultLangGroup", `input[name="adultLang"]`);
 
-  const isAdult = isAdultBasic || isAdultAdv;
-  if (isAdult) {
-    showGroup("adultLevelGroup");
-  } else {
-    resetGroup("adultLevelGroup", null);
-    hideGroup("adultTestGroup");
-    document.querySelectorAll('input[name="adultTest"]').forEach(r => r.checked = false);
-  }
+  if (isAdultAdv) showGroup("officeGroup");
+  else resetGroup("officeGroup", `input[name="officeTrack"]`);
 }
 
 function initDynamicFields() {
+
   const packageSel = $("campSelectedPackage");
   if (!packageSel || packageSel.dataset.dynBound === "true") return;
   packageSel.dataset.dynBound = "true";
@@ -434,81 +415,63 @@ function initInputSanitizers() {
    MAIN CAMP FORM
 ════════════════════════════════════════════ */
 function validateMainForm() {
-  const pkg       = norm($("campSelectedPackage")?.value);
+  const pkgVal = norm($("campSelectedPackage")?.value);
   const firstName = norm($("campFirstName")?.value);
-  const lastName  = norm($("campLastName")?.value);
-  const age       = norm($("campAge")?.value);
-  const parent    = norm($("campParentName")?.value);
-  const phone     = normPhone($("campParentPhone")?.value);
+  const lastName = norm($("campLastName")?.value);
+  const age = norm($("campAge")?.value);
+  const parent = norm($("campParentName")?.value);
+  const phone = normPhone($("campParentPhone")?.value);
 
   let firstBad = null;
+  const req = el => { if (!el || !norm(el.value)) { markInvalid(el); if (!firstBad) firstBad = el; } };
+  req($("campSelectedPackage")); req($("campFirstName")); req($("campLastName")); req($("campAge")); req($("campParentName")); req($("campParentPhone"));
 
-  const req = el => {
-    if (!el || !norm(el.value)) { markInvalid(el); if (!firstBad) firstBad = el; }
-  };
+  if (age && Number(age) < CAMP_MIN_AGE) { markInvalid($("campAge")); if (!firstBad) firstBad = $("campAge"); }
+  if (phone && !validatePhone(phone)) { markInvalid($("campParentPhone")); if (!firstBad) firstBad = $("campParentPhone"); }
+  if (firstBad) { scrollTo(firstBad.closest(".form-group")); focusEl(firstBad); return null; }
 
-  req($("campSelectedPackage"));
-  req($("campFirstName"));
-  req($("campLastName"));
-  req($("campAge"));
-  req($("campParentName"));
-  req($("campParentPhone"));
-
-  if (age && Number(age) < CAMP_MIN_AGE) {
-    markInvalid($("campAge")); if (!firstBad) firstBad = $("campAge");
-  }
-
-  if (phone && !validatePhone(phone)) {
-    markInvalid($("campParentPhone")); if (!firstBad) firstBad = $("campParentPhone");
-  }
-
-  if (firstBad) {
-    scrollTo(firstBad.closest(".form-group") || firstBad);
-    focusEl(firstBad);
-    return null;
-  }
+  const is510 = pkgVal.includes("5-10") || pkgVal.includes("comm-class");
+  const is1114 = pkgVal.includes("11-14");
+  const is1518 = pkgVal.includes("15-18") && !pkgVal.includes("bac");
+  const isBac = pkgVal.includes("bac");
+  const isAdultBasic = pkgVal === "basic-adults";
+  const isAdultAdv = pkgVal === "advanced-adults";
 
   let langs = "";
-  const is510       = pkg.includes("5–10") || pkg.includes("5-10");
-  const isCommClass = pkg.toLowerCase().includes("communication class");
-  const isBac       = pkg.toLowerCase().includes("بكالوريا") || pkg.toLowerCase().includes("bac prep");
+  let itTrack = "";
 
-  if (is510 || isCommClass) {
-    const sel = [...document.querySelectorAll('input[name="lang510"]:checked')];
-    if (!sel.length) { alert("⚠️ الرجاء اختيار لغة واحدة على الأقل (الإنجليزية أو الفرنسية أو كلتاهما)."); return null; }
-    langs = sel.map(c => c.value).join(" + ");
+  if (isAdultBasic) {
+    const sel = [...document.querySelectorAll(`input[name="adultLang"]:checked`)].map(c => c.value);
+    if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل أو أكثر للباقة الكبار"); return null; }
+    langs = sel.join(" + ");
+  } else if (isAdultAdv) {
+    const sel = [...document.querySelectorAll(`input[name="officeTrack"]:checked`)].map(c => c.value);
+    if (!sel.length) { alert("يرجى اختيار مسار واحد على الأقل للباقة البالغين المتقدمة"); return null; }
+    itTrack = sel.join(" + ");
+  } else if (is510) {
+    const sel = [...document.querySelectorAll(`input[name="lang510"]:checked`)].map(c => c.value);
+    if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل أو جميع اللغات المتوفرة في هذه الباقة"); return null; }
+    langs = sel.join(" + ");
+  } else if (is1114 || is1518) {
+    const sel = [...document.querySelectorAll(`input[name="langPlus"]:checked`)].map(c => c.value);
+    if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل أو جميع اللغات المتوفرة في هذه الباقة"); return null; }
+    langs = sel.join(" + ");
   } else if (isBac) {
-    const sel = [...document.querySelectorAll('input[name="bacLang"]:checked')];
-    if (sel.length !== 2) { alert("⚠️ الرجاء اختيار لغتين بالضبط لباقة البكالوريا."); return null; }
-    langs = sel.map(c => c.value).join(" + ");
-  } else {
-    const sel = [...document.querySelectorAll('input[name="langPlus"]:checked')];
-    const g = $("langGroupPlus");
-    if (g?.classList.contains("visible") && !sel.length) {
-      alert("⚠️ الرجاء اختيار لغة واحدة على الأقل."); return null;
-    }
-    langs = sel.map(c => c.value).join(" + ") || "—";
-  }
-
-  let itTrack = "—";
-  if (pkg.includes("البالغين المتقدمة")) {
-    const chosen = document.querySelector('input[name="itTrack"]:checked');
-    if (!chosen) { alert("⚠️ الرجاء اختيار مسار الإعلام الآلي."); return null; }
-    itTrack = chosen.value;
+    const sel = [...document.querySelectorAll(`input[name="bacLang"]:checked`)].map(c => c.value);
+    if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل أو جميع اللغات المتوفرة في هذه الباقة"); return null; }
+    langs = sel.join(" + ");
   }
 
   const adultLevel = norm($("campAdultLevel")?.value);
-  const adultTest  = document.querySelector('input[name="adultTest"]:checked')?.value || "—";
-  if ((pkg.includes("باقة البالغين")) && !adultLevel) {
-    markInvalid($("campAdultLevel"));
-    scrollTo($("adultLevelGroup"));
-    alert("⚠️ الرجاء اختيار مستوى اللغة."); return null;
-  }
+  const adultTest = document.querySelector(`input[name="adultTest"]:checked`)?.value || "";
+  const isAdult = isAdultBasic || isAdultAdv;
+  if (isAdult && !adultLevel) { markInvalid($("campAdultLevel")); scrollTo($("adultLevelGroup") || $("officeGroup")); alert("يرجى اختيار مستوى اللغة"); return null; }
 
-  return { pkg, langs, itTrack, adultLevel, adultTest, firstName, lastName, age, parent, phone };
+  return { pkgVal, langs, itTrack, adultLevel, adultTest, firstName, lastName, age, parent, phone };
 }
 
 function resetMainForm() {
+
   $("camp-form")?.reset();
   ["campSelectedPackage","campFirstName","campLastName","campAge","campParentName","campParentPhone","campAdultLevel"]
     .forEach(id => clearInvalid($(id)));
