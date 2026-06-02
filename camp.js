@@ -10,7 +10,7 @@ const CAMP_MIN_AGE = 5;
 
 // URL حق باقات المخيم الصيفي — SummerPlus
 const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbyb1jHUlBHdyqmwuip3wu6LceU8eZDRcHAybWQPctGWDC2XcCK-UK2DxOFjfiNTz6C5zw/exec";
+  "https://script.google.com/macros/s/AKfycbzGcJb8TVAfyyGjlvbXKwsbELBeYI831KU09cpit7k4smSgZ0kRmSPhdjC_m4NO5tcw4g/exec";
 
 // URL حق البرامج الخاصة — programsummerschool
 const SPECIAL_SCRIPT_URL =
@@ -600,6 +600,7 @@ function calcTotalAmount(pkgVal) {
 /* ═══════════════════════════════════════════
    MAIN CAMP FORM VALIDATION
 ════════════════════════════════════════════ */
+function validateMainForm() {
   const pkgVal = norm($("campSelectedPackage")?.value);
   const firstName = norm($("campFirstName")?.value);
   const lastName = norm($("campLastName")?.value);
