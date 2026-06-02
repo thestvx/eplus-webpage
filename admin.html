@@ -1607,8 +1607,8 @@ const PACK_BASE_PRICES = {
   'باقة البالغين':8000,'باقة البالغين المتقدمة':12000,
   'English Communication Class':8000,
 };
-// سعر كل لغة إضافية — عدّل حسب نظامك
-const PRICE_PER_LANG = 2000;
+// سعر كل لغة — كل لغة = 8,000 دج (نفس منطق camp.js)
+const PRICE_PER_LANG = 8000;
 
 // ══════════════════════════════════════════════════════════════
 // ⚡ APPS SCRIPT PROXY — الحل الوحيد لمشكلة CORS
@@ -1659,10 +1659,21 @@ async function fetchSheetData(sheetId, sheetName) {
   }
 }
 
+// حساب السعر الاحتياطي (يُستخدم فقط إذا لم يكن المبلغ الإجمالي موجوداً في الشيت)
 function calcTotalPrice(pack, langCount) {
-  const base = PACK_BASE_PRICES[pack] || 0;
+  // باقات بسعر ثابت بغض النظر عن اللغات
+  const FIXED = {
+    'باقة النخبة (5-10)': 10000,
+    'باقة النخبة (11-14)': 10000,
+    'باقة النخبة (15-18)': 10000,
+    'باقة تحضير البكالوريا (15-18)': 15000,
+    'باقة البالغين المتقدمة': 12000,
+    'English Communication Class': 8000,
+  };
+  if (FIXED[pack]) return FIXED[pack];
+  // باقات اللغة: كل لغة = 8,000 دج
   const langs = parseInt(langCount) || 1;
-  return base + Math.max(0, langs - 1) * PRICE_PER_LANG;
+  return langs * PRICE_PER_LANG;
 }
 
 window.searchStudent = async () => {
@@ -1716,23 +1727,34 @@ window.searchStudent = async () => {
     resultsDiv.innerHTML = `<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px">🎯 ${matches.length} نتيجة — اختر الطالب:</div>`;
 
     matches.slice(0, 8).forEach((row, idx) => {
-      // استخلاص الاسم الكامل من الاسم + اللقب
-      const firstName  = String(row['الاسم']  || '').trim();
-      const lastName   = String(row['اللقب']  || '').trim();
+      // ── استخلاص الاسم الكامل ──
+      const firstName   = String(row['الاسم']  || '').trim();
+      const lastName    = String(row['اللقب']  || '').trim();
       const studentName = [firstName, lastName].filter(Boolean).join(' ') || Object.values(row)[0] || '—';
 
-      // الباقة: جدول 1 → "الباقة"، جدول 2 → "نوع البرنامج"
+      // ── الباقة ──
       const packKey = ['الباقة', 'نوع البرنامج', 'الباقة المختارة', 'pack', 'Package', 'plan'].find(k => row[k]);
       const pack = packKey ? String(row[packKey]).trim() : '';
 
-      // اللغة المختارة (جدول 1 فقط)
-      const langKey = ['اللغة المختارة', 'عدد اللغات', 'اللغات', 'languages'].find(k => row[k]);
-      const langCount = langKey ? (parseInt(row[langKey]) || 1) : 1;
+      // ── اللغات ──
+      const langsRaw = String(row['اللغات'] || row['اللغة المختارة'] || row['languages'] || '').trim();
 
-      const totalPrice = calcTotalPrice(pack, langCount);
-      // لا يوجد عمود مبلغ مدفوع في الشيت — يُعبأ يدوياً لاحقاً
-      const paid = 0;
-      const remaining = totalPrice > 0 ? totalPrice : 0;
+      // ── مسار الإعلام الآلي ──
+      const itTrack = String(row['مسار الإعلام الآلي'] || row['itTrack'] || '').trim();
+
+      // ── المبلغ الإجمالي من الشيت مباشرة (العمود J) ──
+      const sheetTotalRaw = String(row['المبلغ الإجمالي'] || '').trim();
+      // نستخرج الرقم: "16,000 دج" → 16000
+      const sheetTotalNum = parseFloat(sheetTotalRaw.replace(/[^\d.]/g, '')) || 0;
+
+      // ── معلومات ولي الأمر ──
+      const parentName  = String(row['اسم ولي الأمر'] || row['parentName'] || '').trim();
+      const parentPhone = String(row['رقم هاتف ولي الأمر'] || row['رقم الهاتف'] || row['parentPhone'] || '').trim();
+      const age         = String(row['العمر'] || row['age'] || '').trim();
+
+      // ── حساب totalPrice: من الشيت أولاً، وإلا من جدول الأسعار ──
+      const langCount  = langsRaw ? (langsRaw.split('+').length || 1) : 1;
+      const totalPrice = sheetTotalNum > 0 ? sheetTotalNum : calcTotalPrice(pack, langCount);
 
       const card = document.createElement('div');
       card.style.cssText = 'padding:12px 14px;border-radius:12px;border:1px solid var(--border-2);background:white;cursor:pointer;transition:all 0.2s;margin-bottom:8px';
@@ -1742,17 +1764,23 @@ window.searchStudent = async () => {
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
           <div style="flex:1">
             <div style="font-size:14px;font-weight:800;color:var(--text)">${studentName}</div>
-            ${pack ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px">📦 ${pack}${langCount > 1 ? ` · ${langCount} لغات` : ''}</div>` : ''}
+            ${pack ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px">📦 ${pack}</div>` : ''}
+            ${langsRaw ? `<div style="font-size:12px;color:var(--text-muted);margin-top:1px">🌍 ${langsRaw}</div>` : ''}
+            ${itTrack ? `<div style="font-size:12px;color:var(--text-muted);margin-top:1px">💻 ${itTrack}</div>` : ''}
+            ${parentPhone ? `<div style="font-size:12px;color:var(--text-muted);margin-top:1px">📞 ${parentPhone}</div>` : ''}
             <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
               ${totalPrice > 0 ? `<span style="font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(124,58,237,0.1);color:var(--primary);font-weight:800">💰 ${totalPrice.toLocaleString('ar-DZ')} دج</span>` : ''}
-              ${paid > 0 ? `<span style="font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(16,185,129,0.1);color:#059669;font-weight:800">✅ ${paid.toLocaleString('ar-DZ')} دج مدفوع</span>` : ''}
-              ${remaining > 0 ? `<span style="font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(239,68,68,0.1);color:#DC2626;font-weight:800">⏳ ${remaining.toLocaleString('ar-DZ')} دج متبقي</span>` : (totalPrice > 0 ? `<span style="font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(16,185,129,0.1);color:#059669;font-weight:800">✅ مكتمل</span>` : '')}
+              ${sheetTotalRaw && sheetTotalRaw !== '—' && sheetTotalRaw !== 'غير محدد' ? `<span style="font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(34,197,94,0.1);color:#059669;font-weight:800">✅ مبلغ الشيت</span>` : ''}
             </div>
           </div>
           <span style="font-size:10px;padding:2px 7px;border-radius:6px;background:rgba(124,58,237,0.08);color:var(--primary);font-weight:700;white-space:nowrap">${row._source}</span>
         </div>`;
 
-      card.onclick = () => applyStudentData(studentName, pack, langCount, totalPrice, paid, remaining, row, firstName, lastName);
+      card.onclick = () => applyStudentData(
+        studentName, pack, langCount, totalPrice, 0, totalPrice,
+        row, firstName, lastName,
+        langsRaw, itTrack, parentName, parentPhone, age, sheetTotalNum
+      );
       resultsDiv.appendChild(card);
     });
 
@@ -1771,12 +1799,15 @@ window.searchStudent = async () => {
   }
 };
 
-function applyStudentData(name, pack, langCount, totalPrice, paid, remaining, rawRow, firstName, lastName) {
-  // أدخل الاسم الكامل (اسم + لقب)
+function applyStudentData(name, pack, langCount, totalPrice, paid, remaining, rawRow,
+                          firstName, lastName,
+                          langsRaw, itTrack, parentName, parentPhone, age, sheetTotalNum) {
+
+  // ── 1. الاسم الكامل ──
   const fullName = firstName && lastName ? firstName + ' ' + lastName : name;
   document.getElementById('sc-name').value = fullName;
 
-  // اختر الباقة إن وُجدت في القائمة
+  // ── 2. الباقة ──
   if (pack) {
     const sel = document.getElementById('sc-pack-select');
     let found = false;
@@ -1786,27 +1817,48 @@ function applyStudentData(name, pack, langCount, totalPrice, paid, remaining, ra
     if (found) {
       onPackSelect(pack);
     } else {
-      // باقة غير موجودة في القائمة — نكتبها يدوياً في الحقل المخفي
       document.getElementById('sc-pack').value = pack;
     }
   }
 
-  // عبّئ حاسبة المبلغ المتبقي تلقائياً
-  if (totalPrice > 0) {
-    document.getElementById('sc-full-price').value = totalPrice;
-    document.getElementById('sc-paid-amount').value = paid || totalPrice;
-    document.getElementById('sc-amount').value = paid || totalPrice;
+  // ── 3. سعر الباقة الكامل ──
+  // نستخدم المبلغ الإجمالي من الشيت إن وجد، وإلا السعر المحسوب
+  const finalTotal = sheetTotalNum > 0 ? sheetTotalNum : totalPrice;
+  if (finalTotal > 0) {
+    document.getElementById('sc-full-price').value = finalTotal;
+    document.getElementById('sc-paid-amount').value = finalTotal; // افتراضي: دفع الكل
+    document.getElementById('sc-amount').value = finalTotal;
     calcRemaining();
   }
 
-  // أغلق نتائج البحث وأظهر رسالة
+  // ── 4. ملاحظة اللغات ومسار IT في حقل الباقة إن لم تكن موجودة في القائمة ──
+  const packField = document.getElementById('sc-pack');
+  if (langsRaw || itTrack) {
+    const currentPack = packField.value || pack;
+    const extras = [langsRaw, itTrack].filter(Boolean).join(' | ');
+    if (extras && !currentPack.includes(langsRaw || '')) {
+      packField.value = currentPack + (extras ? ' — ' + extras : '');
+    }
+  }
+
+  // ── 5. تاريخ اليوم كافتراضي (بدون تغيير ما هو محدد) ──
+  // لا نغيّره — الأدمين يحدده يدوياً
+
+  // ── 6. أغلق نتائج البحث ──
   document.getElementById('student-search-results').style.display = 'none';
   document.getElementById('student-search-inp').value = '';
 
-  const msg = totalPrice > 0
-    ? `✅ ${fullName} — الإجمالي: ${totalPrice.toLocaleString('ar-DZ')} دج — المتبقي: ${remaining > 0 ? remaining.toLocaleString('ar-DZ') + ' دج' : '0 دج'}`
-    : `✅ تم ملء بيانات ${fullName}`;
-  showToast(msg);
+  // ── 7. تمرير لأعلى نموذج التذكرة ──
+  document.getElementById('sc-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  // ── 8. toast يلخص البيانات المُدخلة ──
+  const parts = [`✅ ${fullName}`];
+  if (pack) parts.push(`📦 ${pack}`);
+  if (langsRaw) parts.push(`🌍 ${langsRaw}`);
+  if (itTrack) parts.push(`💻 ${itTrack}`);
+  if (parentPhone) parts.push(`📞 ${parentPhone}`);
+  if (finalTotal > 0) parts.push(`💰 ${finalTotal.toLocaleString('ar-DZ')} دج`);
+  showToast(parts.join('  '));
 }
 
 // ══ إدخال المبلغ يدوياً ══
