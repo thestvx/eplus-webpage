@@ -547,8 +547,7 @@ function calcTotalAmount(pkgVal) {
   const langPerPrice = 8000;
   let total = 0;
 
-  const is510        = pkgVal.includes("5-10") && !pkgVal.includes("comm");
-  const is1114basic  = pkgVal === "basic-11-14";
+  const is510        = pkgVal.includes("5-10") && !pkgVal.includes("comm") && !pkgVal.includes("elite");
   const is1518basic  = pkgVal === "basic-15-18";
   const is1114       = pkgVal.includes("11-14") && !pkgVal.includes("elite");
   const isAdultBasic = pkgVal === "basic-adults";
