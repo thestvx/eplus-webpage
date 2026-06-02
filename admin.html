@@ -1689,13 +1689,20 @@ window.searchStudent = async () => {
 
     // بحث غير حساس لحالة الأحرف وللمسافات
     const q = query.trim().toLowerCase();
-    // نحاول مطابقة في أي عمود يحتوي على اسم الطالب
-    const nameKeys = ['الاسم','الاسم الكامل','name','student','اسم الطالب','Student Name'];
+
+    // أسماء الأعمدة الحقيقية من الجدولين:
+    // جدول 1 (SummerPlus):        الاسم، اللقب، الباقة، اللغة المختارة
+    // جدول 2 (programsummerschool): الاسم، اللقب، نوع البرنامج
+    const nameKeys = ['الاسم', 'اللقب', 'الاسم الكامل', 'name', 'student', 'اسم الطالب', 'Student Name'];
+
     const matches = allRows.filter(row => {
-      return nameKeys.some(k => {
-        const v = String(row[k] || '').toLowerCase();
-        return v.includes(q);
-      }) || Object.values(row).some(v => String(v).toLowerCase().includes(q));
+      // بحث في عمودَي الاسم واللقب أولاً
+      const firstName  = String(row['الاسم']  || '').toLowerCase();
+      const lastName   = String(row['اللقب']  || '').toLowerCase();
+      const fullName   = (firstName + ' ' + lastName).trim();
+      if (firstName.includes(q) || lastName.includes(q) || fullName.includes(q)) return true;
+      // fallback: بحث في أي حقل آخر
+      return Object.values(row).some(v => String(v).toLowerCase().includes(q));
     });
 
     if (!matches.length) {
@@ -1709,16 +1716,23 @@ window.searchStudent = async () => {
     resultsDiv.innerHTML = `<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px">🎯 ${matches.length} نتيجة — اختر الطالب:</div>`;
 
     matches.slice(0, 8).forEach((row, idx) => {
-      // استخلاص الحقول
-      const studentName = nameKeys.map(k => row[k]).find(v => v) || Object.values(row)[0] || '—';
-      const packKey = ['الباقة','الباقة المختارة','pack','Package','plan','الخطة'].find(k => row[k]);
-      const pack = packKey ? row[packKey] : '';
-      const langKey = ['عدد اللغات','اللغات','languages','lang count','عدد اللغة'].find(k => row[k]);
-      const langCount = langKey ? parseInt(row[langKey]) || 1 : 1;
+      // استخلاص الاسم الكامل من الاسم + اللقب
+      const firstName  = String(row['الاسم']  || '').trim();
+      const lastName   = String(row['اللقب']  || '').trim();
+      const studentName = [firstName, lastName].filter(Boolean).join(' ') || Object.values(row)[0] || '—';
+
+      // الباقة: جدول 1 → "الباقة"، جدول 2 → "نوع البرنامج"
+      const packKey = ['الباقة', 'نوع البرنامج', 'الباقة المختارة', 'pack', 'Package', 'plan'].find(k => row[k]);
+      const pack = packKey ? String(row[packKey]).trim() : '';
+
+      // اللغة المختارة (جدول 1 فقط)
+      const langKey = ['اللغة المختارة', 'عدد اللغات', 'اللغات', 'languages'].find(k => row[k]);
+      const langCount = langKey ? (parseInt(row[langKey]) || 1) : 1;
+
       const totalPrice = calcTotalPrice(pack, langCount);
-      const paidKey = ['المبلغ المدفوع','المدفوع','paid','amount','المبلغ'].find(k => row[k]);
-      const paid = paidKey ? parseFloat(row[paidKey]) || 0 : 0;
-      const remaining = totalPrice > 0 ? Math.max(0, totalPrice - paid) : 0;
+      // لا يوجد عمود مبلغ مدفوع في الشيت — يُعبأ يدوياً لاحقاً
+      const paid = 0;
+      const remaining = totalPrice > 0 ? totalPrice : 0;
 
       const card = document.createElement('div');
       card.style.cssText = 'padding:12px 14px;border-radius:12px;border:1px solid var(--border-2);background:white;cursor:pointer;transition:all 0.2s;margin-bottom:8px';
@@ -1738,7 +1752,7 @@ window.searchStudent = async () => {
           <span style="font-size:10px;padding:2px 7px;border-radius:6px;background:rgba(124,58,237,0.08);color:var(--primary);font-weight:700;white-space:nowrap">${row._source}</span>
         </div>`;
 
-      card.onclick = () => applyStudentData(studentName, pack, langCount, totalPrice, paid, remaining, row);
+      card.onclick = () => applyStudentData(studentName, pack, langCount, totalPrice, paid, remaining, row, firstName, lastName);
       resultsDiv.appendChild(card);
     });
 
@@ -1757,9 +1771,10 @@ window.searchStudent = async () => {
   }
 };
 
-function applyStudentData(name, pack, langCount, totalPrice, paid, remaining, rawRow) {
-  // أدخل الاسم
-  document.getElementById('sc-name').value = name;
+function applyStudentData(name, pack, langCount, totalPrice, paid, remaining, rawRow, firstName, lastName) {
+  // أدخل الاسم الكامل (اسم + لقب)
+  const fullName = firstName && lastName ? firstName + ' ' + lastName : name;
+  document.getElementById('sc-name').value = fullName;
 
   // اختر الباقة إن وُجدت في القائمة
   if (pack) {
@@ -1789,8 +1804,8 @@ function applyStudentData(name, pack, langCount, totalPrice, paid, remaining, ra
   document.getElementById('student-search-inp').value = '';
 
   const msg = totalPrice > 0
-    ? `✅ ${name} — الإجمالي: ${totalPrice.toLocaleString('ar-DZ')} دج — المتبقي: ${remaining > 0 ? remaining.toLocaleString('ar-DZ') + ' دج' : '0 دج'}`
-    : `✅ تم ملء بيانات ${name}`;
+    ? `✅ ${fullName} — الإجمالي: ${totalPrice.toLocaleString('ar-DZ')} دج — المتبقي: ${remaining > 0 ? remaining.toLocaleString('ar-DZ') + ' دج' : '0 دج'}`
+    : `✅ تم ملء بيانات ${fullName}`;
   showToast(msg);
 }
 
