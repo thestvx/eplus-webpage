@@ -10,11 +10,11 @@ const CAMP_MIN_AGE = 5;
 
 // URL حق باقات المخيم الصيفي — SummerPlus
 const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbymn3NG4tGZdBkH-2gOyUSpSId4n9_MQ4JuK5AJxoPXktjJZR2NaID3FURXML00YEi_kw/exec";
+  "https://script.google.com/macros/s/AKfycbyb1jHUlBHdyqmwuip3wu6LceU8eZDRcHAybWQPctGWDC2XcCK-UK2DxOFjfiNTz6C5zw/exec";
 
 // URL حق البرامج الخاصة — programsummerschool
 const SPECIAL_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbz7dWGL35sIFP4H4ASsRPKBC_LKMFMwUIcC6hXMfSi8P59QIxhTOFbm6ZFpN1So40iyGA/exec";
+  "https://script.google.com/macros/s/AKfycbyJp48FX1vdn35zezbrsk_XHbeYksJ28n4T-5OpOrBTPzhsisx8gTubrlcOsaYbnu-kkg/exec";
 
 const VIDEO_PUBLIC_ID   = "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab";
 const VIDEO_CLOUD_NAME  = "dac4mwuwe";
@@ -539,9 +539,67 @@ function initInputSanitizers() {
 }
 
 /* ═══════════════════════════════════════════
-   MAIN CAMP FORM
+   CALC TOTAL AMOUNT (for payload)
 ════════════════════════════════════════════ */
-function validateMainForm() {
+function calcTotalAmount(pkgVal) {
+  if (!pkgVal) return "";
+
+  const langPerPrice = 8000;
+  let total = 0;
+
+  const is510        = pkgVal.includes("5-10") && !pkgVal.includes("comm");
+  const is1114basic  = pkgVal === "basic-11-14";
+  const is1518basic  = pkgVal === "basic-15-18";
+  const is1114       = pkgVal.includes("11-14") && !pkgVal.includes("elite");
+  const isAdultBasic = pkgVal === "basic-adults";
+  const isAdultAdv   = pkgVal === "advanced-adults";
+
+  if (is510) {
+    const count = document.querySelectorAll(`input[name="lang510"]:checked`).length;
+    if (!count) return "";
+    total = count * langPerPrice;
+
+  } else if (is1114 || is1518basic) {
+    const count = document.querySelectorAll(`input[name="langPlus"]:checked`).length;
+    if (!count) return "";
+    total = count * langPerPrice;
+
+  } else if (isAdultBasic) {
+    const count = document.querySelectorAll(`input[name="adultLang"]:checked`).length;
+    if (!count) return "";
+    total = count * langPerPrice;
+
+  } else if (isAdultAdv) {
+    total = 12000;
+    const tracks = document.querySelectorAll(`input[name="itTrack"]:checked`).length;
+    if (tracks === 2) total += 5000;
+    else if (tracks === 1) total += 2500;
+
+  } else if (pkgVal === "elite-5-10") {
+    total = 10000;
+    const track = document.querySelector(`input[name="itTrack"]:checked`);
+    if (track) total += 2000;
+
+  } else if (pkgVal === "elite-11-14" || pkgVal === "elite-15-18") {
+    total = 10000;
+
+  } else if (pkgVal === "bac-15-18") {
+    total = 15000;
+
+  } else if (pkgVal === "comm-class-5-10") {
+    total = 8000;
+
+  } else {
+    // ESP / IELTS: سعر غير محدد
+    return "غير محدد";
+  }
+
+  return total > 0 ? total.toLocaleString("ar-DZ") + " دج" : "";
+}
+
+/* ═══════════════════════════════════════════
+   MAIN CAMP FORM VALIDATION
+════════════════════════════════════════════ */
   const pkgVal = norm($("campSelectedPackage")?.value);
   const firstName = norm($("campFirstName")?.value);
   const lastName = norm($("campLastName")?.value);
@@ -591,7 +649,7 @@ function validateMainForm() {
     langs = sel.join(" + ");
   }
 
-  return { pkgVal, langs, itTrack, adultLevel, adultTest, firstName, lastName, age, parent, phone };
+  return { pkgVal, langs, itTrack, adultLevel, adultTest, firstName, lastName, age, parent, phone, totalAmount: calcTotalAmount(pkgVal) };
 }
 
 function resetMainForm() {
@@ -636,6 +694,7 @@ function initMainForm() {
       age: data.age,
       parentName:  data.parent,
       parentPhone: data.phone,
+      totalAmount: data.totalAmount || "—",
       userAgent: navigator.userAgent.slice(0, 180),
       lang: navigator.language || "unknown"
     };
