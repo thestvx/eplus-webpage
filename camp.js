@@ -317,23 +317,11 @@ function updateFormFields(val) {
   const isBac = val.includes("bac");
   const isAdultBasic = val === "basic-adults";
   const isAdultAdv = val === "advanced-adults";
-  const isCommClass = val.includes("comm-class");
 
-  if (is510 || isCommClass) showGroup("langGroup510");
-  else resetGroup("langGroup510", `input[name="lang510"]`);
-
-  const needsPlus = is1114 || is1518basic || is1518elite;
-  if (needsPlus) showGroup("langGroupPlus");
-  else resetGroup("langGroupPlus", `input[name="langPlus"]`);
-
-  if (isBac) showGroup("bacGroup");
-  else resetGroup("bacGroup", `input[name="bacLang"]`);
-
-  if (isAdultBasic) showGroup("adultLangGroup");
-  else resetGroup("adultLangGroup", `input[name="adultLang"]`);
-
-  if (isAdultAdv) showGroup("officeGroup");
-  else resetGroup("officeGroup", `input[name="officeTrack"]`);
+  if (is510) showGroup("langGroup510"); else resetGroup("langGroup510", `input[name="lang510"]`);
+  if (is1114 || is1518basic || is1518elite || isBac) showGroup("langGroupPlus"); else resetGroup("langGroupPlus", `input[name="langPlus"]`);
+  if (isAdultBasic) showGroup("adultLangGroup"); else resetGroup("adultLangGroup", `input[name="adultLang"]`);
+  if (isAdultAdv) showGroup("officeGroup"); else resetGroup("officeGroup", `input[name="officeTrack"]`);
 }
 
 function initDynamicFields() {
@@ -425,47 +413,39 @@ function validateMainForm() {
   let firstBad = null;
   const req = el => { if (!el || !norm(el.value)) { markInvalid(el); if (!firstBad) firstBad = el; } };
   req($("campSelectedPackage")); req($("campFirstName")); req($("campLastName")); req($("campAge")); req($("campParentName")); req($("campParentPhone"));
-
   if (age && Number(age) < CAMP_MIN_AGE) { markInvalid($("campAge")); if (!firstBad) firstBad = $("campAge"); }
   if (phone && !validatePhone(phone)) { markInvalid($("campParentPhone")); if (!firstBad) firstBad = $("campParentPhone"); }
   if (firstBad) { scrollTo(firstBad.closest(".form-group")); focusEl(firstBad); return null; }
 
-  const is510 = pkgVal.includes("5-10") || pkgVal.includes("comm-class");
+  const is510 = pkgVal.includes("5-10");
   const is1114 = pkgVal.includes("11-14");
-  const is1518 = pkgVal.includes("15-18") && !pkgVal.includes("bac");
+  const is1518 = pkgVal.includes("15-18");
   const isBac = pkgVal.includes("bac");
   const isAdultBasic = pkgVal === "basic-adults";
   const isAdultAdv = pkgVal === "advanced-adults";
 
   let langs = "";
   let itTrack = "";
+  let adultLevel = norm($("campAdultLevel")?.value);
+  let adultTest = document.querySelector(`input[name="adultTest"]:checked`)?.value || "";
 
   if (isAdultBasic) {
     const sel = [...document.querySelectorAll(`input[name="adultLang"]:checked`)].map(c => c.value);
-    if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل أو أكثر للباقة الكبار"); return null; }
+    if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
     langs = sel.join(" + ");
   } else if (isAdultAdv) {
     const sel = [...document.querySelectorAll(`input[name="officeTrack"]:checked`)].map(c => c.value);
-    if (!sel.length) { alert("يرجى اختيار مسار واحد على الأقل للباقة البالغين المتقدمة"); return null; }
+    if (!sel.length) { alert("يرجى اختيار مسار واحد على الأقل"); return null; }
     itTrack = sel.join(" + ");
   } else if (is510) {
     const sel = [...document.querySelectorAll(`input[name="lang510"]:checked`)].map(c => c.value);
-    if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل أو جميع اللغات المتوفرة في هذه الباقة"); return null; }
+    if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
     langs = sel.join(" + ");
-  } else if (is1114 || is1518) {
+  } else if (is1114 || (is1518 && !isBac)) {
     const sel = [...document.querySelectorAll(`input[name="langPlus"]:checked`)].map(c => c.value);
-    if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل أو جميع اللغات المتوفرة في هذه الباقة"); return null; }
-    langs = sel.join(" + ");
-  } else if (isBac) {
-    const sel = [...document.querySelectorAll(`input[name="bacLang"]:checked`)].map(c => c.value);
-    if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل أو جميع اللغات المتوفرة في هذه الباقة"); return null; }
+    if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
     langs = sel.join(" + ");
   }
-
-  const adultLevel = norm($("campAdultLevel")?.value);
-  const adultTest = document.querySelector(`input[name="adultTest"]:checked`)?.value || "";
-  const isAdult = isAdultBasic || isAdultAdv;
-  if (isAdult && !adultLevel) { markInvalid($("campAdultLevel")); scrollTo($("adultLevelGroup") || $("officeGroup")); alert("يرجى اختيار مستوى اللغة"); return null; }
 
   return { pkgVal, langs, itTrack, adultLevel, adultTest, firstName, lastName, age, parent, phone };
 }
