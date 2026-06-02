@@ -996,6 +996,18 @@
               <div class="panel-icon orange">🎟️</div>
               بيانات المشارك
             </div>
+            <!-- ══ بحث عن الطالب في Google Sheets ══ -->
+            <div class="form-group" style="background:linear-gradient(135deg,rgba(124,58,237,0.06),rgba(59,130,246,0.06));border:2px solid rgba(124,58,237,0.2);border-radius:16px;padding:18px;margin-bottom:18px">
+              <div style="font-size:13px;font-weight:800;color:var(--text-2);margin-bottom:12px;display:flex;align-items:center;gap:8px">
+                <span style="width:30px;height:30px;border-radius:10px;background:rgba(124,58,237,0.12);display:inline-flex;align-items:center;justify-content:center;font-size:16px">🔍</span>
+                البحث عن طالب مسجّل
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input class="inp" type="text" id="student-search-inp" placeholder="اكتب اسم الطالب للبحث..." style="flex:1" onkeydown="if(event.key==='Enter')searchStudent()">
+                <button type="button" onclick="searchStudent()" id="student-search-btn" style="flex-shrink:0;padding:12px 20px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--primary),#9333EA);color:white;font-size:14px;font-weight:800;font-family:'Tajawal',sans-serif;cursor:pointer;white-space:nowrap;transition:all 0.25s ease;box-shadow:0 4px 14px var(--primary-glow)">🔍 بحث</button>
+              </div>
+              <div id="student-search-results" style="margin-top:10px;display:none"></div>
+            </div>
             <div class="form-group">
               <label class="form-label">الاسم الكامل <span class="required">*</span></label>
               <input class="inp" type="text" id="sc-name" placeholder="مثال: أحمد محمد بن علي">
@@ -1574,6 +1586,183 @@ window.resetSelection = () => {
 window.resetProgram = window.resetSelection;
 window.autoFillAmount = () => {};
 
+// ══════════════════════════════════════════════════════
+// البحث عن الطالب في جدولَي Google Sheets
+// ══════════════════════════════════════════════════════
+
+// ← ضع هنا معرّفَي جدولَي Google Sheets
+const SHEET_ID_1 = '1dsCDRAo0f5mDSbTjaK_iqWGFBaEXmkHqkDPFp8ClkNI';   // الجدول الأول
+const SHEET_ID_2 = '1AM1uKyQ9GjuPlw7_baWfU3z6nMAkwtl4i83ydJc8Rb4';  // الجدول الثاني
+
+// اسم الصفحة (Sheet) داخل كل ملف — عدّل حسب حاجتك
+const SHEET_NAME_1 = 'SummerPlus';
+const SHEET_NAME_2 = 'programsummerschool';
+
+// ── جدول الأسعار حسب الباقة واللغات ──
+const PACK_BASE_PRICES = {
+  'الباقة الأساسية (5-10)':8000,'باقة النخبة (5-10)':10000,
+  'الباقة الأساسية (11-14)':8000,'باقة النخبة (11-14)':10000,
+  'الباقة الأساسية (15-18)':8000,'باقة النخبة (15-18)':10000,
+  'باقة تحضير البكالوريا (15-18)':15000,
+  'باقة البالغين':8000,'باقة البالغين المتقدمة':12000,
+  'English Communication Class':8000,
+};
+// سعر كل لغة إضافية — عدّل حسب نظامك
+const PRICE_PER_LANG = 2000;
+
+async function fetchSheetData(sheetId, sheetName) {
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+  try {
+    const res = await fetch(url);
+    const text = await res.text();
+    // Google returns: /*O_o*/\ngoogle.visualization.Query.setResponse({...});
+    const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+    const cols = json.table.cols.map(c => c.label);
+    const rows = json.table.rows.map(r =>
+      Object.fromEntries(cols.map((c, i) => [c, r.c[i]?.v ?? '']))
+    );
+    return rows;
+  } catch(e) {
+    console.warn('خطأ في جلب الشيت:', sheetId, e);
+    return [];
+  }
+}
+
+function calcTotalPrice(pack, langCount) {
+  const base = PACK_BASE_PRICES[pack] || 0;
+  const langs = parseInt(langCount) || 1;
+  return base + Math.max(0, langs - 1) * PRICE_PER_LANG;
+}
+
+window.searchStudent = async () => {
+  const query = document.getElementById('student-search-inp').value.trim();
+  if (!query) { showToast('⚠️ اكتب اسم الطالب أولاً', true); return; }
+
+  const btn = document.getElementById('student-search-btn');
+  const resultsDiv = document.getElementById('student-search-results');
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري البحث...';
+  resultsDiv.style.display = 'none';
+
+  try {
+    // جلب البيانات من الجدولين
+    const [rows1, rows2] = await Promise.all([
+      SHEET_ID_1 !== 'YOUR_FIRST_SHEET_ID'  ? fetchSheetData(SHEET_ID_1, SHEET_NAME_1) : [],
+      SHEET_ID_2 !== 'YOUR_SECOND_SHEET_ID' ? fetchSheetData(SHEET_ID_2, SHEET_NAME_2) : [],
+    ]);
+
+    const allRows = [
+      ...rows1.map(r => ({ ...r, _source: 'الجدول الأول' })),
+      ...rows2.map(r => ({ ...r, _source: 'الجدول الثاني' })),
+    ];
+
+    // بحث غير حساس لحالة الأحرف وللمسافات
+    const q = query.trim().toLowerCase();
+    // نحاول مطابقة في أي عمود يحتوي على اسم الطالب
+    const nameKeys = ['الاسم','الاسم الكامل','name','student','اسم الطالب','Student Name'];
+    const matches = allRows.filter(row => {
+      return nameKeys.some(k => {
+        const v = String(row[k] || '').toLowerCase();
+        return v.includes(q);
+      }) || Object.values(row).some(v => String(v).toLowerCase().includes(q));
+    });
+
+    if (!matches.length) {
+      resultsDiv.style.display = 'block';
+      resultsDiv.innerHTML = `<div style="text-align:center;padding:14px;color:var(--text-muted);font-weight:700;font-size:13px;background:rgba(239,68,68,0.05);border-radius:10px;border:1px solid rgba(239,68,68,0.15)">❌ لم يُعثر على طالب بهذا الاسم في كلا الجدولين</div>`;
+      return;
+    }
+
+    // عرض النتائج
+    resultsDiv.style.display = 'block';
+    resultsDiv.innerHTML = `<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px">🎯 ${matches.length} نتيجة — اختر الطالب:</div>`;
+
+    matches.slice(0, 8).forEach((row, idx) => {
+      // استخلاص الحقول
+      const studentName = nameKeys.map(k => row[k]).find(v => v) || Object.values(row)[0] || '—';
+      const packKey = ['الباقة','الباقة المختارة','pack','Package','plan','الخطة'].find(k => row[k]);
+      const pack = packKey ? row[packKey] : '';
+      const langKey = ['عدد اللغات','اللغات','languages','lang count','عدد اللغة'].find(k => row[k]);
+      const langCount = langKey ? parseInt(row[langKey]) || 1 : 1;
+      const totalPrice = calcTotalPrice(pack, langCount);
+      const paidKey = ['المبلغ المدفوع','المدفوع','paid','amount','المبلغ'].find(k => row[k]);
+      const paid = paidKey ? parseFloat(row[paidKey]) || 0 : 0;
+      const remaining = totalPrice > 0 ? Math.max(0, totalPrice - paid) : 0;
+
+      const card = document.createElement('div');
+      card.style.cssText = 'padding:12px 14px;border-radius:12px;border:1px solid var(--border-2);background:white;cursor:pointer;transition:all 0.2s;margin-bottom:8px';
+      card.onmouseenter = () => { card.style.borderColor = 'var(--primary)'; card.style.background = 'var(--primary-light)'; };
+      card.onmouseleave = () => { card.style.borderColor = 'var(--border-2)'; card.style.background = 'white'; };
+      card.innerHTML = `
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:800;color:var(--text)">${studentName}</div>
+            ${pack ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px">📦 ${pack}${langCount > 1 ? ` · ${langCount} لغات` : ''}</div>` : ''}
+            <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+              ${totalPrice > 0 ? `<span style="font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(124,58,237,0.1);color:var(--primary);font-weight:800">💰 ${totalPrice.toLocaleString('ar-DZ')} دج</span>` : ''}
+              ${paid > 0 ? `<span style="font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(16,185,129,0.1);color:#059669;font-weight:800">✅ ${paid.toLocaleString('ar-DZ')} دج مدفوع</span>` : ''}
+              ${remaining > 0 ? `<span style="font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(239,68,68,0.1);color:#DC2626;font-weight:800">⏳ ${remaining.toLocaleString('ar-DZ')} دج متبقي</span>` : (totalPrice > 0 ? `<span style="font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(16,185,129,0.1);color:#059669;font-weight:800">✅ مكتمل</span>` : '')}
+            </div>
+          </div>
+          <span style="font-size:10px;padding:2px 7px;border-radius:6px;background:rgba(124,58,237,0.08);color:var(--primary);font-weight:700;white-space:nowrap">${row._source}</span>
+        </div>`;
+
+      card.onclick = () => applyStudentData(studentName, pack, langCount, totalPrice, paid, remaining, row);
+      resultsDiv.appendChild(card);
+    });
+
+    if (matches.length > 8) {
+      const more = document.createElement('div');
+      more.style.cssText = 'text-align:center;font-size:12px;color:var(--text-muted);font-weight:700;padding:6px';
+      more.textContent = `+ ${matches.length - 8} نتيجة أخرى — دقّق اسم البحث`;
+      resultsDiv.appendChild(more);
+    }
+  } catch(e) {
+    resultsDiv.style.display = 'block';
+    resultsDiv.innerHTML = `<div style="padding:12px;color:var(--danger);font-weight:700;font-size:13px;background:var(--danger-soft);border-radius:10px">⚠️ خطأ في البحث: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔍 بحث';
+  }
+};
+
+function applyStudentData(name, pack, langCount, totalPrice, paid, remaining, rawRow) {
+  // أدخل الاسم
+  document.getElementById('sc-name').value = name;
+
+  // اختر الباقة إن وُجدت في القائمة
+  if (pack) {
+    const sel = document.getElementById('sc-pack-select');
+    let found = false;
+    for (const opt of sel.options) {
+      if (opt.value === pack) { sel.value = pack; found = true; break; }
+    }
+    if (found) {
+      onPackSelect(pack);
+    } else {
+      // باقة غير موجودة في القائمة — نكتبها يدوياً في الحقل المخفي
+      document.getElementById('sc-pack').value = pack;
+    }
+  }
+
+  // عبّئ حاسبة المبلغ المتبقي تلقائياً
+  if (totalPrice > 0) {
+    document.getElementById('sc-full-price').value = totalPrice;
+    document.getElementById('sc-paid-amount').value = paid || totalPrice;
+    document.getElementById('sc-amount').value = paid || totalPrice;
+    calcRemaining();
+  }
+
+  // أغلق نتائج البحث وأظهر رسالة
+  document.getElementById('student-search-results').style.display = 'none';
+  document.getElementById('student-search-inp').value = '';
+
+  const msg = totalPrice > 0
+    ? `✅ ${name} — الإجمالي: ${totalPrice.toLocaleString('ar-DZ')} دج — المتبقي: ${remaining > 0 ? remaining.toLocaleString('ar-DZ') + ' دج' : '0 دج'}`
+    : `✅ تم ملء بيانات ${name}`;
+  showToast(msg);
+}
+
 // ══ إدخال المبلغ يدوياً ══
 let manualAmountMode = false;
 window.toggleManualAmount = () => {
@@ -1743,6 +1932,7 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
     val(data.receipt || '—',                                        772, 'bold 26px monospace');
 
     // ── المبلغ المتبقي ──
+    // إحداثيات من Photoshop Info: X=2140, Y=600
     const remainingAmtDraw = data.remainingAmount !== undefined
       ? data.remainingAmount
       : (() => {
@@ -1750,18 +1940,22 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
           const paid = parseFloat(document.getElementById('sc-paid-amount').value) || 0;
           return full > 0 ? Math.max(0, full - paid) : 0;
         })();
+
+    // نص المبلغ المتبقي: إذا كان 0 نكتب "0 دج"، وإذا كان موجود نكتب القيمة
     const remainingTxt = remainingAmtDraw > 0
       ? Number(remainingAmtDraw).toLocaleString('ar-DZ') + ' دج'
-      : (remainingAmtDraw === 0 && (data.remainingAmount !== undefined || (parseFloat(document.getElementById('sc-full-price').value) || 0) > 0) ? '✅ مكتمل' : '—');
+      : '0 دج';
+
     ctx.save();
-    ctx.font = 'bold 26px Tajawal, Arial';
-    ctx.fillStyle = remainingAmtDraw > 0 ? '#DC2626' : (remainingAmtDraw === 0 ? '#059669' : CLR);
+    ctx.font = 'bold 28px Tajawal, Arial';
+    ctx.fillStyle = remainingAmtDraw > 0 ? '#DC2626' : CLR;
     ctx.textAlign = 'right';
     ctx.direction = 'rtl';
     ctx.beginPath();
-    ctx.rect(1852, 836, 592, 40);
+    // موقع المبلغ المتبقي: X=2140, Y=600 (من Photoshop) — نضيف هامش للنص
+    ctx.rect(1700, 568, 740, 50);
     ctx.clip();
-    ctx.fillText(remainingTxt, R, 866);
+    ctx.fillText(remainingTxt, 2440, 600);
     ctx.restore();
 
     // ── QR code ──────────────────────────────────────────
