@@ -267,7 +267,10 @@ window.selectPackage = function(pkgName) {
     sel.dispatchEvent(new Event("change", { bubbles: true }));
   }
   openModal("camp-register-modal");
-  setTimeout(() => sel?.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+  setTimeout(() => {
+    calcAndShowPrice();
+    sel?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, 300);
 };
 
 /* ═══════════════════════════════════════════
@@ -385,6 +388,120 @@ function initDynamicFields() {
   updateFormFields(packageSel.value || "");
 }
 
+/* ═══════════════════════════════════════════
+   PRICE CALCULATOR
+════════════════════════════════════════════ */
+function calcAndShowPrice() {
+  const pkgVal = norm($("campSelectedPackage")?.value);
+  const box    = $("priceSummaryBox");
+  const lines  = $("priceSummaryLines");
+  const total  = $("priceTotalAmount");
+
+  if (!box || !lines || !total || !pkgVal) {
+    if (box) { box.classList.remove("visible"); }
+    return;
+  }
+
+  // باقات بسعر ثابت لا تحتاج حساباً
+  const fixedPrices = {
+    "elite-5-10":   10000,
+    "elite-11-14":  10000,
+    "elite-15-18":  10000,
+    "bac-15-18":    15000,
+    "comm-class-5-10": 8000,
+    "esp-special":  null,
+    "ielts-special": null
+  };
+
+  const isAdultAdv  = pkgVal === "advanced-adults";
+  const isAdultBasic = pkgVal === "basic-adults";
+  const is510       = pkgVal.includes("5-10") && !pkgVal.includes("comm");
+  const is1114      = pkgVal.includes("11-14") && !pkgVal.includes("elite");
+  const is1518basic = pkgVal === "basic-15-18";
+
+  // باقات ESP و IELTS: بدون سعر محدد
+  if (pkgVal === "esp-special" || pkgVal === "ielts-special") {
+    box.classList.remove("visible");
+    return;
+  }
+
+  let items  = [];
+  let grandTotal = 0;
+
+  // ─── باقات بسعر اللغة × 8,000 ───
+  const langPerPrice = 8000;
+
+  if (is510) {
+    const langs = [...document.querySelectorAll(`input[name="lang510"]:checked`)].map(c => c.value);
+    if (!langs.length) { box.classList.remove("visible"); return; }
+    langs.forEach(l => { items.push({ label: `لغة — ${l}`, val: langPerPrice }); grandTotal += langPerPrice; });
+
+  } else if (is1114 || is1518basic) {
+    const langs = [...document.querySelectorAll(`input[name="langPlus"]:checked`)].map(c => c.value);
+    if (!langs.length) { box.classList.remove("visible"); return; }
+    langs.forEach(l => { items.push({ label: `لغة — ${l}`, val: langPerPrice }); grandTotal += langPerPrice; });
+
+  } else if (isAdultBasic) {
+    const langs = [...document.querySelectorAll(`input[name="adultLang"]:checked`)].map(c => c.value);
+    if (!langs.length) { box.classList.remove("visible"); return; }
+    langs.forEach(l => { items.push({ label: `لغة — ${l}`, val: langPerPrice }); grandTotal += langPerPrice; });
+
+  } else if (isAdultAdv) {
+    // الباقة المتقدمة: لغة واحدة مدرجة في 12,000
+    const lang = document.querySelector(`input[name="adultAdvLang"]:checked`)?.value;
+    if (!lang) { box.classList.remove("visible"); return; }
+    items.push({ label: `لغة — ${lang}`, val: 12000 });
+    grandTotal += 12000;
+
+    // مسار الإعلام الآلي
+    const tracks = [...document.querySelectorAll(`input[name="itTrack"]:checked`)].map(c => c.value);
+    if (tracks.length === 2) {
+      items.push({ label: "مسار الإعلام الآلي (Office + برمجة ويب)", val: 5000 }); grandTotal += 5000;
+    } else if (tracks.length === 1) {
+      const label = tracks[0] === "PowerPoint / Excel / Word" ? "مسار Office (تطبيقات)" : "مسار برمجة الويب";
+      items.push({ label, val: 2500 }); grandTotal += 2500;
+    }
+
+  } else if (pkgVal in fixedPrices) {
+    // باقة النخبة أو البكالوريا
+    const base = fixedPrices[pkgVal];
+    if (!base) { box.classList.remove("visible"); return; }
+    items.push({ label: "الباقة", val: base }); grandTotal += base;
+    // نخبة 5-10 لها إعلام آلي (لو اخترها تزيد 2,000)
+    if (pkgVal === "elite-5-10") {
+      const track = document.querySelector(`input[name="itTrack"]:checked`)?.value || "";
+      if (track) { items.push({ label: "مسار الإعلام الآلي", val: 2000 }); grandTotal += 2000; }
+    }
+  }
+
+  if (!items.length || grandTotal === 0) { box.classList.remove("visible"); return; }
+
+  lines.innerHTML = items.map(it =>
+    `<div class="price-line"><span>${it.label}</span><span class="price-val">${it.val.toLocaleString("ar-DZ")} دج</span></div>`
+  ).join("");
+  total.textContent = grandTotal.toLocaleString("ar-DZ");
+
+  box.classList.add("visible");
+}
+
+function initPriceCalculator() {
+  const events = [
+    { sel: '#campSelectedPackage',              event: 'change' },
+    { sel: 'input[name="lang510"]',             event: 'change' },
+    { sel: 'input[name="langPlus"]',            event: 'change' },
+    { sel: 'input[name="adultLang"]',           event: 'change' },
+    { sel: 'input[name="adultAdvLang"]',        event: 'change' },
+    { sel: 'input[name="itTrack"]',             event: 'change' },
+  ];
+  events.forEach(({ sel, event }) => {
+    document.querySelectorAll(sel).forEach(el => {
+      el.addEventListener(event, calcAndShowPrice);
+    });
+  });
+  // حساب أولي لو كان في اختيار مسبق
+  calcAndShowPrice();
+}
+
 function limitCheckboxes(name, max) {
   document.querySelectorAll(`input[name="${name}"]`).forEach(cb => {
     if (cb.dataset.limitBound === "true") return;
@@ -460,10 +577,10 @@ function validateMainForm() {
     const selLang = document.querySelector(`input[name="adultAdvLang"]:checked`)?.value || "";
     if (!selLang) { alert("يرجى اختيار لغة واحدة للباقة المتقدمة"); return null; }
     langs = selLang;
-    // مسار الإعلام الآلي إجباري
-    const selTrack = document.querySelector(`input[name="itTrack"]:checked`)?.value || "";
-    if (!selTrack) { alert("يرجى اختيار مسار الإعلام الآلي"); return null; }
-    itTrack = selTrack;
+    // مسار الإعلام الآلي: checkbox — واحد أو الاثنين
+    const selTracks = [...document.querySelectorAll(`input[name="itTrack"]:checked`)].map(c => c.value);
+    if (!selTracks.length) { alert("يرجى اختيار مسار الإعلام الآلي"); return null; }
+    itTrack = selTracks.join(" + ");
   } else if (is510) {
     const sel = [...document.querySelectorAll(`input[name="lang510"]:checked`)].map(c => c.value);
     if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
@@ -783,6 +900,7 @@ function init() {
   initModals();
   initDynamicFields();
   initInputSanitizers();
+  initPriceCalculator();
   initMainForm();
   initSpecialForm();
   initCampVideo();
