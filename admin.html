@@ -1808,22 +1808,38 @@ function applyStudentData(name, pack, langCount, totalPrice, paid, remaining, ra
   document.getElementById('sc-name').value = fullName;
 
   // ── 2. الباقة ──
+  const finalTotal = sheetTotalNum > 0 ? sheetTotalNum : totalPrice;
+
   if (pack) {
     const sel = document.getElementById('sc-pack-select');
     let found = false;
     for (const opt of sel.options) {
       if (opt.value === pack) { sel.value = pack; found = true; break; }
     }
+
     if (found) {
-      onPackSelect(pack);
-    } else {
+      // تفعيل اختيار الباقة من القائمة بدون مسح المبلغ
+      document.querySelectorAll('#program-btns .prog-btn').forEach(b => {
+        b.disabled = true; b.style.opacity = '0.35'; b.style.pointerEvents = 'none';
+      });
+      document.getElementById('category-group').style.display = 'none';
+      document.getElementById('reset-row').style.display = 'block';
       document.getElementById('sc-pack').value = pack;
+    } else {
+      // الباقة غير موجودة في القائمة — نكتبها مباشرة في الحقل المخفي ونعرضها للأدمين
+      sel.value = '';
+      document.getElementById('sc-pack').value = pack;
+      document.getElementById('reset-row').style.display = 'block';
     }
+
+    // عرض اسم الباقة في واجهة برنامج الفئة
+    document.getElementById('program-group').style.display = 'none';
+    document.getElementById('category-group').style.display = 'block';
+    const catLabel = document.querySelector('#category-group label');
+    if (catLabel) catLabel.textContent = '📦 الباقة المختارة: ' + pack;
   }
 
   // ── 3. سعر الباقة الكامل ──
-  // نستخدم المبلغ الإجمالي من الشيت إن وجد، وإلا السعر المحسوب
-  const finalTotal = sheetTotalNum > 0 ? sheetTotalNum : totalPrice;
   if (finalTotal > 0) {
     document.getElementById('sc-full-price').value = finalTotal;
     document.getElementById('sc-paid-amount').value = finalTotal; // افتراضي: دفع الكل
