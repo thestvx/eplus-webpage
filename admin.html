@@ -1611,16 +1611,38 @@ const PACK_BASE_PRICES = {
 const PRICE_PER_LANG = 2000;
 
 async function fetchSheetData(sheetId, sheetName) {
-  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+  // نستخدم CSV export بدلاً من gviz/tq لتجنّب مشكلة CORS
+  // ⚠️ تأكّد أن الشيت منشور للعموم: File > Share > Publish to web > CSV
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
-    // Google returns: /*O_o*/\ngoogle.visualization.Query.setResponse({...});
-    const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
-    const cols = json.table.cols.map(c => c.label);
-    const rows = json.table.rows.map(r =>
-      Object.fromEntries(cols.map((c, i) => [c, r.c[i]?.v ?? '']))
-    );
+
+    // تحليل CSV مع مراعاة الأعمدة التي تحتوي على فواصل
+    function parseCSVLine(line) {
+      const result = [];
+      let cur = '', inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+          else inQ = !inQ;
+        } else if (ch === ',' && !inQ) {
+          result.push(cur.trim()); cur = '';
+        } else { cur += ch; }
+      }
+      result.push(cur.trim());
+      return result;
+    }
+
+    const lines = text.trim().split('\n').filter(l => l.trim());
+    if (!lines.length) return [];
+    const cols = parseCSVLine(lines[0]).map(c => c.replace(/^"|"$/g,''));
+    const rows = lines.slice(1).map(line => {
+      const vals = parseCSVLine(line).map(v => v.replace(/^"|"$/g,''));
+      return Object.fromEntries(cols.map((c, i) => [c, vals[i] ?? '']));
+    }).filter(r => Object.values(r).some(v => v !== ''));
     return rows;
   } catch(e) {
     console.warn('خطأ في جلب الشيت:', sheetId, e);
@@ -1952,10 +1974,11 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
     ctx.textAlign = 'right';
     ctx.direction = 'rtl';
     ctx.beginPath();
-    // موقع المبلغ المتبقي: X=2140, Y=600 (من Photoshop) — نضيف هامش للنص
-    ctx.rect(1700, 568, 740, 50);
+    // إحداثيات من Photoshop: X=2147, Y=579 — W=206, H=48
+    // منطقة الكتابة: من x=1942 إلى x=2147، baseline = Y+H = 627
+    ctx.rect(1942, 579, 206, 48);
     ctx.clip();
-    ctx.fillText(remainingTxt, 2440, 600);
+    ctx.fillText(remainingTxt, 2147, 620);
     ctx.restore();
 
     // ── QR code ──────────────────────────────────────────
