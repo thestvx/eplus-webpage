@@ -1812,32 +1812,19 @@ function applyStudentData(name, pack, langCount, totalPrice, paid, remaining, ra
 
   if (pack) {
     const sel = document.getElementById('sc-pack-select');
+    // مطابقة كاملة أولاً
     let found = false;
     for (const opt of sel.options) {
       if (opt.value === pack) { sel.value = pack; found = true; break; }
     }
-
-    // تعطيل أزرار البرامج دائماً عند الاختيار من البحث
-    document.querySelectorAll('#program-btns .prog-btn').forEach(b => {
-      b.disabled = true; b.style.opacity = '0.35'; b.style.pointerEvents = 'none';
-    });
-    document.getElementById('reset-row').style.display = 'block';
-    document.getElementById('sc-pack').value = pack;
-
-    if (found) {
-      // الباقة موجودة في القائمة — نُظهر القائمة مع الباقة محددة فيها
-      document.getElementById('pack-group').style.display = 'block';
-      document.getElementById('program-group').style.display = 'none';
-      document.getElementById('category-group').style.display = 'none';
-    } else {
-      // الباقة غير موجودة في القائمة — نعرض label واضح بدلاً من القائمة
-      sel.value = '';
-      document.getElementById('pack-group').style.display = 'none';
-      document.getElementById('program-group').style.display = 'none';
-      document.getElementById('category-group').style.display = 'block';
-      const catLabel = document.querySelector('#category-group label');
-      if (catLabel) catLabel.textContent = '📦 الباقة المختارة: ' + pack;
+    // مطابقة جزئية إن لم تُوجد
+    if (!found) {
+      for (const opt of sel.options) {
+        if (opt.value && pack.includes(opt.value)) { sel.value = opt.value; found = true; break; }
+      }
     }
+    // احفظ القيمة الكاملة (مع اللغات) في الحقل المخفي
+    document.getElementById('sc-pack').value = pack;
   }
 
   // ── 3. سعر الباقة الكامل ──
