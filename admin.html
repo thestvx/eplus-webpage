@@ -594,6 +594,35 @@
     .att-summary-n{font-size:22px;font-weight:900;color:var(--primary)}
     .att-summary-l{font-size:11px;color:var(--text-muted);font-weight:600;margin-top:2px}
 
+    /* ===== SESSIONS SYSTEM ===== */
+    .sessions-header{background:white;border-radius:var(--radius);border:1px solid var(--border);padding:20px 24px;margin-bottom:16px;box-shadow:var(--shadow)}
+    .sessions-title{font-size:15px;font-weight:900;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+    .sessions-sub{font-size:12px;color:var(--text-muted)}
+    .sessions-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+    @media(max-width:640px){.sessions-grid{grid-template-columns:repeat(3,1fr)}}
+    .session-card{border-radius:14px;border:2px solid var(--border);background:white;padding:14px 10px;text-align:center;cursor:pointer;transition:all 0.3s ease;position:relative;overflow:hidden}
+    .session-card.locked{opacity:0.45;filter:blur(1.5px);pointer-events:none;background:#f8f8f8}
+    .session-card.locked::after{content:'🔒';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;background:rgba(255,255,255,0.6);pointer-events:none}
+    .session-card.current{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light);cursor:pointer;animation:sessionPulse 2s infinite}
+    @keyframes sessionPulse{0%,100%{box-shadow:0 0 0 3px var(--primary-light)}50%{box-shadow:0 0 0 6px rgba(124,58,237,0.08)}}
+    .session-card.done{border-color:var(--success);background:var(--success-soft)}
+    .session-num{font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:6px}
+    .session-day{font-size:13px;font-weight:900;color:var(--text);margin-bottom:8px}
+    .session-dots{display:flex;justify-content:center;gap:4px;flex-wrap:wrap;margin-top:6px}
+    .sdot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:all 0.4s ease;border:1.5px solid rgba(0,0,0,0.08)}
+    .sdot.recorded{background:var(--success);border-color:var(--success);box-shadow:0 0 6px rgba(16,185,129,0.5)}
+    .sdot.current-dot{background:var(--primary);border-color:var(--primary);animation:dotPulse 1.5s infinite}
+    @keyframes dotPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.3)}}
+    .session-status-chip{font-size:10px;font-weight:800;padding:3px 8px;border-radius:99px;margin-top:8px;display:inline-block}
+    .session-status-chip.done-chip{background:var(--success-soft);color:#059669}
+    .session-status-chip.current-chip{background:var(--primary-light);color:var(--primary)}
+    .session-status-chip.locked-chip{background:#f1f0f0;color:#aaa}
+    
+    /* Attendance within session */
+    .session-att-wrap{background:white;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden;margin-top:10px}
+    .session-att-header{background:linear-gradient(135deg,var(--primary-light),rgba(236,72,153,0.06));padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+    .student-dots-row{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px}
+
     /* ===== RESPONSIVE ===== */
     @media(max-width:900px){
       .sidebar{transform:translateX(260px);transition:transform 0.3s ease}
@@ -1383,8 +1412,8 @@
           </div>
         </div>
 
-        <!-- Admin Log -->
-        <div class="panel">
+        <!-- Admin Log — أدمين فقط -->
+        <div class="panel" id="admin-log-panel">
           <div class="panel-header"><div class="panel-icon">📋</div> سجل النشاطات</div>
           <div id="admin-log-list" style="max-height:300px;overflow-y:auto">
             <div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px">لا توجد نشاطات بعد</div>
@@ -1602,8 +1631,10 @@ onAuthStateChanged(auth, async user => {
           if (el) el.style.display = 'none';
         });
         document.getElementById('section-teachers').style.display = 'block';
-        // إخفاء نموذج إضافة أستاذ وشبكة الأساتذة الأخرى
+        // إخفاء نموذج إضافة أستاذ وسجل النشاطات
         document.querySelector('.teacher-form-panel').style.display = 'none';
+        const logPanel = document.getElementById('admin-log-panel');
+        if (logPanel) logPanel.style.display = 'none';
         // عرض نافذة الترحيب
         currentTeacherData = { uid: user.uid, id: user.uid, ...td };
         document.getElementById('welcome-teacher-name').textContent = `أهلاً، ${td.name}!`;
@@ -3163,6 +3194,7 @@ window.closeAttModal = () => {
 
 function renderAttStudents(students, filter) {
   const list = document.getElementById('att-students-list');
+  if (!list) return;
   const filtered = filter ? students.filter(s => s.name.includes(filter)) : students;
   if (!filtered.length) {
     list.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">
@@ -3175,9 +3207,12 @@ function renderAttStudents(students, filter) {
     const row = document.createElement('div');
     row.className = 'att-student-row';
     row.dataset.sid = s.id;
+    // 12 نقطة حضور — النقطة الحالية تضيء عند تحديد الحضور
+    const dotsHtml = Array.from({length:12},(_,d)=>`<span class="sdot" id="dot-${s.id}-${d+1}"></span>`).join('');
     row.innerHTML = `
       <span class="att-student-id">${s.id}</span>
       <span class="att-student-name">${s.name}</span>
+      <div class="student-dots-row">${dotsHtml}</div>
       <div class="att-toggle">
         <div class="att-check ${s.present ? 'present' : ''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
         <div class="att-check ${!s.present && s.marked ? 'absent' : ''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
@@ -3282,58 +3317,229 @@ async function loadTeacherStudentsView(uid, teacherData) {
   });
 }
 
-// ─── عرض قائمة الحضور مباشرة في صفحة الأستاذ ───
+// ─── عرض نظام الحضور بالـ 12 حصة للأستاذ ───
 function showTeacherInlineAttendance(teacherId, teacherData) {
   currentAttTeacherId = teacherId;
   const grid = document.getElementById('teachers-grid');
   if (!grid) return;
 
-  const todayLabel = `${AR_DAYS[new Date().getDay()]} ${new Date().toLocaleDateString('ar-DZ')}`;
+  const teacherDays = teacherData.days || [];
+  // بناء 12 حصة موزعة على الأيام (نكرر الدورة حتى 12)
+  const sessions = [];
+  for (let i = 0; i < 12; i++) {
+    sessions.push({
+      num: i + 1,
+      day: teacherDays[i % teacherDays.length] || '—',
+      dayIndex: i % teacherDays.length
+    });
+  }
+
+  // نحدد الحصة الحالية: أول حصة لم تُسجَّل بعد
+  // سنحملها من Firestore — نعرض الهيكل أولاً ونحدّث لاحقاً
   const avatarHtml = teacherData.photo
-    ? `<img class="att-modal-avatar" src="${teacherData.photo}" alt="${teacherData.name}" style="width:56px;height:56px;border-radius:16px;object-fit:cover;flex-shrink:0">`
-    : `<div class="att-modal-avatar-placeholder" style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--primary),#9333EA);display:flex;align-items:center;justify-content:center;font-size:22px;color:white;font-weight:900;flex-shrink:0">${(teacherData.name||'?')[0]}</div>`;
+    ? `<img src="${teacherData.photo}" alt="${teacherData.name}" style="width:56px;height:56px;border-radius:16px;object-fit:cover;flex-shrink:0">`
+    : `<div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--primary),#9333EA);display:flex;align-items:center;justify-content:center;font-size:22px;color:white;font-weight:900;flex-shrink:0">${(teacherData.name||'?')[0]}</div>`;
 
   grid.innerHTML = `
-    <div style="grid-column:1/-1;background:white;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden">
-      <!-- Header -->
-      <div style="background:linear-gradient(135deg,var(--primary-light),rgba(236,72,153,0.06));padding:22px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-        ${avatarHtml}
-        <div style="flex:1">
-          <div style="font-size:18px;font-weight:900;color:var(--text)">${teacherData.name}</div>
-          <div style="font-size:13px;color:var(--text-muted);margin-top:3px">📅 تسجيل الحضور — ${todayLabel}</div>
-          <div style="font-size:12px;color:var(--primary);font-weight:700;margin-top:4px">🎓 ${teacherData.spec}</div>
+    <div style="grid-column:1/-1">
+      <!-- هيدر الأستاذ -->
+      <div class="sessions-header">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
+          ${avatarHtml}
+          <div>
+            <div style="font-size:18px;font-weight:900;color:var(--text)">${teacherData.name}</div>
+            <div style="font-size:13px;color:var(--text-muted);margin-top:2px">🎓 ${teacherData.spec}</div>
+            <div style="font-size:12px;color:var(--primary);font-weight:700;margin-top:3px">📅 أيام التدريس: ${teacherDays.join('، ')}</div>
+          </div>
+        </div>
+        <div class="sessions-title">📅 سجل الحضور — 12 حصة في الشهر</div>
+        <div class="sessions-sub">اضغط على الحصة الحالية لتسجيل حضور التلاميذ — الحصص الأخرى مغلقة حتى يحين موعدها</div>
+      </div>
+
+      <!-- شبكة الـ 12 حصة -->
+      <div class="sessions-grid" id="sessions-grid">
+        ${sessions.map((s,i) => `
+          <div class="session-card locked" id="session-card-${i+1}" data-session="${i+1}" onclick="openSession(${i+1})">
+            <div class="session-num">حصة ${s.num}</div>
+            <div class="session-day">${s.day}</div>
+            <div class="session-dots" id="session-dots-${i+1}">
+              <!-- النقاط تُحشى ديناميكياً -->
+            </div>
+            <div id="session-chip-${i+1}"></div>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- منطقة تسجيل الحضور (تظهر عند فتح حصة) -->
+      <div id="active-session-area" style="display:none"></div>
+    </div>`;
+
+  // تحميل سجلات الحضور من Firestore وتحديث الحصص
+  loadSessionsData(teacherId, teacherData, sessions);
+}
+
+// ─── تحميل بيانات الحصص من Firestore ───
+async function loadSessionsData(teacherId, teacherData, sessions) {
+  onSnapshot(
+    query(collection(db, 'sessionAttendance'), where('teacherId', '==', teacherId)),
+    snap => {
+      const recordedSessions = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        if (data.sessionNum) recordedSessions[data.sessionNum] = data;
+      });
+      updateSessionCards(sessions, recordedSessions, teacherData);
+    }
+  );
+}
+
+// ─── تحديث بطاقات الحصص بناءً على البيانات ───
+function updateSessionCards(sessions, recordedSessions, teacherData) {
+  const students = currentAttStudents;
+  const totalStudents = students.length || 1; // لتجنب القسمة على صفر
+
+  // حدد الحصة الحالية: أول حصة غير مسجلة
+  let currentSession = 1;
+  for (let i = 1; i <= 12; i++) {
+    if (!recordedSessions[i]) { currentSession = i; break; }
+    if (i === 12) currentSession = 12; // كل الحصص مسجلة
+  }
+
+  for (let i = 1; i <= 12; i++) {
+    const card = document.getElementById(`session-card-${i}`);
+    const dotsEl = document.getElementById(`session-dots-${i}`);
+    const chipEl = document.getElementById(`session-chip-${i}`);
+    if (!card) continue;
+
+    const isRecorded = !!recordedSessions[i];
+    const isCurrent = i === currentSession;
+    const isLocked = !isRecorded && !isCurrent;
+
+    // إزالة الكلاسات القديمة
+    card.classList.remove('locked','current','done');
+
+    if (isRecorded) {
+      card.classList.add('done');
+      chipEl.innerHTML = `<span class="session-status-chip done-chip">✅ مسجّلة</span>`;
+      // نقاط التلاميذ الحاضرين
+      const recData = recordedSessions[i];
+      const recStudents = recData.students || [];
+      dotsEl.innerHTML = '';
+      // 12 نقطة (واحدة لكل تلميذ/حصة - هنا تمثل التلاميذ)
+      const displayCount = Math.min(recStudents.length || totalStudents, 12);
+      for (let d = 0; d < displayCount; d++) {
+        const present = recStudents[d] ? recStudents[d].present : false;
+        dotsEl.innerHTML += `<span class="sdot ${present ? 'recorded' : ''}"></span>`;
+      }
+      // إذا لم يكن فيه طلاب بعد نعرض نقاط دائرية عامة
+      if (!recStudents.length) {
+        dotsEl.innerHTML = '';
+        for (let d = 0; d < 12; d++) dotsEl.innerHTML += `<span class="sdot recorded"></span>`;
+      }
+    } else if (isCurrent) {
+      card.classList.add('current');
+      chipEl.innerHTML = `<span class="session-status-chip current-chip">▶ الحصة الحالية</span>`;
+      // نقاط فارغة مع نقطة نابضة للحصة الحالية
+      dotsEl.innerHTML = '';
+      const displayCount = Math.max(students.length, 1);
+      for (let d = 0; d < displayCount; d++) {
+        dotsEl.innerHTML += `<span class="sdot ${d === 0 ? 'current-dot' : ''}"></span>`;
+      }
+    } else {
+      card.classList.add('locked');
+      chipEl.innerHTML = `<span class="session-status-chip locked-chip">🔒 مغلقة</span>`;
+      dotsEl.innerHTML = '';
+      const displayCount = Math.max(students.length, 1);
+      for (let d = 0; d < displayCount; d++) dotsEl.innerHTML += `<span class="sdot"></span>`;
+    }
+  }
+
+  // إذا كانت الحصة الحالية مفتوحة تلقائياً لم يفتحها المستخدم بعد — ابقِ المنطقة مخفية
+}
+
+// ─── فتح حصة لتسجيل الحضور ───
+window.openSession = (sessionNum) => {
+  const card = document.getElementById(`session-card-${sessionNum}`);
+  if (!card || card.classList.contains('locked')) return;
+  if (card.classList.contains('done')) {
+    showToast('✅ هذه الحصة مسجّلة مسبقاً', false); return;
+  }
+
+  currentOpenSession = sessionNum;
+  const areaEl = document.getElementById('active-session-area');
+  if (!areaEl) return;
+
+  const students = currentAttStudents;
+  const studentsHtml = students.length
+    ? students.map(s => `
+        <div class="att-student-row" data-sid="${s.id}">
+          <span class="att-student-id">${s.id}</span>
+          <span class="att-student-name">${s.name}</span>
+          <div class="student-dots-row">
+            ${Array.from({length:12},(_,i)=>`<span class="sdot ${i===sessionNum-1?'current-dot':''}"></span>`).join('')}
+          </div>
+          <div class="att-toggle" style="margin-right:auto">
+            <div class="att-check ${s.present?'present':''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
+            <div class="att-check ${!s.present&&s.marked?'absent':''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
+          </div>
+        </div>`)
+    .join('')
+    : `<div style="text-align:center;padding:30px;color:var(--text-muted)">لا يوجد تلاميذ — أضف تلاميذ أولاً</div>`;
+
+  areaEl.style.display = 'block';
+  areaEl.innerHTML = `
+    <div class="session-att-wrap">
+      <div class="session-att-header">
+        <div style="font-size:20px">📋</div>
+        <div>
+          <div style="font-size:15px;font-weight:900;color:var(--text)">تسجيل حضور الحصة ${sessionNum} من 12</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">حدد الحضور لكل تلميذ ثم احفظ</div>
         </div>
       </div>
-      <!-- Body -->
-      <div style="padding:24px 28px">
-        <!-- ملخص -->
-        <div class="att-summary-grid" style="margin-bottom:20px">
-          <div class="att-summary-card"><div class="att-summary-n" id="att-total">0</div><div class="att-summary-l">إجمالي التلاميذ</div></div>
+      <div style="padding:20px 24px">
+        <div class="att-summary-grid" style="margin-bottom:16px">
+          <div class="att-summary-card"><div class="att-summary-n" id="att-total">0</div><div class="att-summary-l">إجمالي</div></div>
           <div class="att-summary-card" style="background:var(--success-soft);border-color:rgba(16,185,129,0.2)"><div class="att-summary-n" id="att-present" style="color:var(--success)">0</div><div class="att-summary-l">حاضر</div></div>
           <div class="att-summary-card" style="background:var(--danger-soft);border-color:rgba(239,68,68,0.15)"><div class="att-summary-n" id="att-absent" style="color:var(--danger)">0</div><div class="att-summary-l">غائب</div></div>
         </div>
-        <!-- بحث -->
-        <div class="att-search-wrap" style="margin-bottom:16px">
+        <div class="att-search-wrap" style="margin-bottom:12px">
           <span class="att-search-icon">🔍</span>
           <input class="inp" type="text" id="att-search" placeholder="ابحث عن تلميذ..." style="padding-right:40px" oninput="filterStudents()">
         </div>
-        <!-- قائمة التلاميذ -->
-        <div class="att-students-list" id="att-students-list">
-          <div style="text-align:center;padding:30px;color:var(--text-muted)">لا يوجد تلاميذ بعد</div>
-        </div>
-        <!-- إضافة تلميذ -->
+        <div class="att-students-list" id="att-students-list">${studentsHtml}</div>
         <div class="att-add-student" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:10px">
           <input class="inp" type="text" id="new-student-name" placeholder="اسم التلميذ الجديد" style="flex:1">
           <button class="btn-primary" style="width:auto;padding:12px 20px;white-space:nowrap" onclick="addStudent()">➕ إضافة</button>
         </div>
-        <!-- حفظ -->
-        <button class="btn-primary" id="save-att-btn" onclick="saveAttendance()" style="margin-top:14px">💾 حفظ الحضور</button>
+        <button class="btn-primary" id="save-att-btn" onclick="saveSessionAttendance()" style="margin-top:14px">💾 حفظ حضور الحصة ${sessionNum}</button>
       </div>
     </div>`;
 
-  renderAttStudents(currentAttStudents, '');
   updateAttSummary(currentAttStudents);
-}
+  // scroll to area
+  setTimeout(() => areaEl.scrollIntoView({ behavior:'smooth', block:'start' }), 100);
+};
+
+// حفظ حضور حصة معينة
+let currentOpenSession = null;
+window.saveSessionAttendance = async () => {
+  if (!currentAttTeacherId || !currentOpenSession) return;
+  const sessionKey = `${currentAttTeacherId}_session_${currentOpenSession}`;
+  const record = {
+    teacherId: currentAttTeacherId,
+    sessionNum: currentOpenSession,
+    savedAt: serverTimestamp(),
+    students: currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }))
+  };
+  try {
+    await setDoc(doc(db, 'sessionAttendance', sessionKey), record);
+    const present = currentAttStudents.filter(s => s.present).length;
+    await addLog('📋 تسجيل حضور', `حصة ${currentOpenSession} — ${present}/${currentAttStudents.length} حاضر`, '✅');
+    showToast(`✅ تم حفظ حضور الحصة ${currentOpenSession}`);
+    document.getElementById('active-session-area').style.display = 'none';
+    currentOpenSession = null;
+  } catch(e) { showToast('خطأ: ' + e.message, true); }
+};
 
 // ─── Welcome modal for teacher ───
 window.confirmTeacherPresence = () => {
