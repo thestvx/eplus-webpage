@@ -647,6 +647,11 @@ function validateMainForm() {
     const sel = [...document.querySelectorAll(`input[name="langPlus"]:checked`)].map(c => c.value);
     if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
     langs = sel.join(" + ");
+  } else if (isBac) {
+    // ✅ جمع لغات البكالوريا
+    const sel = [...document.querySelectorAll(`input[name="bacLang"]:checked`)].map(c => c.value);
+    if (!sel.length) { alert("يرجى اختيار لغتين للباقة البكالوريا"); return null; }
+    langs = sel.join(" + ");
   }
 
   return { pkgVal, langs, itTrack, adultLevel, adultTest, firstName, lastName, age, parent, phone, totalAmount: calcTotalAmount(pkgVal) };
