@@ -459,7 +459,7 @@ function calcAndShowPrice() {
       items.push({ label: "مسار الإعلام الآلي (Office + برمجة ويب)", val: 5000 }); grandTotal += 5000;
     } else if (tracks.length === 1) {
       const label = tracks[0] === "PowerPoint / Excel / Word" ? "مسار Office (تطبيقات)" : "مسار برمجة الويب";
-      items.push({ label, val: 2500 }); grandTotal += 2500;
+      items.push({ label: `${label} — مدرج في الباقة`, val: 0 });
     }
 
   } else if (pkgVal in fixedPrices) {
@@ -572,7 +572,7 @@ function calcTotalAmount(pkgVal) {
     total = 12000;
     const tracks = document.querySelectorAll(`input[name="itTrack"]:checked`).length;
     if (tracks === 2) total += 5000;
-    else if (tracks === 1) total += 2500;
+    // مسار واحد مدرج في الـ 12,000 — لا شيء يُضاف
 
   } else if (pkgVal === "elite-5-10") {
     total = 10000;
@@ -646,11 +646,6 @@ function validateMainForm() {
   } else if (is1114 || (is1518 && !isBac)) {
     const sel = [...document.querySelectorAll(`input[name="langPlus"]:checked`)].map(c => c.value);
     if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
-    langs = sel.join(" + ");
-  } else if (isBac) {
-    // ✅ جمع لغات البكالوريا
-    const sel = [...document.querySelectorAll(`input[name="bacLang"]:checked`)].map(c => c.value);
-    if (!sel.length) { alert("يرجى اختيار لغتين للباقة البكالوريا"); return null; }
     langs = sel.join(" + ");
   }
 
