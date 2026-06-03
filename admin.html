@@ -1532,12 +1532,12 @@
 </div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, setDoc, getDoc, query, orderBy, where, onSnapshot, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
 
-const app = initializeApp({
+const firebaseConfig = {
   apiKey: "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
   authDomain: "eplus-center-39.firebaseapp.com",
   projectId: "eplus-center-39",
@@ -1545,10 +1545,24 @@ const app = initializeApp({
   messagingSenderId: "191532732034",
   appId: "1:191532732034:web:b11449a2f0595db5d02e9b",
   databaseURL: "https://eplus-center-39-default-rtdb.firebaseio.com"
-});
+};
+
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const rtdb = getDatabase(app);
+
+// ── Secondary app لإنشاء حسابات الأساتذة دون إلغاء جلسة الأدمين ──
+let secondaryApp;
+let secondaryAuth;
+try {
+  secondaryApp = initializeApp(firebaseConfig, 'secondary');
+  secondaryAuth = getAuth(secondaryApp);
+} catch(e) {
+  // إذا كان موجوداً مسبقاً
+  secondaryApp = getApps().find(a => a.name === 'secondary');
+  secondaryAuth = getAuth(secondaryApp);
+}
 
 // Date in topbar
 const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
@@ -1556,24 +1570,30 @@ const months = ['يناير','فبراير','مارس','أبريل','مايو','
 const now = new Date();
 document.getElementById('topbar-date').textContent = `${days[now.getDay()]}، ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
 
+// ── Flag لمنع تحميل قائمة الأساتذة كاملة عند دخول أستاذ ──
+let isTeacherMode = false;
+
 onAuthStateChanged(auth, async user => {
   const ls = document.getElementById('login-screen');
   const dash = document.getElementById('dashboard');
   if (user) {
-    // Check if this user is a teacher
+    // تحقق هل هذا المستخدم أستاذ
     try {
       const teacherSnap = await getDoc(doc(db, 'teachers', user.uid));
       if (teacherSnap.exists()) {
-        // Teacher mode
+        // ── وضع الأستاذ ──
+        isTeacherMode = true;
         ls.classList.add('hidden');
         setTimeout(() => ls.style.display = 'none', 600);
         dash.style.display = 'flex';
         const td = teacherSnap.data();
         document.getElementById('admin-name').textContent = td.name || user.email;
+        document.getElementById('admin-role-text') && (document.getElementById('admin-role-text').textContent = 'أستاذ');
+        document.querySelector('.admin-role').textContent = '👨‍🏫 أستاذ';
         document.getElementById('topbar-greeting').textContent = `أهلاً، ${td.name || user.email} 👋`;
-        // Hide admin-only nav items, show only attendance
+        // إخفاء عناصر الأدمين، إظهار قسم الأساتذة فقط
         document.querySelectorAll('.nav-item').forEach(el => el.style.display = 'none');
-        const teacherNav = document.querySelectorAll('.nav-item')[3]; // teachers nav
+        const teacherNav = document.querySelectorAll('.nav-item')[3];
         if (teacherNav) { teacherNav.style.display = 'flex'; teacherNav.classList.add('active'); }
         document.querySelectorAll('.nav-section').forEach(el => el.style.display = 'none');
         document.getElementById('maintenance-card').style.display = 'none';
@@ -1582,17 +1602,19 @@ onAuthStateChanged(auth, async user => {
           if (el) el.style.display = 'none';
         });
         document.getElementById('section-teachers').style.display = 'block';
-        // Show welcome modal
-        currentTeacherData = { uid: user.uid, ...td };
+        // إخفاء نموذج إضافة أستاذ وشبكة الأساتذة الأخرى
+        document.querySelector('.teacher-form-panel').style.display = 'none';
+        // عرض نافذة الترحيب
+        currentTeacherData = { uid: user.uid, id: user.uid, ...td };
         document.getElementById('welcome-teacher-name').textContent = `أهلاً، ${td.name}!`;
         document.getElementById('welcome-modal').classList.add('open');
-        // Hide add teacher form for teacher users
-        document.querySelector('.teacher-form-panel').style.display = 'none';
+        // تحميل بيانات الأستاذ
         loadTeacherStudentsView(user.uid, td);
         return;
       }
-    } catch(e) {}
-    // Admin mode
+    } catch(e) { console.warn('Teacher check error:', e); }
+    // ── وضع الأدمين ──
+    isTeacherMode = false;
     ls.classList.add('hidden');
     setTimeout(() => ls.style.display = 'none', 600);
     dash.style.display = 'flex';
@@ -1606,6 +1628,7 @@ onAuthStateChanged(auth, async user => {
     loadTickets();
     loadTeachers();
   } else {
+    isTeacherMode = false;
     ls.style.display = 'flex';
     ls.classList.remove('hidden');
     dash.style.display = 'none';
@@ -2951,6 +2974,7 @@ function genStudentId(teacherId, idx) {
 }
 
 // ─── Add teacher (admin creates Firebase Auth account + Firestore doc) ───
+// ⚠️ نستخدم secondaryAuth لإنشاء الحساب حتى لا تتغير جلسة الأدمين الحالية
 window.addTeacher = async () => {
   const name = document.getElementById('t-name').value.trim();
   const email = document.getElementById('t-email').value.trim();
@@ -2965,9 +2989,11 @@ window.addTeacher = async () => {
   const btn = document.getElementById('add-teacher-btn');
   btn.disabled = true; btn.textContent = '⏳ جاري الإنشاء...';
   try {
-    // Create Firebase Auth account
-    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    // إنشاء حساب Firebase Auth عبر الـ app الثاني — جلسة الأدمين لا تتأثر ✅
+    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
     const uid = cred.user.uid;
+    // تسجيل خروج الـ secondary auth حالاً لتنظيفه
+    await signOut(secondaryAuth);
     const teacherId = genTeacherId();
     const payload = {
       name, email, spec, levels, days,
@@ -2976,10 +3002,9 @@ window.addTeacher = async () => {
       createdAt: serverTimestamp()
     };
     await setDoc(doc(db, 'teachers', uid), payload);
-    // Log
     await addLog('➕ أستاذ جديد', `تم إنشاء حساب للأستاذ ${name} (${teacherId})`, '👨‍🏫');
-    showToast(`✅ تم إنشاء حساب الأستاذ ${name} بنجاح!`);
-    // Reset form
+    showToast(`✅ تم إنشاء حساب الأستاذ ${name} بنجاح! — يمكنه الدخول الآن بالبريد وكلمة المرور`);
+    // إعادة ضبط النموذج
     document.getElementById('t-name').value = '';
     document.getElementById('t-email').value = '';
     document.getElementById('t-password').value = '';
@@ -2990,7 +3015,10 @@ window.addTeacher = async () => {
     document.getElementById('teacher-photo-preview').style.display = 'none';
     document.getElementById('teacher-photo-input').value = '';
   } catch(e) {
-    const msg = e.code === 'auth/email-already-in-use' ? 'البريد مستخدم بالفعل' : e.message;
+    let msg = e.message;
+    if (e.code === 'auth/email-already-in-use') msg = 'البريد الإلكتروني مستخدم بالفعل';
+    else if (e.code === 'auth/invalid-email') msg = 'البريد الإلكتروني غير صالح';
+    else if (e.code === 'auth/weak-password') msg = 'كلمة المرور ضعيفة جداً';
     showToast('❌ ' + msg, true);
   }
   btn.disabled = false; btn.textContent = '👨‍🏫 إنشاء حساب الأستاذ';
@@ -2998,6 +3026,8 @@ window.addTeacher = async () => {
 
 // ─── Load teachers list ───
 function loadTeachers() {
+  // الأساتذة لا يحملون قائمة بقية الأساتذة
+  if (isTeacherMode) return;
   onSnapshot(query(collection(db, 'teachers'), orderBy('createdAt', 'desc')), async snap => {
     allTeachers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     document.getElementById('nav-badge-teachers').textContent = allTeachers.length;
@@ -3217,37 +3247,103 @@ window.saveAttendance = async () => {
       teacherId: currentAttTeacherId,
       ...record
     });
-    const t = allTeachers.find(x => x.id === currentAttTeacherId);
+    const t = allTeachers.find(x => x.id === currentAttTeacherId) || currentTeacherData;
     const present = currentAttStudents.filter(s => s.present).length;
     await addLog('📋 تسجيل حضور', `${t?.name || 'أستاذ'} — ${present}/${currentAttStudents.length} حاضر (${todayKey})`, '✅');
     showToast('✅ تم حفظ سجل الحضور');
-    closeAttModal();
+    // في وضع الأدمين نغلق الـ modal — في وضع الأستاذ نبقى في الصفحة
+    if (!isTeacherMode) closeAttModal();
   } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
 
 // ─── Teacher self-view (when teacher logs in) ───
 async function loadTeacherStudentsView(uid, teacherData) {
-  // Load their own data from Firestore
   onSnapshot(doc(db, 'teachers', uid), snap => {
     if (!snap.exists()) return;
     const t = snap.data();
     currentTeacherData = { uid, id: uid, ...t };
     currentAttStudents = t.students ? [...t.students] : [];
-    renderTeachersGrid([{ id: uid, ...t }]);
-    document.getElementById('t-stat-total').textContent = 1;
-    document.getElementById('t-stat-students').textContent = currentAttStudents.length;
-    document.getElementById('teachers-hero').querySelector('.teachers-hero-sub').textContent =
-      `مرحباً ${t.name} — تخصص: ${t.spec} — أيام التدريس: ${(t.days||[]).join('، ')}`;
+
+    // تحديث إحصائيات الهيدر — مع تحقق آمن من وجود العنصر
+    const heroEl = document.getElementById('teachers-hero');
+    if (heroEl) {
+      const heroSub = heroEl.querySelector('.teachers-hero-sub');
+      if (heroSub) {
+        heroSub.textContent = `مرحباً ${t.name} — تخصص: ${t.spec} — أيام التدريس: ${(t.days||[]).join('، ')}`;
+      }
+    }
+    const statTotal = document.getElementById('t-stat-total');
+    if (statTotal) statTotal.textContent = 1;
+    const statStudents = document.getElementById('t-stat-students');
+    if (statStudents) statStudents.textContent = currentAttStudents.length;
+
+    // عرض قائمة حضور الأستاذ مباشرة في الصفحة (وليس في modal)
+    showTeacherInlineAttendance(uid, t);
   });
+}
+
+// ─── عرض قائمة الحضور مباشرة في صفحة الأستاذ ───
+function showTeacherInlineAttendance(teacherId, teacherData) {
+  currentAttTeacherId = teacherId;
+  const grid = document.getElementById('teachers-grid');
+  if (!grid) return;
+
+  const todayLabel = `${AR_DAYS[new Date().getDay()]} ${new Date().toLocaleDateString('ar-DZ')}`;
+  const avatarHtml = teacherData.photo
+    ? `<img class="att-modal-avatar" src="${teacherData.photo}" alt="${teacherData.name}" style="width:56px;height:56px;border-radius:16px;object-fit:cover;flex-shrink:0">`
+    : `<div class="att-modal-avatar-placeholder" style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--primary),#9333EA);display:flex;align-items:center;justify-content:center;font-size:22px;color:white;font-weight:900;flex-shrink:0">${(teacherData.name||'?')[0]}</div>`;
+
+  grid.innerHTML = `
+    <div style="grid-column:1/-1;background:white;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden">
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,var(--primary-light),rgba(236,72,153,0.06));padding:22px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        ${avatarHtml}
+        <div style="flex:1">
+          <div style="font-size:18px;font-weight:900;color:var(--text)">${teacherData.name}</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-top:3px">📅 تسجيل الحضور — ${todayLabel}</div>
+          <div style="font-size:12px;color:var(--primary);font-weight:700;margin-top:4px">🎓 ${teacherData.spec}</div>
+        </div>
+      </div>
+      <!-- Body -->
+      <div style="padding:24px 28px">
+        <!-- ملخص -->
+        <div class="att-summary-grid" style="margin-bottom:20px">
+          <div class="att-summary-card"><div class="att-summary-n" id="att-total">0</div><div class="att-summary-l">إجمالي التلاميذ</div></div>
+          <div class="att-summary-card" style="background:var(--success-soft);border-color:rgba(16,185,129,0.2)"><div class="att-summary-n" id="att-present" style="color:var(--success)">0</div><div class="att-summary-l">حاضر</div></div>
+          <div class="att-summary-card" style="background:var(--danger-soft);border-color:rgba(239,68,68,0.15)"><div class="att-summary-n" id="att-absent" style="color:var(--danger)">0</div><div class="att-summary-l">غائب</div></div>
+        </div>
+        <!-- بحث -->
+        <div class="att-search-wrap" style="margin-bottom:16px">
+          <span class="att-search-icon">🔍</span>
+          <input class="inp" type="text" id="att-search" placeholder="ابحث عن تلميذ..." style="padding-right:40px" oninput="filterStudents()">
+        </div>
+        <!-- قائمة التلاميذ -->
+        <div class="att-students-list" id="att-students-list">
+          <div style="text-align:center;padding:30px;color:var(--text-muted)">لا يوجد تلاميذ بعد</div>
+        </div>
+        <!-- إضافة تلميذ -->
+        <div class="att-add-student" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:10px">
+          <input class="inp" type="text" id="new-student-name" placeholder="اسم التلميذ الجديد" style="flex:1">
+          <button class="btn-primary" style="width:auto;padding:12px 20px;white-space:nowrap" onclick="addStudent()">➕ إضافة</button>
+        </div>
+        <!-- حفظ -->
+        <button class="btn-primary" id="save-att-btn" onclick="saveAttendance()" style="margin-top:14px">💾 حفظ الحضور</button>
+      </div>
+    </div>`;
+
+  renderAttStudents(currentAttStudents, '');
+  updateAttSummary(currentAttStudents);
 }
 
 // ─── Welcome modal for teacher ───
 window.confirmTeacherPresence = () => {
   document.getElementById('welcome-modal').classList.remove('open');
-  // Open attendance immediately
+  // القائمة تظهر مباشرة في الصفحة — لا حاجة لفتح modal
+  // scrollToAttendance بعد لحظة قصيرة
   setTimeout(() => {
-    if (currentTeacherData) openAttModal(currentTeacherData.uid || currentTeacherData.id);
-  }, 300);
+    const grid = document.getElementById('teachers-grid');
+    if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 350);
 };
 
 // ─── Admin log ───
@@ -3283,7 +3379,8 @@ function loadAdminLog() {
 const _origSwitch = window.switchNavSection;
 window.switchNavSection = (section) => {
   _origSwitch(section);
-  if (section === 'teachers') loadAdminLog();
+  // سجل النشاطات للأدمين فقط
+  if (section === 'teachers' && !isTeacherMode) loadAdminLog();
 };
 
 </script>
