@@ -623,6 +623,38 @@
     .session-att-header{background:linear-gradient(135deg,var(--primary-light),rgba(236,72,153,0.06));padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
     .student-dots-row{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px}
 
+    /* Summary card after session 12 */
+    .summary-card{border-radius:14px;border:2px dashed var(--primary);background:linear-gradient(135deg,var(--primary-light),rgba(236,72,153,0.06));padding:14px 10px;text-align:center;cursor:pointer;transition:all 0.3s ease;position:relative}
+    .summary-card:hover{border-style:solid;box-shadow:0 0 0 3px var(--primary-light);transform:translateY(-2px)}
+    .summary-card-title{font-size:12px;font-weight:900;color:var(--primary);margin-bottom:6px}
+    .summary-card-num{font-size:22px;font-weight:900;color:var(--text)}
+    .summary-card-sub{font-size:10px;color:var(--text-muted);margin-top:2px}
+
+    /* Student summary modal */
+    .summary-modal-bg{position:fixed;inset:0;background:rgba(30,27,75,0.6);backdrop-filter:blur(8px);z-index:4000;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;visibility:hidden;transition:all 0.35s ease}
+    .summary-modal-bg.open{opacity:1;visibility:visible}
+    .summary-modal{background:white;border-radius:28px;width:100%;max-width:580px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 40px 100px rgba(124,58,237,0.25);transform:translateY(30px) scale(0.96);transition:all 0.35s cubic-bezier(0.2,0.8,0.2,1);overflow:hidden}
+    .summary-modal-bg.open .summary-modal{transform:translateY(0) scale(1)}
+    .summary-modal-header{padding:22px 26px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+    .summary-modal-body{padding:24px 26px;overflow-y:auto;flex:1}
+
+    /* Student attendance row in summary */
+    .student-summary-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
+    .student-summary-row:last-child{border-bottom:none}
+    .student-summary-name{font-size:13px;font-weight:700;color:var(--text);min-width:140px}
+    .student-summary-dots{display:flex;gap:4px;flex-wrap:wrap;flex:1}
+    .student-summary-stat{font-size:11px;font-weight:800;padding:3px 10px;border-radius:99px;white-space:nowrap}
+    .stat-present{background:var(--success-soft);color:#059669}
+    .stat-absent{background:var(--danger-soft);color:#DC2626}
+
+    /* Payment status */
+    .payment-status-bar{margin-top:20px;padding:18px 20px;border-radius:16px;border:2px solid var(--border);background:#fafafa;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .payment-status-label{font-size:13px;font-weight:800;color:var(--text-2)}
+    .payment-chip{font-size:12px;font-weight:800;padding:6px 16px;border-radius:99px}
+    .payment-chip.paid{background:var(--success-soft);color:#059669;border:1.5px solid rgba(16,185,129,0.3)}
+    .payment-chip.unpaid{background:var(--danger-soft);color:#DC2626;border:1.5px solid rgba(239,68,68,0.3)}
+    .btn-payment-toggle{padding:10px 20px;border-radius:12px;border:none;font-size:13px;font-weight:800;font-family:'Tajawal',sans-serif;cursor:pointer;transition:all 0.25s}
+
     /* ===== RESPONSIVE ===== */
     @media(max-width:900px){
       .sidebar{transform:translateX(260px);transition:transform 0.3s ease}
@@ -1552,6 +1584,34 @@
     <div class="welcome-title" id="welcome-teacher-name">أهلاً بك!</div>
     <div class="welcome-sub">مرحباً في نظام تسجيل الحضور.<br>اضغط الزر أدناه للتأكيد على حضورك وبدء الحصة.</div>
     <button class="btn-present" onclick="confirmTeacherPresence()">✅ أنا حاضر — لنبدأ!</button>
+  </div>
+</div>
+
+<!-- ===== SUMMARY MODAL ===== -->
+<div class="summary-modal-bg" id="summary-modal">
+  <div class="summary-modal">
+    <div class="summary-modal-header">
+      <div class="panel-icon" style="background:var(--primary-light);border-color:var(--border-2)">📊</div>
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:900;color:var(--text)">ملخص حضور التلاميذ</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px" id="summary-modal-sub">إجمالي 12 حصة</div>
+      </div>
+      <button class="att-modal-close" onclick="closeSummaryModal()">✕</button>
+    </div>
+    <div class="summary-modal-body">
+      <div id="summary-modal-content"></div>
+      <!-- حالة الراتب -->
+      <div class="payment-status-bar" id="payment-status-bar">
+        <div>
+          <div class="payment-status-label">💰 حالة صرف الراتب</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">هل تم دفع مستحقات الأستاذ هذا الشهر؟</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="payment-chip unpaid" id="payment-chip">⏳ لم يُصرف بعد</span>
+          <button class="btn-payment-toggle" id="payment-toggle-btn" onclick="toggleTeacherPayment()" style="background:linear-gradient(135deg,var(--success),#059669);color:white">✅ تأكيد الصرف</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -3368,6 +3428,13 @@ function showTeacherInlineAttendance(teacherId, teacherData) {
             <div id="session-chip-${i+1}"></div>
           </div>
         `).join('')}
+        <!-- بطاقة الملخص بعد الحصة 12 -->
+        <div class="summary-card" onclick="openSummaryModal()">
+          <div class="summary-card-title">📊 ملخص الشهر</div>
+          <div class="summary-card-num" id="summary-sessions-done">0/12</div>
+          <div class="summary-card-sub">حصة مسجّلة</div>
+          <div style="margin-top:8px;font-size:11px;color:var(--primary);font-weight:700">اضغط للتفاصيل ←</div>
+        </div>
       </div>
 
       <!-- منطقة تسجيل الحضور (تظهر عند فتح حصة) -->
@@ -3394,16 +3461,23 @@ async function loadSessionsData(teacherId, teacherData, sessions) {
 }
 
 // ─── تحديث بطاقات الحصص بناءً على البيانات ───
+let _allRecordedSessions = {}; // نحتفظ بها لملخص الحضور
+
 function updateSessionCards(sessions, recordedSessions, teacherData) {
+  _allRecordedSessions = recordedSessions;
   const students = currentAttStudents;
-  const totalStudents = students.length || 1; // لتجنب القسمة على صفر
 
   // حدد الحصة الحالية: أول حصة غير مسجلة
   let currentSession = 1;
   for (let i = 1; i <= 12; i++) {
     if (!recordedSessions[i]) { currentSession = i; break; }
-    if (i === 12) currentSession = 12; // كل الحصص مسجلة
+    if (i === 12) currentSession = 13; // كل الحصص مسجلة — لا توجد حالية
   }
+
+  // تحديث عداد الملخص
+  const doneCount = Object.keys(recordedSessions).length;
+  const summaryEl = document.getElementById('summary-sessions-done');
+  if (summaryEl) summaryEl.textContent = `${doneCount}/12`;
 
   for (let i = 1; i <= 12; i++) {
     const card = document.getElementById(`session-card-${i}`);
@@ -3413,48 +3487,32 @@ function updateSessionCards(sessions, recordedSessions, teacherData) {
 
     const isRecorded = !!recordedSessions[i];
     const isCurrent = i === currentSession;
-    const isLocked = !isRecorded && !isCurrent;
 
-    // إزالة الكلاسات القديمة
     card.classList.remove('locked','current','done');
 
     if (isRecorded) {
       card.classList.add('done');
       chipEl.innerHTML = `<span class="session-status-chip done-chip">✅ مسجّلة</span>`;
-      // نقاط التلاميذ الحاضرين
-      const recData = recordedSessions[i];
-      const recStudents = recData.students || [];
-      dotsEl.innerHTML = '';
-      // 12 نقطة (واحدة لكل تلميذ/حصة - هنا تمثل التلاميذ)
-      const displayCount = Math.min(recStudents.length || totalStudents, 12);
-      for (let d = 0; d < displayCount; d++) {
-        const present = recStudents[d] ? recStudents[d].present : false;
-        dotsEl.innerHTML += `<span class="sdot ${present ? 'recorded' : ''}"></span>`;
-      }
-      // إذا لم يكن فيه طلاب بعد نعرض نقاط دائرية عامة
-      if (!recStudents.length) {
-        dotsEl.innerHTML = '';
-        for (let d = 0; d < 12; d++) dotsEl.innerHTML += `<span class="sdot recorded"></span>`;
-      }
+      // نقطة لكل تلميذ: معبأة خضراء = حاضر، فارغة = غائب
+      const recStudents = recordedSessions[i].students || [];
+      dotsEl.innerHTML = recStudents.length
+        ? recStudents.map(s => `<span class="sdot ${s.present ? 'recorded' : ''}" title="${s.name}: ${s.present ? 'حاضر' : 'غائب'}"></span>`).join('')
+        : `<span class="sdot recorded"></span>`;
     } else if (isCurrent) {
       card.classList.add('current');
       chipEl.innerHTML = `<span class="session-status-chip current-chip">▶ الحصة الحالية</span>`;
-      // نقاط فارغة مع نقطة نابضة للحصة الحالية
-      dotsEl.innerHTML = '';
-      const displayCount = Math.max(students.length, 1);
-      for (let d = 0; d < displayCount; d++) {
-        dotsEl.innerHTML += `<span class="sdot ${d === 0 ? 'current-dot' : ''}"></span>`;
-      }
+      // نقطة لكل تلميذ فارغة (لم تُسجَّل بعد)، أولها نابضة
+      dotsEl.innerHTML = students.length
+        ? students.map((s,idx) => `<span class="sdot ${idx===0?'current-dot':''}" title="${s.name}"></span>`).join('')
+        : `<span class="sdot current-dot"></span>`;
     } else {
       card.classList.add('locked');
       chipEl.innerHTML = `<span class="session-status-chip locked-chip">🔒 مغلقة</span>`;
-      dotsEl.innerHTML = '';
-      const displayCount = Math.max(students.length, 1);
-      for (let d = 0; d < displayCount; d++) dotsEl.innerHTML += `<span class="sdot"></span>`;
+      dotsEl.innerHTML = students.length
+        ? students.map(s => `<span class="sdot" title="${s.name}"></span>`).join('')
+        : `<span class="sdot"></span>`;
     }
   }
-
-  // إذا كانت الحصة الحالية مفتوحة تلقائياً لم يفتحها المستخدم بعد — ابقِ المنطقة مخفية
 }
 
 // ─── فتح حصة لتسجيل الحضور ───
@@ -3538,6 +3596,107 @@ window.saveSessionAttendance = async () => {
     showToast(`✅ تم حفظ حضور الحصة ${currentOpenSession}`);
     document.getElementById('active-session-area').style.display = 'none';
     currentOpenSession = null;
+  } catch(e) { showToast('خطأ: ' + e.message, true); }
+};
+
+// ─── ملخص حضور التلاميذ ───
+window.openSummaryModal = () => {
+  const students = currentAttStudents;
+  if (!students.length) { showToast('لا يوجد تلاميذ بعد', true); return; }
+
+  const recordedCount = Object.keys(_allRecordedSessions).length;
+  const subEl = document.getElementById('summary-modal-sub');
+  if (subEl) subEl.textContent = `${recordedCount} حصة مسجّلة من أصل 12`;
+
+  // بناء إحصائيات كل تلميذ عبر جميع الحصص المسجلة
+  const studentStats = {};
+  students.forEach(s => { studentStats[s.id] = { name: s.name, present: 0, absent: 0, dots: [] }; });
+
+  for (let i = 1; i <= 12; i++) {
+    const rec = _allRecordedSessions[i];
+    if (rec && rec.students) {
+      rec.students.forEach(s => {
+        if (!studentStats[s.id]) studentStats[s.id] = { name: s.name, present: 0, absent: 0, dots: [] };
+        if (s.present) { studentStats[s.id].present++; studentStats[s.id].dots.push(true); }
+        else { studentStats[s.id].absent++; studentStats[s.id].dots.push(false); }
+      });
+    } else {
+      // حصة غير مسجلة — نضيف فراغ
+      students.forEach(s => { if (studentStats[s.id]) studentStats[s.id].dots.push(null); });
+    }
+  }
+
+  const contentEl = document.getElementById('summary-modal-content');
+  contentEl.innerHTML = Object.values(studentStats).map(st => {
+    const dotsHtml = st.dots.map((d,i) =>
+      d === true  ? `<span class="sdot recorded" title="حصة ${i+1}: حاضر"></span>` :
+      d === false ? `<span class="sdot" style="border-color:rgba(239,68,68,0.4)" title="حصة ${i+1}: غائب"></span>` :
+                   `<span class="sdot" style="opacity:0.3" title="حصة ${i+1}: لم تُسجَّل"></span>`
+    ).join('');
+    return `
+      <div class="student-summary-row">
+        <div class="student-summary-name">${st.name}</div>
+        <div class="student-summary-dots">${dotsHtml}</div>
+        <span class="student-summary-stat stat-present">✅ ${st.present}</span>
+        <span class="student-summary-stat stat-absent">❌ ${st.absent}</span>
+      </div>`;
+  }).join('') || `<div style="text-align:center;padding:30px;color:var(--text-muted)">لا توجد بيانات بعد</div>`;
+
+  // تحديث حالة الراتب
+  loadTeacherPaymentStatus();
+
+  document.getElementById('summary-modal').classList.add('open');
+};
+
+window.closeSummaryModal = () => {
+  document.getElementById('summary-modal').classList.remove('open');
+};
+
+// ─── حالة راتب الأستاذ ───
+async function loadTeacherPaymentStatus() {
+  if (!currentAttTeacherId) return;
+  const monthKey = new Date().toISOString().slice(0, 7); // YYYY-MM
+  try {
+    const snap = await getDoc(doc(db, 'teacherPayments', `${currentAttTeacherId}_${monthKey}`));
+    const isPaid = snap.exists() && snap.data().paid === true;
+    updatePaymentUI(isPaid);
+  } catch(e) { updatePaymentUI(false); }
+}
+
+function updatePaymentUI(isPaid) {
+  const chip = document.getElementById('payment-chip');
+  const btn  = document.getElementById('payment-toggle-btn');
+  if (!chip || !btn) return;
+  if (isPaid) {
+    chip.className = 'payment-chip paid';
+    chip.textContent = '✅ تم الصرف';
+    btn.style.background = 'linear-gradient(135deg,var(--danger),#B91C1C)';
+    btn.textContent = '↩️ إلغاء الصرف';
+  } else {
+    chip.className = 'payment-chip unpaid';
+    chip.textContent = '⏳ لم يُصرف بعد';
+    btn.style.background = 'linear-gradient(135deg,var(--success),#059669)';
+    btn.textContent = '✅ تأكيد الصرف';
+  }
+}
+
+window.toggleTeacherPayment = async () => {
+  if (!currentAttTeacherId) return;
+  const monthKey = new Date().toISOString().slice(0, 7);
+  const docRef = doc(db, 'teacherPayments', `${currentAttTeacherId}_${monthKey}`);
+  try {
+    const snap = await getDoc(docRef);
+    const isPaid = snap.exists() && snap.data().paid === true;
+    await setDoc(docRef, {
+      teacherId: currentAttTeacherId,
+      month: monthKey,
+      paid: !isPaid,
+      updatedAt: serverTimestamp()
+    });
+    updatePaymentUI(!isPaid);
+    const t = allTeachers.find(x => x.id === currentAttTeacherId) || currentTeacherData;
+    await addLog(!isPaid ? '💰 صرف راتب' : '↩️ إلغاء صرف', `${t?.name || 'أستاذ'} — ${monthKey}`, '💸');
+    showToast(!isPaid ? '✅ تم تسجيل صرف الراتب' : '↩️ تم إلغاء الصرف');
   } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
 
