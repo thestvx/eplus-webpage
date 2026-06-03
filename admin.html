@@ -547,9 +547,9 @@
     .att-modal-body{padding:24px 28px;overflow-y:auto;flex:1}
 
     /* Welcome modal */
-    .welcome-modal-bg{position:fixed;inset:0;background:rgba(30,27,75,0.7);backdrop-filter:blur(12px);z-index:4000;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;visibility:hidden;transition:all 0.35s ease;pointer-events:none}.welcome-modal-bg.open{pointer-events:auto}
+    .welcome-modal-bg{position:fixed;inset:0;background:rgba(30,27,75,0.7);backdrop-filter:blur(12px);z-index:4000;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;visibility:hidden;transition:all 0.35s ease}
     .welcome-modal-bg.open{opacity:1;visibility:visible}
-    .welcome-modal{background:white;border-radius:32px;width:100%;max-width:400px;padding:44px 36px;text-align:center;box-shadow:0 40px 100px rgba(124,58,237,0.3);transform:translateY(40px) scale(0.93);transition:all 0.4s cubic-bezier(0.2,0.8,0.2,1);position:relative;overflow:hidden;pointer-events:auto}
+    .welcome-modal{background:white;border-radius:32px;width:100%;max-width:400px;padding:44px 36px;text-align:center;box-shadow:0 40px 100px rgba(124,58,237,0.3);transform:translateY(40px) scale(0.93);transition:all 0.4s cubic-bezier(0.2,0.8,0.2,1);position:relative;overflow:hidden}
     .welcome-modal-bg.open .welcome-modal{transform:translateY(0) scale(1)}
     .welcome-modal::before{content:'';position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--primary),var(--accent-2),var(--teal))}
     .welcome-emoji{font-size:64px;margin-bottom:16px;display:block;animation:waveHand 2s ease-in-out infinite}
@@ -558,7 +558,6 @@
     .welcome-sub{font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:28px}
     .btn-present{width:100%;padding:16px;border:none;border-radius:16px;background:linear-gradient(135deg,var(--primary),#9333EA);color:white;font-size:16px;font-weight:900;font-family:'Tajawal',sans-serif;cursor:pointer;box-shadow:0 8px 24px var(--primary-glow);transition:all 0.3s}
     .btn-present:hover{transform:translateY(-3px);box-shadow:0 14px 36px rgba(124,58,237,0.45)}
-    .btn-present{pointer-events:auto;position:relative;z-index:2}
 
     /* Students in attendance */
     .att-search-wrap{position:relative;margin-bottom:16px}
@@ -1523,7 +1522,7 @@
     <span class="welcome-emoji">👋</span>
     <div class="welcome-title" id="welcome-teacher-name">أهلاً بك!</div>
     <div class="welcome-sub">مرحباً في نظام تسجيل الحضور.<br>اضغط الزر أدناه للتأكيد على حضورك وبدء الحصة.</div>
-    <button class="btn-present" id="btn-teacher-present" type="button" onclick="window.confirmTeacherPresence && window.confirmTeacherPresence(event)">✅ أنا حاضر — لنبدأ!</button>
+    <button class="btn-present" onclick="confirmTeacherPresence()">✅ أنا حاضر — لنبدأ!</button>
   </div>
 </div>
 
@@ -1535,7 +1534,7 @@
 <script type="module">
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, setDoc, getDoc, getDocs, query, orderBy, where, onSnapshot, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, setDoc, getDoc, query, orderBy, where, onSnapshot, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -1611,8 +1610,6 @@ onAuthStateChanged(auth, async user => {
         document.getElementById('welcome-modal').classList.add('open');
         // تحميل بيانات الأستاذ
         loadTeacherStudentsView(user.uid, td);
-        const logPanel = document.querySelector('#admin-log-list')?.closest('.panel');
-        if (logPanel) logPanel.style.display = 'none';
         return;
       }
     } catch(e) { console.warn('Teacher check error:', e); }
@@ -3260,105 +3257,7 @@ window.saveAttendance = async () => {
 };
 
 // ─── Teacher self-view (when teacher logs in) ───
-// ═══════════════════════════════════════════
-// TEACHER ATTENDANCE SESSIONS PRO
-// ═══════════════════════════════════════════
-let teacherAttendanceState = { teacher: null, students: [], session: 1 };
-const DAY_LABELS = { sun:'الأحد', mon:'الإثنين', tue:'الثلاثاء', wed:'الأربعاء', thu:'الخميس', fri:'الجمعة', sat:'السبت' };
-const DAY_KEYS = ['sun','mon','tue','wed','thu','fri','sat'];
-
-function teacherDayKeyFromLabel(v){
-  const map = { 'الأحد':'sun','الإثنين':'mon','الاثنين':'mon','الثلاثاء':'tue','الأربعاء':'wed','الخميس':'thu','الجمعة':'fri','السبت':'sat', sun:'sun', mon:'mon', tue:'tue', wed:'wed', thu:'thu', fri:'fri', sat:'sat' };
-  return map[(v || '').toString().trim()] || (v || '').toString().trim();
-}
-
-function teacherAllowedToday(teacher){
-  const days = Array.isArray(teacher?.days) ? teacher.days.map(teacherDayKeyFromLabel) : [];
-  return days.includes(DAY_KEYS[new Date().getDay()]);
-}
-
-function buildAttendanceLockedUI(teacher){
-  const days = Array.isArray(teacher?.days) ? teacher.days : [];
-  let tabs = '';
-  for (let i = 1; i <= 12; i++) tabs += `<button class="session-tab-btn locked" type="button"><span class="session-dot"></span>${i}</button>`;
-  return `
-    <div class="sessions-tabs-wrap">
-      <div class="sessions-tab-bar">${tabs}</div>
-      <div class="session-page">
-        <div class="session-locked-msg">🔒 صفحات الحضور متاحة حسب الأيام المحددة من الأدمين فقط</div>
-        <div style="margin-top:12px;font-size:12px;color:var(--text-muted);line-height:1.8">أيام التدريس: ${(days.length ? days.join(' • ') : 'لم يتم تحديد الأيام')}</div>
-      </div>
-    </div>`;
-}
-
-function buildAttendanceUI(teacher, students, sessionNo){
-  const days = Array.isArray(teacher?.days) ? teacher.days : [];
-  const sessionTabs = Array.from({length:12}, (_,i)=>{
-    const n = i + 1;
-    return `<button class="session-tab-btn ${n===sessionNo?'active':''}" type="button" onclick="openTeacherAttendanceSession('${teacher.id}', ${n})"><span class="session-dot ${n===sessionNo?'active-dot':''}"></span>${n}</button>`;
-  }).join('');
-  const studentRows = students.map((s, idx)=>{
-    const sid = s.id || s.uid || s.studentId || idx;
-    const att = teacherAttendanceState.record?.attendance?.[sid] === true;
-    const dots = Array.from({length:12}, (_,j)=> `<span class="s-dot ${(teacherAttendanceState.recordedSessions || []).includes(j+1) ? 'filled' : ''}"></span>`).join('');
-    return `<div class="session-student-row"><span class="att-student-id">${idx+1}</span><span class="session-student-name">${s.name || s.fullName || s.studentName || 'بدون اسم'}</span><div class="session-dots-wrap">${dots}</div><div class="att-toggle"><div class="att-check ${att ? 'present' : ''}" onclick="toggleSessionStudent('${sid}', this)">${att ? '✓' : ''}</div></div></div>`;
-  }).join('');
-  return `
-    <div class="sessions-tabs-wrap">
-      <div class="session-tab-bar">${sessionTabs}</div>
-      <div class="session-page">
-        <div class="session-header"><div class="session-title">📅 الحصة ${sessionNo} من 12</div><div class="session-date-tag">${days.join(' • ') || 'أيام غير محددة'}</div></div>
-        <div id="teacher-session-students">${studentRows || '<div class="session-locked-msg">لا يوجد تلاميذ مضافون</div>'}</div>
-        <button class="btn-save-session" type="button" onclick="saveTeacherAttendanceSession(${sessionNo})">💾 حفظ الحضور</button>
-      </div>
-    </div>`;
-}
-
-window.openTeacherAttendanceSession = async (teacherId, sessionNo) => {
-  try {
-    const tSnap = await getDoc(doc(db, 'teachers', teacherId));
-    if (!tSnap.exists()) return;
-    const teacher = { id: teacherId, ...tSnap.data() };
-    const sSnap = await getDocs(query(collection(db, 'students'), where('teacherId', '==', teacherId)));
-    const students = sSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const canOpen = teacherAllowedToday(teacher);
-    teacherAttendanceState = { teacher, students, session: sessionNo, record: null, recordedSessions: [] };
-    const body = document.querySelector('.att-modal-body');
-    if (!canOpen) { body.innerHTML = buildAttendanceLockedUI(teacher); return; }
-    try {
-      const rSnap = await getDoc(doc(db, 'teachers', teacherId, 'attendance', `session_${sessionNo}`));
-      if (rSnap.exists()) teacherAttendanceState.record = rSnap.data();
-      const all = await Promise.all(Array.from({length:12}, async (_,i)=> {
-        const ds = await getDoc(doc(db, 'teachers', teacherId, 'attendance', `session_${i+1}`));
-        return ds.exists() ? i+1 : null;
-      }));
-      teacherAttendanceState.recordedSessions = all.filter(Boolean);
-    } catch(e) {}
-    body.innerHTML = buildAttendanceUI(teacher, students, sessionNo);
-    document.querySelectorAll('.att-modal-bg .session-tab-btn').forEach((btn, idx)=> btn.classList.toggle('recorded', teacherAttendanceState.recordedSessions.includes(idx+1)));
-    document.getElementById('att-modal-bg').classList.add('open');
-  } catch(e) { showToast('خطأ في فتح الحضور', true); }
-};
-
-window.toggleSessionStudent = (sid, el) => {
-  el.classList.toggle('present');
-  el.textContent = el.classList.contains('present') ? '✓' : '';
-};
-
-window.saveTeacherAttendanceSession = async (sessionNo) => {
-  const { teacher, students } = teacherAttendanceState;
-  if (!teacher) return;
-  const attendance = {};
-  students.forEach(s => {
-    const sid = s.id || s.uid || s.studentId;
-    const el = document.querySelector(`.session-student-row .att-check[onclick*="${sid}"]`);
-    attendance[sid] = !!(el && el.classList.contains('present'));
-  });
-  await setDoc(doc(db, 'teachers', teacher.id, 'attendance', `session_${sessionNo}`), { teacherId: teacher.id, sessionNo, attendance, savedAt: serverTimestamp() }, { merge: true });
-  showToast('✅ تم حفظ الحضور');
-};
-
-function loadTeacherStudentsView(uid, teacherData) {
+async function loadTeacherStudentsView(uid, teacherData) {
   onSnapshot(doc(db, 'teachers', uid), snap => {
     if (!snap.exists()) return;
     const t = snap.data();
