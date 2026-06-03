@@ -566,7 +566,11 @@
     .att-student-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;border:1px solid var(--border);background:#FAFAFA;transition:all 0.2s}
     .att-student-row:hover{background:white;border-color:var(--border-2);box-shadow:var(--shadow)}
     .att-student-id{font-size:10px;font-weight:800;color:var(--text-muted);background:var(--primary-light);padding:3px 7px;border-radius:6px;flex-shrink:0}
-    .att-student-name{flex:1;font-size:14px;font-weight:700;color:var(--text)}
+    .att-student-name{font-size:14px;font-weight:700;color:var(--text)}
+    .pay-badge{font-size:10px;font-weight:800;padding:2px 9px;border-radius:99px;white-space:nowrap;flex-shrink:0}
+    .pay-badge.paid{background:var(--success-soft);color:#059669;border:1px solid rgba(16,185,129,0.25)}
+    .pay-badge.unpaid{background:var(--danger-soft);color:#DC2626;border:1px solid rgba(239,68,68,0.2)}
+    .pay-badge.unknown{background:var(--bg-2);color:var(--text-muted);border:1px solid var(--border)}
     .att-toggle{display:flex;gap:6px;align-items:center}
     .att-check{width:24px;height:24px;border-radius:8px;border:2px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all 0.2s;flex-shrink:0;background:white}
     .att-check.present{background:var(--success);border-color:var(--success);box-shadow:0 2px 8px rgba(16,185,129,0.3)}
@@ -3263,21 +3267,46 @@ function renderAttStudents(students, filter) {
     return;
   }
   list.innerHTML = '';
-  filtered.forEach((s, i) => {
+  filtered.forEach(s => {
+    // حالة الدفع — إذا لم تكن محفوظة نبحث الآن
+    let payStatus = s.payStatus || 'unknown';
+    let receipt   = s.receipt   || null;
+    if (payStatus === 'unknown' && allTicketsData && allTicketsData.length) {
+      const ticket = findStudentTicket(s.name);
+      if (ticket) {
+        payStatus = ticket.status === 'paid' ? 'paid' : 'unpaid';
+        receipt   = ticket.receipt || null;
+      }
+    }
+
+    const badgeHtml =
+      payStatus === 'paid'   ? `<span class="pay-badge paid">✅ مفعّلة</span>` :
+      payStatus === 'unpaid' ? `<span class="pay-badge unpaid">⏳ غير مفعّلة</span>` :
+                               `<span class="pay-badge unknown">— لا تذكرة</span>`;
+
+    const receiptHtml = receipt
+      ? `<span style="font-size:10px;font-family:monospace;color:var(--primary);background:var(--primary-light);padding:2px 7px;border-radius:6px;flex-shrink:0">${receipt}</span>`
+      : '';
+
+    // 12 نقطة حضور
+    const dotsHtml = Array.from({length:12},(_,d) =>
+      `<span class="sdot" id="dot-${s.id}-${d+1}"></span>`
+    ).join('');
+
     const row = document.createElement('div');
     row.className = 'att-student-row';
     row.dataset.sid = s.id;
-    // 12 نقطة حضور — النقطة الحالية تضيء عند تحديد الحضور
-    const dotsHtml = Array.from({length:12},(_,d)=>`<span class="sdot" id="dot-${s.id}-${d+1}"></span>`).join('');
     row.innerHTML = `
       <span class="att-student-id">${s.id}</span>
       <span class="att-student-name">${s.name}</span>
-      <div class="student-dots-row">${dotsHtml}</div>
+      ${badgeHtml}
+      ${receiptHtml}
+      <div class="student-dots-row" style="flex:1">${dotsHtml}</div>
       <div class="att-toggle">
         <div class="att-check ${s.present ? 'present' : ''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
         <div class="att-check ${!s.present && s.marked ? 'absent' : ''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
       </div>
-      <button style="padding:4px 8px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:var(--danger-soft);color:var(--danger);font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700" onclick="removeStudent('${s.id}')">حذف</button>`;
+      <button style="padding:4px 8px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:var(--danger-soft);color:var(--danger);font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700;flex-shrink:0" onclick="removeStudent('${s.id}')">حذف</button>`;
     list.appendChild(row);
   });
 }
@@ -3307,18 +3336,50 @@ window.filterStudents = () => {
   renderAttStudents(currentAttStudents, val);
 };
 
+// ─── دالة مساعدة: البحث عن تذكرة التلميذ في سجل التذاكر ───
+function findStudentTicket(name) {
+  if (!allTicketsData || !allTicketsData.length) return null;
+  const norm = s => String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+  const target = norm(name);
+  // مطابقة كاملة أولاً
+  let match = allTicketsData.find(t => norm(t.name) === target);
+  // مطابقة جزئية إذا لم تُوجد
+  if (!match) match = allTicketsData.find(t => norm(t.name).includes(target) || target.includes(norm(t.name)));
+  return match || null;
+}
+
 window.addStudent = async () => {
   const name = document.getElementById('new-student-name').value.trim();
   if (!name) return;
+
+  // البحث عن التذكرة في السجل
+  const ticket = findStudentTicket(name);
+  const isPaid    = ticket && ticket.status === 'paid';
+  const isUnpaid  = ticket && ticket.status !== 'paid';
+  const receipt   = ticket ? (ticket.receipt || null) : null;
+
+  // رقم التعريف = رقم الوصل إن وُجد، وإلا نولّده
   const idx = currentAttStudents.length;
-  const id = genStudentId(currentAttTeacherId.slice(-4).toUpperCase(), idx);
-  const newStudent = { id, name, present: false, marked: false };
+  const id  = receipt || genStudentId(currentAttTeacherId.slice(-4).toUpperCase(), idx);
+
+  const newStudent = {
+    id,
+    name,
+    present: false,
+    marked: false,
+    payStatus: ticket ? (isPaid ? 'paid' : 'unpaid') : 'unknown',
+    receipt: receipt || null
+  };
+
   currentAttStudents.push(newStudent);
   await updateDoc(doc(db, 'teachers', currentAttTeacherId), { students: currentAttStudents });
   document.getElementById('new-student-name').value = '';
   renderAttStudents(currentAttStudents, '');
   updateAttSummary(currentAttStudents);
-  showToast(`✅ تمت إضافة التلميذ ${name}`);
+
+  if (isPaid)   showToast(`✅ تمت إضافة ${name} — التذكرة مفعّلة ✔`);
+  else if (isUnpaid) showToast(`⚠️ تمت إضافة ${name} — التذكرة غير مفعّلة`, true);
+  else          showToast(`✅ تمت إضافة ${name} — لا توجد تذكرة مسجّلة`);
 };
 
 window.removeStudent = async (sid) => {
