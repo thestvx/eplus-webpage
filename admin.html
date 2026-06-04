@@ -1341,6 +1341,11 @@
             <div class="panel-icon orange">📋</div>
             سجل التذاكر الصادرة
           </div>
+          <!-- خانة البحث -->
+          <div style="position:relative;margin-bottom:16px">
+            <span style="position:absolute;top:50%;right:14px;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
+            <input class="inp" type="text" id="tickets-search-inp" placeholder="بحث برقم الوصل أو الاسم واللقب..." style="padding-right:42px" oninput="filterTicketsTable(this.value)">
+          </div>
           <div class="tbl-wrap">
             <table class="tbl" id="tickets-table">
               <thead>
@@ -1616,8 +1621,8 @@
     </div>
     <div class="summary-modal-body">
       <div id="summary-modal-content"></div>
-      <!-- حالة الراتب -->
-      <div class="payment-status-bar" id="payment-status-bar">
+      <!-- حالة الراتب — للأدمين فقط -->
+      <div class="payment-status-bar" id="payment-status-bar" style="display:none">
         <div>
           <div class="payment-status-label">💰 حالة صرف الراتب</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:3px">هل تم دفع مستحقات الأستاذ هذا الشهر؟</div>
@@ -2631,6 +2636,53 @@ window.copyReceiptNum = () => {
 
 // store tickets globally for export
 let allTicketsData = [];
+let _ticketsSearchVal = '';
+
+// ─── بناء صفوف جدول التذاكر ───
+function renderTicketRows(data) {
+  const tbody = document.getElementById('tickets-tbody');
+  if (!tbody) return;
+  const norm = s => String(s || '').trim().toLowerCase();
+  const q = norm(_ticketsSearchVal);
+  const filtered = q
+    ? data.filter(x => norm(x.receipt).includes(q) || norm(x.name).includes(q))
+    : data;
+
+  tbody.innerHTML = '';
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">${q ? '🔍 لا توجد نتائج مطابقة' : '📭 لم يتم إصدار أي تذاكر بعد'}</td></tr>`;
+    return;
+  }
+  filtered.forEach(x => {
+    const remaining  = Number(x.remainingAmount || 0);
+    const dateStr    = x.date ? new Date(x.date).toLocaleDateString('ar-DZ') : '—';
+    const statusHtml = x.status === 'paid'
+      ? '<span class="status-paid">✅ مفعّلة</span>'
+      : '<span class="status-pending">⏳ قيد المراجعة</span>';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="receipt-code">${x.receipt || '—'}</span></td>
+      <td style="font-weight:700;color:var(--text)">${x.name || '—'}</td>
+      <td><span class="pack-chip">${x.pack || '—'}</span></td>
+      <td><span class="amount-badge">${Number(x.amount || 0).toLocaleString('ar-DZ')} دج</span></td>
+      <td>${remaining > 0
+        ? `<span style="font-size:12px;font-weight:800;padding:4px 10px;border-radius:99px;background:rgba(239,68,68,0.1);color:#DC2626">${Number(remaining).toLocaleString('ar-DZ')} دج</span>`
+        : '<span style="font-size:12px;font-weight:800;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,0.1);color:#059669">✅ مكتمل</span>'}</td>
+      <td style="color:var(--text-muted)">${dateStr}</td>
+      <td>${statusHtml}</td>
+      <td style="display:flex;gap:6px">
+        <button class="tbl-action view" onclick="previewFromDB('${x.id}')">👁️ عرض</button>
+        <button class="tbl-action del" onclick="deleteTicket('${x.id}')">🗑️</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ─── فلترة الجدول عند الكتابة ───
+window.filterTicketsTable = (val) => {
+  _ticketsSearchVal = val;
+  renderTicketRows(allTicketsData);
+};
 
 let _unsubTickets = null;
 
@@ -2656,9 +2708,8 @@ function loadTickets() {
     const tbody = document.getElementById('tickets-tbody');
     if (!tbody) return;
 
-    tbody.innerHTML = '';
     if (snap.empty) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">📭 لم يتم إصدار أي تذاكر بعد</td></tr>`;
+      renderTicketRows([]);
       updateSummerStats(0,0,0);
       updateFinancialStats(0,0,0,0,0,0);
       return;
@@ -2670,35 +2721,14 @@ function loadTickets() {
       const amountPaid    = Number(x.amount || 0);
       const remaining     = Number(x.remainingAmount || 0);
       const fullPrice     = Number(x.fullPrice || 0);
-      // إذا كان fullPrice مسجّل نستخدمه، وإلا نحسب من مجموع المدفوع + المتبقي
       const expectedTotal = fullPrice > 0 ? fullPrice : (amountPaid + remaining);
 
       totalExpected   += expectedTotal;
       totalCollected  += amountPaid;
       totalRemaining  += remaining;
       if (remaining > 0) studentsWithRemaining++;
-
-      const dateStr = x.date ? new Date(x.date).toLocaleDateString('ar-DZ') : '—';
-      const statusHtml = x.status === 'paid'
-        ? '<span class="status-paid">✅ مفعّلة</span>'
-        : '<span class="status-pending">⏳ قيد المراجعة</span>';
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><span class="receipt-code">${x.receipt || '—'}</span></td>
-        <td style="font-weight:700;color:var(--text)">${x.name || '—'}</td>
-        <td><span class="pack-chip">${x.pack || '—'}</span></td>
-        <td><span class="amount-badge">${Number(x.amount || 0).toLocaleString('ar-DZ')} دج</span></td>
-        <td>${remaining > 0
-          ? `<span style="font-size:12px;font-weight:800;padding:4px 10px;border-radius:99px;background:rgba(239,68,68,0.1);color:#DC2626">${Number(remaining).toLocaleString('ar-DZ')} دج</span>`
-          : '<span style="font-size:12px;font-weight:800;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,0.1);color:#059669">✅ مكتمل</span>'}</td>
-        <td style="color:var(--text-muted)">${dateStr}</td>
-        <td>${statusHtml}</td>
-        <td style="display:flex;gap:6px">
-          <button class="tbl-action view" onclick="previewFromDB('${d.id}')">👁️ عرض</button>
-          <button class="tbl-action del" onclick="deleteTicket('${d.id}')">🗑️</button>
-        </td>`;
-      tbody.appendChild(tr);
     });
+    renderTicketRows(allTicketsData);
     updateSummerStats(snap.size, paid, pending);
     updateFinancialStats(snap.size, paid, studentsWithRemaining, totalExpected, totalCollected, totalRemaining);
     document.getElementById('nav-badge-summer').textContent = snap.size;
@@ -3305,6 +3335,7 @@ window.openAttModal = async (teacherId) => {
   document.getElementById('att-modal-date-label').textContent = todayLabel;
   document.getElementById('att-search').value = '';
   document.getElementById('new-student-name').value = '';
+  _attCurrentPage = 0;
   renderAttStudents(currentAttStudents, '');
   updateAttSummary(currentAttStudents);
   document.getElementById('att-modal').classList.add('open');
@@ -3314,18 +3345,38 @@ window.closeAttModal = () => {
   currentAttTeacherId = null;
 };
 
-function renderAttStudents(students, filter) {
+// ─── Pagination للقائمة ───
+const ATT_PAGE_SIZE = 10;
+let _attCurrentPage = 0; // الصفحة الحالية (0-indexed)
+
+function renderAttStudents(students, filter, page) {
   const list = document.getElementById('att-students-list');
   if (!list) return;
   const filtered = filter ? students.filter(s => s.name.includes(filter)) : students;
+
   if (!filtered.length) {
     list.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">
       ${filter ? 'لم يتم العثور على نتائج' : 'لا يوجد تلاميذ بعد — أضف تلميذاً أدناه'}
     </div>`;
+    // أزل pagination إن وجدت
+    const old = document.getElementById('att-pagination');
+    if (old) old.remove();
     return;
   }
+
+  // حساب الصفحات
+  const totalPages = Math.ceil(filtered.length / ATT_PAGE_SIZE);
+  if (page === undefined) page = _attCurrentPage;
+  // تأكد الصفحة في النطاق
+  if (page >= totalPages) page = totalPages - 1;
+  if (page < 0) page = 0;
+  _attCurrentPage = page;
+
+  const start = page * ATT_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + ATT_PAGE_SIZE);
+
   list.innerHTML = '';
-  filtered.forEach(s => {
+  pageItems.forEach(s => {
     const { ps: payStatus, rc: receipt } = getLivePayStatus(s);
 
     const badgeHtml =
@@ -3357,6 +3408,47 @@ function renderAttStudents(students, filter) {
       <button style="padding:4px 8px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:var(--danger-soft);color:var(--danger);font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700;flex-shrink:0" onclick="removeStudent('${s.id}')">حذف</button>`;
     list.appendChild(row);
   });
+
+  // أزل pagination القديمة وأضف الجديدة إن احتجنا
+  const oldPag = document.getElementById('att-pagination');
+  if (oldPag) oldPag.remove();
+
+  if (totalPages > 1) {
+    const pag = document.createElement('div');
+    pag.id = 'att-pagination';
+    pag.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)';
+
+    const btnStyle = (active) =>
+      `padding:7px 13px;border-radius:10px;border:1.5px solid ${active ? 'var(--primary)' : 'var(--border)'};background:${active ? 'var(--primary)' : 'white'};color:${active ? 'white' : 'var(--text-2)'};font-size:13px;font-weight:800;cursor:${active ? 'default' : 'pointer'};font-family:'Tajawal',sans-serif;transition:all 0.2s`;
+
+    // زر السابق
+    const prevBtn = document.createElement('button');
+    prevBtn.textContent = '→';
+    prevBtn.style.cssText = `padding:7px 13px;border-radius:10px;border:1.5px solid var(--border);background:white;color:var(--text-2);font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;opacity:${page === 0 ? 0.35 : 1}`;
+    prevBtn.disabled = page === 0;
+    prevBtn.onclick = () => renderAttStudents(students, filter, _attCurrentPage - 1);
+    pag.appendChild(prevBtn);
+
+    // أرقام الصفحات
+    for (let p = 0; p < totalPages; p++) {
+      const btn = document.createElement('button');
+      btn.textContent = p + 1;
+      btn.style.cssText = btnStyle(p === page);
+      if (p !== page) btn.onclick = ((_p) => () => renderAttStudents(students, filter, _p))(p);
+      pag.appendChild(btn);
+    }
+
+    // زر التالي
+    const nextBtn = document.createElement('button');
+    nextBtn.textContent = '←';
+    nextBtn.style.cssText = `padding:7px 13px;border-radius:10px;border:1.5px solid var(--border);background:white;color:var(--text-2);font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;opacity:${page === totalPages - 1 ? 0.35 : 1}`;
+    nextBtn.disabled = page === totalPages - 1;
+    nextBtn.onclick = () => renderAttStudents(students, filter, _attCurrentPage + 1);
+    pag.appendChild(nextBtn);
+
+    // إدراج pagination بعد القائمة مباشرة
+    list.after(pag);
+  }
 }
 
 window.toggleStudentAtt = (sid, isPresent, el) => {
@@ -3381,6 +3473,7 @@ function updateAttSummary(students) {
 
 window.filterStudents = () => {
   const val = document.getElementById('att-search').value;
+  _attCurrentPage = 0; // ارجع للصفحة الأولى عند كل بحث
   renderAttStudents(currentAttStudents, val);
 };
 
@@ -3390,29 +3483,8 @@ function refreshAttendanceListIfOpen() {
   if (!list || !currentAttStudents.length) return;
   const saveBtn = document.getElementById('save-att-btn');
   if (!saveBtn) return; // وضع القراءة فقط — لا نُحدّث
-
-  list.innerHTML = currentAttStudents.map(s => {
-    const { ps, rc } = getLivePayStatus(s);
-    const badgeHtml =
-      ps === 'paid'   ? `<span class="pay-badge paid">✅ مفعّلة</span>` :
-      ps === 'unpaid' ? `<span class="pay-badge unpaid">⏳ غير مفعّلة</span>` :
-                       `<span class="pay-badge unknown">— لا تذكرة</span>`;
-    const receiptHtml = rc ? `<span style="font-size:10px;font-family:monospace;color:var(--primary);background:var(--primary-light);padding:2px 7px;border-radius:6px;flex-shrink:0">${rc}</span>` : '';
-    const sessionDots = currentOpenSession
-      ? Array.from({length:12},(_,i)=>`<span class="sdot ${i===currentOpenSession-1?'current-dot':''}"></span>`).join('')
-      : Array.from({length:12},()=>`<span class="sdot"></span>`).join('');
-    return `<div class="att-student-row" data-sid="${s.id}">
-      <span class="att-student-id">${s.id}</span>
-      <span class="att-student-name">${s.name}</span>
-      ${badgeHtml}${receiptHtml}
-      <div class="student-dots-row">${sessionDots}</div>
-      <div class="att-toggle" style="margin-right:auto">
-        <div class="att-check ${s.present?'present':''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
-        <div class="att-check ${!s.present&&s.marked?'absent':''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
-      </div>
-      <button style="padding:4px 8px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:var(--danger-soft);color:var(--danger);font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700;flex-shrink:0" onclick="removeStudent('${s.id}')">حذف</button>
-    </div>`;
-  }).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">لا يوجد تلاميذ بعد</div>`;
+  const searchVal = (document.getElementById('att-search') || {}).value || '';
+  renderAttStudents(currentAttStudents, searchVal);
 }
 
 // ─── متغير لحفظ بيانات التلميذ المختار من البحث ───
@@ -4087,8 +4159,10 @@ window.openSummaryModal = () => {
       </div>`;
   }).join('') || `<div style="text-align:center;padding:30px;color:var(--text-muted)">لا توجد بيانات بعد</div>`;
 
-  // تحديث حالة الراتب
-  loadTeacherPaymentStatus();
+  // تحديث حالة الراتب — للأدمين فقط
+  const payBar = document.getElementById('payment-status-bar');
+  if (payBar) payBar.style.display = isTeacherMode ? 'none' : 'flex';
+  if (!isTeacherMode) loadTeacherPaymentStatus();
 
   document.getElementById('summary-modal').classList.add('open');
 };
