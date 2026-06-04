@@ -576,6 +576,7 @@
     .att-check.present{background:var(--success);border-color:var(--success);box-shadow:0 2px 8px rgba(16,185,129,0.3)}
     .att-check.absent{background:var(--danger-soft);border-color:rgba(239,68,68,0.4)}
     .att-add-student{display:flex;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+    .student-suggest-item:hover{background:var(--primary-light)!important}
 
     /* Admin teacher form modal */
     .teacher-modal-bg{position:fixed;inset:0;background:rgba(30,27,75,0.6);backdrop-filter:blur(8px);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;visibility:hidden;transition:all 0.35s ease}
@@ -1567,10 +1568,19 @@
         <div style="text-align:center;padding:30px;color:var(--text-muted)">لا يوجد تلاميذ بعد</div>
       </div>
 
-      <!-- Add student -->
-      <div class="att-add-student">
-        <input class="inp" type="text" id="new-student-name" placeholder="اسم التلميذ الجديد" style="flex:1">
-        <button class="btn-primary" style="width:auto;padding:12px 20px;white-space:nowrap" onclick="addStudent()">➕ إضافة</button>
+      <!-- Add student — smart search -->
+      <div class="att-add-student" style="flex-direction:column;gap:8px">
+        <div style="display:flex;gap:10px;width:100%">
+          <div style="position:relative;flex:1">
+            <input class="inp" type="text" id="new-student-name" placeholder="ابحث باسم التلميذ أو رقم الوصل..." style="width:100%;padding-left:40px" oninput="searchStudentSuggestions(this.value)">
+            <span style="position:absolute;top:50%;left:14px;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
+          </div>
+          <button class="btn-primary" style="width:auto;padding:12px 20px;white-space:nowrap" onclick="addStudent()">➕ إضافة</button>
+        </div>
+        <!-- نتائج البحث -->
+        <div id="student-suggestions" style="display:none;background:white;border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;max-height:220px;overflow-y:auto;width:100%"></div>
+        <!-- معلومات التلميذ المختار -->
+        <div id="selected-student-info" style="display:none;background:linear-gradient(135deg,var(--primary-light),rgba(16,185,129,0.06));border:1px solid var(--border-2);border-radius:12px;padding:10px 14px;font-size:12px;font-weight:700;color:var(--text-2)"></div>
       </div>
 
       <!-- Save -->
@@ -3356,6 +3366,113 @@ window.filterStudents = () => {
   renderAttStudents(currentAttStudents, val);
 };
 
+// ─── متغير لحفظ بيانات التلميذ المختار من البحث ───
+let _selectedStudentData = null;
+
+// ─── بحث ذكي في التذاكر: بالاسم أو رقم الوصل ───
+window.searchStudentSuggestions = (val) => {
+  const suggestionsEl = document.getElementById('student-suggestions');
+  const infoEl = document.getElementById('selected-student-info');
+  if (!suggestionsEl) return;
+
+  // إذا مسح المستخدم الحقل، نصفّر الاختيار
+  if (!val || val.trim().length < 2) {
+    suggestionsEl.style.display = 'none';
+    if (infoEl) infoEl.style.display = 'none';
+    _selectedStudentData = null;
+    return;
+  }
+
+  const norm = s => String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+  const q = norm(val);
+
+  // البحث في التذاكر
+  const matches = (allTicketsData || []).filter(t => {
+    return norm(t.name).includes(q) || (t.receipt && norm(t.receipt).includes(q));
+  }).slice(0, 8);
+
+  if (!matches.length) {
+    // لا نتائج — نعرض خيار إضافة يدوية
+    suggestionsEl.style.display = 'block';
+    suggestionsEl.innerHTML = `
+      <div style="padding:14px 16px">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;font-weight:600">لم يُوجد في التذاكر — يمكنك الإضافة يدوياً:</div>
+        <div class="student-suggest-item" style="border:1.5px dashed var(--border-2);border-radius:10px;cursor:pointer;padding:10px 14px" onclick="selectManualStudent('${val.replace(/'/g,"\\'")}')">
+          <div style="font-size:14px;font-weight:800;color:var(--text)">➕ ${val}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">إضافة بدون تذكرة — لا يوجد رقم وصل</div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  suggestionsEl.style.display = 'block';
+  suggestionsEl.innerHTML = matches.map(t => {
+    const isPaid = t.status === 'paid';
+    const badgeColor = isPaid ? 'var(--success)' : 'var(--danger)';
+    const badgeBg = isPaid ? 'var(--success-soft)' : 'var(--danger-soft)';
+    const badgeText = isPaid ? '✅ مفعّلة' : '⏳ غير مفعّلة';
+    // التحقق إذا كان التلميذ مضاف مسبقاً
+    const alreadyAdded = currentAttStudents.some(s => s.receipt === t.receipt || (s.name === t.name && !s.receipt && !t.receipt));
+    return `
+      <div class="student-suggest-item" onclick="selectTicketStudent('${(t.receipt||'').replace(/'/g,"\\'")}','${t.name.replace(/'/g,"\\'")}')" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);transition:background 0.15s;${alreadyAdded?'opacity:0.5;pointer-events:none;':''}">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:800;color:var(--text)">${t.name}${alreadyAdded?' <span style="font-size:10px;color:var(--text-muted)">(مضاف)</span>':''}</div>
+            ${t.receipt ? `<div style="font-size:11px;font-family:monospace;color:var(--primary);margin-top:2px">🎟️ ${t.receipt}</div>` : ''}
+            ${t.pack ? `<div style="font-size:11px;color:var(--text-muted);margin-top:1px">📦 ${t.pack}</div>` : ''}
+          </div>
+          <span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:99px;background:${badgeBg};color:${badgeColor};border:1px solid ${badgeColor}30;white-space:nowrap">${badgeText}</span>
+        </div>
+      </div>`;
+  }).join('') + (matches.length >= 8 ? `<div style="padding:10px 16px;font-size:11px;color:var(--text-muted);font-weight:700;text-align:center">+ دقّق البحث لرؤية نتائج أكثر</div>` : '');
+};
+
+// ─── اختيار تلميذ من التذاكر ───
+window.selectTicketStudent = (receipt, name) => {
+  const ticket = (allTicketsData || []).find(t => t.receipt === receipt) || (allTicketsData || []).find(t => t.name === name);
+  if (!ticket) return;
+  _selectedStudentData = {
+    name: ticket.name,
+    receipt: ticket.receipt || null,
+    payStatus: ticket.status === 'paid' ? 'paid' : 'unpaid',
+    fromTicket: true
+  };
+  const inp = document.getElementById('new-student-name');
+  if (inp) inp.value = ticket.name;
+  const sug = document.getElementById('student-suggestions');
+  if (sug) sug.style.display = 'none';
+  const info = document.getElementById('selected-student-info');
+  if (info) {
+    const isPaid = ticket.status === 'paid';
+    info.style.display = 'block';
+    info.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:16px">✅</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:800;color:var(--text)">${ticket.name}</div>
+          ${ticket.receipt ? `<div style="font-size:11px;font-family:monospace;color:var(--primary);margin-top:1px">🎟️ ${ticket.receipt}</div>` : ''}
+        </div>
+        <span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:99px;background:${isPaid?'var(--success-soft)':'var(--danger-soft)'};color:${isPaid?'#059669':'#DC2626'}">
+          ${isPaid?'✅ مفعّلة':'⏳ غير مفعّلة'}
+        </span>
+      </div>`;
+  }
+};
+
+// ─── إضافة يدوية بدون تذكرة ───
+window.selectManualStudent = (name) => {
+  _selectedStudentData = { name, receipt: null, payStatus: 'unknown', fromTicket: false };
+  const inp = document.getElementById('new-student-name');
+  if (inp) inp.value = name;
+  const sug = document.getElementById('student-suggestions');
+  if (sug) sug.style.display = 'none';
+  const info = document.getElementById('selected-student-info');
+  if (info) {
+    info.style.display = 'block';
+    info.innerHTML = `<span style="font-size:13px;color:var(--text-2)">📝 ${name} — سيُضاف بدون رقم وصل</span>`;
+  }
+};
+
 // ─── دالة مساعدة: البحث عن تذكرة التلميذ في سجل التذاكر ───
 function findStudentTicket(name) {
   if (!allTicketsData || !allTicketsData.length) return null;
@@ -3369,37 +3486,58 @@ function findStudentTicket(name) {
 }
 
 window.addStudent = async () => {
-  const name = document.getElementById('new-student-name').value.trim();
-  if (!name) return;
+  const nameInp = document.getElementById('new-student-name');
+  const rawName = nameInp ? nameInp.value.trim() : '';
+  if (!rawName) return;
 
-  // البحث عن التذكرة في السجل
-  const ticket = findStudentTicket(name);
-  const isPaid    = ticket && ticket.status === 'paid';
-  const isUnpaid  = ticket && ticket.status !== 'paid';
-  const receipt   = ticket ? (ticket.receipt || null) : null;
+  let name, receipt, isPaid, isUnpaid, payStatus;
 
-  // رقم التعريف = رقم الوصل إن وُجد، وإلا نولّده
+  if (_selectedStudentData) {
+    // استخدام بيانات التلميذ المختار من البحث
+    name      = _selectedStudentData.name;
+    receipt   = _selectedStudentData.receipt;
+    payStatus = _selectedStudentData.payStatus;
+    isPaid    = payStatus === 'paid';
+    isUnpaid  = payStatus === 'unpaid';
+  } else {
+    // البحث التلقائي (fallback إذا أضاف مباشرة بدون اختيار)
+    name = rawName;
+    const ticket = findStudentTicket(name);
+    isPaid   = !!(ticket && ticket.status === 'paid');
+    isUnpaid = !!(ticket && ticket.status !== 'paid');
+    receipt  = ticket ? (ticket.receipt || null) : null;
+    payStatus = ticket ? (isPaid ? 'paid' : 'unpaid') : 'unknown';
+  }
+
+  // منع التكرار — بالوصل إذا موجود، وإلا بالاسم
+  const duplicate = currentAttStudents.some(s =>
+    (receipt && s.receipt === receipt) ||
+    (!receipt && !s.receipt && s.name === name)
+  );
+  if (duplicate) {
+    showToast(`⚠️ ${name} مضاف مسبقاً في القائمة`, true);
+    return;
+  }
+
   const idx = currentAttStudents.length;
   const id  = receipt || genStudentId(currentAttTeacherId.slice(-4).toUpperCase(), idx);
 
-  const newStudent = {
-    id,
-    name,
-    present: false,
-    marked: false,
-    payStatus: ticket ? (isPaid ? 'paid' : 'unpaid') : 'unknown',
-    receipt: receipt || null
-  };
+  const newStudent = { id, name, present: false, marked: false, payStatus, receipt: receipt || null };
 
   currentAttStudents.push(newStudent);
   await updateDoc(doc(db, 'teachers', currentAttTeacherId), { students: currentAttStudents });
-  document.getElementById('new-student-name').value = '';
 
-  // في وضع الأدمين (modal) — إعادة رسم قائمة الـ modal
-  // في وضع الأستاذ (inline) — إعادة رسم القائمة الموجودة بدون إعادة بناء المنطقة كاملة
+  // تنظيف الحقل والاختيار
+  if (nameInp) nameInp.value = '';
+  _selectedStudentData = null;
+  const sug = document.getElementById('student-suggestions');
+  if (sug) sug.style.display = 'none';
+  const info = document.getElementById('selected-student-info');
+  if (info) info.style.display = 'none';
+
+  // إعادة رسم القائمة
   const inlineList = document.getElementById('att-students-list');
   if (inlineList) {
-    // إعادة بناء عناصر القائمة فقط (بدون إعادة رسم هيكل active-session-area)
     const studentsHtml = currentAttStudents.map(s => {
       let ps = s.payStatus || 'unknown';
       let rc = s.receipt || null;
@@ -3433,9 +3571,9 @@ window.addStudent = async () => {
   }
   updateAttSummary(currentAttStudents);
 
-  if (isPaid)   showToast(`✅ تمت إضافة ${name} — التذكرة مفعّلة ✔`);
+  if (isPaid)    showToast(`✅ تمت إضافة ${name} — التذكرة مفعّلة ✔`);
   else if (isUnpaid) showToast(`⚠️ تمت إضافة ${name} — التذكرة غير مفعّلة`, true);
-  else          showToast(`✅ تمت إضافة ${name} — لا توجد تذكرة مسجّلة`);
+  else           showToast(`✅ تمت إضافة ${name} — لا توجد تذكرة مسجّلة`);
 };
 
 window.removeStudent = async (sid) => {
@@ -3696,9 +3834,16 @@ window.openSession = (sessionNum) => {
           <input class="inp" type="text" id="att-search" placeholder="ابحث عن تلميذ..." style="padding-right:40px" oninput="filterStudents()">
         </div>
         <div class="att-students-list" id="att-students-list">${studentsHtml}</div>
-        <div class="att-add-student" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:10px">
-          <input class="inp" type="text" id="new-student-name" placeholder="اسم التلميذ الجديد" style="flex:1">
-          <button class="btn-primary" style="width:auto;padding:12px 20px;white-space:nowrap" onclick="addStudent()">➕ إضافة</button>
+        <div class="att-add-student" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);flex-direction:column;gap:8px">
+          <div style="display:flex;gap:10px;width:100%">
+            <div style="position:relative;flex:1">
+              <input class="inp" type="text" id="new-student-name" placeholder="ابحث باسم التلميذ أو رقم الوصل..." style="width:100%;padding-left:40px" oninput="searchStudentSuggestions(this.value)">
+              <span style="position:absolute;top:50%;left:14px;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
+            </div>
+            <button class="btn-primary" style="width:auto;padding:12px 20px;white-space:nowrap" onclick="addStudent()">➕ إضافة</button>
+          </div>
+          <div id="student-suggestions" style="display:none;background:white;border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;max-height:220px;overflow-y:auto;width:100%"></div>
+          <div id="selected-student-info" style="display:none;background:linear-gradient(135deg,var(--primary-light),rgba(16,185,129,0.06));border:1px solid var(--border-2);border-radius:12px;padding:10px 14px;font-size:12px;font-weight:700;color:var(--text-2)"></div>
         </div>
         <button class="btn-primary" id="save-att-btn" onclick="saveSessionAttendance()" style="margin-top:14px">💾 حفظ حضور الحصة ${sessionNum}</button>
       </div>
