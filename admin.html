@@ -3535,9 +3535,10 @@ window.addStudent = async () => {
   const info = document.getElementById('selected-student-info');
   if (info) info.style.display = 'none';
 
-  // إعادة رسم القائمة
+  // إعادة رسم القائمة مع تثبيت موضع الـ scroll
   const inlineList = document.getElementById('att-students-list');
   if (inlineList) {
+    const scrollY = window.scrollY; // حفظ موضع الصفحة
     const studentsHtml = currentAttStudents.map(s => {
       let ps = s.payStatus || 'unknown';
       let rc = s.receipt || null;
@@ -3566,6 +3567,7 @@ window.addStudent = async () => {
       </div>`;
     }).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">لا يوجد تلاميذ بعد</div>`;
     inlineList.innerHTML = studentsHtml;
+    window.scrollTo({ top: scrollY }); // إعادة موضع الصفحة
   } else {
     renderAttStudents(currentAttStudents, '');
   }
@@ -3747,7 +3749,11 @@ function updateSessionCards(sessions, recordedSessions, teacherData) {
 
     if (isRecorded) {
       card.classList.add('done');
-      chipEl.innerHTML = `<span class="session-status-chip done-chip">✅ مسجّلة</span>`;
+      // تاريخ الحصة المسجّلة
+      const recDate = recordedSessions[i].savedAt?.toDate
+        ? recordedSessions[i].savedAt.toDate().toLocaleDateString('ar-DZ', {day:'numeric', month:'short'})
+        : (recordedSessions[i].date || '');
+      chipEl.innerHTML = `<span class="session-status-chip done-chip">✅ مسجّلة</span>${recDate ? `<div style="font-size:9px;color:#059669;font-weight:700;margin-top:3px">${recDate}</div>` : ''}`;
       // نقطة لكل تلميذ: معبأة خضراء = حاضر، فارغة = غائب
       const recStudents = recordedSessions[i].students || [];
       dotsEl.innerHTML = recStudents.length
@@ -3755,7 +3761,8 @@ function updateSessionCards(sessions, recordedSessions, teacherData) {
         : `<span class="sdot recorded"></span>`;
     } else if (isCurrent) {
       card.classList.add('current');
-      chipEl.innerHTML = `<span class="session-status-chip current-chip">▶ الحصة الحالية</span>`;
+      const todayStr = new Date().toLocaleDateString('ar-DZ', {day:'numeric', month:'short'});
+      chipEl.innerHTML = `<span class="session-status-chip current-chip">▶ الحصة الحالية</span><div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">${todayStr}</div>`;
       // نقطة لكل تلميذ فارغة (لم تُسجَّل بعد)، أولها نابضة
       dotsEl.innerHTML = students.length
         ? students.map((s,idx) => `<span class="sdot ${idx===0?'current-dot':''}" title="${s.name}"></span>`).join('')
