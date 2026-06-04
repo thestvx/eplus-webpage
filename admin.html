@@ -679,6 +679,26 @@
       .summer-stats-row{flex-wrap:wrap}
       .settings-grid{grid-template-columns:1fr}
     }
+
+    /* ===== GROUPS (أفواج) ===== */
+    .group-row{background:var(--bg);border:1.5px solid var(--border-2);border-radius:14px;padding:14px 16px;position:relative;transition:all 0.2s}
+    .group-row:hover{border-color:var(--primary);box-shadow:0 2px 10px var(--primary-light)}
+    .group-row-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+    .group-name-inp{flex:1;padding:8px 12px;border-radius:10px;border:1.5px solid var(--border);background:white;color:var(--text);font-size:14px;font-weight:700;font-family:'Tajawal',sans-serif;outline:none;transition:border-color 0.2s}
+    .group-name-inp:focus{border-color:var(--primary)}
+    .group-del-btn{width:30px;height:30px;border-radius:9px;border:1px solid rgba(239,68,68,0.3);background:var(--danger-soft);color:var(--danger);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s}
+    .group-del-btn:hover{background:rgba(239,68,68,0.2)}
+    .group-days-wrap{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+    .group-day-btn{padding:5px 11px;border-radius:8px;border:1.5px solid var(--border);background:white;color:var(--text-muted);font-size:12px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s}
+    .group-day-btn:hover{border-color:var(--border-2)}
+    .group-day-btn.sel{background:linear-gradient(135deg,var(--primary),#9333EA);color:white;border-color:transparent;box-shadow:0 2px 8px var(--primary-glow)}
+    .group-students-area{min-height:36px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+    .group-student-chip{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;background:var(--primary-light);border:1px solid var(--border-2);font-size:12px;font-weight:700;color:var(--text)}
+    .group-student-chip button{border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:13px;line-height:1;padding:0;margin-right:2px}
+    .group-student-chip button:hover{color:var(--danger)}
+    .group-add-student-wrap{display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+    .group-label-sm{font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:5px;margin-top:4px}
+
     @media print{body *{visibility:hidden}#print-area,#print-area *{visibility:visible}#print-area{position:fixed;inset:0;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;padding:6mm;box-sizing:border-box;gap:4mm}#print-area img{width:100%;max-width:195mm;height:auto;display:block}@page{size:A4 portrait;margin:0}}
   </style>
 </head>
@@ -707,7 +727,11 @@
     <div class="login-sub">لوحة تحكم أكاديمية E-PLUS — الدخول للإدارة فقط</div>
     <div class="inp-wrap">
       <span class="inp-icon">✉️</span>
-      <input class="inp" type="email" id="email-inp" placeholder="البريد الإلكتروني">
+      <div style="display:flex;align-items:center;border:2px solid var(--border);border-radius:14px;background:#FAFAFA;overflow:hidden;transition:all 0.3s ease" id="email-inp-wrap">
+        <input style="flex:1;border:none;background:transparent;padding:14px 14px 14px 0;color:var(--text);font-size:15px;font-family:'Tajawal',sans-serif;outline:none;min-width:0" type="text" id="email-user-inp" placeholder="اسم المستخدم" oninput="syncEmailInp()" onkeydown="if(event.key==='Enter')doLogin()" onfocus="document.getElementById('email-inp-wrap').style.borderColor='var(--primary)';document.getElementById('email-inp-wrap').style.background='#fff';document.getElementById('email-inp-wrap').style.boxShadow='0 0 0 4px var(--primary-light)'" onblur="document.getElementById('email-inp-wrap').style.borderColor='var(--border)';document.getElementById('email-inp-wrap').style.background='#FAFAFA';document.getElementById('email-inp-wrap').style.boxShadow='none'">
+        <span style="padding:14px 14px 14px 4px;font-size:13px;font-weight:700;color:var(--primary);white-space:nowrap;background:transparent;user-select:none">@epluscenter.com</span>
+      </div>
+      <input type="hidden" id="email-inp">
     </div>
     <div class="inp-wrap">
       <span class="inp-icon">🔐</span>
@@ -1497,7 +1521,19 @@
           <button type="button" class="day-pick-btn" data-day="الجمعة">الجمعة</button>
         </div>
       </div>
-      <button class="btn-primary" id="add-teacher-btn" onclick="addTeacher()" style="margin-top:8px">👨‍🏫 إنشاء حساب الأستاذ</button>
+      <!-- ===== الأفواج ===== -->
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label" style="display:flex;align-items:center;justify-content:space-between">
+          <span>🏫 الأفواج <span class="required">*</span></span>
+          <button type="button" onclick="addGroupRow('t-groups-list')" style="padding:5px 12px;border-radius:9px;border:1.5px solid var(--border-2);background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">+ إضافة فوج</button>
+        </label>
+        <div id="t-groups-list" style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+          <!-- تُضاف الأفواج هنا ديناميكياً -->
+        </div>
+        <div id="t-groups-empty" style="font-size:12px;color:var(--text-muted);margin-top:6px;text-align:center;padding:10px;border:1.5px dashed var(--border);border-radius:10px">لم تُضف أي فوج بعد — اضغط "+ إضافة فوج"</div>
+      </div>
+
+      <button class="btn-primary" id="add-teacher-btn" onclick="addTeacher()" style="margin-top:16px">👨‍🏫 إنشاء حساب الأستاذ</button>
       <div style="font-size:12px;color:var(--text-muted);margin-top:10px;text-align:center">سيتمكن الأستاذ من الدخول بالبريد وكلمة المرور المحددة</div>
     </div>
   </div>
@@ -1540,7 +1576,17 @@
           <button type="button" class="day-pick-btn" data-day="الجمعة">الجمعة</button>
         </div>
       </div>
-      <button class="btn-primary" onclick="saveTeacherEdit()" style="margin-top:8px">💾 حفظ التعديلات</button>
+      <!-- ===== الأفواج (تعديل) ===== -->
+      <div class="form-group" style="margin-bottom:0;margin-top:4px">
+        <label class="form-label" style="display:flex;align-items:center;justify-content:space-between">
+          <span>🏫 الأفواج</span>
+          <button type="button" onclick="addGroupRow('edit-groups-list')" style="padding:5px 12px;border-radius:9px;border:1.5px solid var(--border-2);background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">+ إضافة فوج</button>
+        </label>
+        <div id="edit-groups-list" style="display:flex;flex-direction:column;gap:10px;margin-top:8px"></div>
+        <div id="edit-groups-empty" style="font-size:12px;color:var(--text-muted);margin-top:6px;text-align:center;padding:10px;border:1.5px dashed var(--border);border-radius:10px;display:none">لم تُضف أي فوج</div>
+      </div>
+
+      <button class="btn-primary" onclick="saveTeacherEdit()" style="margin-top:16px">💾 حفظ التعديلات</button>
     </div>
   </div>
 </div>
@@ -1760,7 +1806,13 @@ onAuthStateChanged(auth, async user => {
   }
 });
 
+window.syncEmailInp = () => {
+  const user = document.getElementById('email-user-inp').value.trim();
+  document.getElementById('email-inp').value = user ? user + '@epluscenter.com' : '';
+};
+
 window.doLogin = async () => {
+  syncEmailInp();
   const email = document.getElementById('email-inp').value.trim();
   const pass = document.getElementById('password-inp').value;
   const errEl = document.getElementById('login-error');
@@ -3152,6 +3204,111 @@ function genStudentId(teacherId, idx) {
 
 // ─── Add teacher (admin creates Firebase Auth account + Firestore doc) ───
 // ⚠️ نستخدم secondaryAuth لإنشاء الحساب حتى لا تتغير جلسة الأدمين الحالية
+
+// ════════════════════════════════════════
+// ───────── نظام الأفواج (Groups) ─────────
+// ════════════════════════════════════════
+const GROUP_DAYS = ['السبت','الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة'];
+
+function buildGroupRow(containerId, groupData) {
+  /* groupData = { name, days:[], students:[] } */
+  const container = document.getElementById(containerId);
+  const emptyEl = document.getElementById(containerId.replace('-list','-empty'));
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  const idx = container.children.length;
+  const g = groupData || { name: '', days: [], students: [] };
+
+  const row = document.createElement('div');
+  row.className = 'group-row';
+  row.dataset.gidx = idx;
+
+  // رسم الأيام
+  const daysHtml = GROUP_DAYS.map(d =>
+    `<button type="button" class="group-day-btn${(g.days||[]).includes(d)?' sel':''}" data-day="${d}" onclick="toggleGroupDay(this)">${d}</button>`
+  ).join('');
+
+  // رسم التلاميذ
+  const studentsHtml = (g.students||[]).map((name,si) =>
+    `<span class="group-student-chip" data-si="${si}"><span>${name}</span><button onclick="removeGroupStudent(this)" title="حذف">✕</button></span>`
+  ).join('');
+
+  row.innerHTML = `
+    <div class="group-row-header">
+      <span style="font-size:16px">🏫</span>
+      <input class="group-name-inp" type="text" placeholder="اسم الفوج (مثال: فوج أ، مجموعة 1...)" value="${(g.name||'').replace(/"/g,'&quot;')}">
+      <button class="group-del-btn" onclick="deleteGroupRow(this)" title="حذف الفوج">🗑️</button>
+    </div>
+    <div class="group-label-sm">📅 أيام الفوج</div>
+    <div class="group-days-wrap">${daysHtml}</div>
+    <div class="group-label-sm">👥 تلاميذ الفوج</div>
+    <div class="group-students-area">${studentsHtml}</div>
+    <div class="group-add-student-wrap">
+      <input class="inp" type="text" placeholder="اسم التلميذ..." style="flex:1;padding:7px 12px;font-size:13px" onkeydown="if(event.key==='Enter'){event.preventDefault();addGroupStudentFromInp(this)}">
+      <button type="button" onclick="addGroupStudentFromInp(this.previousElementSibling)" style="padding:7px 14px;border-radius:10px;border:1.5px solid var(--border-2);background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;white-space:nowrap">+ تلميذ</button>
+    </div>`;
+
+  container.appendChild(row);
+}
+
+window.addGroupRow = (containerId) => {
+  buildGroupRow(containerId, null);
+};
+
+window.toggleGroupDay = (btn) => {
+  btn.classList.toggle('sel');
+};
+
+window.deleteGroupRow = (btn) => {
+  const row = btn.closest('.group-row');
+  const container = row.parentElement;
+  row.remove();
+  const emptyId = container.id.replace('-list','-empty');
+  const emptyEl = document.getElementById(emptyId);
+  if (emptyEl && !container.children.length) emptyEl.style.display = 'block';
+};
+
+window.addGroupStudentFromInp = (inp) => {
+  const name = inp.value.trim();
+  if (!name) return;
+  const area = inp.closest('.group-row').querySelector('.group-students-area');
+  const chip = document.createElement('span');
+  chip.className = 'group-student-chip';
+  chip.innerHTML = `<span>${name}</span><button onclick="removeGroupStudent(this)" title="حذف">✕</button>`;
+  area.appendChild(chip);
+  inp.value = '';
+};
+
+window.removeGroupStudent = (btn) => {
+  btn.closest('.group-student-chip').remove();
+};
+
+function collectGroups(containerId) {
+  const rows = document.querySelectorAll(`#${containerId} .group-row`);
+  const groups = [];
+  rows.forEach(row => {
+    const name = row.querySelector('.group-name-inp').value.trim();
+    const days = [...row.querySelectorAll('.group-day-btn.sel')].map(b => b.dataset.day);
+    const students = [...row.querySelectorAll('.group-students-area .group-student-chip span:first-child')].map(s => s.textContent.trim());
+    if (name) groups.push({ name, days, students });
+  });
+  return groups;
+}
+
+function populateGroupsList(containerId, groups) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+  const emptyEl = document.getElementById(containerId.replace('-list','-empty'));
+  if (!groups || !groups.length) {
+    if (emptyEl) emptyEl.style.display = 'block';
+    return;
+  }
+  if (emptyEl) emptyEl.style.display = 'none';
+  groups.forEach(g => buildGroupRow(containerId, g));
+}
+// ════════════════════════════════════════
+
 window.addTeacher = async () => {
   const name = document.getElementById('t-name').value.trim();
   const email = document.getElementById('t-email').value.trim();
@@ -3159,6 +3316,7 @@ window.addTeacher = async () => {
   const spec = document.getElementById('t-spec').value.trim();
   const levels = document.getElementById('t-levels').value.trim();
   const days = getSelectedDays('t-days-picker');
+  const groups = collectGroups('t-groups-list');
   if (!name || !email || !pass || !spec || !days.length) {
     showToast('❌ يرجى ملء جميع الحقول واختيار يوم واحد على الأقل', true); return;
   }
@@ -3173,7 +3331,7 @@ window.addTeacher = async () => {
     await signOut(secondaryAuth);
     const teacherId = genTeacherId();
     const payload = {
-      name, email, spec, levels, days,
+      name, email, spec, levels, days, groups,
       teacherId, uid,
       photo: newTeacherPhotoBase64 || null,
       createdAt: serverTimestamp()
@@ -3188,6 +3346,8 @@ window.addTeacher = async () => {
     document.getElementById('t-spec').value = '';
     document.getElementById('t-levels').value = '';
     setSelectedDays('t-days-picker', []);
+    document.getElementById('t-groups-list').innerHTML = '';
+    document.getElementById('t-groups-empty').style.display = 'block';
     newTeacherPhotoBase64 = null;
     document.getElementById('teacher-photo-preview').style.display = 'none';
     document.getElementById('teacher-photo-input').value = '';
@@ -3288,6 +3448,7 @@ window.openTeacherEditModal = (id) => {
   document.getElementById('edit-t-spec').value = t.spec || '';
   document.getElementById('edit-t-levels').value = t.levels || '';
   setSelectedDays('edit-days-picker', t.days || []);
+  populateGroupsList('edit-groups-list', t.groups || []);
   editTeacherPhotoBase64 = t.photo || null;
   const prev = document.getElementById('edit-photo-preview');
   if (t.photo) { prev.src = t.photo; prev.style.display = 'block'; }
@@ -3304,8 +3465,9 @@ window.saveTeacherEdit = async () => {
   const spec = document.getElementById('edit-t-spec').value.trim();
   const levels = document.getElementById('edit-t-levels').value.trim();
   const days = getSelectedDays('edit-days-picker');
+  const groups = collectGroups('edit-groups-list');
   if (!name || !spec || !days.length) { showToast('❌ ملء الاسم والتخصص والأيام مطلوب', true); return; }
-  const updates = { name, spec, levels, days };
+  const updates = { name, spec, levels, days, groups };
   if (editTeacherPhotoBase64) updates.photo = editTeacherPhotoBase64;
   try {
     await updateDoc(doc(db, 'teachers', id), updates);
@@ -3335,7 +3497,6 @@ window.openAttModal = async (teacherId) => {
   document.getElementById('att-modal-date-label').textContent = todayLabel;
   document.getElementById('att-search').value = '';
   document.getElementById('new-student-name').value = '';
-  _attCurrentPage = 0;
   renderAttStudents(currentAttStudents, '');
   updateAttSummary(currentAttStudents);
   document.getElementById('att-modal').classList.add('open');
@@ -3345,11 +3506,7 @@ window.closeAttModal = () => {
   currentAttTeacherId = null;
 };
 
-// ─── Pagination للقائمة ───
-const ATT_PAGE_SIZE = 10;
-let _attCurrentPage = 0; // الصفحة الحالية (0-indexed)
-
-function renderAttStudents(students, filter, page) {
+function renderAttStudents(students, filter) {
   const list = document.getElementById('att-students-list');
   if (!list) return;
   const filtered = filter ? students.filter(s => s.name.includes(filter)) : students;
@@ -3358,25 +3515,11 @@ function renderAttStudents(students, filter, page) {
     list.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">
       ${filter ? 'لم يتم العثور على نتائج' : 'لا يوجد تلاميذ بعد — أضف تلميذاً أدناه'}
     </div>`;
-    // أزل pagination إن وجدت
-    const old = document.getElementById('att-pagination');
-    if (old) old.remove();
     return;
   }
 
-  // حساب الصفحات
-  const totalPages = Math.ceil(filtered.length / ATT_PAGE_SIZE);
-  if (page === undefined) page = _attCurrentPage;
-  // تأكد الصفحة في النطاق
-  if (page >= totalPages) page = totalPages - 1;
-  if (page < 0) page = 0;
-  _attCurrentPage = page;
-
-  const start = page * ATT_PAGE_SIZE;
-  const pageItems = filtered.slice(start, start + ATT_PAGE_SIZE);
-
   list.innerHTML = '';
-  pageItems.forEach(s => {
+  filtered.forEach(s => {
     const { ps: payStatus, rc: receipt } = getLivePayStatus(s);
 
     const badgeHtml =
@@ -3388,10 +3531,6 @@ function renderAttStudents(students, filter, page) {
       ? `<span style="font-size:10px;font-family:monospace;color:var(--primary);background:var(--primary-light);padding:2px 7px;border-radius:6px;flex-shrink:0">${receipt}</span>`
       : '';
 
-    const dotsHtml = Array.from({length:12},(_,d) =>
-      `<span class="sdot" id="dot-${s.id}-${d+1}"></span>`
-    ).join('');
-
     const row = document.createElement('div');
     row.className = 'att-student-row';
     row.dataset.sid = s.id;
@@ -3400,8 +3539,7 @@ function renderAttStudents(students, filter, page) {
       <span class="att-student-name">${s.name}</span>
       ${badgeHtml}
       ${receiptHtml}
-      <div class="student-dots-row" style="flex:1">${dotsHtml}</div>
-      <div class="att-toggle">
+      <div class="att-toggle" style="margin-right:auto">
         <div class="att-check ${s.present ? 'present' : ''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
         <div class="att-check ${!s.present && s.marked ? 'absent' : ''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
       </div>
@@ -3409,46 +3547,6 @@ function renderAttStudents(students, filter, page) {
     list.appendChild(row);
   });
 
-  // أزل pagination القديمة وأضف الجديدة إن احتجنا
-  const oldPag = document.getElementById('att-pagination');
-  if (oldPag) oldPag.remove();
-
-  if (totalPages > 1) {
-    const pag = document.createElement('div');
-    pag.id = 'att-pagination';
-    pag.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)';
-
-    const btnStyle = (active) =>
-      `padding:7px 13px;border-radius:10px;border:1.5px solid ${active ? 'var(--primary)' : 'var(--border)'};background:${active ? 'var(--primary)' : 'white'};color:${active ? 'white' : 'var(--text-2)'};font-size:13px;font-weight:800;cursor:${active ? 'default' : 'pointer'};font-family:'Tajawal',sans-serif;transition:all 0.2s`;
-
-    // زر السابق
-    const prevBtn = document.createElement('button');
-    prevBtn.textContent = '→';
-    prevBtn.style.cssText = `padding:7px 13px;border-radius:10px;border:1.5px solid var(--border);background:white;color:var(--text-2);font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;opacity:${page === 0 ? 0.35 : 1}`;
-    prevBtn.disabled = page === 0;
-    prevBtn.onclick = () => renderAttStudents(students, filter, _attCurrentPage - 1);
-    pag.appendChild(prevBtn);
-
-    // أرقام الصفحات
-    for (let p = 0; p < totalPages; p++) {
-      const btn = document.createElement('button');
-      btn.textContent = p + 1;
-      btn.style.cssText = btnStyle(p === page);
-      if (p !== page) btn.onclick = ((_p) => () => renderAttStudents(students, filter, _p))(p);
-      pag.appendChild(btn);
-    }
-
-    // زر التالي
-    const nextBtn = document.createElement('button');
-    nextBtn.textContent = '←';
-    nextBtn.style.cssText = `padding:7px 13px;border-radius:10px;border:1.5px solid var(--border);background:white;color:var(--text-2);font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;opacity:${page === totalPages - 1 ? 0.35 : 1}`;
-    nextBtn.disabled = page === totalPages - 1;
-    nextBtn.onclick = () => renderAttStudents(students, filter, _attCurrentPage + 1);
-    pag.appendChild(nextBtn);
-
-    // إدراج pagination بعد القائمة مباشرة
-    list.after(pag);
-  }
 }
 
 window.toggleStudentAtt = (sid, isPresent, el) => {
@@ -3473,7 +3571,6 @@ function updateAttSummary(students) {
 
 window.filterStudents = () => {
   const val = document.getElementById('att-search').value;
-  _attCurrentPage = 0; // ارجع للصفحة الأولى عند كل بحث
   renderAttStudents(currentAttStudents, val);
 };
 
@@ -3505,7 +3602,7 @@ window.searchStudentSuggestions = (val) => {
     return;
   }
 
-  // إذا كان المستخدم قد اختار تلميذاً مسبقاً والاسم لا يزال نفسه — لا نتدخل
+  // إذا كان التلميذ مختاراً مسبقاً والاسم لا يزال نفسه — لا نتدخل
   if (_selectedStudentData && _selectedStudentData.name === val.trim()) return;
 
   const norm = s => String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
@@ -3689,14 +3786,10 @@ window.addStudent = async () => {
         ps === 'unpaid' ? `<span class="pay-badge unpaid">⏳ غير مفعّلة</span>` :
                          `<span class="pay-badge unknown">— لا تذكرة</span>`;
       const receiptHtml = rc ? `<span style="font-size:10px;font-family:monospace;color:var(--primary);background:var(--primary-light);padding:2px 7px;border-radius:6px;flex-shrink:0">${rc}</span>` : '';
-      const sessionDots = currentOpenSession
-        ? Array.from({length:12},(_,i)=>`<span class="sdot ${i===currentOpenSession-1?'current-dot':''}"></span>`).join('')
-        : Array.from({length:12},()=>`<span class="sdot"></span>`).join('');
       return `<div class="att-student-row" data-sid="${s.id}">
         <span class="att-student-id">${s.id}</span>
         <span class="att-student-name">${s.name}</span>
         ${badgeHtml}${receiptHtml}
-        <div class="student-dots-row">${sessionDots}</div>
         <div class="att-toggle" style="margin-right:auto">
           <div class="att-check ${s.present?'present':''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
           <div class="att-check ${!s.present&&s.marked?'absent':''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
