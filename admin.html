@@ -1372,7 +1372,17 @@
       <div id="section-teachers" style="display:none">
 
         <!-- Hero -->
-        
+        <div class="teachers-hero">
+          <div>
+            <div class="teachers-hero-title">👨‍🏫 إدارة الأساتذة والحضور</div>
+            <div class="teachers-hero-sub">أضف حسابات الأساتذة، حدد أيامهم وتخصصاتهم، وتابع حضور تلاميذهم يومياً.</div>
+          </div>
+          <div class="teachers-stats-row">
+            <div class="teachers-mini"><div class="n" id="t-stat-total">0</div><div class="l">أستاذ</div></div>
+            <div class="teachers-mini"><div class="n" id="t-stat-students">0</div><div class="l">تلميذ مسجّل</div></div>
+            <div class="teachers-mini"><div class="n" id="t-stat-today">0</div><div class="l">حصة اليوم</div></div>
+          </div>
+        </div>
 
         <!-- Add teacher button -->
         <div class="teacher-form-panel" style="display:flex;align-items:center;justify-content:space-between;padding:20px 28px;flex-wrap:wrap;gap:12px">
@@ -1388,7 +1398,7 @@
 
         <!-- Teachers grid -->
         <div class="section-header">
-          <div class="section-title"><div class="section-icon">👥</div> قائمة الأستاذ</div>
+          <div class="section-title"><div class="section-icon">👥</div> قائمة الأساتذة</div>
           <div id="t-today-label" style="font-size:13px;font-weight:700;color:var(--primary);background:var(--primary-light);padding:6px 14px;border-radius:99px"></div>
         </div>
         <div class="teachers-grid" id="teachers-grid">
@@ -1473,14 +1483,6 @@
           <div class="form-group"><label class="form-label">كلمة المرور <span class="required">*</span></label><input class="inp" type="password" id="t-password" placeholder="6 أحرف على الأقل"></div>
           <div class="form-group"><label class="form-label">التخصص <span class="required">*</span></label><input class="inp" type="text" id="t-spec" placeholder="مثال: رياضيات / فيزياء"></div>
           <div class="form-group" style="margin-bottom:0"><label class="form-label">الأطوار الدراسية</label><input class="inp" type="text" id="t-levels" placeholder="مثال: الطور الثالث، المتوسط"></div>
-          <div class="form-group" style="grid-column:1/-1; margin-top:8px;">
-            <label class="form-label">عدد الأفواج <span class="required">*</span></label>
-            <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
-              <input class="inp" type="number" id="t-groups-count" placeholder="مثال: 3" min="1" max="10" style="width:130px;flex-shrink:0;" oninput="renderGroupNameInputs()">
-              <span style="font-size:12px;color:var(--text-muted);font-weight:600;">— أدخل العدد ثم سمّ كل فوج</span>
-            </div>
-            <div id="t-groups-names" style="display:flex;flex-direction:column;gap:8px;"></div>
-          </div>
         </div>
       </div>
       <div class="form-group">
@@ -1678,7 +1680,7 @@ const months = ['يناير','فبراير','مارس','أبريل','مايو','
 const now = new Date();
 document.getElementById('topbar-date').textContent = `${days[now.getDay()]}، ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
 
-// ── Flag لمنع تحميل قائمة الأستاذ كاملة عند دخول أستاذ ──
+// ── Flag لمنع تحميل قائمة الأساتذة كاملة عند دخول أستاذ ──
 let isTeacherMode = false;
 
 onAuthStateChanged(auth, async user => {
@@ -3207,16 +3209,16 @@ function loadTeachers() {
   if (isTeacherMode) return;
   onSnapshot(query(collection(db, 'teachers'), orderBy('createdAt', 'desc')), async snap => {
     allTeachers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    document.getElementById('nav-badge-teachers').textContent = allTeachers.length;
-    document.getElementById('t-stat-total').textContent = allTeachers.length;
+    document.getElementById('nav-badge-teachers')?.textContent = allTeachers.length;
+    document.getElementById('t-stat-total')?.textContent = allTeachers.length;
     // Count total students
     let totalStudents = 0;
     allTeachers.forEach(t => { totalStudents += (t.students || []).length; });
-    document.getElementById('t-stat-students').textContent = totalStudents;
+    document.getElementById('t-stat-students')?.textContent = totalStudents;
     // Today's label
     const todayName = AR_DAYS[new Date().getDay()];
     const todayCount = allTeachers.filter(t => (t.days || []).includes(todayName)).length;
-    document.getElementById('t-stat-today').textContent = todayCount;
+    document.getElementById('t-stat-today')?.textContent = todayCount;
     document.getElementById('t-today-label').textContent = `📅 اليوم: ${todayName} — ${todayCount} أستاذ`;
     renderTeachersGrid(allTeachers);
   });
