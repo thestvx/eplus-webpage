@@ -4311,8 +4311,8 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
 
     // ── قفل الحصة إذا يومها ليس من أيام هذا الفوج ──
     const isDayAllowed = allowedDays.includes(sessionDay);
-    // الحصة الحالية تُفعَّل إذا كانت هي الحصة الحالية واليوم من أيام تدريس الفوج
-    const isTodayAndAllowed = isCurrent && allowedDays.includes(todayArabic);
+    // الحصة تنفتح فقط إذا: هي الحصة الحالية + اليوم الحالي = يوم هذه الحصة في الجدول
+    const isTodayAndAllowed = isCurrent && sessionDay === todayArabic;
 
     card.classList.remove('locked', 'current', 'done', 'missed');
 
@@ -4351,12 +4351,8 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
         : `<span class="sdot current-dot"></span>`;
     } else {
       card.classList.add('locked');
-      // نضيف رسالة "ليس يومك" إذا اليوم غير مسموح
-      if (!isDayAllowed) {
-        chipEl.innerHTML = `<span class="session-status-chip locked-chip" style="font-size:9px">📅 ${sessionDay}</span>`;
-      } else {
-        chipEl.innerHTML = `<span class="session-status-chip locked-chip">🔒 مغلقة</span>`;
-      }
+      // الحصة مقفلة — نعرض يومها حتى يعرف الأستاذ متى تنفتح
+      chipEl.innerHTML = `<span class="session-status-chip locked-chip" style="font-size:9px">📅 ${sessionDay}</span>`;
       dotsEl.innerHTML = students.length
         ? students.map(s => `<span class="sdot" title="${s.name}"></span>`).join('')
         : `<span class="sdot"></span>`;
@@ -4801,7 +4797,7 @@ window.switchNavSection = (section) => {
 
 <script type="module">
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, doc, setDoc, getDoc, getDocs, where, updateDoc, deleteDoc, limit } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, doc, setDoc, getDoc, getDocs, where, updateDoc, deleteDoc, limit, writeBatch } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
 /* ══════════════════════════════════════════════════
    نظام التواصل — E-PLUS Academy
@@ -4941,6 +4937,14 @@ async function _openRoom(roomId, roomName, roomData) {
 
   const chatArea = document.getElementById('msg-chat-area');
   const initials = roomId === 'general' ? '👥' : (hName[0]||'؟').toUpperCase();
+  const clearBtnHtml = (roomId === 'general' && _me.isAdmin)
+    ? `<button onclick="window._clearGeneralChat()" title="مسح جميع رسائل الغرفة العامة"
+        style="padding:7px 14px;border-radius:11px;border:1.5px solid rgba(239,68,68,0.3);background:var(--danger-soft);color:#DC2626;font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;display:flex;align-items:center;gap:6px;transition:all 0.2s;flex-shrink:0"
+        onmouseover="this.style.background='rgba(239,68,68,0.15)';this.style.borderColor='rgba(239,68,68,0.5)'"
+        onmouseout="this.style.background='var(--danger-soft)';this.style.borderColor='rgba(239,68,68,0.3)'">
+        🗑️ مسح الشات
+      </button>`
+    : '';
   chatArea.innerHTML = `
     <div class="msg-chat-header">
       <div class="msg-chat-avatar" style="${roomId==='general'?'font-size:20px':'font-size:16px;font-weight:900'}">${initials}</div>
@@ -4948,6 +4952,7 @@ async function _openRoom(roomId, roomName, roomData) {
         <div class="msg-chat-name">${hName}</div>
         <div class="msg-chat-status">${hSub}</div>
       </div>
+      ${clearBtnHtml}
     </div>
     <div class="msg-messages" id="msg-messages-list">
       <div class="msg-empty"><div class="msg-empty-icon">💬</div><div style="font-size:13px">لا توجد رسائل بعد</div></div>
@@ -5311,6 +5316,43 @@ window._openImgLightbox = (src) => {
   bg.appendChild(img);
   bg.appendChild(closeBtn);
   document.body.appendChild(bg);
+};
+
+// ═══════════════════════════
+// مسح الشات العام (أدمين فقط)
+// ═══════════════════════════
+window._clearGeneralChat = async () => {
+  if (!_db || !_me || !_me.isAdmin) return;
+  const confirmed = confirm('⚠️ هل أنت متأكد من مسح جميع رسائل الغرفة العامة؟\nهذا الإجراء لا يمكن التراجع عنه.');
+  if (!confirmed) return;
+
+  const btn = document.querySelector('[onclick="window._clearGeneralChat()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري المسح...'; }
+
+  try {
+    // جلب كل الرسائل العامة
+    const snap = await getDocs(
+      query(collection(_db, 'messages'), where('roomId', '==', 'general'))
+    );
+    if (snap.empty) {
+      window.showToast && showToast('💬 الغرفة العامة فارغة أصلاً');
+      if (btn) { btn.disabled = false; btn.innerHTML = '🗑️ مسح الشات'; }
+      return;
+    }
+    // حذف بالـ batch (50 في كل مرة كحد أقصى لـ Firestore)
+    const batchSize = 50;
+    const docs = snap.docs;
+    for (let i = 0; i < docs.length; i += batchSize) {
+      const batch = writeBatch(_db);
+      docs.slice(i, i + batchSize).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+    window.showToast && showToast(`✅ تم مسح ${docs.length} رسالة من الغرفة العامة`);
+  } catch(e) {
+    window.showToast && showToast('❌ خطأ أثناء المسح: ' + e.message, true);
+    console.error('clearGeneralChat error:', e);
+  }
+  if (btn) { btn.disabled = false; btn.innerHTML = '🗑️ مسح الشات'; }
 };
 </script>
 
