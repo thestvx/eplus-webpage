@@ -5027,21 +5027,15 @@ function _renderMessages(docs) {
       if (m.edited) contentHtml += ` <span style="font-size:9px;opacity:0.6">(معدَّل)</span>`;
     }
 
-    // زر 3 نقاط لصاحب الرسالة فقط
-    const menuId = `msg-menu-${msgId}`;
-    const hasEdit = isMine && !m.fileUrl;
-    const threeDotBtn = isMine ? `
-      <button class="msg-three-dot" onclick="_toggleMsgMenu('${msgId}', event)" title="خيارات">⋮</button>
-      <div class="msg-menu" id="${menuId}" style="display:none">
-        ${hasEdit ? `<div class="msg-menu-item" onclick="_editMsg('${msgId}','${(m.text||'').replace(/'/g,"&#39;")}');_closeMsgMenus()">✏️ تعديل</div>` : ''}
-        <div class="msg-menu-item danger" onclick="_deleteMsg('${msgId}');_closeMsgMenus()">🗑️ حذف</div>
-      </div>` : '';
-
     wrap.innerHTML = `
       ${!isMine ? `<div class="msg-sender-name">${m.senderName || 'مجهول'}${adminBadge}</div>` : ''}
       <div style="display:flex;align-items:flex-start;gap:4px;position:relative">
         <div class="msg-bubble-inner" style="flex:1">${contentHtml}</div>
-        ${threeDotBtn}
+        ${isMine ? `<button class="msg-three-dot" data-msgid="${msgId}" title="خيارات">⋮</button>
+        <div class="msg-menu" data-menuid="${msgId}" style="display:none">
+          ${isMine && !m.fileUrl ? `<div class="msg-menu-item" data-action="edit" data-msgid="${msgId}" data-text="${(m.text||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}">✏️ تعديل</div>` : ''}
+          <div class="msg-menu-item danger" data-action="delete" data-msgid="${msgId}">🗑️ حذف</div>
+        </div>` : ''}
       </div>
       <div class="msg-meta">${timeStr}${isMine ? ' <span style="color:rgba(255,255,255,0.7)">✓✓</span>' : ''}</div>`;
 
@@ -5266,21 +5260,39 @@ window.startPrivateConv = _startPrivateConv;
 
 
 // ═══════════════════════════
-// قائمة 3 نقاط
+// قائمة 3 نقاط — event delegation
 // ═══════════════════════════
-window._toggleMsgMenu = (msgId, e) => {
-  e.stopPropagation();
-  const menuId = `msg-menu-${msgId}`;
-  const menu = document.getElementById(menuId);
-  if (!menu) return;
-  const isOpen = menu.style.display === 'block';
-  _closeMsgMenus();
-  if (!isOpen) menu.style.display = 'block';
-};
-window._closeMsgMenus = () => {
+document.addEventListener('click', (e) => {
+  // زر 3 نقاط
+  const dotBtn = e.target.closest('.msg-three-dot');
+  if (dotBtn) {
+    e.stopPropagation();
+    const msgId = dotBtn.dataset.msgid;
+    const menu = dotBtn.parentElement.querySelector(`.msg-menu[data-menuid="${msgId}"]`);
+    if (!menu) return;
+    const isOpen = menu.style.display === 'block';
+    document.querySelectorAll('.msg-menu').forEach(m => m.style.display = 'none');
+    if (!isOpen) menu.style.display = 'block';
+    return;
+  }
+  // عناصر القائمة
+  const menuItem = e.target.closest('.msg-menu-item');
+  if (menuItem) {
+    e.stopPropagation();
+    const action = menuItem.dataset.action;
+    const msgId  = menuItem.dataset.msgid;
+    document.querySelectorAll('.msg-menu').forEach(m => m.style.display = 'none');
+    if (action === 'delete') {
+      window._deleteMsg && window._deleteMsg(msgId);
+    } else if (action === 'edit') {
+      const text = menuItem.dataset.text || '';
+      window._editMsg && window._editMsg(msgId, text);
+    }
+    return;
+  }
+  // إغلاق عند الضغط خارج القائمة
   document.querySelectorAll('.msg-menu').forEach(m => m.style.display = 'none');
-};
-document.addEventListener('click', _closeMsgMenus);
+});
 
 // ═══════════════════════════
 // Lightbox للصور
