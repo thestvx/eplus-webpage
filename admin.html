@@ -1587,6 +1587,8 @@
 
       <!-- Save -->
       <button class="btn-primary" id="save-att-btn" onclick="saveAttendance()" style="margin-top:14px">💾 حفظ الحضور</button>
+      <!-- Monthly summary for admin -->
+      <button onclick="openSummaryModal()" style="margin-top:10px;width:100%;padding:11px;border-radius:14px;border:2px dashed var(--primary);background:var(--primary-light);color:var(--primary);font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">📊 ملخص الشهر</button>
     </div>
   </div>
 </div>
@@ -1637,7 +1639,7 @@
 <script type="module">
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, setDoc, getDoc, query, orderBy, where, onSnapshot, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, setDoc, getDoc, getDocs, query, orderBy, where, onSnapshot, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -3289,6 +3291,10 @@ window.openAttModal = async (teacherId) => {
   if (!t) return;
   currentAttTeacherId = teacherId;
   currentAttStudents = t.students ? [...t.students] : [];
+  // تحميل سجلات الحصص الخاصة بهذا الأستاذ لملخص الشهر
+  _allRecordedSessions = {};
+  const sessSnap = await getDocs(query(collection(db, 'sessionAttendance'), where('teacherId', '==', teacherId)));
+  sessSnap.forEach(d => { const data = d.data(); if (data.sessionNum) _allRecordedSessions[data.sessionNum] = data; });
   // Header
   const avatarWrap = document.getElementById('att-modal-avatar-wrap');
   avatarWrap.innerHTML = t.photo
@@ -3584,7 +3590,9 @@ window.addStudent = async () => {
   const newStudent = { id, name, present: false, marked: false, payStatus, receipt: receipt || null };
 
   currentAttStudents.push(newStudent);
+  _suppressSnapshot = true;
   await updateDoc(doc(db, 'teachers', currentAttTeacherId), { students: currentAttStudents });
+  setTimeout(() => { _suppressSnapshot = false; }, 1500);
 
   // تنظيف الحقل والاختيار
   if (nameInp) nameInp.value = '';
@@ -3640,8 +3648,10 @@ window.removeStudent = async (sid) => {
   // تحديث البيانات
   currentAttStudents = currentAttStudents.filter(s => s.id !== sid);
   updateAttSummary(currentAttStudents);
-  // حفظ في Firestore
+  // حفظ في Firestore مع تجميد الـ snapshot
+  _suppressSnapshot = true;
   await updateDoc(doc(db, 'teachers', currentAttTeacherId), { students: currentAttStudents });
+  setTimeout(() => { _suppressSnapshot = false; }, 1500);
 };
 
 window.saveAttendance = async () => {
@@ -3668,8 +3678,11 @@ window.saveAttendance = async () => {
 
 // ─── Teacher self-view (when teacher logs in) ───
 async function loadTeacherStudentsView(uid, teacherData) {
+let _suppressSnapshot = false;
+
   onSnapshot(doc(db, 'teachers', uid), snap => {
     if (!snap.exists()) return;
+    if (_suppressSnapshot) return; // جاري تعديل — تجاهل هذا التحديث
     const t = snap.data();
     currentTeacherData = { uid, id: uid, ...t };
     currentAttStudents = t.students ? [...t.students] : [];
