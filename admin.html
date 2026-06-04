@@ -3634,10 +3634,14 @@ window.addStudent = async () => {
 
 window.removeStudent = async (sid) => {
   if (!confirm('حذف هذا التلميذ نهائياً؟')) return;
+  // حذف فوري من DOM
+  const row = document.querySelector(`.att-student-row[data-sid="${sid}"]`);
+  if (row) row.remove();
+  // تحديث البيانات
   currentAttStudents = currentAttStudents.filter(s => s.id !== sid);
-  await updateDoc(doc(db, 'teachers', currentAttTeacherId), { students: currentAttStudents });
-  renderAttStudents(currentAttStudents, document.getElementById('att-search').value);
   updateAttSummary(currentAttStudents);
+  // حفظ في Firestore
+  await updateDoc(doc(db, 'teachers', currentAttTeacherId), { students: currentAttStudents });
 };
 
 window.saveAttendance = async () => {
@@ -3759,7 +3763,7 @@ function ensureSessionModal() {
   const bg = document.createElement('div');
   bg.id = 'session-modal-bg';
   bg.style.cssText = 'position:fixed;inset:0;background:rgba(15,10,40,0.65);backdrop-filter:blur(8px);z-index:4000;display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;visibility:hidden;transition:all 0.3s ease';
-  bg.innerHTML = `<div id="session-modal-inner" style="background:var(--card);border-radius:24px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,0.35);transform:translateY(20px) scale(0.97);transition:all 0.3s ease"></div>`;
+  bg.innerHTML = `<div id="session-modal-inner" style="background:var(--card,#fff);border-radius:24px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,0.35);transform:translateY(20px) scale(0.97);transition:all 0.3s ease;border:1px solid var(--border,#e5e7eb)"></div>`;
   bg.addEventListener('click', e => { if (e.target === bg) closeSessionModal(); });
   document.body.appendChild(bg);
 }
