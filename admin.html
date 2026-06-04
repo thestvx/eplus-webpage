@@ -773,6 +773,25 @@
     /* No conversation selected */
     .msg-no-conv{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-muted)}
     .msg-no-conv-icon{font-size:52px;opacity:0.25}
+    /* ===== MESSAGE 3-DOT MENU ===== */
+    .msg-three-dot{background:none;border:none;cursor:pointer;font-size:18px;color:rgba(255,255,255,0.7);padding:0 4px;line-height:1;flex-shrink:0;border-radius:6px;transition:all 0.2s;font-weight:900}
+    .msg-bubble.theirs .msg-three-dot{color:var(--text-muted)}
+    .msg-three-dot:hover{background:rgba(255,255,255,0.15);color:white}
+    .msg-bubble.theirs .msg-three-dot:hover{background:var(--primary-light);color:var(--primary)}
+    .msg-menu{position:absolute;top:0;left:-110px;background:white;border-radius:12px;border:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:999;min-width:110px;overflow:hidden;animation:menuPop 0.15s ease}
+    .msg-bubble.mine .msg-menu{left:auto;right:-110px}
+    @keyframes menuPop{from{opacity:0;transform:scale(0.92)}to{opacity:1;transform:scale(1)}}
+    .msg-menu-item{padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;color:var(--text-2);transition:background 0.15s;white-space:nowrap;font-family:'Tajawal',sans-serif}
+    .msg-menu-item:hover{background:var(--primary-light);color:var(--primary)}
+    .msg-menu-item.danger{color:#DC2626}
+    .msg-menu-item.danger:hover{background:var(--danger-soft)}
+
+    /* ===== IMAGE LIGHTBOX ===== */
+    .img-lightbox-bg{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;cursor:zoom-out;animation:fadeIn 0.2s ease}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .img-lightbox-bg img{max-width:90vw;max-height:90vh;border-radius:12px;object-fit:contain;box-shadow:0 20px 60px rgba(0,0,0,0.5);cursor:default}
+    .img-lightbox-close{position:absolute;top:16px;left:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:white;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
+    .img-lightbox-close:hover{background:rgba(255,255,255,0.3)}
   </style>
 </head>
 <body>
@@ -1862,11 +1881,9 @@ onAuthStateChanged(auth, async user => {
         document.querySelector('.teacher-form-panel').style.display = 'none';
         const logPanel = document.getElementById('admin-log-panel');
         if (logPanel) logPanel.style.display = 'none';
-        // إخفاء عنوان "إدارة الأساتذة والحضور" في حساب الأستاذ
-        const heroTitle = document.getElementById('teachers-hero-title');
-        const heroSub   = document.getElementById('teachers-hero-sub');
-        if (heroTitle) heroTitle.style.display = 'none';
-        if (heroSub)   heroSub.style.display   = 'none';
+        // إخفاء البانر البنفسجي كاملاً في حساب الأستاذ
+        const teachersHero = document.getElementById('teachers-hero');
+        if (teachersHero) teachersHero.style.display = 'none';
         // عرض نافذة الترحيب
         currentTeacherData = { uid: user.uid, id: user.uid, ...td };
         document.getElementById('welcome-teacher-name').textContent = `أهلاً استاذ ${td.name} .. يوم سعيد 🌟`;
@@ -4294,8 +4311,8 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
 
     // ── قفل الحصة إذا يومها ليس من أيام هذا الفوج ──
     const isDayAllowed = allowedDays.includes(sessionDay);
-    // الحصة الحالية تُفعَّل فقط إذا كان يومها هو اليوم ومن أيام الفوج
-    const isTodayAndAllowed = isCurrent && sessionDay === todayArabic && isDayAllowed;
+    // الحصة الحالية تُفعَّل إذا كانت هي الحصة الحالية واليوم من أيام تدريس الفوج
+    const isTodayAndAllowed = isCurrent && allowedDays.includes(todayArabic);
 
     card.classList.remove('locked', 'current', 'done', 'missed');
 
@@ -4999,7 +5016,7 @@ function _renderMessages(docs) {
       const ext = (m.fileName || '').split('.').pop().toLowerCase();
       const isImg = ['jpg','jpeg','png','gif','webp'].includes(ext);
       if (isImg) {
-        contentHtml = `<img src="${m.fileUrl}" alt="${m.fileName||'صورة'}" style="max-width:220px;max-height:180px;border-radius:10px;display:block;margin-bottom:4px" onclick="window.open('${m.fileUrl}','_blank')">`;
+        contentHtml = `<img src="${m.fileUrl}" alt="${m.fileName||'صورة'}" style="max-width:220px;max-height:180px;border-radius:10px;display:block;margin-bottom:4px;cursor:zoom-in" onclick="_openImgLightbox(this.src)">`;
       } else {
         const fileEmoji = ext === 'pdf' ? '📄' : (ext === 'xlsx' || ext === 'xls') ? '📊' : (ext === 'doc' || ext === 'docx') ? '📝' : '📎';
         contentHtml = `<a href="${m.fileUrl}" target="_blank" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,255,255,0.15);border-radius:10px;text-decoration:none;color:inherit;font-size:13px;font-weight:700;max-width:220px">${fileEmoji} <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.fileName||'ملف'}</span></a>`;
@@ -5010,31 +5027,23 @@ function _renderMessages(docs) {
       if (m.edited) contentHtml += ` <span style="font-size:9px;opacity:0.6">(معدَّل)</span>`;
     }
 
-    // أزرار حذف/تعديل لصاحب الرسالة
-    const actionBtns = isMine && !m.fileUrl ? `
-      <div class="msg-actions" style="display:none;gap:4px;margin-top:4px">
-        <button onclick="_editMsg('${msgId}','${(m.text||'').replace(/'/g,"&#39;")}')" style="padding:3px 8px;border-radius:7px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:white;font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">✏️ تعديل</button>
-        <button onclick="_deleteMsg('${msgId}')" style="padding:3px 8px;border-radius:7px;border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.2);color:white;font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">🗑️ حذف</button>
-      </div>` : (isMine ? `
-      <div class="msg-actions" style="display:none;gap:4px;margin-top:4px">
-        <button onclick="_deleteMsg('${msgId}')" style="padding:3px 8px;border-radius:7px;border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.2);color:white;font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">🗑️ حذف</button>
-      </div>` : '');
+    // زر 3 نقاط لصاحب الرسالة فقط
+    const menuId = `msg-menu-${msgId}`;
+    const hasEdit = isMine && !m.fileUrl;
+    const threeDotBtn = isMine ? `
+      <button class="msg-three-dot" onclick="_toggleMsgMenu('${msgId}', event)" title="خيارات">⋮</button>
+      <div class="msg-menu" id="${menuId}" style="display:none">
+        ${hasEdit ? `<div class="msg-menu-item" onclick="_editMsg('${msgId}','${(m.text||'').replace(/'/g,"&#39;")}');_closeMsgMenus()">✏️ تعديل</div>` : ''}
+        <div class="msg-menu-item danger" onclick="_deleteMsg('${msgId}');_closeMsgMenus()">🗑️ حذف</div>
+      </div>` : '';
 
     wrap.innerHTML = `
       ${!isMine ? `<div class="msg-sender-name">${m.senderName || 'مجهول'}${adminBadge}</div>` : ''}
-      <div class="msg-bubble-inner">${contentHtml}</div>
-      <div class="msg-meta">${timeStr}${isMine ? ' <span style="color:rgba(255,255,255,0.7)">✓✓</span>' : ''}</div>
-      ${actionBtns}`;
-
-    // إظهار/إخفاء الأزرار عند hover
-    wrap.addEventListener('mouseenter', () => {
-      const acts = wrap.querySelector('.msg-actions');
-      if (acts) acts.style.display = 'flex';
-    });
-    wrap.addEventListener('mouseleave', () => {
-      const acts = wrap.querySelector('.msg-actions');
-      if (acts) acts.style.display = 'none';
-    });
+      <div style="display:flex;align-items:flex-start;gap:4px;position:relative">
+        <div class="msg-bubble-inner" style="flex:1">${contentHtml}</div>
+        ${threeDotBtn}
+      </div>
+      <div class="msg-meta">${timeStr}${isMine ? ' <span style="color:rgba(255,255,255,0.7)">✓✓</span>' : ''}</div>`;
 
     list.appendChild(wrap);
   });
@@ -5255,6 +5264,42 @@ async function _startPrivateConv(teacherUid, teacherName) {
 }
 window.startPrivateConv = _startPrivateConv;
 
+
+// ═══════════════════════════
+// قائمة 3 نقاط
+// ═══════════════════════════
+window._toggleMsgMenu = (msgId, e) => {
+  e.stopPropagation();
+  const menuId = `msg-menu-${msgId}`;
+  const menu = document.getElementById(menuId);
+  if (!menu) return;
+  const isOpen = menu.style.display === 'block';
+  _closeMsgMenus();
+  if (!isOpen) menu.style.display = 'block';
+};
+window._closeMsgMenus = () => {
+  document.querySelectorAll('.msg-menu').forEach(m => m.style.display = 'none');
+};
+document.addEventListener('click', _closeMsgMenus);
+
+// ═══════════════════════════
+// Lightbox للصور
+// ═══════════════════════════
+window._openImgLightbox = (src) => {
+  const bg = document.createElement('div');
+  bg.className = 'img-lightbox-bg';
+  bg.onclick = () => bg.remove();
+  const img = document.createElement('img');
+  img.src = src;
+  img.onclick = e => e.stopPropagation();
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'img-lightbox-close';
+  closeBtn.textContent = '✕';
+  closeBtn.onclick = () => bg.remove();
+  bg.appendChild(img);
+  bg.appendChild(closeBtn);
+  document.body.appendChild(bg);
+};
 </script>
 
 <!-- ─── تعليمات Firestore Rules ─── -->
