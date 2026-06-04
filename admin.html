@@ -611,6 +611,8 @@
     .session-card.current{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light);cursor:pointer;animation:sessionPulse 2s infinite}
     @keyframes sessionPulse{0%,100%{box-shadow:0 0 0 3px var(--primary-light)}50%{box-shadow:0 0 0 6px rgba(124,58,237,0.08)}}
     .session-card.done{border-color:var(--success);background:var(--success-soft)}
+    .session-card.missed{background:rgba(245,158,11,0.07);border-color:rgba(245,158,11,0.35);cursor:pointer}
+    .session-card.missed:hover{background:rgba(245,158,11,0.13);border-color:rgba(245,158,11,0.55)}
     .session-num{font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:6px}
     .session-day{font-size:13px;font-weight:900;color:var(--text);margin-bottom:8px}
     .session-dots{display:flex;justify-content:center;gap:4px;flex-wrap:wrap;margin-top:6px}
@@ -1709,7 +1711,7 @@ onAuthStateChanged(auth, async user => {
         if (logPanel) logPanel.style.display = 'none';
         // عرض نافذة الترحيب
         currentTeacherData = { uid: user.uid, id: user.uid, ...td };
-        document.getElementById('welcome-teacher-name').textContent = `أهلاً، ${td.name}!`;
+        document.getElementById('welcome-teacher-name').textContent = `أهلاً استاذ ${td.name} .. يوم سعيد 🌟`;
         document.getElementById('welcome-modal').classList.add('open');
         // تحميل بيانات الأستاذ
         loadTeacherStudentsView(user.uid, td);
@@ -3724,12 +3726,26 @@ function updateSessionCards(sessions, recordedSessions, teacherData) {
   _allRecordedSessions = recordedSessions;
   const students = currentAttStudents;
 
-  // حدد الحصة الحالية: أول حصة غير مسجلة
-  let currentSession = 1;
+  // ── تحديد الحصة الحالية بناءً على يوم الأسبوع الفعلي ──
+  const arabicDayNames = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const todayArabic = arabicDayNames[new Date().getDay()];
+  const teacherDays = teacherData.days || [];
+
+  // نبني خريطة: رقم الحصة → هل يومها فات أم لا
+  // الفكرة: نمشي الحصص بالترتيب. أي حصة غير مسجلة ويومها != اليوم الحالي
+  // نعتبرها "فائتة" إذا كان ترتيبها قبل الحصة الحالية.
+  // "الحصة الحالية" = أول حصة غير مسجلة يومها == اليوم أو ما زلنا لم نصلها.
+
+  // نحدد الحصة الحالية: أول حصة غير مسجلة
+  let currentSession = 13; // افتراضياً كل مسجلة
   for (let i = 1; i <= 12; i++) {
     if (!recordedSessions[i]) { currentSession = i; break; }
-    if (i === 12) currentSession = 13; // كل الحصص مسجلة — لا توجد حالية
   }
+
+  // الحصة الحالية يومها
+  const currentSessionDay = currentSession <= 12 ? sessions[currentSession - 1]?.day : null;
+  // هل يوم الحصة الحالية هو اليوم نفسه؟
+  const isSessionDayToday = currentSessionDay === todayArabic;
 
   // تحديث عداد الملخص
   const doneCount = Object.keys(recordedSessions).length;
@@ -3743,27 +3759,44 @@ function updateSessionCards(sessions, recordedSessions, teacherData) {
     if (!card) continue;
 
     const isRecorded = !!recordedSessions[i];
-    const isCurrent = i === currentSession;
+    const isCurrent  = i === currentSession;
+    const sessionDay = sessions[i - 1]?.day || '';
 
-    card.classList.remove('locked','current','done');
+    // الحصة "فائتة": قبل الحصة الحالية، غير مسجلة، ويومها ≠ اليوم
+    const isMissed = !isRecorded && !isCurrent && i < currentSession;
+
+    card.classList.remove('locked', 'current', 'done', 'missed');
+    // تحديث onclick: الحصة المسجلة أو الفائتة تفتح عرض القراءة فقط
+    if (isRecorded) {
+      card.setAttribute('onclick', `viewSessionHistory(${i})`);
+    } else if (isMissed) {
+      card.setAttribute('onclick', `viewSessionHistory(${i})`);
+    } else if (isCurrent) {
+      card.setAttribute('onclick', `openSession(${i})`);
+    } else {
+      card.setAttribute('onclick', '');
+    }
 
     if (isRecorded) {
       card.classList.add('done');
-      // تاريخ الحصة المسجّلة
       const recDate = recordedSessions[i].savedAt?.toDate
         ? recordedSessions[i].savedAt.toDate().toLocaleDateString('ar-DZ', {day:'numeric', month:'short'})
         : (recordedSessions[i].date || '');
       chipEl.innerHTML = `<span class="session-status-chip done-chip">✅ مسجّلة</span>${recDate ? `<div style="font-size:9px;color:#059669;font-weight:700;margin-top:3px">${recDate}</div>` : ''}`;
-      // نقطة لكل تلميذ: معبأة خضراء = حاضر، فارغة = غائب
       const recStudents = recordedSessions[i].students || [];
       dotsEl.innerHTML = recStudents.length
         ? recStudents.map(s => `<span class="sdot ${s.present ? 'recorded' : ''}" title="${s.name}: ${s.present ? 'حاضر' : 'غائب'}"></span>`).join('')
         : `<span class="sdot recorded"></span>`;
+    } else if (isMissed) {
+      card.classList.add('missed');
+      chipEl.innerHTML = `<span class="session-status-chip" style="background:rgba(245,158,11,0.12);color:#d97706;border:1px solid rgba(245,158,11,0.25)">⚠️ فائتة</span><div style="font-size:9px;color:#d97706;font-weight:700;margin-top:3px">انتهى وقتها</div>`;
+      dotsEl.innerHTML = students.length
+        ? students.map(s => `<span class="sdot" style="opacity:0.4" title="${s.name}"></span>`).join('')
+        : `<span class="sdot" style="opacity:0.4"></span>`;
     } else if (isCurrent) {
       card.classList.add('current');
       const todayStr = new Date().toLocaleDateString('ar-DZ', {day:'numeric', month:'short'});
       chipEl.innerHTML = `<span class="session-status-chip current-chip">▶ الحصة الحالية</span><div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">${todayStr}</div>`;
-      // نقطة لكل تلميذ فارغة (لم تُسجَّل بعد)، أولها نابضة
       dotsEl.innerHTML = students.length
         ? students.map((s,idx) => `<span class="sdot ${idx===0?'current-dot':''}" title="${s.name}"></span>`).join('')
         : `<span class="sdot current-dot"></span>`;
@@ -3776,6 +3809,57 @@ function updateSessionCards(sessions, recordedSessions, teacherData) {
     }
   }
 }
+
+// ─── عرض سجل حصة فائتة أو مسجّلة (قراءة فقط) ───
+window.viewSessionHistory = (sessionNum) => {
+  const areaEl = document.getElementById('active-session-area');
+  if (!areaEl) return;
+
+  const record = _allRecordedSessions[sessionNum];
+  const isMissed = !record;
+
+  const recDate = record?.savedAt?.toDate
+    ? record.savedAt.toDate().toLocaleDateString('ar-DZ', {weekday:'long', day:'numeric', month:'long'})
+    : (record?.date || '');
+
+  const studentsHtml = isMissed
+    ? `<div style="text-align:center;padding:30px 20px">
+        <div style="font-size:36px;margin-bottom:10px">⚠️</div>
+        <div style="font-size:15px;font-weight:800;color:#d97706;margin-bottom:6px">لم يُسجَّل الحضور لهذه الحصة</div>
+        <div style="font-size:12px;color:var(--text-muted)">انتهى وقت تسجيل هذه الحصة — تم قفلها تلقائياً</div>
+      </div>`
+    : (record.students || []).map(s => `
+        <div class="att-student-row" style="pointer-events:none;opacity:${s.present?1:0.6}">
+          <span class="att-student-id">${s.id || '—'}</span>
+          <span class="att-student-name">${s.name}</span>
+          <span class="pay-badge ${s.present?'paid':'unpaid'}" style="margin-right:auto">${s.present ? '✅ حاضر' : '❌ غائب'}</span>
+        </div>`).join('') || `<div style="text-align:center;padding:20px;color:var(--text-muted)">لا يوجد تلاميذ</div>`;
+
+  const presentCount = isMissed ? 0 : (record.students || []).filter(s => s.present).length;
+  const totalCount   = isMissed ? 0 : (record.students || []).length;
+
+  areaEl.style.display = 'block';
+  areaEl.innerHTML = `
+    <div class="session-att-wrap" style="border:2px solid ${isMissed?'rgba(245,158,11,0.35)':'rgba(16,185,129,0.3)'}">
+      <div class="session-att-header" style="background:${isMissed?'rgba(245,158,11,0.08)':'var(--success-soft)'}">
+        <div style="font-size:20px">${isMissed ? '⚠️' : '📋'}</div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:900;color:var(--text)">سجل الحصة ${sessionNum} — ${isMissed ? 'فائتة' : 'مسجّلة'}</div>
+          ${recDate ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px">📅 ${recDate}</div>` : ''}
+        </div>
+        ${!isMissed ? `<div style="font-size:13px;font-weight:800;color:var(--success)">${presentCount}/${totalCount} حاضر</div>` : ''}
+        <button onclick="document.getElementById('active-session-area').style.display='none'" style="padding:6px 14px;border-radius:10px;border:1px solid var(--border-2);background:var(--card);color:var(--text-muted);font-size:12px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">✕ إغلاق</button>
+      </div>
+      <div style="padding:16px 24px">
+        <div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--text-muted);font-weight:700;text-align:center">
+          🔒 هذه الحصة في وضع القراءة فقط — لا يمكن التعديل عليها
+        </div>
+        <div class="att-students-list" id="att-students-list">${studentsHtml}</div>
+      </div>
+    </div>`;
+
+  setTimeout(() => areaEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+};
 
 // ─── فتح حصة لتسجيل الحضور ───
 window.openSession = (sessionNum) => {
