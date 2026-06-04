@@ -4596,275 +4596,402 @@ window.switchNavSection = (section) => {
 </div>
 
 <!-- New Conversation Picker (Admin) -->
-<div id="msg-new-conv-bg" style="position:fixed;inset:0;background:rgba(15,10,40,0.5);z-index:4000;display:none;align-items:center;justify-content:center;padding:20px">
-  <div style="background:white;border-radius:22px;padding:28px;max-width:400px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,0.3)">
-    <div style="font-size:15px;font-weight:900;color:var(--text);margin-bottom:16px">💬 محادثة جديدة مع أستاذ</div>
-    <div id="msg-teacher-picker-list" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto"></div>
-    <button onclick="closeNewConvPicker()" style="margin-top:16px;width:100%;padding:11px;border-radius:12px;border:1px solid var(--border);background:white;color:var(--text-muted);font-size:13px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif">إلغاء</button>
+<div id="msg-new-conv-bg" style="position:fixed;inset:0;background:rgba(15,10,40,0.6);backdrop-filter:blur(8px);z-index:4000;display:none;align-items:center;justify-content:center;padding:20px">
+  <div style="background:white;border-radius:24px;padding:0;max-width:460px;width:100%;box-shadow:0 28px 70px rgba(0,0,0,0.3);overflow:hidden;max-height:90vh;display:flex;flex-direction:column">
+    <!-- Header -->
+    <div style="padding:22px 24px 16px;background:linear-gradient(135deg,var(--primary-light),rgba(236,72,153,0.06));border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+        <div style="width:40px;height:40px;border-radius:13px;background:linear-gradient(135deg,var(--primary),#9333EA);display:flex;align-items:center;justify-content:center;font-size:18px">💬</div>
+        <div>
+          <div style="font-size:15px;font-weight:900;color:var(--text)">مراسلة أستاذ</div>
+          <div style="font-size:12px;color:var(--text-muted)">اختر الأستاذ الذي تريد مراسلته</div>
+        </div>
+        <button onclick="window.closeNewConvPicker()" style="margin-right:auto;padding:7px;border:none;background:rgba(0,0,0,0.06);color:var(--text-muted);border-radius:9px;cursor:pointer;font-size:16px;line-height:1">✕</button>
+      </div>
+      <!-- Search -->
+      <div style="position:relative">
+        <span style="position:absolute;top:50%;right:13px;transform:translateY(-50%);font-size:15px;pointer-events:none">🔍</span>
+        <input id="msg-teacher-search"
+          type="text"
+          placeholder="ابحث بالاسم أو التخصص..."
+          style="width:100%;padding:10px 38px 10px 14px;border:2px solid var(--border);border-radius:12px;font-size:13px;font-family:'Tajawal',sans-serif;color:var(--text);background:#FAFAFA;outline:none;transition:all 0.25s"
+          oninput="_buildTeacherPicker ? _buildTeacherPicker() : window._buildTP && window._buildTP()"
+          onfocus="this.style.borderColor='var(--primary)';this.style.background='#fff'"
+          onblur="this.style.borderColor='var(--border)';this.style.background='#FAFAFA'">
+      </div>
+    </div>
+    <!-- List -->
+    <div id="msg-teacher-picker-list" style="padding:14px 16px;flex:1;overflow-y:auto;max-height:420px"></div>
   </div>
 </div>
 
 <script type="module">
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, doc, setDoc, getDoc, getDocs, where, updateDoc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, doc, setDoc, getDoc, getDocs, where, updateDoc, limit } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
-// استخدام نفس app Firebase الموجودة
-const existingApps = getApps();
-const app = existingApps[0];
-if (!app) { console.warn('Messaging: Firebase app not ready'); }
-const db2 = app ? getFirestore(app) : null;
+/* ══════════════════════════════════════════════════
+   نظام التواصل — E-PLUS Academy
+   ────────────────────────────────────────────────
+   Collections في Firestore:
+   • messages          — كل الرسائل (general + private)
+     { roomId, text, senderId, senderName, isAdmin, sentAt }
+   • msgRooms          — معلومات الغرف الخاصة
+     { id, participants:[], names:{}, lastMsg, lastAt }
 
-// ─── الحالة ───
-let msgCurrentUser = null;       // { uid, name, isAdmin }
-let msgCurrentRoom = null;       // 'general' | convId
-let _msgUnsub = null;
-let _msgRoomsUnsub = null;
-let _unreadCounts = {};
+   قواعد Firestore المطلوبة (أضفها في Firebase Console):
+   ─────────────────────────────────────────────────
+   match /messages/{id} {
+     allow read, write: if request.auth != null;
+   }
+   match /msgRooms/{id} {
+     allow read, write: if request.auth != null;
+   }
+══════════════════════════════════════════════════ */
 
-// ─── تهيئة: ننتظر أن يُسجّل المستخدم الدخول ───
-function initMessaging(uid, name, isAdmin) {
-  if (!db2) return;
-  msgCurrentUser = { uid, name, isAdmin };
-  renderPrivateList();
-  listenUnreadCounts();
-  // Auto-open general room
-  openMsgRoom('general');
-  // أظهر زر "محادثة جديدة" للأدمين فقط
-  const newBtnWrap = document.getElementById('msg-new-btn-wrap');
-  if (newBtnWrap) newBtnWrap.style.display = isAdmin ? 'block' : 'none';
-}
-window.initMessaging = initMessaging;
+const existingApp = getApps()[0];
+if (!existingApp) { console.warn('Messaging: Firebase not ready'); }
+const _db = existingApp ? getFirestore(existingApp) : null;
 
-// ─── فتح modal التواصل ───
+// ─── State ───
+let _me = null;           // { uid, name, isAdmin }
+let _room = null;         // 'general' | roomId
+let _msgUnsub2 = null;
+let _roomsUnsub = null;
+let _localTeachers = [];  // يُملأ من allTeachers الموجودة
+
+// ═══════════════════════════
+// تهيئة
+// ═══════════════════════════
+window.initMessaging = (uid, name, isAdmin) => {
+  if (!_db) return;
+  _me = { uid, name, isAdmin };
+  // سحب قائمة الأساتذة من المتغير العام (موجود في نفس الصفحة)
+  setTimeout(() => {
+    _localTeachers = window.allTeachers || [];
+  }, 1500);
+  _renderRoomsList();
+  // للأدمين نفتح الغرفة العامة تلقائياً
+  if (isAdmin) _openRoom('general');
+  // زر "محادثة جديدة" للأدمين فقط
+  const nb = document.getElementById('msg-new-btn-wrap');
+  if (nb) nb.style.display = isAdmin ? 'block' : 'none';
+};
+
+// ═══════════════════════════
+// فتح/إغلاق Modal
+// ═══════════════════════════
 window.openMsgModal = () => {
+  if (!_me) { window.showToast && showToast('⏳ يرجى الانتظار...', true); return; }
+  // تحديث قائمة الأساتذة عند كل فتح
+  _localTeachers = window.allTeachers || [];
   document.getElementById('msg-modal-bg').classList.add('open');
-  if (msgCurrentRoom) openMsgRoom(msgCurrentRoom);
+  // إعادة فتح الغرفة الحالية أو العامة
+  _openRoom(_room || 'general');
 };
 window.closeMsgModal = () => {
   document.getElementById('msg-modal-bg').classList.remove('open');
-  if (_msgUnsub) { _msgUnsub(); _msgUnsub = null; }
+  if (_msgUnsub2) { _msgUnsub2(); _msgUnsub2 = null; }
 };
 
-// ─── قائمة المحادثات الخاصة ───
-function renderPrivateList() {
-  if (!db2 || !msgCurrentUser) return;
-  if (_msgRoomsUnsub) { _msgRoomsUnsub(); _msgRoomsUnsub = null; }
+// ═══════════════════════════
+// قائمة الغرف في السايدبار
+// ═══════════════════════════
+function _renderRoomsList() {
+  if (!_db || !_me) return;
+  if (_roomsUnsub) { _roomsUnsub(); _roomsUnsub = null; }
   const listEl = document.getElementById('msg-private-list');
   if (!listEl) return;
 
-  // جلب المحادثات التي يشارك فيها المستخدم
-  const convRef = collection(db2, 'conversations');
-  _msgRoomsUnsub = onSnapshot(query(convRef, orderBy('lastAt', 'desc')), snap => {
-    const myConvs = snap.docs.filter(d => {
-      const data = d.data();
-      return data.participants && data.participants.includes(msgCurrentUser.uid);
-    });
-
-    // نظهر فقط "خاص" قسم
-    const existing = listEl.querySelectorAll('.msg-room-btn');
-    existing.forEach(e => e.remove());
-
-    myConvs.forEach(d => {
-      const data = d.data();
-      const otherId = data.participants.find(p => p !== msgCurrentUser.uid);
-      const otherName = data.participantNames?.[otherId] || 'أستاذ';
-      const unread = _unreadCounts[d.id] || 0;
-      const btn = document.createElement('div');
-      btn.className = 'msg-room-btn' + (msgCurrentRoom === d.id ? ' active' : '');
-      btn.id = 'msg-room-' + d.id;
-      btn.onclick = () => openMsgRoom(d.id, otherName, data);
-      btn.innerHTML = `
-        <div class="msg-room-icon" style="background:var(--primary-light);color:var(--primary);font-weight:900;font-size:13px">${otherName[0] || '؟'}</div>
-        <div style="flex:1;min-width:0">
-          <div class="msg-room-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${otherName}</div>
-          <div class="msg-room-sub">${data.lastMsg ? data.lastMsg.substring(0, 28) + (data.lastMsg.length > 28 ? '…' : '') : 'لا توجد رسائل'}</div>
-        </div>
-        ${unread > 0 ? `<span style="min-width:18px;height:18px;border-radius:99px;background:var(--danger);color:white;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 4px">${unread}</span>` : ''}`;
-      listEl.appendChild(btn);
-    });
-  });
+  _roomsUnsub = onSnapshot(
+    query(collection(_db, 'msgRooms'), orderBy('lastAt', 'desc')),
+    snap => {
+      const myRooms = snap.docs.filter(d => {
+        const p = d.data().participants || [];
+        return p.includes(_me.uid);
+      });
+      // حذف العناصر القديمة
+      listEl.querySelectorAll('.msg-room-btn').forEach(e => e.remove());
+      if (!myRooms.length) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'font-size:11px;color:var(--text-muted);padding:10px 4px;text-align:center';
+        empty.textContent = 'لا توجد محادثات خاصة بعد';
+        empty.id = 'msg-no-private';
+        listEl.appendChild(empty);
+        return;
+      }
+      document.getElementById('msg-no-private')?.remove();
+      myRooms.forEach(d => {
+        const data = d.data();
+        const otherId = (data.participants || []).find(p => p !== _me.uid);
+        const otherName = data.names?.[otherId] || 'أستاذ';
+        const btn = document.createElement('div');
+        btn.className = 'msg-room-btn' + (_room === d.id ? ' active' : '');
+        btn.id = 'msg-room-' + d.id;
+        btn.onclick = () => _openRoom(d.id, otherName, data);
+        const lastMsg = data.lastMsg ? data.lastMsg.substring(0, 30) + (data.lastMsg.length > 30 ? '…' : '') : 'لا توجد رسائل';
+        btn.innerHTML = `
+          <div class="msg-room-icon" style="background:var(--primary-light);color:var(--primary);font-weight:900;font-size:15px">${(otherName[0]||'؟').toUpperCase()}</div>
+          <div style="flex:1;min-width:0">
+            <div class="msg-room-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${otherName}</div>
+            <div class="msg-room-sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lastMsg}</div>
+          </div>`;
+        listEl.appendChild(btn);
+      });
+    },
+    err => console.warn('msgRooms listen error:', err.code)
+  );
 }
 
-// ─── مراقبة الرسائل غير المقروءة ───
-function listenUnreadCounts() {
-  if (!db2 || !msgCurrentUser) return;
-  // نحسب الكل من قاعدة البيانات بشكل مبسط
-}
+// ═══════════════════════════
+// فتح غرفة
+// ═══════════════════════════
+async function _openRoom(roomId, roomName, roomData) {
+  if (!_db || !_me) return;
+  _room = roomId;
 
-// ─── فتح غرفة أو محادثة ───
-window.openMsgRoom = async (roomId, roomName, convData) => {
-  if (!db2 || !msgCurrentUser) return;
-  msgCurrentRoom = roomId;
-
-  // تحديث active states في sidebar
+  // تحديث active
   document.querySelectorAll('.msg-room-btn').forEach(b => b.classList.remove('active'));
-  const activeBtn = document.getElementById('msg-room-' + roomId);
-  if (activeBtn) activeBtn.classList.add('active');
+  document.getElementById('msg-room-' + roomId)?.classList.add('active');
+  document.getElementById('msg-room-general')?.classList.toggle('active', roomId === 'general');
 
-  // بناء chat header
-  let headerName, headerSub, headerIcon;
+  // تحديد الاسم والأيقونة
+  let hName, hSub;
   if (roomId === 'general') {
-    headerName = 'غرفة الأساتذة العامة';
-    headerSub = 'جميع الأساتذة والإدارة';
-    headerIcon = '👥';
+    hName = 'غرفة الأساتذة العامة';
+    hSub = 'مرئية لجميع الأساتذة والإدارة';
   } else {
-    const otherId = convData?.participants?.find(p => p !== msgCurrentUser.uid);
-    headerName = roomName || convData?.participantNames?.[otherId] || 'محادثة خاصة';
-    headerSub = 'محادثة خاصة';
-    headerIcon = headerName[0] || '؟';
+    const otherId = (roomData?.participants || []).find(p => p !== _me.uid);
+    hName = roomName || roomData?.names?.[otherId] || 'محادثة خاصة';
+    hSub = 'محادثة خاصة 🔒';
   }
 
   const chatArea = document.getElementById('msg-chat-area');
+  const initials = roomId === 'general' ? '👥' : (hName[0]||'؟').toUpperCase();
   chatArea.innerHTML = `
     <div class="msg-chat-header">
-      <div class="msg-chat-avatar">${roomId === 'general' ? '👥' : headerIcon}</div>
-      <div>
-        <div class="msg-chat-name">${headerName}</div>
-        <div class="msg-chat-status">${headerSub}</div>
+      <div class="msg-chat-avatar" style="${roomId==='general'?'font-size:20px':'font-size:16px;font-weight:900'}">${initials}</div>
+      <div style="flex:1">
+        <div class="msg-chat-name">${hName}</div>
+        <div class="msg-chat-status">${hSub}</div>
       </div>
     </div>
-    <div class="msg-messages" id="msg-messages-list"><div class="msg-empty"><div class="msg-empty-icon">💬</div><div>لا توجد رسائل بعد</div></div></div>
+    <div class="msg-messages" id="msg-messages-list">
+      <div class="msg-empty"><div class="msg-empty-icon">💬</div><div style="font-size:13px">لا توجد رسائل بعد</div></div>
+    </div>
     <div class="msg-input-area">
-      <textarea class="msg-input" id="msg-text-inp" placeholder="اكتب رسالتك..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
-      <button class="msg-send-btn" onclick="sendMsg()">إرسال ←</button>
+      <textarea class="msg-input" id="msg-text-inp" placeholder="اكتب رسالتك هنا..." rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();window.sendMsg()}"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+      <button class="msg-send-btn" onclick="window.sendMsg()">إرسال ←</button>
     </div>`;
 
   // الاستماع للرسائل
-  if (_msgUnsub) { _msgUnsub(); _msgUnsub = null; }
-  const collPath = roomId === 'general' ? 'generalMessages' : `conversations/${roomId}/messages`;
-  _msgUnsub = onSnapshot(
-    query(collection(db2, collPath), orderBy('sentAt', 'asc')),
-    snap => renderMessages(snap.docs)
+  if (_msgUnsub2) { _msgUnsub2(); _msgUnsub2 = null; }
+  _msgUnsub2 = onSnapshot(
+    query(collection(_db, 'messages'), where('roomId', '==', roomId), orderBy('sentAt', 'asc'), limit(200)),
+    snap => _renderMessages(snap.docs),
+    err => {
+      console.warn('messages listen error:', err.code, err.message);
+      const list = document.getElementById('msg-messages-list');
+      if (list) list.innerHTML = `<div class="msg-empty" style="color:var(--danger)"><div style="font-size:32px">⚠️</div><div style="font-size:13px;font-weight:700">خطأ في الاتصال</div><div style="font-size:12px;margin-top:4px">تحقق من صلاحيات Firestore — راجع التعليمات أدناه</div></div>`;
+    }
   );
-};
+}
+window.openMsgRoom = (roomId, roomName, data) => _openRoom(roomId, roomName, data);
 
-// ─── رسم الرسائل ───
-function renderMessages(docs) {
+// ═══════════════════════════
+// رسم الرسائل
+// ═══════════════════════════
+function _renderMessages(docs) {
   const list = document.getElementById('msg-messages-list');
   if (!list) return;
   if (!docs.length) {
-    list.innerHTML = `<div class="msg-empty"><div class="msg-empty-icon">💬</div><div>لا توجد رسائل بعد — كن أول من يكتب!</div></div>`;
+    list.innerHTML = `<div class="msg-empty"><div class="msg-empty-icon">💬</div><div style="font-size:13px">لا توجد رسائل — ابدأ المحادثة!</div></div>`;
     return;
   }
-  let lastDateStr = '';
+  let lastDate = '';
   list.innerHTML = '';
   docs.forEach(d => {
     const m = d.data();
-    const isMine = m.senderId === msgCurrentUser?.uid;
+    const isMine = m.senderId === _me?.uid;
     const dateObj = m.sentAt?.toDate ? m.sentAt.toDate() : new Date();
-    const dateStr = dateObj.toLocaleDateString('ar-DZ', {weekday:'short', day:'numeric', month:'short'});
-    const timeStr = dateObj.toLocaleTimeString('ar-DZ', {hour:'2-digit', minute:'2-digit'});
+    const dateStr = dateObj.toLocaleDateString('ar-DZ', { weekday: 'long', day: 'numeric', month: 'long' });
+    const timeStr = dateObj.toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' });
 
-    if (dateStr !== lastDateStr) {
-      lastDateStr = dateStr;
+    if (dateStr !== lastDate) {
+      lastDate = dateStr;
       const sep = document.createElement('div');
       sep.className = 'msg-date-sep';
       sep.textContent = dateStr;
       list.appendChild(sep);
     }
 
-    const bubble = document.createElement('div');
-    bubble.className = `msg-bubble ${isMine ? 'mine' : 'theirs'}`;
-    bubble.innerHTML = `
-      ${!isMine ? `<div class="msg-sender-name">${m.senderName || 'مجهول'}</div>` : ''}
-      <div class="msg-bubble-inner">${m.text || ''}</div>
-      <div class="msg-meta">${timeStr}${isMine ? ' ✓✓' : ''}</div>`;
-    list.appendChild(bubble);
+    const wrap = document.createElement('div');
+    wrap.className = `msg-bubble ${isMine ? 'mine' : 'theirs'}`;
+    const adminBadge = m.isAdmin && !isMine ? `<span style="font-size:9px;background:linear-gradient(135deg,var(--primary),#9333EA);color:white;padding:2px 6px;border-radius:99px;font-weight:800;margin-inline-start:4px">إدارة</span>` : '';
+    wrap.innerHTML = `
+      ${!isMine ? `<div class="msg-sender-name">${m.senderName || 'مجهول'}${adminBadge}</div>` : ''}
+      <div class="msg-bubble-inner">${(m.text || '').replace(/\n/g,'<br>')}</div>
+      <div class="msg-meta">${timeStr}${isMine ? ' <span style="color:rgba(255,255,255,0.7)">✓✓</span>' : ''}</div>`;
+    list.appendChild(wrap);
   });
   list.scrollTop = list.scrollHeight;
 }
 
-// ─── إرسال رسالة ───
+// ═══════════════════════════
+// إرسال رسالة
+// ═══════════════════════════
 window.sendMsg = async () => {
-  if (!db2 || !msgCurrentUser || !msgCurrentRoom) return;
+  if (!_db || !_me || !_room) return;
   const inp = document.getElementById('msg-text-inp');
   if (!inp) return;
   const text = inp.value.trim();
   if (!text) return;
   inp.value = '';
   inp.style.height = '';
-  const collPath = msgCurrentRoom === 'general' ? 'generalMessages' : `conversations/${msgCurrentRoom}/messages`;
-  const payload = {
-    text,
-    senderId: msgCurrentUser.uid,
-    senderName: msgCurrentUser.name,
-    isAdmin: msgCurrentUser.isAdmin,
-    sentAt: serverTimestamp()
-  };
   try {
-    await addDoc(collection(db2, collPath), payload);
-    // تحديث آخر رسالة في المحادثة الخاصة
-    if (msgCurrentRoom !== 'general') {
-      await updateDoc(doc(db2, 'conversations', msgCurrentRoom), {
+    await addDoc(collection(_db, 'messages'), {
+      roomId: _room,
+      text,
+      senderId: _me.uid,
+      senderName: _me.name,
+      isAdmin: _me.isAdmin || false,
+      sentAt: serverTimestamp()
+    });
+    // تحديث آخر رسالة في الغرفة الخاصة
+    if (_room !== 'general') {
+      await updateDoc(doc(_db, 'msgRooms', _room), {
         lastMsg: text,
         lastAt: serverTimestamp()
-      });
+      }).catch(() => {});
     }
-  } catch(e) { console.error('send msg error:', e); }
+  } catch(e) {
+    console.error('sendMsg error:', e.code, e.message);
+    window.showToast && showToast('❌ خطأ: ' + (e.code === 'permission-denied' ? 'راجع صلاحيات Firestore' : e.message), true);
+  }
 };
 
-// ─── فتح picker لإنشاء محادثة جديدة (أدمين فقط) ───
-window.openNewConvPicker = async () => {
-  if (!db2) return;
+// ═══════════════════════════
+// فتح picker اختيار الأستاذ (أدمين)
+// ═══════════════════════════
+window.openNewConvPicker = () => {
   const bg = document.getElementById('msg-new-conv-bg');
   bg.style.display = 'flex';
-  const list = document.getElementById('msg-teacher-picker-list');
-  list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted)">⏳ جاري التحميل...</div>`;
-  // جلب الأساتذة
-  const snap = await getDocs(collection(db2, 'teachers'));
-  if (snap.empty) { list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted)">لا يوجد أساتذة</div>`; return; }
-  list.innerHTML = '';
-  snap.docs.forEach(d => {
-    const t = d.data();
-    const btn = document.createElement('button');
-    btn.style.cssText = 'width:100%;padding:12px 16px;border-radius:12px;border:1.5px solid var(--border);background:white;cursor:pointer;font-family:Tajawal,sans-serif;display:flex;align-items:center;gap:12px;text-align:right;transition:all 0.2s';
-    btn.onmouseenter = () => { btn.style.borderColor = 'var(--primary)'; btn.style.background = 'var(--primary-light)'; };
-    btn.onmouseleave = () => { btn.style.borderColor = 'var(--border)'; btn.style.background = 'white'; };
-    btn.innerHTML = `
-      <div style="width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,var(--primary),#9333EA);display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:14px;flex-shrink:0">${(t.name||'?')[0]}</div>
-      <div>
-        <div style="font-size:13px;font-weight:800;color:var(--text)">${t.name}</div>
-        <div style="font-size:11px;color:var(--text-muted)">${t.spec || ''}</div>
-      </div>`;
-    btn.onclick = () => startPrivateConv(d.id, t.name);
-    list.appendChild(btn);
-  });
+  const si = document.getElementById('msg-teacher-search');
+  if (si) si.value = '';
+  _buildTeacherPicker();
 };
-window.closeNewConvPicker = () => { document.getElementById('msg-new-conv-bg').style.display = 'none'; };
+window.closeNewConvPicker = () => {
+  document.getElementById('msg-new-conv-bg').style.display = 'none';
+};
 
-// ─── بدء محادثة خاصة مع أستاذ ───
-window.startPrivateConv = async (teacherUid, teacherName) => {
-  if (!db2 || !msgCurrentUser) return;
-  closeNewConvPicker();
-  // البحث عن محادثة موجودة
-  const convRef = collection(db2, 'conversations');
-  const snap = await getDocs(query(convRef));
-  let convId = null;
-  snap.docs.forEach(d => {
-    const data = d.data();
-    if (data.participants && data.participants.includes(msgCurrentUser.uid) && data.participants.includes(teacherUid)) {
-      convId = d.id;
-    }
-  });
-  if (!convId) {
-    // إنشاء محادثة جديدة
-    const newConv = await addDoc(convRef, {
-      participants: [msgCurrentUser.uid, teacherUid],
-      participantNames: {
-        [msgCurrentUser.uid]: msgCurrentUser.name,
-        [teacherUid]: teacherName
-      },
-      lastMsg: '',
-      lastAt: serverTimestamp(),
-      createdAt: serverTimestamp()
-    });
-    convId = newConv.id;
+function _buildTeacherPicker() {
+  window._buildTP = _buildTeacherPicker; // expose for inline oninput
+  const list = document.getElementById('msg-teacher-picker-list');
+  // تحديث القائمة من المتغير العام
+  _localTeachers = window.allTeachers || [];
+  if (!_localTeachers.length) {
+    list.innerHTML = `<div style="text-align:center;padding:28px;color:var(--text-muted)">
+      <div style="font-size:36px;opacity:0.4;margin-bottom:8px">👨‍🏫</div>
+      <div style="font-weight:700">لا يوجد أساتذة مسجّلون بعد</div>
+    </div>`;
+    return;
   }
-  const convData = { participants: [msgCurrentUser.uid, teacherUid], participantNames: { [msgCurrentUser.uid]: msgCurrentUser.name, [teacherUid]: teacherName } };
-  openMsgRoom(convId, teacherName, convData);
-  renderPrivateList();
-};
+  // فلترة البحث
+  const searchVal = (document.getElementById('msg-teacher-search')?.value || '').trim().toLowerCase();
+  const filtered = searchVal
+    ? _localTeachers.filter(t => t.name?.toLowerCase().includes(searchVal) || t.spec?.toLowerCase().includes(searchVal))
+    : _localTeachers;
+
+  list.innerHTML = '';
+  if (!filtered.length) {
+    list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">🔍 لا توجد نتائج مطابقة</div>`;
+    return;
+  }
+  filtered.forEach(t => {
+    const card = document.createElement('div');
+    card.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:1.5px solid var(--border);background:white;cursor:pointer;transition:all 0.2s;margin-bottom:8px';
+    card.onmouseenter = () => { card.style.borderColor = 'var(--primary)'; card.style.background = 'var(--primary-light)'; card.style.transform = 'translateY(-1px)'; };
+    card.onmouseleave = () => { card.style.borderColor = 'var(--border)'; card.style.background = 'white'; card.style.transform = ''; };
+    card.onclick = () => _startPrivateConv(t.id, t.name);
+
+    const avatarHtml = t.photo
+      ? `<img src="${t.photo}" style="width:44px;height:44px;border-radius:13px;object-fit:cover;flex-shrink:0" alt="${t.name}">`
+      : `<div style="width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--primary),#9333EA);display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:17px;flex-shrink:0">${(t.name||'?')[0]}</div>`;
+
+    const todayName = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'][new Date().getDay()];
+    const isActive = (t.days||[]).includes(todayName);
+
+    card.innerHTML = `
+      ${avatarHtml}
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:14px;font-weight:800;color:var(--text)">${t.name}</span>
+          ${isActive ? `<span style="font-size:10px;padding:2px 7px;border-radius:99px;background:var(--success-soft);color:var(--success);font-weight:800">● اليوم</span>` : ''}
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">🎓 ${t.spec || '—'}</div>
+        <div style="font-size:11px;color:var(--primary);margin-top:1px;font-weight:600">📅 ${(t.days||[]).join('، ') || '—'}</div>
+      </div>
+      <div style="padding:8px 14px;border-radius:10px;background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:800;flex-shrink:0">راسل ←</div>`;
+    list.appendChild(card);
+  });
+}
+
+// ═══════════════════════════
+// بدء محادثة خاصة
+// ═══════════════════════════
+async function _startPrivateConv(teacherUid, teacherName) {
+  if (!_db || !_me) return;
+  closeNewConvPicker();
+
+  // البحث عن غرفة موجودة
+  let roomId = null;
+  try {
+    const snap = await getDocs(collection(_db, 'msgRooms'));
+    snap.docs.forEach(d => {
+      const p = d.data().participants || [];
+      if (p.includes(_me.uid) && p.includes(teacherUid)) roomId = d.id;
+    });
+  } catch(e) { console.warn('msgRooms read error:', e.code); }
+
+  if (!roomId) {
+    try {
+      const newRoom = await addDoc(collection(_db, 'msgRooms'), {
+        participants: [_me.uid, teacherUid],
+        names: { [_me.uid]: _me.name, [teacherUid]: teacherName },
+        lastMsg: '',
+        lastAt: serverTimestamp(),
+        createdAt: serverTimestamp()
+      });
+      roomId = newRoom.id;
+    } catch(e) {
+      console.error('create room error:', e.code);
+      window.showToast && showToast('❌ تعذّر إنشاء المحادثة — تحقق من صلاحيات Firestore', true);
+      return;
+    }
+  }
+
+  const roomData = { participants: [_me.uid, teacherUid], names: { [_me.uid]: _me.name, [teacherUid]: teacherName } };
+  _openRoom(roomId, teacherName, roomData);
+}
+window.startPrivateConv = _startPrivateConv;
+
 </script>
+
+<!-- ─── تعليمات Firestore Rules ─── -->
+<!-- 
+  أضف هذه القواعد في Firebase Console ← Firestore ← Rules:
+  ─────────────────────────────────────────────────────────
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      match /{document=**} {
+        allow read, write: if request.auth != null;
+      }
+    }
+  }
+  ─────────────────────────────────────────────────────────
+-->
 
 </body>
 </html>
