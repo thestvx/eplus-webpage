@@ -770,10 +770,22 @@
     .msg-send-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(124,58,237,0.4)}
     .msg-send-btn:disabled{opacity:0.5;pointer-events:none}
 
-    /* No conversation selected */
-    .msg-no-conv{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-muted)}
-    .msg-no-conv-icon{font-size:52px;opacity:0.25}
-  </style>
+    /* File attachment bubble */
+    .msg-file-bubble{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;border:1.5px solid var(--border);background:white;min-width:180px;cursor:pointer;transition:all 0.2s}
+    .msg-file-bubble:hover{border-color:var(--primary);background:var(--primary-light)}
+    .msg-file-icon{font-size:22px;flex-shrink:0}
+    .msg-file-name{font-size:12px;font-weight:700;color:var(--text);word-break:break-all;flex:1}
+    .msg-file-size{font-size:10px;color:var(--text-muted);margin-top:2px}
+    .msg-bubble-actions{display:none;gap:4px;margin-top:3px}
+    .msg-bubble:hover .msg-bubble-actions{display:flex}
+    .msg-action-btn{padding:3px 8px;border:1px solid var(--border);border-radius:7px;background:white;font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700;color:var(--text-2);transition:all 0.15s}
+    .msg-action-btn:hover{background:var(--primary-light);border-color:var(--border-2);color:var(--primary)}
+    .msg-action-btn.del:hover{background:var(--danger-soft);border-color:rgba(239,68,68,0.3);color:var(--danger)}
+    .msg-edit-area{display:none;margin-top:6px;gap:6px}
+    .msg-edit-inp{flex:1;padding:7px 12px;border:2px solid var(--primary);border-radius:12px;font-size:13px;font-family:'Tajawal',sans-serif;outline:none;color:var(--text)}
+    /* Upload button in message input */
+    .msg-attach-btn{padding:10px;border:none;border-radius:12px;background:var(--primary-light);color:var(--primary);cursor:pointer;font-size:16px;line-height:1;transition:all 0.2s;flex-shrink:0}
+    .msg-attach-btn:hover{background:var(--border-2);transform:scale(1.05)}
 </head>
 <body>
 
@@ -1858,10 +1870,15 @@ onAuthStateChanged(auth, async user => {
           if (el) el.style.display = 'none';
         });
         document.getElementById('section-teachers').style.display = 'block';
-        // إخفاء نموذج إضافة أستاذ وسجل النشاطات
+        // إخفاء نموذج إضافة أستاذ وسجل النشاطات وهيدر الأدمين
         document.querySelector('.teacher-form-panel').style.display = 'none';
         const logPanel = document.getElementById('admin-log-panel');
         if (logPanel) logPanel.style.display = 'none';
+        // إخفاء Hero section (إدارة الأساتذة والحضور) للأساتذة
+        const teachersHero = document.querySelector('.teachers-hero');
+        if (teachersHero) teachersHero.style.display = 'none';
+        const teachersSectionHeader = document.querySelector('#section-teachers .section-header');
+        if (teachersSectionHeader) teachersSectionHeader.style.display = 'none';
         // عرض نافذة الترحيب
         currentTeacherData = { uid: user.uid, id: user.uid, ...td };
         document.getElementById('welcome-teacher-name').textContent = `أهلاً استاذ ${td.name} .. يوم سعيد 🌟`;
@@ -4063,6 +4080,10 @@ function showTeacherInlineAttendance(teacherId, teacherData) {
   if (!grid) return;
 
   const teacherDays = teacherData.days || [];
+  const todayArabic = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'][new Date().getDay()];
+  const isTodayTeachingDay = teacherDays.includes(todayArabic);
+  const groups = teacherData.groups || [];
+
   // بناء 12 حصة موزعة على الأيام (نكرر الدورة حتى 12)
   const sessions = [];
   for (let i = 0; i < 12; i++) {
@@ -4073,11 +4094,34 @@ function showTeacherInlineAttendance(teacherId, teacherData) {
     });
   }
 
-  // نحدد الحصة الحالية: أول حصة لم تُسجَّل بعد
-  // سنحملها من Firestore — نعرض الهيكل أولاً ونحدّث لاحقاً
   const avatarHtml = teacherData.photo
     ? `<img src="${teacherData.photo}" alt="${teacherData.name}" style="width:56px;height:56px;border-radius:16px;object-fit:cover;flex-shrink:0">`
     : `<div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--primary),#9333EA);display:flex;align-items:center;justify-content:center;font-size:22px;color:white;font-weight:900;flex-shrink:0">${(teacherData.name||'?')[0]}</div>`;
+
+  // بناء تبويبات الأفواج
+  const groupTabsHtml = groups.length > 0
+    ? `<div id="teacher-groups-tabs-wrap" style="margin-bottom:20px">
+        <div style="font-size:13px;font-weight:800;color:var(--text-2);margin-bottom:10px">🏫 اختر الفوج لتسجيل الحضور</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="teacher-group-tabs">
+          ${groups.map((g, idx) => `
+            <button class="att-group-tab${idx===0?' active':''}" data-gidx="${idx}" onclick="switchTeacherGroupTab(${idx})" style="padding:8px 18px">
+              🏫 ${g.name}
+              <span class="g-count" style="margin-right:6px">${(g.students||[]).length}</span>
+            </button>`).join('')}
+        </div>
+      </div>`
+    : '';
+
+  // تحذير إذا اليوم ليس يوم تدريس
+  const todayWarning = !isTodayTeachingDay
+    ? `<div style="background:rgba(245,158,11,0.1);border:2px solid rgba(245,158,11,0.3);border-radius:14px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
+        <span style="font-size:22px">⚠️</span>
+        <div>
+          <div style="font-size:14px;font-weight:800;color:#d97706">اليوم (${todayArabic}) ليس من أيام تدريسك</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">يمكنك فقط تسجيل الحضور في أيام: ${teacherDays.join('، ')}</div>
+        </div>
+      </div>`
+    : '';
 
   grid.innerHTML = `
     <div style="grid-column:1/-1">
@@ -4091,22 +4135,27 @@ function showTeacherInlineAttendance(teacherId, teacherData) {
             <div style="font-size:12px;color:var(--primary);font-weight:700;margin-top:3px">📅 أيام التدريس: ${teacherDays.join('، ')}</div>
           </div>
         </div>
+        ${todayWarning}
         <div class="sessions-title">📅 سجل الحضور — 12 حصة في الشهر</div>
-        <div class="sessions-sub">اضغط على الحصة الحالية لتسجيل حضور التلاميذ — الحصص الأخرى مغلقة حتى يحين موعدها</div>
+        <div class="sessions-sub">اضغط على الحصة الحالية لتسجيل حضور التلاميذ — الحصص الأخرى وأيام عدم التدريس مغلقة</div>
       </div>
+
+      ${groupTabsHtml}
 
       <!-- شبكة الـ 12 حصة -->
       <div class="sessions-grid" id="sessions-grid">
-        ${sessions.map((s,i) => `
-          <div class="session-card locked" id="session-card-${i+1}" data-session="${i+1}" onclick="openSession(${i+1})">
+        ${sessions.map((s,i) => {
+          const isTeachingDay = teacherDays.includes(s.day);
+          return `
+          <div class="session-card locked" id="session-card-${i+1}" data-session="${i+1}" data-day="${s.day}" data-is-teaching-day="${isTeachingDay}" onclick="openSession(${i+1})">
             <div class="session-num">حصة ${s.num}</div>
             <div class="session-day">${s.day}</div>
             <div class="session-dots" id="session-dots-${i+1}">
               <!-- النقاط تُحشى ديناميكياً -->
             </div>
             <div id="session-chip-${i+1}"></div>
-          </div>
-        `).join('')}
+          </div>`;
+        }).join('')}
         <!-- بطاقة الملخص بعد الحصة 12 -->
         <div class="summary-card" onclick="openSummaryModal()">
           <div class="summary-card-title">📊 ملخص الشهر</div>
@@ -4119,6 +4168,44 @@ function showTeacherInlineAttendance(teacherId, teacherData) {
 
   // تحميل سجلات الحضور من Firestore وتحديث الحصص
   loadSessionsData(teacherId, teacherData, sessions);
+
+  // تفعيل التبويب الأول إذا كانت هناك أفواج
+  if (groups.length > 0) {
+    window._teacherGroups = groups;
+    window._teacherCurrentGroupIdx = 0;
+    updateStudentsForGroup(0, teacherData);
+  }
+}
+
+// ─── تبديل فوج الأستاذ ───
+window.switchTeacherGroupTab = (idx) => {
+  document.querySelectorAll('#teacher-group-tabs .att-group-tab').forEach(t => t.classList.remove('active'));
+  const tab = document.querySelector(`#teacher-group-tabs [data-gidx="${idx}"]`);
+  if (tab) tab.classList.add('active');
+  window._teacherCurrentGroupIdx = idx;
+  if (window._teacherGroups && window._teacherGroups[idx]) {
+    updateStudentsForGroup(idx, window.currentTeacherData);
+  }
+};
+
+// ─── تحديث التلاميذ حسب الفوج المختار ───
+function updateStudentsForGroup(gidx, teacherData) {
+  const groups = window._teacherGroups || teacherData.groups || [];
+  const g = groups[gidx];
+  if (!g) return;
+  // تصفية التلاميذ حسب أسماء الفوج
+  const groupStudentNames = new Set((g.students || []).map(s => s.trim().toLowerCase()));
+  const allStudents = teacherData.students || [];
+  const filtered = allStudents.filter(s => groupStudentNames.has(s.name.trim().toLowerCase()));
+  // إذا لا يوجد تطابق، نعرض تلاميذ الفوج من قائمة g.students مباشرة
+  if (filtered.length === 0 && g.students && g.students.length > 0) {
+    currentAttStudents = g.students.map((name, idx) => {
+      const existing = allStudents.find(s => s.name.trim().toLowerCase() === name.trim().toLowerCase());
+      return existing || { id: `g${gidx}_${idx}`, name, present: false, marked: false, payStatus: 'unknown' };
+    });
+  } else {
+    currentAttStudents = filtered;
+  }
 }
 
 // ─── Modal تسجيل الحضور (يُبنى مرة واحدة في DOM) ───
@@ -4208,11 +4295,24 @@ function updateSessionCards(sessions, recordedSessions, teacherData) {
     const isCurrent  = i === currentSession;
     const sessionDay = sessions[i - 1]?.day || '';
 
+    // قفل إضافي: إذا يوم الحصة ليس من أيام التدريس
+    const isTeachingDay = (teacherData.days || []).includes(sessionDay);
+    const isNonTeachingDayLock = !isTeachingDay && isTeacherMode;
+
     // الحصة "فائتة": قبل الحصة الحالية، غير مسجلة، ويومها ≠ اليوم
     const isMissed = !isRecorded && !isCurrent && i < currentSession;
 
     card.classList.remove('locked', 'current', 'done', 'missed');
-    // تحديث onclick: الحصة المسجلة أو الفائتة تفتح عرض القراءة فقط
+    // تحديث onclick
+    if (isNonTeachingDayLock) {
+      card.setAttribute('onclick', '');
+      card.classList.add('locked');
+      chipEl.innerHTML = `<span class="session-status-chip locked-chip">🚫 يوم غير تدريسي</span>`;
+      dotsEl.innerHTML = students.length
+        ? students.map(s => `<span class="sdot" title="${s.name}"></span>`).join('')
+        : `<span class="sdot"></span>`;
+      continue;
+    }
     if (isRecorded) {
       card.setAttribute('onclick', `viewSessionHistory(${i})`);
     } else if (isMissed) {
@@ -4307,10 +4407,35 @@ window.openSession = (sessionNum) => {
     showToast('✅ هذه الحصة مسجّلة مسبقاً', false); return;
   }
 
+  // التحقق من أن يوم الحصة هو يوم تدريس
+  const sessionDay = card.dataset.day || '';
+  const teacherDays = currentTeacherData?.days || [];
+  if (isTeacherMode && !teacherDays.includes(sessionDay)) {
+    showToast(`🚫 لا يمكن تسجيل الحضور — ${sessionDay} ليس من أيام تدريسك`, true);
+    return;
+  }
+
   currentOpenSession = sessionNum;
 
+  // تحديد التلاميذ حسب الفوج المختار (إن كان هناك أفواج)
+  let displayStudents = currentAttStudents;
+  if (isTeacherMode && window._teacherGroups && window._teacherGroups.length > 0) {
+    const gidx = window._teacherCurrentGroupIdx || 0;
+    const g = window._teacherGroups[gidx];
+    if (g) {
+      const groupStudentNames = new Set((g.students || []).map(s => s.trim().toLowerCase()));
+      const allStudents = currentTeacherData?.students || currentAttStudents;
+      const filtered = allStudents.filter(s => groupStudentNames.has(s.name.trim().toLowerCase()));
+      displayStudents = filtered.length > 0 ? filtered : (g.students||[]).map((name, idx2) => {
+        const existing = allStudents.find(s => s.name.trim().toLowerCase() === name.trim().toLowerCase());
+        return existing || { id: `g${gidx}_${idx2}`, name, present: false, marked: false, payStatus: 'unknown' };
+      });
+      currentAttStudents = displayStudents;
+    }
+  }
+
   const buildModalHtml = () => {
-    const students = currentAttStudents;
+    const students = displayStudents;
     const studentsHtml = students.length
       ? students.map(s => {
           const { ps, rc } = getLivePayStatus(s);
@@ -4779,6 +4904,8 @@ async function _openRoom(roomId, roomName, roomData) {
       <div class="msg-empty"><div class="msg-empty-icon">💬</div><div style="font-size:13px">لا توجد رسائل بعد</div></div>
     </div>
     <div class="msg-input-area">
+      <input type="file" id="msg-file-input" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" style="display:none" onchange="window.sendMsgFile(event)">
+      <button class="msg-attach-btn" onclick="document.getElementById('msg-file-input').click()" title="إرفاق ملف">📎</button>
       <textarea class="msg-input" id="msg-text-inp" placeholder="اكتب رسالتك هنا..." rows="1"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();window.sendMsg()}"
         oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
@@ -4813,6 +4940,7 @@ function _renderMessages(docs) {
   list.innerHTML = '';
   docs.forEach(d => {
     const m = d.data();
+    const msgId = d.id;
     const isMine = m.senderId === _me?.uid;
     const dateObj = m.sentAt?.toDate ? m.sentAt.toDate() : new Date();
     const dateStr = dateObj.toLocaleDateString('ar-DZ', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -4828,11 +4956,50 @@ function _renderMessages(docs) {
 
     const wrap = document.createElement('div');
     wrap.className = `msg-bubble ${isMine ? 'mine' : 'theirs'}`;
+    wrap.dataset.msgId = msgId;
     const adminBadge = m.isAdmin && !isMine ? `<span style="font-size:9px;background:linear-gradient(135deg,var(--primary),#9333EA);color:white;padding:2px 6px;border-radius:99px;font-weight:800;margin-inline-start:4px">إدارة</span>` : '';
+    const editedBadge = m.edited ? `<span style="font-size:9px;color:var(--text-muted);margin-inline-start:4px">(معدَّل)</span>` : '';
+
+    // محتوى الرسالة: نص أو ملف
+    let bubbleContent = '';
+    if (m.fileUrl) {
+      const ext = (m.fileName || '').split('.').pop().toLowerCase();
+      const isImage = ['jpg','jpeg','png','gif','webp'].includes(ext);
+      if (isImage) {
+        bubbleContent = `<div class="msg-bubble-inner" style="padding:6px;background:${isMine?'linear-gradient(135deg,var(--primary),#9333EA)':'white'}">
+          <img src="${m.fileUrl}" alt="${m.fileName}" style="max-width:220px;border-radius:10px;display:block;cursor:pointer" onclick="window.open('${m.fileUrl}','_blank')">
+          <div style="font-size:10px;margin-top:4px;color:${isMine?'rgba(255,255,255,0.8)':'var(--text-muted)'}">${m.fileName||'صورة'}</div>
+        </div>`;
+      } else {
+        const fileIcons = {pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊'};
+        const icon = fileIcons[ext] || '📎';
+        bubbleContent = `<div class="msg-file-bubble" onclick="window.open('${m.fileUrl}','_blank')" title="فتح الملف">
+          <span class="msg-file-icon">${icon}</span>
+          <div><div class="msg-file-name">${m.fileName||'ملف'}</div><div class="msg-file-size">${m.fileSize||''}</div></div>
+          <span style="font-size:12px;color:var(--primary)">↗</span>
+        </div>`;
+      }
+    } else {
+      bubbleContent = `<div class="msg-bubble-inner">${(m.text || '').replace(/\n/g,'<br>')}</div>`;
+    }
+
+    // أزرار الحذف والتعديل (للمرسِل فقط، وللنص فقط)
+    const actionsHtml = isMine ? `
+      <div class="msg-bubble-actions">
+        ${!m.fileUrl ? `<button class="msg-action-btn" onclick="window.startEditMsg('${msgId}','${(m.text||'').replace(/'/g,"\\'")}')">✏️ تعديل</button>` : ''}
+        <button class="msg-action-btn del" onclick="window.deleteMsg('${msgId}')">🗑️ حذف</button>
+      </div>
+      <div class="msg-edit-area" id="edit-area-${msgId}" style="display:none;margin-top:6px;gap:6px">
+        <input class="msg-edit-inp" id="edit-inp-${msgId}" value="${(m.text||'').replace(/"/g,'&quot;')}" style="flex:1;padding:7px 12px;border:2px solid var(--primary);border-radius:12px;font-size:13px;font-family:'Tajawal',sans-serif;outline:none;color:var(--text)">
+        <button style="padding:7px 14px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--primary),#9333EA);color:white;font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif" onclick="window.saveEditMsg('${msgId}')">حفظ</button>
+        <button style="padding:7px 12px;border:1px solid var(--border);border-radius:10px;background:white;color:var(--text-muted);font-size:12px;cursor:pointer;font-family:'Tajawal',sans-serif" onclick="window.cancelEditMsg('${msgId}')">إلغاء</button>
+      </div>` : '';
+
     wrap.innerHTML = `
       ${!isMine ? `<div class="msg-sender-name">${m.senderName || 'مجهول'}${adminBadge}</div>` : ''}
-      <div class="msg-bubble-inner">${(m.text || '').replace(/\n/g,'<br>')}</div>
-      <div class="msg-meta">${timeStr}${isMine ? ' <span style="color:rgba(255,255,255,0.7)">✓✓</span>' : ''}</div>`;
+      ${bubbleContent}
+      <div class="msg-meta">${timeStr}${editedBadge}${isMine ? ' <span style="color:rgba(255,255,255,0.7)">✓✓</span>' : ''}</div>
+      ${actionsHtml}`;
     list.appendChild(wrap);
   });
   list.scrollTop = list.scrollHeight;
@@ -4891,10 +5058,18 @@ function _buildTeacherPicker() {
   // تحديث القائمة من المتغير العام
   _localTeachers = window.allTeachers || [];
   if (!_localTeachers.length) {
-    list.innerHTML = `<div style="text-align:center;padding:28px;color:var(--text-muted)">
-      <div style="font-size:36px;opacity:0.4;margin-bottom:8px">👨‍🏫</div>
-      <div style="font-weight:700">لا يوجد أساتذة مسجّلون بعد</div>
-    </div>`;
+    // جلب الأساتذة من Firestore مباشرة (في حالة الأدمين ولم تُحمَّل بعد)
+    list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">⏳ جاري تحميل الأساتذة...</div>`;
+    getDocs(collection(_db, 'teachers')).then(snap => {
+      _localTeachers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      window.allTeachers = _localTeachers;
+      _buildTeacherPicker();
+    }).catch(() => {
+      list.innerHTML = `<div style="text-align:center;padding:28px;color:var(--text-muted)">
+        <div style="font-size:36px;opacity:0.4;margin-bottom:8px">👨‍🏫</div>
+        <div style="font-weight:700">لا يوجد أساتذة مسجّلون بعد</div>
+      </div>`;
+    });
     return;
   }
   // فلترة البحث
@@ -4974,7 +5149,104 @@ async function _startPrivateConv(teacherUid, teacherName) {
   const roomData = { participants: [_me.uid, teacherUid], names: { [_me.uid]: _me.name, [teacherUid]: teacherName } };
   _openRoom(roomId, teacherName, roomData);
 }
-window.startPrivateConv = _startPrivateConv;
+// ═══════════════════════════
+// حذف رسالة
+// ═══════════════════════════
+window.deleteMsg = async (msgId) => {
+  if (!confirm('⚠️ حذف هذه الرسالة نهائياً؟')) return;
+  try {
+    const { deleteDoc: _delDoc, doc: _doc } = await import("https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js");
+    await _delDoc(_doc(_db, 'messages', msgId));
+  } catch(e) {
+    window.showToast && showToast('❌ خطأ في الحذف: ' + e.message, true);
+  }
+};
+
+// ═══════════════════════════
+// تعديل رسالة
+// ═══════════════════════════
+window.startEditMsg = (msgId, currentText) => {
+  const editArea = document.getElementById(`edit-area-${msgId}`);
+  if (editArea) {
+    editArea.style.display = 'flex';
+    const inp = document.getElementById(`edit-inp-${msgId}`);
+    if (inp) { inp.focus(); inp.select(); }
+  }
+};
+window.cancelEditMsg = (msgId) => {
+  const editArea = document.getElementById(`edit-area-${msgId}`);
+  if (editArea) editArea.style.display = 'none';
+};
+window.saveEditMsg = async (msgId) => {
+  const inp = document.getElementById(`edit-inp-${msgId}`);
+  if (!inp) return;
+  const newText = inp.value.trim();
+  if (!newText) return;
+  try {
+    await updateDoc(doc(_db, 'messages', msgId), { text: newText, edited: true });
+    const editArea = document.getElementById(`edit-area-${msgId}`);
+    if (editArea) editArea.style.display = 'none';
+  } catch(e) {
+    window.showToast && showToast('❌ خطأ في التعديل: ' + e.message, true);
+  }
+};
+
+// ═══════════════════════════
+// رفع ملف (base64 في Firestore)
+// ═══════════════════════════
+window.sendMsgFile = async (event) => {
+  if (!_db || !_me || !_room) return;
+  const file = event.target.files[0];
+  if (!file) return;
+  // تحقق من الحجم (5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    window.showToast && showToast('❌ حجم الملف أكبر من 5MB', true);
+    event.target.value = '';
+    return;
+  }
+  // تحقق من النوع
+  const allowed = ['pdf','doc','docx','xls','xlsx','jpg','jpeg','png'];
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!allowed.includes(ext)) {
+    window.showToast && showToast('❌ نوع الملف غير مدعوم', true);
+    event.target.value = '';
+    return;
+  }
+
+  window.showToast && showToast('⏳ جاري رفع الملف...', false);
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const base64Data = e.target.result;
+    const sizeKB = Math.round(file.size / 1024);
+    const sizeTxt = sizeKB > 1024 ? `${(sizeKB/1024).toFixed(1)} MB` : `${sizeKB} KB`;
+    try {
+      await addDoc(collection(_db, 'messages'), {
+        roomId: _room,
+        text: '',
+        fileName: file.name,
+        fileUrl: base64Data,
+        fileSize: sizeTxt,
+        fileExt: ext,
+        senderId: _me.uid,
+        senderName: _me.name,
+        isAdmin: _me.isAdmin || false,
+        sentAt: serverTimestamp()
+      });
+      if (_room !== 'general') {
+        await updateDoc(doc(_db, 'msgRooms', _room), {
+          lastMsg: `📎 ${file.name}`,
+          lastAt: serverTimestamp()
+        }).catch(() => {});
+      }
+      window.showToast && showToast(`✅ تم إرسال الملف: ${file.name}`);
+    } catch(e) {
+      window.showToast && showToast('❌ خطأ في رفع الملف: ' + e.message, true);
+    }
+    event.target.value = '';
+  };
+  reader.readAsDataURL(file);
+};
 
 </script>
 
