@@ -643,6 +643,10 @@ function validateMainForm() {
     const sel = [...document.querySelectorAll(`input[name="lang510"]:checked`)].map(c => c.value);
     if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
     langs = sel.join(" + ");
+  } else if (isBac) {
+    const sel = [...document.querySelectorAll(`input[name="bacLang"]:checked`)].map(c => c.value);
+    if (!sel.length) { alert("يرجى اختيار لغتين للبكالوريا"); return null; }
+    langs = sel.join(" + ");
   } else if (is1114 || (is1518 && !isBac)) {
     const sel = [...document.querySelectorAll(`input[name="langPlus"]:checked`)].map(c => c.value);
     if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
