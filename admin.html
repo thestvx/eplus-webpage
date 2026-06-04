@@ -3320,16 +3320,7 @@ function renderAttStudents(students, filter) {
   }
   list.innerHTML = '';
   filtered.forEach(s => {
-    // حالة الدفع — إذا لم تكن محفوظة نبحث الآن
-    let payStatus = s.payStatus || 'unknown';
-    let receipt   = s.receipt   || null;
-    if (payStatus === 'unknown' && allTicketsData && allTicketsData.length) {
-      const ticket = findStudentTicket(s.name);
-      if (ticket) {
-        payStatus = ticket.status === 'paid' ? 'paid' : 'unpaid';
-        receipt   = ticket.receipt || null;
-      }
-    }
+    const { ps: payStatus, rc: receipt } = getLivePayStatus(s);
 
     const badgeHtml =
       payStatus === 'paid'   ? `<span class="pay-badge paid">✅ مفعّلة</span>` :
@@ -3340,7 +3331,6 @@ function renderAttStudents(students, filter) {
       ? `<span style="font-size:10px;font-family:monospace;color:var(--primary);background:var(--primary-light);padding:2px 7px;border-radius:6px;flex-shrink:0">${receipt}</span>`
       : '';
 
-    // 12 نقطة حضور
     const dotsHtml = Array.from({length:12},(_,d) =>
       `<span class="sdot" id="dot-${s.id}-${d+1}"></span>`
     ).join('');
@@ -3757,9 +3747,6 @@ function showTeacherInlineAttendance(teacherId, teacherData) {
           <div style="margin-top:8px;font-size:11px;color:var(--primary);font-weight:700">اضغط للتفاصيل ←</div>
         </div>
       </div>
-
-      <!-- منطقة تسجيل الحضور (تظهر عند فتح حصة) -->
-      <div id="active-session-area" style="display:none"></div>
     </div>`;
 
   // تحميل سجلات الحضور من Firestore وتحديث الحصص
