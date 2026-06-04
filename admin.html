@@ -2633,8 +2633,6 @@ function loadTickets() {
     allTicketsData = [];
     let totalExpected = 0, totalCollected = 0, totalRemaining = 0;
     let studentsWithRemaining = 0;
-
-    const tbody = document.getElementById('tickets-tbody');
     tbody.innerHTML = '';
     if (snap.empty) {
       tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">📭 لم يتم إصدار أي تذاكر بعد</td></tr>`;
@@ -2682,6 +2680,8 @@ function loadTickets() {
     updateSummerStats(snap.size, paid, pending);
     updateFinancialStats(snap.size, paid, studentsWithRemaining, totalExpected, totalCollected, totalRemaining);
     document.getElementById('nav-badge-summer').textContent = snap.size;
+    // إعادة رسم قائمة الحضور إذا كانت مفتوحة — حتى تنعكس أي تغييرات في حالة التذاكر فوراً
+    refreshAttendanceListIfOpen();
   });
 }
 
@@ -3368,6 +3368,38 @@ window.filterStudents = () => {
   renderAttStudents(currentAttStudents, val);
 };
 
+// ─── إعادة رسم قائمة الحضور عند تحديث التذاكر ───
+function refreshAttendanceListIfOpen() {
+  const list = document.getElementById('att-students-list');
+  if (!list || !currentAttStudents.length) return;
+  // نتحقق أن المنطقة الحية مفتوحة فعلاً (ليست في وضع القراءة)
+  const saveBtn = document.getElementById('save-att-btn');
+  if (!saveBtn) return; // وضع القراءة فقط — لا نُحدّث
+
+  list.innerHTML = currentAttStudents.map(s => {
+    const { ps, rc } = getLivePayStatus(s);
+    const badgeHtml =
+      ps === 'paid'   ? `<span class="pay-badge paid">✅ مفعّلة</span>` :
+      ps === 'unpaid' ? `<span class="pay-badge unpaid">⏳ غير مفعّلة</span>` :
+                       `<span class="pay-badge unknown">— لا تذكرة</span>`;
+    const receiptHtml = rc ? `<span style="font-size:10px;font-family:monospace;color:var(--primary);background:var(--primary-light);padding:2px 7px;border-radius:6px;flex-shrink:0">${rc}</span>` : '';
+    const sessionDots = currentOpenSession
+      ? Array.from({length:12},(_,i)=>`<span class="sdot ${i===currentOpenSession-1?'current-dot':''}"></span>`).join('')
+      : Array.from({length:12},()=>`<span class="sdot"></span>`).join('');
+    return `<div class="att-student-row" data-sid="${s.id}">
+      <span class="att-student-id">${s.id}</span>
+      <span class="att-student-name">${s.name}</span>
+      ${badgeHtml}${receiptHtml}
+      <div class="student-dots-row">${sessionDots}</div>
+      <div class="att-toggle" style="margin-right:auto">
+        <div class="att-check ${s.present?'present':''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
+        <div class="att-check ${!s.present&&s.marked?'absent':''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
+      </div>
+      <button style="padding:4px 8px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:var(--danger-soft);color:var(--danger);font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700;flex-shrink:0" onclick="removeStudent('${s.id}')">حذف</button>
+    </div>`;
+  }).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">لا يوجد تلاميذ بعد</div>`;
+}
+
 // ─── متغير لحفظ بيانات التلميذ المختار من البحث ───
 let _selectedStudentData = null;
 
@@ -3476,6 +3508,22 @@ window.selectManualStudent = (name) => {
 };
 
 // ─── دالة مساعدة: البحث عن تذكرة التلميذ في سجل التذاكر ───
+// ─── حالة الدفع الحية — تتجاهل القيمة المحفوظة وتبحث دائماً في التذاكر ───
+function getLivePayStatus(student) {
+  if (!allTicketsData || !allTicketsData.length) return { ps: 'unknown', rc: student.receipt || null };
+  // البحث أولاً برقم الوصل (أدق)
+  let ticket = student.receipt
+    ? allTicketsData.find(t => t.receipt && t.receipt === student.receipt)
+    : null;
+  // ثم بالاسم
+  if (!ticket) ticket = findStudentTicket(student.name);
+  if (!ticket) return { ps: 'unknown', rc: student.receipt || null };
+  return {
+    ps: ticket.status === 'paid' ? 'paid' : 'unpaid',
+    rc: ticket.receipt || student.receipt || null
+  };
+}
+
 function findStudentTicket(name) {
   if (!allTicketsData || !allTicketsData.length) return null;
   const norm = s => String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
@@ -3542,12 +3590,7 @@ window.addStudent = async () => {
   if (inlineList) {
     const scrollY = window.scrollY; // حفظ موضع الصفحة
     const studentsHtml = currentAttStudents.map(s => {
-      let ps = s.payStatus || 'unknown';
-      let rc = s.receipt || null;
-      if (ps === 'unknown' && allTicketsData && allTicketsData.length) {
-        const tk = findStudentTicket(s.name);
-        if (tk) { ps = tk.status === 'paid' ? 'paid' : 'unpaid'; rc = tk.receipt || null; }
-      }
+      const { ps, rc } = getLivePayStatus(s);
       const badgeHtml =
         ps === 'paid'   ? `<span class="pay-badge paid">✅ مفعّلة</span>` :
         ps === 'unpaid' ? `<span class="pay-badge unpaid">⏳ غير مفعّلة</span>` :
@@ -3876,12 +3919,7 @@ window.openSession = (sessionNum) => {
   const students = currentAttStudents;
   const studentsHtml = students.length
     ? students.map(s => {
-        let ps = s.payStatus || 'unknown';
-        let rc = s.receipt || null;
-        if (ps === 'unknown' && allTicketsData && allTicketsData.length) {
-          const tk = findStudentTicket(s.name);
-          if (tk) { ps = tk.status === 'paid' ? 'paid' : 'unpaid'; rc = tk.receipt || null; }
-        }
+        const { ps, rc } = getLivePayStatus(s);
         const badgeHtml =
           ps === 'paid'   ? `<span class="pay-badge paid">✅ مفعّلة</span>` :
           ps === 'unpaid' ? `<span class="pay-badge unpaid">⏳ غير مفعّلة</span>` :
