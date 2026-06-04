@@ -1763,7 +1763,10 @@ window.doLogin = async () => {
     errEl.style.display = 'block';
   }
 };
-window.doLogout = () => signOut(auth);
+window.doLogout = () => {
+  if (_unsubTickets) { _unsubTickets(); _unsubTickets = null; }
+  signOut(auth);
+};
 
 // NAV SWITCHING (sidebar-based, not tabs)
 window.switchNavSection = (section) => {
@@ -2626,13 +2629,30 @@ window.copyReceiptNum = () => {
 // store tickets globally for export
 let allTicketsData = [];
 
+let _unsubTickets = null;
+
 function loadTickets() {
+  // إلغاء الاشتراك السابق إن وُجد
+  if (_unsubTickets) { _unsubTickets(); _unsubTickets = null; }
   let paid = 0, pending = 0;
-  onSnapshot(query(collection(db,'summerTickets'), orderBy('createdAt','desc')), snap => {
+  _unsubTickets = onSnapshot(query(collection(db,'summerTickets'), orderBy('createdAt','desc')), snap => {
     paid = 0; pending = 0;
     allTicketsData = [];
     let totalExpected = 0, totalCollected = 0, totalRemaining = 0;
     let studentsWithRemaining = 0;
+
+    // تحديث allTicketsData دائماً (للأستاذ والأدمين)
+    snap.forEach(d => {
+      const x = d.data();
+      allTicketsData.push({ id: d.id, ...x });
+    });
+    // إعادة رسم قائمة الحضور إذا كانت مفتوحة
+    refreshAttendanceListIfOpen();
+
+    // باقي التحديثات للأدمين فقط — إذا ما كان الـ DOM موجود نتوقف
+    const tbody = document.getElementById('tickets-tbody');
+    if (!tbody) return;
+
     tbody.innerHTML = '';
     if (snap.empty) {
       tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">📭 لم يتم إصدار أي تذاكر بعد</td></tr>`;
@@ -2642,7 +2662,6 @@ function loadTickets() {
     }
     snap.forEach(d => {
       const x = d.data();
-      allTicketsData.push({ id: d.id, ...x });
       if (x.status === 'paid') paid++; else pending++;
 
       const amountPaid    = Number(x.amount || 0);
