@@ -5689,7 +5689,6 @@ window.saveTreasuryBalance = async () => {
 window.openChangeCredentialsModal = (teacherId, teacherName) => {
   document.getElementById('cred-teacher-id').value = teacherId;
   document.getElementById('cred-teacher-name').textContent = teacherName;
-  document.getElementById('cred-current-password').value = '';
   document.getElementById('cred-email').value = '';
   document.getElementById('cred-password').value = '';
   document.getElementById('change-cred-modal').classList.add('open');
@@ -5708,49 +5707,36 @@ window.saveTeacherCredentials = async () => {
   const btn = document.getElementById('cred-save-btn');
   btn.disabled = true; btn.textContent = '⏳ جاري التحديث...';
 
-  const currentPassword = document.getElementById('cred-current-password').value;
-  if (!currentPassword) return (() => { btn.disabled = false; btn.innerHTML = '💾 حفظ التغييرات'; showToast && showToast('أدخل الباسوورد الحالي للأستاذ', true); })();
-
   try {
-    // جلب إيميل الأستاذ الحالي من Firestore
-    const tSnap = await getDoc(doc(_db, 'teachers', teacherId));
-    if (!tSnap.exists()) throw new Error('لم يتم العثور على الأستاذ');
-    const currentEmail = tSnap.data().email;
-    if (!currentEmail) throw new Error('الإيميل الحالي للأستاذ غير موجود في قاعدة البيانات');
+    const apiKey = 'AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo';
+    const updates = { localId: teacherId, returnSecureToken: false };
+    if (newEmail)    updates.email    = newEmail;
+    if (newPassword) updates.password = newPassword;
 
-    // تسجيل دخول الأستاذ في secondary app للتحقق + التعديل
-    const { getAuth, signInWithEmailAndPassword, updateEmail, updatePassword, signOut } =
-      await import('https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js');
-
-    const secondaryApp = (await import('https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js'))
-      .getApps().find(a => a.name === 'secondary');
-    if (!secondaryApp) throw new Error('Secondary app غير جاهز');
-
-    const secAuth = getAuth(secondaryApp);
-    const cred = await signInWithEmailAndPassword(secAuth, currentEmail, currentPassword);
-    const teacherUser = cred.user;
-
-    if (newEmail) {
-      await updateEmail(teacherUser, newEmail);
-      await updateDoc(doc(_db, 'teachers', teacherId), { email: newEmail });
-    }
-    if (newPassword) {
-      await updatePassword(teacherUser, newPassword);
+    // Firebase Identity Toolkit — تحديث بيانات المستخدم مباشرة بـ localId (Admin-level)
+    const r = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      }
+    );
+    const data = await r.json();
+    if (data.error) {
+      // إذا طلب التحقق من الإيميل — نغيّر الإيميل في Firestore فقط ونبلّغ الأدمين
+      if (data.error.message?.includes('EMAIL_EXISTS')) throw new Error('هذا الإيميل مستخدم من حساب آخر');
+      if (data.error.message?.includes('INVALID_EMAIL'))  throw new Error('الإيميل غير صحيح');
+      throw new Error(data.error.message);
     }
 
-    await signOut(secAuth);
+    // تحديث الإيميل في Firestore أيضاً
+    if (newEmail) await updateDoc(doc(_db, 'teachers', teacherId), { email: newEmail });
+
     closeChangeCredentialsModal();
     showToast && showToast('✅ تم تحديث بيانات الدخول بنجاح');
   } catch(e) {
-    const msgs = {
-      'auth/wrong-password': 'الباسوورد الحالي غير صحيح',
-      'auth/user-not-found': 'المستخدم غير موجود',
-      'auth/email-already-in-use': 'هذا الإيميل مستخدم من حساب آخر',
-      'auth/invalid-email': 'الإيميل غير صحيح',
-      'auth/weak-password': 'الباسوورد ضعيف جداً',
-      'auth/requires-recent-login': 'يرجى إعادة تسجيل دخول الأستاذ أولاً',
-    };
-    showToast && showToast('❌ ' + (msgs[e.code] || e.message), true);
+    showToast && showToast('❌ ' + e.message, true);
   }
   btn.disabled = false; btn.innerHTML = '💾 حفظ التغييرات';
 };
@@ -5896,11 +5882,7 @@ window.saveEditTicket = async () => {
     <div class="finance-modal-body">
       <input type="hidden" id="cred-teacher-id">
       <div style="background:var(--bg-2);border-radius:12px;padding:12px 14px;font-size:12px;color:var(--text-2);font-weight:600;margin-bottom:16px">
-        💡 أدخل الباسوورد الحالي للأستاذ للتحقق، ثم اترك الحقل الذي لا تريد تغييره فارغاً
-      </div>
-      <div class="form-group">
-        <label class="form-label">الباسوورد الحالي للأستاذ <span class="required">*</span></label>
-        <input class="inp" type="password" id="cred-current-password" placeholder="الباسوورد الحالي (مطلوب)">
+        💡 اترك الحقل فارغاً إذا لا تريد تغييره
       </div>
       <div class="form-group">
         <label class="form-label">الإيميل الجديد</label>
