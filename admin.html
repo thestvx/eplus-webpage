@@ -2986,6 +2986,7 @@ function renderTicketRows(data) {
       <td>${statusHtml}</td>
       <td style="display:flex;gap:6px">
         <button class="tbl-action view" onclick="previewFromDB('${x.id}')">👁️ عرض</button>
+        <button class="tbl-action" onclick="openEditTicketModal('${x.id}')" style="background:var(--primary-light);color:var(--primary);border-color:var(--border-2)">✏️ تعديل</button>
         <button class="tbl-action del" onclick="deleteTicket('${x.id}')">🗑️</button>
       </td>`;
     tbody.appendChild(tr);
@@ -5740,6 +5741,61 @@ window.saveTeacherCredentials = async () => {
   }
   btn.disabled = false; btn.innerHTML = '💾 حفظ التغييرات';
 };
+
+// ══════════════════════════════════════════════
+// تعديل التذكرة
+// ══════════════════════════════════════════════
+window.openEditTicketModal = (ticketId) => {
+  const t = allTicketsData.find(x => x.id === ticketId);
+  if (!t) return showToast && showToast('لم يتم العثور على التذكرة', true);
+
+  document.getElementById('et-id').value        = ticketId;
+  document.getElementById('et-name').value      = t.name || '';
+  document.getElementById('et-receipt').value   = t.receipt || '';
+  document.getElementById('et-date').value      = t.date || '';
+  document.getElementById('et-pack').value      = t.pack || '';
+  document.getElementById('et-amount').value    = t.amount || 0;
+  document.getElementById('et-remaining').value = t.remainingAmount || 0;
+  document.getElementById('et-fullprice').value = t.fullPrice || 0;
+  document.getElementById('et-status').value    = t.status || 'pending';
+
+  document.getElementById('edit-ticket-modal').classList.add('open');
+};
+
+window.closeEditTicketModal = () => document.getElementById('edit-ticket-modal').classList.remove('open');
+
+window.saveEditTicket = async () => {
+  const id = document.getElementById('et-id').value;
+  if (!id) return;
+
+  const name      = document.getElementById('et-name').value.trim();
+  const receipt   = document.getElementById('et-receipt').value.trim();
+  const date      = document.getElementById('et-date').value;
+  const pack      = document.getElementById('et-pack').value.trim();
+  const amount    = parseFloat(document.getElementById('et-amount').value) || 0;
+  const remaining = parseFloat(document.getElementById('et-remaining').value) || 0;
+  const fullPrice = parseFloat(document.getElementById('et-fullprice').value) || 0;
+  const status    = document.getElementById('et-status').value;
+
+  if (!name) return showToast && showToast('أدخل اسم المشترك', true);
+
+  const btn = document.getElementById('et-save-btn');
+  btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
+
+  try {
+    await updateDoc(doc(db, 'summerTickets', id), {
+      name, receipt, date, pack,
+      amount, remainingAmount: remaining,
+      fullPrice: fullPrice || (amount + remaining),
+      status
+    });
+    showToast && showToast('✅ تم تحديث التذكرة');
+    closeEditTicketModal();
+  } catch(e) {
+    showToast && showToast('❌ خطأ: ' + e.message, true);
+  }
+  btn.disabled = false; btn.innerHTML = '💾 حفظ التعديلات';
+};
 </script>
 
 <!-- ─── تعليمات Firestore Rules ─── -->
@@ -5837,6 +5893,67 @@ window.saveTeacherCredentials = async () => {
         <input class="inp" type="password" id="cred-password" placeholder="6 أحرف على الأقل">
       </div>
       <button class="btn-primary" id="cred-save-btn" onclick="saveTeacherCredentials()" style="margin-top:8px">💾 حفظ التغييرات</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== EDIT TICKET MODAL ===== -->
+<div class="finance-modal-bg" id="edit-ticket-modal">
+  <div class="finance-modal" style="max-width:540px">
+    <div class="finance-modal-header">
+      <div class="panel-icon" style="background:var(--accent-soft)">✏️</div>
+      <div class="finance-modal-title">تعديل بيانات التذكرة</div>
+      <button class="att-modal-close" onclick="closeEditTicketModal()">✕</button>
+    </div>
+    <div class="finance-modal-body" style="display:flex;flex-direction:column;gap:12px">
+      <input type="hidden" id="et-id">
+
+      <div class="form-group" style="margin:0">
+        <label class="form-label">اسم المشترك</label>
+        <input class="inp" type="text" id="et-name" placeholder="الاسم الكامل">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">رقم الوصل</label>
+          <input class="inp" type="text" id="et-receipt" placeholder="رقم الوصل">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">التاريخ</label>
+          <input class="inp" type="date" id="et-date">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin:0">
+        <label class="form-label">الباقة</label>
+        <input class="inp" type="text" id="et-pack" placeholder="اسم الباقة">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">المبلغ المدفوع (دج)</label>
+          <input class="inp" type="number" id="et-amount" min="0" placeholder="0">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">المبلغ المتبقي (دج)</label>
+          <input class="inp" type="number" id="et-remaining" min="0" placeholder="0">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin:0">
+        <label class="form-label">السعر الكامل للباقة (دج)</label>
+        <input class="inp" type="number" id="et-fullprice" min="0" placeholder="0">
+      </div>
+
+      <div class="form-group" style="margin:0">
+        <label class="form-label">الحالة</label>
+        <select class="inp" id="et-status">
+          <option value="pending">⏳ قيد المراجعة</option>
+          <option value="paid">✅ مفعّلة</option>
+        </select>
+      </div>
+
+      <button class="btn-primary" id="et-save-btn" onclick="saveEditTicket()" style="margin-top:4px">💾 حفظ التعديلات</button>
     </div>
   </div>
 </div>
