@@ -3783,6 +3783,10 @@ window.openAttModal = async (teacherId) => {
   if (!t) return;
   currentAttTeacherId = teacherId;
   currentAttStudents = t.students ? [...t.students] : [];
+  // إعادة تعيين الفوج النشط
+  window._activeAttGroupIdx  = 'all';
+  window._activeAttGroups    = t.groups || [];
+  window._activeAttTeacherId = teacherId;
   // تحميل سجلات الحصص الخاصة بهذا الأستاذ لملخص الشهر
   _allRecordedSessions = {};
   const sessSnap = await getDocs(query(collection(db, 'sessionAttendance'), where('teacherId', '==', teacherId)));
@@ -3840,6 +3844,11 @@ window.closeAttModal = () => {
 
 // ─── تبديل تبويب الفوج في modal الحضور ───
 window.switchAttGroupTab = (gidx, teacher, groups) => {
+  // تتبع الفوج النشط حالياً
+  window._activeAttGroupIdx    = gidx;
+  window._activeAttGroups      = groups;
+  window._activeAttTeacherId   = teacher ? teacher.id : currentAttTeacherId;
+
   // تحديث active
   document.querySelectorAll('.att-group-tab').forEach(t => t.classList.remove('active'));
   const activeTab = document.querySelector(`.att-group-tab[data-gidx="${gidx}"]`);
@@ -4142,9 +4151,42 @@ window.addStudent = async () => {
   const newStudent = { id, name, present: false, marked: false, payStatus, receipt: receipt || null };
 
   currentAttStudents.push(newStudent);
+
+  // ── إذا كان المستخدم في تاب فوج معين، أضف التلميذ في groups[x].students أيضاً ──
+  const activeGidx  = window._activeAttGroupIdx;
+  const activeGroups = window._activeAttGroups ? [...window._activeAttGroups.map(g => ({...g, students: [...(g.students||[])]}))] : [];
+  if (activeGidx !== 'all' && activeGidx !== undefined && activeGroups[activeGidx]) {
+    const gStudents = activeGroups[activeGidx].students;
+    const alreadyInGroup = gStudents.some(s => s.trim().toLowerCase() === name.trim().toLowerCase());
+    if (!alreadyInGroup) {
+      gStudents.push(name);
+      window._activeAttGroups = activeGroups;
+    }
+  }
+
   _suppressSnapshot = true;
-  await updateDoc(doc(db, 'teachers', currentAttTeacherId), { students: currentAttStudents });
+  const savePayload = { students: currentAttStudents };
+  if (activeGidx !== 'all' && activeGroups.length > 0) savePayload.groups = activeGroups;
+  await updateDoc(doc(db, 'teachers', currentAttTeacherId), savePayload);
   setTimeout(() => { _suppressSnapshot = false; }, 1500);
+
+  // تحديث عداد تاب الفوج النشط
+  if (activeGidx !== 'all' && activeGroups[activeGidx]) {
+    const activeTabEl = document.querySelector(`.att-group-tab[data-gidx="${activeGidx}"]`);
+    if (activeTabEl) {
+      const cnt = activeTabEl.querySelector('.g-count');
+      if (cnt) cnt.textContent = activeGroups[activeGidx].students.length;
+    }
+    // تحديث header الفوج
+    const metaEl = document.getElementById('att-group-header-meta');
+    if (metaEl) {
+      const days = (activeGroups[activeGidx].days || []).join('، ');
+      metaEl.textContent = `📅 ${days || 'يومياً'} — 👥 ${activeGroups[activeGidx].students.length} تلميذ`;
+    }
+  }
+  // تحديث عداد تاب الكل
+  const allTabEl = document.querySelector('.att-group-tab[data-gidx="all"]');
+  if (allTabEl) { const cnt = allTabEl.querySelector('.g-count'); if (cnt) cnt.textContent = currentAttStudents.length; }
 
   // تنظيف الحقل والاختيار
   if (nameInp) nameInp.value = '';
@@ -4193,13 +4235,33 @@ window.removeStudent = async (sid) => {
   // حذف فوري من DOM
   const row = document.querySelector(`.att-student-row[data-sid="${sid}"]`);
   if (row) row.remove();
-  // تحديث البيانات
+
+  // اسم التلميذ المحذوف
+  const removedStudent = currentAttStudents.find(s => s.id === sid);
+  const removedName = removedStudent ? removedStudent.name.trim().toLowerCase() : null;
+
+  // تحديث القائمة الرئيسية
   currentAttStudents = currentAttStudents.filter(s => s.id !== sid);
   updateAttSummary(currentAttStudents);
+
+  // حذف التلميذ من جميع الأفواج أيضاً
+  const updatedGroups = (window._activeAttGroups || []).map(g => ({
+    ...g,
+    students: (g.students || []).filter(s => s.trim().toLowerCase() !== removedName)
+  }));
+  window._activeAttGroups = updatedGroups;
+
   // حفظ في Firestore مع تجميد الـ snapshot
   _suppressSnapshot = true;
-  await updateDoc(doc(db, 'teachers', currentAttTeacherId), { students: currentAttStudents });
+  await updateDoc(doc(db, 'teachers', currentAttTeacherId), {
+    students: currentAttStudents,
+    groups: updatedGroups
+  });
   setTimeout(() => { _suppressSnapshot = false; }, 1500);
+
+  // تحديث عداد تاب الكل
+  const allTabEl = document.querySelector('.att-group-tab[data-gidx="all"]');
+  if (allTabEl) { const cnt = allTabEl.querySelector('.g-count'); if (cnt) cnt.textContent = currentAttStudents.length; }
 };
 
 window.saveAttendance = async () => {
