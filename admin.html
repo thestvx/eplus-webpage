@@ -1952,6 +1952,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 window._auth = auth; // expose for other modules
+window._secondaryAuth = secondaryAuth;
+window._signOut = signOut;
+window._signInWithEmailAndPassword = signInWithEmailAndPassword;
 const db = getFirestore(app);
 const rtdb = getDatabase(app);
 
@@ -5737,18 +5740,21 @@ window.saveTeacherCredentials = async () => {
     if (!currentEmail) throw new Error('الإيميل الحالي غير موجود في قاعدة البيانات');
 
     // ── 3: سجّل دخول بحساب الأستاذ عبر secondaryAuth ──
+    const _secondaryAuth = window._secondaryAuth;
+    const _signIn        = window._signInWithEmailAndPassword;
+    const _signOutFn     = window._signOut;
     let credResult;
     try {
-      credResult = await signInWithEmailAndPassword(secondaryAuth, currentEmail, currentPassword);
+      credResult = await _signIn(_secondaryAuth, currentEmail, currentPassword);
     } catch(authErr) {
-      await signOut(secondaryAuth).catch(()=>{});
+      await _signOutFn(_secondaryAuth).catch(()=>{});
       if (authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/wrong-password') {
         throw new Error('الباسوورد الحالي غير صحيح');
       }
       throw new Error('فشل التحقق: ' + authErr.message);
     }
     const idToken = await credResult.user.getIdToken();
-    await signOut(secondaryAuth);
+    await _signOutFn(_secondaryAuth);
 
     // ── 4: عدّل الإيميل/الباسوورد باستخدام idToken ──
     const updatePayload = { idToken, returnSecureToken: false };
