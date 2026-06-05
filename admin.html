@@ -3779,7 +3779,17 @@ window.saveTeacherEdit = async () => {
 
 // ─── Attendance modal (admin view) ───
 window.openAttModal = async (teacherId) => {
-  const t = allTeachers.find(x => x.id === teacherId);
+  // نقرأ البيانات من Firestore مباشرة لضمان الحصول على آخر تحديث
+  let t;
+  try {
+    const freshSnap = await getDoc(doc(db, 'teachers', teacherId));
+    if (freshSnap.exists()) {
+      t = { id: freshSnap.id, ...freshSnap.data() };
+      const cacheIdx = allTeachers.findIndex(x => x.id === teacherId);
+      if (cacheIdx !== -1) allTeachers[cacheIdx] = t;
+    }
+  } catch(e) { /* fallback */ }
+  if (!t) t = allTeachers.find(x => x.id === teacherId);
   if (!t) return;
   currentAttTeacherId = teacherId;
   currentAttStudents = t.students ? [...t.students] : [];
@@ -3879,15 +3889,29 @@ window.switchAttGroupTab = (gidx, teacher, groups) => {
     groupStudentNames.has(s.name.trim().toLowerCase())
   );
 
-  // إذا لا يوجد تطابق، نعرض تلاميذ الفوج من قائمة g.students مباشرة
+  // إذا لا يوجد تطابق، ندمج تلاميذ الفوج في currentAttStudents لتجنب الاختفاء المؤقت
   if (filtered.length === 0 && g.students && g.students.length > 0) {
-    // بناء قائمة مؤقتة من أسماء الفوج
-    const tempStudents = g.students.map((name, idx) => {
+    // بناء قائمة التلاميذ الجدد الغائبين عن currentAttStudents وإضافتهم
+    const newStudents = [];
+    g.students.forEach((name, idx) => {
       const existing = currentAttStudents.find(s => s.name.trim().toLowerCase() === name.trim().toLowerCase());
-      return existing || { id: `g${gidx}_${idx}`, name, present: false, marked: false, payStatus: 'unknown' };
+      if (!existing) {
+        newStudents.push({ id: `g${gidx}_${idx}_${Date.now()}`, name, present: false, marked: false, payStatus: 'unknown' });
+      }
     });
-    renderAttStudents(tempStudents, '');
-    updateAttSummary(tempStudents);
+    if (newStudents.length > 0) {
+      currentAttStudents.push(...newStudents);
+      // حفظ القائمة المحدثة في Firestore
+      _suppressSnapshot = true;
+      updateDoc(doc(db, 'teachers', currentAttTeacherId), { students: currentAttStudents })
+        .catch(e => console.warn('خطأ في مزامنة تلاميذ الفوج:', e))
+        .finally(() => { setTimeout(() => { _suppressSnapshot = false; }, 1500); });
+    }
+    // الآن نُصفّي مجدداً من currentAttStudents المحدثة
+    const groupStudentNames2 = new Set((g.students || []).map(s => s.trim().toLowerCase()));
+    const filtered2 = currentAttStudents.filter(s => groupStudentNames2.has(s.name.trim().toLowerCase()));
+    renderAttStudents(filtered2, '');
+    updateAttSummary(filtered2);
   } else {
     renderAttStudents(filtered, '');
     updateAttSummary(filtered);
