@@ -3739,7 +3739,35 @@ window.saveTeacherEdit = async () => {
   const days = getSelectedDays('edit-days-picker');
   const groups = collectGroups('edit-groups-list');
   if (!name || !spec || !days.length) { showToast('❌ ملء الاسم والتخصص والأيام مطلوب', true); return; }
-  const updates = { name, spec, levels, days, groups };
+
+  // ── مزامنة تلاميذ الأفواج مع قائمة students الرئيسية ──
+  const teacher = allTeachers.find(t => t.id === id);
+  const existingStudents = teacher ? [...(teacher.students || [])] : [];
+
+  // جمع كل أسماء التلاميذ من جميع الأفواج
+  const allGroupStudentNames = new Set();
+  groups.forEach(g => (g.students || []).forEach(s => allGroupStudentNames.add(s.trim().toLowerCase())));
+
+  // إضافة التلاميذ الجدد (من الأفواج) إلى القائمة الرئيسية إذا ما كانوا موجودين
+  const existingNames = new Set(existingStudents.map(s => s.name.trim().toLowerCase()));
+  allGroupStudentNames.forEach(nameLC => {
+    if (!existingNames.has(nameLC)) {
+      // نجيب الاسم بصيغته الأصلية من الأفواج
+      let originalName = nameLC;
+      groups.forEach(g => (g.students || []).forEach(s => {
+        if (s.trim().toLowerCase() === nameLC) originalName = s.trim();
+      }));
+      existingStudents.push({
+        id: 'gs_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+        name: originalName,
+        present: false,
+        marked: false,
+        payStatus: 'unknown'
+      });
+    }
+  });
+
+  const updates = { name, spec, levels, days, groups, students: existingStudents };
   if (editTeacherPhotoBase64) updates.photo = editTeacherPhotoBase64;
   try {
     await updateDoc(doc(db, 'teachers', id), updates);
