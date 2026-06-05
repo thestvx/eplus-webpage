@@ -3597,6 +3597,7 @@ window.addTeacher = async () => {
     const payload = {
       name, email, spec, levels, days, groups,
       teacherId, uid,
+      password: pass,
       photo: newTeacherPhotoBase64 || null,
       createdAt: serverTimestamp()
     };
@@ -5686,19 +5687,28 @@ window.saveTreasuryBalance = async () => {
 // ══════════════════════════════════════════════
 // تغيير إيميل/باسوورد الأستاذ (أدمين)
 // ══════════════════════════════════════════════
-window.openChangeCredentialsModal = (teacherId, teacherName) => {
+window.openChangeCredentialsModal = async (teacherId, teacherName) => {
   document.getElementById('cred-teacher-id').value = teacherId;
   document.getElementById('cred-teacher-name').textContent = teacherName;
   document.getElementById('cred-email').value = '';
   document.getElementById('cred-password').value = '';
+  document.getElementById('cred-current-password').value = '';
+
+  // تحقق إذا الباسوورد محفوظ في Firestore
+  const snap = await getDoc(doc(_db, 'teachers', teacherId));
+  const hasPassword = snap.exists() && !!snap.data().password;
+  const currentPwRow = document.getElementById('cred-current-password-row');
+  currentPwRow.style.display = hasPassword ? 'none' : 'block';
+
   document.getElementById('change-cred-modal').classList.add('open');
 };
 window.closeChangeCredentialsModal = () => document.getElementById('change-cred-modal').classList.remove('open');
 
 window.saveTeacherCredentials = async () => {
-  const teacherId   = document.getElementById('cred-teacher-id').value;
-  const newEmail    = document.getElementById('cred-email').value.trim();
-  const newPassword = document.getElementById('cred-password').value;
+  const teacherId      = document.getElementById('cred-teacher-id').value;
+  const newEmail       = document.getElementById('cred-email').value.trim();
+  const newPassword    = document.getElementById('cred-password').value;
+  const currentPwInput = document.getElementById('cred-current-password').value;
 
   if (!newEmail && !newPassword) return showToast && showToast('أدخل إيميل أو باسوورد جديد', true);
   if (newEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) return showToast && showToast('الإيميل غير صحيح', true);
@@ -5710,66 +5720,55 @@ window.saveTeacherCredentials = async () => {
   try {
     const apiKey = 'AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo';
 
-    // ── الخطوة 1: تسجيل دخول وهمي لجلب idToken الخاص بالأستاذ من Firestore ──
-    // نقرأ بيانات الأستاذ الحالية من Firestore (الإيميل + الباسوورد المخزّن)
+    // ── 1: جيب بيانات الأستاذ من Firestore ──
     const teacherSnap = await getDoc(doc(_db, 'teachers', teacherId));
-    if (!teacherSnap.exists()) throw new Error('لم يتم العثور على حساب الأستاذ');
-    const teacherData = teacherSnap.data();
+    if (!teacherSnap.exists()) throw new Error('لم يتم العثور على بيانات الأستاذ');
+    const teacherData  = teacherSnap.data();
+    const currentEmail = teacherData.email || '';
 
-    const currentEmail    = teacherData.email    || '';
-    const currentPassword = teacherData.password || '';
-
-    if (!currentEmail || !currentPassword) {
-      throw new Error('بيانات الأستاذ الحالية غير مكتملة في قاعدة البيانات');
+    // ── 2: حدد الباسوورد الحالي (من Firestore أو من حقل الإدخال) ──
+    let currentPassword = teacherData.password || '';
+    if (!currentPassword) {
+      // الأستاذ قديم — الأدمين يجب أن يدخله يدوياً
+      if (!currentPwInput) throw new Error('أدخل الباسوورد الحالي للأستاذ أولاً');
+      currentPassword = currentPwInput;
     }
 
-    // ── الخطوة 2: تسجيل الدخول بالبيانات الحالية للحصول على idToken ──
-    const signInRes = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: currentEmail,
-          password: currentPassword,
-          returnSecureToken: true
-        })
-      }
-    );
-    const signInData = await signInRes.json();
-    if (signInData.error) {
-      if (signInData.error.message?.includes('INVALID_LOGIN_CREDENTIALS') ||
-          signInData.error.message?.includes('INVALID_PASSWORD') ||
-          signInData.error.message?.includes('EMAIL_NOT_FOUND')) {
-        throw new Error('تعذّر التحقق من حساب الأستاذ — تأكد أن الإيميل والباسوورد محفوظان بشكل صحيح في Firestore');
-      }
-      throw new Error('خطأ في تسجيل الدخول: ' + signInData.error.message);
-    }
-    const idToken = signInData.idToken;
+    if (!currentEmail) throw new Error('الإيميل الحالي غير موجود في قاعدة البيانات');
 
-    // ── الخطوة 3: تحديث الإيميل والباسوورد باستخدام idToken ──
+    // ── 3: سجّل دخول بحساب الأستاذ عبر secondaryAuth ──
+    let credResult;
+    try {
+      credResult = await signInWithEmailAndPassword(secondaryAuth, currentEmail, currentPassword);
+    } catch(authErr) {
+      await signOut(secondaryAuth).catch(()=>{});
+      if (authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/wrong-password') {
+        throw new Error('الباسوورد الحالي غير صحيح');
+      }
+      throw new Error('فشل التحقق: ' + authErr.message);
+    }
+    const idToken = await credResult.user.getIdToken();
+    await signOut(secondaryAuth);
+
+    // ── 4: عدّل الإيميل/الباسوورد باستخدام idToken ──
     const updatePayload = { idToken, returnSecureToken: false };
     if (newEmail)    updatePayload.email    = newEmail;
     if (newPassword) updatePayload.password = newPassword;
 
-    const updateRes = await fetch(
+    const r = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatePayload)
-      }
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatePayload) }
     );
-    const updateData = await updateRes.json();
-    if (updateData.error) {
-      if (updateData.error.message?.includes('EMAIL_EXISTS'))   throw new Error('هذا الإيميل مستخدم من حساب آخر');
-      if (updateData.error.message?.includes('INVALID_EMAIL'))  throw new Error('الإيميل غير صحيح');
-      if (updateData.error.message?.includes('WEAK_PASSWORD'))  throw new Error('الباسوورد ضعيف جداً، استخدم 6 أحرف أو أكثر');
-      throw new Error(updateData.error.message);
+    const data = await r.json();
+    if (data.error) {
+      if (data.error.message?.includes('EMAIL_EXISTS'))  throw new Error('هذا الإيميل مستخدم من حساب آخر');
+      if (data.error.message?.includes('INVALID_EMAIL')) throw new Error('الإيميل غير صحيح');
+      if (data.error.message?.includes('WEAK_PASSWORD')) throw new Error('الباسوورد ضعيف، استخدم 6 أحرف أو أكثر');
+      throw new Error(data.error.message);
     }
 
-    // ── الخطوة 4: تحديث Firestore بالبيانات الجديدة ──
-    const firestoreUpdate = {};
+    // ── 5: حدّث Firestore بالبيانات الجديدة (دائماً احفظ الباسوورد) ──
+    const firestoreUpdate = { password: newPassword || currentPassword };
     if (newEmail)    firestoreUpdate.email    = newEmail;
     if (newPassword) firestoreUpdate.password = newPassword;
     await updateDoc(doc(_db, 'teachers', teacherId), firestoreUpdate);
@@ -5924,6 +5923,11 @@ window.saveEditTicket = async () => {
       <input type="hidden" id="cred-teacher-id">
       <div style="background:var(--bg-2);border-radius:12px;padding:12px 14px;font-size:12px;color:var(--text-2);font-weight:600;margin-bottom:16px">
         💡 اترك الحقل فارغاً إذا لا تريد تغييره
+      </div>
+      <div class="form-group" id="cred-current-password-row" style="display:none">
+        <label class="form-label" style="color:var(--danger)">🔑 الباسوورد الحالي للأستاذ <span style="font-size:11px;font-weight:500">(مطلوب مرة وحدة فقط)</span></label>
+        <input class="inp" type="password" id="cred-current-password" placeholder="أدخل الباسوورد الحالي للأستاذ" style="border-color:rgba(239,68,68,0.4)">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px;font-weight:600">⚠️ بعد الحفظ لن يُطلب منك هذا مجدداً</div>
       </div>
       <div class="form-group">
         <label class="form-label">الإيميل الجديد</label>
