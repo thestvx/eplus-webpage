@@ -5696,7 +5696,7 @@ window.openChangeCredentialsModal = (teacherId, teacherName) => {
 window.closeChangeCredentialsModal = () => document.getElementById('change-cred-modal').classList.remove('open');
 
 window.saveTeacherCredentials = async () => {
-  const teacherId = document.getElementById('cred-teacher-id').value;
+  const teacherId   = document.getElementById('cred-teacher-id').value;
   const newEmail    = document.getElementById('cred-email').value.trim();
   const newPassword = document.getElementById('cred-password').value;
 
@@ -5709,29 +5709,70 @@ window.saveTeacherCredentials = async () => {
 
   try {
     const apiKey = 'AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo';
-    const updates = { localId: teacherId, returnSecureToken: false };
-    if (newEmail)    updates.email    = newEmail;
-    if (newPassword) updates.password = newPassword;
 
-    // Firebase Identity Toolkit — تحديث بيانات المستخدم مباشرة بـ localId (Admin-level)
-    const r = await fetch(
+    // ── الخطوة 1: تسجيل دخول وهمي لجلب idToken الخاص بالأستاذ من Firestore ──
+    // نقرأ بيانات الأستاذ الحالية من Firestore (الإيميل + الباسوورد المخزّن)
+    const teacherSnap = await getDoc(doc(_db, 'teachers', teacherId));
+    if (!teacherSnap.exists()) throw new Error('لم يتم العثور على حساب الأستاذ');
+    const teacherData = teacherSnap.data();
+
+    const currentEmail    = teacherData.email    || '';
+    const currentPassword = teacherData.password || '';
+
+    if (!currentEmail || !currentPassword) {
+      throw new Error('بيانات الأستاذ الحالية غير مكتملة في قاعدة البيانات');
+    }
+
+    // ── الخطوة 2: تسجيل الدخول بالبيانات الحالية للحصول على idToken ──
+    const signInRes = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: currentEmail,
+          password: currentPassword,
+          returnSecureToken: true
+        })
+      }
+    );
+    const signInData = await signInRes.json();
+    if (signInData.error) {
+      if (signInData.error.message?.includes('INVALID_LOGIN_CREDENTIALS') ||
+          signInData.error.message?.includes('INVALID_PASSWORD') ||
+          signInData.error.message?.includes('EMAIL_NOT_FOUND')) {
+        throw new Error('تعذّر التحقق من حساب الأستاذ — تأكد أن الإيميل والباسوورد محفوظان بشكل صحيح في Firestore');
+      }
+      throw new Error('خطأ في تسجيل الدخول: ' + signInData.error.message);
+    }
+    const idToken = signInData.idToken;
+
+    // ── الخطوة 3: تحديث الإيميل والباسوورد باستخدام idToken ──
+    const updatePayload = { idToken, returnSecureToken: false };
+    if (newEmail)    updatePayload.email    = newEmail;
+    if (newPassword) updatePayload.password = newPassword;
+
+    const updateRes = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
+        body: JSON.stringify(updatePayload)
       }
     );
-    const data = await r.json();
-    if (data.error) {
-      // إذا طلب التحقق من الإيميل — نغيّر الإيميل في Firestore فقط ونبلّغ الأدمين
-      if (data.error.message?.includes('EMAIL_EXISTS')) throw new Error('هذا الإيميل مستخدم من حساب آخر');
-      if (data.error.message?.includes('INVALID_EMAIL'))  throw new Error('الإيميل غير صحيح');
-      throw new Error(data.error.message);
+    const updateData = await updateRes.json();
+    if (updateData.error) {
+      if (updateData.error.message?.includes('EMAIL_EXISTS'))   throw new Error('هذا الإيميل مستخدم من حساب آخر');
+      if (updateData.error.message?.includes('INVALID_EMAIL'))  throw new Error('الإيميل غير صحيح');
+      if (updateData.error.message?.includes('WEAK_PASSWORD'))  throw new Error('الباسوورد ضعيف جداً، استخدم 6 أحرف أو أكثر');
+      throw new Error(updateData.error.message);
     }
 
-    // تحديث الإيميل في Firestore أيضاً
-    if (newEmail) await updateDoc(doc(_db, 'teachers', teacherId), { email: newEmail });
+    // ── الخطوة 4: تحديث Firestore بالبيانات الجديدة ──
+    const firestoreUpdate = {};
+    if (newEmail)    firestoreUpdate.email    = newEmail;
+    if (newPassword) firestoreUpdate.password = newPassword;
+    await updateDoc(doc(_db, 'teachers', teacherId), firestoreUpdate);
 
     closeChangeCredentialsModal();
     showToast && showToast('✅ تم تحديث بيانات الدخول بنجاح');
