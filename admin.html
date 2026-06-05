@@ -758,7 +758,7 @@
     .msg-bubble.mine .msg-bubble-inner{background:linear-gradient(135deg,var(--primary),#9333EA);color:white;border-bottom-left-radius:6px}
     .msg-bubble.theirs .msg-bubble-inner{background:white;color:var(--text);border:1px solid var(--border);border-bottom-right-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
     .msg-meta{font-size:10px;color:var(--text-muted);font-weight:600;display:flex;align-items:center;gap:6px;position:relative;z-index:1}
-    .msg-bubble.mine .msg-meta{color:rgba(255,255,255,0.65)}
+    .msg-bubble.mine .msg-meta{color:rgba(255,255,255,0.95)}
     .msg-sender-name{font-weight:800;color:var(--primary);font-size:11px;margin-bottom:3px;position:relative;z-index:1}
     .msg-date-sep{text-align:center;font-size:11px;color:var(--text-muted);font-weight:700;padding:8px 0;display:flex;align-items:center;gap:10px;position:relative;z-index:1}
     .msg-date-sep::before,.msg-date-sep::after{content:'';flex:1;height:1px;background:var(--border)}
@@ -776,6 +776,10 @@
     /* No conversation selected */
     .msg-no-conv{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-muted)}
     .msg-no-conv-icon{font-size:52px;opacity:0.25}
+    /* Delete private room button */
+    .msg-room-delete-btn{opacity:0;background:none;border:none;cursor:pointer;font-size:14px;padding:4px 6px;border-radius:8px;transition:all 0.2s;flex-shrink:0;line-height:1}
+    .msg-room-btn:hover .msg-room-delete-btn{opacity:1}
+    .msg-room-delete-btn:hover{background:var(--danger-soft);transform:scale(1.15)}
     /* ===== MESSAGE 3-DOT MENU ===== */
     .msg-bubble-row{display:flex;align-items:center;gap:6px;position:relative}
     .msg-bubble.mine .msg-bubble-row{flex-direction:row-reverse}
@@ -5147,7 +5151,8 @@ function _renderRoomsList() {
     snap => {
       const myRooms = snap.docs.filter(d => {
         const p = d.data().participants || [];
-        return p.includes(_me.uid);
+        const hidden = d.data().hiddenBy || {};
+        return p.includes(_me.uid) && !hidden[_me.uid];
       });
       // حذف العناصر القديمة
       listEl.querySelectorAll('.msg-room-btn').forEach(e => e.remove());
@@ -5174,7 +5179,8 @@ function _renderRoomsList() {
           <div style="flex:1;min-width:0">
             <div class="msg-room-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${otherName}</div>
             <div class="msg-room-sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lastMsg}</div>
-          </div>`;
+          </div>
+          <button class="msg-room-delete-btn" title="إخفاء المحادثة" onclick="_hidePrivateRoom(event,'${d.id}','${otherName}')">🗑️</button>`;
         listEl.appendChild(btn);
       });
     },
@@ -5387,7 +5393,7 @@ function _renderMessages(docs) {
 
     const metaDiv = document.createElement('div');
     metaDiv.className = 'msg-meta';
-    metaDiv.innerHTML = `${timeStr}${isMine ? ' <span style="color:rgba(255,255,255,0.7)">✓✓</span>' : ''}`;
+    metaDiv.innerHTML = `${timeStr}${isMine ? ' <span style="color:#A5F3FC;font-size:11px">✓✓</span>' : ''}`;
     wrap.appendChild(metaDiv);
 
     list.appendChild(wrap);
@@ -5533,11 +5539,12 @@ window.sendMsg = async () => {
       isAdmin: _me.isAdmin || false,
       sentAt: serverTimestamp()
     });
-    // تحديث آخر رسالة في الغرفة الخاصة
+    // تحديث آخر رسالة في الغرفة الخاصة + إظهارها لو كانت مخفية
     if (_room !== 'general') {
       await updateDoc(doc(_db, 'msgRooms', _room), {
         lastMsg: text,
-        lastAt: serverTimestamp()
+        lastAt: serverTimestamp(),
+        hiddenBy: {}
       }).catch(() => {});
     }
   } catch(e) {
@@ -5727,6 +5734,52 @@ window._clearGeneralChat = async () => {
     console.error('clearGeneralChat error:', e);
   }
   if (btn) { btn.disabled = false; btn.innerHTML = '🗑️ مسح الشات'; }
+};
+
+// ═══════════════════════════
+// إخفاء محادثة خاصة من القائمة
+// ═══════════════════════════
+window._hidePrivateRoom = (e, roomId, roomName) => {
+  e.stopPropagation();
+  // نافذة تأكيد
+  const bg = document.createElement('div');
+  bg.className = 'del-confirm-bg';
+  bg.innerHTML = `
+    <div class="del-confirm-box">
+      <div class="del-confirm-icon">🗑️</div>
+      <div class="del-confirm-title">إخفاء المحادثة</div>
+      <div class="del-confirm-sub">هل تريد إخفاء محادثتك مع <strong>${roomName}</strong> من القائمة؟<br><span style="font-size:11px;color:var(--text-muted)">ستظهر مجدداً عند مراسلته مرة أخرى.</span></div>
+      <div class="del-confirm-btns">
+        <button class="del-confirm-cancel" id="hpr-cancel">إلغاء</button>
+        <button class="del-confirm-ok" id="hpr-ok">🗑️ إخفاء</button>
+      </div>
+    </div>`;
+  document.body.appendChild(bg);
+  const close = () => bg.remove();
+  document.getElementById('hpr-cancel').onclick = close;
+  bg.addEventListener('click', e => { if (e.target === bg) close(); });
+  document.getElementById('hpr-ok').onclick = async () => {
+    close();
+    // نضيف الـ uid في hiddenBy بدون حذف الغرفة — يشوفها الطرف الآخر بعدين
+    try {
+      await updateDoc(doc(_db, 'msgRooms', roomId), {
+        [`hiddenBy.${_me.uid}`]: true
+      });
+      // لو كانت مفتوحة، نغلقها
+      if (_room === roomId) {
+        _room = null;
+        document.getElementById('msg-chat-area').innerHTML = `
+          <div class="msg-no-conv">
+            <div class="msg-no-conv-icon">💬</div>
+            <div style="font-size:14px;font-weight:700">اختر محادثة للبدء</div>
+            <div style="font-size:12px;color:var(--text-muted)">أو تصفّح غرفة الأساتذة</div>
+          </div>`;
+      }
+      window.showToast && showToast('✅ تم إخفاء المحادثة');
+    } catch(e) {
+      window.showToast && showToast('❌ تعذّر الإخفاء: ' + e.message, true);
+    }
+  };
 };
 
 // ══════════════════════════════════════════════
