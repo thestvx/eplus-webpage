@@ -755,7 +755,8 @@
     .msg-bubble-inner{padding:10px 14px;border-radius:18px;font-size:14px;font-weight:500;line-height:1.55;word-break:break-word}
     .msg-bubble.mine .msg-bubble-inner{background:linear-gradient(135deg,var(--primary),#9333EA);color:white;border-bottom-left-radius:6px}
     .msg-bubble.theirs .msg-bubble-inner{background:white;color:var(--text);border:1px solid var(--border);border-bottom-right-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
-    .msg-meta{font-size:10px;color:var(--text-muted);margin-top:3px;font-weight:600;display:flex;align-items:center;gap:6px}
+    .msg-meta{font-size:10px;color:var(--text-muted);font-weight:600;display:flex;align-items:center;gap:6px}
+    .msg-bubble.mine .msg-meta{color:rgba(255,255,255,0.65)}
     .msg-sender-name{font-weight:800;color:var(--primary);font-size:11px;margin-bottom:3px}
     .msg-date-sep{text-align:center;font-size:11px;color:var(--text-muted);font-weight:700;padding:8px 0;display:flex;align-items:center;gap:10px}
     .msg-date-sep::before,.msg-date-sep::after{content:'';flex:1;height:1px;background:var(--border)}
@@ -774,12 +775,12 @@
     .msg-no-conv{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-muted)}
     .msg-no-conv-icon{font-size:52px;opacity:0.25}
     /* ===== MESSAGE 3-DOT MENU ===== */
-    .msg-three-dot{background:none;border:none;cursor:pointer;font-size:18px;color:rgba(255,255,255,0.7);padding:0 4px;line-height:1;flex-shrink:0;border-radius:6px;transition:all 0.2s;font-weight:900}
-    .msg-bubble.theirs .msg-three-dot{color:var(--text-muted)}
-    .msg-three-dot:hover{background:rgba(255,255,255,0.15);color:white}
-    .msg-bubble.theirs .msg-three-dot:hover{background:var(--primary-light);color:var(--primary)}
-    .msg-menu{position:absolute;top:0;left:-110px;background:white;border-radius:12px;border:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:999;min-width:110px;overflow:hidden;animation:menuPop 0.15s ease}
-    .msg-bubble.mine .msg-menu{left:auto;right:-110px}
+    .msg-three-dot{background:rgba(255,255,255,0.2);border:none;cursor:pointer;font-size:16px;color:white;padding:2px 7px;line-height:1.4;flex-shrink:0;border-radius:8px;transition:all 0.2s;font-weight:900;display:inline-block}
+    .msg-bubble.theirs .msg-three-dot{background:var(--primary-light);color:var(--primary)}
+    .msg-three-dot:hover{background:rgba(255,255,255,0.4);transform:scale(1.1)}
+    .msg-bubble.theirs .msg-three-dot:hover{background:var(--border-2)}
+    .msg-menu{position:absolute;top:calc(100% + 4px);left:0;background:white;border-radius:12px;border:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,0.18);z-index:9999;min-width:120px;overflow:hidden}
+    .msg-bubble.mine .msg-menu{left:auto;right:0}
     @keyframes menuPop{from{opacity:0;transform:scale(0.92)}to{opacity:1;transform:scale(1)}}
     .msg-menu-item{padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;color:var(--text-2);transition:background 0.15s;white-space:nowrap;font-family:'Tajawal',sans-serif}
     .msg-menu-item:hover{background:var(--primary-light);color:var(--primary)}
@@ -5034,15 +5035,15 @@ function _renderMessages(docs) {
 
     wrap.innerHTML = `
       ${!isMine ? `<div class="msg-sender-name">${m.senderName || 'مجهول'}${adminBadge}</div>` : ''}
-      <div style="display:flex;align-items:flex-start;gap:4px;position:relative">
-        <div class="msg-bubble-inner" style="flex:1">${contentHtml}</div>
-        ${isMine ? `<button class="msg-three-dot" data-msgid="${msgId}" title="خيارات">⋮</button>
+      <div class="msg-bubble-inner">${contentHtml}</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:3px;position:relative">
+        <div class="msg-meta" style="margin:0">${timeStr}${isMine ? ' <span style="color:rgba(255,255,255,0.7)">✓✓</span>' : ''}</div>
+        ${isMine ? `<button class="msg-three-dot" data-msgid="${msgId}" title="خيارات">⋯</button>
         <div class="msg-menu" data-menuid="${msgId}" style="display:none">
-          ${isMine && !m.fileUrl ? `<div class="msg-menu-item" data-action="edit" data-msgid="${msgId}" data-text="${(m.text||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}">✏️ تعديل</div>` : ''}
+          ${!m.fileUrl ? `<div class="msg-menu-item" data-action="edit" data-msgid="${msgId}" data-text="${(m.text||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}">✏️ تعديل</div>` : ''}
           <div class="msg-menu-item danger" data-action="delete" data-msgid="${msgId}">🗑️ حذف</div>
         </div>` : ''}
-      </div>
-      <div class="msg-meta">${timeStr}${isMine ? ' <span style="color:rgba(255,255,255,0.7)">✓✓</span>' : ''}</div>`;
+      </div>`;
 
     list.appendChild(wrap);
   });
@@ -5267,13 +5268,16 @@ window.startPrivateConv = _startPrivateConv;
 // ═══════════════════════════
 // قائمة 3 نقاط — event delegation
 // ═══════════════════════════
-document.addEventListener('click', (e) => {
+function _handleMsgClick(e) {
   // زر 3 نقاط
   const dotBtn = e.target.closest('.msg-three-dot');
   if (dotBtn) {
     e.stopPropagation();
+    e.preventDefault();
     const msgId = dotBtn.dataset.msgid;
-    const menu = dotBtn.parentElement.querySelector(`.msg-menu[data-menuid="${msgId}"]`);
+    // البحث عن القائمة في نفس الـ container
+    const container = dotBtn.parentElement;
+    const menu = container.querySelector(`.msg-menu[data-menuid="${msgId}"]`);
     if (!menu) return;
     const isOpen = menu.style.display === 'block';
     document.querySelectorAll('.msg-menu').forEach(m => m.style.display = 'none');
@@ -5296,8 +5300,12 @@ document.addEventListener('click', (e) => {
     return;
   }
   // إغلاق عند الضغط خارج القائمة
-  document.querySelectorAll('.msg-menu').forEach(m => m.style.display = 'none');
-});
+  if (!e.target.closest('.msg-menu')) {
+    document.querySelectorAll('.msg-menu').forEach(m => m.style.display = 'none');
+  }
+}
+// نربط على document بـ capture=true عشان يشتغل حتى داخل الـ modal
+document.addEventListener('click', _handleMsgClick, true);
 
 // ═══════════════════════════
 // Lightbox للصور
