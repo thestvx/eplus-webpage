@@ -775,14 +775,18 @@
     .msg-no-conv{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-muted)}
     .msg-no-conv-icon{font-size:52px;opacity:0.25}
     /* ===== MESSAGE 3-DOT MENU ===== */
-    .msg-three-dot{background:rgba(255,255,255,0.2);border:none;cursor:pointer;font-size:16px;color:white;padding:2px 7px;line-height:1.4;flex-shrink:0;border-radius:8px;transition:all 0.2s;font-weight:900;display:inline-block}
-    .msg-bubble.theirs .msg-three-dot{background:var(--primary-light);color:var(--primary)}
-    .msg-three-dot:hover{background:rgba(255,255,255,0.4);transform:scale(1.1)}
-    .msg-bubble.theirs .msg-three-dot:hover{background:var(--border-2)}
-    .msg-menu{position:absolute;top:calc(100% + 4px);left:0;background:white;border-radius:12px;border:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,0.18);z-index:9999;min-width:120px;overflow:hidden}
+    .msg-bubble-row{display:flex;align-items:center;gap:4px;position:relative}
+    .msg-bubble.mine .msg-bubble-row{flex-direction:row-reverse}
+    .msg-three-dot-wrap{opacity:0;transition:opacity 0.15s;position:relative;flex-shrink:0}
+    .msg-bubble:hover .msg-three-dot-wrap{opacity:1}
+    .msg-three-dot{background:rgba(0,0,0,0.08);border:none;cursor:pointer;font-size:15px;color:var(--text-2);width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all 0.2s;font-weight:900}
+    .msg-bubble.mine .msg-three-dot{background:rgba(255,255,255,0.25);color:white}
+    .msg-three-dot:hover{background:rgba(0,0,0,0.15);transform:scale(1.1)}
+    .msg-bubble.mine .msg-three-dot:hover{background:rgba(255,255,255,0.4)}
+    .msg-menu{position:absolute;top:calc(100% + 4px);left:0;background:white;border-radius:12px;border:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,0.18);z-index:9999;min-width:130px;overflow:hidden;animation:menuPop 0.15s ease}
     .msg-bubble.mine .msg-menu{left:auto;right:0}
-    @keyframes menuPop{from{opacity:0;transform:scale(0.92)}to{opacity:1;transform:scale(1)}}
-    .msg-menu-item{padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;color:var(--text-2);transition:background 0.15s;white-space:nowrap;font-family:'Tajawal',sans-serif}
+    @keyframes menuPop{from{opacity:0;transform:scale(0.92) translateY(-4px)}to{opacity:1;transform:scale(1) translateY(0)}}
+    .msg-menu-item{padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;color:var(--text-2);transition:background 0.15s;white-space:nowrap;font-family:'Tajawal',sans-serif;display:flex;align-items:center;gap:7px}
     .msg-menu-item:hover{background:var(--primary-light);color:var(--primary)}
     .msg-menu-item.danger{color:#DC2626}
     .msg-menu-item.danger:hover{background:var(--danger-soft)}
@@ -5277,72 +5281,83 @@ function _renderMessages(docs) {
       if (m.edited) contentHtml += ` <span style="font-size:9px;opacity:0.6">(معدَّل)</span>`;
     }
 
-    wrap.innerHTML = `
-      ${!isMine ? `<div class="msg-sender-name">${m.senderName || 'مجهول'}${adminBadge}</div>` : ''}
-      <div class="msg-bubble-inner">${contentHtml}</div>
-      <div class="msg-meta">${timeStr}${isMine ? ' <span style="color:rgba(255,255,255,0.7)">✓✓</span>' : ''}</div>`;
+    // زر 3 نقاط — يظهر عند hover لكل الرسائل (mine أو theirs إذا أدمين)
+    const canAct = isMine || (_me?.isAdmin === true);
 
-    // زر 3 نقاط — نضيفه بعد innerHTML عشان يكون عنصر DOM حقيقي
-    if (isMine) {
-      const dotContainer = document.createElement('div');
-      dotContainer.style.cssText = 'position:relative;display:inline-block';
+    // بناء زر 3 نقاط
+    const dotWrap = document.createElement('div');
+    dotWrap.className = 'msg-three-dot-wrap';
 
-      const dotBtn = document.createElement('button');
-      dotBtn.className = 'msg-three-dot';
-      dotBtn.textContent = '⋯';
-      dotBtn.title = 'خيارات';
-      dotBtn.dataset.msgid = msgId;
+    const dotBtn = document.createElement('button');
+    dotBtn.className = 'msg-three-dot';
+    dotBtn.innerHTML = '&#8942;'; // ⋮ ثلاث نقاط عمودية
+    dotBtn.title = 'خيارات';
 
-      const menu = document.createElement('div');
-      menu.className = 'msg-menu';
-      menu.style.display = 'none';
-      menu.dataset.menuid = msgId;
+    const menu = document.createElement('div');
+    menu.className = 'msg-menu';
+    menu.style.display = 'none';
 
-      if (!m.fileUrl) {
-        const editItem = document.createElement('div');
-        editItem.className = 'msg-menu-item';
-        editItem.dataset.action = 'edit';
-        editItem.dataset.msgid = msgId;
-        editItem.dataset.text = m.text || '';
-        editItem.textContent = '✏️ تعديل';
-        menu.appendChild(editItem);
-      }
-
-      const delItem = document.createElement('div');
-      delItem.className = 'msg-menu-item danger';
-      delItem.dataset.action = 'delete';
-      delItem.dataset.msgid = msgId;
-      delItem.textContent = '🗑️ حذف';
-      menu.appendChild(delItem);
-
-      // Listeners مباشرة على الأزرار
-      dotBtn.addEventListener('click', (e) => {
+    if (!m.fileUrl) {
+      const editItem = document.createElement('div');
+      editItem.className = 'msg-menu-item';
+      editItem.innerHTML = '✏️ تعديل';
+      editItem.addEventListener('click', (e) => {
         e.stopPropagation();
-        const isOpen = menu.style.display === 'block';
-        document.querySelectorAll('.msg-menu').forEach(m => m.style.display = 'none');
-        if (!isOpen) menu.style.display = 'block';
+        menu.style.display = 'none';
+        window._editMsg && window._editMsg(msgId, m.text || '');
       });
-
-      menu.querySelectorAll('.msg-menu-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-          e.stopPropagation();
-          menu.style.display = 'none';
-          const action = item.dataset.action;
-          if (action === 'delete') window._deleteMsg && window._deleteMsg(item.dataset.msgid);
-          else if (action === 'edit') window._editMsg && window._editMsg(item.dataset.msgid, item.dataset.text || '');
-        });
-      });
-
-      dotContainer.appendChild(dotBtn);
-      dotContainer.appendChild(menu);
-
-      // نضيف الزر في الـ msg-meta row
-      const metaDiv = wrap.querySelector('.msg-meta');
-      metaDiv.style.display = 'flex';
-      metaDiv.style.alignItems = 'center';
-      metaDiv.style.gap = '6px';
-      metaDiv.appendChild(dotContainer);
+      menu.appendChild(editItem);
     }
+
+    const delItem = document.createElement('div');
+    delItem.className = 'msg-menu-item danger';
+    delItem.innerHTML = '🗑️ حذف';
+    delItem.addEventListener('click', (e) => {
+      e.stopPropagation();
+      menu.style.display = 'none';
+      window._deleteMsg && window._deleteMsg(msgId);
+    });
+    menu.appendChild(delItem);
+
+    dotBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = menu.style.display === 'block';
+      document.querySelectorAll('.msg-menu').forEach(el => el.style.display = 'none');
+      if (!isOpen) { menu.style.display = 'block'; menu.style.animation = 'menuPop 0.15s ease'; }
+    });
+
+    dotWrap.appendChild(dotBtn);
+    dotWrap.appendChild(menu);
+
+    // صف يحتوي الفقاعة + الزر جنبها
+    const bubbleRow = document.createElement('div');
+    bubbleRow.className = 'msg-bubble-row';
+
+    const bubbleInner = document.createElement('div');
+    bubbleInner.className = 'msg-bubble-inner';
+    bubbleInner.innerHTML = contentHtml;
+
+    if (isMine) {
+      bubbleRow.appendChild(dotWrap);
+      bubbleRow.appendChild(bubbleInner);
+    } else {
+      bubbleRow.appendChild(bubbleInner);
+      if (canAct) bubbleRow.appendChild(dotWrap);
+    }
+
+    if (!isMine) {
+      const senderDiv = document.createElement('div');
+      senderDiv.className = 'msg-sender-name';
+      senderDiv.innerHTML = `${m.senderName || 'مجهول'}${adminBadge}`;
+      wrap.appendChild(senderDiv);
+    }
+
+    wrap.appendChild(bubbleRow);
+
+    const metaDiv = document.createElement('div');
+    metaDiv.className = 'msg-meta';
+    metaDiv.innerHTML = `${timeStr}${isMine ? ' <span style="color:rgba(255,255,255,0.7)">✓✓</span>' : ''}`;
+    wrap.appendChild(metaDiv);
 
     list.appendChild(wrap);
   });
