@@ -5536,11 +5536,11 @@ let _finTreasury = 0;  // الرصيد الابتدائي للخزينة
 async function loadFinanceSection() {
   try {
     // تحميل رصيد الخزينة
-    const tSnap = await getDoc(doc(db, 'settings', 'treasury'));
+    const tSnap = await getDoc(doc(_db, 'settings', 'treasury'));
     _finTreasury = tSnap.exists() ? (tSnap.data().balance || 0) : 0;
 
     // تحميل المعاملات
-    const txSnap = await getDocs(query(collection(db, 'financeTx'), orderBy('date','desc')));
+    const txSnap = await getDocs(query(collection(_db, 'financeTx'), orderBy('date','desc')));
     _finTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     renderFinanceKPIs();
@@ -5637,7 +5637,7 @@ window.saveFinanceTx = async () => {
   try {
     const tx = { type, desc, amount, date, createdAt: serverTimestamp() };
     if (teacher) tx.teacher = teacher;
-    const ref = await addDoc(collection(db, 'financeTx'), tx);
+    const ref = await addDoc(collection(_db, 'financeTx'), tx);
     _finTxs.unshift({ id: ref.id, ...tx });
     renderFinanceKPIs();
     renderFinanceTable();
@@ -5673,7 +5673,7 @@ window.closeTreasuryModal = () => document.getElementById('treasury-modal').clas
 window.saveTreasuryBalance = async () => {
   const amount = parseFloat(document.getElementById('treasury-amount').value) || 0;
   try {
-    await setDoc(doc(db, 'settings', 'treasury'), { balance: amount, updatedAt: serverTimestamp() });
+    await setDoc(doc(_db, 'settings', 'treasury'), { balance: amount, updatedAt: serverTimestamp() });
     _finTreasury = amount;
     renderFinanceKPIs();
     closeTreasuryModal();
@@ -5722,7 +5722,7 @@ window.saveTeacherCredentials = async () => {
       const data = await r.json();
       if (data.error) throw new Error(data.error.message);
       // حفظ الإيميل الجديد في Firestore أيضاً
-      await updateDoc(doc(db, 'teachers', teacherId), { email: newEmail });
+      await updateDoc(doc(_db, 'teachers', teacherId), { email: newEmail });
     }
 
     if (newPassword) {
@@ -5785,7 +5785,7 @@ window.saveEditTicket = async () => {
   btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
 
   try {
-    await updateDoc(doc(db, 'summerTickets', id), {
+    await updateDoc(doc(_db, 'summerTickets', id), {
       name, receipt, date, pack,
       amount, remainingAmount: remaining,
       fullPrice: fullPrice || (amount + remaining),
