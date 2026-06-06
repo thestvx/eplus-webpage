@@ -1943,6 +1943,8 @@
 
       <!-- تعديل حصة مسجّلة — للأدمين فقط -->
       <button onclick="openEditSessionPicker()" style="margin-top:8px;width:100%;padding:11px;border-radius:14px;border:2px solid rgba(217,119,6,0.4);background:rgba(245,158,11,0.08);color:#b45309;font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">✏️ تعديل حصة مسجّلة</button>
+      <!-- إعادة تسجيل الحضور من الصفر -->
+      <button onclick="resetAttendance()" style="margin-top:8px;width:100%;padding:11px;border-radius:14px;border:2px solid rgba(239,68,68,0.35);background:rgba(239,68,68,0.07);color:#DC2626;font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">🔄 إعادة تسجيل الحضور من الصفر</button>
       <!-- Monthly summary for admin -->
       <button onclick="openSummaryModal()" style="margin-top:8px;width:100%;padding:11px;border-radius:14px;border:2px dashed var(--primary);background:var(--primary-light);color:var(--primary);font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">📊 ملخص الشهر</button>
     </div>
@@ -5004,6 +5006,50 @@ window.openSession = (sessionNum) => {
 };
 
 // ─── تعديل حصة مسجّلة — للأدمين فقط ───
+// ─── إعادة تسجيل الحضور من الصفر — حذف كل sessionAttendance للأستاذ ───
+window.resetAttendance = async () => {
+  const tid = currentAttTeacherId;
+  if (!tid) return;
+  const teacherName = document.getElementById('att-modal-teacher-name')?.textContent || 'الأستاذ';
+
+  const confirmed = confirm(`⚠️ تحذير\n\nسيتم حذف جميع سجلات الحضور للأستاذ "${teacherName}" نهائياً.\n\nهذه العملية لا يمكن التراجع عنها.\n\nهل أنت متأكد؟`);
+  if (!confirmed) return;
+
+  // تأكيد ثانٍ
+  const confirmed2 = confirm(`تأكيد أخير: حذف كل سجلات حضور "${teacherName}"؟`);
+  if (!confirmed2) return;
+
+  try {
+    // جلب كل docs الخاصة بهذا الأستاذ من sessionAttendance
+    const q = query(
+      collection(db, 'sessionAttendance'),
+      where('teacherId', '>=', tid + '_g'),
+      where('teacherId', '<=', tid + '_g\uf8ff')
+    );
+    const snap = await getDocs(q);
+
+    if (snap.empty) {
+      showToast('لا توجد سجلات حضور لهذا الأستاذ', false);
+      return;
+    }
+
+    // حذف batch
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+
+    // تصفير المتغيرات المحلية
+    _allRecordedSessions = {};
+    _allRecordedSessionsByGroup = {};
+
+    await addLog('🔄 إعادة ضبط الحضور', `تم حذف ${snap.size} سجل حضور للأستاذ ${teacherName}`, '⚠️');
+    showToast(`✅ تم حذف ${snap.size} سجل — الحضور جاهز للتسجيل من جديد`);
+    closeAttModal();
+  } catch(e) {
+    showToast('خطأ: ' + e.message, true);
+  }
+};
+
 // ─── picker: اختيار حصة مسجّلة للتعديل ───
 window.openEditSessionPicker = () => {
   const tid = currentAttTeacherId;
