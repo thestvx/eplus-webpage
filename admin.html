@@ -1943,8 +1943,10 @@
 
       <!-- Save -->
       <button class="btn-primary" id="save-att-btn" onclick="saveAttendance()" style="margin-top:14px">💾 حفظ الحضور</button>
+      <!-- تعديل حصة مسجّلة — للأدمين فقط -->
+      <button onclick="openEditSessionPicker()" style="margin-top:8px;width:100%;padding:11px;border-radius:14px;border:2px solid rgba(217,119,6,0.4);background:rgba(245,158,11,0.08);color:#b45309;font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">✏️ تعديل حصة مسجّلة</button>
       <!-- Monthly summary for admin -->
-      <button onclick="openSummaryModal()" style="margin-top:10px;width:100%;padding:11px;border-radius:14px;border:2px dashed var(--primary);background:var(--primary-light);color:var(--primary);font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">📊 ملخص الشهر</button>
+      <button onclick="openSummaryModal()" style="margin-top:8px;width:100%;padding:11px;border-radius:14px;border:2px dashed var(--primary);background:var(--primary-light);color:var(--primary);font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">📊 ملخص الشهر</button>
     </div>
   </div>
 </div>
@@ -5004,6 +5006,65 @@ window.openSession = (sessionNum) => {
 };
 
 // ─── تعديل حصة مسجّلة — للأدمين فقط ───
+// ─── picker: اختيار حصة مسجّلة للتعديل ───
+window.openEditSessionPicker = () => {
+  const tid = currentAttTeacherId;
+  if (!tid) return;
+
+  // جمع كل الحصص المسجّلة من جميع الأفواج
+  const allRecorded = []; // { sessionNum, gi, groupName, date, present, total }
+  const groups = window._activeAttGroups || [];
+
+  Object.entries(_allRecordedSessionsByGroup || {}).forEach(([giStr, sessions]) => {
+    const gi = parseInt(giStr);
+    const groupName = groups[gi]?.name || (Object.keys(_allRecordedSessionsByGroup).length > 1 ? `فوج ${gi+1}` : '');
+    Object.entries(sessions).forEach(([num, record]) => {
+      const present = (record.students || []).filter(s => s.present).length;
+      const total   = (record.students || []).length;
+      const date    = record.savedAt?.toDate
+        ? record.savedAt.toDate().toLocaleDateString('ar-DZ', {day:'numeric', month:'long'})
+        : (record.date || '');
+      allRecorded.push({ sessionNum: parseInt(num), gi, groupName, date, present, total });
+    });
+  });
+
+  if (!allRecorded.length) {
+    showToast('⚠️ لا توجد حصص مسجّلة لهذا الأستاذ بعد', true);
+    return;
+  }
+
+  // ترتيب: فوج ثم رقم الحصة
+  allRecorded.sort((a, b) => a.gi - b.gi || a.sessionNum - b.sessionNum);
+
+  const rowsHtml = allRecorded.map(r => `
+    <div onclick="editSession_g(${r.sessionNum}, ${r.gi})"
+      style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:14px;border:1.5px solid var(--border);background:white;cursor:pointer;transition:all 0.2s;margin-bottom:8px"
+      onmouseover="this.style.borderColor='var(--primary)';this.style.background='var(--primary-light)'"
+      onmouseout="this.style.borderColor='var(--border)';this.style.background='white'">
+      <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,rgba(217,119,6,0.12),rgba(245,158,11,0.08));display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#b45309;flex-shrink:0">${r.sessionNum}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:800;color:var(--text)">
+          حصة ${r.sessionNum}${r.groupName ? ` — ${r.groupName}` : ''}
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+          ${r.date ? `📅 ${r.date} · ` : ''}👥 ${r.present}/${r.total} حاضر
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:800;color:#b45309;flex-shrink:0">تعديل ✏️</div>
+    </div>`).join('');
+
+  openSessionModal(`
+    <div class="session-att-header" style="border-radius:24px 24px 0 0;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(124,58,237,0.04))">
+      <div style="font-size:22px">✏️</div>
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:900;color:var(--text)">اختر الحصة للتعديل</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${allRecorded.length} حصة مسجّلة</div>
+      </div>
+      <button onclick="closeSessionModal()" style="padding:8px 16px;border-radius:12px;border:1px solid var(--border-2);background:var(--card);color:var(--text-muted);font-size:13px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">✕</button>
+    </div>
+    <div style="padding:20px 24px">${rowsHtml}</div>`);
+};
+
 window.editSession_g = async (sessionNum, gi) => {
   const tid = currentAttTeacherId;
   if (!tid) return;
