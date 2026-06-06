@@ -4392,10 +4392,11 @@ window.addStudent = async () => {
     payStatus = ticket ? (isPaid ? 'paid' : 'unpaid') : 'unknown';
   }
 
-  // منع التكرار — بالوصل إذا موجود، وإلا بالاسم
+  // منع التكرار — بالوصل إذا موجود، وإلا بالاسم مع مقارنة الكلمات بغض النظر عن الترتيب
+  const normName = n => String(n||'').trim().toLowerCase().replace(/\s+/g,' ').split(' ').sort().join(' ');
   const duplicate = currentAttStudents.some(s =>
-    (receipt && s.receipt === receipt) ||
-    (!receipt && !s.receipt && s.name === name)
+    (receipt && s.receipt && s.receipt === receipt) ||
+    (!receipt && normName(s.name) === normName(name))
   );
   if (duplicate) {
     showToast(`⚠️ ${name} مضاف مسبقاً في القائمة`, true);
@@ -5153,7 +5154,15 @@ window.viewSessionHistory = (sessionNum) => {
 
 // حفظ حضور حصة معينة — مع الفوج
 window.saveSessionAttendance_g = async (sessionNum, gi) => {
-  if (!currentAttTeacherId) return;
+  // ── fallback للأستاذ ──
+  if (!currentAttTeacherId && window.currentTeacherData?.uid) {
+    currentAttTeacherId = window.currentTeacherData.uid;
+    window.currentAttTeacherId = currentAttTeacherId;
+  }
+  if (!currentAttTeacherId) {
+    showToast('⚠️ خطأ: لم يتم تحديد الأستاذ، يرجى إعادة تحميل الصفحة', true);
+    return;
+  }
   const groupSuffix = `_g${gi}`;
   const sessionKey  = `${currentAttTeacherId}${groupSuffix}_session_${sessionNum}`;
   const record = {
@@ -5176,6 +5185,10 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
 // حفظ حضور حصة معينة (توافق قديم — للأدمين أو بدون أفواج)
 let currentOpenSession = null;
 window.saveSessionAttendance = async () => {
+  if (!currentAttTeacherId && window.currentTeacherData?.uid) {
+    currentAttTeacherId = window.currentTeacherData.uid;
+    window.currentAttTeacherId = currentAttTeacherId;
+  }
   if (!currentAttTeacherId || !currentOpenSession) return;
   await saveSessionAttendance_g(currentOpenSession, window._currentGroupIdx || 0);
 };
