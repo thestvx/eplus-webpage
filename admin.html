@@ -699,7 +699,7 @@
     .group-add-student-wrap{display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
     .group-label-sm{font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:5px;margin-top:4px}
 
-    @media print{body *{visibility:hidden}#print-area,#print-area *{visibility:visible}#print-area{position:fixed;inset:0;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;padding:4mm;box-sizing:border-box;gap:6mm}#print-area img{width:100%;max-width:139.7mm;height:auto;display:block}@page{size:139.7mm 127mm portrait;margin:0}}
+    @media print{body *{visibility:hidden}#print-area,#print-area *{visibility:visible}#print-area{position:fixed;inset:0;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;padding:6mm;box-sizing:border-box;gap:4mm}#print-area img{width:100%;max-width:195mm;height:auto;display:block}@page{size:A4 portrait;margin:0}}
 
     /* ===== GROUPS TABS IN ATT MODAL ===== */
     .att-groups-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
@@ -2842,8 +2842,8 @@ window.generateTicket = async () => {
 
 function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
   const canvas = document.getElementById('ticket-canvas');
-  // New ticket design: 5.5 × 5 inch @ 288 DPI = 1584 × 1440 px (portrait)
-  const W = 1584, H = 1440;
+  // Actual ticket image: 2480 × 1063 px
+  const W = 2480, H = 1063;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
 
@@ -2853,29 +2853,26 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
     ctx.drawImage(img, 0, 0, W, H);
 
     // ═══════════════════════════════════════════════════════
-    // PIXEL-PERFECT COORDINATES — New portrait design (1584×1440)
-    // Layout (RTL):
-    //   Logo area     : top ~0–160px
-    //   ─────────────────────────────────────────────────────
-    //   الإسم واللقب  : label ~y=260,  value baseline = 308
-    //   اسم الباقة    : label ~y=368,  value baseline = 416
-    //   المبلغ         : label ~y=476,  value baseline = 524
-    //   التاريخ        : label ~y=584,  value baseline = 632
-    //   رقم الوصل     : label ~y=692,  value baseline = 740
+    // PIXEL-PERFECT COORDINATES — measured by scanning the
+    // original blank ticket image (2480×1063) for label text
     //
-    //   المبلغ المتبقي : same row as المبلغ, left side
-    //     label  x_right = 560,  value baseline = 524
+    // Label bands (from dark-pixel scan):
+    //   الاسم الكامل  : y = 359–382   → value baseline = 424
+    //   اسم الباقة    : y = 441–468   → value baseline = 510
+    //   المبلغ         : y = 533–557   → value baseline = 599
+    //   التاريخ        : y = 624–650   → value baseline = 692
+    //   رقم الوصل     : y = 697–730   → value baseline = 772
     //
-    //   Right anchor (values): x = 1544
-    //   Value clip zone width : 700px (right panel)
-    //   Left panel right edge : 560px (for المبلغ المتبقي)
+    // Right anchor (text right-edge): x = 2440
+    // Panel left edge: x = 1850
+    // Value font: 28px (fits the ~42px slot between labels)
     //
-    //   QR zone (bottom free area):
-    //     centered x = 792,  y starts = 860
-    //     size = 280px
+    // QR zone (free area between dashed line & labels):
+    //   x = 1665 → 2045  (380px wide)
+    //   y = 390  → 770   (380px tall)
     // ═══════════════════════════════════════════════════════
 
-    const R   = 1544;        // right anchor for values
+    const R   = 2440;        // right anchor
     const CLR = '#0D2080';   // dark navy
 
     ctx.textAlign = 'right';
@@ -2886,21 +2883,22 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
     const val = (txt, baseline, font) => {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(844, baseline - 44, 700, 52);   // clip to right value slot
+      ctx.rect(1852, baseline - 32, 592, 40);   // clip to value slot
       ctx.clip();
-      ctx.font = font || 'bold 36px Tajawal, Arial';
+      ctx.font = font || 'bold 28px Tajawal, Arial';
       ctx.fillStyle = CLR;
       ctx.fillText(txt || '—', R, baseline);
       ctx.restore();
     };
 
-    val(data.name,                                                  308);
-    val(data.pack,                                                  416);
-    val(Number(data.amount || 0).toLocaleString('ar-DZ') + ' دج', 524);
-    val(data.dateFormatted || '—',                                  632);
-    val(data.receipt || '—',                                        740, 'bold 34px monospace');
+    val(data.name,                                                  424);
+    val(data.pack,                                                  510);
+    val(Number(data.amount || 0).toLocaleString('ar-DZ') + ' دج', 599);
+    val(data.dateFormatted || '—',                                  692);
+    val(data.receipt || '—',                                        772, 'bold 26px monospace');
 
-    // ── المبلغ المتبقي — يسار نفس صف المبلغ ──
+    // ── المبلغ المتبقي ──
+    // إحداثيات من Photoshop Info: X=2140, Y=600
     const remainingAmtDraw = data.remainingAmount !== undefined
       ? data.remainingAmount
       : (() => {
@@ -2909,31 +2907,33 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
           return full > 0 ? Math.max(0, full - paid) : 0;
         })();
 
+    // نص المبلغ المتبقي: إذا كان 0 نكتب "0 دج"، وإذا كان موجود نكتب القيمة
     const remainingTxt = remainingAmtDraw > 0
       ? Number(remainingAmtDraw).toLocaleString('ar-DZ') + ' دج'
       : '0 دج';
 
     ctx.save();
-    ctx.font = 'bold 36px Tajawal, Arial';
+    ctx.font = 'bold 28px Tajawal, Arial';
     ctx.fillStyle = remainingAmtDraw > 0 ? '#DC2626' : CLR;
     ctx.textAlign = 'right';
     ctx.direction = 'rtl';
     ctx.beginPath();
-    // Left panel: value sits to the right of "المبلغ المتبقي:" label
-    // label right edge ~x=560, value right anchor = 540
-    ctx.rect(40, 480, 500, 52);
+    // إحداثيات من Photoshop: X=2147, Y=579 — W=206, H=48
+    // منطقة الكتابة: من x=1942 إلى x=2147، baseline = Y+H = 627
+    ctx.rect(1942, 579, 206, 48);
     ctx.clip();
-    ctx.fillText(remainingTxt, 540, 524);
+    ctx.fillText(remainingTxt, 2147, 620);
     ctx.restore();
 
-    // ── QR code — centered in bottom free area ──
+    // ── QR code ──────────────────────────────────────────
+    // Exact position from Photoshop Info panel: X=2007, Y=846
     if (qrCanvas) {
-      const qrSize = 280;
-      const qrX = Math.round((W - qrSize) / 2);   // centered horizontally ≈ 652
-      const qrY = 880;                              // starts below رقم الوصل row
+      const qrSize = 180;
+      const qrX = 2007 - qrSize / 2;  // centered on X=2007 → 1917
+      const qrY = 846;                  // starts at Y=846
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.roundRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16, 14);
+      ctx.roundRect(qrX - 6, qrY - 6, qrSize + 12, qrSize + 12, 10);
       ctx.fill();
       ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
     }
