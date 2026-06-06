@@ -4097,8 +4097,8 @@ window.switchAttGroupTab = (gidx, teacher, groups) => {
       currentAttStudents.push(...newStudents);
       // حفظ القائمة المحدثة في Firestore
       _suppressSnapshot = true;
-      updateDoc(doc(db, 'teachers', currentAttTeacherId), { students: currentAttStudents })
-        .catch(e => console.warn('خطأ في مزامنة تلاميذ الفوج:', e))
+      setDoc(doc(db, 'teachers', currentAttTeacherId), { students: currentAttStudents }, { merge: true })
+        .catch(e => showToast('خطأ: ' + e.message, true))
         .finally(() => { setTimeout(() => { _suppressSnapshot = false; }, 1500); });
     }
     // الآن نُصفّي مجدداً من currentAttStudents المحدثة
@@ -4390,7 +4390,13 @@ window.addStudent = async () => {
   _suppressSnapshot = true;
   const savePayload = { students: currentAttStudents };
   if (activeGidx !== 'all' && activeGroups.length > 0) savePayload.groups = activeGroups;
-  await updateDoc(doc(db, 'teachers', currentAttTeacherId), savePayload);
+  try {
+    await setDoc(doc(db, 'teachers', currentAttTeacherId), savePayload, { merge: true });
+  } catch(e) {
+    showToast('خطأ في حفظ التلميذ: ' + e.message, true);
+    _suppressSnapshot = false;
+    return;
+  }
   setTimeout(() => { _suppressSnapshot = false; }, 1500);
 
   // تحديث عداد تاب الفوج النشط
@@ -4461,10 +4467,10 @@ window.removeStudent = async (sid) => {
 
   // حفظ في Firestore مع تجميد الـ snapshot
   _suppressSnapshot = true;
-  await updateDoc(doc(db, 'teachers', currentAttTeacherId), {
-    students: currentAttStudents,
-    groups: updatedGroups
-  });
+  try {
+    await setDoc(doc(db, 'teachers', currentAttTeacherId),
+      { students: currentAttStudents, groups: updatedGroups }, { merge: true });
+  } catch(e) { showToast('خطأ: ' + e.message, true); }
   setTimeout(() => { _suppressSnapshot = false; }, 1500);
 
   // تحديث عداد تاب الكل
