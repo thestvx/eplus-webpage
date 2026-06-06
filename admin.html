@@ -2193,6 +2193,7 @@ onAuthStateChanged(auth, async user => {
         if (teachersHero) teachersHero.style.display = 'none';
         // عرض نافذة الترحيب
         currentTeacherData = { uid: user.uid, id: user.uid, ...td };
+        window.currentTeacherData = currentTeacherData;
         document.getElementById('welcome-teacher-name').textContent = `أهلاً استاذ ${td.name} .. يوم سعيد 🌟`;
         document.getElementById('welcome-modal').classList.add('open');
         // تحميل بيانات الأستاذ
@@ -3578,8 +3579,8 @@ window.previewFromDB = async (id) => {
 const AR_DAYS = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 let allTeachers = [];
 let currentTeacherData = null;
-let currentAttTeacherId = null;
-let currentAttStudents = [];
+let currentAttTeacherId = null; window.currentAttTeacherId = null;
+let currentAttStudents  = [];
 let newTeacherPhotoBase64 = null;
 let editTeacherPhotoBase64 = null;
 
@@ -3962,8 +3963,8 @@ window.openAttModal = async (teacherId) => {
   } catch(e) { /* fallback */ }
   if (!t) t = allTeachers.find(x => x.id === teacherId);
   if (!t) return;
-  currentAttTeacherId = teacherId;
-  currentAttStudents = t.students ? [...t.students] : [];
+  currentAttTeacherId = teacherId; window.currentAttTeacherId = currentAttTeacherId;
+  currentAttStudents = t.students ? [...t.students] : []; window.currentAttStudents = currentAttStudents;
   try {
     const todayKey = new Date().toISOString().slice(0,10);
     const todaySnap = await getDoc(doc(db, 'attendance', `${teacherId}_${todayKey}`));
@@ -4043,7 +4044,7 @@ window.openAttModal = async (teacherId) => {
 };
 window.closeAttModal = () => {
   document.getElementById('att-modal').classList.remove('open');
-  currentAttTeacherId = null;
+  currentAttTeacherId = null; window.currentAttTeacherId = null;
 };
 
 // ─── تبديل تبويب الفوج في modal الحضور ───
@@ -4368,6 +4369,15 @@ window.addStudent = async () => {
     return;
   }
 
+  // ── ضمان currentAttTeacherId — fallback لوضع الأستاذ ──
+  if (!currentAttTeacherId && window.currentTeacherData?.uid) {
+    currentAttTeacherId = window.currentTeacherData.uid; window.currentAttTeacherId = currentAttTeacherId;
+  }
+  if (!currentAttTeacherId) {
+    showToast('⚠️ خطأ: لم يتم تحديد الأستاذ، يرجى إعادة تحميل الصفحة', true);
+    return;
+  }
+
   const idx = currentAttStudents.length;
   const id  = receipt || genStudentId(currentAttTeacherId.slice(-4).toUpperCase(), idx);
 
@@ -4515,7 +4525,8 @@ async function loadTeacherStudentsView(uid, teacherData) {
     if (_suppressSnapshot) return; // جاري تعديل — تجاهل هذا التحديث
     const t = snap.data();
     currentTeacherData = { uid, id: uid, ...t };
-    currentAttStudents = t.students ? [...t.students] : [];
+    window.currentTeacherData = currentTeacherData;
+    currentAttStudents = t.students ? [...t.students] : []; window.currentAttStudents = currentAttStudents;
 
     // تحديث إحصائيات الهيدر — مع تحقق آمن من وجود العنصر
     const heroEl = document.getElementById('teachers-hero');
@@ -4537,7 +4548,7 @@ async function loadTeacherStudentsView(uid, teacherData) {
 
 // ─── عرض نظام الحضور بالـ 12 حصة للأستاذ — مقسّم على الأفواج ───
 function showTeacherInlineAttendance(teacherId, teacherData) {
-  currentAttTeacherId = teacherId;
+  currentAttTeacherId = teacherId; window.currentAttTeacherId = currentAttTeacherId;
   const grid = document.getElementById('teachers-grid');
   if (!grid) return;
 
@@ -4871,6 +4882,10 @@ window.viewSessionHistory = (sessionNum) => {
 window.openSession_g = (sessionNum, gi) => {
   currentOpenSession = sessionNum;
   window._currentGroupIdx = gi;
+  // ── ضمان أن currentAttTeacherId محدد دائماً (مهم لدالة addStudent) ──
+  if (!currentAttTeacherId && window.currentTeacherData?.uid) {
+    currentAttTeacherId = window.currentTeacherData.uid; window.currentAttTeacherId = currentAttTeacherId;
+  }
 
   const buildModalHtml = () => {
     const students = currentAttStudents;
@@ -4970,7 +4985,7 @@ window.editSession_g = async (sessionNum, gi) => {
   }
 
   // تحميل قائمة التلاميذ إلى currentAttStudents
-  currentAttStudents = savedStudents.map(s => ({ ...s, marked: true }));
+  currentAttStudents = savedStudents.map(s => ({ ...s, marked: true })); window.currentAttStudents = currentAttStudents;
   currentOpenSession = sessionNum;
   window._currentGroupIdx = gi;
   window._editingDocRef    = docRef;
