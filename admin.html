@@ -452,6 +452,21 @@
     .tbl tbody tr:hover td{background:#F9F6FF}
     .receipt-code{font-family:monospace;font-size:11px;color:var(--primary);letter-spacing:1px;background:var(--primary-light);padding:2px 8px;border-radius:6px}
     .pack-chip{padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700;background:var(--accent-soft);color:#92400E;border:1px solid rgba(245,158,11,0.2)}
+    /* ── فلاتر التذاكر ── */
+    .tickets-filter-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
+    .ticket-filter-btn{padding:6px 14px;border-radius:99px;border:2px solid var(--border);background:white;font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;color:var(--text-2);transition:all 0.18s;white-space:nowrap}
+    .ticket-filter-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+    .ticket-filter-btn.active{border-color:var(--primary);background:var(--primary);color:white}
+    .ticket-filter-btn.active-green{border-color:#059669;background:#059669;color:white}
+    .ticket-filter-btn.active-amber{border-color:#d97706;background:#d97706;color:white}
+    .tickets-stats-mini{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+    .tsm-card{flex:1;min-width:120px;border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:10px;border:1.5px solid}
+    .tsm-card.green{background:rgba(16,185,129,0.07);border-color:rgba(16,185,129,0.25)}
+    .tsm-card.amber{background:rgba(245,158,11,0.07);border-color:rgba(245,158,11,0.25)}
+    .tsm-card-num{font-size:22px;font-weight:900;line-height:1}
+    .tsm-card.green .tsm-card-num{color:#059669}
+    .tsm-card.amber .tsm-card-num{color:#d97706}
+    .tsm-card-lbl{font-size:11px;font-weight:700;color:var(--text-muted);margin-top:2px}
     .amount-badge{font-weight:800;color:var(--text)}
     .status-paid{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;background:var(--success-soft);color:#065F46;border:1px solid rgba(16,185,129,0.25);font-size:10px;font-weight:800}
     .status-pending{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;background:rgba(245,158,11,0.1);color:#92400E;border:1px solid rgba(245,158,11,0.25);font-size:10px;font-weight:800}
@@ -1545,10 +1560,42 @@
             <div class="panel-icon orange">📋</div>
             سجل التذاكر الصادرة
           </div>
+          <!-- إحصائيات سريعة -->
+          <div class="tickets-stats-mini">
+            <div class="tsm-card green">
+              <div>
+                <div class="tsm-card-num" id="tsm-active">0</div>
+                <div class="tsm-card-lbl">✅ تذكرة مفعّلة</div>
+              </div>
+            </div>
+            <div class="tsm-card amber">
+              <div>
+                <div class="tsm-card-num" id="tsm-pending">0</div>
+                <div class="tsm-card-lbl">⏳ قيد المراجعة</div>
+              </div>
+            </div>
+            <div class="tsm-card" style="background:rgba(99,102,241,0.07);border-color:rgba(99,102,241,0.25);flex:2;min-width:180px">
+              <div>
+                <div class="tsm-card-num" id="tsm-total-amount" style="color:#4f46e5;font-size:18px">0 دج</div>
+                <div class="tsm-card-lbl">💰 إجمالي المفعّلة</div>
+              </div>
+            </div>
+          </div>
           <!-- خانة البحث -->
-          <div style="position:relative;margin-bottom:16px">
+          <div style="position:relative;margin-bottom:12px">
             <span style="position:absolute;top:50%;right:14px;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
             <input class="inp" type="text" id="tickets-search-inp" placeholder="بحث برقم الوصل أو الاسم واللقب..." style="padding-right:42px" oninput="filterTicketsTable(this.value)">
+          </div>
+          <!-- فلاتر الحالة والباقة -->
+          <div class="tickets-filter-bar" id="tickets-filter-bar">
+            <button class="ticket-filter-btn active" data-filter="all"     onclick="setTicketFilter('all',this)">الكل</button>
+            <button class="ticket-filter-btn"        data-filter="paid"    onclick="setTicketFilter('paid',this)">✅ مفعّلة</button>
+            <button class="ticket-filter-btn"        data-filter="pending" onclick="setTicketFilter('pending',this)">⏳ قيد المراجعة</button>
+            <span style="width:1px;height:20px;background:var(--border);margin:0 2px"></span>
+            <button class="ticket-filter-btn" data-filter="pack:الباقة الأساسية" onclick="setTicketFilter('pack:الباقة الأساسية',this)">📦 أساسية</button>
+            <button class="ticket-filter-btn" data-filter="pack:باقة النخبة"     onclick="setTicketFilter('pack:باقة النخبة',this)">⭐ نخبة</button>
+            <button class="ticket-filter-btn" data-filter="pack:باقة تحضير"      onclick="setTicketFilter('pack:باقة تحضير',this)">🎓 تحضير بكالوريا</button>
+            <button class="ticket-filter-btn" data-filter="pack:باقة البالغين"    onclick="setTicketFilter('pack:باقة البالغين',this)">👤 بالغين</button>
           </div>
           <div class="tbl-wrap">
             <table class="tbl" id="tickets-table">
@@ -2969,6 +3016,7 @@ window.copyReceiptNum = () => {
 // store tickets globally for export
 let allTicketsData = [];
 let _ticketsSearchVal = '';
+let _ticketsFilterVal = 'all'; // all | paid | pending | pack:XXX
 
 // ─── بناء صفوف جدول التذاكر ───
 function renderTicketRows(data) {
@@ -2976,9 +3024,16 @@ function renderTicketRows(data) {
   if (!tbody) return;
   const norm = s => String(s || '').trim().toLowerCase();
   const q = norm(_ticketsSearchVal);
-  const filtered = q
+  const f = _ticketsFilterVal;
+  let filtered = q
     ? data.filter(x => norm(x.receipt).includes(q) || norm(x.name).includes(q))
     : data;
+  if (f === 'paid')    filtered = filtered.filter(x => x.status === 'paid');
+  else if (f === 'pending') filtered = filtered.filter(x => x.status !== 'paid');
+  else if (f.startsWith('pack:')) {
+    const packKey = norm(f.slice(5));
+    filtered = filtered.filter(x => norm(x.pack).includes(packKey));
+  }
 
   tbody.innerHTML = '';
   if (!filtered.length) {
@@ -3014,6 +3069,20 @@ function renderTicketRows(data) {
 // ─── فلترة الجدول عند الكتابة ───
 window.filterTicketsTable = (val) => {
   _ticketsSearchVal = val;
+  renderTicketRows(allTicketsData);
+};
+
+window.setTicketFilter = (val, btn) => {
+  _ticketsFilterVal = val;
+  // تحديث الأزرار
+  document.querySelectorAll('#tickets-filter-bar .ticket-filter-btn').forEach(b => {
+    b.classList.remove('active','active-green','active-amber');
+  });
+  if (btn) {
+    if (val === 'paid')    btn.classList.add('active-green');
+    else if (val === 'pending') btn.classList.add('active-amber');
+    else btn.classList.add('active');
+  }
   renderTicketRows(allTicketsData);
 };
 
@@ -3063,6 +3132,18 @@ function loadTickets() {
       if (remaining > 0) studentsWithRemaining++;
     });
     renderTicketRows(allTicketsData);
+    // تحديث الإحصائيات السريعة
+    const tsmActive  = document.getElementById('tsm-active');
+    const tsmPending = document.getElementById('tsm-pending');
+    const tsmAmount  = document.getElementById('tsm-total-amount');
+    if (tsmActive)  tsmActive.textContent  = paid;
+    if (tsmPending) tsmPending.textContent = pending;
+    if (tsmAmount) {
+      const paidTotal = allTicketsData
+        .filter(x => x.status === 'paid')
+        .reduce((sum, x) => sum + Number(x.amount || 0), 0);
+      tsmAmount.textContent = paidTotal.toLocaleString('ar-DZ') + ' دج';
+    }
     updateSummerStats(snap.size, paid, pending);
     updateFinancialStats(snap.size, paid, studentsWithRemaining, totalExpected, totalCollected, totalRemaining);
     document.getElementById('nav-badge-summer').textContent = snap.size;
@@ -3812,8 +3893,8 @@ window.openAttModal = async (teacherId) => {
   window._activeAttTeacherId = teacherId;
   // تحميل سجلات الحصص الخاصة بهذا الأستاذ لملخص الشهر
   _allRecordedSessions = {};
-  // الملخص يُبنى لاحقاً من _allRecordedSessionsByGroup عند فتح modal الحصص
-  _allRecordedSessions = {};
+  const sessSnap = await getDocs(query(collection(db, 'sessionAttendance'), where('teacherId', '==', teacherId)));
+  sessSnap.forEach(d => { const data = d.data(); if (data.sessionNum) _allRecordedSessions[data.sessionNum] = data; });
   // Header
   const avatarWrap = document.getElementById('att-modal-avatar-wrap');
   avatarWrap.innerHTML = t.photo
@@ -4739,7 +4820,7 @@ window.openSession_g = (sessionNum, gi) => {
           <div id="student-suggestions" style="display:none;background:white;border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;max-height:220px;overflow-y:auto;width:100%"></div>
           <div id="selected-student-info" style="display:none;background:linear-gradient(135deg,var(--primary-light),rgba(16,185,129,0.06));border:1px solid var(--border-2);border-radius:12px;padding:10px 14px;font-size:12px;font-weight:700;color:var(--text-2)"></div>
         </div>
-        <button class="btn-primary" id="save-session-att-btn" onclick="saveSessionAttendance_g(${sessionNum}, ${gi})" style="margin-top:14px">💾 حفظ حضور الحصة ${sessionNum}</button>
+        <button class="btn-primary" id="save-att-btn" onclick="saveSessionAttendance_g(${sessionNum}, ${gi})" style="margin-top:14px">💾 حفظ حضور الحصة ${sessionNum}</button>
       </div>`;
   };
 
@@ -4760,32 +4841,28 @@ window.openSession = (sessionNum) => {
 // ─── تعديل حصة مسجّلة — للأدمين فقط ───
 window.editSession_g = async (sessionNum, gi) => {
   const tid = currentAttTeacherId;
-  if (!tid) { showToast('خطأ: لم يُحدد الأستاذ (tid فارغ)', true); return; }
+  if (!tid) return;
 
+  // نفس المفتاح المستخدم في saveSessionAttendance_g
   const sessionKey = `${tid}_g${gi}_session_${sessionNum}`;
-  const docRef = doc(db, 'sessionAttendance', sessionKey);
+  const docRef     = doc(db, 'sessionAttendance', sessionKey);
+  const docSnap    = await getDoc(docRef);
 
-  let docSnap;
-  try { docSnap = await getDoc(docRef); }
-  catch(e) { showToast('❌ خطأ: ' + e.message, true); return; }
-
-  if (!docSnap.exists()) {
-    // fallback: اقرأ من الـ cache المحلي
-    const cached = (_allRecordedSessionsByGroup[gi] || {})[sessionNum];
-    if (!cached) { showToast('⚠️ لم يُعثر على سجل هذه الحصة', true); return; }
-    docSnap = { exists: () => true, data: () => cached };
+  let savedStudents = [];
+  if (docSnap.exists()) {
+    savedStudents = docSnap.data().students || [];
+  } else {
+    showToast('⚠️ لم يُعثر على سجل لهذه الحصة', true);
+    return;
   }
 
-  const teacherGroups = window.currentTeacherData?.groups || [];
-  const groupName     = teacherGroups[gi]?.name || '';
-
   // تحميل قائمة التلاميذ إلى currentAttStudents
-  currentAttStudents   = (docSnap.data().students || []).map(s => ({ ...s, marked: true }));
-  currentOpenSession   = sessionNum;
+  currentAttStudents = savedStudents.map(s => ({ ...s, marked: true }));
+  currentOpenSession = sessionNum;
   window._currentGroupIdx = gi;
-  window._editingDocRef   = docRef;
-  window._editingGi       = gi;
-  window._editingSession  = sessionNum;
+  window._editingDocRef    = docRef;
+
+  const groupName = teacherGroups[gi]?.name || '';
 
   const studentsHtml = () => currentAttStudents.length
     ? currentAttStudents.map(s => {
@@ -4840,7 +4917,7 @@ window.editSession_g = async (sessionNum, gi) => {
         <div id="student-suggestions" style="display:none;background:white;border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;max-height:220px;overflow-y:auto;width:100%"></div>
         <div id="selected-student-info" style="display:none;background:linear-gradient(135deg,var(--primary-light),rgba(16,185,129,0.06));border:1px solid var(--border-2);border-radius:12px;padding:10px 14px;font-size:12px;font-weight:700;color:var(--text-2)"></div>
       </div>
-      <button class="btn-primary" id="save-edit-att-btn" onclick="saveEditedSession_g(${sessionNum}, ${gi})" style="margin-top:14px;background:linear-gradient(135deg,#d97706,#b45309)">💾 حفظ التعديلات على الحصة ${sessionNum}</button>
+      <button class="btn-primary" id="save-att-btn" onclick="saveEditedSession_g(${sessionNum}, ${gi})" style="margin-top:14px;background:linear-gradient(135deg,#d97706,#b45309)">💾 حفظ التعديلات على الحصة ${sessionNum}</button>
     </div>`);
   updateAttSummary(currentAttStudents);
 };
@@ -4848,29 +4925,21 @@ window.editSession_g = async (sessionNum, gi) => {
 // ─── حفظ تعديلات حصة مسجّلة ───
 window.saveEditedSession_g = async (sessionNum, gi) => {
   const docRef = window._editingDocRef;
-  const tid    = currentAttTeacherId;
-  if (!docRef || !tid) { showToast('خطأ: لم يُحدد سجل للتعديل', true); return; }
-
-  const record = {
-    teacherId:     tid + `_g${gi}`,
-    sessionNum,
-    savedAt:       serverTimestamp(),
-    editedAt:      serverTimestamp(),
-    editedByAdmin: true,
-    students:      currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }))
-  };
+  if (!docRef) { showToast('خطأ: لم يُحدد سجل للتعديل', true); return; }
   try {
-    await setDoc(docRef, record);
-    const present   = currentAttStudents.filter(s => s.present).length;
+    await setDoc(docRef, {
+      teacherId: currentAttTeacherId + `_g${gi}`,
+      sessionNum,
+      students: currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present })),
+      editedAt: serverTimestamp(),
+      editedByAdmin: true
+    });
+    const present = currentAttStudents.filter(s => s.present).length;
     const groupName = (window.currentTeacherData?.groups||[])[gi]?.name || '';
     await addLog('✏️ تعديل حضور', `الحصة ${sessionNum}${groupName?' — '+groupName:''} — ${present}/${currentAttStudents.length} حاضر`, '🔧');
-    showToast(`✅ تم حفظ تعديلات الحصة ${sessionNum}`);
+    showToast('✅ تم حفظ التعديلات');
     closeSessionModal();
-    // onSnapshot يُحدّث الكروت تلقائياً عبر loadSessionsDataForGroup
-  } catch(e) {
-    console.error('[saveEditedSession_g]', e.code, e.message);
-    showToast('❌ خطأ في الحفظ: ' + e.message, true);
-  }
+  } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
 
 // ─── عرض سجل حصة فائتة أو مسجّلة — مع الأفواج ───
@@ -4919,11 +4988,7 @@ window.viewSessionHistory = (sessionNum) => {
 
 // حفظ حضور حصة معينة — مع الفوج
 window.saveSessionAttendance_g = async (sessionNum, gi) => {
-  if (!currentAttTeacherId) {
-    showToast('خطأ: لم يُحدد الأستاذ', true);
-    console.error('[saveAtt] currentAttTeacherId is empty');
-    return;
-  }
+  if (!currentAttTeacherId) return;
   const groupSuffix = `_g${gi}`;
   const sessionKey  = `${currentAttTeacherId}${groupSuffix}_session_${sessionNum}`;
   const record = {
@@ -4932,7 +4997,6 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
     savedAt: serverTimestamp(),
     students: currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }))
   };
-  console.log('[saveAtt] key:', sessionKey, '| students:', record.students.length);
   try {
     await setDoc(doc(db, 'sessionAttendance', sessionKey), record);
     const present = currentAttStudents.filter(s => s.present).length;
@@ -4941,10 +5005,7 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
     await addLog('📋 تسجيل حضور', `حصة ${sessionNum}${groupName?' — '+groupName:''} — ${present}/${currentAttStudents.length} حاضر`, '✅');
     showToast(`✅ تم حفظ حضور الحصة ${sessionNum}${groupName?' ('+groupName+')':''}`);
     closeSessionModal();
-  } catch(e) {
-    console.error('[saveAtt] ERROR:', e.code, e.message);
-    showToast('❌ خطأ في الحفظ: ' + e.message, true);
-  }
+  } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
 
 // حفظ حضور حصة معينة (توافق قديم — للأدمين أو بدون أفواج)
@@ -4959,24 +5020,7 @@ window.openSummaryModal = () => {
   const students = currentAttStudents;
   if (!students.length) { showToast('لا يوجد تلاميذ بعد', true); return; }
 
-  // دمج كل الحصص من جميع الأفواج في كائن موحّد {sessionNum: data}
-  const mergedSessions = {};
-  Object.values(_allRecordedSessionsByGroup).forEach(grpSessions => {
-    Object.entries(grpSessions).forEach(([sNum, data]) => {
-      if (!mergedSessions[sNum]) mergedSessions[sNum] = data;
-      else {
-        // دمج قائمة التلاميذ من أفواج مختلفة في نفس الحصة
-        const existing = mergedSessions[sNum].students || [];
-        const incoming = data.students || [];
-        const ids = new Set(existing.map(s => s.id));
-        mergedSessions[sNum] = { ...mergedSessions[sNum], students: [...existing, ...incoming.filter(s => !ids.has(s.id))] };
-      }
-    });
-  });
-  // أيضاً دمج _allRecordedSessions (للأدمين الذي لا يستخدم أفواج)
-  Object.entries(_allRecordedSessions).forEach(([k, v]) => { if (!mergedSessions[k]) mergedSessions[k] = v; });
-
-  const recordedCount = Object.keys(mergedSessions).length;
+  const recordedCount = Object.keys(_allRecordedSessions).length;
   const subEl = document.getElementById('summary-modal-sub');
   if (subEl) subEl.textContent = `${recordedCount} حصة مسجّلة من أصل 12`;
 
@@ -4985,7 +5029,7 @@ window.openSummaryModal = () => {
   students.forEach(s => { studentStats[s.id] = { name: s.name, present: 0, absent: 0, dots: [] }; });
 
   for (let i = 1; i <= 12; i++) {
-    const rec = mergedSessions[i];
+    const rec = _allRecordedSessions[i];
     if (rec && rec.students) {
       rec.students.forEach(s => {
         if (!studentStats[s.id]) studentStats[s.id] = { name: s.name, present: 0, absent: 0, dots: [] };
