@@ -2848,58 +2848,59 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
   const ctx = canvas.getContext('2d');
 
   const img = new Image();
-  img.src = 'images/new-ticket.png';
+  img.src = 'images/ticketsummerplus.png';
   img.onload = () => {
     ctx.drawImage(img, 0, 0, W, H);
 
     // ═══════════════════════════════════════════════════════
-    // PIXEL-PERFECT COORDINATES — محسوبة من تحليل البيكسل
-    // Canvas: 1584 × 1440 px
+    // PIXEL-PERFECT COORDINATES — New portrait design (1584×1440)
+    // Layout (RTL):
+    //   Logo area     : top ~0–160px
+    //   ─────────────────────────────────────────────────────
+    //   الإسم واللقب  : label ~y=260,  value baseline = 308
+    //   اسم الباقة    : label ~y=368,  value baseline = 416
+    //   المبلغ         : label ~y=476,  value baseline = 524
+    //   التاريخ        : label ~y=584,  value baseline = 632
+    //   رقم الوصل     : label ~y=692,  value baseline = 740
     //
-    // ترتيب التصميم (من أعلى لأسفل):
-    //  Logo                y=50–159
-    //  VALUE الإسم         y=170–308   above label y=309–371
-    //  LABEL الإسم         y=309–371   (مدمج في الصورة)
-    //  VALUE الباقة        y=375–487   above label y=490–536
-    //  LABEL الباقة        y=490–536
-    //  QR code             y=517–658   x=103 (يسار)
-    //  VALUE المبلغ        y=545–670   above labels y=673–747
-    //  LABEL المبلغ+متبقي  y=673–747
-    //  VALUE التاريخ       y=762–854   above label y=857–928
-    //  LABEL التاريخ       y=857–928
-    //  VALUE رقم الوصل    y=940–1030  above label y=1033–1095
-    //  LABEL رقم الوصل    y=1033–1095
+    //   المبلغ المتبقي : same row as المبلغ, left side
+    //     label  x_right = 560,  value baseline = 524
+    //
+    //   Right anchor (values): x = 1544
+    //   Value clip zone width : 700px (right panel)
+    //   Left panel right edge : 560px (for المبلغ المتبقي)
+    //
+    //   QR zone (bottom free area):
+    //     centered x = 792,  y starts = 860
+    //     size = 280px
     // ═══════════════════════════════════════════════════════
 
-    const CLR = '#0D2080';
+    const R   = 1544;        // right anchor for values
+    const CLR = '#0D2080';   // dark navy
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // إحداثيات مأخوذة من Photoshop Info Panel — Image: 590×649px داخل Doc: 900×649px
-    // Scale: 1584/900 = 1.76  ×  1440/649 = 2.219
-    // ═══════════════════════════════════════════════════════════════════════
+    ctx.textAlign = 'right';
+    ctx.direction = 'rtl';
+    ctx.fillStyle = CLR;
 
-    const val = (txt, clipX, clipY, clipW, clipH, rightAnchor, baseline, font) => {
-      const fs = font || `bold ${Math.round(clipH * 0.82)}px Tajawal, Arial`;
+    // ── helper: draw value text, clipped to right panel ──
+    const val = (txt, baseline, font) => {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(clipX, clipY, clipW, clipH);
+      ctx.rect(844, baseline - 44, 700, 52);   // clip to right value slot
       ctx.clip();
-      ctx.font = fs;
+      ctx.font = font || 'bold 36px Tajawal, Arial';
       ctx.fillStyle = CLR;
-      ctx.textAlign = 'right';
-      ctx.direction = 'rtl';
-      ctx.fillText(txt || '—', rightAnchor, baseline);
+      ctx.fillText(txt || '—', R, baseline);
       ctx.restore();
     };
 
-    //       text                                               clipX  clipY  clipW  clipH  right   base
-    val(data.name,                                               977,   422,   415,    82,  1392,   489);
-    val(data.pack,                                               977,   601,   607,    80,  1584,   667);
-    val(Number(data.amount||0).toLocaleString('ar-DZ')+' دج',   980,   794,   289,    87,  1269,   865);
-    val(data.dateFormatted || '—',                               972,   976,   371,    69,  1343,  1033);
-    val(data.receipt || '—',                                     977,  1163,   389,    82,  1366,  1230,  'bold 38px monospace');
+    val(data.name,                                                  308);
+    val(data.pack,                                                  416);
+    val(Number(data.amount || 0).toLocaleString('ar-DZ') + ' دج', 524);
+    val(data.dateFormatted || '—',                                  632);
+    val(data.receipt || '—',                                        740, 'bold 34px monospace');
 
-    // ── المبلغ المتبقي (يسار) — PS: x=259,y=355,w=234,h=41 × (1.76 × 2.219) ──
+    // ── المبلغ المتبقي — يسار نفس صف المبلغ ──
     const remainingAmtDraw = data.remainingAmount !== undefined
       ? data.remainingAmount
       : (() => {
@@ -2913,24 +2914,28 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
       : '0 دج';
 
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(456, 788, 412, 91);
-    ctx.clip();
-    ctx.font = `bold ${Math.round(91 * 0.82)}px Tajawal, Arial`;
+    ctx.font = 'bold 36px Tajawal, Arial';
     ctx.fillStyle = remainingAmtDraw > 0 ? '#DC2626' : CLR;
     ctx.textAlign = 'right';
     ctx.direction = 'rtl';
-    ctx.fillText(remainingTxt, 868, 863);
+    ctx.beginPath();
+    // Left panel: value sits to the right of "المبلغ المتبقي:" label
+    // label right edge ~x=560, value right anchor = 540
+    ctx.rect(40, 480, 500, 52);
+    ctx.clip();
+    ctx.fillText(remainingTxt, 540, 524);
     ctx.restore();
 
-    // ── QR code — PS: x=108,y=505,w=172,h=141 × (1.76 × 2.219) ──
+    // ── QR code — centered in bottom free area ──
     if (qrCanvas) {
-      const qrX = 190, qrY = 1120, qrW = 303, qrH = 313;
+      const qrSize = 280;
+      const qrX = Math.round((W - qrSize) / 2);   // centered horizontally ≈ 652
+      const qrY = 880;                              // starts below رقم الوصل row
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.roundRect(qrX - 4, qrY - 4, qrW + 8, qrH + 8, 8);
+      ctx.roundRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16, 14);
       ctx.fill();
-      ctx.drawImage(qrCanvas, qrX, qrY, qrW, qrH);
+      ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
     }
 
     document.getElementById('ticket-empty').style.display = 'none';
