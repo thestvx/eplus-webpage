@@ -454,7 +454,7 @@
     .pack-chip{padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700;background:var(--accent-soft);color:#92400E;border:1px solid rgba(245,158,11,0.2)}
     .tickets-filter-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
     .ticket-filter-btn{padding:6px 14px;border-radius:99px;border:2px solid var(--border);background:white;font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;color:var(--text-2);transition:all 0.18s;white-space:nowrap}
-    .ticket-filter-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+    .ticket-filter-btn:hover{border-color:var(--primary);color:var(--primary)}
     .ticket-filter-btn.active{border-color:var(--primary);background:var(--primary);color:white}
     .ticket-filter-btn.active-green{border-color:#059669;background:#059669;color:white}
     .ticket-filter-btn.active-amber{border-color:#d97706;background:#d97706;color:white}
@@ -1559,28 +1559,21 @@
             <div class="panel-icon orange">📋</div>
             سجل التذاكر الصادرة
           </div>
-          <!-- إحصائيات سريعة -->
           <div class="tickets-stats-mini">
-            <div class="tsm-card green">
-              <div><div class="tsm-card-num" id="tsm-active">0</div><div class="tsm-card-lbl">✅ تذكرة مفعّلة</div></div>
-            </div>
-            <div class="tsm-card amber">
-              <div><div class="tsm-card-num" id="tsm-pending">0</div><div class="tsm-card-lbl">⏳ قيد المراجعة</div></div>
-            </div>
+            <div class="tsm-card green"><div><div class="tsm-card-num" id="tsm-active">0</div><div class="tsm-card-lbl">✅ تذكرة مفعّلة</div></div></div>
+            <div class="tsm-card amber"><div><div class="tsm-card-num" id="tsm-pending">0</div><div class="tsm-card-lbl">⏳ قيد المراجعة</div></div></div>
             <div class="tsm-card" style="background:rgba(99,102,241,0.07);border-color:rgba(99,102,241,0.25);flex:2;min-width:180px">
               <div><div class="tsm-card-num" id="tsm-total-amount" style="color:#4f46e5;font-size:18px">0 دج</div><div class="tsm-card-lbl">💰 إجمالي المفعّلة</div></div>
             </div>
           </div>
-          <!-- بحث -->
           <div style="position:relative;margin-bottom:12px">
             <span style="position:absolute;top:50%;right:14px;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
             <input class="inp" type="text" id="tickets-search-inp" placeholder="بحث برقم الوصل أو الاسم واللقب..." style="padding-right:42px" oninput="filterTicketsTable(this.value)">
           </div>
-          <!-- فلاتر -->
           <div class="tickets-filter-bar" id="tickets-filter-bar">
             <button class="ticket-filter-btn active" onclick="setTicketFilter('all',this)">الكل</button>
-            <button class="ticket-filter-btn"        onclick="setTicketFilter('paid',this)">✅ مفعّلة</button>
-            <button class="ticket-filter-btn"        onclick="setTicketFilter('pending',this)">⏳ قيد المراجعة</button>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('paid',this)">✅ مفعّلة</button>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('pending',this)">⏳ قيد المراجعة</button>
             <span style="width:1px;height:20px;background:var(--border);margin:0 2px"></span>
             <button class="ticket-filter-btn" onclick="setTicketFilter('pack:الباقة الأساسية',this)">📦 أساسية</button>
             <button class="ticket-filter-btn" onclick="setTicketFilter('pack:باقة النخبة',this)">⭐ نخبة</button>
@@ -2047,6 +2040,117 @@ document.getElementById('topbar-date').textContent = `${days[now.getDay()]}، ${
 // ── Flag لمنع تحميل قائمة الأساتذة كاملة عند دخول أستاذ ──
 let isTeacherMode = false;
 
+
+// ─── إعدادات حسابات الموظفين ───
+const EMPLOYEES = {
+  'hafnaouilanez@epluscenter.com': {
+    name: 'الحفناوي العانز',
+    role: 'موظف',
+    allowedSections: ['home', 'summer', 'teachers', 'msgs', 'finance', 'settings'],
+    showWebsite: true,
+    restrictions: {
+      noDeleteTicket: true,
+      noEditTicket: true,
+      noDeleteMsg: true,
+      noClearMsg: true,
+      noAddTeacher: true,
+      noEditTeacher: true,
+      noDeleteTeacher: true,
+      noMaintenanceToggle: true,
+      noActivityLog: true,
+      teachersReadOnly: true,
+    }
+  }
+};
+
+function applyEmployeeMode(cfg) {
+  window._employeeRestrictions = cfg.restrictions;
+
+  // ── الـ sidebar: إظهار الأقسام المسموحة فقط ──
+  const navItems = document.querySelectorAll('.nav-item');
+  // ترتيب navItems: 0=home,1=announcements,2=summer,3=teachers,4=msgs,5=finance,6=settings,7=website
+  const navMap = [
+    { section: 'home' },
+    { section: 'announcements' },
+    { section: 'summer' },
+    { section: 'teachers' },
+    { section: 'msgs' },
+    { section: 'finance' },
+    { section: 'settings' },
+    { section: 'website' },
+  ];
+  navItems.forEach((el, i) => {
+    const sec = navMap[i]?.section;
+    if (!sec) return;
+    if (sec === 'website') { el.style.display = cfg.showWebsite ? '' : 'none'; return; }
+    el.style.display = cfg.allowedSections.includes(sec) ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-section').forEach(el => el.style.display = '');
+
+  // ── إخفاء سجل النشاطات ──
+  if (cfg.restrictions.noActivityLog) {
+    const lp = document.getElementById('admin-log-panel');
+    if (lp) lp.style.display = 'none';
+  }
+
+  // ── إخفاء بطاقة الصيانة ──
+  if (cfg.restrictions.noMaintenanceToggle) {
+    const mc = document.getElementById('maintenance-card');
+    if (mc) mc.style.display = 'none';
+  }
+
+  // ── قسم الأساتذة: إخفاء نموذج الإضافة/التعديل ──
+  if (cfg.restrictions.noAddTeacher) {
+    const tfp = document.querySelector('.teacher-form-panel');
+    if (tfp) tfp.style.display = 'none';
+  }
+
+  // ── إخفاء أزرار الحذف في التذاكر ──
+  if (cfg.restrictions.noDeleteTicket) {
+    document.querySelectorAll('.tbl-action.del').forEach(b => b.style.display = 'none');
+  }
+
+  // ── تعطيل تعديل وحذف الأساتذة من جدول الأساتذة ──
+  if (cfg.restrictions.noEditTeacher || cfg.restrictions.noDeleteTeacher) {
+    // نراقب تحديثات DOM في قسم الأساتذة
+    const observer = new MutationObserver(() => {
+      if (cfg.restrictions.noDeleteTeacher)
+        document.querySelectorAll('button[onclick*="deleteTeacher"]').forEach(b => b.style.display = 'none');
+      if (cfg.restrictions.noEditTeacher)
+        document.querySelectorAll('button[onclick*="editTeacher"]').forEach(b => b.style.display = 'none');
+      if (cfg.restrictions.noDeleteTicket)
+        document.querySelectorAll('.tbl-action.del').forEach(b => b.style.display = 'none');
+      if (cfg.restrictions.noDeleteMsg || cfg.restrictions.noClearMsg)
+        document.querySelectorAll('button[onclick*="_deleteMsg"], .msg-clear-btn, button[onclick*="clearRoom"]').forEach(b => b.style.display = 'none');
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  // ── تعطيل دوال الحذف/التعديل مباشرة ──
+  if (cfg.restrictions.noDeleteTicket) {
+    window.deleteTicket = () => showToast('⛔ ليس لديك صلاحية حذف التذاكر', true);
+  }
+  if (cfg.restrictions.noDeleteTeacher) {
+    window.deleteTeacher = () => showToast('⛔ ليس لديك صلاحية حذف الأساتذة', true);
+  }
+  if (cfg.restrictions.noEditTeacher) {
+    window.editTeacher = () => showToast('⛔ ليس لديك صلاحية تعديل بيانات الأستاذ', true);
+    window.addTeacher  = () => showToast('⛔ ليس لديك صلاحية إضافة أستاذ', true);
+  }
+  if (cfg.restrictions.noMaintenanceToggle) {
+    window.toggleMaintenance = () => showToast('⛔ ليس لديك صلاحية تغيير حالة الصيانة', true);
+    const mc = document.getElementById('btn-maintenance');
+    if (mc) { mc.disabled = true; mc.style.opacity = '0.4'; mc.style.cursor = 'not-allowed'; }
+  }
+  if (cfg.restrictions.noDeleteMsg || cfg.restrictions.noClearMsg) {
+    window._deleteMsg  = () => showToast('⛔ ليس لديك صلاحية حذف الرسائل', true);
+    window.clearRoom   = () => showToast('⛔ ليس لديك صلاحية مسح المحادثة', true);
+  }
+
+  // ── الانتقال للقسم الأول المتاح ──
+  switchNavSection(cfg.allowedSections[0] || 'home');
+}
+
 onAuthStateChanged(auth, async user => {
   const ls = document.getElementById('login-screen');
   const dash = document.getElementById('dashboard');
@@ -2099,16 +2203,17 @@ onAuthStateChanged(auth, async user => {
         return;
       }
     } catch(e) { console.warn('Teacher check error:', e); }
-    // ── وضع الأدمين ──
+    // ── فحص هل هو موظف ──
+    const empCfg = EMPLOYEES[user.email];
     isTeacherMode = false;
     ls.classList.add('hidden');
     setTimeout(() => ls.style.display = 'none', 600);
     dash.style.display = 'flex';
-    const uname = user.email.split('@')[0];
+    const uname = empCfg ? empCfg.name : user.email.split('@')[0];
     document.getElementById('admin-name').textContent = uname;
     document.getElementById('topbar-greeting').textContent = `أهلاً، ${uname} 👋`;
-    document.querySelector('.admin-role').textContent = 'مشرف النظام';
-    // إعادة إظهار جميع عناصر الأدمين (في حالة سبق دخول أستاذ وأخفاها)
+    document.querySelector('.admin-role').textContent = empCfg ? ('👔 ' + empCfg.role) : 'مشرف النظام';
+    // إعادة إظهار جميع عناصر الأدمين
     document.querySelectorAll('.nav-item').forEach(el => el.style.display = '');
     document.querySelectorAll('.nav-section').forEach(el => el.style.display = '');
     const mc = document.getElementById('maintenance-card');
@@ -2117,16 +2222,22 @@ onAuthStateChanged(auth, async user => {
     if (tfp) tfp.style.display = '';
     const lp = document.getElementById('admin-log-panel');
     if (lp) lp.style.display = '';
-    // إعادة ضبط القسم الافتراضي
-    switchNavSection('home');
+    // تحميل البيانات
     loadRegistrations();
     loadVisitorStats();
     loadMaintenanceStatus();
     loadAnnouncements();
     loadTickets();
     loadTeachers();
-    // تهيئة نظام الرسائل للأدمين — اسمه "الإدارة"
-    setTimeout(() => { if (window.initMessaging) window.initMessaging(user.uid, 'الإدارة', true); }, 800);
+    const isEmpAdmin = !empCfg; // الأدمين الحقيقي فقط
+    setTimeout(() => { if (window.initMessaging) window.initMessaging(user.uid, empCfg ? empCfg.name : 'الإدارة', isEmpAdmin); }, 800);
+    if (empCfg) {
+      // وضع الموظف — تطبيق الصلاحيات بعد تحميل البيانات
+      setTimeout(() => applyEmployeeMode(empCfg), 500);
+    } else {
+      // وضع الأدمين الكامل
+      switchNavSection('home');
+    }
   } else {
     isTeacherMode = false;
     ls.style.display = 'flex';
@@ -3018,10 +3129,7 @@ function renderTicketRows(data) {
   let filtered = q ? data.filter(x => norm(x.receipt).includes(q) || norm(x.name).includes(q)) : data;
   if (f === 'paid')         filtered = filtered.filter(x => x.status === 'paid');
   else if (f === 'pending') filtered = filtered.filter(x => x.status !== 'paid');
-  else if (f.startsWith('pack:')) {
-    const pk = norm(f.slice(5));
-    filtered = filtered.filter(x => norm(x.pack).includes(pk));
-  }
+  else if (f.startsWith('pack:')) { const pk=norm(f.slice(5)); filtered=filtered.filter(x=>norm(x.pack).includes(pk)); }
 
   tbody.innerHTML = '';
   if (!filtered.length) {
@@ -3055,19 +3163,11 @@ function renderTicketRows(data) {
 }
 
 // ─── فلترة الجدول عند الكتابة ───
-window.filterTicketsTable = (val) => {
-  _ticketsSearchVal = val;
-  renderTicketRows(allTicketsData);
-};
+window.filterTicketsTable = (val) => { _ticketsSearchVal = val; renderTicketRows(allTicketsData); };
 window.setTicketFilter = (val, btn) => {
   _ticketsFilterVal = val;
-  document.querySelectorAll('#tickets-filter-bar .ticket-filter-btn').forEach(b =>
-    b.classList.remove('active','active-green','active-amber'));
-  if (btn) {
-    if (val === 'paid') btn.classList.add('active-green');
-    else if (val === 'pending') btn.classList.add('active-amber');
-    else btn.classList.add('active');
-  }
+  document.querySelectorAll('#tickets-filter-bar .ticket-filter-btn').forEach(b => b.classList.remove('active','active-green','active-amber'));
+  if (btn) { if(val==='paid') btn.classList.add('active-green'); else if(val==='pending') btn.classList.add('active-amber'); else btn.classList.add('active'); }
   renderTicketRows(allTicketsData);
 };
 
@@ -3117,16 +3217,10 @@ function loadTickets() {
       if (remaining > 0) studentsWithRemaining++;
     });
     renderTicketRows(allTicketsData);
-    const tsmA = document.getElementById('tsm-active');
-    const tsmP = document.getElementById('tsm-pending');
-    const tsmT = document.getElementById('tsm-total-amount');
-    if (tsmA) tsmA.textContent = paid;
-    if (tsmP) tsmP.textContent = pending;
-    if (tsmT) {
-      const total = allTicketsData.filter(x => x.status === 'paid')
-                                  .reduce((s, x) => s + Number(x.amount || 0), 0);
-      tsmT.textContent = total.toLocaleString('ar-DZ') + ' دج';
-    }
+    const tsmA=document.getElementById('tsm-active'), tsmP=document.getElementById('tsm-pending'), tsmT=document.getElementById('tsm-total-amount');
+    if(tsmA) tsmA.textContent=paid;
+    if(tsmP) tsmP.textContent=pending;
+    if(tsmT) tsmT.textContent=allTicketsData.filter(x=>x.status==='paid').reduce((s,x)=>s+Number(x.amount||0),0).toLocaleString('ar-DZ')+' دج';
     updateSummerStats(snap.size, paid, pending);
     updateFinancialStats(snap.size, paid, studentsWithRemaining, totalExpected, totalCollected, totalRemaining);
     document.getElementById('nav-badge-summer').textContent = snap.size;
@@ -3870,8 +3964,6 @@ window.openAttModal = async (teacherId) => {
   if (!t) return;
   currentAttTeacherId = teacherId;
   currentAttStudents = t.students ? [...t.students] : [];
-
-  // تحميل حضور اليوم المحفوظ
   try {
     const todayKey = new Date().toISOString().slice(0,10);
     const todaySnap = await getDoc(doc(db, 'attendance', `${teacherId}_${todayKey}`));
@@ -3879,16 +3971,12 @@ window.openAttModal = async (teacherId) => {
       const savedMap = {};
       (todaySnap.data().students || []).forEach(s => { savedMap[s.id] = s; });
       currentAttStudents = currentAttStudents.map(s =>
-        savedMap[s.id] ? { ...s, present: !!savedMap[s.id].present } : s
-      );
+        savedMap[s.id] ? { ...s, present: !!savedMap[s.id].present } : s);
     }
   } catch(e) {}
-
   window._activeAttGroupIdx  = 'all';
   window._activeAttGroups    = t.groups || [];
   window._activeAttTeacherId = teacherId;
-
-  // تحميل سجلات الحصص لجميع الأفواج
   _allRecordedSessions = {};
   _allRecordedSessionsByGroup = {};
   try {
@@ -4390,11 +4478,9 @@ window.saveAttendance = async () => {
   const gi       = typeof window._activeAttGroupIdx === 'number' ? window._activeAttGroupIdx : 0;
   const todayKey = new Date().toISOString().slice(0,10);
   const students = currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
-
   const existingSessions = _allRecordedSessionsByGroup[gi] || {};
   let sessionNum = 1;
   for (let i = 1; i <= 12; i++) { if (!existingSessions[i]) { sessionNum = i; break; } }
-
   const groupSuffix = '_g' + gi;
   const sessionKey  = tid + groupSuffix + '_session_' + sessionNum;
   const record = { teacherId: tid + groupSuffix, sessionNum, date: todayKey, savedAt: serverTimestamp(), students };
@@ -5042,7 +5128,6 @@ window.openSummaryModal = () => {
   const students = currentAttStudents;
   if (!students.length) { showToast('لا يوجد تلاميذ بعد', true); return; }
 
-  // دمج جميع الأفواج
   const mergedSessions = {};
   Object.values(_allRecordedSessionsByGroup).forEach(groupSessions => {
     Object.entries(groupSessions).forEach(([sNum, rec]) => {
@@ -5051,20 +5136,14 @@ window.openSummaryModal = () => {
       mergedSessions[n].students.push(...(rec.students || []));
     });
   });
-  // fallback لو لا أفواج
   if (!Object.keys(mergedSessions).length) {
-    Object.entries(_allRecordedSessions).forEach(([sNum, rec]) => {
-      mergedSessions[parseInt(sNum)] = rec;
-    });
+    Object.entries(_allRecordedSessions).forEach(([sNum, rec]) => { mergedSessions[parseInt(sNum)] = rec; });
   }
-
   const recordedCount = Object.keys(mergedSessions).length;
   const subEl = document.getElementById('summary-modal-sub');
   if (subEl) subEl.textContent = recordedCount + ' حصة مسجّلة من أصل 12';
-
   const studentStats = {};
   students.forEach(s => { studentStats[s.id] = { name: s.name, present: 0, absent: 0, dots: [] }; });
-
   for (let i = 1; i <= 12; i++) {
     const rec = mergedSessions[i];
     if (rec && rec.students) {
