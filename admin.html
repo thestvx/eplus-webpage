@@ -4739,7 +4739,7 @@ window.openSession_g = (sessionNum, gi) => {
           <div id="student-suggestions" style="display:none;background:white;border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;max-height:220px;overflow-y:auto;width:100%"></div>
           <div id="selected-student-info" style="display:none;background:linear-gradient(135deg,var(--primary-light),rgba(16,185,129,0.06));border:1px solid var(--border-2);border-radius:12px;padding:10px 14px;font-size:12px;font-weight:700;color:var(--text-2)"></div>
         </div>
-        <button class="btn-primary" id="save-att-btn" onclick="saveSessionAttendance_g(${sessionNum}, ${gi})" style="margin-top:14px">💾 حفظ حضور الحصة ${sessionNum}</button>
+        <button class="btn-primary" id="save-session-att-btn" onclick="saveSessionAttendance_g(${sessionNum}, ${gi})" style="margin-top:14px">💾 حفظ حضور الحصة ${sessionNum}</button>
       </div>`;
   };
 
@@ -4763,20 +4763,16 @@ window.editSession_g = async (sessionNum, gi) => {
   if (!tid) { showToast('خطأ: لم يُحدد الأستاذ (tid فارغ)', true); return; }
 
   const sessionKey = `${tid}_g${gi}_session_${sessionNum}`;
-  showToast(`⏳ تحميل الحصة ${sessionNum}... key: ${sessionKey}`, false);
-
   const docRef = doc(db, 'sessionAttendance', sessionKey);
 
   let docSnap;
   try { docSnap = await getDoc(docRef); }
-  catch(e) { showToast('❌ خطأ Firestore: ' + e.message, true); return; }
+  catch(e) { showToast('❌ خطأ: ' + e.message, true); return; }
 
   if (!docSnap.exists()) {
-    showToast(`⚠️ السجل غير موجود: ${sessionKey}`, true);
-    // جرب القراءة من الـ cache المحلي
+    // fallback: اقرأ من الـ cache المحلي
     const cached = (_allRecordedSessionsByGroup[gi] || {})[sessionNum];
-    if (!cached) return;
-    showToast('ℹ️ قراءة من الـ cache المحلي', false);
+    if (!cached) { showToast('⚠️ لم يُعثر على سجل هذه الحصة', true); return; }
     docSnap = { exists: () => true, data: () => cached };
   }
 
@@ -4844,7 +4840,7 @@ window.editSession_g = async (sessionNum, gi) => {
         <div id="student-suggestions" style="display:none;background:white;border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;max-height:220px;overflow-y:auto;width:100%"></div>
         <div id="selected-student-info" style="display:none;background:linear-gradient(135deg,var(--primary-light),rgba(16,185,129,0.06));border:1px solid var(--border-2);border-radius:12px;padding:10px 14px;font-size:12px;font-weight:700;color:var(--text-2)"></div>
       </div>
-      <button class="btn-primary" id="save-att-btn" onclick="saveEditedSession_g(${sessionNum}, ${gi})" style="margin-top:14px;background:linear-gradient(135deg,#d97706,#b45309)">💾 حفظ التعديلات على الحصة ${sessionNum}</button>
+      <button class="btn-primary" id="save-edit-att-btn" onclick="saveEditedSession_g(${sessionNum}, ${gi})" style="margin-top:14px;background:linear-gradient(135deg,#d97706,#b45309)">💾 حفظ التعديلات على الحصة ${sessionNum}</button>
     </div>`);
   updateAttSummary(currentAttStudents);
 };
