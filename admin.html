@@ -4030,12 +4030,17 @@ window.searchStudentSuggestions = (val) => {
   // إذا كان التلميذ مختاراً مسبقاً والاسم لا يزال نفسه — لا نتدخل
   if (_selectedStudentData && _selectedStudentData.name === val.trim()) return;
 
-  const norm = s => String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
-  const q = norm(val);
+  const norm  = s => String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+  const normSort = s => norm(s).split(' ').sort().join(' ');
+  const q     = norm(val);
+  const qSort = normSort(val);
 
-  // البحث في التذاكر
+  // البحث في التذاكر — الترتيب في الاسم غير مهم
   const matches = (allTicketsData || []).filter(t => {
-    return norm(t.name).includes(q) || (t.receipt && norm(t.receipt).includes(q));
+    const tn = norm(t.name);
+    const ts = normSort(t.name);
+    return tn.includes(q) || ts.includes(qSort) || qSort.includes(ts) ||
+           (t.receipt && norm(t.receipt).includes(q));
   }).slice(0, 8);
 
   if (!matches.length) {
@@ -4575,7 +4580,8 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
     card.classList.remove('locked', 'current', 'done', 'missed');
 
     if (isRecorded) {
-      card.setAttribute('onclick', `viewSessionHistory_g(${i}, ${gi})`);
+      // الأدمين يقدر يعدّل أي حصة مسجّلة — الأستاذ يشوف فقط
+      card.setAttribute('onclick', isTeacherMode ? `viewSessionHistory_g(${i}, ${gi})` : `editSession_g(${i}, ${gi})`);
     } else if (isMissed) {
       card.setAttribute('onclick', `viewSessionHistory_g(${i}, ${gi})`);
     } else if (isTodayAndAllowed) {
@@ -4589,7 +4595,8 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
       const recDate = recordedSessions[i].savedAt?.toDate
         ? recordedSessions[i].savedAt.toDate().toLocaleDateString('ar-DZ', {day:'numeric', month:'short'})
         : (recordedSessions[i].date || '');
-      chipEl.innerHTML = `<span class="session-status-chip done-chip">✅ مسجّلة</span>${recDate ? `<div style="font-size:9px;color:#059669;font-weight:700;margin-top:3px">${recDate}</div>` : ''}`;
+      const editHint = !isTeacherMode ? `<div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">✏️ اضغط للتعديل</div>` : '';
+      chipEl.innerHTML = `<span class="session-status-chip done-chip">✅ مسجّلة</span>${recDate ? `<div style="font-size:9px;color:#059669;font-weight:700;margin-top:3px">${recDate}</div>` : ''}${editHint}`;
       const recStudents = recordedSessions[i].students || [];
       dotsEl.innerHTML = recStudents.length
         ? recStudents.map(s => `<span class="sdot ${s.present ? 'recorded' : ''}" title="${s.name}: ${s.present ? 'حاضر' : 'غائب'}"></span>`).join('')
@@ -4748,6 +4755,120 @@ window.openSession = (sessionNum) => {
     showToast('✅ هذه الحصة مسجّلة مسبقاً', false); return;
   }
   openSession_g(sessionNum, window._currentGroupIdx || 0);
+};
+
+// ─── تعديل حصة مسجّلة — للأدمين فقط ───
+window.editSession_g = async (sessionNum, gi) => {
+  const tid = currentAttTeacherId;
+  if (!tid) return;
+  // جلب بيانات الحصة المسجّلة من Firestore
+  const { getDocs, collection, query, where } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  const snap = await getDocs(query(
+    collection(db, 'attendance'),
+    where('teacherId','==', tid),
+    where('sessionNum','==', sessionNum)
+  ));
+  // محاولة بالمفتاح المباشر
+  const { getDoc, doc: fsDoc, setDoc: fsSetDoc, serverTimestamp: fsST } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+
+  // استخدام نفس مفتاح الحصة المستخدم في saveSessionAttendance_g
+  const teacherGroups = window.currentTeacherData?.groups || [];
+  const groupObj      = teacherGroups[gi] || {};
+  const sessions      = groupObj.sessions || window._sessionsCache?.[gi] || [];
+  const sessionDate   = sessions[sessionNum - 1]?.date || new Date().toISOString().slice(0,10);
+  const docId         = `${tid}_g${gi}_s${sessionNum}_${sessionDate}`;
+  const docRef        = fsDoc(db, 'attendance', docId);
+  const docSnap       = await getDoc(docRef);
+
+  let savedStudents = [];
+  if (docSnap.exists()) {
+    savedStudents = docSnap.data().students || [];
+  }
+
+  // تحميل قائمة التلاميذ المسجّلة في الحصة إلى currentAttStudents
+  currentAttStudents = savedStudents.map(s => ({ ...s, marked: true }));
+  currentOpenSession = sessionNum;
+  window._currentGroupIdx = gi;
+  window._editingDocId = docId;
+  window._editingDocRef = docRef;
+
+  const groupName = teacherGroups[gi]?.name || '';
+
+  const studentsHtml = () => currentAttStudents.length
+    ? currentAttStudents.map(s => {
+        const { ps, rc } = getLivePayStatus(s);
+        const badgeHtml =
+          ps === 'paid'   ? `<span class="pay-badge paid">✅ مفعّلة</span>` :
+          ps === 'unpaid' ? `<span class="pay-badge unpaid">⏳ غير مفعّلة</span>` :
+                           `<span class="pay-badge unknown">— لا تذكرة</span>`;
+        const receiptHtml = rc ? `<span style="font-size:10px;font-family:monospace;color:var(--primary);background:var(--primary-light);padding:2px 7px;border-radius:6px;flex-shrink:0">${rc}</span>` : '';
+        return `
+        <div class="att-student-row" data-sid="${s.id}">
+          <span class="att-student-id">${s.id}</span>
+          <span class="att-student-name">${s.name}</span>
+          ${badgeHtml}${receiptHtml}
+          <div class="att-toggle" style="margin-right:auto">
+            <div class="att-check ${s.present?'present':''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
+            <div class="att-check ${!s.present&&s.marked?'absent':''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
+          </div>
+          <button style="padding:4px 8px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:var(--danger-soft);color:var(--danger);font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700;flex-shrink:0" onclick="removeStudent('${s.id}')">حذف</button>
+        </div>`;
+      }).join('')
+    : `<div style="text-align:center;padding:30px;color:var(--text-muted)">لا يوجد تلاميذ في هذه الحصة</div>`;
+
+  openSessionModal(`
+    <div class="session-att-header" style="border-radius:24px 24px 0 0;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(124,58,237,0.06))">
+      <div style="font-size:22px">✏️</div>
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:900;color:var(--text)">تعديل حضور الحصة ${sessionNum} من 12 ${groupName?`— ${groupName}`:''}</div>
+        <div style="font-size:12px;color:#d97706;font-weight:700;margin-top:2px">⚠️ أنت تعدّل حصة مسجّلة مسبقاً</div>
+      </div>
+      <button onclick="closeSessionModal()" style="padding:8px 16px;border-radius:12px;border:1px solid var(--border-2);background:var(--card);color:var(--text-muted);font-size:13px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">✕</button>
+    </div>
+    <div style="padding:20px 24px">
+      <div class="att-summary-grid" style="margin-bottom:16px">
+        <div class="att-summary-card"><div class="att-summary-n" id="att-total">0</div><div class="att-summary-l">إجمالي</div></div>
+        <div class="att-summary-card" style="background:var(--success-soft);border-color:rgba(16,185,129,0.2)"><div class="att-summary-n" id="att-present" style="color:var(--success)">0</div><div class="att-summary-l">حاضر</div></div>
+        <div class="att-summary-card" style="background:var(--danger-soft);border-color:rgba(239,68,68,0.15)"><div class="att-summary-n" id="att-absent" style="color:var(--danger)">0</div><div class="att-summary-l">غائب</div></div>
+      </div>
+      <div class="att-search-wrap" style="margin-bottom:12px">
+        <span class="att-search-icon">🔍</span>
+        <input class="inp" type="text" id="att-search" placeholder="ابحث عن تلميذ..." style="padding-right:40px" oninput="filterStudents()">
+      </div>
+      <div class="att-students-list" id="att-students-list">${studentsHtml()}</div>
+      <div class="att-add-student" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);flex-direction:column;gap:8px">
+        <div style="display:flex;gap:10px;width:100%">
+          <div style="position:relative;flex:1">
+            <input class="inp" type="text" id="new-student-name" placeholder="ابحث باسم التلميذ أو رقم الوصل..." style="width:100%;padding-left:40px" oninput="searchStudentSuggestions(this.value)">
+            <span style="position:absolute;top:50%;left:14px;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
+          </div>
+          <button class="btn-primary" style="width:auto;padding:12px 20px;white-space:nowrap" onclick="addStudent()">➕ إضافة</button>
+        </div>
+        <div id="student-suggestions" style="display:none;background:white;border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;max-height:220px;overflow-y:auto;width:100%"></div>
+        <div id="selected-student-info" style="display:none;background:linear-gradient(135deg,var(--primary-light),rgba(16,185,129,0.06));border:1px solid var(--border-2);border-radius:12px;padding:10px 14px;font-size:12px;font-weight:700;color:var(--text-2)"></div>
+      </div>
+      <button class="btn-primary" id="save-att-btn" onclick="saveEditedSession_g(${sessionNum}, ${gi})" style="margin-top:14px;background:linear-gradient(135deg,#d97706,#b45309)">💾 حفظ التعديلات على الحصة ${sessionNum}</button>
+    </div>`);
+  updateAttSummary(currentAttStudents);
+};
+
+// ─── حفظ تعديلات حصة مسجّلة ───
+window.saveEditedSession_g = async (sessionNum, gi) => {
+  const docRef = window._editingDocRef;
+  if (!docRef) { showToast('خطأ: لم يُحدد سجل للتعديل', true); return; }
+  try {
+    await setDoc(docRef, {
+      students: currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present })),
+      editedAt: serverTimestamp(),
+      editedByAdmin: true
+    }, { merge: true });
+    const present = currentAttStudents.filter(s => s.present).length;
+    await addLog('✏️ تعديل حضور', `الحصة ${sessionNum} — ${present}/${currentAttStudents.length} حاضر`, '🔧');
+    showToast('✅ تم حفظ التعديلات');
+    closeSessionModal();
+    // إعادة تحميل عرض الأستاذ لتحديث الكروت
+    if (window._reloadCurrentTeacherView) window._reloadCurrentTeacherView();
+  } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
 
 // ─── عرض سجل حصة فائتة أو مسجّلة — مع الأفواج ───
