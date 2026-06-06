@@ -2853,59 +2853,43 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
     ctx.drawImage(img, 0, 0, W, H);
 
     // ═══════════════════════════════════════════════════════
-    // PIXEL-PERFECT COORDINATES — Portrait design (1584×1440)
-    // Measured from generated ticket pixel scan.
+    // PIXEL-PERFECT COORDINATES — من Photoshop Info Panel
+    // Canvas: 1584 × 1440 px
     //
-    // Template label bands (black text baked into image):
-    //   Logo               : y=87–127
-    //   "الإسم واللقب:"    : y=309–371
-    //   "اسم الباقة:"      : y=489–536
-    //   "المبلغ:"           : y=609–631
-    //   "التاريخ:"+"رقم الوصل:" : y=676–746 (stacked)
-    //   QR area / scan text : y=857–1159
-    //
-    // VALUES appear ABOVE each label (small text above big label):
-    //   الإسم واللقب  → baseline=285  (slot y=170–305, 135px)
-    //   اسم الباقة    → baseline=466  (slot y=375–484, 109px)
-    //   المبلغ         → baseline=590  (slot y=545–606, 61px)
-    //   التاريخ        → baseline=655  (slot y=638–673, 35px)
-    //   رقم الوصل     → baseline=740  (slot y=650–770, inside stacked block)
-    //
-    //   المبلغ المتبقي : same baseline=590, left side x=40–560
-    //
-    //   Right anchor: x=1544
-    //   Value clip right edge: 1544, width from x=844
-    //   Font: bold 38px (fits ~50px slot comfortably)
+    //  الحقل           X    Y    W    H   right  baseline
+    //  الإسم واللقب   556  188  210   33   766    219
+    //  اسم الباقة     559  272  386   30   945    300
+    //  المبلغ          563  360  170   36   733    394
+    //  المبلغ المتبقي  260  365  231   37   491    400
+    //  التاريخ         555  445  224   31   779    474
+    //  رقم الوصل      556  527  211   36   767    561
+    //  QR             103  517  173  142  (drawImage)
     // ═══════════════════════════════════════════════════════
 
-    const R   = 1544;        // right anchor
     const CLR = '#0D2080';   // dark navy
 
-    ctx.textAlign = 'right';
-    ctx.direction = 'rtl';
-
-    // ── helper: draw value clipped to its slot ──
-    const val = (txt, baseline, font, clipY1, clipY2) => {
+    // ── helper: رسم النص مع كليب دقيق على منطقة الحقل ──
+    const val = (txt, x, y, w, h, rightAnchor, baseline, font) => {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(844, clipY1, 700, clipY2 - clipY1);
+      ctx.rect(x, y, w, h);
       ctx.clip();
-      ctx.font = font || 'bold 38px Tajawal, Arial';
+      ctx.font = font || `bold ${Math.round(h * 0.72)}px Tajawal, Arial`;
       ctx.fillStyle = CLR;
       ctx.textAlign = 'right';
       ctx.direction = 'rtl';
-      ctx.fillText(txt || '—', R, baseline);
+      ctx.fillText(txt || '—', rightAnchor, baseline);
       ctx.restore();
     };
 
-    //                      text                                          baseline  font                          clipY1  clipY2
-    val(data.name,                                                        285,      'bold 38px Tajawal, Arial',   200,    306);
-    val(data.pack,                                                        466,      'bold 38px Tajawal, Arial',   375,    485);
-    val(Number(data.amount || 0).toLocaleString('ar-DZ') + ' دج',        590,      'bold 38px Tajawal, Arial',   545,    607);
-    val(data.dateFormatted || '—',                                        655,      'bold 34px Tajawal, Arial',   638,    674);
-    val(data.receipt || '—',                                              740,      'bold 32px monospace',        675,    760);
+    //       text                                                  x    y    w    h   right  base   font
+    val(data.name,                                               556, 188, 210,  33,  766,   219);
+    val(data.pack,                                               559, 272, 386,  30,  945,   300);
+    val(Number(data.amount||0).toLocaleString('ar-DZ')+' دج',   563, 360, 170,  36,  733,   394);
+    val(data.dateFormatted || '—',                              555, 445, 224,  31,  779,   474);
+    val(data.receipt || '—',                                    556, 527, 211,  36,  767,   561,  'bold 24px monospace');
 
-    // ── المبلغ المتبقي — يسار، نفس صف المبلغ ──
+    // ── المبلغ المتبقي ──
     const remainingAmtDraw = data.remainingAmount !== undefined
       ? data.remainingAmount
       : (() => {
@@ -2920,24 +2904,21 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
 
     ctx.save();
     ctx.beginPath();
-    ctx.rect(40, 545, 520, 62);   // left panel, same row as المبلغ
+    ctx.rect(260, 365, 231, 37);
     ctx.clip();
-    ctx.font = 'bold 38px Tajawal, Arial';
+    ctx.font = `bold ${Math.round(37 * 0.72)}px Tajawal, Arial`;
     ctx.fillStyle = remainingAmtDraw > 0 ? '#DC2626' : CLR;
     ctx.textAlign = 'right';
     ctx.direction = 'rtl';
-    ctx.fillText(remainingTxt, 560, 590);
+    ctx.fillText(remainingTxt, 491, 400);
     ctx.restore();
 
-    // ── QR code — في منطقة المسح، يسار الوسط ──
-    // QR zone: y=880–1159, center_x≈400 (left-center area)
+    // ── QR code — x=103, y=517, size=142 (من Photoshop) ──
     if (qrCanvas) {
-      const qrSize = 260;
-      const qrX = 130;    // left side, matching "إمسح لتأكيد التسجيل" label position
-      const qrY = 890;
+      const qrX = 103, qrY = 517, qrSize = 142;
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.roundRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16, 12);
+      ctx.roundRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8, 8);
       ctx.fill();
       ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
     }
