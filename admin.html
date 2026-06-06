@@ -3806,45 +3806,14 @@ window.openAttModal = async (teacherId) => {
   if (!t) return;
   currentAttTeacherId = teacherId;
   currentAttStudents = t.students ? [...t.students] : [];
-  // ── تحميل حضور اليوم المحفوظ مسبقاً وتطبيقه على القائمة ──
-  try {
-    const todayKey = new Date().toISOString().slice(0,10);
-    const todaySnap = await getDoc(doc(db, 'attendance', `${teacherId}_${todayKey}`));
-    if (todaySnap.exists()) {
-      const savedStudents = todaySnap.data().students || [];
-      const savedMap = {};
-      savedStudents.forEach(s => { savedMap[s.id] = s; });
-      currentAttStudents = currentAttStudents.map(s => {
-        const saved = savedMap[s.id];
-        if (saved) return { ...s, present: !!saved.present, marked: true };
-        return s;
-      });
-    }
-  } catch(e) { /* تجاهل خطأ القراءة */ }
   // إعادة تعيين الفوج النشط
   window._activeAttGroupIdx  = 'all';
   window._activeAttGroups    = t.groups || [];
   window._activeAttTeacherId = teacherId;
-  // تحميل سجلات الحصص الخاصة بهذا الأستاذ لملخص الشهر (يشمل جميع الأفواج)
+  // تحميل سجلات الحصص الخاصة بهذا الأستاذ لملخص الشهر
   _allRecordedSessions = {};
-  try {
-    const allGroupsSnap = await getDocs(
-      query(collection(db, 'sessionAttendance'),
-            where('teacherId', '>=', teacherId),
-            where('teacherId', '<=', teacherId + '\uf8ff'))
-    );
-    allGroupsSnap.forEach(d => {
-      const data = d.data();
-      if (data.sessionNum) {
-        // دمج التلاميذ من جميع الأفواج في نفس رقم الحصة
-        if (!_allRecordedSessions[data.sessionNum]) {
-          _allRecordedSessions[data.sessionNum] = { ...data, students: [...(data.students||[])] };
-        } else {
-          _allRecordedSessions[data.sessionNum].students.push(...(data.students||[]));
-        }
-      }
-    });
-  } catch(e) { /* تجاهل */ }
+  const sessSnap = await getDocs(query(collection(db, 'sessionAttendance'), where('teacherId', '==', teacherId)));
+  sessSnap.forEach(d => { const data = d.data(); if (data.sessionNum) _allRecordedSessions[data.sessionNum] = data; });
   // Header
   const avatarWrap = document.getElementById('att-modal-avatar-wrap');
   avatarWrap.innerHTML = t.photo
@@ -4971,16 +4940,37 @@ window.openSummaryModal = () => {
   const students = currentAttStudents;
   if (!students.length) { showToast('لا يوجد تلاميذ بعد', true); return; }
 
-  const recordedCount = Object.keys(_allRecordedSessions).length;
+  // دمج جميع الأفواج في كائن موحّد: sessionNum -> {students merged}
+  const mergedSessions = {};
+  const allGroupKeys = Object.keys(_allRecordedSessionsByGroup);
+  if (allGroupKeys.length > 0) {
+    allGroupKeys.forEach(gi => {
+      const groupSessions = _allRecordedSessionsByGroup[gi] || {};
+      Object.keys(groupSessions).forEach(sNum => {
+        const rec = groupSessions[sNum];
+        if (!rec || !rec.students) return;
+        const num = parseInt(sNum);
+        if (!mergedSessions[num]) mergedSessions[num] = { students: [] };
+        mergedSessions[num].students.push(...rec.students);
+      });
+    });
+  } else {
+    // fallback: لا أفواج - استخدم _allRecordedSessions مباشرة
+    for (let i = 1; i <= 12; i++) {
+      if (_allRecordedSessions[i]) mergedSessions[i] = _allRecordedSessions[i];
+    }
+  }
+
+  const recordedCount = Object.keys(mergedSessions).length;
   const subEl = document.getElementById('summary-modal-sub');
-  if (subEl) subEl.textContent = `${recordedCount} حصة مسجّلة من أصل 12`;
+  if (subEl) subEl.textContent = recordedCount + ' حصة مسجّلة من أصل 12';
 
   // بناء إحصائيات كل تلميذ عبر جميع الحصص المسجلة
   const studentStats = {};
   students.forEach(s => { studentStats[s.id] = { name: s.name, present: 0, absent: 0, dots: [] }; });
 
   for (let i = 1; i <= 12; i++) {
-    const rec = _allRecordedSessions[i];
+    const rec = mergedSessions[i];
     if (rec && rec.students) {
       rec.students.forEach(s => {
         if (!studentStats[s.id]) studentStats[s.id] = { name: s.name, present: 0, absent: 0, dots: [] };
@@ -4988,7 +4978,7 @@ window.openSummaryModal = () => {
         else { studentStats[s.id].absent++; studentStats[s.id].dots.push(false); }
       });
     } else {
-      // حصة غير مسجلة — نضيف فراغ
+      // حصة غير مسجلة - نضيف فراغ
       students.forEach(s => { if (studentStats[s.id]) studentStats[s.id].dots.push(null); });
     }
   }
