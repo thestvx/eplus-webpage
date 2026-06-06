@@ -4428,30 +4428,31 @@ window.addStudent = async () => {
   if (allTabEl) { const cnt = allTabEl.querySelector('.g-count'); if (cnt) cnt.textContent = currentAttStudents.length; }
 
   // تنظيف الحقل والاختيار
-  if (nameInp) nameInp.value = '';
   _selectedStudentData = null;
-  const sug = document.getElementById('student-suggestions');
-  if (sug) sug.style.display = 'none';
-  const info = document.getElementById('selected-student-info');
-  if (info) info.style.display = 'none';
 
-  // إعادة رسم القائمة مع تثبيت موضع الـ scroll — مع احترام الفوج النشط
-  const scrollY = window.scrollY;
-  if (activeGidx !== 'all' && activeGidx !== undefined && activeGroups[activeGidx]) {
-    // نعيد رسم تلاميذ الفوج فقط
-    const groupStudentNames = new Set((activeGroups[activeGidx].students || []).map(s => s.trim().toLowerCase()));
-    const filteredForGroup = currentAttStudents.filter(s => groupStudentNames.has(s.name.trim().toLowerCase()));
-    renderAttStudents(filteredForGroup, '');
-    updateAttSummary(filteredForGroup);
-  } else {
-    renderAttStudents(currentAttStudents, '');
+  // ── إعادة رسم الـ modal أو القائمة حسب السياق ──
+  if (window._buildSessionModalHtml) {
+    // وضع الأستاذ: نعيد بناء session modal بالكامل مع القائمة المحدثة
+    openSessionModal(window._buildSessionModalHtml());
     updateAttSummary(currentAttStudents);
+  } else {
+    // وضع الأدمين: نستخدم renderAttStudents العادية
+    const scrollY = window.scrollY;
+    if (activeGidx !== 'all' && activeGidx !== undefined && activeGroups[activeGidx]) {
+      const groupStudentNames = new Set((activeGroups[activeGidx].students || []).map(s => s.trim().toLowerCase()));
+      const filteredForGroup = currentAttStudents.filter(s => groupStudentNames.has(s.name.trim().toLowerCase()));
+      renderAttStudents(filteredForGroup, '');
+      updateAttSummary(filteredForGroup);
+    } else {
+      renderAttStudents(currentAttStudents, '');
+      updateAttSummary(currentAttStudents);
+    }
+    window.scrollTo({ top: scrollY });
   }
-  window.scrollTo({ top: scrollY });
 
-  if (isPaid)    showToast(`✅ تمت إضافة ${name} — التذكرة مفعّلة ✔`);
-  else if (isUnpaid) showToast(`⚠️ تمت إضافة ${name} — التذكرة غير مفعّلة`, true);
-  else           showToast(`✅ تمت إضافة ${name} — لا توجد تذكرة مسجّلة`);
+  if (isPaid)         showToast(`✅ تمت إضافة ${name} — التذكرة مفعّلة ✔`);
+  else if (isUnpaid)  showToast(`⚠️ تمت إضافة ${name} — التذكرة غير مفعّلة`, true);
+  else                showToast(`✅ تمت إضافة ${name} — لا توجد تذكرة مسجّلة`);
 };
 
 window.removeStudent = async (sid) => {
@@ -4717,6 +4718,7 @@ window.closeSessionModal = () => {
   document.getElementById('session-modal-inner').style.transform = 'translateY(20px) scale(0.97)';
   document.body.style.overflow = '';
   currentOpenSession = null;
+  window._buildSessionModalHtml = null; // تنظيف عند الإغلاق
 };
 
 // ─── تحميل بيانات الحصص من Firestore لفوج معين ───
@@ -4887,7 +4889,8 @@ window.openSession_g = (sessionNum, gi) => {
     currentAttTeacherId = window.currentTeacherData.uid; window.currentAttTeacherId = currentAttTeacherId;
   }
 
-  const buildModalHtml = () => {
+  // ── دالة بناء HTML للـ modal — محفوظة على window لإعادة الاستخدام بعد إضافة تلميذ ──
+  window._buildSessionModalHtml = () => {
     const students = currentAttStudents;
     const studentsHtml = students.length
       ? students.map(s => {
@@ -4952,7 +4955,7 @@ window.openSession_g = (sessionNum, gi) => {
       </div>`;
   };
 
-  openSessionModal(buildModalHtml());
+  openSessionModal(window._buildSessionModalHtml());
   updateAttSummary(currentAttStudents);
 };
 
