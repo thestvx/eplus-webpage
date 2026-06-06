@@ -452,7 +452,6 @@
     .tbl tbody tr:hover td{background:#F9F6FF}
     .receipt-code{font-family:monospace;font-size:11px;color:var(--primary);letter-spacing:1px;background:var(--primary-light);padding:2px 8px;border-radius:6px}
     .pack-chip{padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700;background:var(--accent-soft);color:#92400E;border:1px solid rgba(245,158,11,0.2)}
-    /* ── فلاتر التذاكر ── */
     .tickets-filter-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
     .ticket-filter-btn{padding:6px 14px;border-radius:99px;border:2px solid var(--border);background:white;font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;color:var(--text-2);transition:all 0.18s;white-space:nowrap}
     .ticket-filter-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
@@ -1563,39 +1562,30 @@
           <!-- إحصائيات سريعة -->
           <div class="tickets-stats-mini">
             <div class="tsm-card green">
-              <div>
-                <div class="tsm-card-num" id="tsm-active">0</div>
-                <div class="tsm-card-lbl">✅ تذكرة مفعّلة</div>
-              </div>
+              <div><div class="tsm-card-num" id="tsm-active">0</div><div class="tsm-card-lbl">✅ تذكرة مفعّلة</div></div>
             </div>
             <div class="tsm-card amber">
-              <div>
-                <div class="tsm-card-num" id="tsm-pending">0</div>
-                <div class="tsm-card-lbl">⏳ قيد المراجعة</div>
-              </div>
+              <div><div class="tsm-card-num" id="tsm-pending">0</div><div class="tsm-card-lbl">⏳ قيد المراجعة</div></div>
             </div>
             <div class="tsm-card" style="background:rgba(99,102,241,0.07);border-color:rgba(99,102,241,0.25);flex:2;min-width:180px">
-              <div>
-                <div class="tsm-card-num" id="tsm-total-amount" style="color:#4f46e5;font-size:18px">0 دج</div>
-                <div class="tsm-card-lbl">💰 إجمالي المفعّلة</div>
-              </div>
+              <div><div class="tsm-card-num" id="tsm-total-amount" style="color:#4f46e5;font-size:18px">0 دج</div><div class="tsm-card-lbl">💰 إجمالي المفعّلة</div></div>
             </div>
           </div>
-          <!-- خانة البحث -->
+          <!-- بحث -->
           <div style="position:relative;margin-bottom:12px">
             <span style="position:absolute;top:50%;right:14px;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
             <input class="inp" type="text" id="tickets-search-inp" placeholder="بحث برقم الوصل أو الاسم واللقب..." style="padding-right:42px" oninput="filterTicketsTable(this.value)">
           </div>
-          <!-- فلاتر الحالة والباقة -->
+          <!-- فلاتر -->
           <div class="tickets-filter-bar" id="tickets-filter-bar">
-            <button class="ticket-filter-btn active" data-filter="all"     onclick="setTicketFilter('all',this)">الكل</button>
-            <button class="ticket-filter-btn"        data-filter="paid"    onclick="setTicketFilter('paid',this)">✅ مفعّلة</button>
-            <button class="ticket-filter-btn"        data-filter="pending" onclick="setTicketFilter('pending',this)">⏳ قيد المراجعة</button>
+            <button class="ticket-filter-btn active" onclick="setTicketFilter('all',this)">الكل</button>
+            <button class="ticket-filter-btn"        onclick="setTicketFilter('paid',this)">✅ مفعّلة</button>
+            <button class="ticket-filter-btn"        onclick="setTicketFilter('pending',this)">⏳ قيد المراجعة</button>
             <span style="width:1px;height:20px;background:var(--border);margin:0 2px"></span>
-            <button class="ticket-filter-btn" data-filter="pack:الباقة الأساسية" onclick="setTicketFilter('pack:الباقة الأساسية',this)">📦 أساسية</button>
-            <button class="ticket-filter-btn" data-filter="pack:باقة النخبة"     onclick="setTicketFilter('pack:باقة النخبة',this)">⭐ نخبة</button>
-            <button class="ticket-filter-btn" data-filter="pack:باقة تحضير"      onclick="setTicketFilter('pack:باقة تحضير',this)">🎓 تحضير بكالوريا</button>
-            <button class="ticket-filter-btn" data-filter="pack:باقة البالغين"    onclick="setTicketFilter('pack:باقة البالغين',this)">👤 بالغين</button>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('pack:الباقة الأساسية',this)">📦 أساسية</button>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('pack:باقة النخبة',this)">⭐ نخبة</button>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('pack:باقة تحضير',this)">🎓 تحضير بكالوريا</button>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('pack:باقة البالغين',this)">👤 بالغين</button>
           </div>
           <div class="tbl-wrap">
             <table class="tbl" id="tickets-table">
@@ -3016,7 +3006,7 @@ window.copyReceiptNum = () => {
 // store tickets globally for export
 let allTicketsData = [];
 let _ticketsSearchVal = '';
-let _ticketsFilterVal = 'all'; // all | paid | pending | pack:XXX
+let _ticketsFilterVal = 'all';
 
 // ─── بناء صفوف جدول التذاكر ───
 function renderTicketRows(data) {
@@ -3025,14 +3015,12 @@ function renderTicketRows(data) {
   const norm = s => String(s || '').trim().toLowerCase();
   const q = norm(_ticketsSearchVal);
   const f = _ticketsFilterVal;
-  let filtered = q
-    ? data.filter(x => norm(x.receipt).includes(q) || norm(x.name).includes(q))
-    : data;
-  if (f === 'paid')    filtered = filtered.filter(x => x.status === 'paid');
+  let filtered = q ? data.filter(x => norm(x.receipt).includes(q) || norm(x.name).includes(q)) : data;
+  if (f === 'paid')         filtered = filtered.filter(x => x.status === 'paid');
   else if (f === 'pending') filtered = filtered.filter(x => x.status !== 'paid');
   else if (f.startsWith('pack:')) {
-    const packKey = norm(f.slice(5));
-    filtered = filtered.filter(x => norm(x.pack).includes(packKey));
+    const pk = norm(f.slice(5));
+    filtered = filtered.filter(x => norm(x.pack).includes(pk));
   }
 
   tbody.innerHTML = '';
@@ -3071,15 +3059,12 @@ window.filterTicketsTable = (val) => {
   _ticketsSearchVal = val;
   renderTicketRows(allTicketsData);
 };
-
 window.setTicketFilter = (val, btn) => {
   _ticketsFilterVal = val;
-  // تحديث الأزرار
-  document.querySelectorAll('#tickets-filter-bar .ticket-filter-btn').forEach(b => {
-    b.classList.remove('active','active-green','active-amber');
-  });
+  document.querySelectorAll('#tickets-filter-bar .ticket-filter-btn').forEach(b =>
+    b.classList.remove('active','active-green','active-amber'));
   if (btn) {
-    if (val === 'paid')    btn.classList.add('active-green');
+    if (val === 'paid') btn.classList.add('active-green');
     else if (val === 'pending') btn.classList.add('active-amber');
     else btn.classList.add('active');
   }
@@ -3132,17 +3117,15 @@ function loadTickets() {
       if (remaining > 0) studentsWithRemaining++;
     });
     renderTicketRows(allTicketsData);
-    // تحديث الإحصائيات السريعة
-    const tsmActive  = document.getElementById('tsm-active');
-    const tsmPending = document.getElementById('tsm-pending');
-    const tsmAmount  = document.getElementById('tsm-total-amount');
-    if (tsmActive)  tsmActive.textContent  = paid;
-    if (tsmPending) tsmPending.textContent = pending;
-    if (tsmAmount) {
-      const paidTotal = allTicketsData
-        .filter(x => x.status === 'paid')
-        .reduce((sum, x) => sum + Number(x.amount || 0), 0);
-      tsmAmount.textContent = paidTotal.toLocaleString('ar-DZ') + ' دج';
+    const tsmA = document.getElementById('tsm-active');
+    const tsmP = document.getElementById('tsm-pending');
+    const tsmT = document.getElementById('tsm-total-amount');
+    if (tsmA) tsmA.textContent = paid;
+    if (tsmP) tsmP.textContent = pending;
+    if (tsmT) {
+      const total = allTicketsData.filter(x => x.status === 'paid')
+                                  .reduce((s, x) => s + Number(x.amount || 0), 0);
+      tsmT.textContent = total.toLocaleString('ar-DZ') + ' دج';
     }
     updateSummerStats(snap.size, paid, pending);
     updateFinancialStats(snap.size, paid, studentsWithRemaining, totalExpected, totalCollected, totalRemaining);
@@ -3887,14 +3870,43 @@ window.openAttModal = async (teacherId) => {
   if (!t) return;
   currentAttTeacherId = teacherId;
   currentAttStudents = t.students ? [...t.students] : [];
-  // إعادة تعيين الفوج النشط
+
+  // تحميل حضور اليوم المحفوظ
+  try {
+    const todayKey = new Date().toISOString().slice(0,10);
+    const todaySnap = await getDoc(doc(db, 'attendance', `${teacherId}_${todayKey}`));
+    if (todaySnap.exists()) {
+      const savedMap = {};
+      (todaySnap.data().students || []).forEach(s => { savedMap[s.id] = s; });
+      currentAttStudents = currentAttStudents.map(s =>
+        savedMap[s.id] ? { ...s, present: !!savedMap[s.id].present } : s
+      );
+    }
+  } catch(e) {}
+
   window._activeAttGroupIdx  = 'all';
   window._activeAttGroups    = t.groups || [];
   window._activeAttTeacherId = teacherId;
-  // تحميل سجلات الحصص الخاصة بهذا الأستاذ لملخص الشهر
+
+  // تحميل سجلات الحصص لجميع الأفواج
   _allRecordedSessions = {};
-  const sessSnap = await getDocs(query(collection(db, 'sessionAttendance'), where('teacherId', '==', teacherId)));
-  sessSnap.forEach(d => { const data = d.data(); if (data.sessionNum) _allRecordedSessions[data.sessionNum] = data; });
+  _allRecordedSessionsByGroup = {};
+  try {
+    const sessSnap = await getDocs(query(
+      collection(db, 'sessionAttendance'),
+      where('teacherId', '>=', teacherId + '_g'),
+      where('teacherId', '<=', teacherId + '_g')
+    ));
+    sessSnap.forEach(d => {
+      const data = d.data();
+      if (!data.sessionNum) return;
+      const gStr = String(data.teacherId || '');
+      const gi = parseInt((gStr.match(/_g(\d+)$/) || [0,0])[1]);
+      if (!_allRecordedSessionsByGroup[gi]) _allRecordedSessionsByGroup[gi] = {};
+      _allRecordedSessionsByGroup[gi][data.sessionNum] = data;
+      if (gi === 0) _allRecordedSessions[data.sessionNum] = data;
+    });
+  } catch(e) {}
   // Header
   const avatarWrap = document.getElementById('att-modal-avatar-wrap');
   avatarWrap.innerHTML = t.photo
@@ -4374,22 +4386,31 @@ window.removeStudent = async (sid) => {
 
 window.saveAttendance = async () => {
   if (!currentAttTeacherId) return;
+  const tid      = currentAttTeacherId;
+  const gi       = typeof window._activeAttGroupIdx === 'number' ? window._activeAttGroupIdx : 0;
   const todayKey = new Date().toISOString().slice(0,10);
-  const record = {
-    date: todayKey,
-    savedAt: serverTimestamp(),
-    students: currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }))
-  };
+  const students = currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
+
+  const existingSessions = _allRecordedSessionsByGroup[gi] || {};
+  let sessionNum = 1;
+  for (let i = 1; i <= 12; i++) { if (!existingSessions[i]) { sessionNum = i; break; } }
+
+  const groupSuffix = '_g' + gi;
+  const sessionKey  = tid + groupSuffix + '_session_' + sessionNum;
+  const record = { teacherId: tid + groupSuffix, sessionNum, date: todayKey, savedAt: serverTimestamp(), students };
   try {
-    await setDoc(doc(db, 'attendance', `${currentAttTeacherId}_${todayKey}`), {
-      teacherId: currentAttTeacherId,
-      ...record
-    });
-    const t = allTeachers.find(x => x.id === currentAttTeacherId) || currentTeacherData;
-    const present = currentAttStudents.filter(s => s.present).length;
-    await addLog('📋 تسجيل حضور', `${t?.name || 'أستاذ'} — ${present}/${currentAttStudents.length} حاضر (${todayKey})`, '✅');
-    showToast('✅ تم حفظ سجل الحضور');
-    // في وضع الأدمين نغلق الـ modal — في وضع الأستاذ نبقى في الصفحة
+    await setDoc(doc(db, 'sessionAttendance', sessionKey), record);
+    await setDoc(doc(db, 'attendance', tid + '_' + todayKey),
+      { teacherId: tid, date: todayKey, savedAt: serverTimestamp(), students }, { merge: true });
+    if (!_allRecordedSessionsByGroup[gi]) _allRecordedSessionsByGroup[gi] = {};
+    _allRecordedSessionsByGroup[gi][sessionNum] = record;
+    if (gi === 0) _allRecordedSessions[sessionNum] = record;
+    const t     = allTeachers.find(x => x.id === tid) || currentTeacherData;
+    const pres  = students.filter(s => s.present).length;
+    const gName = (window._activeAttGroups || [])[gi]?.name || '';
+    await addLog('📋 تسجيل حضور',
+      (t?.name||'أستاذ') + ' — حصة ' + sessionNum + (gName?' ('+gName+')':'') + ' — ' + pres + '/' + students.length + ' حاضر', '✅');
+    showToast('✅ تم حفظ حضور الحصة ' + sessionNum + (gName?' ('+gName+')':''));
     if (!isTeacherMode) closeAttModal();
   } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
@@ -4862,6 +4883,7 @@ window.editSession_g = async (sessionNum, gi) => {
   window._currentGroupIdx = gi;
   window._editingDocRef    = docRef;
 
+  const teacherGroups = window.currentTeacherData?.groups || [];
   const groupName = teacherGroups[gi]?.name || '';
 
   const studentsHtml = () => currentAttStudents.length
@@ -4933,7 +4955,7 @@ window.saveEditedSession_g = async (sessionNum, gi) => {
       students: currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present })),
       editedAt: serverTimestamp(),
       editedByAdmin: true
-    });
+    }, { merge: true });
     const present = currentAttStudents.filter(s => s.present).length;
     const groupName = (window.currentTeacherData?.groups||[])[gi]?.name || '';
     await addLog('✏️ تعديل حضور', `الحصة ${sessionNum}${groupName?' — '+groupName:''} — ${present}/${currentAttStudents.length} حاضر`, '🔧');
@@ -5020,16 +5042,31 @@ window.openSummaryModal = () => {
   const students = currentAttStudents;
   if (!students.length) { showToast('لا يوجد تلاميذ بعد', true); return; }
 
-  const recordedCount = Object.keys(_allRecordedSessions).length;
-  const subEl = document.getElementById('summary-modal-sub');
-  if (subEl) subEl.textContent = `${recordedCount} حصة مسجّلة من أصل 12`;
+  // دمج جميع الأفواج
+  const mergedSessions = {};
+  Object.values(_allRecordedSessionsByGroup).forEach(groupSessions => {
+    Object.entries(groupSessions).forEach(([sNum, rec]) => {
+      const n = parseInt(sNum);
+      if (!mergedSessions[n]) mergedSessions[n] = { students: [] };
+      mergedSessions[n].students.push(...(rec.students || []));
+    });
+  });
+  // fallback لو لا أفواج
+  if (!Object.keys(mergedSessions).length) {
+    Object.entries(_allRecordedSessions).forEach(([sNum, rec]) => {
+      mergedSessions[parseInt(sNum)] = rec;
+    });
+  }
 
-  // بناء إحصائيات كل تلميذ عبر جميع الحصص المسجلة
+  const recordedCount = Object.keys(mergedSessions).length;
+  const subEl = document.getElementById('summary-modal-sub');
+  if (subEl) subEl.textContent = recordedCount + ' حصة مسجّلة من أصل 12';
+
   const studentStats = {};
   students.forEach(s => { studentStats[s.id] = { name: s.name, present: 0, absent: 0, dots: [] }; });
 
   for (let i = 1; i <= 12; i++) {
-    const rec = _allRecordedSessions[i];
+    const rec = mergedSessions[i];
     if (rec && rec.students) {
       rec.students.forEach(s => {
         if (!studentStats[s.id]) studentStats[s.id] = { name: s.name, present: 0, absent: 0, dots: [] };
