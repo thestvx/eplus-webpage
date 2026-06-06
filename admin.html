@@ -4760,19 +4760,24 @@ window.openSession = (sessionNum) => {
 // ─── تعديل حصة مسجّلة — للأدمين فقط ───
 window.editSession_g = async (sessionNum, gi) => {
   const tid = currentAttTeacherId;
-  if (!tid) { showToast('خطأ: لم يُحدد الأستاذ', true); return; }
+  if (!tid) { showToast('خطأ: لم يُحدد الأستاذ (tid فارغ)', true); return; }
 
-  // نفس المفتاح المستخدم في saveSessionAttendance_g
   const sessionKey = `${tid}_g${gi}_session_${sessionNum}`;
-  const docRef     = doc(db, 'sessionAttendance', sessionKey);
+  showToast(`⏳ تحميل الحصة ${sessionNum}... key: ${sessionKey}`, false);
+
+  const docRef = doc(db, 'sessionAttendance', sessionKey);
 
   let docSnap;
   try { docSnap = await getDoc(docRef); }
-  catch(e) { showToast('خطأ في قراءة البيانات: ' + e.message, true); return; }
+  catch(e) { showToast('❌ خطأ Firestore: ' + e.message, true); return; }
 
   if (!docSnap.exists()) {
-    showToast('⚠️ لم يُعثر على سجل لهذه الحصة', true);
-    return;
+    showToast(`⚠️ السجل غير موجود: ${sessionKey}`, true);
+    // جرب القراءة من الـ cache المحلي
+    const cached = (_allRecordedSessionsByGroup[gi] || {})[sessionNum];
+    if (!cached) return;
+    showToast('ℹ️ قراءة من الـ cache المحلي', false);
+    docSnap = { exists: () => true, data: () => cached };
   }
 
   const teacherGroups = window.currentTeacherData?.groups || [];
