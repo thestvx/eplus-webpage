@@ -3806,6 +3806,21 @@ window.openAttModal = async (teacherId) => {
   if (!t) return;
   currentAttTeacherId = teacherId;
   currentAttStudents = t.students ? [...t.students] : [];
+  // تحميل حضور اليوم المحفوظ مسبقاً وتطبيقه على القائمة
+  try {
+    const todayKey = new Date().toISOString().slice(0,10);
+    const todaySnap = await getDoc(doc(db, 'attendance', `${teacherId}_${todayKey}`));
+    if (todaySnap.exists()) {
+      const savedStudents = todaySnap.data().students || [];
+      const savedMap = {};
+      savedStudents.forEach(s => { savedMap[s.id] = s; });
+      currentAttStudents = currentAttStudents.map(s => {
+        const saved = savedMap[s.id];
+        if (saved) return { ...s, present: !!saved.present, marked: true };
+        return s;
+      });
+    }
+  } catch(e) { /* تجاهل خطأ القراءة */ }
   // إعادة تعيين الفوج النشط
   window._activeAttGroupIdx  = 'all';
   window._activeAttGroups    = t.groups || [];
@@ -4293,22 +4308,51 @@ window.removeStudent = async (sid) => {
 
 window.saveAttendance = async () => {
   if (!currentAttTeacherId) return;
-  const todayKey = new Date().toISOString().slice(0,10);
+  const tid = currentAttTeacherId;
+  const gi  = typeof window._activeAttGroupIdx === 'number' ? window._activeAttGroupIdx : 0;
+
+  // تحديد رقم الحصة التالية غير المسجلة لهذا الفوج
+  const existingSessions = _allRecordedSessionsByGroup[gi] || {};
+  let sessionNum = 1;
+  for (let i = 1; i <= 12; i++) {
+    if (!existingSessions[i]) { sessionNum = i; break; }
+  }
+
+  const groupSuffix = `_g${gi}`;
+  const sessionKey  = `${tid}${groupSuffix}_session_${sessionNum}`;
+  const students    = currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
+  const todayKey    = new Date().toISOString().slice(0,10);
+
   const record = {
-    date: todayKey,
+    teacherId: tid + groupSuffix,
+    sessionNum,
     savedAt: serverTimestamp(),
-    students: currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }))
+    date: todayKey,
+    students
   };
+
   try {
-    await setDoc(doc(db, 'attendance', `${currentAttTeacherId}_${todayKey}`), {
-      teacherId: currentAttTeacherId,
-      ...record
-    });
-    const t = allTeachers.find(x => x.id === currentAttTeacherId) || currentTeacherData;
-    const present = currentAttStudents.filter(s => s.present).length;
-    await addLog('📋 تسجيل حضور', `${t?.name || 'أستاذ'} — ${present}/${currentAttStudents.length} حاضر (${todayKey})`, '✅');
-    showToast('✅ تم حفظ سجل الحضور');
-    // في وضع الأدمين نغلق الـ modal — في وضع الأستاذ نبقى في الصفحة
+    // حفظ في sessionAttendance (نفس المكان الذي يقرأ منه ملخص الشهر)
+    await setDoc(doc(db, 'sessionAttendance', sessionKey), record);
+
+    // حفظ أيضاً في attendance للتوافق مع الكود القديم
+    await setDoc(doc(db, 'attendance', `${tid}_${todayKey}`), {
+      teacherId: tid,
+      date: todayKey,
+      savedAt: serverTimestamp(),
+      students
+    }, { merge: true });
+
+    // تحديث الذاكرة فوراً حتى يظهر في ملخص الشهر بدون إعادة تحميل
+    if (!_allRecordedSessionsByGroup[gi]) _allRecordedSessionsByGroup[gi] = {};
+    _allRecordedSessionsByGroup[gi][sessionNum] = { ...record, savedAt: { toDate: () => new Date() } };
+    _allRecordedSessions = _allRecordedSessionsByGroup[gi];
+
+    const t       = allTeachers.find(x => x.id === tid) || currentTeacherData;
+    const present = students.filter(s => s.present).length;
+    const groupName = (window.currentTeacherData?.groups || [])[gi]?.name || '';
+    await addLog('📋 تسجيل حضور', `${t?.name || 'أستاذ'} — حصة ${sessionNum}${groupName?' ('+groupName+')':''} — ${present}/${students.length} حاضر`, '✅');
+    showToast(`✅ تم حفظ حضور الحصة ${sessionNum}${groupName?' ('+groupName+')':''}`);
     if (!isTeacherMode) closeAttModal();
   } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
@@ -4955,7 +4999,6 @@ window.openSummaryModal = () => {
       });
     });
   } else {
-    // fallback: لا أفواج - استخدم _allRecordedSessions مباشرة
     for (let i = 1; i <= 12; i++) {
       if (_allRecordedSessions[i]) mergedSessions[i] = _allRecordedSessions[i];
     }
@@ -4978,7 +5021,6 @@ window.openSummaryModal = () => {
         else { studentStats[s.id].absent++; studentStats[s.id].dots.push(false); }
       });
     } else {
-      // حصة غير مسجلة - نضيف فراغ
       students.forEach(s => { if (studentStats[s.id]) studentStats[s.id].dots.push(null); });
     }
   }
