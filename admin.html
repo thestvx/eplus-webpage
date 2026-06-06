@@ -4761,36 +4761,25 @@ window.openSession = (sessionNum) => {
 window.editSession_g = async (sessionNum, gi) => {
   const tid = currentAttTeacherId;
   if (!tid) return;
-  // جلب بيانات الحصة المسجّلة من Firestore
-  const { getDocs, collection, query, where } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-  const snap = await getDocs(query(
-    collection(db, 'attendance'),
-    where('teacherId','==', tid),
-    where('sessionNum','==', sessionNum)
-  ));
-  // محاولة بالمفتاح المباشر
-  const { getDoc, doc: fsDoc, setDoc: fsSetDoc, serverTimestamp: fsST } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
 
-  // استخدام نفس مفتاح الحصة المستخدم في saveSessionAttendance_g
-  const teacherGroups = window.currentTeacherData?.groups || [];
-  const groupObj      = teacherGroups[gi] || {};
-  const sessions      = groupObj.sessions || window._sessionsCache?.[gi] || [];
-  const sessionDate   = sessions[sessionNum - 1]?.date || new Date().toISOString().slice(0,10);
-  const docId         = `${tid}_g${gi}_s${sessionNum}_${sessionDate}`;
-  const docRef        = fsDoc(db, 'attendance', docId);
-  const docSnap       = await getDoc(docRef);
+  // نفس المفتاح المستخدم في saveSessionAttendance_g
+  const sessionKey = `${tid}_g${gi}_session_${sessionNum}`;
+  const docRef     = doc(db, 'sessionAttendance', sessionKey);
+  const docSnap    = await getDoc(docRef);
 
   let savedStudents = [];
   if (docSnap.exists()) {
     savedStudents = docSnap.data().students || [];
+  } else {
+    showToast('⚠️ لم يُعثر على سجل لهذه الحصة', true);
+    return;
   }
 
-  // تحميل قائمة التلاميذ المسجّلة في الحصة إلى currentAttStudents
+  // تحميل قائمة التلاميذ إلى currentAttStudents
   currentAttStudents = savedStudents.map(s => ({ ...s, marked: true }));
   currentOpenSession = sessionNum;
   window._currentGroupIdx = gi;
-  window._editingDocId = docId;
-  window._editingDocRef = docRef;
+  window._editingDocRef    = docRef;
 
   const groupName = teacherGroups[gi]?.name || '';
 
@@ -4858,16 +4847,17 @@ window.saveEditedSession_g = async (sessionNum, gi) => {
   if (!docRef) { showToast('خطأ: لم يُحدد سجل للتعديل', true); return; }
   try {
     await setDoc(docRef, {
+      teacherId: currentAttTeacherId + `_g${gi}`,
+      sessionNum,
       students: currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present })),
       editedAt: serverTimestamp(),
       editedByAdmin: true
-    }, { merge: true });
+    });
     const present = currentAttStudents.filter(s => s.present).length;
-    await addLog('✏️ تعديل حضور', `الحصة ${sessionNum} — ${present}/${currentAttStudents.length} حاضر`, '🔧');
+    const groupName = (window.currentTeacherData?.groups||[])[gi]?.name || '';
+    await addLog('✏️ تعديل حضور', `الحصة ${sessionNum}${groupName?' — '+groupName:''} — ${present}/${currentAttStudents.length} حاضر`, '🔧');
     showToast('✅ تم حفظ التعديلات');
     closeSessionModal();
-    // إعادة تحميل عرض الأستاذ لتحديث الكروت
-    if (window._reloadCurrentTeacherView) window._reloadCurrentTeacherView();
   } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
 
