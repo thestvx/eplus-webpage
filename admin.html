@@ -4197,8 +4197,14 @@ let _suppressSnapshot = false;
 
 // ─── بحث ذكي في التذاكر: بالاسم أو رقم الوصل ───
 window.searchStudentSuggestions = (val) => {
-  const suggestionsEl = document.getElementById('student-suggestions');
-  const infoEl = document.getElementById('selected-student-info');
+  // ── نبحث عن العناصر المرئية دائماً ──
+  const findVisible = (sel) => {
+    const all = document.querySelectorAll(sel);
+    for (const el of all) { if (el.offsetParent !== null || el.closest('#session-modal-bg')?.style.visibility === 'visible') return el; }
+    return all[all.length - 1] || null;
+  };
+  const suggestionsEl = findVisible('#student-suggestions');
+  const infoEl = findVisible('#selected-student-info');
   if (!suggestionsEl) return;
 
   // إذا مسح المستخدم الحقل، نصفّر الاختيار
@@ -4271,11 +4277,21 @@ window.selectTicketStudent = (receipt, name) => {
     payStatus: ticket.status === 'paid' ? 'paid' : 'unpaid',
     fromTicket: true
   };
-  const inp = document.getElementById('new-student-name');
+  // البحث عن العناصر المرئية
+  const allInps = document.querySelectorAll('#new-student-name');
+  let inp = null;
+  for (const el of allInps) { if (el.offsetParent !== null || el.closest('#session-modal-bg')?.style.visibility === 'visible') { inp = el; break; } }
+  if (!inp) inp = allInps[allInps.length - 1];
   if (inp) inp.value = ticket.name;
-  const sug = document.getElementById('student-suggestions');
+  const allSugs = document.querySelectorAll('#student-suggestions');
+  let sug = null;
+  for (const el of allSugs) { if (el.offsetParent !== null || el.closest('#session-modal-bg')?.style.visibility === 'visible') { sug = el; break; } }
+  if (!sug) sug = allSugs[allSugs.length - 1];
   if (sug) sug.style.display = 'none';
-  const info = document.getElementById('selected-student-info');
+  const allInfos = document.querySelectorAll('#selected-student-info');
+  let info = null;
+  for (const el of allInfos) { if (el.offsetParent !== null || el.closest('#session-modal-bg')?.style.visibility === 'visible') { info = el; break; } }
+  if (!info) info = allInfos[allInfos.length - 1];
   if (info) {
     const isPaid = ticket.status === 'paid';
     info.style.display = 'block';
@@ -4296,11 +4312,20 @@ window.selectTicketStudent = (receipt, name) => {
 // ─── إضافة يدوية بدون تذكرة ───
 window.selectManualStudent = (name) => {
   _selectedStudentData = { name, receipt: null, payStatus: 'unknown', fromTicket: false };
-  const inp = document.getElementById('new-student-name');
+  const allInps = document.querySelectorAll('#new-student-name');
+  let inp = null;
+  for (const el of allInps) { if (el.offsetParent !== null || el.closest('#session-modal-bg')?.style.visibility === 'visible') { inp = el; break; } }
+  if (!inp) inp = allInps[allInps.length - 1];
   if (inp) inp.value = name;
-  const sug = document.getElementById('student-suggestions');
+  const allSugs = document.querySelectorAll('#student-suggestions');
+  let sug = null;
+  for (const el of allSugs) { if (el.offsetParent !== null || el.closest('#session-modal-bg')?.style.visibility === 'visible') { sug = el; break; } }
+  if (!sug) sug = allSugs[allSugs.length - 1];
   if (sug) sug.style.display = 'none';
-  const info = document.getElementById('selected-student-info');
+  const allInfos = document.querySelectorAll('#selected-student-info');
+  let info = null;
+  for (const el of allInfos) { if (el.offsetParent !== null || el.closest('#session-modal-bg')?.style.visibility === 'visible') { info = el; break; } }
+  if (!info) info = allInfos[allInfos.length - 1];
   if (info) {
     info.style.display = 'block';
     info.innerHTML = `<span style="font-size:13px;color:var(--text-2)">📝 ${name} — سيُضاف بدون رقم وصل</span>`;
@@ -4336,7 +4361,15 @@ function findStudentTicket(name) {
 }
 
 window.addStudent = async () => {
-  const nameInp = document.getElementById('new-student-name');
+  // ── نبحث عن الحقل المرئي (قد يوجد أكثر من عنصر بنفس الـ id) ──
+  const allNameInps = document.querySelectorAll('#new-student-name');
+  let nameInp = null;
+  for (const el of allNameInps) {
+    if (el.offsetParent !== null || el.closest('#session-modal-bg')?.style.visibility === 'visible') {
+      nameInp = el; break;
+    }
+  }
+  if (!nameInp) nameInp = allNameInps[allNameInps.length - 1];
   const rawName = nameInp ? nameInp.value.trim() : '';
   if (!rawName) return;
 
