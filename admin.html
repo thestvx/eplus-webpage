@@ -2872,11 +2872,15 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
     // ═══════════════════════════════════════════════════════
 
     const CLR = '#0D2080';
-    const R   = 1540;   // right anchor for all right-side values
+
+    // ═══════════════════════════════════════════════════════════════════
+    // إحداثيات محسوبة من جدول التحليل الدقيق للتذكرة (5.5cm × 5cm)
+    // المرجع: 770×660px  →  Canvas: 1584×1440px  (scale ≈ 2.057 × 2.182)
+    // ═══════════════════════════════════════════════════════════════════
 
     // ── helper: رسم النص مع كليب دقيق ──
     const val = (txt, clipX, clipY, clipW, clipH, rightAnchor, baseline, font) => {
-      const fs = font || `bold ${Math.round(clipH * 0.55)}px Tajawal, Arial`;
+      const fs = font || `bold ${Math.round(clipH * 0.72)}px Tajawal, Arial`;
       ctx.save();
       ctx.beginPath();
       ctx.rect(clipX, clipY, clipW, clipH);
@@ -2889,14 +2893,14 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
       ctx.restore();
     };
 
-    //        text                                              clipX  clipY  clipW  clipH  right   base    font
-    val(data.name,                                             959,   170,   581,   138,   R,      305);
-    val(data.pack,                                             700,   375,   840,   112,   R,      484);
-    val(Number(data.amount||0).toLocaleString('ar-DZ')+' دج', 880,   545,   660,   125,   R,      667);
-    val(data.dateFormatted || '—',                            700,   762,   840,    92,   R,      851);
-    val(data.receipt || '—',                                  700,   940,   840,    90,   R,      1028,  'bold 38px monospace');
+    //        text                                               clipX  clipY  clipW  clipH  right   base
+    val(data.name,                                              1144,   410,   432,    72,  1576,    469);
+    val(data.pack,                                              1150,   593,   794,    65,  1944,    647);
+    val(Number(data.amount||0).toLocaleString('ar-DZ')+' دج',  1158,   785,   350,    79,  1508,    850);
+    val(data.dateFormatted || '—',                             1142,   971,   461,    68,  1603,   1026);
+    val(data.receipt || '—',                                   1144,  1150,   434,    79,  1578,   1214,  'bold 42px monospace');
 
-    // ── المبلغ المتبقي — يسار، نفس مستوى المبلغ ──
+    // ── المبلغ المتبقي ──
     const remainingAmtDraw = data.remainingAmount !== undefined
       ? data.remainingAmount
       : (() => {
@@ -2909,25 +2913,26 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
       ? Number(remainingAmtDraw).toLocaleString('ar-DZ') + ' دج'
       : '0 دج';
 
+    // clipX=535 clipY=796 clipW=475 clipH=81 right=1010 baseline=863
     ctx.save();
     ctx.beginPath();
-    ctx.rect(40, 548, 630, 122);
+    ctx.rect(535, 796, 475, 81);
     ctx.clip();
-    ctx.font = `bold ${Math.round(122 * 0.55)}px Tajawal, Arial`;
+    ctx.font = `bold ${Math.round(81 * 0.72)}px Tajawal, Arial`;
     ctx.fillStyle = remainingAmtDraw > 0 ? '#DC2626' : CLR;
     ctx.textAlign = 'right';
     ctx.direction = 'rtl';
-    ctx.fillText(remainingTxt, 670, 667);
+    ctx.fillText(remainingTxt, 1010, 863);
     ctx.restore();
 
-    // ── QR code — x=103, y=517, size=142 (من تحليل البيكسل) ──
+    // ── QR code — x=212, y=1128, w=356, h=310 (محسوبة من الجدول) ──
     if (qrCanvas) {
-      const qrX = 103, qrY = 517, qrSize = 142;
+      const qrX = 212, qrY = 1128, qrW = 356, qrH = 310;
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.roundRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8, 8);
+      ctx.roundRect(qrX - 4, qrY - 4, qrW + 8, qrH + 8, 8);
       ctx.fill();
-      ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
+      ctx.drawImage(qrCanvas, qrX, qrY, qrW, qrH);
     }
 
     document.getElementById('ticket-empty').style.display = 'none';
