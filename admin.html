@@ -3164,69 +3164,50 @@ window.closePrintPreview = () => {
 
 window.executePrint = () => {
   const canvas = document.getElementById('ticket-canvas');
+  if (!canvas || canvas.width === 0) { showToast('⚠️ لا توجد تذكرة للطباعة', true); return; }
   const dataURL = canvas.toDataURL('image/png');
-
-  // نبني HTML صفحة طباعة نظيفة داخل iframe
   const isDouble = _printMode === 'double';
 
-  // نسبة التذكرة: 1584x1440 → W/H = 1.1
-  // في A4 (210x297mm) نريد التذكرة بأقصى حجم ممكن مع هامش 8mm
   const ticketsHtml = isDouble
     ? `<img class="ticket" src="${dataURL}"><img class="ticket" src="${dataURL}">`
-    : `<img class="ticket single" src="${dataURL}">`;
+    : `<img class="ticket" src="${dataURL}">`;
 
   const html = `<!DOCTYPE html>
 <html dir="rtl">
 <head>
 <meta charset="UTF-8">
-<title>طباعة التذكرة — E-PLUS</title>
+<title>طباعة التذكرة</title>
 <style>
   @page { size: A4 portrait; margin: 0; }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 210mm; height: 297mm; background: #fff; }
+  html, body { width: 210mm; min-height: 297mm; background: #fff; }
   body {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 8mm;
+    padding: ${isDouble ? '8mm' : '10mm'};
     gap: 6mm;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   img.ticket {
     display: block;
-    /* تذكرة واحدة: أقصى عرض مع الحفاظ على النسبة */
     width: 190mm;
     height: auto;
+    max-height: ${isDouble ? '130mm' : '270mm'};
     object-fit: contain;
-  }
-  img.ticket.single {
-    /* تذكرة منفردة: نكبّرها أكثر */
-    width: 190mm;
-    max-height: 277mm;
   }
 </style>
 </head>
-<body>${ticketsHtml}</body>
+<body>${ticketsHtml}<script>window.onload=function(){window.print();}<\/script></body>
 </html>`;
 
-  const iframe = document.getElementById('print-frame');
-  const wrapper = document.getElementById('print-frame-wrapper');
-  wrapper.style.display = 'none'; // لا نعرضه على الشاشة
-
-  const blob = new Blob([html], { type: 'text/html; charset=utf-8' });
-  const blobURL = URL.createObjectURL(blob);
-  iframe.src = blobURL;
-
-  iframe.onload = () => {
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-    setTimeout(() => {
-      URL.revokeObjectURL(blobURL);
-      iframe.src = '';
-    }, 2000);
-  };
+  const printWin = window.open('', '_blank', 'width=900,height=700');
+  if (!printWin) { showToast('⚠️ يرجى السماح بالنوافذ المنبثقة لهذا الموقع', true); return; }
+  printWin.document.open();
+  printWin.document.write(html);
+  printWin.document.close();
 };
 
 // إبقاء الاسم القديم للتوافق
