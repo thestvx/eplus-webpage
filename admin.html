@@ -2987,24 +2987,20 @@ window.generateTicket = async () => {
   currentReceipt = receipt;
   const verifyURL = `https://e-plus-center.pages.dev/verify.html?r=${receipt}`;
   const dateFormatted = dateRaw ? new Date(dateRaw).toLocaleDateString('ar-DZ',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) : '—';
-  const qrContainer = document.getElementById('qr-gen-hidden');
-  qrContainer.innerHTML = '';
-  new QRCode(qrContainer, { text: verifyURL, width: 200, height: 200, colorDark:'#000000', colorLight:'#ffffff', correctLevel: QRCode.CorrectLevel.H });
-  setTimeout(async () => {
-    const qrCanvas = qrContainer.querySelector('canvas');
-    try {
-      const fullPrice = parseFloat(document.getElementById('sc-full-price').value) || 0;
-      const paidCalc = parseFloat(document.getElementById('sc-paid-amount').value) || 0;
-      const remainingAmount = fullPrice > 0 ? Math.max(0, fullPrice - paidCalc) : 0;
-      await addDoc(collection(db,'summerTickets'), { name, pack, amount: Number(amount), fullPrice: fullPrice || Number(amount), remainingAmount, date: dateRaw, status, receipt, verifyURL, createdAt: serverTimestamp() });
-      drawTicketOnCanvas({ name, pack, amount, dateRaw, dateFormatted, status, receipt, remainingAmount }, qrCanvas, btn, verifyURL);
-    } catch(e) { showToast('خطأ في الحفظ: ' + e.message, true); btn.disabled = false; btn.textContent = '🎟️ توليد التذكرة وحفظها'; }
-  }, 400);
+  try {
+    const fullPrice = parseFloat(document.getElementById('sc-full-price').value) || 0;
+    const paidCalc = parseFloat(document.getElementById('sc-paid-amount').value) || 0;
+    const remainingAmount = fullPrice > 0 ? Math.max(0, fullPrice - paidCalc) : 0;
+    addDoc(collection(db,'summerTickets'), { name, pack, amount: Number(amount), fullPrice: fullPrice || Number(amount), remainingAmount, date: dateRaw, status, receipt, verifyURL, createdAt: serverTimestamp() })
+      .then(() => drawTicketOnCanvas({ name, pack, amount, dateRaw, dateFormatted, status, receipt, remainingAmount }, null, btn, verifyURL))
+      .catch(e => { showToast('خطأ في الحفظ: ' + e.message, true); btn.disabled = false; btn.textContent = '🎟️ توليد التذكرة وحفظها'; });
+    drawTicketOnCanvas({ name, pack, amount, dateRaw, dateFormatted, status, receipt, remainingAmount }, null, btn, verifyURL);
+  } catch(e) { showToast('خطأ: ' + e.message, true); btn.disabled = false; btn.textContent = '🎟️ توليد التذكرة وحفظها'; }
 };
 
 function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
   const canvas = document.getElementById('ticket-canvas');
-  // New ticket design: ticketeplus.png — 2480 × 1063 px @ 72 PPI (landscape)
+  // ticketeplus.png — 2480 × 1063 px @ 72 PPI (landscape)
   const W = 2480, H = 1063;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -3014,42 +3010,81 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
   img.onload = () => {
     ctx.drawImage(img, 0, 0, W, H);
 
-    // ═══════════════════════════════════════════════════════
-    // إحداثيات مضبوطة على ديزاين ticketeplus.png
-    // Canvas: 2480 × 1063 px (landscape)
+    // ══════════════════════════════════════════════════════════════════
+    // تحليل الصورة الناتجة الفعلية:
+    // الكانفاس 2480 × 1063 px
     //
-    // الحقول على الجانب الأيمن — النصوص بعد labels الموجودة في الصورة
-    //  الحقل              x     y     w     h    right   base   font
-    //  الاسم واللقب     1450   355   870    60   2310    405   bold 42px
-    //  اسم الباقة       1450   445   870    55   2310    492   bold 38px
-    //  المبلغ           1760   535   530    55   2310    582   bold 42px
-    //  المبلغ المتبقي    810   535   500    55   1290    582   bold 38px
-    //  التاريخ          1510   625   800    55   2310    668   bold 36px
-    //  رقم الوصل       1510   710   800    55   2310    752   bold 34px monospace
-    // ═══════════════════════════════════════════════════════
+    // من الناتج الحقيقي، الـ labels تظهر في هذه المواقع (y = baseline السطر):
+    //   "الاسم واللقب:"   → y ≈ 430   (label يسار النقطتين = x ≈ 2420)
+    //   "اسم الباقة:"     → y ≈ 490
+    //   "المبلغ:"         → y ≈ 565   label عند x ≈ 2070، "المبلغ المتبقي:" label عند x ≈ 1270
+    //   "التاريخ:"        → y ≈ 645
+    //   "رقم الوصل:"     → y ≈ 720
+    //
+    // القيمة تُكتب على نفس السطر (نفس y) على يسار الـ label
+    // textAlign = 'left' + x = يمين منطقة القيمة (بعد نهاية الـ label)
+    // ══════════════════════════════════════════════════════════════════
 
     const CLR = '#0D2080';
+    const FONT_LG = 'bold 38px Tajawal, Arial';
+    const FONT_MD = 'bold 34px Tajawal, Arial';
+    const FONT_SM = 'bold 30px monospace';
 
-    const val = (txt, x, y, w, h, right, base, font) => {
+    // دالة رسم القيمة: textAlign=left، من x إلى x+w، baseline = y
+    const drawVal = (txt, x, y, maxW, font, color) => {
       ctx.save();
-      ctx.beginPath();
-      ctx.rect(x, y, w, h);
-      ctx.clip();
       ctx.font = font;
-      ctx.fillStyle = CLR;
-      ctx.textAlign = 'right';
-      ctx.direction = 'rtl';
-      ctx.fillText(txt || '—', right, base);
+      ctx.fillStyle = color || CLR;
+      ctx.textAlign = 'left';
+      ctx.direction = 'ltr';
+      // قص النص إذا تجاوز العرض الأقصى
+      let t = txt || '—';
+      while (ctx.measureText(t).width > maxW && t.length > 1) t = t.slice(0, -1);
+      ctx.fillText(t, x, y);
       ctx.restore();
     };
 
-    val(data.name,                                                1450, 355, 870, 60, 2310,  405, 'bold 42px Tajawal, Arial');
-    val(data.pack,                                                1450, 445, 870, 55, 2310,  492, 'bold 38px Tajawal, Arial');
-    val(Number(data.amount||0).toLocaleString('ar-DZ')+' دج',    1760, 535, 530, 55, 2310,  582, 'bold 42px Tajawal, Arial');
-    val(data.dateFormatted || '—',                               1510, 625, 800, 55, 2310,  668, 'bold 36px Tajawal, Arial');
-    val(data.receipt || '—',                                     1510, 710, 800, 55, 2310,  752, 'bold 34px monospace');
+    // ── من الصورة الناتجة، labels تنتهي عند هذه الـ x (من اليمين):
+    //    "الاسم واللقب:"   → نهاية label ≈ x=2050 (RTL)، القيمة تبدأ من يسارها
+    //    القيمة تُكتب من اليسار باتجاه اليمين، بعد مسافة بسيطة من بداية المنطقة البيضاء
 
-    // ── المبلغ المتبقي ──
+    // نستخدم textAlign=right وندرج من طرف الـ label
+    // الأسلوب الصحيح: نكتب القيمة بـ textAlign='right' من x=labelStart-padding
+    const writeRight = (txt, rightEdge, baselineY, maxW, font, color) => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(rightEdge - maxW, baselineY - 50, maxW, 55);
+      ctx.clip();
+      ctx.font = font;
+      ctx.fillStyle = color || CLR;
+      ctx.textAlign = 'right';
+      ctx.direction = 'rtl';
+      ctx.fillText(txt || '—', rightEdge, baselineY);
+      ctx.restore();
+    };
+
+    // ── القيم تُكتب على يسار الـ labels (باتجاه اليسار في الصورة) ──
+    // من تحليل الناتج:
+    //
+    //  السطر 1 — "الاسم واللقب:" label ينتهي عند ~x=2050
+    //             القيمة تُكتب في المنطقة [1200 .. 2020] baseline=430
+    //
+    //  السطر 2 — "اسم الباقة:" label ينتهي عند ~x=2060
+    //             القيمة: [900 .. 2020] baseline=490
+    //
+    //  السطر 3 — "المبلغ:" [1680..2020] baseline=565 | "المبلغ المتبقي:" [440..1070] baseline=565
+    //
+    //  السطر 4 — "التاريخ:" [800..2020] baseline=645
+    //
+    //  السطر 5 — "رقم الوصل:" [800..2020] baseline=720
+
+    writeRight(data.name,                                                         2020, 430, 820, FONT_LG,           CLR);
+    writeRight(data.pack,                                                         2020, 490, 1120, FONT_MD,          CLR);
+    writeRight(Number(data.amount||0).toLocaleString('ar-DZ')+' دج',             2020, 565, 340, FONT_LG,           CLR);
+    writeRight(data.dateFormatted || '—',                                         2020, 645, 1220, FONT_MD,          CLR);
+    writeRight(data.receipt || '—',                                               2020, 720, 1220, FONT_SM,          CLR);
+
+    // ── المبلغ المتبقي — على نفس سطر المبلغ، في منطقة "المبلغ المتبقي:" ──
     const remainingAmtDraw = data.remainingAmount !== undefined
       ? data.remainingAmount
       : (() => {
@@ -3058,30 +3093,9 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
           return full > 0 ? Math.max(0, full - paid) : 0;
         })();
 
-    const remainingTxt = remainingAmtDraw > 0
-      ? Number(remainingAmtDraw).toLocaleString('ar-DZ') + ' دج'
-      : '0 دج';
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(810, 535, 500, 55);
-    ctx.clip();
-    ctx.font = 'bold 38px Tajawal, Arial';
-    ctx.fillStyle = remainingAmtDraw > 0 ? '#DC2626' : CLR;
-    ctx.textAlign = 'right';
-    ctx.direction = 'rtl';
-    ctx.fillText(remainingTxt, 1290, 582);
-    ctx.restore();
-
-    // ── QR code — جانب أيسر من الصورة ──
-    if (qrCanvas) {
-      const qrX = 60, qrY = 390, qrSize = 280;
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.roundRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8, 8);
-      ctx.fill();
-      ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
-    }
+    const remainingTxt = Number(remainingAmtDraw).toLocaleString('ar-DZ') + ' دج';
+    const remColor = remainingAmtDraw > 0 ? '#DC2626' : CLR;
+    writeRight(remainingTxt, 1070, 565, 360, FONT_MD, remColor);
 
     document.getElementById('ticket-empty').style.display = 'none';
     document.getElementById('ticket-canvas-wrap').style.display = 'block';
@@ -3098,7 +3112,6 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
     ctx.fillText('images/ticketeplus.png', W-60, 140);
     ctx.fillStyle = '#A78BFA'; ctx.font = 'bold 50px Arial';
     ctx.fillText(data.name, W-60, 240);
-    if (qrCanvas) ctx.drawImage(qrCanvas, 60, 200, 280, 280);
     document.getElementById('ticket-empty').style.display = 'none';
     document.getElementById('ticket-canvas-wrap').style.display = 'block';
     if (btn) { btn.disabled = false; btn.textContent = '🎟️ توليد التذكرة وحفظها'; }
@@ -3158,6 +3171,9 @@ window.executePrint = () => {
   const dataURL = canvas.toDataURL('image/png');
   const isDouble = _printMode === 'double';
 
+  // التذكرة عرضها أكبر من ارتفاعها (2480×1063) → نطبع على A4 landscape
+  // تذكرة واحدة: أعلى الصفحة مع هامش بسيط
+  // تذكرتان: الأولى في الأعلى، الثانية تحتها مباشرة
   const ticketsHtml = isDouble
     ? `<img class="ticket" src="${dataURL}"><img class="ticket" src="${dataURL}">`
     : `<img class="ticket" src="${dataURL}">`;
@@ -3168,24 +3184,24 @@ window.executePrint = () => {
 <meta charset="UTF-8">
 <title>طباعة التذكرة</title>
 <style>
-  @page { size: A4 portrait; margin: 0; }
+  @page { size: A4 landscape; margin: 0; }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 210mm; min-height: 297mm; background: #fff; }
+  html, body { width: 297mm; height: 210mm; background: #fff; overflow: hidden; }
   body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: ${isDouble ? '8mm' : '10mm'};
-    gap: 6mm;
+    justify-content: flex-start;
+    padding-top: ${isDouble ? '4mm' : '6mm'};
+    gap: ${isDouble ? '4mm' : '0'};
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
   img.ticket {
     display: block;
-    width: 190mm;
+    width: 285mm;
     height: auto;
-    max-height: ${isDouble ? '130mm' : '270mm'};
+    max-height: ${isDouble ? '96mm' : '196mm'};
     object-fit: contain;
   }
 </style>
@@ -3193,7 +3209,7 @@ window.executePrint = () => {
 <body>${ticketsHtml}<script>window.onload=function(){window.print();}<\/script></body>
 </html>`;
 
-  const printWin = window.open('', '_blank', 'width=900,height=700');
+  const printWin = window.open('', '_blank', 'width=1000,height=700');
   if (!printWin) { showToast('⚠️ يرجى السماح بالنوافذ المنبثقة لهذا الموقع', true); return; }
   printWin.document.open();
   printWin.document.write(html);
@@ -3636,13 +3652,11 @@ window.previewFromDB = async (id) => {
     document.getElementById('sc-pack').value   = x.pack   || '';
     document.getElementById('sc-amount').value = x.amount || '';
     document.getElementById('sc-date').value   = x.date   || '';
-    // تحميل بيانات الحاسبة إن وجدت
     if (x.fullPrice) document.getElementById('sc-full-price').value = x.fullPrice;
     if (x.remainingAmount !== undefined) {
       document.getElementById('sc-paid-amount').value = x.amount || '';
       calcRemaining();
     }
-    // Show pack info in program UI
     if (x.pack) {
       document.getElementById('program-group').style.display = 'none';
       document.getElementById('category-group').style.display = 'block';
@@ -3651,15 +3665,9 @@ window.previewFromDB = async (id) => {
     currentReceipt = x.receipt;
     const btn = document.getElementById('sc-gen-btn');
     btn.disabled = true; btn.textContent = '⏳ جاري عرض التذكرة...';
-    const qrContainer = document.getElementById('qr-gen-hidden');
-    qrContainer.innerHTML = '';
-    new QRCode(qrContainer, { text: x.verifyURL || `https://e-plus-center.pages.dev/verify.html?r=${x.receipt}`, width: 200, height: 200, colorDark:'#000000', colorLight:'#ffffff', correctLevel: QRCode.CorrectLevel.H });
-    setTimeout(() => {
-      const qrCanvas = qrContainer.querySelector('canvas');
-      const dateFormatted = x.date ? new Date(x.date).toLocaleDateString('ar-DZ',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) : '—';
-      drawTicketOnCanvas({ name: x.name, pack: x.pack, amount: x.amount, dateRaw: x.date, dateFormatted, status: x.status, receipt: x.receipt, remainingAmount: x.remainingAmount }, qrCanvas, btn, x.verifyURL);
-      document.getElementById('ticket-canvas').scrollIntoView({ behavior:'smooth', block:'start' });
-    }, 400);
+    const dateFormatted = x.date ? new Date(x.date).toLocaleDateString('ar-DZ',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) : '—';
+    drawTicketOnCanvas({ name: x.name, pack: x.pack, amount: x.amount, dateRaw: x.date, dateFormatted, status: x.status, receipt: x.receipt, remainingAmount: x.remainingAmount }, null, btn, x.verifyURL);
+    document.getElementById('ticket-canvas').scrollIntoView({ behavior:'smooth', block:'start' });
   } catch(e) { showToast('خطأ في عرض التذكرة: ' + e.message, true); }
 };
 
