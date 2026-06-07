@@ -4967,11 +4967,30 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
 
   const arabicDayNames = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
   const todayArabic = arabicDayNames[new Date().getDay()];
+  const nowMs = Date.now();
 
   // الأيام المسموح بها لهذا الفوج
   const allowedDays = groupData && groupData.days && groupData.days.length ? groupData.days : (teacherData.days || []);
 
-  // تحديد الحصة الحالية
+  // ─── دالة مساعدة: هل الحصة في نافذة التسجيل المفتوحة؟
+  // الحصة تنفتح عند بداية يوم تدريسها (00:00) وتنقفل بعد 24 ساعة منه
+  const isSessionOpen = (sessionDay) => {
+    if (!allowedDays.includes(sessionDay)) return false;
+    // نبحث عن آخر يوم مضى أو اليوم الحالي يطابق sessionDay
+    const dayIdx = arabicDayNames.indexOf(sessionDay);
+    if (dayIdx === -1) return false;
+    const now = new Date();
+    const todayIdx = now.getDay(); // 0=أحد
+    // كم يوم مضى منذ آخر مرة كان فيها هذا اليوم
+    let daysAgo = (todayIdx - dayIdx + 7) % 7; // 0 = اليوم نفسه
+    const lastOccurrence = new Date(now);
+    lastOccurrence.setDate(now.getDate() - daysAgo);
+    lastOccurrence.setHours(0, 0, 0, 0); // بداية ذلك اليوم
+    const windowEnd = lastOccurrence.getTime() + 24 * 60 * 60 * 1000; // + 24 ساعة
+    return nowMs >= lastOccurrence.getTime() && nowMs < windowEnd;
+  };
+
+  // تحديد الحصة الحالية (أول حصة غير مسجّلة)
   let currentSession = 13;
   for (let i = 1; i <= 12; i++) {
     if (!recordedSessions[i]) { currentSession = i; break; }
@@ -4988,28 +5007,26 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
     const chipEl  = document.getElementById(`session-chip-g${gi}-${i}`);
     if (!card) continue;
 
-    const isRecorded = !!recordedSessions[i];
-    const isCurrent  = i === currentSession;
-    const isMissed   = !isRecorded && !isCurrent && i < currentSession;
-    const sessionDay = sessions[i - 1]?.day || '';
+    const isRecorded  = !!recordedSessions[i];
+    const isCurrent   = i === currentSession;
+    const sessionDay  = sessions[i - 1]?.day || '';
 
-    // ── قفل الحصة إذا يومها ليس من أيام هذا الفوج ──
-    const isDayAllowed = allowedDays.includes(sessionDay);
-    // الحصة تنفتح إذا: هي الحصة الحالية + (اليوم الحالي ضمن أيام الفوج/الأستاذ)
-    // نقبل أي يوم تدريس وليس فقط اليوم المعين لهذه الحصة بالذات
-    const isTodayAndAllowed = isCurrent && allowedDays.includes(todayArabic);
+    // ── هل نافذة تسجيل هذه الحصة مفتوحة الآن؟ (يوم الحصة + 24 ساعة)
+    const sessionIsOpen = isCurrent && isSessionOpen(sessionDay);
+
+    // ── الحصة "فائتة": كانت مفتوحة لكن لم تُسجّل وانتهت نافذتها
+    const isMissed = !isRecorded && !isCurrent && i < currentSession;
 
     card.classList.remove('locked', 'current', 'done', 'missed');
 
     if (isRecorded) {
-      // الأدمين: يعدّل دائماً | الأستاذ: يعدّل فقط خلال 24 ساعة من التسجيل
+      // الأدمين: يعدّل دائماً | الأستاذ: يعدّل خلال 24 ساعة من التسجيل
       let teacherCanEdit = false;
       if (isTeacherMode) {
         const rec = recordedSessions[i];
         const savedTs = rec?.savedAt?.toDate ? rec.savedAt.toDate() : (rec?.date ? new Date(rec.date + 'T00:00:00') : null);
         if (savedTs) {
-          const hoursSince = (Date.now() - savedTs.getTime()) / (1000 * 60 * 60);
-          teacherCanEdit = hoursSince < 24;
+          teacherCanEdit = (nowMs - savedTs.getTime()) / (1000 * 60 * 60) < 24;
         }
       }
       if (isTeacherMode && teacherCanEdit) {
@@ -5021,7 +5038,7 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
       }
     } else if (isMissed) {
       card.setAttribute('onclick', `viewSessionHistory_g(${i}, ${gi})`);
-    } else if (isTodayAndAllowed) {
+    } else if (sessionIsOpen) {
       card.setAttribute('onclick', `openSession_g(${i}, ${gi})`);
     } else {
       card.setAttribute('onclick', '');
@@ -5059,17 +5076,37 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
       dotsEl.innerHTML = students.length
         ? students.map(s => `<span class="sdot" style="opacity:0.4" title="${s.name}"></span>`).join('')
         : `<span class="sdot" style="opacity:0.4"></span>`;
-    } else if (isTodayAndAllowed) {
+    } else if (sessionIsOpen) {
       card.classList.add('current');
-      const todayStr = new Date().toLocaleDateString('ar-DZ', {day:'numeric', month:'short'});
-      chipEl.innerHTML = `<span class="session-status-chip current-chip">▶ الحصة الحالية</span><div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">${todayStr}</div>`;
+      // احسب الوقت المتبقي قبل قفل الحصة
+      const dayIdx2 = arabicDayNames.indexOf(sessionDay);
+      const now2 = new Date();
+      const daysAgo2 = (now2.getDay() - dayIdx2 + 7) % 7;
+      const openedAt2 = new Date(now2); openedAt2.setDate(now2.getDate() - daysAgo2); openedAt2.setHours(0,0,0,0);
+      const minsLeft2 = Math.max(0, Math.round((openedAt2.getTime() + 24*3600*1000 - nowMs) / 60000));
+      const timeHint2 = minsLeft2 > 60
+        ? `${Math.ceil(minsLeft2/60)}س متبقية`
+        : `${minsLeft2} دقيقة`;
+      const todayStr = now2.toLocaleDateString('ar-DZ', {day:'numeric', month:'short'});
+      chipEl.innerHTML = `<span class="session-status-chip current-chip">▶ الحصة الحالية</span><div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">${todayStr} — ⏳ ${timeHint2}</div>`;
       dotsEl.innerHTML = students.length
         ? students.map((s,idx) => `<span class="sdot ${idx===0?'current-dot':''}" title="${s.name}"></span>`).join('')
         : `<span class="sdot current-dot"></span>`;
     } else {
       card.classList.add('locked');
-      // الحصة مقفلة — نعرض يومها حتى يعرف الأستاذ متى تنفتح
-      chipEl.innerHTML = `<span class="session-status-chip locked-chip" style="font-size:9px">📅 ${sessionDay}</span>`;
+      // الحصة مقفلة — نحسب متى تنفتح (اليوم القادم الذي يطابق sessionDay)
+      if (isCurrent && sessionDay) {
+        const dayIdx3 = arabicDayNames.indexOf(sessionDay);
+        const now3 = new Date();
+        const todayIdx3 = now3.getDay();
+        let daysUntil3 = (dayIdx3 - todayIdx3 + 7) % 7;
+        if (daysUntil3 === 0) daysUntil3 = 7; // اليوم نفسه لكن فات الوقت → الأسبوع القادم
+        const opensOn3 = new Date(now3); opensOn3.setDate(now3.getDate() + daysUntil3);
+        const opensStr3 = opensOn3.toLocaleDateString('ar-DZ', {weekday:'long', day:'numeric', month:'short'});
+        chipEl.innerHTML = `<span class="session-status-chip locked-chip" style="font-size:9px">🔒 ${sessionDay}</span><div style="font-size:9px;color:#888;font-weight:700;margin-top:3px">تنفتح ${opensStr3}</div>`;
+      } else {
+        chipEl.innerHTML = `<span class="session-status-chip locked-chip" style="font-size:9px">📅 ${sessionDay}</span>`;
+      }
       dotsEl.innerHTML = students.length
         ? students.map(s => `<span class="sdot" title="${s.name}"></span>`).join('')
         : `<span class="sdot"></span>`;
