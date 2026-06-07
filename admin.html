@@ -5002,8 +5002,23 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
     card.classList.remove('locked', 'current', 'done', 'missed');
 
     if (isRecorded) {
-      // الأدمين يقدر يعدّل أي حصة مسجّلة — الأستاذ يشوف فقط
-      card.setAttribute('onclick', isTeacherMode ? `viewSessionHistory_g(${i}, ${gi})` : `editSession_g(${i}, ${gi})`);
+      // الأدمين: يعدّل دائماً | الأستاذ: يعدّل فقط خلال 24 ساعة من التسجيل
+      let teacherCanEdit = false;
+      if (isTeacherMode) {
+        const rec = recordedSessions[i];
+        const savedTs = rec?.savedAt?.toDate ? rec.savedAt.toDate() : (rec?.date ? new Date(rec.date + 'T00:00:00') : null);
+        if (savedTs) {
+          const hoursSince = (Date.now() - savedTs.getTime()) / (1000 * 60 * 60);
+          teacherCanEdit = hoursSince < 24;
+        }
+      }
+      if (isTeacherMode && teacherCanEdit) {
+        card.setAttribute('onclick', `editSession_g(${i}, ${gi})`);
+      } else if (isTeacherMode) {
+        card.setAttribute('onclick', `viewSessionHistory_g(${i}, ${gi})`);
+      } else {
+        card.setAttribute('onclick', `editSession_g(${i}, ${gi})`);
+      }
     } else if (isMissed) {
       card.setAttribute('onclick', `viewSessionHistory_g(${i}, ${gi})`);
     } else if (isTodayAndAllowed) {
@@ -5017,7 +5032,22 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
       const recDate = recordedSessions[i].savedAt?.toDate
         ? recordedSessions[i].savedAt.toDate().toLocaleDateString('ar-DZ', {day:'numeric', month:'short'})
         : (recordedSessions[i].date || '');
-      const editHint = !isTeacherMode ? `<div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">✏️ اضغط للتعديل</div>` : '';
+      let editHint = '';
+      if (!isTeacherMode) {
+        editHint = `<div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">✏️ اضغط للتعديل</div>`;
+      } else {
+        const rec2 = recordedSessions[i];
+        const savedTs2 = rec2?.savedAt?.toDate ? rec2.savedAt.toDate() : (rec2?.date ? new Date(rec2.date + 'T00:00:00') : null);
+        if (savedTs2) {
+          const hrs = (Date.now() - savedTs2.getTime()) / (1000 * 60 * 60);
+          if (hrs < 24) {
+            const hrsLeft = Math.max(0, Math.ceil(24 - hrs));
+            editHint = `<div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">✏️ تعديل (${hrsLeft}س متبقية)</div>`;
+          } else {
+            editHint = `<div style="font-size:9px;color:var(--text-muted);font-weight:700;margin-top:3px">🔒 انتهت مدة التعديل</div>`;
+          }
+        }
+      }
       chipEl.innerHTML = `<span class="session-status-chip done-chip">✅ مسجّلة</span>${recDate ? `<div style="font-size:9px;color:#059669;font-weight:700;margin-top:3px">${recDate}</div>` : ''}${editHint}`;
       const recStudents = recordedSessions[i].students || [];
       dotsEl.innerHTML = recStudents.length
@@ -5322,6 +5352,20 @@ window.editSession_g = async (sessionNum, gi) => {
     return;
   }
 
+  // ✅ تحقق من نافذة 24 ساعة للأستاذ فقط
+  if (isTeacherMode) {
+    const recData  = docSnap.data();
+    const savedTs  = recData?.savedAt?.toDate ? recData.savedAt.toDate()
+                   : (recData?.date ? new Date(recData.date + 'T00:00:00') : null);
+    if (savedTs) {
+      const hoursSince = (Date.now() - savedTs.getTime()) / (1000 * 60 * 60);
+      if (hoursSince >= 24) {
+        showToast('🔒 انتهت مدة التعديل — يمكن التعديل خلال 24 ساعة فقط من تسجيل الحضور', true);
+        return;
+      }
+    }
+  }
+
   // تحميل قائمة التلاميذ إلى currentAttStudents
   currentAttStudents = savedStudents.map(s => ({ ...s, marked: true })); window.currentAttStudents = currentAttStudents;
   currentOpenSession = sessionNum;
@@ -5360,7 +5404,7 @@ window.editSession_g = async (sessionNum, gi) => {
       <div style="font-size:22px">✏️</div>
       <div style="flex:1">
         <div style="font-size:16px;font-weight:900;color:var(--text)">تعديل حضور الحصة ${sessionNum} من 12 ${groupName?`— ${groupName}`:''}</div>
-        <div style="font-size:12px;color:#d97706;font-weight:700;margin-top:2px">⚠️ أنت تعدّل حصة مسجّلة مسبقاً</div>
+        <div id="edit-session-time-hint" style="font-size:12px;color:#d97706;font-weight:700;margin-top:2px">⚠️ أنت تعدّل حصة مسجّلة مسبقاً</div>
       </div>
       <button onclick="closeSessionModal()" style="padding:8px 16px;border-radius:12px;border:1px solid var(--border-2);background:var(--card);color:var(--text-muted);font-size:13px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">✕</button>
     </div>
@@ -5391,12 +5435,46 @@ window.editSession_g = async (sessionNum, gi) => {
 
   openSessionModal(window._buildSessionModalHtml());
   updateAttSummary(currentAttStudents);
+
+  // ✅ تحديث hint الوقت المتبقي للتعديل
+  if (isTeacherMode) {
+    const recData2 = docSnap.data();
+    const ts2 = recData2?.savedAt?.toDate ? recData2.savedAt.toDate()
+              : (recData2?.date ? new Date(recData2.date + 'T00:00:00') : null);
+    const hintEl = document.getElementById('edit-session-time-hint');
+    if (hintEl && ts2) {
+      const hrsLeft = Math.max(0, 24 - (Date.now() - ts2.getTime()) / (1000 * 60 * 60));
+      const minsLeft = Math.ceil(hrsLeft * 60);
+      if (minsLeft > 60) {
+        hintEl.textContent = `✏️ يمكنك التعديل — متبقي ${Math.ceil(hrsLeft)} ساعة`;
+        hintEl.style.color = '#059669';
+      } else {
+        hintEl.textContent = `⚠️ تنتهي مدة التعديل خلال ${minsLeft} دقيقة`;
+        hintEl.style.color = '#d97706';
+      }
+    }
+  }
 };
 
 // ─── حفظ تعديلات حصة مسجّلة ───
 window.saveEditedSession_g = async (sessionNum, gi) => {
   const docRef = window._editingDocRef;
   if (!docRef) { showToast('خطأ: لم يُحدد سجل للتعديل', true); return; }
+
+  // ✅ تحقق أخير من نافذة 24 ساعة قبل الحفظ (حماية إضافية للأستاذ)
+  if (isTeacherMode) {
+    const snap24 = await getDoc(docRef);
+    if (snap24.exists()) {
+      const d = snap24.data();
+      const ts = d?.savedAt?.toDate ? d.savedAt.toDate() : (d?.date ? new Date(d.date + 'T00:00:00') : null);
+      if (ts && (Date.now() - ts.getTime()) / (1000 * 60 * 60) >= 24) {
+        showToast('🔒 انتهت مدة التعديل — لا يمكن الحفظ بعد 24 ساعة', true);
+        closeSessionModal();
+        return;
+      }
+    }
+  }
+
   try {
     const savedStudents = currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
     await setDoc(docRef, {
