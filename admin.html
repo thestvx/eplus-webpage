@@ -5201,6 +5201,7 @@ window.editSession_g = async (sessionNum, gi) => {
   currentAttStudents = savedStudents.map(s => ({ ...s, marked: true })); window.currentAttStudents = currentAttStudents;
   currentOpenSession = sessionNum;
   window._currentGroupIdx = gi;
+  window._activeAttGroupIdx = gi; // ✅ إصلاح: مزامنة _activeAttGroupIdx لدالة addStudent
   window._editingDocRef    = docRef;
 
   const teacherGroups = window.currentTeacherData?.groups || [];
@@ -5228,7 +5229,8 @@ window.editSession_g = async (sessionNum, gi) => {
       }).join('')
     : `<div style="text-align:center;padding:30px;color:var(--text-muted)">لا يوجد تلاميذ في هذه الحصة</div>`;
 
-  openSessionModal(`
+  // ✅ إصلاح: تعريف _buildSessionModalHtml حتى تعمل addStudent بشكل صحيح داخل modal التعديل
+  window._buildSessionModalHtml = () => `
     <div class="session-att-header" style="border-radius:24px 24px 0 0;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(124,58,237,0.06))">
       <div style="font-size:22px">✏️</div>
       <div style="flex:1">
@@ -5260,7 +5262,9 @@ window.editSession_g = async (sessionNum, gi) => {
         <div id="selected-student-info" style="display:none;background:linear-gradient(135deg,var(--primary-light),rgba(16,185,129,0.06));border:1px solid var(--border-2);border-radius:12px;padding:10px 14px;font-size:12px;font-weight:700;color:var(--text-2)"></div>
       </div>
       <button class="btn-primary" id="save-att-btn" onclick="saveEditedSession_g(${sessionNum}, ${gi})" style="margin-top:14px;background:linear-gradient(135deg,#d97706,#b45309)">💾 حفظ التعديلات على الحصة ${sessionNum}</button>
-    </div>`);
+    </div>`;
+
+  openSessionModal(window._buildSessionModalHtml());
   updateAttSummary(currentAttStudents);
 };
 
