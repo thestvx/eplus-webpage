@@ -5273,16 +5273,28 @@ window.saveEditedSession_g = async (sessionNum, gi) => {
   const docRef = window._editingDocRef;
   if (!docRef) { showToast('خطأ: لم يُحدد سجل للتعديل', true); return; }
   try {
+    const savedStudents = currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
     await setDoc(docRef, {
       teacherId: currentAttTeacherId + `_g${gi}`,
       sessionNum,
-      students: currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present })),
+      students: savedStudents,
       editedAt: serverTimestamp(),
       editedByAdmin: true
     }, { merge: true });
-    const present = currentAttStudents.filter(s => s.present).length;
+
+    // ✅ إصلاح: تحديث _allRecordedSessionsByGroup في الذاكرة حتى يعكس ملخص الشهر التعديلات فوراً
+    if (!_allRecordedSessionsByGroup[gi]) _allRecordedSessionsByGroup[gi] = {};
+    _allRecordedSessionsByGroup[gi][sessionNum] = {
+      ...((_allRecordedSessionsByGroup[gi][sessionNum]) || {}),
+      students: savedStudents,
+      sessionNum,
+      editedByAdmin: true
+    };
+    if (gi === 0) _allRecordedSessions[sessionNum] = _allRecordedSessionsByGroup[gi][sessionNum];
+
+    const present = savedStudents.filter(s => s.present).length;
     const groupName = (window.currentTeacherData?.groups||[])[gi]?.name || '';
-    await addLog('✏️ تعديل حضور', `الحصة ${sessionNum}${groupName?' — '+groupName:''} — ${present}/${currentAttStudents.length} حاضر`, '🔧');
+    await addLog('✏️ تعديل حضور', `الحصة ${sessionNum}${groupName?' — '+groupName:''} — ${present}/${savedStudents.length} حاضر`, '🔧');
     showToast('✅ تم حفظ التعديلات');
     closeSessionModal();
   } catch(e) { showToast('خطأ: ' + e.message, true); }
