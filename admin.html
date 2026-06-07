@@ -4181,7 +4181,16 @@ function updateAttSummary(students) {
 
 window.filterStudents = () => {
   const val = document.getElementById('att-search').value;
-  renderAttStudents(currentAttStudents, val);
+  // ✅ إصلاح: نُصفّي من الفوج النشط فقط وليس من كل التلاميذ
+  const activeGidx = window._activeAttGroupIdx;
+  const activeGroups = window._activeAttGroups || [];
+  if (activeGidx !== 'all' && activeGidx !== undefined && activeGroups[activeGidx]) {
+    const groupNames = new Set((activeGroups[activeGidx].students || []).map(s => s.trim().toLowerCase()));
+    const groupStudents = currentAttStudents.filter(s => groupNames.has(s.name.trim().toLowerCase()));
+    renderAttStudents(groupStudents, val);
+  } else {
+    renderAttStudents(currentAttStudents, val);
+  }
 };
 
 // ─── إعادة رسم قائمة الحضور عند تحديث التذاكر ───
@@ -4531,7 +4540,14 @@ window.saveAttendance = async () => {
   const tid      = currentAttTeacherId;
   const gi       = typeof window._activeAttGroupIdx === 'number' ? window._activeAttGroupIdx : 0;
   const todayKey = new Date().toISOString().slice(0,10);
-  const students = currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
+  // ✅ إصلاح: حفظ تلاميذ الفوج المحدد فقط (وليس كل التلاميذ)
+  let studentsToSave = currentAttStudents;
+  const activeGroup = (window._activeAttGroups || [])[gi];
+  if (activeGroup && activeGroup.students && activeGroup.students.length > 0) {
+    const groupNames = new Set(activeGroup.students.map(s => s.trim().toLowerCase()));
+    studentsToSave = currentAttStudents.filter(s => groupNames.has(s.name.trim().toLowerCase()));
+  }
+  const students = studentsToSave.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
   const existingSessions = _allRecordedSessionsByGroup[gi] || {};
   let sessionNum = 1;
   for (let i = 1; i <= 12; i++) { if (!existingSessions[i]) { sessionNum = i; break; } }
@@ -4564,6 +4580,8 @@ async function loadTeacherStudentsView(uid, teacherData) {
     const t = snap.data();
     currentTeacherData = { uid, id: uid, ...t };
     window.currentTeacherData = currentTeacherData;
+    // ✅ إصلاح: حفظ رقم الفوج النشط قبل إعادة البناء
+    const _savedGroupIdx = window._currentGroupIdx || 0;
     currentAttStudents = t.students ? [...t.students] : []; window.currentAttStudents = currentAttStudents;
 
     // تحديث إحصائيات الهيدر — مع تحقق آمن من وجود العنصر
@@ -4581,6 +4599,12 @@ async function loadTeacherStudentsView(uid, teacherData) {
 
     // عرض قائمة حضور الأستاذ مباشرة في الصفحة (وليس في modal)
     showTeacherInlineAttendance(uid, t);
+    // ✅ إصلاح: استعادة الفوج النشط بعد إعادة البناء
+    setTimeout(() => {
+      if (_savedGroupIdx > 0 && window.switchGroupTab) {
+        window.switchGroupTab(_savedGroupIdx);
+      }
+    }, 100);
   });
 }
 
@@ -4818,8 +4842,9 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
 
     // ── قفل الحصة إذا يومها ليس من أيام هذا الفوج ──
     const isDayAllowed = allowedDays.includes(sessionDay);
-    // الحصة تنفتح فقط إذا: هي الحصة الحالية + اليوم الحالي = يوم هذه الحصة في الجدول
-    const isTodayAndAllowed = isCurrent && sessionDay === todayArabic;
+    // الحصة تنفتح إذا: هي الحصة الحالية + (اليوم الحالي ضمن أيام الفوج/الأستاذ)
+    // نقبل أي يوم تدريس وليس فقط اليوم المعين لهذه الحصة بالذات
+    const isTodayAndAllowed = isCurrent && allowedDays.includes(todayArabic);
 
     card.classList.remove('locked', 'current', 'done', 'missed');
 
@@ -4921,6 +4946,8 @@ window.viewSessionHistory = (sessionNum) => {
 window.openSession_g = (sessionNum, gi) => {
   currentOpenSession = sessionNum;
   window._currentGroupIdx = gi;
+  // ✅ إصلاح: مزامنة _activeAttGroupIdx مع gi حتى تعمل addStudent بشكل صحيح
+  window._activeAttGroupIdx = gi;
   // ── ضمان أن currentAttTeacherId محدد دائماً (مهم لدالة addStudent) ──
   if (!currentAttTeacherId && window.currentTeacherData?.uid) {
     currentAttTeacherId = window.currentTeacherData.uid; window.currentAttTeacherId = currentAttTeacherId;
@@ -4928,7 +4955,14 @@ window.openSession_g = (sessionNum, gi) => {
 
   // ── دالة بناء HTML للـ modal — محفوظة على window لإعادة الاستخدام بعد إضافة تلميذ ──
   window._buildSessionModalHtml = () => {
-    const students = currentAttStudents;
+    // ✅ إصلاح: عرض تلاميذ الفوج المحدد فقط (وليس كل تلاميذ الأستاذ)
+    const teacherGroups = window.currentTeacherData?.groups || [];
+    const groupData = teacherGroups[gi];
+    let students = currentAttStudents;
+    if (groupData && groupData.students && groupData.students.length > 0) {
+      const groupNames = new Set(groupData.students.map(s => s.trim().toLowerCase()));
+      students = currentAttStudents.filter(s => groupNames.has(s.name.trim().toLowerCase()));
+    }
     const studentsHtml = students.length
       ? students.map(s => {
           const { ps, rc } = getLivePayStatus(s);
@@ -4954,8 +4988,7 @@ window.openSession_g = (sessionNum, gi) => {
         }).join('')
       : `<div style="text-align:center;padding:30px;color:var(--text-muted)">لا يوجد تلاميذ — أضف تلاميذ أولاً</div>`;
 
-    const teacherGroups = window.currentTeacherData?.groups || [];
-    const groupName = teacherGroups[gi]?.name || '';
+    const groupName = groupData?.name || '';
 
     return `
       <div class="session-att-header" style="border-radius:24px 24px 0 0;border-bottom:1px solid var(--border)">
@@ -4993,7 +5026,16 @@ window.openSession_g = (sessionNum, gi) => {
   };
 
   openSessionModal(window._buildSessionModalHtml());
-  updateAttSummary(currentAttStudents);
+  // ✅ إصلاح: حساب ملخص الحضور على تلاميذ الفوج فقط
+  const _grps = window.currentTeacherData?.groups || [];
+  const _gData = _grps[gi];
+  if (_gData && _gData.students && _gData.students.length > 0) {
+    const _gNames = new Set(_gData.students.map(s => s.trim().toLowerCase()));
+    const _gStudents = currentAttStudents.filter(s => _gNames.has(s.name.trim().toLowerCase()));
+    updateAttSummary(_gStudents);
+  } else {
+    updateAttSummary(currentAttStudents);
+  }
 };
 
 // ─── فتح حصة للأدمين (دالة توافقية) ───
@@ -5271,9 +5313,11 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
   }
   const groupSuffix = `_g${gi}`;
   const sessionKey  = `${currentAttTeacherId}${groupSuffix}_session_${sessionNum}`;
+  const todayDateKey = new Date().toISOString().slice(0, 10); // ✅ إصلاح: حفظ التاريخ دائماً
   const record = {
     teacherId: currentAttTeacherId + groupSuffix,
     sessionNum,
+    date: todayDateKey,
     savedAt: serverTimestamp(),
     students: currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }))
   };
