@@ -3178,11 +3178,17 @@ window.executePrint = () => {
 <body>${ticketsHtml}<script>window.onload=function(){window.print();}<\/script></body>
 </html>`;
 
-  const printWin = window.open('', '_blank', 'width=1000,height=700');
-  if (!printWin) { showToast('⚠️ يرجى السماح بالنوافذ المنبثقة لهذا الموقع', true); return; }
-  printWin.document.open();
-  printWin.document.write(html);
-  printWin.document.close();
+  const frame = document.getElementById('print-frame');
+  const wrapper = document.getElementById('print-frame-wrapper');
+  frame.style.width = '0'; frame.style.height = '0';
+  frame.style.position = 'absolute';
+  const doc = frame.contentDocument || frame.contentWindow.document;
+  doc.open(); doc.write(html); doc.close();
+  frame.contentWindow.focus();
+  // إعطاء وقت للصورة لتحمّل داخل الـ iframe ثم الطباعة
+  setTimeout(() => {
+    frame.contentWindow.print();
+  }, 600);
 };
 
 // إبقاء الاسم القديم للتوافق
