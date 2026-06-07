@@ -1567,15 +1567,6 @@
               <label class="form-label">تاريخ الدفع</label>
               <input class="inp" type="date" id="sc-date" value="2026-06-03">
             </div>
-            <div class="form-group">
-              <label class="form-label">حالة الدفع</label>
-              <div class="inp-wrap" style="margin-bottom:0">
-                <select class="inp" id="sc-status">
-                  <option value="pending" selected>⏳ قيد المراجعة</option>
-                  <option value="paid">✅ مفعّلة</option>
-                </select>
-              </div>
-            </div>
             <button class="btn-primary btn-summer" id="sc-gen-btn" onclick="generateTicket()">🎟️ توليد التذكرة وحفظها</button>
           </div>
 
@@ -2988,7 +2979,7 @@ window.generateTicket = async () => {
   const pack = document.getElementById('sc-pack').value;
   const amount = document.getElementById('sc-amount').value;
   const dateRaw = document.getElementById('sc-date').value;
-  const status = document.getElementById('sc-status').value;
+  const status = 'paid'; // التذاكر تُصدر مفعّلة دائماً
   if (!name || !pack || !amount) { showToast('يرجى ملء الحقول الإلزامية', true); return; }
   const btn = document.getElementById('sc-gen-btn');
   btn.disabled = true; btn.textContent = '⏳ جاري التوليد...';
@@ -3013,29 +3004,28 @@ window.generateTicket = async () => {
 
 function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
   const canvas = document.getElementById('ticket-canvas');
-  // New ticket design: 5.5 × 5 inch @ 288 DPI = 1584 × 1440 px (portrait)
-  const W = 1584, H = 1440;
+  // New ticket design: ticketeplus.png — 2480 × 1063 px @ 72 PPI (landscape)
+  const W = 2480, H = 1063;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
 
   const img = new Image();
-  img.src = 'images/new-ticket.png';
+  img.src = 'images/ticketeplus.png';
   img.onload = () => {
     ctx.drawImage(img, 0, 0, W, H);
 
     // ═══════════════════════════════════════════════════════
-    // ═══════════════════════════════════════════════════════
-    // إحداثيات نهائية — مقاسة من overlay screenshot بدقة
-    // Canvas: 1584 × 1440 px
+    // إحداثيات مضبوطة على ديزاين ticketeplus.png
+    // Canvas: 2480 × 1063 px (landscape)
     //
-    //  الحقل             x     y     w    h   right  base  font
-    //  الإسم واللقب    1286   397   203   40  1489   430   32px
-    //  اسم الباقة      1133   580   383   41  1516   614   30px
-    //  المبلغ           1346   761   165   49  1511   803   38px
-    //  المبلغ المتبقي    494   761   225   46   719   800   34px
-    //  التاريخ          1293   951   218   39  1511   983   30px
-    //  رقم الوصل       1293  1131   218   44  1511  1168   28px mono
-    //  QR               120  1180   280  280
+    // الحقول على الجانب الأيمن — النصوص بعد labels الموجودة في الصورة
+    //  الحقل              x     y     w     h    right   base   font
+    //  الاسم واللقب     1450   355   870    60   2310    405   bold 42px
+    //  اسم الباقة       1450   445   870    55   2310    492   bold 38px
+    //  المبلغ           1760   535   530    55   2310    582   bold 42px
+    //  المبلغ المتبقي    810   535   500    55   1290    582   bold 38px
+    //  التاريخ          1510   625   800    55   2310    668   bold 36px
+    //  رقم الوصل       1510   710   800    55   2310    752   bold 34px monospace
     // ═══════════════════════════════════════════════════════
 
     const CLR = '#0D2080';
@@ -3053,13 +3043,13 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
       ctx.restore();
     };
 
-    val(data.name,                                               1286,  397, 203, 40, 1489,  430, 'bold 32px Tajawal, Arial');
-    val(data.pack,                                               1133,  580, 383, 41, 1516,  614, 'bold 30px Tajawal, Arial');
-    val(Number(data.amount||0).toLocaleString('ar-DZ')+' دج',   1346,  761, 165, 49, 1511,  803, 'bold 38px Tajawal, Arial');
-    val(data.dateFormatted || '—',                              1050,  951, 461, 39, 1511,  983, 'bold 30px Tajawal, Arial');
-    val(data.receipt || '—',                                    1293, 1131, 218, 44, 1511, 1168, 'bold 26px monospace');
+    val(data.name,                                                1450, 355, 870, 60, 2310,  405, 'bold 42px Tajawal, Arial');
+    val(data.pack,                                                1450, 445, 870, 55, 2310,  492, 'bold 38px Tajawal, Arial');
+    val(Number(data.amount||0).toLocaleString('ar-DZ')+' دج',    1760, 535, 530, 55, 2310,  582, 'bold 42px Tajawal, Arial');
+    val(data.dateFormatted || '—',                               1510, 625, 800, 55, 2310,  668, 'bold 36px Tajawal, Arial');
+    val(data.receipt || '—',                                     1510, 710, 800, 55, 2310,  752, 'bold 34px monospace');
 
-    // ── المبلغ المتبقي (يسار) ──
+    // ── المبلغ المتبقي ──
     const remainingAmtDraw = data.remainingAmount !== undefined
       ? data.remainingAmount
       : (() => {
@@ -3074,18 +3064,18 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
 
     ctx.save();
     ctx.beginPath();
-    ctx.rect(494, 761, 225, 46);
+    ctx.rect(810, 535, 500, 55);
     ctx.clip();
-    ctx.font = 'bold 34px Tajawal, Arial';
+    ctx.font = 'bold 38px Tajawal, Arial';
     ctx.fillStyle = remainingAmtDraw > 0 ? '#DC2626' : CLR;
     ctx.textAlign = 'right';
     ctx.direction = 'rtl';
-    ctx.fillText(remainingTxt, 719, 800);
+    ctx.fillText(remainingTxt, 1290, 582);
     ctx.restore();
 
-    // ── QR code — منزّل تحت "إمسح لتأكيد التسجيل" ──
+    // ── QR code — جانب أيسر من الصورة ──
     if (qrCanvas) {
-      const qrX = 120, qrY = 1145, qrSize = 270;
+      const qrX = 60, qrY = 390, qrSize = 280;
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
       ctx.roundRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8, 8);
@@ -3104,11 +3094,11 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
     grad.addColorStop(0,'#1a0533'); grad.addColorStop(1,'#0f1a3d');
     ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
     ctx.fillStyle = '#fff'; ctx.font = 'bold 40px Arial'; ctx.textAlign = 'right';
-    ctx.fillText('⚠️ صورة التذكرة غير موجودة', W-60, 120);
-    ctx.fillText('images/ticketsummerplus.jpg', W-60, 180);
+    ctx.fillText('⚠️ صورة التذكرة غير موجودة', W-60, 80);
+    ctx.fillText('images/ticketeplus.png', W-60, 140);
     ctx.fillStyle = '#A78BFA'; ctx.font = 'bold 50px Arial';
-    ctx.fillText(data.name, W-60, 300);
-    if (qrCanvas) ctx.drawImage(qrCanvas, 60, 200, 300, 300);
+    ctx.fillText(data.name, W-60, 240);
+    if (qrCanvas) ctx.drawImage(qrCanvas, 60, 200, 280, 280);
     document.getElementById('ticket-empty').style.display = 'none';
     document.getElementById('ticket-canvas-wrap').style.display = 'block';
     if (btn) { btn.disabled = false; btn.textContent = '🎟️ توليد التذكرة وحفظها'; }
@@ -3646,7 +3636,6 @@ window.previewFromDB = async (id) => {
     document.getElementById('sc-pack').value   = x.pack   || '';
     document.getElementById('sc-amount').value = x.amount || '';
     document.getElementById('sc-date').value   = x.date   || '';
-    document.getElementById('sc-status').value = x.status || 'paid';
     // تحميل بيانات الحاسبة إن وجدت
     if (x.fullPrice) document.getElementById('sc-full-price').value = x.fullPrice;
     if (x.remainingAmount !== undefined) {
@@ -6852,7 +6841,6 @@ window.openEditTicketModal = (ticketId) => {
   document.getElementById('et-amount').value    = t.amount || 0;
   document.getElementById('et-remaining').value = t.remainingAmount || 0;
   document.getElementById('et-fullprice').value = t.fullPrice || 0;
-  document.getElementById('et-status').value    = t.status || 'pending';
 
   document.getElementById('edit-ticket-modal').classList.add('open');
 };
@@ -6870,7 +6858,7 @@ window.saveEditTicket = async () => {
   const amount    = parseFloat(document.getElementById('et-amount').value) || 0;
   const remaining = parseFloat(document.getElementById('et-remaining').value) || 0;
   const fullPrice = parseFloat(document.getElementById('et-fullprice').value) || 0;
-  const status    = document.getElementById('et-status').value;
+  const status    = 'paid'; // التذاكر مفعّلة دائماً
 
   if (!name) return showToast && showToast('أدخل اسم المشترك', true);
 
@@ -7043,14 +7031,6 @@ window.saveEditTicket = async () => {
       <div class="form-group" style="margin:0">
         <label class="form-label">السعر الكامل للباقة (دج)</label>
         <input class="inp" type="number" id="et-fullprice" min="0" placeholder="0">
-      </div>
-
-      <div class="form-group" style="margin:0">
-        <label class="form-label">الحالة</label>
-        <select class="inp" id="et-status">
-          <option value="pending">⏳ قيد المراجعة</option>
-          <option value="paid">✅ مفعّلة</option>
-        </select>
       </div>
 
       <button class="btn-primary" id="et-save-btn" onclick="saveEditTicket()" style="margin-top:4px">💾 حفظ التعديلات</button>
