@@ -713,7 +713,35 @@
     .group-add-student-wrap{display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
     .group-label-sm{font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:5px;margin-top:4px}
 
-    @media print{body *{visibility:hidden}#print-area,#print-area *{visibility:visible}#print-area{position:fixed;inset:0;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;padding:4mm;box-sizing:border-box;gap:6mm}#print-area img{width:100%;max-width:139.7mm;height:auto;display:block}@page{size:139.7mm 127mm portrait;margin:0}}
+    /* ===== PRINT PREVIEW MODAL ===== */
+    #print-preview-modal{position:fixed;inset:0;z-index:99999;background:rgba(15,15,30,0.85);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px}
+    #print-preview-modal.open{display:flex}
+    .print-preview-inner{background:#f0f0f0;border-radius:20px;overflow:hidden;box-shadow:0 40px 120px rgba(0,0,0,0.5);display:flex;flex-direction:column;max-height:95vh;width:auto}
+    .print-preview-toolbar{background:#2d2d3a;padding:14px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+    .print-preview-title{flex:1;color:#e2e8f0;font-size:14px;font-weight:700;font-family:'Tajawal',sans-serif}
+    .print-preview-btn{padding:9px 18px;border-radius:10px;border:none;font-size:13px;font-weight:800;font-family:'Tajawal',sans-serif;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:6px}
+    .print-preview-btn.print{background:linear-gradient(135deg,#7C3AED,#9333EA);color:white;box-shadow:0 4px 16px rgba(124,58,237,0.4)}
+    .print-preview-btn.print:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(124,58,237,0.5)}
+    .print-preview-btn.close{background:rgba(255,255,255,0.1);color:#e2e8f0;border:1px solid rgba(255,255,255,0.15)}
+    .print-preview-btn.close:hover{background:rgba(255,255,255,0.18)}
+    .print-mode-tabs{display:flex;gap:6px}
+    .print-mode-tab{padding:7px 14px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.15);background:transparent;color:#a0aec0;font-size:12px;font-weight:700;font-family:'Tajawal',sans-serif;cursor:pointer;transition:all 0.2s}
+    .print-mode-tab.active{background:rgba(124,58,237,0.5);border-color:rgba(124,58,237,0.7);color:white}
+    .print-preview-page-wrap{overflow:auto;flex:1;display:flex;align-items:flex-start;justify-content:center;padding:24px;background:#525659;min-height:0}
+    /* A4 بـ scale — 1mm ≈ 3.7796px لكن للعرض نستخدم 2.5px/mm حتى تناسب الشاشة */
+    .print-preview-page{background:white;box-shadow:0 8px 40px rgba(0,0,0,0.4);position:relative;flex-shrink:0;transform-origin:top center}
+    .print-preview-page.a4-portrait{width:595px;height:842px} /* 210x297mm @ 72dpi approx */
+    .preview-ticket-single{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:28px;box-sizing:border-box}
+    .preview-ticket-single img{max-width:100%;max-height:100%;object-fit:contain;display:block;border-radius:4px;box-shadow:0 2px 12px rgba(0,0,0,0.15)}
+    .preview-ticket-double{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:22px;box-sizing:border-box}
+    .preview-ticket-double img{width:100%;max-width:520px;object-fit:contain;display:block;border-radius:4px;box-shadow:0 2px 12px rgba(0,0,0,0.15)}
+
+    @media print {
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      body > *:not(#print-frame-wrapper) { display: none !important; }
+      #print-frame-wrapper { display: block !important; position: fixed; inset: 0; z-index: 999999; }
+      #print-frame-wrapper iframe { width: 100%; height: 100%; border: none; }
+    }
 
     /* ===== GROUPS TABS IN ATT MODAL ===== */
     .att-groups-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
@@ -887,10 +915,27 @@
   <div class="blob blob-3"></div>
 </div>
 
-<div id="print-area" style="display:none">
-  <img id="print-img-1" src="" alt="ticket">
-  <img id="print-img-2" src="" alt="ticket">
-  <img id="print-img-3" src="" alt="ticket">
+<!-- hidden iframe for printing -->
+<div id="print-frame-wrapper" style="display:none"><iframe id="print-frame" style="width:0;height:0;border:none;position:absolute"></iframe></div>
+
+<!-- Print Preview Modal -->
+<div id="print-preview-modal">
+  <div class="print-preview-inner">
+    <div class="print-preview-toolbar">
+      <div class="print-preview-title">🖨️ معاينة قبل الطباعة</div>
+      <div class="print-mode-tabs">
+        <button class="print-mode-tab active" id="pmt-single" onclick="setPrintMode('single')">📄 تذكرة واحدة</button>
+        <button class="print-mode-tab" id="pmt-double" onclick="setPrintMode('double')">📑 تذكرتان</button>
+      </div>
+      <button class="print-preview-btn print" onclick="executePrint()">🖨️ طباعة الآن</button>
+      <button class="print-preview-btn close" onclick="closePrintPreview()">✕ إغلاق</button>
+    </div>
+    <div class="print-preview-page-wrap">
+      <div class="print-preview-page a4-portrait" id="print-preview-page">
+        <!-- يتم ملؤها ديناميكياً -->
+      </div>
+    </div>
+  </div>
 </div>
 <div id="qr-gen-hidden" style="position:absolute;visibility:hidden;width:0;height:0;overflow:hidden"></div>
 
@@ -1547,7 +1592,7 @@
               <canvas id="ticket-canvas" style="width:100%;border-radius:16px;box-shadow:0 16px 48px rgba(124,58,237,0.12);display:block"></canvas>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
                 <button class="btn-ticket primary" onclick="downloadTicket()">⬇️ تحميل التذكرة</button>
-                <button class="btn-ticket" onclick="printTicketCanvas()">🖨️ طباعة</button>
+                <button class="btn-ticket" onclick="openPrintPreview()">🖨️ طباعة</button>
                 <button class="btn-ticket" onclick="copyReceiptNum()" style="grid-column:span 2">📋 نسخ رقم الوصل</button>
               </div>
             </div>
@@ -3079,14 +3124,113 @@ window.downloadTicket = () => {
   link.click();
 };
 
-window.printTicketCanvas = () => {
+// ─── نظام طباعة التذكرة المحسّن ───
+let _printMode = 'single'; // 'single' | 'double'
+
+window.setPrintMode = (mode) => {
+  _printMode = mode;
+  document.getElementById('pmt-single').classList.toggle('active', mode === 'single');
+  document.getElementById('pmt-double').classList.toggle('active', mode === 'double');
+  _buildPrintPreview();
+};
+
+function _buildPrintPreview() {
   const canvas = document.getElementById('ticket-canvas');
   const dataURL = canvas.toDataURL('image/png');
-  ['print-img-1','print-img-2','print-img-3'].forEach(id => document.getElementById(id).src = dataURL);
-  document.getElementById('print-area').style.display = 'flex';
-  window.print();
-  setTimeout(() => document.getElementById('print-area').style.display = 'none', 1000);
+  const page = document.getElementById('print-preview-page');
+
+  if (_printMode === 'single') {
+    page.className = 'print-preview-page a4-portrait';
+    page.innerHTML = `<div class="preview-ticket-single"><img src="${dataURL}" alt="ticket"></div>`;
+  } else {
+    page.className = 'print-preview-page a4-portrait';
+    page.innerHTML = `<div class="preview-ticket-double"><img src="${dataURL}" alt="ticket"><img src="${dataURL}" alt="ticket"></div>`;
+  }
+}
+
+window.openPrintPreview = () => {
+  const canvas = document.getElementById('ticket-canvas');
+  if (!canvas || canvas.width === 0) { showToast('⚠️ لا توجد تذكرة للطباعة', true); return; }
+  _printMode = 'single';
+  document.getElementById('pmt-single').classList.add('active');
+  document.getElementById('pmt-double').classList.remove('active');
+  _buildPrintPreview();
+  document.getElementById('print-preview-modal').classList.add('open');
 };
+
+window.closePrintPreview = () => {
+  document.getElementById('print-preview-modal').classList.remove('open');
+};
+
+window.executePrint = () => {
+  const canvas = document.getElementById('ticket-canvas');
+  const dataURL = canvas.toDataURL('image/png');
+
+  // نبني HTML صفحة طباعة نظيفة داخل iframe
+  const isDouble = _printMode === 'double';
+
+  // نسبة التذكرة: 1584x1440 → W/H = 1.1
+  // في A4 (210x297mm) نريد التذكرة بأقصى حجم ممكن مع هامش 8mm
+  const ticketsHtml = isDouble
+    ? `<img class="ticket" src="${dataURL}"><img class="ticket" src="${dataURL}">`
+    : `<img class="ticket single" src="${dataURL}">`;
+
+  const html = `<!DOCTYPE html>
+<html dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>طباعة التذكرة — E-PLUS</title>
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 210mm; height: 297mm; background: #fff; }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8mm;
+    gap: 6mm;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  img.ticket {
+    display: block;
+    /* تذكرة واحدة: أقصى عرض مع الحفاظ على النسبة */
+    width: 190mm;
+    height: auto;
+    object-fit: contain;
+  }
+  img.ticket.single {
+    /* تذكرة منفردة: نكبّرها أكثر */
+    width: 190mm;
+    max-height: 277mm;
+  }
+</style>
+</head>
+<body>${ticketsHtml}</body>
+</html>`;
+
+  const iframe = document.getElementById('print-frame');
+  const wrapper = document.getElementById('print-frame-wrapper');
+  wrapper.style.display = 'none'; // لا نعرضه على الشاشة
+
+  const blob = new Blob([html], { type: 'text/html; charset=utf-8' });
+  const blobURL = URL.createObjectURL(blob);
+  iframe.src = blobURL;
+
+  iframe.onload = () => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    setTimeout(() => {
+      URL.revokeObjectURL(blobURL);
+      iframe.src = '';
+    }, 2000);
+  };
+};
+
+// إبقاء الاسم القديم للتوافق
+window.printTicketCanvas = window.openPrintPreview;
 
 window.copyReceiptNum = () => {
   if (currentReceipt) { navigator.clipboard.writeText(currentReceipt).then(() => showToast('📋 تم نسخ رقم الوصل: ' + currentReceipt)); }
