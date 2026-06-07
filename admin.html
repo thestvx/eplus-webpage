@@ -3010,81 +3010,54 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
   img.onload = () => {
     ctx.drawImage(img, 0, 0, W, H);
 
-    // ══════════════════════════════════════════════════════════════════
-    // تحليل الصورة الناتجة الفعلية:
-    // الكانفاس 2480 × 1063 px
+    // ══════════════════════════════════════════════════════════
+    // إحداثيات مستخرجة بدقة بكسل من تحليل ticketeplus.png
+    // Canvas: 2480 × 1063 px
     //
-    // من الناتج الحقيقي، الـ labels تظهر في هذه المواقع (y = baseline السطر):
-    //   "الاسم واللقب:"   → y ≈ 430   (label يسار النقطتين = x ≈ 2420)
-    //   "اسم الباقة:"     → y ≈ 490
-    //   "المبلغ:"         → y ≈ 565   label عند x ≈ 2070، "المبلغ المتبقي:" label عند x ≈ 1270
-    //   "التاريخ:"        → y ≈ 645
-    //   "رقم الوصل:"     → y ≈ 720
+    // كل قيمة تُكتب على يسار الـ label مباشرة (textAlign=right)
+    // baseline = y الوسطي لنص الـ label المستخرج من الصورة
     //
-    // القيمة تُكتب على نفس السطر (نفس y) على يسار الـ label
-    // textAlign = 'left' + x = يمين منطقة القيمة (بعد نهاية الـ label)
-    // ══════════════════════════════════════════════════════════════════
+    //  الحقل            baseline  rightEdge  maxW
+    //  الاسم واللقب      348       2204       700
+    //  اسم الباقة        444       2250       900
+    //  المبلغ             556       2324       480
+    //  المبلغ المتبقي     556       1935       450
+    //  التاريخ            675       2314       900
+    //  رقم الوصل         771       2247       900
+    // ══════════════════════════════════════════════════════════
 
     const CLR = '#0D2080';
-    const FONT_LG = 'bold 38px Tajawal, Arial';
-    const FONT_MD = 'bold 34px Tajawal, Arial';
-    const FONT_SM = 'bold 30px monospace';
 
-    // دالة رسم القيمة: textAlign=left، من x إلى x+w، baseline = y
-    const drawVal = (txt, x, y, maxW, font, color) => {
+    // دالة رسم القيمة بجانب الـ label مباشرة
+    const val = (txt, rightEdge, baseline, maxW, font, color) => {
       ctx.save();
-      ctx.font = font;
-      ctx.fillStyle = color || CLR;
-      ctx.textAlign = 'left';
-      ctx.direction = 'ltr';
-      // قص النص إذا تجاوز العرض الأقصى
-      let t = txt || '—';
-      while (ctx.measureText(t).width > maxW && t.length > 1) t = t.slice(0, -1);
-      ctx.fillText(t, x, y);
-      ctx.restore();
-    };
-
-    // ── من الصورة الناتجة، labels تنتهي عند هذه الـ x (من اليمين):
-    //    "الاسم واللقب:"   → نهاية label ≈ x=2050 (RTL)، القيمة تبدأ من يسارها
-    //    القيمة تُكتب من اليسار باتجاه اليمين، بعد مسافة بسيطة من بداية المنطقة البيضاء
-
-    // نستخدم textAlign=right وندرج من طرف الـ label
-    // الأسلوب الصحيح: نكتب القيمة بـ textAlign='right' من x=labelStart-padding
-    const writeRight = (txt, rightEdge, baselineY, maxW, font, color) => {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(rightEdge - maxW, baselineY - 50, maxW, 55);
-      ctx.clip();
-      ctx.font = font;
+      ctx.font = font || 'bold 36px Tajawal, Arial';
       ctx.fillStyle = color || CLR;
       ctx.textAlign = 'right';
       ctx.direction = 'rtl';
-      ctx.fillText(txt || '—', rightEdge, baselineY);
+      // قص النص إذا تجاوز العرض
+      let t = String(txt || '—');
+      while (ctx.measureText(t).width > maxW && t.length > 1) t = t.slice(0, -1);
+      ctx.fillText(t, rightEdge, baseline);
       ctx.restore();
     };
 
-    // ── القيم تُكتب على يسار الـ labels (باتجاه اليسار في الصورة) ──
-    // من تحليل الناتج:
-    //
-    //  السطر 1 — "الاسم واللقب:" label ينتهي عند ~x=2050
-    //             القيمة تُكتب في المنطقة [1200 .. 2020] baseline=430
-    //
-    //  السطر 2 — "اسم الباقة:" label ينتهي عند ~x=2060
-    //             القيمة: [900 .. 2020] baseline=490
-    //
-    //  السطر 3 — "المبلغ:" [1680..2020] baseline=565 | "المبلغ المتبقي:" [440..1070] baseline=565
-    //
-    //  السطر 4 — "التاريخ:" [800..2020] baseline=645
-    //
-    //  السطر 5 — "رقم الوصل:" [800..2020] baseline=720
+    val(data.name,
+        2204, 348, 700, 'bold 36px Tajawal, Arial');
 
-    writeRight(data.name,                                                         2020, 430, 820, FONT_LG,           CLR);
-    writeRight(data.pack,                                                         2020, 490, 1120, FONT_MD,          CLR);
-    writeRight(Number(data.amount||0).toLocaleString('ar-DZ')+' دج',             2020, 565, 340, FONT_LG,           CLR);
-    writeRight(data.dateFormatted || '—',                                         2020, 645, 1220, FONT_MD,          CLR);
-    writeRight(data.receipt || '—',                                               2020, 720, 1220, FONT_SM,          CLR);
+    val(data.pack,
+        2250, 444, 900, 'bold 32px Tajawal, Arial');
 
-    // ── المبلغ المتبقي — على نفس سطر المبلغ، في منطقة "المبلغ المتبقي:" ──
+    val(Number(data.amount || 0).toLocaleString('ar-DZ') + ' دج',
+        2324, 556, 480, 'bold 36px Tajawal, Arial');
+
+    val(data.dateFormatted || '—',
+        2314, 675, 900, 'bold 32px Tajawal, Arial');
+
+    val(data.receipt || '—',
+        2247, 771, 900, 'bold 28px monospace');
+
+    // ── المبلغ المتبقي — على نفس baseline المبلغ ──
     const remainingAmtDraw = data.remainingAmount !== undefined
       ? data.remainingAmount
       : (() => {
@@ -3093,9 +3066,10 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
           return full > 0 ? Math.max(0, full - paid) : 0;
         })();
 
-    const remainingTxt = Number(remainingAmtDraw).toLocaleString('ar-DZ') + ' دج';
-    const remColor = remainingAmtDraw > 0 ? '#DC2626' : CLR;
-    writeRight(remainingTxt, 1070, 565, 360, FONT_MD, remColor);
+    val(Number(remainingAmtDraw).toLocaleString('ar-DZ') + ' دج',
+        1935, 556, 450,
+        'bold 34px Tajawal, Arial',
+        remainingAmtDraw > 0 ? '#DC2626' : CLR);
 
     document.getElementById('ticket-empty').style.display = 'none';
     document.getElementById('ticket-canvas-wrap').style.display = 'block';
@@ -3104,14 +3078,9 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
   };
 
   img.onerror = () => {
-    const grad = ctx.createLinearGradient(0,0,W,H);
-    grad.addColorStop(0,'#1a0533'); grad.addColorStop(1,'#0f1a3d');
-    ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = '#1a0533'; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#fff'; ctx.font = 'bold 40px Arial'; ctx.textAlign = 'right';
-    ctx.fillText('⚠️ صورة التذكرة غير موجودة', W-60, 80);
-    ctx.fillText('images/ticketeplus.png', W-60, 140);
-    ctx.fillStyle = '#A78BFA'; ctx.font = 'bold 50px Arial';
-    ctx.fillText(data.name, W-60, 240);
+    ctx.fillText('⚠️ images/ticketeplus.png غير موجودة', W - 60, 100);
     document.getElementById('ticket-empty').style.display = 'none';
     document.getElementById('ticket-canvas-wrap').style.display = 'block';
     if (btn) { btn.disabled = false; btn.textContent = '🎟️ توليد التذكرة وحفظها'; }
