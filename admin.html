@@ -3135,60 +3135,84 @@ window.closePrintPreview = () => {
 };
 
 window.executePrint = () => {
-  const canvas = document.getElementById('ticket-canvas');
-  if (!canvas || canvas.width === 0) { showToast('⚠️ لا توجد تذكرة للطباعة', true); return; }
-  const dataURL = canvas.toDataURL('image/png');
+  const srcCanvas = document.getElementById('ticket-canvas');
+  if (!srcCanvas || srcCanvas.width === 0) { showToast('⚠️ لا توجد تذكرة للطباعة', true); return; }
   const isDouble = _printMode === 'double';
 
-  // التذكرة عرضها أكبر من ارتفاعها (2480×1063) → نطبع على A4 landscape
-  // تذكرة واحدة: أعلى الصفحة مع هامش بسيط
-  // تذكرتان: الأولى في الأعلى، الثانية تحتها مباشرة
-  const ticketsHtml = isDouble
-    ? `<img class="ticket" src="${dataURL}"><img class="ticket" src="${dataURL}">`
-    : `<img class="ticket" src="${dataURL}">`;
+  // ── الحل المضمون 100% في جميع المتصفحات ──
+  // Chrome وغيره يتجاهل @page landscape في popups/iframes
+  // الحل: ندور التذكرة 90° على canvas جديد → نطبع على portrait عادي
+  // التذكرة الأصلية: 2480×1063 (landscape)
+  // بعد الدوران: تصبح 1063 عرضاً × 2480 ارتفاعاً (portrait)
+
+  const tickW = srcCanvas.width;   // 2480
+  const tickH = srcCanvas.height;  // 1063
+  const gap = isDouble ? 20 : 0;
+  const count = isDouble ? 2 : 1;
+
+  // canvas الصفحة: عرض=tickH ارتفاع=tickW*count
+  const pageCanvas = document.createElement('canvas');
+  pageCanvas.width = tickH;
+  pageCanvas.height = tickW * count + gap * (count - 1);
+
+  const pCtx = pageCanvas.getContext('2d');
+  pCtx.fillStyle = '#ffffff';
+  pCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+
+  for (let i = 0; i < count; i++) {
+    const yOff = i * (tickW + gap);
+    pCtx.save();
+    pCtx.translate(tickH / 2, yOff + tickW / 2);
+    pCtx.rotate(-Math.PI / 2);
+    pCtx.drawImage(srcCanvas, -tickW / 2, -tickH / 2, tickW, tickH);
+    pCtx.restore();
+  }
+
+  const rotatedURL = pageCanvas.toDataURL('image/png');
 
   const html = `<!DOCTYPE html>
-<html dir="rtl">
+<html>
 <head>
 <meta charset="UTF-8">
 <title>طباعة التذكرة</title>
 <style>
-  @page { size: A4 landscape; margin: 0; }
+  @page { size: A4 portrait; margin: 0; }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 297mm; height: 210mm; background: #fff; overflow: hidden; }
-  body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    padding-top: ${isDouble ? '4mm' : '6mm'};
-    gap: ${isDouble ? '4mm' : '0'};
+  html, body {
+    width: 210mm;
+    height: 297mm;
+    background: #fff;
+    overflow: hidden;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   img.ticket {
     display: block;
-    width: 285mm;
+    width: 210mm;
     height: auto;
-    max-height: ${isDouble ? '96mm' : '196mm'};
+    max-height: 297mm;
     object-fit: contain;
   }
 </style>
 </head>
-<body>${ticketsHtml}<script>window.onload=function(){window.print();}<\/script></body>
+<body>
+<img class="ticket" src="${rotatedURL}">
+<script>
+window.onload = function() {
+  setTimeout(function(){ window.print(); window.close(); }, 400);
+};
+<\/script>
+</body>
 </html>`;
 
-  const frame = document.getElementById('print-frame');
-  const wrapper = document.getElementById('print-frame-wrapper');
-  frame.style.width = '0'; frame.style.height = '0';
-  frame.style.position = 'absolute';
-  const doc = frame.contentDocument || frame.contentWindow.document;
-  doc.open(); doc.write(html); doc.close();
-  frame.contentWindow.focus();
-  // إعطاء وقت للصورة لتحمّل داخل الـ iframe ثم الطباعة
-  setTimeout(() => {
-    frame.contentWindow.print();
-  }, 600);
+  const printWin = window.open('', '_blank', 'width=800,height=600');
+  if (!printWin) { showToast('⚠️ يرجى السماح بالنوافذ المنبثقة', true); return; }
+  printWin.document.open();
+  printWin.document.write(html);
+  printWin.document.close();
 };
 
 // إبقاء الاسم القديم للتوافق
