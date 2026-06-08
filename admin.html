@@ -3032,44 +3032,43 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
     const CLR = '#0D2080';
 
     // ══════════════════════════════════════════════════════════════════
-    // الإحداثيات محسوبة بدقة بكسل من ticketeplus.png (2480×1063)
-    // التذكرة تُطبع بعد دوران -90° → المعلومات تُكتب بدوران +90° مسبقاً
-    // بهذه الطريقة تظهر بالطول الصحيح في الفراغ الأبيض بعد الطباعة
+    // إحداثيات محسوبة بدقة بكسل من ticketeplus.png (2480×1063)
+    // المعلومات على اليسار — القيم تُكتب يمين الـ label (textAlign=left)
     //
-    //  الحقل             y      rightEdge   maxW
-    //  الاسم واللقب     344      2196        2116
-    //  اسم الباقة       439      2242        2162
-    //  المبلغ           555      1926        1846
-    //  المبلغ المتبقي   555      2315        2235
-    //  التاريخ          671      2308        2228
-    //  رقم الوصل        772      2239        2159
+    //  الحقل             y      leftEdge   maxW
+    //  الاسم واللقب     248      651        1789
+    //  اسم الباقة       345      654        1786
+    //  المبلغ           460      651        1789
+    //  المبلغ المتبقي   460      382        450
+    //  التاريخ          580      650        1790
+    //  رقم الوصل        679      650        1790
     // ══════════════════════════════════════════════════════════════════
 
-    const val = (txt, rightEdge, baseline, maxW, font, color) => {
+    const val = (txt, leftEdge, baseline, maxW, font, color) => {
       ctx.save();
       ctx.font = font || 'bold 36px Tajawal, Arial';
       ctx.fillStyle = color || CLR;
-      ctx.textAlign = 'right';
+      ctx.textAlign = 'left';
       let t = String(txt || '—');
       while (ctx.measureText(t).width > maxW && t.length > 1) t = t.slice(0, -1);
-      ctx.fillText(t, rightEdge, baseline);
+      ctx.fillText(t, leftEdge, baseline);
       ctx.restore();
     };
 
     val(data.name,
-        2196, 344, 2116, 'bold 36px Tajawal, Arial');
+        651, 248, 1789, 'bold 36px Tajawal, Arial');
 
     val(data.pack,
-        2242, 439, 2162, 'bold 32px Tajawal, Arial');
+        654, 345, 1786, 'bold 32px Tajawal, Arial');
 
     val(Number(data.amount || 0).toLocaleString('ar-DZ') + ' دج',
-        2315, 555, 2235, 'bold 36px Tajawal, Arial');
+        651, 460, 300, 'bold 36px Tajawal, Arial');
 
     val(data.dateFormatted || '—',
-        2308, 671, 2228, 'bold 32px Tajawal, Arial');
+        650, 580, 1790, 'bold 32px Tajawal, Arial');
 
     val(data.receipt || '—',
-        2239, 772, 2159, 'bold 28px monospace');
+        650, 679, 1790, 'bold 28px monospace');
 
     // ── المبلغ المتبقي ──
     const remainingAmtDraw = data.remainingAmount !== undefined
@@ -3081,7 +3080,7 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
         })();
 
     val(Number(remainingAmtDraw).toLocaleString('ar-DZ') + ' دج',
-        1926, 555, 1846,
+        382, 460, 130,
         'bold 34px Tajawal, Arial',
         remainingAmtDraw > 0 ? '#DC2626' : CLR);
 
