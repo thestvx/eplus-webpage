@@ -916,6 +916,7 @@
     .finance-tx-type{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;font-size:11px;font-weight:800}
     .finance-tx-type.expense{background:var(--danger-soft);color:#DC2626}
     .finance-tx-type.income{background:var(--success-soft);color:#059669}
+    .finance-tx-type.income.summer-ticket{background:linear-gradient(135deg,rgba(249,115,22,0.12),rgba(234,88,12,0.08));color:#EA580C;border:1px solid rgba(249,115,22,0.2)}
     .finance-tx-type.salary{background:var(--accent-soft);color:#D97706}
     .finance-tx-type.treasury{background:var(--primary-light);color:var(--primary)}
     .finance-tx-del{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:14px;padding:4px 6px;border-radius:6px;transition:all 0.15s}
@@ -1814,6 +1815,25 @@
           </div>
         </div>
 
+        <!-- ☀️ بطاقة إيرادات المخيم الصيفي -->
+        <div style="background:linear-gradient(135deg,rgba(249,115,22,0.08),rgba(234,88,12,0.04));border:1.5px solid rgba(249,115,22,0.22);border-radius:var(--radius-sm);padding:20px 24px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;position:relative;overflow:hidden">
+          <div style="position:absolute;left:-20px;top:-20px;width:100px;height:100px;background:radial-gradient(circle,rgba(249,115,22,0.15),transparent);border-radius:50%;pointer-events:none"></div>
+          <div style="display:flex;align-items:center;gap:16px">
+            <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#FED7AA,#FDBA74);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;box-shadow:0 4px 14px rgba(249,115,22,0.25)">☀️</div>
+            <div>
+              <div style="font-size:12px;font-weight:800;color:#EA580C;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">مخيم صيفي — Summer Plus</div>
+              <div style="font-size:26px;font-weight:900;color:#C2410C;line-height:1" id="fin-summer-total">0 دج</div>
+              <div style="font-size:12px;color:#9A3412;margin-top:4px;font-weight:600" id="fin-summer-meta">0 تذكرة مسجّلة كمدخول — 0 بانتظار الاستيراد</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+            <button onclick="importSummerTicketsToFinance()" id="btn-import-summer" style="padding:11px 20px;border-radius:12px;border:none;background:linear-gradient(135deg,#F97316,#EA580C);color:white;font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;display:flex;align-items:center;gap:8px;transition:all 0.25s;box-shadow:0 6px 18px rgba(249,115,22,0.35)">
+              ☀️ استيراد تذاكر المخيم
+            </button>
+            <div style="font-size:11px;color:#9A3412;font-weight:600;text-align:left">يُضيف التذاكر المدفوعة غير المسجَّلة بعد</div>
+          </div>
+        </div>
+
         <!-- Action buttons -->
         <div class="finance-actions-row">
           <button class="finance-btn expense" onclick="openFinanceModal('expense')">📤 إضافة مصروف</button>
@@ -1828,6 +1848,7 @@
             <option value="">الكل</option>
             <option value="expense">مصاريف</option>
             <option value="income">إيرادات</option>
+            <option value="income_summer">☀️ تذاكر المخيم فقط</option>
             <option value="salary">رواتب</option>
           </select>
         </div>
@@ -3135,7 +3156,7 @@ window.generateTicket = async () => {
       try {
         await addDoc(collection(db,'financeTx'), {
           type: 'income',
-          desc: `تذكرة مخيم — ${name} (${pack})`,
+          desc: `☀️ تذكرة مخيم — ${name} (${pack})`,
           amount: paidAmount,
           date: dateRaw,
           receipt,
@@ -7041,11 +7062,46 @@ function renderFinanceKPIs() {
   document.getElementById('fin-total-expense').textContent = fmt(totalExpense);
   document.getElementById('fin-total-income').textContent  = fmt(totalIncome);
   document.getElementById('fin-total-salary').textContent  = fmt(totalSalary);
+
+  // ── KPI تذاكر المخيم الصيفي ──
+  const summerTxs = _finTxs.filter(t => t.type === 'income' && t.source === 'summer_ticket');
+  const summerTotal = summerTxs.reduce((a,t) => a + (t.amount||0), 0);
+  const importedReceipts = new Set(summerTxs.map(t => t.receipt).filter(Boolean));
+
+  // حساب التذاكر المدفوعة غير المستوردة بعد
+  const allTickets = window._allTicketsData || [];
+  const pendingImport = allTickets.filter(t =>
+    t.status === 'paid' && Number(t.amount || 0) > 0 && !importedReceipts.has(t.receipt)
+  );
+
+  const sumTotalEl  = document.getElementById('fin-summer-total');
+  const sumMetaEl   = document.getElementById('fin-summer-meta');
+  const importBtn   = document.getElementById('btn-import-summer');
+  if (sumTotalEl)  sumTotalEl.textContent  = fmt(summerTotal);
+  if (sumMetaEl)   sumMetaEl.textContent   = `${importedReceipts.size} تذكرة مسجّلة كمدخول — ${pendingImport.length} بانتظار الاستيراد`;
+  if (importBtn) {
+    if (pendingImport.length > 0) {
+      importBtn.style.opacity = '1';
+      importBtn.style.pointerEvents = '';
+      importBtn.innerHTML = `☀️ استيراد ${pendingImport.length} تذكرة غير مسجّلة`;
+    } else {
+      importBtn.style.opacity = '0.5';
+      importBtn.style.pointerEvents = 'none';
+      importBtn.innerHTML = `✅ جميع التذاكر مسجّلة`;
+    }
+  }
 }
 
 function renderFinanceTable() {
   const filter = document.getElementById('fin-filter')?.value || '';
-  const rows = filter ? _finTxs.filter(t => t.type === filter) : _finTxs;
+  let rows;
+  if (filter === 'income_summer') {
+    rows = _finTxs.filter(t => t.type === 'income' && t.source === 'summer_ticket');
+  } else if (filter) {
+    rows = _finTxs.filter(t => t.type === filter);
+  } else {
+    rows = _finTxs;
+  }
   const body = document.getElementById('fin-tx-body');
   if (!body) return;
 
@@ -7054,16 +7110,42 @@ function renderFinanceTable() {
     return;
   }
 
-  const typeLabels = { expense: {label:'مصروف', icon:'📤'}, income: {label:'إيراد', icon:'📥'}, salary: {label:'راتب', icon:'👨‍🏫'} };
+  const typeLabels = {
+    expense: { label:'مصروف', icon:'📤' },
+    income:  { label:'إيراد', icon:'📥' },
+    salary:  { label:'راتب', icon:'👨‍🏫' }
+  };
+
   body.innerHTML = rows.map(t => {
-    const info = typeLabels[t.type] || {label:t.type, icon:'💰'};
-    const dateStr = t.date ? new Date(t.date + 'T00:00:00').toLocaleDateString('ar-DZ', {day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
-    const amountColor = t.type === 'income' ? '#059669' : '#DC2626';
+    const isSummerTicket = t.type === 'income' && t.source === 'summer_ticket';
+    const info = isSummerTicket
+      ? { label: 'تذكرة مخيم', icon: '☀️' }
+      : (typeLabels[t.type] || { label: t.type, icon: '💰' });
+
+    const dateStr = t.date
+      ? new Date(t.date + 'T00:00:00').toLocaleDateString('ar-DZ', {day:'2-digit', month:'2-digit', year:'numeric'})
+      : '—';
+    const amountColor = t.type === 'income' ? (isSummerTicket ? '#C2410C' : '#059669') : '#DC2626';
     const amountSign  = t.type === 'income' ? '+' : '-';
-    return `<div class="finance-tx-row">
+
+    const receiptBadge = t.receipt
+      ? `<span style="font-size:10px;font-family:monospace;color:var(--primary);background:var(--primary-light);padding:2px 7px;border-radius:6px;display:inline-block;margin-top:3px">${t.receipt}</span>`
+      : '';
+
+    const rowBg = isSummerTicket
+      ? 'background:linear-gradient(135deg,rgba(249,115,22,0.04),rgba(234,88,12,0.02));'
+      : '';
+
+    return `<div class="finance-tx-row" style="${rowBg}">
       <div style="font-size:12px;color:var(--text-muted);font-weight:700">${dateStr}</div>
-      <div style="font-weight:700;color:var(--text)">${t.desc || '—'}${t.teacher ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">👨‍🏫 ${t.teacher}</div>` : ''}</div>
-      <div><span class="finance-tx-type ${t.type}">${info.icon} ${info.label}</span></div>
+      <div style="font-weight:700;color:var(--text)">
+        ${t.desc || '—'}
+        ${t.teacher ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">👨‍🏫 ${t.teacher}</div>` : ''}
+        ${receiptBadge}
+      </div>
+      <div>
+        <span class="finance-tx-type ${t.type}${isSummerTicket ? ' summer-ticket' : ''}">${info.icon} ${info.label}</span>
+      </div>
       <div style="font-weight:900;color:${amountColor}">${amountSign}${(t.amount||0).toLocaleString('ar-DZ')} دج</div>
       <div><button class="finance-tx-del" onclick="deleteFinanceTx('${t.id}')" title="حذف">🗑️</button></div>
     </div>`;
@@ -7135,6 +7217,75 @@ window.deleteFinanceTx = async (txId) => {
     showToast && showToast('🗑️ تم الحذف');
   } catch(e) {
     showToast && showToast('❌ خطأ: ' + e.message, true);
+  }
+};
+
+// ── استيراد تذاكر المخيم الصيفي المدفوعة إلى الموارد المالية ──
+window.importSummerTicketsToFinance = async () => {
+  const finDb = getFinDb();
+  if (!finDb) { showToast && showToast('❌ خطأ في الاتصال', true); return; }
+
+  const allTickets = window._allTicketsData || [];
+  if (!allTickets.length) { showToast && showToast('⚠️ لا توجد تذاكر بعد', true); return; }
+
+  // التذاكر المستوردة مسبقاً (بناءً على رقم الوصل)
+  const importedReceipts = new Set(
+    _finTxs
+      .filter(t => t.type === 'income' && t.source === 'summer_ticket' && t.receipt)
+      .map(t => t.receipt)
+  );
+
+  // التذاكر المدفوعة التي لم تُستورد بعد
+  const toImport = allTickets.filter(t =>
+    t.status === 'paid' &&
+    Number(t.amount || 0) > 0 &&
+    t.receipt &&
+    !importedReceipts.has(t.receipt)
+  );
+
+  if (!toImport.length) {
+    showToast && showToast('✅ جميع التذاكر المدفوعة مسجَّلة بالفعل في الموارد المالية');
+    return;
+  }
+
+  const confirmed = confirm(
+    `☀️ استيراد تذاكر المخيم الصيفي\n\nسيتم إضافة ${toImport.length} تذكرة كمدخول في الموارد المالية:\n` +
+    toImport.slice(0, 5).map(t => `• ${t.name} — ${Number(t.amount).toLocaleString('ar-DZ')} دج`).join('\n') +
+    (toImport.length > 5 ? `\n... و${toImport.length - 5} تذاكر أخرى` : '') +
+    '\n\nهل تريد المتابعة؟'
+  );
+  if (!confirmed) return;
+
+  const btn = document.getElementById('btn-import-summer');
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ جاري الاستيراد...'; }
+
+  let successCount = 0, errorCount = 0;
+  const today = new Date().toISOString().split('T')[0];
+
+  for (const ticket of toImport) {
+    try {
+      await addDoc(collection(finDb, 'financeTx'), {
+        type: 'income',
+        source: 'summer_ticket',
+        desc: `☀️ تذكرة مخيم — ${ticket.name}${ticket.pack ? ' (' + ticket.pack + ')' : ''}`,
+        amount: Number(ticket.amount),
+        date: ticket.date || today,
+        receipt: ticket.receipt || '',
+        createdAt: serverTimestamp()
+      });
+      successCount++;
+    } catch(e) {
+      console.error('Import error for', ticket.name, e.message);
+      errorCount++;
+    }
+  }
+
+  if (btn) { btn.disabled = false; }
+
+  if (successCount > 0) {
+    showToast && showToast(`✅ تم استيراد ${successCount} تذكرة بنجاح${errorCount > 0 ? ` — ${errorCount} فشلت` : ''}`);
+  } else {
+    showToast && showToast('❌ فشل الاستيراد — تحقق من صلاحيات Firebase', true);
   }
 };
 
@@ -7317,7 +7468,8 @@ window.saveEditTicket = async () => {
       const finDb = (typeof getFinDb === 'function' ? getFinDb() : null) || _db;
       addDoc(collection(finDb, 'financeTx'), {
         type: 'income',
-        desc: `دفعة إضافية — ${name} (${pack || receipt || '—'})`,
+        source: 'summer_ticket',
+        desc: `☀️ دفعة إضافية — ${name} (${pack || receipt || '—'})`,
         amount: diff,
         date: date || new Date().toISOString().split('T')[0],
         receipt: receipt || '',
