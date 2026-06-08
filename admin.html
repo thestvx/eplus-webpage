@@ -3120,9 +3120,28 @@ window.generateTicket = async () => {
     const fullPrice = parseFloat(document.getElementById('sc-full-price').value) || 0;
     const paidCalc = parseFloat(document.getElementById('sc-paid-amount').value) || 0;
     const remainingAmount = fullPrice > 0 ? Math.max(0, fullPrice - paidCalc) : 0;
-    addDoc(collection(db,'summerTickets'), { name, pack, amount: Number(amount), fullPrice: fullPrice || Number(amount), remainingAmount, date: dateRaw, status, receipt, note, verifyURL, createdAt: serverTimestamp() })
-      .then(() => drawTicketOnCanvas({ name, pack, amount, dateRaw, dateFormatted, status, receipt, remainingAmount, note }, null, btn, verifyURL))
-      .catch(e => { showToast('خطأ في الحفظ: ' + e.message, true); btn.disabled = false; btn.textContent = '🎟️ توليد التذكرة وحفظها'; });
+    const paidAmount = Number(amount);
+
+    // ── حفظ التذكرة في summerTickets ──
+    await addDoc(collection(db,'summerTickets'), {
+      name, pack, amount: paidAmount,
+      fullPrice: fullPrice || paidAmount,
+      remainingAmount, date: dateRaw, status, receipt, note, verifyURL,
+      createdAt: serverTimestamp()
+    });
+
+    // ── تسجيل المبلغ المدفوع تلقائياً في الموارد المالية ──
+    if (paidAmount > 0) {
+      addDoc(collection(db,'financeTx'), {
+        type: 'income',
+        desc: `تذكرة مخيم — ${name} (${pack})`,
+        amount: paidAmount,
+        date: dateRaw,
+        receipt,
+        createdAt: serverTimestamp()
+      }).catch(e => console.warn('financeTx auto-save error:', e));
+    }
+
     drawTicketOnCanvas({ name, pack, amount, dateRaw, dateFormatted, status, receipt, remainingAmount, note }, null, btn, verifyURL);
   } catch(e) { showToast('خطأ: ' + e.message, true); btn.disabled = false; btn.textContent = '🎟️ توليد التذكرة وحفظها'; }
 };
@@ -7272,6 +7291,11 @@ window.saveEditTicket = async () => {
   const btn = document.getElementById('et-save-btn');
   btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
 
+  // ── نجيب المبلغ القديم قبل التعديل لحساب الفرق ──
+  const _tickets = window._allTicketsData || [];
+  const oldTicket = _tickets.find(x => x.id === id);
+  const oldAmount = oldTicket ? Number(oldTicket.amount || 0) : 0;
+
   try {
     await updateDoc(doc(_db, 'summerTickets', id), {
       name, receipt, date, pack,
@@ -7279,6 +7303,21 @@ window.saveEditTicket = async () => {
       fullPrice: fullPrice || (amount + remaining),
       status
     });
+
+    // ── لو المبلغ المدفوع زاد، نسجّل الفرق في الموارد المالية ──
+    const diff = amount - oldAmount;
+    if (diff > 0) {
+      const finDb = (typeof getFinDb === 'function' ? getFinDb() : null) || _db;
+      addDoc(collection(finDb, 'financeTx'), {
+        type: 'income',
+        desc: `دفعة إضافية — ${name} (${pack || receipt || '—'})`,
+        amount: diff,
+        date: date || new Date().toISOString().split('T')[0],
+        receipt: receipt || '',
+        createdAt: serverTimestamp()
+      }).catch(e => console.warn('financeTx diff-save error:', e));
+    }
+
     showToast && showToast('✅ تم تحديث التذكرة');
     closeEditTicketModal();
   } catch(e) {
