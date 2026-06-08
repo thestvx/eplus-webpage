@@ -5081,6 +5081,9 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
     return nowMs >= lastOccurrence.getTime() && nowMs < windowEnd;
   };
 
+  // الأدمين: لا قيود زمنية — كل حصة غير مسجّلة قابلة للتسجيل
+  const adminCanRecord = !isTeacherMode;
+
   // تحديد الحصة الحالية (أول حصة غير مسجّلة)
   let currentSession = 13;
   for (let i = 1; i <= 12; i++) {
@@ -5111,40 +5114,27 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
     card.classList.remove('locked', 'current', 'done', 'missed');
 
     if (isRecorded) {
-      // الأدمين: يعدّل دائماً | الأستاذ: يعدّل خلال 24 ساعة من التسجيل
+      // مسجّلة — الأدمين يعدّل دائماً، الأستاذ خلال 24 ساعة فقط
       let teacherCanEdit = false;
       if (isTeacherMode) {
         const rec = recordedSessions[i];
         const savedTs = rec?.savedAt?.toDate ? rec.savedAt.toDate() : (rec?.date ? new Date(rec.date + 'T00:00:00') : null);
-        if (savedTs) {
-          teacherCanEdit = (nowMs - savedTs.getTime()) / (1000 * 60 * 60) < 24;
-        }
+        if (savedTs) teacherCanEdit = (nowMs - savedTs.getTime()) / (1000 * 60 * 60) < 24;
       }
-      if (isTeacherMode && teacherCanEdit) {
+      if (!isTeacherMode || teacherCanEdit) {
         card.setAttribute('onclick', `editSession_g(${i}, ${gi})`);
-      } else if (isTeacherMode) {
-        card.setAttribute('onclick', `viewSessionHistory_g(${i}, ${gi})`);
       } else {
-        card.setAttribute('onclick', `editSession_g(${i}, ${gi})`);
+        card.setAttribute('onclick', `viewSessionHistory_g(${i}, ${gi})`);
       }
+    } else if (adminCanRecord) {
+      // الأدمين: كل حصة غير مسجّلة — مفتوحة للتسجيل بلا قيود
+      card.setAttribute('onclick', `openSession_g(${i}, ${gi})`);
     } else if (isMissed) {
-      // الأدمين يقدر يسجّل الحصة الفائتة — الأستاذ عرض فقط
-      if (!isTeacherMode) {
-        card.setAttribute('onclick', `openSession_g(${i}, ${gi})`);
-      } else {
-        card.setAttribute('onclick', `viewSessionHistory_g(${i}, ${gi})`);
-      }
+      card.setAttribute('onclick', `viewSessionHistory_g(${i}, ${gi})`);
     } else if (sessionIsOpen) {
       card.setAttribute('onclick', `openSession_g(${i}, ${gi})`);
     } else {
-      // مقفولة — الأدمين يقدر يفتحها مباشرةً
-      if (!isTeacherMode && isCurrent) {
-        card.setAttribute('onclick', `openSession_g(${i}, ${gi})`);
-      } else if (!isTeacherMode && !isRecorded) {
-        card.setAttribute('onclick', `openSession_g(${i}, ${gi})`);
-      } else {
-        card.setAttribute('onclick', '');
-      }
+      card.setAttribute('onclick', '');
     }
 
     if (isRecorded) {
@@ -5175,7 +5165,7 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
         : `<span class="sdot recorded"></span>`;
     } else if (isMissed) {
       card.classList.add('missed');
-      if (!isTeacherMode) {
+      if (adminCanRecord) {
         chipEl.innerHTML = `<span class="session-status-chip" style="background:rgba(245,158,11,0.12);color:#d97706;border:1px solid rgba(245,158,11,0.25)">⚠️ فائتة</span><div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">✏️ اضغط للتسجيل</div>`;
       } else {
         chipEl.innerHTML = `<span class="session-status-chip" style="background:rgba(245,158,11,0.12);color:#d97706;border:1px solid rgba(245,158,11,0.25)">⚠️ فائتة</span><div style="font-size:9px;color:#d97706;font-weight:700;margin-top:3px">انتهى وقتها</div>`;
@@ -5202,7 +5192,7 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
     } else {
       card.classList.add('locked');
       // الحصة مقفلة — الأدمين يقدر يسجّل في أي وقت
-      if (!isTeacherMode) {
+      if (adminCanRecord) {
         chipEl.innerHTML = `<span class="session-status-chip" style="background:rgba(124,58,237,0.08);color:var(--primary);border:1px solid var(--border-2);font-size:9px">📅 ${sessionDay||'—'}</span><div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">✏️ اضغط للتسجيل</div>`;
       } else if (isCurrent && sessionDay) {
         const dayIdx3 = arabicDayNames.indexOf(sessionDay);
