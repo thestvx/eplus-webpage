@@ -5441,10 +5441,13 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
     const sessionDay  = sessions[i - 1]?.day || '';
 
     // ── هل نافذة تسجيل هذه الحصة مفتوحة الآن؟ (يوم الحصة + 24 ساعة)
-    const sessionIsOpen = isCurrent && isSessionOpen(sessionDay);
+    // ✅ إصلاح: الحصة تفتح لأي حصة غير مسجّلة إذا كان يومها هو اليوم،
+    //    وليس فقط للحصة الحالية (isCurrent)، لأن الأستاذ قد تكون حصته
+    //    يوم الاثنين لكنها ليست أول حصة غير مسجّلة فتُقفل خطأً.
+    const sessionIsOpen = !isRecorded && isSessionOpen(sessionDay);
 
-    // ── الحصة "فائتة": كانت مفتوحة لكن لم تُسجّل وانتهت نافذتها
-    const isMissed = !isRecorded && !isCurrent && i < currentSession;
+    // ── الحصة "فائتة": لم تُسجّل وانتهت نافذتها (ولم تكن مفتوحة اليوم)
+    const isMissed = !isRecorded && !sessionIsOpen && i < currentSession;
 
     card.classList.remove('locked', 'current', 'done', 'missed');
 
@@ -5529,12 +5532,12 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
       // الحصة مقفلة — الأدمين يقدر يسجّل في أي وقت
       if (adminCanRecord) {
         chipEl.innerHTML = `<span class="session-status-chip" style="background:rgba(124,58,237,0.08);color:var(--primary);border:1px solid var(--border-2);font-size:9px">📅 ${sessionDay||'—'}</span><div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">✏️ اضغط للتسجيل</div>`;
-      } else if (isCurrent && sessionDay) {
+      } else if (sessionDay) {
         const dayIdx3 = arabicDayNames.indexOf(sessionDay);
         const now3 = new Date();
         const todayIdx3 = now3.getDay();
         let daysUntil3 = (dayIdx3 - todayIdx3 + 7) % 7;
-        if (daysUntil3 === 0) daysUntil3 = 7; // اليوم نفسه لكن فات الوقت → الأسبوع القادم
+        if (daysUntil3 === 0) daysUntil3 = 7; // اليوم نفسه لكن النافذة مغلقة → الأسبوع القادم
         const opensOn3 = new Date(now3); opensOn3.setDate(now3.getDate() + daysUntil3);
         const opensStr3 = opensOn3.toLocaleDateString('ar-DZ', {weekday:'long', day:'numeric', month:'short'});
         chipEl.innerHTML = `<span class="session-status-chip locked-chip" style="font-size:9px">🔒 ${sessionDay}</span><div style="font-size:9px;color:#888;font-weight:700;margin-top:3px">تنفتح ${opensStr3}</div>`;
