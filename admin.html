@@ -503,6 +503,25 @@
     ::-webkit-scrollbar-thumb{background:rgba(124,58,237,0.2);border-radius:99px}
 
     /* ===== TEACHERS SECTION ===== */
+    /* ===== CROSS STUDENT SEARCH ===== */
+    .cs-result-card{background:linear-gradient(135deg,rgba(20,184,166,0.04),rgba(124,58,237,0.04));border:1.5px solid rgba(20,184,166,0.2);border-radius:18px;padding:20px 24px;margin-bottom:12px;transition:box-shadow 0.2s}
+    .cs-result-card:hover{box-shadow:0 8px 28px rgba(20,184,166,0.12)}
+    .cs-header{display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+    .cs-avatar{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,var(--teal),#0891b2);display:flex;align-items:center;justify-content:center;font-size:20px;color:white;font-weight:900;flex-shrink:0}
+    .cs-name{font-size:16px;font-weight:900;color:var(--text)}
+    .cs-teacher{font-size:12px;color:var(--text-muted);font-weight:600;margin-top:2px}
+    .cs-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:14px}
+    .cs-stat{background:white;border:1px solid var(--border);border-radius:12px;padding:12px 14px;text-align:center}
+    .cs-stat-n{font-size:22px;font-weight:900}
+    .cs-stat-l{font-size:11px;color:var(--text-muted);font-weight:600;margin-top:2px}
+    .cs-info-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .cs-badge{padding:5px 12px;border-radius:99px;font-size:12px;font-weight:700;border:1px solid transparent}
+    .cs-badge.pack{background:rgba(124,58,237,0.08);color:var(--primary);border-color:var(--border-2)}
+    .cs-badge.paid{background:var(--success-soft);color:var(--success);border-color:rgba(16,185,129,0.2)}
+    .cs-badge.unpaid{background:var(--danger-soft);color:var(--danger);border-color:rgba(239,68,68,0.15)}
+    .cs-badge.group{background:rgba(245,158,11,0.1);color:#92400e;border-color:rgba(245,158,11,0.2)}
+    .cs-badge.note{background:rgba(20,184,166,0.1);color:var(--teal);border-color:rgba(20,184,166,0.2)}
+    .cs-no-result{text-align:center;padding:30px 20px;color:var(--text-muted)}
     .teachers-hero{background:linear-gradient(135deg,#4F46E5 0%,#7C3AED 50%,#9333EA 100%);border-radius:var(--radius);padding:28px 32px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;gap:20px;color:white;position:relative;overflow:hidden;box-shadow:0 12px 40px rgba(124,58,237,0.3)}
     .teachers-hero::before{content:'';position:absolute;top:-40px;left:-40px;width:200px;height:200px;background:rgba(255,255,255,0.06);border-radius:50%}
     .teachers-hero::after{content:'';position:absolute;bottom:-60px;right:20%;width:280px;height:280px;background:rgba(255,255,255,0.04);border-radius:50%}
@@ -1697,6 +1716,35 @@
             </div>
           </div>
           <button class="btn-primary" style="width:auto;padding:12px 24px" onclick="openAddTeacherModal()">➕ إضافة أستاذ جديد</button>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════
+             بحث التلميذ عبر جميع الأساتذة
+        ══════════════════════════════════════════════════ -->
+        <div class="panel" style="margin-bottom:20px" id="student-cross-search-panel">
+          <div class="panel-header">
+            <div class="panel-icon" style="background:rgba(20,184,166,0.12);border-color:rgba(20,184,166,0.25)">🔍</div>
+            <div>
+              <div style="font-size:15px;font-weight:800;color:var(--text)">بحث عن تلميذ</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:2px">اكتب اسم التلميذ لمعرفة أستاذه، فوجه، حضوره، وحالة الدفع</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+            <div style="position:relative;flex:1">
+              <span style="position:absolute;top:50%;right:14px;transform:translateY(-50%);font-size:17px;pointer-events:none">🔍</span>
+              <input class="inp" type="text" id="cross-search-inp"
+                placeholder="اكتب اسم التلميذ..."
+                style="padding-right:44px"
+                oninput="crossSearchStudent(this.value)">
+            </div>
+            <button style="padding:12px 20px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--teal),#0891b2);color:white;font-size:14px;font-weight:800;font-family:'Tajawal',sans-serif;cursor:pointer;white-space:nowrap;box-shadow:0 4px 14px rgba(20,184,166,0.35);transition:all 0.2s"
+              onclick="crossSearchStudent(document.getElementById('cross-search-inp').value)">
+              بحث
+            </button>
+          </div>
+
+          <div id="cross-search-results" style="display:none"></div>
         </div>
 
         <!-- Teachers grid -->
@@ -3996,6 +4044,145 @@ window.addTeacher = async () => {
     showToast('❌ ' + msg, true);
   }
   btn.disabled = false; btn.textContent = '👨‍🏫 إنشاء حساب الأستاذ';
+};
+
+// ─── بحث التلميذ عبر جميع الأساتذة ───
+window.crossSearchStudent = async (rawVal) => {
+  const val = (rawVal || '').trim().toLowerCase();
+  const container = document.getElementById('cross-search-results');
+  if (!container) return;
+
+  if (val.length < 2) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  container.style.display = 'block';
+  container.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-muted);font-weight:700">⏳ جاري البحث...</div>`;
+
+  // ── 1. ابحث في allTeachers عن كل تلميذ يطابق الاسم ──
+  const matches = []; // { teacher, student, groupName, groupIdx }
+  for (const t of allTeachers) {
+    const allStudents = t.students || [];
+    const groups = t.groups || [];
+
+    // ابحث بدون أفواج
+    allStudents.forEach(s => {
+      if (!s.name) return;
+      if (!s.name.toLowerCase().includes(val)) return;
+      // حدد الفوج
+      let groupName = '—';
+      let groupIdx = -1;
+      groups.forEach((g, gi) => {
+        if ((g.students || []).some(gs => gs.trim().toLowerCase() === s.name.trim().toLowerCase())) {
+          groupName = g.name;
+          groupIdx = gi;
+        }
+      });
+      matches.push({ teacher: t, student: s, groupName, groupIdx });
+    });
+  }
+
+  if (!matches.length) {
+    container.innerHTML = `<div class="cs-no-result"><div style="font-size:36px;margin-bottom:10px">🔍</div><div style="font-weight:700">لم يُعثر على تلميذ بهذا الاسم</div><div style="font-size:12px;margin-top:4px">تأكد من الكتابة الصحيحة</div></div>`;
+    return;
+  }
+
+  // ── 2. لكل تطابق: اجلب سجلات الحضور من Firestore ──
+  const resultsHtml = await Promise.all(matches.map(async ({ teacher, student, groupName, groupIdx }) => {
+    const tid = teacher.id;
+    const groupSuffix = groupIdx >= 0 ? `_g${groupIdx}` : '_g0';
+
+    let presentCount = 0, absentCount = 0, totalSessions = 0;
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'sessionAttendance'),
+          where('teacherId', '==', tid + groupSuffix))
+      );
+      snap.forEach(d => {
+        const data = d.data();
+        const stuArr = data.students || [];
+        const stuRec = stuArr.find(s => s.name?.trim().toLowerCase() === student.name?.trim().toLowerCase());
+        if (stuRec !== undefined) {
+          totalSessions++;
+          if (stuRec.present) presentCount++;
+          else absentCount++;
+        }
+      });
+    } catch(e) {}
+
+    // ── 3. ابحث في التذاكر عن حالة الدفع ──
+    const ticketData = (window._allTicketsData || allTicketsData || [])
+      .find(tk => tk.name?.trim().toLowerCase() === student.name?.trim().toLowerCase());
+
+    const packLabel  = ticketData?.pack || student.pack || '—';
+    const noteLabel  = ticketData?.note || '';
+    const paidAmt    = ticketData ? Number(ticketData.amount || 0) : null;
+    const remaining  = ticketData ? Number(ticketData.remainingAmount || 0) : null;
+    const isPaid     = ticketData ? (remaining === 0) : null;
+    const receipt    = ticketData?.receipt || '';
+
+    const payBadge = ticketData === undefined
+      ? `<span class="cs-badge unpaid">❓ لا تذكرة</span>`
+      : isPaid
+        ? `<span class="cs-badge paid">✅ مدفوع — ${paidAmt?.toLocaleString('ar-DZ')} دج</span>`
+        : `<span class="cs-badge unpaid">⏳ متبقي ${remaining?.toLocaleString('ar-DZ')} دج</span>`;
+
+    const presentPct = totalSessions > 0 ? Math.round(presentCount / totalSessions * 100) : null;
+    const barColor   = presentPct === null ? '#d1d5db' : presentPct >= 75 ? '#10B981' : presentPct >= 50 ? '#F59E0B' : '#EF4444';
+
+    return `
+      <div class="cs-result-card">
+        <div class="cs-header">
+          <div class="cs-avatar">${(student.name||'?')[0]}</div>
+          <div style="flex:1">
+            <div class="cs-name">${student.name}</div>
+            <div class="cs-teacher">👨‍🏫 ${teacher.name} &nbsp;·&nbsp; 🎓 ${teacher.spec || '—'}</div>
+          </div>
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);background:var(--bg-2);padding:4px 10px;border-radius:8px">🔑 ${receipt || '—'}</div>
+        </div>
+
+        <div class="cs-stats">
+          <div class="cs-stat">
+            <div class="cs-stat-n" style="color:var(--success)">${presentCount}</div>
+            <div class="cs-stat-l">✅ حصص حاضر</div>
+          </div>
+          <div class="cs-stat">
+            <div class="cs-stat-n" style="color:var(--danger)">${absentCount}</div>
+            <div class="cs-stat-l">❌ حصص غائب</div>
+          </div>
+          <div class="cs-stat">
+            <div class="cs-stat-n" style="color:var(--primary)">${totalSessions}</div>
+            <div class="cs-stat-l">📋 حصص مسجّلة</div>
+          </div>
+          <div class="cs-stat">
+            <div class="cs-stat-n" style="color:${barColor}">${presentPct !== null ? presentPct + '%' : '—'}</div>
+            <div class="cs-stat-l">📈 نسبة الحضور</div>
+          </div>
+        </div>
+
+        ${totalSessions > 0 ? `
+        <div style="margin-bottom:14px">
+          <div style="height:8px;border-radius:99px;background:#e5e7eb;overflow:hidden">
+            <div style="height:100%;width:${presentPct}%;background:${barColor};border-radius:99px;transition:width 0.6s ease"></div>
+          </div>
+        </div>` : ''}
+
+        <div class="cs-info-row">
+          ${groupName !== '—' ? `<span class="cs-badge group">🏫 ${groupName}</span>` : ''}
+          ${packLabel !== '—' ? `<span class="cs-badge pack">📦 ${packLabel}</span>` : ''}
+          ${noteLabel ? `<span class="cs-badge note">🌍 ${noteLabel}</span>` : ''}
+          ${payBadge}
+        </div>
+      </div>`;
+  }));
+
+  container.innerHTML = `
+    <div style="font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:12px">
+      🔎 ${matches.length} نتيجة لـ "<span style="color:var(--primary)">${rawVal.trim()}</span>"
+    </div>
+    ${resultsHtml.join('')}`;
 };
 
 // ─── Load teachers list ───
