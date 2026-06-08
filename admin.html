@@ -4222,7 +4222,7 @@ window.openAttModal = async (teacherId) => {
       bannerEl.style.background = 'rgba(245,158,11,0.08)';
       bannerEl.style.border = '1px solid rgba(245,158,11,0.3)';
       bannerEl.style.color = '#92400e';
-      bannerEl.innerHTML = `⏳ الحصة <strong>${currentSessionNum}</strong> — لم يُسجِّلها الأستاذ بعد<br><span style="font-size:11px;color:var(--text-muted);margin-top:4px;display:block">التسجيل من صلاحية الأستاذ فقط — بعد تسجيله يمكنك التعديل من "تعديل حصة مسجّلة"</span>`;
+      bannerEl.innerHTML = `⏳ الحصة <strong>${currentSessionNum}</strong> — لم يُسجِّلها الأستاذ بعد<br><span style="font-size:11px;color:var(--primary);margin-top:4px;display:block">✏️ بإمكانك تسجيل الحضور مباشرةً من شبكة الحصص أدناه</span>`;
     }
   }
 
@@ -4899,8 +4899,8 @@ function showTeacherInlineAttendance(teacherId, teacherData) {
         <div class="sessions-title">📅 سجل الحضور — 12 حصة في الشهر</div>
         <div class="sessions-sub">
           ${hasGroups
-            ? 'اختر الفوج ثم اضغط على الحصة الحالية لتسجيل الحضور — تُفعَّل فقط أيام كل فوج'
-            : 'اضغط على الحصة الحالية لتسجيل حضور التلاميذ — الحصص الأخرى مغلقة حتى يحين موعدها'}
+            ? 'اختر الفوج ثم اضغط على أي حصة لتسجيل الحضور أو تعديله'
+            : 'اضغط على أي حصة لتسجيل الحضور — الحصص المسجّلة قابلة للتعديل في أي وقت'}
         </div>
       </div>
 
@@ -5128,11 +5128,23 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
         card.setAttribute('onclick', `editSession_g(${i}, ${gi})`);
       }
     } else if (isMissed) {
-      card.setAttribute('onclick', `viewSessionHistory_g(${i}, ${gi})`);
+      // الأدمين يقدر يسجّل الحصة الفائتة — الأستاذ عرض فقط
+      if (!isTeacherMode) {
+        card.setAttribute('onclick', `openSession_g(${i}, ${gi})`);
+      } else {
+        card.setAttribute('onclick', `viewSessionHistory_g(${i}, ${gi})`);
+      }
     } else if (sessionIsOpen) {
       card.setAttribute('onclick', `openSession_g(${i}, ${gi})`);
     } else {
-      card.setAttribute('onclick', '');
+      // مقفولة — الأدمين يقدر يفتحها مباشرةً
+      if (!isTeacherMode && isCurrent) {
+        card.setAttribute('onclick', `openSession_g(${i}, ${gi})`);
+      } else if (!isTeacherMode && !isRecorded) {
+        card.setAttribute('onclick', `openSession_g(${i}, ${gi})`);
+      } else {
+        card.setAttribute('onclick', '');
+      }
     }
 
     if (isRecorded) {
@@ -5163,7 +5175,11 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
         : `<span class="sdot recorded"></span>`;
     } else if (isMissed) {
       card.classList.add('missed');
-      chipEl.innerHTML = `<span class="session-status-chip" style="background:rgba(245,158,11,0.12);color:#d97706;border:1px solid rgba(245,158,11,0.25)">⚠️ فائتة</span><div style="font-size:9px;color:#d97706;font-weight:700;margin-top:3px">انتهى وقتها</div>`;
+      if (!isTeacherMode) {
+        chipEl.innerHTML = `<span class="session-status-chip" style="background:rgba(245,158,11,0.12);color:#d97706;border:1px solid rgba(245,158,11,0.25)">⚠️ فائتة</span><div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">✏️ اضغط للتسجيل</div>`;
+      } else {
+        chipEl.innerHTML = `<span class="session-status-chip" style="background:rgba(245,158,11,0.12);color:#d97706;border:1px solid rgba(245,158,11,0.25)">⚠️ فائتة</span><div style="font-size:9px;color:#d97706;font-weight:700;margin-top:3px">انتهى وقتها</div>`;
+      }
       dotsEl.innerHTML = students.length
         ? students.map(s => `<span class="sdot" style="opacity:0.4" title="${s.name}"></span>`).join('')
         : `<span class="sdot" style="opacity:0.4"></span>`;
@@ -5185,8 +5201,10 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
         : `<span class="sdot current-dot"></span>`;
     } else {
       card.classList.add('locked');
-      // الحصة مقفلة — نحسب متى تنفتح (اليوم القادم الذي يطابق sessionDay)
-      if (isCurrent && sessionDay) {
+      // الحصة مقفلة — الأدمين يقدر يسجّل في أي وقت
+      if (!isTeacherMode) {
+        chipEl.innerHTML = `<span class="session-status-chip" style="background:rgba(124,58,237,0.08);color:var(--primary);border:1px solid var(--border-2);font-size:9px">📅 ${sessionDay||'—'}</span><div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">✏️ اضغط للتسجيل</div>`;
+      } else if (isCurrent && sessionDay) {
         const dayIdx3 = arabicDayNames.indexOf(sessionDay);
         const now3 = new Date();
         const todayIdx3 = now3.getDay();
