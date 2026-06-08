@@ -2380,7 +2380,10 @@ window.switchNavSection = (section) => {
   // Finance nav item by ID
   const finNav = document.getElementById('nav-finance');
   if (finNav) finNav.classList.toggle('active', section === 'finance');
-  if (section === 'finance') loadFinanceSection();
+  if (section === 'finance') {
+    if (window.loadFinanceSection) window.loadFinanceSection();
+    else setTimeout(() => window.loadFinanceSection?.(), 600);
+  }
 };
 
 // Keep old switchTab for compatibility
@@ -6974,7 +6977,7 @@ let _finUnsubTx = null; // real-time listener
 function getFinDb() { return _db || window._mainDb; }
 
 // تحميل البيانات من Firestore — real-time
-async function loadFinanceSection() {
+window.loadFinanceSection = async function loadFinanceSection() {
   const finDb = getFinDb();
   if (!finDb) { console.error('Finance: db not ready'); showToast && showToast('❌ خطأ في الاتصال بقاعدة البيانات', true); return; }
   try {
