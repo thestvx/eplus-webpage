@@ -4253,7 +4253,7 @@ function loadTeachers() {
     allTeachers.forEach(t => { totalStudents += (t.students || []).length; });
     document.getElementById('t-stat-students').textContent = totalStudents;
     // Today's label
-    const todayName = AR_DAYS[new Date().getDay()];
+    const todayName = AR_DAYS[new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Algiers'})).getDay()];
     const todayCount = allTeachers.filter(t => (t.days || []).includes(todayName)).length;
     document.getElementById('t-stat-today').textContent = todayCount;
     document.getElementById('t-today-label').textContent = `📅 اليوم: ${todayName} — ${todayCount} أستاذ`;
@@ -4268,7 +4268,7 @@ function renderTeachersGrid(teachers) {
     grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted)"><div style="font-size:48px;opacity:0.3;margin-bottom:10px">👨‍🏫</div><div style="font-weight:700">لا يوجد أساتذة بعد</div></div>`;
     return;
   }
-  const todayName = AR_DAYS[new Date().getDay()];
+  const todayName = AR_DAYS[new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Algiers'})).getDay()];
   grid.innerHTML = '';
   teachers.forEach(t => {
     const card = document.createElement('div');
@@ -4427,7 +4427,8 @@ window.openAttModal = async (teacherId) => {
     ? `<img class="att-modal-avatar" src="${t.photo}" alt="${t.name}">`
     : `<div class="att-modal-avatar-placeholder">${(t.name||'?')[0]}</div>`;
   document.getElementById('att-modal-teacher-name').textContent = t.name;
-  const todayLabel = `سجل الحضور — ${AR_DAYS[new Date().getDay()]} ${new Date().toLocaleDateString('ar-DZ')}`;
+  const _dzNow = new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Algiers'}));
+  const todayLabel = `سجل الحضور — ${AR_DAYS[_dzNow.getDay()]} ${_dzNow.toLocaleDateString('ar-DZ')}`;
   document.getElementById('att-modal-date-label').textContent = todayLabel;
 
   // تحديد الحصة الحالية
@@ -5196,7 +5197,7 @@ function showTeacherInlineAttendance(teacherId, teacherData) {
   const teacherDays   = teacherData.days || [];
   const groups        = teacherData.groups || [];
   const arabicDayNames = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
-  const todayArabic   = arabicDayNames[new Date().getDay()];
+  const todayArabic   = arabicDayNames[new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Algiers'})).getDay()];
 
   const avatarHtml = teacherData.photo
     ? `<img src="${teacherData.photo}" alt="${teacherData.name}" style="width:56px;height:56px;border-radius:16px;object-fit:cover;flex-shrink:0">`
@@ -5392,26 +5393,30 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
   const students = currentAttStudents;
 
   const arabicDayNames = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
-  const todayArabic = arabicDayNames[new Date().getDay()];
-  const nowMs = Date.now();
+
+  // ─── الوقت الرسمي في الجزائر (UTC+1) — لا نعتمد على توقيت المتصفح
+  const nowDZ = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Algiers' }));
+  const nowMs = nowDZ.getTime();
+  const todayArabic = arabicDayNames[nowDZ.getDay()];
 
   // الأيام المسموح بها لهذا الفوج
   const allowedDays = groupData && groupData.days && groupData.days.length ? groupData.days : (teacherData.days || []);
 
   // ─── دالة مساعدة: هل نافذة تسجيل هذه الحصة مفتوحة الآن؟
-  // القاعدة: الحصة تنفتح من 01:00 صباحاً ليوم تدريسها وتُقفل عند 23:59 من نفس اليوم.
-  // الحصة التالية تنفتح في اليوم التالي المخصص من 01:00 فصاعداً.
+  // القاعدة (بتوقيت الجزائر):
+  //   • الحصة تنفتح من 01:00 صباحاً ليوم تدريسها
+  //   • تُقفل عند 23:59:59 من نفس اليوم
+  //   • فقط الحصة الأولى بالترتيب (isCurrent) هي التي تفتح
   const isSessionOpen = (sessionDay) => {
     if (!allowedDays.includes(sessionDay)) return false;
     const dayIdx = arabicDayNames.indexOf(sessionDay);
     if (dayIdx === -1) return false;
-    const now = new Date();
-    // الحصة تفتح فقط إذا كان يومها هو اليوم الحالي
-    if (now.getDay() !== dayIdx) return false;
-    // نافذة التسجيل: من 01:00 صباحاً حتى 23:59:59
-    const todayAt1am = new Date(now); todayAt1am.setHours(1, 0, 0, 0);
-    const todayEnd   = new Date(now); todayEnd.setHours(23, 59, 59, 999);
-    return nowMs >= todayAt1am.getTime() && nowMs <= todayEnd.getTime();
+    // يجب أن يكون يوم الحصة هو اليوم الحالي بتوقيت الجزائر
+    if (nowDZ.getDay() !== dayIdx) return false;
+    // نافذة التسجيل: 01:00 → 23:59:59 بتوقيت الجزائر
+    const h = nowDZ.getHours(), m = nowDZ.getMinutes();
+    const totalMins = h * 60 + m;
+    return totalMins >= 60 && totalMins <= 1439; // 01:00=60دق ← 23:59=1439دق
   };
 
   // الأدمين: لا قيود زمنية — كل حصة غير مسجّلة قابلة للتسجيل
@@ -5509,14 +5514,12 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
         : `<span class="sdot" style="opacity:0.4"></span>`;
     } else if (sessionIsOpen) {
       card.classList.add('current');
-      // الوقت المتبقي حتى قفل الحصة (23:59:59 اليوم)
-      const now2 = new Date();
-      const closesAt = new Date(now2); closesAt.setHours(23, 59, 59, 999);
-      const minsLeft2 = Math.max(0, Math.round((closesAt.getTime() - nowMs) / 60000));
+      // الوقت المتبقي حتى قفل الحصة (23:59 بتوقيت الجزائر)
+      const minsLeft2 = Math.max(0, (23 * 60 + 59) - (nowDZ.getHours() * 60 + nowDZ.getMinutes()));
       const timeHint2 = minsLeft2 > 60
         ? `${Math.ceil(minsLeft2/60)}س متبقية`
         : `${minsLeft2} دقيقة`;
-      const todayStr = now2.toLocaleDateString('ar-DZ', {day:'numeric', month:'short'});
+      const todayStr = nowDZ.toLocaleDateString('ar-DZ', {day:'numeric', month:'short'});
       chipEl.innerHTML = `<span class="session-status-chip current-chip">▶ الحصة الحالية</span><div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">${todayStr} — ⏳ ${timeHint2}</div>`;
       dotsEl.innerHTML = students.length
         ? students.map((s,idx) => `<span class="sdot ${idx===0?'current-dot':''}" title="${s.name}"></span>`).join('')
@@ -5527,15 +5530,13 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
       if (adminCanRecord) {
         chipEl.innerHTML = `<span class="session-status-chip" style="background:rgba(124,58,237,0.08);color:var(--primary);border:1px solid var(--border-2);font-size:9px">📅 ${sessionDay||'—'}</span><div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">✏️ اضغط للتسجيل</div>`;
       } else if (sessionDay) {
+        // حساب تاريخ الفتح القادم بتوقيت الجزائر
         const dayIdx3 = arabicDayNames.indexOf(sessionDay);
-        const now3 = new Date();
-        const todayIdx3 = now3.getDay();
+        const todayIdx3 = nowDZ.getDay();
         let daysUntil3 = (dayIdx3 - todayIdx3 + 7) % 7;
-        // إذا كان daysUntil3 === 0 يعني اليوم هو يوم الحصة لكن النافذة مغلقة
-        // (إما قبل 01:00 أو الحصة ليست الحالية) → المرة القادمة بعد أسبوع
+        // 0 = اليوم نفسه لكن النافذة مغلقة (قبل 01:00 أو ليست الحصة الحالية) → الأسبوع القادم
         if (daysUntil3 === 0) daysUntil3 = 7;
-        const opensOn3 = new Date(now3); opensOn3.setDate(now3.getDate() + daysUntil3);
-        opensOn3.setHours(1, 0, 0, 0); // تنفتح من 01:00
+        const opensOn3 = new Date(nowDZ); opensOn3.setDate(nowDZ.getDate() + daysUntil3);
         const opensStr3 = opensOn3.toLocaleDateString('ar-DZ', {weekday:'long', day:'numeric', month:'short'});
         chipEl.innerHTML = `<span class="session-status-chip locked-chip" style="font-size:9px">🔒 ${sessionDay}</span><div style="font-size:9px;color:#888;font-weight:700;margin-top:3px">تنفتح ${opensStr3} 01:00</div>`;
       } else {
