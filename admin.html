@@ -5398,28 +5398,26 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
   // الأيام المسموح بها لهذا الفوج
   const allowedDays = groupData && groupData.days && groupData.days.length ? groupData.days : (teacherData.days || []);
 
-  // ─── دالة مساعدة: هل الحصة في نافذة التسجيل المفتوحة؟
-  // الحصة تنفتح عند بداية يوم تدريسها (00:00) وتنقفل بعد 24 ساعة منه
+  // ─── دالة مساعدة: هل نافذة تسجيل هذه الحصة مفتوحة الآن؟
+  // القاعدة: الحصة تنفتح من 01:00 صباحاً ليوم تدريسها وتُقفل عند 23:59 من نفس اليوم.
+  // الحصة التالية تنفتح في اليوم التالي المخصص من 01:00 فصاعداً.
   const isSessionOpen = (sessionDay) => {
     if (!allowedDays.includes(sessionDay)) return false;
-    // نبحث عن آخر يوم مضى أو اليوم الحالي يطابق sessionDay
     const dayIdx = arabicDayNames.indexOf(sessionDay);
     if (dayIdx === -1) return false;
     const now = new Date();
-    const todayIdx = now.getDay(); // 0=أحد
-    // كم يوم مضى منذ آخر مرة كان فيها هذا اليوم
-    let daysAgo = (todayIdx - dayIdx + 7) % 7; // 0 = اليوم نفسه
-    const lastOccurrence = new Date(now);
-    lastOccurrence.setDate(now.getDate() - daysAgo);
-    lastOccurrence.setHours(0, 0, 0, 0); // بداية ذلك اليوم
-    const windowEnd = lastOccurrence.getTime() + 24 * 60 * 60 * 1000; // + 24 ساعة
-    return nowMs >= lastOccurrence.getTime() && nowMs < windowEnd;
+    // الحصة تفتح فقط إذا كان يومها هو اليوم الحالي
+    if (now.getDay() !== dayIdx) return false;
+    // نافذة التسجيل: من 01:00 صباحاً حتى 23:59:59
+    const todayAt1am = new Date(now); todayAt1am.setHours(1, 0, 0, 0);
+    const todayEnd   = new Date(now); todayEnd.setHours(23, 59, 59, 999);
+    return nowMs >= todayAt1am.getTime() && nowMs <= todayEnd.getTime();
   };
 
   // الأدمين: لا قيود زمنية — كل حصة غير مسجّلة قابلة للتسجيل
   const adminCanRecord = !isTeacherMode;
 
-  // تحديد الحصة الحالية (أول حصة غير مسجّلة)
+  // تحديد الحصة الحالية (أول حصة غير مسجّلة بالترتيب)
   let currentSession = 13;
   for (let i = 1; i <= 12; i++) {
     if (!recordedSessions[i]) { currentSession = i; break; }
@@ -5440,13 +5438,11 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
     const isCurrent   = i === currentSession;
     const sessionDay  = sessions[i - 1]?.day || '';
 
-    // ── هل نافذة تسجيل هذه الحصة مفتوحة الآن؟ (يوم الحصة + 24 ساعة)
-    // ✅ إصلاح: الحصة تفتح لأي حصة غير مسجّلة إذا كان يومها هو اليوم،
-    //    وليس فقط للحصة الحالية (isCurrent)، لأن الأستاذ قد تكون حصته
-    //    يوم الاثنين لكنها ليست أول حصة غير مسجّلة فتُقفل خطأً.
-    const sessionIsOpen = !isRecorded && isSessionOpen(sessionDay);
+    // ── هل نافذة تسجيل هذه الحصة مفتوحة الآن؟
+    // الشرطان معاً: الحصة هي الأولى بالترتيب (isCurrent) + يومها اليوم + الوقت بين 01:00 و23:59
+    const sessionIsOpen = isCurrent && isSessionOpen(sessionDay);
 
-    // ── الحصة "فائتة": لم تُسجّل وانتهت نافذتها (ولم تكن مفتوحة اليوم)
+    // ── الحصة "فائتة": لم تُسجّل وليست الحالية ولا نافذتها مفتوحة
     const isMissed = !isRecorded && !sessionIsOpen && i < currentSession;
 
     card.classList.remove('locked', 'current', 'done', 'missed');
@@ -5513,12 +5509,10 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
         : `<span class="sdot" style="opacity:0.4"></span>`;
     } else if (sessionIsOpen) {
       card.classList.add('current');
-      // احسب الوقت المتبقي قبل قفل الحصة
-      const dayIdx2 = arabicDayNames.indexOf(sessionDay);
+      // الوقت المتبقي حتى قفل الحصة (23:59:59 اليوم)
       const now2 = new Date();
-      const daysAgo2 = (now2.getDay() - dayIdx2 + 7) % 7;
-      const openedAt2 = new Date(now2); openedAt2.setDate(now2.getDate() - daysAgo2); openedAt2.setHours(0,0,0,0);
-      const minsLeft2 = Math.max(0, Math.round((openedAt2.getTime() + 24*3600*1000 - nowMs) / 60000));
+      const closesAt = new Date(now2); closesAt.setHours(23, 59, 59, 999);
+      const minsLeft2 = Math.max(0, Math.round((closesAt.getTime() - nowMs) / 60000));
       const timeHint2 = minsLeft2 > 60
         ? `${Math.ceil(minsLeft2/60)}س متبقية`
         : `${minsLeft2} دقيقة`;
@@ -5537,10 +5531,13 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
         const now3 = new Date();
         const todayIdx3 = now3.getDay();
         let daysUntil3 = (dayIdx3 - todayIdx3 + 7) % 7;
-        if (daysUntil3 === 0) daysUntil3 = 7; // اليوم نفسه لكن النافذة مغلقة → الأسبوع القادم
+        // إذا كان daysUntil3 === 0 يعني اليوم هو يوم الحصة لكن النافذة مغلقة
+        // (إما قبل 01:00 أو الحصة ليست الحالية) → المرة القادمة بعد أسبوع
+        if (daysUntil3 === 0) daysUntil3 = 7;
         const opensOn3 = new Date(now3); opensOn3.setDate(now3.getDate() + daysUntil3);
+        opensOn3.setHours(1, 0, 0, 0); // تنفتح من 01:00
         const opensStr3 = opensOn3.toLocaleDateString('ar-DZ', {weekday:'long', day:'numeric', month:'short'});
-        chipEl.innerHTML = `<span class="session-status-chip locked-chip" style="font-size:9px">🔒 ${sessionDay}</span><div style="font-size:9px;color:#888;font-weight:700;margin-top:3px">تنفتح ${opensStr3}</div>`;
+        chipEl.innerHTML = `<span class="session-status-chip locked-chip" style="font-size:9px">🔒 ${sessionDay}</span><div style="font-size:9px;color:#888;font-weight:700;margin-top:3px">تنفتح ${opensStr3} 01:00</div>`;
       } else {
         chipEl.innerHTML = `<span class="session-status-chip locked-chip" style="font-size:9px">📅 ${sessionDay}</span>`;
       }
