@@ -452,6 +452,12 @@
     .tbl tbody tr:hover td{background:#F9F6FF}
     .receipt-code{font-family:monospace;font-size:11px;color:var(--primary);letter-spacing:1px;background:var(--primary-light);padding:2px 8px;border-radius:6px}
     .pack-chip{padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700;background:var(--accent-soft);color:#92400E;border:1px solid rgba(245,158,11,0.2)}
+    /* ===== LANGUAGE SELECTOR ===== */
+    .lang-options{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+    .lang-chip{display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;border:2px solid var(--border);background:#FAFAFA;cursor:pointer;transition:all 0.2s ease;font-size:14px;font-weight:700;color:var(--text-2);user-select:none}
+    .lang-chip:hover{border-color:var(--primary);background:var(--primary-light);color:var(--primary)}
+    .lang-chip input[type=checkbox]{width:16px;height:16px;accent-color:var(--primary);cursor:pointer}
+    .lang-chip.selected{border-color:var(--primary);background:var(--primary-light);color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
     .tickets-filter-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
     .ticket-filter-btn{padding:6px 14px;border-radius:99px;border:2px solid var(--border);background:white;font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;color:var(--text-2);transition:all 0.18s;white-space:nowrap}
     .ticket-filter-btn:hover{border-color:var(--primary);color:var(--primary)}
@@ -1567,6 +1573,33 @@
               <label class="form-label">تاريخ الدفع</label>
               <input class="inp" type="date" id="sc-date" value="2026-06-03">
             </div>
+
+            <!-- ══ اللغات المختارة ══ -->
+            <div class="form-group" style="background:linear-gradient(135deg,rgba(20,184,166,0.06),rgba(59,130,246,0.06));border:2px solid rgba(20,184,166,0.25);border-radius:16px;padding:18px">
+              <div style="font-size:13px;font-weight:800;color:var(--text-2);margin-bottom:12px;display:flex;align-items:center;gap:8px">
+                <span style="width:30px;height:30px;border-radius:10px;background:rgba(20,184,166,0.12);display:inline-flex;align-items:center;justify-content:center;font-size:16px">🌍</span>
+                اللغة المختارة
+                <span style="font-size:11px;color:var(--text-muted);font-weight:600">(تظهر في خانة الملاحظة)</span>
+              </div>
+              <div class="lang-options">
+                <label class="lang-chip" id="chip-en" onclick="toggleLangChip(this)">
+                  <input type="checkbox" id="lang-en" value="الإنجليزية" onchange="updateLangChips()">
+                  🇬🇧 الإنجليزية
+                </label>
+                <label class="lang-chip" id="chip-fr" onclick="toggleLangChip(this)">
+                  <input type="checkbox" id="lang-fr" value="الفرنسية" onchange="updateLangChips()">
+                  🇫🇷 الفرنسية
+                </label>
+                <label class="lang-chip" id="chip-es" onclick="toggleLangChip(this)">
+                  <input type="checkbox" id="lang-es" value="الإسبانية" onchange="updateLangChips()">
+                  🇪🇸 الإسبانية
+                </label>
+              </div>
+              <div id="lang-preview" style="display:none;margin-top:12px;padding:10px 14px;background:white;border-radius:10px;border:1px solid rgba(20,184,166,0.3);font-size:13px;font-weight:700;color:var(--teal)">
+                📝 الملاحظة: <span id="lang-preview-text"></span>
+              </div>
+            </div>
+
             <button class="btn-primary btn-summer" id="sc-gen-btn" onclick="generateTicket()">🎟️ توليد التذكرة وحفظها</button>
           </div>
 
@@ -2965,6 +2998,45 @@ window.applyRemainingToTicket = () => {
 
 let currentReceipt = null;
 
+// ── Language chips ──
+window.toggleLangChip = (label) => {
+  // Prevent double-toggle from label click + checkbox change
+  const cb = label.querySelector('input[type=checkbox]');
+  // The click on label will toggle checkbox automatically, just sync UI
+  setTimeout(() => {
+    updateLangChips();
+  }, 0);
+};
+
+window.updateLangChips = () => {
+  const chips = [
+    { chip: document.getElementById('chip-en'), cb: document.getElementById('lang-en') },
+    { chip: document.getElementById('chip-fr'), cb: document.getElementById('lang-fr') },
+    { chip: document.getElementById('chip-es'), cb: document.getElementById('lang-es') },
+  ];
+  const selected = [];
+  chips.forEach(({ chip, cb }) => {
+    if (cb.checked) { chip.classList.add('selected'); selected.push(cb.value); }
+    else { chip.classList.remove('selected'); }
+  });
+  const preview = document.getElementById('lang-preview');
+  const previewText = document.getElementById('lang-preview-text');
+  if (selected.length > 0) {
+    preview.style.display = 'block';
+    previewText.textContent = selected.join(' + ');
+  } else {
+    preview.style.display = 'none';
+  }
+};
+
+function getSelectedLanguages() {
+  const langs = [];
+  if (document.getElementById('lang-en').checked) langs.push('الإنجليزية');
+  if (document.getElementById('lang-fr').checked) langs.push('الفرنسية');
+  if (document.getElementById('lang-es').checked) langs.push('الإسبانية');
+  return langs.length > 0 ? langs.join(' + ') : '';
+}
+
 function generateReceiptNumber() {
   const now = new Date();
   const y = now.getFullYear().toString().slice(-2);
@@ -2978,6 +3050,7 @@ window.generateTicket = async () => {
   const name = document.getElementById('sc-name').value.trim();
   const pack = document.getElementById('sc-pack').value;
   const amount = document.getElementById('sc-amount').value;
+  const note = getSelectedLanguages();
   const now = new Date();
   const dateRaw = now.toISOString().split('T')[0]; // تاريخ اليوم تلقائياً
   const status = 'paid'; // التذاكر تُصدر مفعّلة دائماً
@@ -2992,10 +3065,10 @@ window.generateTicket = async () => {
     const fullPrice = parseFloat(document.getElementById('sc-full-price').value) || 0;
     const paidCalc = parseFloat(document.getElementById('sc-paid-amount').value) || 0;
     const remainingAmount = fullPrice > 0 ? Math.max(0, fullPrice - paidCalc) : 0;
-    addDoc(collection(db,'summerTickets'), { name, pack, amount: Number(amount), fullPrice: fullPrice || Number(amount), remainingAmount, date: dateRaw, status, receipt, verifyURL, createdAt: serverTimestamp() })
-      .then(() => drawTicketOnCanvas({ name, pack, amount, dateRaw, dateFormatted, status, receipt, remainingAmount }, null, btn, verifyURL))
+    addDoc(collection(db,'summerTickets'), { name, pack, amount: Number(amount), fullPrice: fullPrice || Number(amount), remainingAmount, date: dateRaw, status, receipt, note, verifyURL, createdAt: serverTimestamp() })
+      .then(() => drawTicketOnCanvas({ name, pack, amount, dateRaw, dateFormatted, status, receipt, remainingAmount, note }, null, btn, verifyURL))
       .catch(e => { showToast('خطأ في الحفظ: ' + e.message, true); btn.disabled = false; btn.textContent = '🎟️ توليد التذكرة وحفظها'; });
-    drawTicketOnCanvas({ name, pack, amount, dateRaw, dateFormatted, status, receipt, remainingAmount }, null, btn, verifyURL);
+    drawTicketOnCanvas({ name, pack, amount, dateRaw, dateFormatted, status, receipt, remainingAmount, note }, null, btn, verifyURL);
   } catch(e) { showToast('خطأ: ' + e.message, true); btn.disabled = false; btn.textContent = '🎟️ توليد التذكرة وحفظها'; }
 };
 
@@ -3085,6 +3158,14 @@ function drawTicketOnCanvas(data, qrCanvas, btn, verifyURL) {
         357, 490, 317,
         'bold 28px Tajawal, Arial',
         remainingAmtDraw > 0 ? '#DC2626' : CLR);
+
+    // ── الملاحظة (اللغة المختارة) ──
+    if (data.note) {
+      val(data.note,
+          384, 780, 344,
+          'bold 30px Tajawal, Arial',
+          '#14B8A6');
+    }
 
     document.getElementById('ticket-empty').style.display = 'none';
     document.getElementById('ticket-canvas-wrap').style.display = 'block';
@@ -3679,7 +3760,7 @@ window.previewFromDB = async (id) => {
     const btn = document.getElementById('sc-gen-btn');
     btn.disabled = true; btn.textContent = '⏳ جاري عرض التذكرة...';
     const dateFormatted = x.date ? new Date(x.date).toLocaleDateString('ar-DZ',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) : '—';
-    drawTicketOnCanvas({ name: x.name, pack: x.pack, amount: x.amount, dateRaw: x.date, dateFormatted, status: x.status, receipt: x.receipt, remainingAmount: x.remainingAmount }, null, btn, x.verifyURL);
+    drawTicketOnCanvas({ name: x.name, pack: x.pack, amount: x.amount, dateRaw: x.date, dateFormatted, status: x.status, receipt: x.receipt, remainingAmount: x.remainingAmount, note: x.note || '' }, null, btn, x.verifyURL);
     document.getElementById('ticket-canvas').scrollIntoView({ behavior:'smooth', block:'start' });
   } catch(e) { showToast('خطأ في عرض التذكرة: ' + e.message, true); }
 };
