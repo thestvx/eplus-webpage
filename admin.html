@@ -3132,14 +3132,21 @@ window.generateTicket = async () => {
 
     // ── تسجيل المبلغ المدفوع تلقائياً في الموارد المالية ──
     if (paidAmount > 0) {
-      addDoc(collection(db,'financeTx'), {
-        type: 'income',
-        desc: `تذكرة مخيم — ${name} (${pack})`,
-        amount: paidAmount,
-        date: dateRaw,
-        receipt,
-        createdAt: serverTimestamp()
-      }).catch(e => console.warn('financeTx auto-save error:', e));
+      try {
+        await addDoc(collection(db,'financeTx'), {
+          type: 'income',
+          desc: `تذكرة مخيم — ${name} (${pack})`,
+          amount: paidAmount,
+          date: dateRaw,
+          receipt,
+          source: 'summer_ticket',
+          createdAt: serverTimestamp()
+        });
+        console.log('✅ financeTx saved for', name, paidAmount);
+      } catch(finErr) {
+        console.error('financeTx save failed:', finErr.code, finErr.message);
+        showToast('⚠️ التذكرة حُفظت لكن المبلغ لم يُسجَّل في الموارد المالية — ' + finErr.message, true);
+      }
     }
 
     drawTicketOnCanvas({ name, pack, amount, dateRaw, dateFormatted, status, receipt, remainingAmount, note }, null, btn, verifyURL);
