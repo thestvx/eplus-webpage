@@ -5422,11 +5422,21 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
   // الأدمين: لا قيود زمنية — كل حصة غير مسجّلة قابلة للتسجيل
   const adminCanRecord = !isTeacherMode;
 
-  // تحديد الحصة الحالية (أول حصة غير مسجّلة بالترتيب)
-  let currentSession = 13;
+  // ─── تحديد "الحصة الحالية" بشكل صحيح:
+  // هي أول حصة غير مسجّلة يومها هو اليوم الحالي (بتوقيت الجزائر).
+  // إذا لم توجد حصة اليوم → نأخذ أول حصة غير مسجّلة بالترتيب (للعرض فقط).
+  let firstUnrecorded = 13; // أول حصة غير مسجّلة بالترتيب المطلق
   for (let i = 1; i <= 12; i++) {
-    if (!recordedSessions[i]) { currentSession = i; break; }
+    if (!recordedSessions[i]) { firstUnrecorded = i; break; }
   }
+  // الحصة الحالية: أول حصة غير مسجّلة يومها اليوم، بشرط ألا تكون قبل firstUnrecorded
+  let currentSession = 13;
+  for (let i = firstUnrecorded; i <= 12; i++) {
+    const sDay = sessions[i - 1]?.day || '';
+    if (!recordedSessions[i] && isSessionOpen(sDay)) { currentSession = i; break; }
+  }
+  // إذا ما لقينا حصة مفتوحة اليوم، نرجع لأول حصة غير مسجّلة (للعرض)
+  if (currentSession === 13) currentSession = firstUnrecorded;
 
   // تحديث عداد الملخص
   const doneCount = Object.keys(recordedSessions).length;
@@ -5440,14 +5450,13 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
     if (!card) continue;
 
     const isRecorded  = !!recordedSessions[i];
-    const isCurrent   = i === currentSession;
     const sessionDay  = sessions[i - 1]?.day || '';
+    const isCurrent   = i === currentSession;
 
-    // ── هل نافذة تسجيل هذه الحصة مفتوحة الآن؟
-    // الشرطان معاً: الحصة هي الأولى بالترتيب (isCurrent) + يومها اليوم + الوقت بين 01:00 و23:59
+    // ── الحصة مفتوحة: هي الحصة الحالية (بالمنطق أعلاه) = يومها اليوم + النافذة مفتوحة
     const sessionIsOpen = isCurrent && isSessionOpen(sessionDay);
 
-    // ── الحصة "فائتة": لم تُسجّل وليست الحالية ولا نافذتها مفتوحة
+    // ── الحصة "فائتة": لم تُسجّل، قبل الحصة الحالية، ونافذتها مغلقة
     const isMissed = !isRecorded && !sessionIsOpen && i < currentSession;
 
     card.classList.remove('locked', 'current', 'done', 'missed');
