@@ -3507,8 +3507,7 @@ function loadTickets() {
       updateFinancialStats(0,0,0,0,0,0);
       return;
     }
-    snap.forEach(d => {
-      const x = d.data();
+    allTicketsData.forEach(x => {
       if (x.status === 'paid') paid++; else pending++;
 
       const amountPaid    = Number(x.amount || 0);
@@ -3606,7 +3605,8 @@ window.finSwitchChart = btn => {
 ═══════════════════════════════════════ */
 function updateFinancialStats(total, paidCount, withRemaining, totalExpected, totalCollected, totalRemaining) {
   const fmt = n => Number(n).toLocaleString('ar-DZ');
-  const pct = totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 0;
+  const pct          = totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 0;
+  const remainingPct = totalExpected > 0 ? Math.round((totalRemaining / totalExpected) * 100) : 0;
 
   /* ── Hero (الإجمالي الكلي دائماً) ── */
   document.getElementById('fc-collected-amount').textContent = fmt(totalCollected) + ' دج';
@@ -3621,7 +3621,7 @@ function updateFinancialStats(total, paidCount, withRemaining, totalExpected, to
   document.getElementById('fc-collected-sub').textContent        = '📈 ' + pct + '% من الإجمالي';
   document.getElementById('fc-remaining-amount').textContent     = fmt(totalRemaining) + ' دج';
   document.getElementById('fc-remaining-count').textContent      = withRemaining + ' طالب لم يكمل';
-  document.getElementById('fc-remaining-sub').textContent        = '⚠️ ' + (100 - pct) + '% من الإجمالي';
+  document.getElementById('fc-remaining-sub').textContent        = '⚠️ ' + remainingPct + '% من الإجمالي';
 
   /* ── حساب الأسبوعي والشهري لكل KPI ── */
   const weekSince  = getDateBounds('weekly');
@@ -7050,7 +7050,7 @@ window.loadFinanceSection = async function loadFinanceSection() {
   }
 }
 
-function renderFinanceKPIs() {
+window.renderFinanceKPIs = function renderFinanceKPIs() {
   const totalExpense = _finTxs.filter(t => t.type === 'expense').reduce((a,t) => a + (t.amount||0), 0);
   const totalIncome  = _finTxs.filter(t => t.type === 'income' ).reduce((a,t) => a + (t.amount||0), 0);
   const totalSalary  = _finTxs.filter(t => t.type === 'salary' ).reduce((a,t) => a + (t.amount||0), 0);
@@ -7092,7 +7092,7 @@ function renderFinanceKPIs() {
   }
 }
 
-function renderFinanceTable() {
+window.renderFinanceTable = function renderFinanceTable() {
   const filter = document.getElementById('fin-filter')?.value || '';
   let rows;
   if (filter === 'income_summer') {
