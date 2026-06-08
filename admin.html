@@ -2032,12 +2032,15 @@
         <div id="selected-student-info"></div>
       </div>
 
-      <!-- تعديل حصة مسجّلة — للأدمين فقط -->
-      <button onclick="openEditSessionPicker()" style="margin-top:12px;width:100%;padding:13px;border-radius:14px;border:2px solid rgba(217,119,6,0.4);background:rgba(245,158,11,0.08);color:#b45309;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">✏️ تعديل حصة مسجّلة</button>
-      <!-- إعادة تسجيل الحضور من الصفر -->
-      <button onclick="resetAttendance()" style="margin-top:8px;width:100%;padding:13px;border-radius:14px;border:2px solid rgba(239,68,68,0.35);background:rgba(239,68,68,0.07);color:#DC2626;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">🔄 إعادة تسجيل الحضور من الصفر</button>
-      <!-- ملخص الشهر -->
-      <button onclick="openSummaryModal()" style="margin-top:8px;width:100%;padding:13px;border-radius:14px;border:2px dashed var(--primary);background:var(--primary-light);color:var(--primary);font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">📊 ملخص الشهر</button>
+      <!-- ✅ شبكة الأفواج والحصص — للأدمين فقط -->
+      <div id="admin-att-groups-grid" style="margin-bottom:12px"></div>
+
+      <!-- أزرار الأدمين -->
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+        <button onclick="openEditSessionPicker()" style="width:100%;padding:13px;border-radius:14px;border:2px solid rgba(217,119,6,0.4);background:rgba(245,158,11,0.08);color:#b45309;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">✏️ تعديل حصة مسجّلة</button>
+        <button onclick="resetAttendance()" style="width:100%;padding:13px;border-radius:14px;border:2px solid rgba(239,68,68,0.35);background:rgba(239,68,68,0.07);color:#DC2626;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">🔄 إعادة تسجيل الحضور من الصفر</button>
+        <button onclick="openSummaryModal()" style="width:100%;padding:13px;border-radius:14px;border:2px dashed var(--primary);background:var(--primary-light);color:var(--primary);font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">📊 ملخص الشهر</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2123,6 +2126,7 @@ try {
 window._secondaryAuth = secondaryAuth;
 window._signOut = signOut;
 window._signInWithEmailAndPassword = signInWithEmailAndPassword;
+window._mainDb = db; // مشاركة db مع باقي الـ modules (Finance, etc.)
 
 // Date in topbar
 const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
@@ -4461,11 +4465,105 @@ window.openAttModal = async (teacherId) => {
 
   renderAttStudents(currentAttStudents, '');
   updateAttSummary(currentAttStudents);
+
+  // ✅ رسم شبكة الأفواج والحصص للأدمين
+  renderAdminAttGroupsGrid(t);
+
   document.getElementById('att-modal').classList.add('open');
 };
 window.closeAttModal = () => {
   document.getElementById('att-modal').classList.remove('open');
   currentAttTeacherId = null; window.currentAttTeacherId = null;
+};
+
+// ─── رسم شبكة الأفواج + الـ 12 حصة للأدمين داخل att-modal ───
+function renderAdminAttGroupsGrid(teacher) {
+  const container = document.getElementById('admin-att-groups-grid');
+  if (!container) return;
+  const groups = teacher.groups || [];
+  const teacherDays = teacher.days || [];
+  const tid = teacher.id;
+
+  if (!groups.length) {
+    // لا أفواج — شبكة واحدة
+    container.innerHTML = buildSessionGridHtml(tid, 0, { name: '', days: teacherDays, students: teacher.students || [] }, teacherDays);
+    return;
+  }
+
+  // تبويبات الأفواج + شبكة لكل فوج
+  const tabsHtml = groups.map((g, i) =>
+    `<button onclick="adminSwitchAttGroup(${i})" id="admin-gtab-${i}"
+      style="padding:7px 16px;border-radius:99px;border:2px solid ${i===0?'var(--primary)':'var(--border-2)'};
+      background:${i===0?'linear-gradient(135deg,var(--primary),#9333EA)':'white'};
+      color:${i===0?'white':'var(--text-2)'};font-size:12px;font-weight:800;cursor:pointer;
+      font-family:'Tajawal',sans-serif;transition:all 0.2s;white-space:nowrap;flex-shrink:0">
+      🏫 ${g.name}
+      <span style="font-size:10px;opacity:0.75">(${(g.students||[]).length})</span>
+    </button>`
+  ).join('');
+
+  const gridsHtml = groups.map((g, i) =>
+    `<div id="admin-gp-${i}" style="display:${i===0?'block':'none'}">
+      ${buildSessionGridHtml(tid, i, g, teacherDays)}
+    </div>`
+  ).join('');
+
+  container.innerHTML = `
+    <div style="font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:8px">📋 شبكة الحصص — اضغط على أي حصة لتسجيل الحضور</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">${tabsHtml}</div>
+    ${gridsHtml}`;
+
+  window.adminSwitchAttGroup = (gi) => {
+    groups.forEach((_,i) => {
+      const p = document.getElementById(`admin-gp-${i}`);
+      const t = document.getElementById(`admin-gtab-${i}`);
+      if (p) p.style.display = i===gi?'block':'none';
+      if (t) {
+        t.style.background = i===gi?'linear-gradient(135deg,var(--primary),#9333EA)':'white';
+        t.style.color = i===gi?'white':'var(--text-2)';
+        t.style.borderColor = i===gi?'var(--primary)':'var(--border-2)';
+      }
+    });
+  };
+}
+
+function buildSessionGridHtml(tid, gi, group, teacherDays) {
+  const gDays = (group.days && group.days.length) ? group.days : teacherDays;
+  const sessions = [];
+  for (let i = 0; i < 12; i++) sessions.push({ num: i+1, day: gDays[i % (gDays.length||1)] || '—' });
+
+  const sessionCards = sessions.map(s => {
+    const rec = (_allRecordedSessionsByGroup[gi] || {})[s.num];
+    const isDone = !!rec;
+    const pres = isDone ? (rec.students||[]).filter(x=>x.present).length : 0;
+    const tot  = isDone ? (rec.students||[]).length : 0;
+    const bg   = isDone ? 'background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.06));border-color:rgba(16,185,129,0.35)'
+                        : 'background:white;border-color:var(--border-2)';
+    const clickFn = isDone
+      ? `editSession_g(${s.num},${gi})`
+      : `adminOpenSession(${s.num},${gi})`;
+    return `<div onclick="${clickFn}" style="padding:10px 8px;border-radius:12px;border:1.5px solid;${bg};cursor:pointer;text-align:center;transition:all 0.2s;min-width:0"
+        onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(124,58,237,0.15)'"
+        onmouseout="this.style.transform='';this.style.boxShadow=''">
+      <div style="font-size:11px;font-weight:900;color:var(--text)">حصة ${s.num}</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${s.day}</div>
+      ${isDone
+        ? `<div style="margin-top:5px;font-size:10px;font-weight:800;color:#059669">✅ ${pres}/${tot}</div>
+           <div style="font-size:9px;color:var(--text-muted)">تعديل ✏️</div>`
+        : `<div style="margin-top:5px;font-size:18px;opacity:0.3">+</div>`}
+    </div>`;
+  }).join('');
+
+  const groupLabel = group.name ? `<div style="font-size:12px;font-weight:800;color:var(--text-2);margin-bottom:8px;padding:6px 12px;background:var(--primary-light);border-radius:8px;border:1px solid var(--border-2)">🏫 ${group.name} — ${(group.students||[]).length} تلميذ — 📅 ${(group.days||teacherDays).join('، ')}</div>` : '';
+
+  return `${groupLabel}<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">${sessionCards}</div>`;
+}
+
+// ─── فتح حصة للأدمين مباشرة من att-modal ───
+window.adminOpenSession = (sessionNum, gi) => {
+  // تعيين currentAttTeacherId و group index قبل فتح الـ modal
+  window._activeAttGroupIdx = gi;
+  openSession_g(sessionNum, gi);
 };
 
 // ─── تبديل تبويب الفوج في modal الحضور ───
@@ -6870,20 +6968,32 @@ window._hidePrivateRoom = (e, roomId, roomName) => {
 
 let _finTxs = [];      // كل المعاملات محلياً
 let _finTreasury = 0;  // الرصيد الابتدائي للخزينة
+let _finUnsubTx = null; // real-time listener
 
-// تحميل البيانات من Firestore
+// دالة مساعدة: الحصول على db الصحيح (fallback للـ main db)
+function getFinDb() { return _db || window._mainDb; }
+
+// تحميل البيانات من Firestore — real-time
 async function loadFinanceSection() {
+  const finDb = getFinDb();
+  if (!finDb) { console.error('Finance: db not ready'); showToast && showToast('❌ خطأ في الاتصال بقاعدة البيانات', true); return; }
   try {
     // تحميل رصيد الخزينة
-    const tSnap = await getDoc(doc(_db, 'settings', 'treasury'));
+    const tSnap = await getDoc(doc(finDb, 'settings', 'treasury'));
     _finTreasury = tSnap.exists() ? (tSnap.data().balance || 0) : 0;
 
-    // تحميل المعاملات
-    const txSnap = await getDocs(query(collection(_db, 'financeTx'), orderBy('date','desc')));
-    _finTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // إلغاء الاستماع السابق إن وُجد
+    if (_finUnsubTx) { _finUnsubTx(); _finUnsubTx = null; }
 
-    renderFinanceKPIs();
-    renderFinanceTable();
+    // real-time listener — يضمن ظهور كل تعديل فوراً
+    _finUnsubTx = onSnapshot(query(collection(finDb, 'financeTx'), orderBy('date','desc')), snap => {
+      _finTxs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderFinanceKPIs();
+      renderFinanceTable();
+    }, e => {
+      console.error('financeTx listener:', e);
+      showToast && showToast('❌ خطأ في الاتصال بقاعدة البيانات المالية', true);
+    });
   } catch(e) {
     console.error('loadFinanceSection:', e);
     showToast && showToast('❌ خطأ في تحميل البيانات المالية', true);
@@ -6976,26 +7086,23 @@ window.saveFinanceTx = async () => {
   try {
     const tx = { type, desc, amount, date, createdAt: serverTimestamp() };
     if (teacher) tx.teacher = teacher;
-    const ref = await addDoc(collection(_db, 'financeTx'), tx);
-    _finTxs.unshift({ id: ref.id, ...tx });
-    renderFinanceKPIs();
-    renderFinanceTable();
+    await addDoc(collection(getFinDb(), 'financeTx'), tx);
+    // onSnapshot سيحدّث _finTxs تلقائياً
     closeFinanceModal();
     showToast && showToast('✅ تم حفظ المعاملة');
   } catch(e) {
-    showToast && showToast('❌ خطأ: ' + e.message, true);
+    showToast && showToast('❌ خطأ في الحفظ: ' + e.message, true);
+  } finally {
+    btn.disabled = false; btn.innerHTML = '💾 حفظ';
   }
-  btn.disabled = false; btn.innerHTML = '💾 حفظ';
 };
 
 // ── حذف معاملة ──
 window.deleteFinanceTx = async (txId) => {
   if (!confirm('حذف هذه المعاملة نهائياً؟')) return;
   try {
-    await deleteDoc(doc(_db, 'financeTx', txId));
-    _finTxs = _finTxs.filter(t => t.id !== txId);
-    renderFinanceKPIs();
-    renderFinanceTable();
+    await deleteDoc(doc(getFinDb(), 'financeTx', txId));
+    // onSnapshot سيحدّث الجدول تلقائياً
     showToast && showToast('🗑️ تم الحذف');
   } catch(e) {
     showToast && showToast('❌ خطأ: ' + e.message, true);
@@ -7012,7 +7119,7 @@ window.closeTreasuryModal = () => document.getElementById('treasury-modal').clas
 window.saveTreasuryBalance = async () => {
   const amount = parseFloat(document.getElementById('treasury-amount').value) || 0;
   try {
-    await setDoc(doc(_db, 'settings', 'treasury'), { balance: amount, updatedAt: serverTimestamp() });
+    await setDoc(doc(getFinDb(), 'settings', 'treasury'), { balance: amount, updatedAt: serverTimestamp() });
     _finTreasury = amount;
     renderFinanceKPIs();
     closeTreasuryModal();
