@@ -1827,25 +1827,20 @@
               </div>
               <div class="lang-options">
                 <label class="lang-chip" id="chip-en" onclick="toggleLangChip(this)">
-                  <input type="checkbox" id="lang-en" value="الإنجليزية" onchange="updateLangChips()">
+                  <input type="checkbox" id="tick-lang-en" value="الإنجليزية" onchange="updateLangChips()">
                   🇬🇧 الإنجليزية
                 </label>
                 <label class="lang-chip" id="chip-fr" onclick="toggleLangChip(this)">
-                  <input type="checkbox" id="lang-fr" value="الفرنسية" onchange="updateLangChips()">
+                  <input type="checkbox" id="tick-lang-fr" value="الفرنسية" onchange="updateLangChips()">
                   🇫🇷 الفرنسية
                 </label>
                 <label class="lang-chip" id="chip-es" onclick="toggleLangChip(this)">
-                  <input type="checkbox" id="lang-es" value="الإسبانية" onchange="updateLangChips()">
+                  <input type="checkbox" id="tick-lang-es" value="الإسبانية" onchange="updateLangChips()">
                   🇪🇸 الإسبانية
                 </label>
               </div>
               <div id="lang-preview" style="display:none;margin-top:12px;padding:10px 14px;background:white;border-radius:10px;border:1px solid rgba(20,184,166,0.3);font-size:13px;font-weight:700;color:var(--teal)">
                 📝 الملاحظة: <span id="lang-preview-text"></span>
-              </div>
-              <!-- حقل الملاحظة اليدوية — يُعبَّأ تلقائياً من اللغات ويمكن تعديله يدوياً -->
-              <div style="margin-top:12px">
-                <label style="font-size:12px;font-weight:800;color:var(--text-muted);display:block;margin-bottom:5px">✏️ الملاحظة في التذكرة (تعبئة تلقائية أو يدوية)</label>
-                <input class="inp" type="text" id="sc-note-manual" placeholder="مثال: الإنجليزية + الفرنسية" style="font-size:13px;padding:9px 14px" oninput="syncNoteFromManual(this.value)">
               </div>
             </div>
 
@@ -2981,7 +2976,7 @@ const PRICE_PER_LANG = 8000;
 //     - Who has access: Anyone
 //  4. انسخ الـ URL وضعه في APPS_SCRIPT_URL أدناه
 // ══════════════════════════════════════════════════════════════
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzGcJb8TVAfyyGjlvbXKwsbELBeYI831KU09cpit7k4smSgZ0kRmSPhdjC_m4NO5tcw4g/exec'; // ← ضع الرابط هنا
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwzTUAA620VFJwlJZOaPXF48AQmzmEiRTca3Js4nOWDYPJrSVYTvJaOEcqF5GhGhhs1bQ/exec'; // ← ضع الرابط هنا
 
 async function fetchSheetData(sheetId, sheetName) {
   if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') {
@@ -3212,9 +3207,9 @@ function applyStudentData(name, pack, langCount, totalPrice, paid, remaining, ra
   // ── 4b. تفعيل checkboxes اللغة تلقائياً حسب اللغات المختارة من الشيت ──
   // هذا يضمن أن حقل الملاحظة في التذكرة يحتوي على اللغات المختارة
   if (langsRaw) {
-    const cbEn = document.getElementById('lang-en');
-    const cbFr = document.getElementById('lang-fr');
-    const cbEs = document.getElementById('lang-es');
+    const cbEn = document.getElementById('tick-lang-en');
+    const cbFr = document.getElementById('tick-lang-fr');
+    const cbEs = document.getElementById('tick-lang-es');
     const langsLower = langsRaw.toLowerCase();
     // إعادة تعيين أولاً
     if (cbEn) cbEn.checked = false;
@@ -3334,9 +3329,9 @@ window.toggleLangChip = (label) => {
 
 window.updateLangChips = () => {
   const chips = [
-    { chip: document.getElementById('chip-en'), cb: document.getElementById('lang-en') },
-    { chip: document.getElementById('chip-fr'), cb: document.getElementById('lang-fr') },
-    { chip: document.getElementById('chip-es'), cb: document.getElementById('lang-es') },
+    { chip: document.getElementById('chip-en'), cb: document.getElementById('tick-lang-en') },
+    { chip: document.getElementById('chip-fr'), cb: document.getElementById('tick-lang-fr') },
+    { chip: document.getElementById('chip-es'), cb: document.getElementById('tick-lang-es') },
   ];
   const selected = [];
   chips.forEach(({ chip, cb }) => {
@@ -3348,36 +3343,17 @@ window.updateLangChips = () => {
   if (selected.length > 0) {
     preview.style.display = 'block';
     previewText.textContent = selected.join(' + ');
-    // تحديث حقل الملاحظة اليدوية تلقائياً
-    const manualInp = document.getElementById('sc-note-manual');
-    if (manualInp) manualInp.value = selected.join(' + ');
   } else {
     preview.style.display = 'none';
-    // لا نمسح الحقل اليدوي إذا كان المستخدم كتب فيه يدوياً
-  }
-};
-
-// تزامن الملاحظة اليدوية مع الـ preview
-window.syncNoteFromManual = (val) => {
-  const previewText = document.getElementById('lang-preview-text');
-  const preview = document.getElementById('lang-preview');
-  if (val.trim()) {
-    if (preview) preview.style.display = 'block';
-    if (previewText) previewText.textContent = val.trim();
-  } else {
-    if (preview) preview.style.display = 'none';
   }
 };
 
 function getSelectedLanguages() {
   const langs = [];
-  if (document.getElementById('lang-en').checked) langs.push('الإنجليزية');
-  if (document.getElementById('lang-fr').checked) langs.push('الفرنسية');
-  if (document.getElementById('lang-es').checked) langs.push('الإسبانية');
-  if (langs.length > 0) return langs.join(' + ');
-  // fallback: استخدم الحقل اليدوي إذا كان الأدمين كتب فيه مباشرة
-  const manual = (document.getElementById('sc-note-manual') || {}).value || '';
-  return manual.trim();
+  if (document.getElementById('tick-lang-en').checked) langs.push('الإنجليزية');
+  if (document.getElementById('tick-lang-fr').checked) langs.push('الفرنسية');
+  if (document.getElementById('tick-lang-es').checked) langs.push('الإسبانية');
+  return langs.length > 0 ? langs.join(' + ') : '';
 }
 
 function generateReceiptNumber() {
@@ -4246,10 +4222,9 @@ function buildGroupRow(containerId, groupData) {
     <div class="group-days-wrap">${daysHtml}</div>
     <div class="group-label-sm">👥 تلاميذ الفوج</div>
     <div class="group-students-area">${studentsHtml}</div>
-    <div class="group-add-student-wrap" style="position:relative">
-      <input class="inp" type="text" placeholder="اسم التلميذ..." style="flex:1;padding:7px 12px;font-size:13px" onkeydown="if(event.key==='Enter'){event.preventDefault();addGroupStudentFromInp(this)}" oninput="onGroupStudentTyping(this)">
-      <div class="group-sheet-suggestions" style="display:none;position:absolute;top:100%;right:0;left:0;z-index:200;background:var(--card-bg);border:1.5px solid var(--border-2);border-radius:12px;box-shadow:0 8px 28px rgba(124,58,237,0.12);max-height:200px;overflow-y:auto;margin-top:4px"></div>
-      <button type="button" onclick="addGroupStudentFromInp(this.previousElementSibling.previousElementSibling)" style="padding:7px 14px;border-radius:10px;border:1.5px solid var(--border-2);background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;white-space:nowrap">+ تلميذ</button>
+    <div class="group-add-student-wrap">
+      <input class="inp" type="text" placeholder="اسم التلميذ..." style="flex:1;padding:7px 12px;font-size:13px" onkeydown="if(event.key==='Enter'){event.preventDefault();addGroupStudentFromInp(this)}">
+      <button type="button" onclick="addGroupStudentFromInp(this.previousElementSibling)" style="padding:7px 14px;border-radius:10px;border:1.5px solid var(--border-2);background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;white-space:nowrap">+ تلميذ</button>
     </div>`;
 
   container.appendChild(row);
@@ -4285,73 +4260,6 @@ window.addGroupStudentFromInp = (inp) => {
 
 window.removeGroupStudent = (btn) => {
   btn.closest('.group-student-chip').remove();
-};
-
-// ── Autocomplete الأفواج من Google Sheet SummerPlus ──
-let _sheetStudentsCache = null; // cache للبيانات
-let _sheetStudentsLoading = false;
-
-async function loadSheetStudentsCache() {
-  if (_sheetStudentsCache) return _sheetStudentsCache;
-  if (_sheetStudentsLoading) return [];
-  _sheetStudentsLoading = true;
-  try {
-    const rows = await fetchSheetData(SHEET_ID_1, SHEET_NAME_1);
-    _sheetStudentsCache = rows.map(r => {
-      const first = String(r['الاسم'] || '').trim();
-      const last  = String(r['اللقب'] || '').trim();
-      return [first, last].filter(Boolean).join(' ');
-    }).filter(Boolean);
-    return _sheetStudentsCache;
-  } catch(e) {
-    console.warn('⚠️ تعذّر تحميل بيانات الشيت للأفواج:', e.message);
-    return [];
-  } finally {
-    _sheetStudentsLoading = false;
-  }
-}
-
-window.onGroupStudentTyping = async (inp) => {
-  const q = inp.value.trim().toLowerCase();
-  const sugBox = inp.parentElement.querySelector('.group-sheet-suggestions');
-  if (!sugBox) return;
-  if (q.length < 2) { sugBox.style.display = 'none'; return; }
-
-  // إخفاء الـ suggestions عند الضغط على Escape
-  inp.onkeydown = (e) => {
-    if (e.key === 'Escape') { sugBox.style.display = 'none'; }
-    if (e.key === 'Enter') { e.preventDefault(); addGroupStudentFromInp(inp); sugBox.style.display = 'none'; }
-  };
-
-  const allStudents = await loadSheetStudentsCache();
-  const matches = allStudents.filter(n => n.toLowerCase().includes(q)).slice(0, 8);
-
-  if (!matches.length) { sugBox.style.display = 'none'; return; }
-
-  sugBox.innerHTML = matches.map(name =>
-    `<div style="padding:9px 14px;cursor:pointer;font-size:13px;font-weight:700;color:var(--text);border-bottom:1px solid var(--border);transition:background 0.15s"
-      onmousedown="event.preventDefault()"
-      onclick="selectGroupStudentSuggestion(this,event)"
-      onmouseenter="this.style.background='var(--primary-light)'"
-      onmouseleave="this.style.background=''"
-      data-name="${name.replace(/"/g,'&quot;')}"
-    >👤 ${name}</div>`
-  ).join('');
-  sugBox.style.display = 'block';
-
-  // إغلاق عند فقدان التركيز
-  inp.onblur = () => setTimeout(() => { sugBox.style.display = 'none'; }, 150);
-};
-
-window.selectGroupStudentSuggestion = (el, e) => {
-  e.stopPropagation();
-  const name = el.dataset.name;
-  const sugBox = el.closest('.group-sheet-suggestions');
-  const inp = sugBox ? sugBox.previousElementSibling : null;
-  if (!inp) return;
-  inp.value = name;
-  sugBox.style.display = 'none';
-  addGroupStudentFromInp(inp);
 };
 
 function collectGroups(containerId) {
