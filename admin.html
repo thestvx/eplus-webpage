@@ -4683,10 +4683,22 @@ window.switchAttGroupTab = (gidx, teacher, groups) => {
   }
 };
 
+// ─── Helper: يجيب عنصر من داخل الـ modal إذا مفتوح، وإلا العنصر المرئي ───
+function getAttEl(id) {
+  const modal = document.getElementById('session-modal-bg');
+  if (modal) {
+    const el = modal.querySelector('#' + id);
+    if (el) return el;
+  }
+  const all = document.querySelectorAll('#' + id);
+  for (const el of all) { if (el.offsetParent !== null) return el; }
+  return all[all.length - 1] || null;
+}
+
 function renderAttStudents(students, filter) {
-  const list = document.getElementById('att-students-list');
+  const list = getAttEl('att-students-list');
   if (!list) return;
-  const filtered = filter ? students.filter(s => s.name.includes(filter)) : students;
+  const filtered = filter ? students.filter(s => s.name.toLowerCase().includes(filter.toLowerCase())) : students;
 
   if (!filtered.length) {
     list.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">
@@ -4741,15 +4753,14 @@ window.toggleStudentAtt = (sid, isPresent, el) => {
 function updateAttSummary(students) {
   const total = students.length;
   const present = students.filter(s => s.present).length;
-  document.getElementById('att-total').textContent = total;
-  document.getElementById('att-present').textContent = present;
-  document.getElementById('att-absent').textContent = total - present;
+  const elTotal = getAttEl('att-total'); if(elTotal) elTotal.textContent = total;
+  const elPresent = getAttEl('att-present'); if(elPresent) elPresent.textContent = present;
+  const elAbsent = getAttEl('att-absent'); if(elAbsent) elAbsent.textContent = total - present;
 }
 
 window.filterStudents = () => {
-  // ✅ إصلاح: نأخذ قيمة الحقل المرئي وليس أول عنصر في الـ DOM (كان مخفياً)
-  const visibleSearch = [...document.querySelectorAll('#att-search')].find(el => el.offsetParent !== null) || document.getElementById('att-search');
-  const val = visibleSearch ? visibleSearch.value : '';
+  const _srch = getAttEl('att-search');
+  const val = _srch ? _srch.value : '';
   // ✅ إصلاح: نُصفّي من الفوج النشط فقط وليس من كل التلاميذ
   const activeGidx = window._activeAttGroupIdx;
   const activeGroups = window._activeAttGroups || [];
@@ -4764,12 +4775,11 @@ window.filterStudents = () => {
 
 // ─── إعادة رسم قائمة الحضور عند تحديث التذاكر ───
 function refreshAttendanceListIfOpen() {
-  const list = document.getElementById('att-students-list');
+  const list = getAttEl('att-students-list');
   if (!list || !currentAttStudents.length) return;
-  const saveBtn = document.getElementById('save-att-btn');
+  const saveBtn = getAttEl('save-att-btn');
   if (!saveBtn) return; // وضع القراءة فقط — لا نُحدّث
-  const _srchEl = [...document.querySelectorAll('#att-search')].find(el => el.offsetParent !== null) || document.getElementById('att-search');
-  const searchVal = _srchEl ? _srchEl.value : '';
+  const searchVal = (getAttEl('att-search') || {}).value || '';
   renderAttStudents(currentAttStudents, searchVal);
 }
 
