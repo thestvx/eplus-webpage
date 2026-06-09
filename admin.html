@@ -3204,6 +3204,25 @@ function applyStudentData(name, pack, langCount, totalPrice, paid, remaining, ra
     }
   }
 
+  // ── 4b. تفعيل checkboxes اللغة تلقائياً حسب اللغات المختارة من الشيت ──
+  // هذا يضمن أن حقل الملاحظة في التذكرة يحتوي على اللغات المختارة
+  if (langsRaw) {
+    const cbEn = document.getElementById('lang-en');
+    const cbFr = document.getElementById('lang-fr');
+    const cbEs = document.getElementById('lang-es');
+    const langsLower = langsRaw.toLowerCase();
+    // إعادة تعيين أولاً
+    if (cbEn) cbEn.checked = false;
+    if (cbFr) cbFr.checked = false;
+    if (cbEs) cbEs.checked = false;
+    // تفعيل حسب ما هو موجود في القيمة
+    if (cbEn && (langsLower.includes('الإنجليزية') || langsLower.includes('english') || langsLower.includes('انجليزية'))) cbEn.checked = true;
+    if (cbFr && (langsLower.includes('الفرنسية') || langsLower.includes('français') || langsLower.includes('french') || langsLower.includes('فرنسية'))) cbFr.checked = true;
+    if (cbEs && (langsLower.includes('الإسبانية') || langsLower.includes('español') || langsLower.includes('spanish') || langsLower.includes('اسبانية') || langsLower.includes('إسبانية'))) cbEs.checked = true;
+    // تحديث واجهة chips اللغة
+    if (typeof window.updateLangChips === 'function') window.updateLangChips();
+  }
+
   // ── 5. تاريخ اليوم كافتراضي (بدون تغيير ما هو محدد) ──
   // لا نغيّره — الأدمين يحدده يدوياً
 
@@ -4838,6 +4857,25 @@ function buildSessionGridHtml(tid, gi, group, teacherDays) {
 window.adminOpenSession = (sessionNum, gi) => {
   // تعيين currentAttTeacherId و group index قبل فتح الـ modal
   window._activeAttGroupIdx = gi;
+  window._currentGroupIdx   = gi;
+
+  // ✅ إصلاح رئيسي: تحميل تلاميذ الفوج المختار في currentAttStudents
+  // حتى يعرض openSession_g القائمة الصحيحة
+  const teacherData = allTeachers.find(x => x.id === currentAttTeacherId);
+  if (teacherData) {
+    const allStuds  = teacherData.students || [];
+    const groupData = (teacherData.groups || [])[gi];
+    if (groupData && (groupData.students || []).length > 0) {
+      const groupNames = new Set(groupData.students.map(s => s.trim().toLowerCase()));
+      currentAttStudents = allStuds.filter(s => groupNames.has(s.name.trim().toLowerCase()));
+    } else {
+      currentAttStudents = [...allStuds];
+    }
+    window.currentAttStudents = currentAttStudents;
+    // مزامنة _activeAttGroups لدوال الحفظ
+    window._activeAttGroups = teacherData.groups || [];
+  }
+
   openSession_g(sessionNum, gi);
 };
 
@@ -5342,7 +5380,11 @@ window.removeStudent = async (sid) => {
 window.saveAttendance = async () => {
   if (!currentAttTeacherId) return;
   const tid      = currentAttTeacherId;
-  const gi       = typeof window._activeAttGroupIdx === 'number' ? window._activeAttGroupIdx : 0;
+  // ✅ إصلاح: _activeAttGroupIdx دائماً رقم عند الحفظ (يُعيَّن في openSession_g و adminOpenSession)
+  // إذا كانت قيمته 'all' فهذا خطأ في التسلسل — نستخدم _currentGroupIdx كـ fallback
+  const gi = (typeof window._activeAttGroupIdx === 'number')
+    ? window._activeAttGroupIdx
+    : (typeof window._currentGroupIdx === 'number' ? window._currentGroupIdx : 0);
   const todayKey = new Date().toISOString().slice(0,10);
   // ✅ إصلاح: حفظ تلاميذ الفوج المحدد فقط (وليس كل التلاميذ)
   let studentsToSave = currentAttStudents;
@@ -5843,8 +5885,9 @@ window.openSession_g = (sessionNum, gi) => {
 
   // ── دالة بناء HTML للـ modal — محفوظة على window لإعادة الاستخدام بعد إضافة تلميذ ──
   window._buildSessionModalHtml = () => {
-    // ✅ إصلاح: عرض تلاميذ الفوج المحدد فقط (وليس كل تلاميذ الأستاذ)
-    const teacherGroups = window.currentTeacherData?.groups || [];
+    // ✅ إصلاح: جلب بيانات الأستاذ من allTeachers عند الأدمين (currentTeacherData غير محدد)
+    const teacherRecord = window.currentTeacherData || (allTeachers||[]).find(x => x.id === currentAttTeacherId) || {};
+    const teacherGroups = teacherRecord.groups || window._activeAttGroups || [];
     const groupData = teacherGroups[gi];
     let students = currentAttStudents;
     if (groupData && groupData.students && groupData.students.length > 0) {
@@ -6078,7 +6121,7 @@ window.editSession_g = async (sessionNum, gi) => {
   window._activeAttGroupIdx = gi; // ✅ إصلاح: مزامنة _activeAttGroupIdx لدالة addStudent
   window._editingDocRef    = docRef;
 
-  const teacherGroups = window.currentTeacherData?.groups || [];
+  const teacherGroups = (window.currentTeacherData?.groups) || (allTeachers||[]).find(x => x.id === currentAttTeacherId)?.groups || window._activeAttGroups || [];
   const groupName = teacherGroups[gi]?.name || '';
 
   const studentsHtml = () => currentAttStudents.length
