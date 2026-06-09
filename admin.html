@@ -1896,6 +1896,8 @@
             <button class="ticket-filter-btn" onclick="setTicketFilter('pack:باقة النخبة',this)">⭐ نخبة</button>
             <button class="ticket-filter-btn" onclick="setTicketFilter('pack:باقة تحضير',this)">🎓 تحضير بكالوريا</button>
             <button class="ticket-filter-btn" onclick="setTicketFilter('pack:باقة البالغين',this)">👤 بالغين</button>
+            <span style="width:1px;height:20px;background:var(--border);margin:0 2px"></span>
+            <button class="ticket-filter-btn" id="trash-filter-btn" onclick="setTicketFilter('trash',this)" style="border-color:rgba(239,68,68,0.3);color:#DC2626">🗑️ سلة المحذوفات <span id="trash-count-badge" style="display:none;background:#EF4444;color:white;border-radius:99px;padding:1px 7px;font-size:11px;margin-right:4px">0</span></button>
           </div>
           <div class="tbl-wrap">
             <table class="tbl" id="tickets-table">
@@ -1907,7 +1909,7 @@
                   <th>المدفوع</th>
                   <th>المتبقي</th>
                   <th>التاريخ</th>
-                  <th>الحالة</th>
+                  <th id="th-status-col">الحالة</th>
                   <th>إجراء</th>
                 </tr>
               </thead>
@@ -3698,23 +3700,54 @@ function renderTicketRows(data) {
   const norm = s => String(s || '').trim().toLowerCase();
   const q = norm(_ticketsSearchVal);
   const f = _ticketsFilterVal;
-  let filtered = q ? data.filter(x => norm(x.receipt).includes(q) || norm(x.name).includes(q)) : data;
-  if (f === 'paid')         filtered = filtered.filter(x => x.status === 'paid');
-  else if (f === 'pending') filtered = filtered.filter(x => x.status !== 'paid');
-  else if (f.startsWith('pack:')) { const pk=norm(f.slice(5)); filtered=filtered.filter(x=>norm(x.pack).includes(pk)); }
+
+  // ── وضع سلة المحذوفات ──
+  const isTrash = f === 'trash';
+  const thStatus = document.getElementById('th-status-col');
+  if (thStatus) thStatus.textContent = isTrash ? 'حُذف بواسطة' : 'الحالة';
+
+  let filtered = isTrash
+    ? data.filter(x => x.deleted === true)
+    : data.filter(x => !x.deleted);
+
+  if (!isTrash) {
+    filtered = q ? filtered.filter(x => norm(x.receipt).includes(q) || norm(x.name).includes(q)) : filtered;
+    if (f === 'paid')           filtered = filtered.filter(x => x.status === 'paid');
+    else if (f === 'pending')   filtered = filtered.filter(x => x.status !== 'paid');
+    else if (f.startsWith('pack:')) { const pk=norm(f.slice(5)); filtered=filtered.filter(x=>norm(x.pack).includes(pk)); }
+  } else {
+    filtered = q ? filtered.filter(x => norm(x.receipt).includes(q) || norm(x.name).includes(q)) : filtered;
+  }
+
+  // تحديث badge عدد المحذوفات
+  const trashCount = data.filter(x => x.deleted === true).length;
+  const badge = document.getElementById('trash-count-badge');
+  if (badge) { badge.textContent = trashCount; badge.style.display = trashCount > 0 ? 'inline' : 'none'; }
 
   tbody.innerHTML = '';
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">${q ? '🔍 لا توجد نتائج مطابقة' : '📭 لم يتم إصدار أي تذاكر بعد'}</td></tr>`;
+    const msg = isTrash ? '🎉 سلة المحذوفات فارغة' : (q ? '🔍 لا توجد نتائج مطابقة' : '📭 لم يتم إصدار أي تذاكر بعد');
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">${msg}</td></tr>`;
     return;
   }
   filtered.forEach(x => {
-    const remaining  = Number(x.remainingAmount || 0);
-    const dateStr    = x.date ? new Date(x.date).toLocaleDateString('ar-DZ') : '—';
-    const statusHtml = x.status === 'paid'
-      ? '<span class="status-paid">✅ مفعّلة</span>'
-      : '<span class="status-pending">⏳ قيد المراجعة</span>';
+    const remaining = Number(x.remainingAmount || 0);
+    const dateStr   = x.date ? new Date(x.date).toLocaleDateString('ar-DZ') : '—';
     const tr = document.createElement('tr');
+    if (isTrash) tr.style.cssText = 'opacity:0.75;background:rgba(239,68,68,0.03)';
+
+    const statusCell = isTrash
+      ? `<span style="font-size:12px;font-weight:700;color:#DC2626">${x.deletedBy || 'مشرف'}</span>`
+      : (x.status === 'paid'
+          ? '<span class="status-paid">✅ مفعّلة</span>'
+          : '<span class="status-pending">⏳ قيد المراجعة</span>');
+
+    const actionsCell = isTrash
+      ? `<button class="tbl-action" onclick="restoreTicket('${x.id}')" style="background:rgba(16,185,129,0.1);color:#059669;border-color:rgba(16,185,129,0.3)">↩️ استرجاع</button>`
+      : `<button class="tbl-action view" onclick="previewFromDB('${x.id}')">👁️ عرض</button>
+         <button class="tbl-action" onclick="openEditTicketModal('${x.id}')" style="background:var(--primary-light);color:var(--primary);border-color:var(--border-2)">✏️ تعديل</button>
+         <button class="tbl-action del" onclick="deleteTicket('${x.id}')">🗑️</button>`;
+
     tr.innerHTML = `
       <td><span class="receipt-code">${x.receipt || '—'}</span></td>
       <td style="font-weight:700;color:var(--text)">${x.name || '—'}</td>
@@ -3724,12 +3757,8 @@ function renderTicketRows(data) {
         ? `<span style="font-size:12px;font-weight:800;padding:4px 10px;border-radius:99px;background:rgba(239,68,68,0.1);color:#DC2626">${Number(remaining).toLocaleString('ar-DZ')} دج</span>`
         : '<span style="font-size:12px;font-weight:800;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,0.1);color:#059669">✅ مكتمل</span>'}</td>
       <td style="color:var(--text-muted)">${dateStr}</td>
-      <td>${statusHtml}</td>
-      <td style="display:flex;gap:6px">
-        <button class="tbl-action view" onclick="previewFromDB('${x.id}')">👁️ عرض</button>
-        <button class="tbl-action" onclick="openEditTicketModal('${x.id}')" style="background:var(--primary-light);color:var(--primary);border-color:var(--border-2)">✏️ تعديل</button>
-        <button class="tbl-action del" onclick="deleteTicket('${x.id}')">🗑️</button>
-      </td>`;
+      <td>${statusCell}</td>
+      <td style="display:flex;gap:6px">${actionsCell}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -3775,6 +3804,7 @@ function loadTickets() {
       return;
     }
     allTicketsData.forEach(x => {
+      if (x.deleted) return; // تجاهل المحذوفات في الإحصائيات
       if (x.status === 'paid') paid++; else pending++;
 
       const amountPaid    = Number(x.amount || 0);
@@ -3788,13 +3818,14 @@ function loadTickets() {
       if (remaining > 0) studentsWithRemaining++;
     });
     renderTicketRows(allTicketsData);
+    const activeTickets = allTicketsData.filter(x => !x.deleted);
     const tsmA=document.getElementById('tsm-active'), tsmP=document.getElementById('tsm-pending'), tsmT=document.getElementById('tsm-total-amount');
     if(tsmA) tsmA.textContent=paid;
     if(tsmP) tsmP.textContent=pending;
-    if(tsmT) tsmT.textContent=allTicketsData.filter(x=>x.status==='paid').reduce((s,x)=>s+Number(x.amount||0),0).toLocaleString('ar-DZ')+' دج';
-    updateSummerStats(snap.size, paid, pending);
-    updateFinancialStats(snap.size, paid, studentsWithRemaining, totalExpected, totalCollected, totalRemaining);
-    document.getElementById('nav-badge-summer').textContent = snap.size;
+    if(tsmT) tsmT.textContent=activeTickets.filter(x=>x.status==='paid').reduce((s,x)=>s+Number(x.amount||0),0).toLocaleString('ar-DZ')+' دج';
+    updateSummerStats(activeTickets.length, paid, pending);
+    updateFinancialStats(activeTickets.length, paid, studentsWithRemaining, totalExpected, totalCollected, totalRemaining);
+    document.getElementById('nav-badge-summer').textContent = activeTickets.length;
     // إعادة رسم قائمة الحضور إذا كانت مفتوحة — حتى تنعكس أي تغييرات في حالة التذاكر فوراً
     refreshAttendanceListIfOpen();
   });
@@ -4100,10 +4131,74 @@ function updateSummerStats(total, paid, pending) {
   document.getElementById('sc-pending').textContent = pending;
 }
 
+// ── سجل نشاط: تسجيل كل عملية ──
+async function logActivity(action, ticketId, details) {
+  try {
+    const adminName = document.getElementById('topbar-greeting')?.getAttribute('data-name') || 'مشرف';
+    await addDoc(collection(db, 'ticketActivityLogs'), {
+      action,       // "delete" | "restore" | "edit" | "create"
+      ticketId,
+      adminName,
+      details,
+      timestamp: serverTimestamp()
+    });
+  } catch(e) { console.warn('logActivity error:', e); }
+}
+
+// ── Soft Delete: حذف آمن بدل الحذف النهائي ──
 window.deleteTicket = async (id) => {
-  if (!confirm('⚠️ حذف هذه التذكرة نهائياً؟')) return;
-  try { await deleteDoc(doc(db,'summerTickets',id)); showToast('🗑️ تم حذف التذكرة'); } catch(e) { showToast('خطأ: ' + e.message, true); }
+  const confirmed = await showDeleteConfirm();
+  if (!confirmed) return;
+  try {
+    const snap = await getDoc(doc(db, 'summerTickets', id));
+    const data = snap.exists() ? snap.data() : {};
+    const adminName = document.getElementById('topbar-greeting')?.getAttribute('data-name') || 'مشرف';
+    await updateDoc(doc(db, 'summerTickets', id), {
+      deleted: true,
+      deletedAt: serverTimestamp(),
+      deletedBy: adminName
+    });
+    await logActivity('delete', id, { name: data.name, receipt: data.receipt, pack: data.pack });
+    showToast('🗑️ تم نقل التذكرة لسلة المحذوفات');
+  } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
+
+// ── استرجاع تذكرة من السلة ──
+window.restoreTicket = async (id) => {
+  try {
+    const snap = await getDoc(doc(db, 'summerTickets', id));
+    const data = snap.exists() ? snap.data() : {};
+    await updateDoc(doc(db, 'summerTickets', id), {
+      deleted: false,
+      deletedAt: null,
+      deletedBy: null
+    });
+    await logActivity('restore', id, { name: data.name, receipt: data.receipt });
+    showToast('✅ تم استرجاع التذكرة بنجاح');
+  } catch(e) { showToast('خطأ: ' + e.message, true); }
+};
+
+// ── نافذة تأكيد الحذف المخصصة ──
+function showDeleteConfirm() {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease';
+    overlay.innerHTML = `
+      <div style="background:var(--card-bg);border-radius:20px;padding:28px 32px;max-width:360px;width:90%;box-shadow:var(--shadow-lg);border:1px solid var(--border-2);text-align:center">
+        <div style="font-size:42px;margin-bottom:12px">🗑️</div>
+        <h3 style="font-size:17px;font-weight:800;color:var(--text);margin-bottom:8px">حذف التذكرة</h3>
+        <p style="font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:20px">سيتم نقل التذكرة إلى <strong>سلة المحذوفات</strong><br>ويمكنك استرجاعها في أي وقت</p>
+        <div style="display:flex;gap:10px;justify-content:center">
+          <button id="del-cancel" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border-2);background:var(--card-bg);color:var(--text-2);font-size:14px;font-weight:700;font-family:'Tajawal',sans-serif;cursor:pointer">إلغاء</button>
+          <button id="del-confirm" style="flex:1;padding:10px;border-radius:12px;border:none;background:#EF4444;color:white;font-size:14px;font-weight:800;font-family:'Tajawal',sans-serif;cursor:pointer">🗑️ حذف</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#del-confirm').onclick = () => { document.body.removeChild(overlay); resolve(true); };
+    overlay.querySelector('#del-cancel').onclick  = () => { document.body.removeChild(overlay); resolve(false); };
+    overlay.onclick = (e) => { if (e.target === overlay) { document.body.removeChild(overlay); resolve(false); } };
+  });
+}
 
 window.previewFromDB = async (id) => {
   try {
