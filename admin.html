@@ -4300,22 +4300,31 @@ let _sheetStudentsLoading = false;
 async function loadSheetStudentsCache() {
   if (_sheetStudentsCache !== null) return _sheetStudentsCache;
   if (_sheetStudentsLoading) {
-    // انتظر حتى تنتهي عملية التحميل الأولى
     await new Promise(res => { const t = setInterval(() => { if(!_sheetStudentsLoading){clearInterval(t);res();} }, 100); });
     return _sheetStudentsCache || [];
   }
   _sheetStudentsLoading = true;
   try {
     const rows = await fetchSheetData(SHEET_ID_1, SHEET_NAME_1);
+    // نحفظ objects كاملة — اسم + كل بيانات الصف
     _sheetStudentsCache = rows.map(r => {
       const first = String(r['الاسم'] || '').trim();
       const last  = String(r['اللقب'] || '').trim();
-      return [first, last].filter(Boolean).join(' ');
+      const fullName = [first, last].filter(Boolean).join(' ');
+      if (!fullName) return null;
+      return {
+        name:     fullName,
+        pack:     String(r['الباقة'] || r['نوع البرنامج'] || r['الباقة المختارة'] || '').trim(),
+        langs:    String(r['اللغة المختارة'] || r['اللغات'] || r['languages'] || '').trim(),
+        age:      String(r['العمر'] || r['age'] || '').trim(),
+        phone:    String(r['رقم هاتف ولي الأمر'] || r['رقم الهاتف'] || '').trim(),
+        parent:   String(r['اسم ولي الأمر'] || '').trim(),
+      };
     }).filter(Boolean);
     console.log('✅ Sheet cache loaded:', _sheetStudentsCache.length, 'students');
     return _sheetStudentsCache;
   } catch(e) {
-    console.warn('⚠️ تعذّر تحميل بيانات الشيت للأفواج:', e.message);
+    console.warn('⚠️ تعذّر تحميل بيانات الشيت:', e.message);
     _sheetStudentsCache = [];
     return [];
   } finally {
@@ -4373,7 +4382,7 @@ window.onGroupStudentTyping = async (inp) => {
 
   if (inp.value.trim().toLowerCase() !== q) return; // تجاهل إذا تغيّر النص
 
-  const matches = allStudents.filter(n => n.toLowerCase().includes(q)).slice(0, 10);
+  const matches = allStudents.filter(s => s.name.toLowerCase().includes(q)).slice(0, 10);
 
   if (!matches.length) {
     sugBox.innerHTML = `<div style="padding:10px 14px;font-size:12px;color:var(--text-muted);font-weight:700;text-align:center">❌ لا نتائج في الشيت</div>`;
@@ -4387,14 +4396,24 @@ window.onGroupStudentTyping = async (inp) => {
     return text.slice(0, idx) + `<mark style="background:rgba(124,58,237,0.15);color:var(--primary);border-radius:3px;padding:0 2px">${text.slice(idx, idx + q.length)}</mark>` + text.slice(idx + q.length);
   };
 
-  sugBox.innerHTML = matches.map(name => `
-    <div style="padding:9px 14px;cursor:pointer;font-size:13px;font-weight:700;color:var(--text);border-bottom:1px solid var(--border);transition:background 0.12s;display:flex;align-items:center;gap:8px"
-      data-name="${esc(name)}"
+  sugBox.innerHTML = matches.map(s => `
+    <div style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background 0.12s"
+      data-name="${esc(s.name)}"
       onmousedown="event.preventDefault()"
       onclick="selectGroupSuggestion(this, event)"
-      onmouseenter="this.style.background='var(--primary-light)';this.style.color='var(--primary)'"
-      onmouseleave="this.style.background='';this.style.color='var(--text)'"
-    ><span style="font-size:15px">👤</span><span>${highlight(name, q)}</span></div>
+      onmouseenter="this.style.background='var(--primary-light)'"
+      onmouseleave="this.style.background=''"
+    >
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:${s.pack||s.langs||s.age?'4px':'0'}">
+        <span style="font-size:14px">👤</span>
+        <span style="font-size:13px;font-weight:800;color:var(--text)">${highlight(s.name, q)}</span>
+      </div>
+      ${s.pack||s.langs||s.age ? `<div style="display:flex;flex-wrap:wrap;gap:5px;padding-right:21px">
+        ${s.pack ? `<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:rgba(124,58,237,0.08);color:var(--primary);font-weight:700">📦 ${s.pack}</span>` : ''}
+        ${s.langs ? `<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:rgba(20,184,166,0.1);color:var(--teal);font-weight:700">🌍 ${s.langs}</span>` : ''}
+        ${s.age ? `<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:rgba(245,158,11,0.1);color:#92400e;font-weight:700">🎂 ${s.age} سنة</span>` : ''}
+      </div>` : ''}
+    </div>
   `).join('');
   sugBox.style.display = 'block';
 
@@ -5232,7 +5251,8 @@ window.searchStudentSuggestions = async (val) => {
     let sheetMatches = [];
     try {
       const sheetRows = await loadSheetStudentsCache();
-      sheetMatches = sheetRows.filter(name => norm(name).includes(q) || normSort(name).includes(qSort)).slice(0, 8);
+      // sheetRows الآن objects — نبحث في الاسم
+      sheetMatches = sheetRows.filter(s => norm(s.name).includes(q) || normSort(s.name).includes(qSort)).slice(0, 8);
     } catch(e) { console.warn('sheet search error:', e); }
 
     // إذا تغيّر النص أثناء الانتظار — تجاهل
@@ -5252,9 +5272,9 @@ window.searchStudentSuggestions = async (val) => {
       return;
     }
 
-    // عرض نتائج الشيت
-    const esc = s => s.replace(/'/g, "\\'");
-    const highlightQ = (text) => {
+    // ── عرض نتائج الشيت مع الباقة واللغة والعمر ──
+    const esc2 = s => s.replace(/'/g, "\\'");
+    const hlQ = (text) => {
       const idx = norm(text).indexOf(q);
       if (idx === -1) return text;
       return text.slice(0, idx) + `<mark style="background:rgba(124,58,237,0.15);color:var(--primary);border-radius:3px;padding:0 1px">${text.slice(idx, idx+q.length)}</mark>` + text.slice(idx+q.length);
@@ -5263,16 +5283,22 @@ window.searchStudentSuggestions = async (val) => {
       <div style="padding:8px 14px 4px;font-size:11px;color:var(--text-muted);font-weight:800;border-bottom:1px solid var(--border)">
         📋 من جدول المخيم — لا تذكرة بعد
       </div>
-      ${sheetMatches.map(name => `
-        <div class="student-suggest-item" onclick="selectManualStudent('${esc(name)}')"
+      ${sheetMatches.map(s => `
+        <div class="student-suggest-item" onclick="selectManualStudent('${esc2(s.name)}')"
           style="padding:11px 16px;cursor:pointer;border-bottom:1px solid var(--border);transition:background 0.12s"
           onmouseenter="this.style.background='var(--primary-light)'"
           onmouseleave="this.style.background=''">
-          <div style="font-size:14px;font-weight:800;color:var(--text)">👤 ${highlightQ(name)}</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">من جدول SummerPlus — إضافة بدون تذكرة</div>
+          <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:${s.pack||s.langs||s.age?'5px':'0'}">
+            👤 ${hlQ(s.name)}
+          </div>
+          ${s.pack||s.langs||s.age ? `<div style="display:flex;flex-wrap:wrap;gap:5px">
+            ${s.pack  ? `<span style="font-size:11px;padding:2px 9px;border-radius:99px;background:rgba(124,58,237,0.08);color:var(--primary);font-weight:700;border:1px solid var(--border-2)">📦 ${s.pack}</span>` : ''}
+            ${s.langs ? `<span style="font-size:11px;padding:2px 9px;border-radius:99px;background:rgba(20,184,166,0.1);color:var(--teal);font-weight:700;border:1px solid rgba(20,184,166,0.2)">🌍 ${s.langs}</span>` : ''}
+            ${s.age   ? `<span style="font-size:11px;padding:2px 9px;border-radius:99px;background:rgba(245,158,11,0.1);color:#92400e;font-weight:700;border:1px solid rgba(245,158,11,0.2)">🎂 ${s.age} سنة</span>` : ''}
+          </div>` : `<div style="font-size:11px;color:var(--text-muted)">من جدول SummerPlus</div>`}
         </div>`).join('')}
       <div style="padding:10px 14px;border-top:1px solid var(--border)">
-        <div class="student-suggest-item" style="border:1.5px dashed var(--border-2);border-radius:10px;cursor:pointer;padding:8px 12px" onclick="selectManualStudent('${esc(val)}')">
+        <div class="student-suggest-item" style="border:1.5px dashed var(--border-2);border-radius:10px;cursor:pointer;padding:8px 12px" onclick="selectManualStudent('${esc2(val)}')">
           <div style="font-size:12px;font-weight:800;color:var(--text-muted)">➕ إضافة "${val}" يدوياً كما هو</div>
         </div>
       </div>`;
