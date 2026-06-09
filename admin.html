@@ -5188,7 +5188,7 @@ let _selectedStudentData = null;
 let _suppressSnapshot = false;
 
 // ─── بحث ذكي في التذاكر: بالاسم أو رقم الوصل ───
-window.searchStudentSuggestions = (val) => {
+window.searchStudentSuggestions = async (val) => {
   // ── نبحث عن العناصر المرئية دائماً ──
   const findVisible = (sel) => {
     const all = document.querySelectorAll(sel);
@@ -5215,27 +5215,72 @@ window.searchStudentSuggestions = (val) => {
   const q     = norm(val);
   const qSort = normSort(val);
 
-  // البحث في التذاكر — الترتيب في الاسم غير مهم
-  const matches = (allTicketsData || []).filter(t => {
+  // ── 1. البحث في التذاكر (Firebase) ──
+  const ticketMatches = (allTicketsData || []).filter(t => {
     const tn = norm(t.name);
     const ts = normSort(t.name);
     return tn.includes(q) || ts.includes(qSort) || qSort.includes(ts) ||
            (t.receipt && norm(t.receipt).includes(q));
   }).slice(0, 8);
 
-  if (!matches.length) {
-    // لا نتائج — نعرض خيار إضافة يدوية
+  // ── 2. إذا لم توجد نتائج في التذاكر — ابحث في Google Sheet ──
+  if (!ticketMatches.length) {
+    // أظهر loading مؤقت
     suggestionsEl.style.display = 'block';
+    suggestionsEl.innerHTML = `<div style="padding:12px 16px;font-size:12px;color:var(--text-muted);font-weight:700;text-align:center">🔍 جاري البحث في جدول المخيم...</div>`;
+
+    let sheetMatches = [];
+    try {
+      const sheetRows = await loadSheetStudentsCache();
+      sheetMatches = sheetRows.filter(name => norm(name).includes(q) || normSort(name).includes(qSort)).slice(0, 8);
+    } catch(e) { console.warn('sheet search error:', e); }
+
+    // إذا تغيّر النص أثناء الانتظار — تجاهل
+    const curVal = findVisible('#new-student-name');
+    if (curVal && norm(curVal.value) !== q) return;
+
+    if (!sheetMatches.length) {
+      // لا نتائج في أي مكان — عرض إضافة يدوية
+      suggestionsEl.innerHTML = `
+        <div style="padding:14px 16px">
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;font-weight:600">لم يُوجد في التذاكر ولا في جدول المخيم — يمكنك الإضافة يدوياً:</div>
+          <div class="student-suggest-item" style="border:1.5px dashed var(--border-2);border-radius:10px;cursor:pointer;padding:10px 14px" onclick="selectManualStudent('${val.replace(/'/g,"\\'")}')">
+            <div style="font-size:14px;font-weight:800;color:var(--text)">➕ ${val}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">إضافة بدون تذكرة — لا يوجد رقم وصل</div>
+          </div>
+        </div>`;
+      return;
+    }
+
+    // عرض نتائج الشيت
+    const esc = s => s.replace(/'/g, "\\'");
+    const highlightQ = (text) => {
+      const idx = norm(text).indexOf(q);
+      if (idx === -1) return text;
+      return text.slice(0, idx) + `<mark style="background:rgba(124,58,237,0.15);color:var(--primary);border-radius:3px;padding:0 1px">${text.slice(idx, idx+q.length)}</mark>` + text.slice(idx+q.length);
+    };
     suggestionsEl.innerHTML = `
-      <div style="padding:14px 16px">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;font-weight:600">لم يُوجد في التذاكر — يمكنك الإضافة يدوياً:</div>
-        <div class="student-suggest-item" style="border:1.5px dashed var(--border-2);border-radius:10px;cursor:pointer;padding:10px 14px" onclick="selectManualStudent('${val.replace(/'/g,"\\'")}')">
-          <div style="font-size:14px;font-weight:800;color:var(--text)">➕ ${val}</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">إضافة بدون تذكرة — لا يوجد رقم وصل</div>
+      <div style="padding:8px 14px 4px;font-size:11px;color:var(--text-muted);font-weight:800;border-bottom:1px solid var(--border)">
+        📋 من جدول المخيم — لا تذكرة بعد
+      </div>
+      ${sheetMatches.map(name => `
+        <div class="student-suggest-item" onclick="selectManualStudent('${esc(name)}')"
+          style="padding:11px 16px;cursor:pointer;border-bottom:1px solid var(--border);transition:background 0.12s"
+          onmouseenter="this.style.background='var(--primary-light)'"
+          onmouseleave="this.style.background=''">
+          <div style="font-size:14px;font-weight:800;color:var(--text)">👤 ${highlightQ(name)}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">من جدول SummerPlus — إضافة بدون تذكرة</div>
+        </div>`).join('')}
+      <div style="padding:10px 14px;border-top:1px solid var(--border)">
+        <div class="student-suggest-item" style="border:1.5px dashed var(--border-2);border-radius:10px;cursor:pointer;padding:8px 12px" onclick="selectManualStudent('${esc(val)}')">
+          <div style="font-size:12px;font-weight:800;color:var(--text-muted)">➕ إضافة "${val}" يدوياً كما هو</div>
         </div>
       </div>`;
     return;
   }
+
+  // ── عرض نتائج التذاكر (الحالة الاعتيادية) ──
+  const matches = ticketMatches;
 
   suggestionsEl.style.display = 'block';
   suggestionsEl.innerHTML = matches.map(t => {
