@@ -1842,6 +1842,10 @@
               <div id="lang-preview" style="display:none;margin-top:12px;padding:10px 14px;background:white;border-radius:10px;border:1px solid rgba(20,184,166,0.3);font-size:13px;font-weight:700;color:var(--teal)">
                 📝 الملاحظة: <span id="lang-preview-text"></span>
               </div>
+              <div style="margin-top:12px">
+                <label style="font-size:12px;font-weight:800;color:var(--text-muted);display:block;margin-bottom:5px">✏️ الملاحظة في التذكرة (تعبئة تلقائية أو يدوية)</label>
+                <input class="inp" type="text" id="sc-note-manual" placeholder="مثال: الإنجليزية + الفرنسية" style="font-size:13px;padding:9px 14px" oninput="syncNoteFromManual(this.value)">
+              </div>
             </div>
 
             <button class="btn-primary btn-summer" id="sc-gen-btn" onclick="generateTicket()">🎟️ توليد التذكرة وحفظها</button>
@@ -2976,7 +2980,7 @@ const PRICE_PER_LANG = 8000;
 //     - Who has access: Anyone
 //  4. انسخ الـ URL وضعه في APPS_SCRIPT_URL أدناه
 // ══════════════════════════════════════════════════════════════
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwzTUAA620VFJwlJZOaPXF48AQmzmEiRTca3Js4nOWDYPJrSVYTvJaOEcqF5GhGhhs1bQ/exec'; // ← ضع الرابط هنا
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzGcJb8TVAfyyGjlvbXKwsbELBeYI831KU09cpit7k4smSgZ0kRmSPhdjC_m4NO5tcw4g/exec';
 
 async function fetchSheetData(sheetId, sheetName) {
   if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') {
@@ -3335,25 +3339,45 @@ window.updateLangChips = () => {
   ];
   const selected = [];
   chips.forEach(({ chip, cb }) => {
-    if (cb.checked) { chip.classList.add('selected'); selected.push(cb.value); }
-    else { chip.classList.remove('selected'); }
+    if (cb && cb.checked) { if(chip) chip.classList.add('selected'); selected.push(cb.value); }
+    else { if(chip) chip.classList.remove('selected'); }
   });
   const preview = document.getElementById('lang-preview');
   const previewText = document.getElementById('lang-preview-text');
   if (selected.length > 0) {
-    preview.style.display = 'block';
-    previewText.textContent = selected.join(' + ');
+    if(preview) preview.style.display = 'block';
+    if(previewText) previewText.textContent = selected.join(' + ');
+    // تحديث حقل الملاحظة اليدوية تلقائياً
+    const manualInp = document.getElementById('sc-note-manual');
+    if (manualInp) manualInp.value = selected.join(' + ');
   } else {
-    preview.style.display = 'none';
+    if(preview) preview.style.display = 'none';
+  }
+};
+
+window.syncNoteFromManual = (val) => {
+  const preview = document.getElementById('lang-preview');
+  const previewText = document.getElementById('lang-preview-text');
+  if (val.trim()) {
+    if (preview) preview.style.display = 'block';
+    if (previewText) previewText.textContent = val.trim();
+  } else {
+    if (preview) preview.style.display = 'none';
   }
 };
 
 function getSelectedLanguages() {
   const langs = [];
-  if (document.getElementById('tick-lang-en').checked) langs.push('الإنجليزية');
-  if (document.getElementById('tick-lang-fr').checked) langs.push('الفرنسية');
-  if (document.getElementById('tick-lang-es').checked) langs.push('الإسبانية');
-  return langs.length > 0 ? langs.join(' + ') : '';
+  const cbEn = document.getElementById('tick-lang-en');
+  const cbFr = document.getElementById('tick-lang-fr');
+  const cbEs = document.getElementById('tick-lang-es');
+  if (cbEn && cbEn.checked) langs.push('الإنجليزية');
+  if (cbFr && cbFr.checked) langs.push('الفرنسية');
+  if (cbEs && cbEs.checked) langs.push('الإسبانية');
+  if (langs.length > 0) return langs.join(' + ');
+  // fallback: الحقل اليدوي
+  const manual = (document.getElementById('sc-note-manual') || {}).value || '';
+  return manual.trim();
 }
 
 function generateReceiptNumber() {
@@ -4222,9 +4246,14 @@ function buildGroupRow(containerId, groupData) {
     <div class="group-days-wrap">${daysHtml}</div>
     <div class="group-label-sm">👥 تلاميذ الفوج</div>
     <div class="group-students-area">${studentsHtml}</div>
-    <div class="group-add-student-wrap">
-      <input class="inp" type="text" placeholder="اسم التلميذ..." style="flex:1;padding:7px 12px;font-size:13px" onkeydown="if(event.key==='Enter'){event.preventDefault();addGroupStudentFromInp(this)}">
-      <button type="button" onclick="addGroupStudentFromInp(this.previousElementSibling)" style="padding:7px 14px;border-radius:10px;border:1.5px solid var(--border-2);background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;white-space:nowrap">+ تلميذ</button>
+    <div class="group-add-student-wrap" style="flex-wrap:wrap;position:relative">
+      <div style="flex:1;position:relative;min-width:160px">
+        <input class="inp" type="text" placeholder="اسم التلميذ..." style="width:100%;padding:7px 12px;font-size:13px"
+          onkeydown="handleGroupStudentKey(event,this)"
+          oninput="onGroupStudentTyping(this)">
+        <div class="group-sheet-suggestions" style="display:none;position:absolute;top:100%;right:0;left:0;z-index:300;background:var(--card-bg);border:1.5px solid var(--border-2);border-radius:12px;box-shadow:0 8px 28px rgba(124,58,237,0.15);max-height:200px;overflow-y:auto;margin-top:4px"></div>
+      </div>
+      <button type="button" onclick="addGroupStudentFromInp(this.previousElementSibling.querySelector('input'))" style="padding:7px 14px;border-radius:10px;border:1.5px solid var(--border-2);background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;white-space:nowrap;flex-shrink:0">+ تلميذ</button>
     </div>`;
 
   container.appendChild(row);
@@ -4260,6 +4289,128 @@ window.addGroupStudentFromInp = (inp) => {
 
 window.removeGroupStudent = (btn) => {
   btn.closest('.group-student-chip').remove();
+};
+
+// ══════════════════════════════════════════════════
+// AUTOCOMPLETE الأفواج من Google Sheet SummerPlus
+// ══════════════════════════════════════════════════
+let _sheetStudentsCache = null;
+let _sheetStudentsLoading = false;
+
+async function loadSheetStudentsCache() {
+  if (_sheetStudentsCache !== null) return _sheetStudentsCache;
+  if (_sheetStudentsLoading) {
+    // انتظر حتى تنتهي عملية التحميل الأولى
+    await new Promise(res => { const t = setInterval(() => { if(!_sheetStudentsLoading){clearInterval(t);res();} }, 100); });
+    return _sheetStudentsCache || [];
+  }
+  _sheetStudentsLoading = true;
+  try {
+    const rows = await fetchSheetData(SHEET_ID_1, SHEET_NAME_1);
+    _sheetStudentsCache = rows.map(r => {
+      const first = String(r['الاسم'] || '').trim();
+      const last  = String(r['اللقب'] || '').trim();
+      return [first, last].filter(Boolean).join(' ');
+    }).filter(Boolean);
+    console.log('✅ Sheet cache loaded:', _sheetStudentsCache.length, 'students');
+    return _sheetStudentsCache;
+  } catch(e) {
+    console.warn('⚠️ تعذّر تحميل بيانات الشيت للأفواج:', e.message);
+    _sheetStudentsCache = [];
+    return [];
+  } finally {
+    _sheetStudentsLoading = false;
+  }
+}
+
+// Pre-load cache in background when page is ready
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => loadSheetStudentsCache(), 3000);
+});
+
+window.handleGroupStudentKey = (e, inp) => {
+  const sugBox = inp.parentElement.querySelector('.group-sheet-suggestions');
+  if (e.key === 'Escape') {
+    if (sugBox) sugBox.style.display = 'none';
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    // إذا فيه suggestion مختار، استخدمه
+    const highlighted = sugBox && sugBox.querySelector('[data-highlighted="true"]');
+    if (highlighted) {
+      inp.value = highlighted.dataset.name;
+      sugBox.style.display = 'none';
+    }
+    addGroupStudentFromInp(inp);
+  } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!sugBox || sugBox.style.display === 'none') return;
+    const items = [...sugBox.querySelectorAll('[data-name]')];
+    if (!items.length) return;
+    const cur = items.findIndex(i => i.dataset.highlighted === 'true');
+    items.forEach(i => delete i.dataset.highlighted);
+    const next = e.key === 'ArrowDown' ? Math.min(cur + 1, items.length - 1) : Math.max(cur - 1, 0);
+    const target = items[cur === -1 ? 0 : next];
+    if (target) {
+      target.dataset.highlighted = 'true';
+      target.style.background = 'var(--primary-light)';
+      target.scrollIntoView({ block: 'nearest' });
+    }
+  }
+};
+
+window.onGroupStudentTyping = async (inp) => {
+  const q = inp.value.trim().toLowerCase();
+  const sugBox = inp.parentElement.querySelector('.group-sheet-suggestions');
+  if (!sugBox) return;
+
+  if (q.length < 2) { sugBox.style.display = 'none'; return; }
+
+  // أظهر loading مؤقت
+  sugBox.innerHTML = `<div style="padding:10px 14px;font-size:12px;color:var(--text-muted);font-weight:700">⏳ جاري البحث...</div>`;
+  sugBox.style.display = 'block';
+
+  const allStudents = await loadSheetStudentsCache();
+
+  if (inp.value.trim().toLowerCase() !== q) return; // تجاهل إذا تغيّر النص
+
+  const matches = allStudents.filter(n => n.toLowerCase().includes(q)).slice(0, 10);
+
+  if (!matches.length) {
+    sugBox.innerHTML = `<div style="padding:10px 14px;font-size:12px;color:var(--text-muted);font-weight:700;text-align:center">❌ لا نتائج في الشيت</div>`;
+    return;
+  }
+
+  const esc = s => s.replace(/"/g, '&quot;');
+  const highlight = (text, q) => {
+    const idx = text.toLowerCase().indexOf(q);
+    if (idx === -1) return text;
+    return text.slice(0, idx) + `<mark style="background:rgba(124,58,237,0.15);color:var(--primary);border-radius:3px;padding:0 2px">${text.slice(idx, idx + q.length)}</mark>` + text.slice(idx + q.length);
+  };
+
+  sugBox.innerHTML = matches.map(name => `
+    <div style="padding:9px 14px;cursor:pointer;font-size:13px;font-weight:700;color:var(--text);border-bottom:1px solid var(--border);transition:background 0.12s;display:flex;align-items:center;gap:8px"
+      data-name="${esc(name)}"
+      onmousedown="event.preventDefault()"
+      onclick="selectGroupSuggestion(this, event)"
+      onmouseenter="this.style.background='var(--primary-light)';this.style.color='var(--primary)'"
+      onmouseleave="this.style.background='';this.style.color='var(--text)'"
+    ><span style="font-size:15px">👤</span><span>${highlight(name, q)}</span></div>
+  `).join('');
+  sugBox.style.display = 'block';
+
+  // إغلاق عند فقدان التركيز
+  inp.onblur = () => setTimeout(() => { if (sugBox) sugBox.style.display = 'none'; }, 200);
+};
+
+window.selectGroupSuggestion = (el, e) => {
+  e.stopPropagation();
+  const name = el.dataset.name;
+  const sugBox = el.closest('.group-sheet-suggestions');
+  const inp = sugBox ? sugBox.previousElementSibling : null;
+  if (!inp) return;
+  inp.value = name;
+  sugBox.style.display = 'none';
+  addGroupStudentFromInp(inp);
 };
 
 function collectGroups(containerId) {
