@@ -4747,7 +4747,9 @@ function updateAttSummary(students) {
 }
 
 window.filterStudents = () => {
-  const val = document.getElementById('att-search').value;
+  // ✅ إصلاح: نأخذ قيمة الحقل المرئي وليس أول عنصر في الـ DOM (كان مخفياً)
+  const visibleSearch = [...document.querySelectorAll('#att-search')].find(el => el.offsetParent !== null) || document.getElementById('att-search');
+  const val = visibleSearch ? visibleSearch.value : '';
   // ✅ إصلاح: نُصفّي من الفوج النشط فقط وليس من كل التلاميذ
   const activeGidx = window._activeAttGroupIdx;
   const activeGroups = window._activeAttGroups || [];
@@ -4766,7 +4768,8 @@ function refreshAttendanceListIfOpen() {
   if (!list || !currentAttStudents.length) return;
   const saveBtn = document.getElementById('save-att-btn');
   if (!saveBtn) return; // وضع القراءة فقط — لا نُحدّث
-  const searchVal = (document.getElementById('att-search') || {}).value || '';
+  const _srchEl = [...document.querySelectorAll('#att-search')].find(el => el.offsetParent !== null) || document.getElementById('att-search');
+  const searchVal = _srchEl ? _srchEl.value : '';
   renderAttStudents(currentAttStudents, searchVal);
 }
 
