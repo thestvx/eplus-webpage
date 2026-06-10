@@ -995,6 +995,36 @@ async function submitForm(e) {
     }
   });
   if (hasError) return;
+
+  // Validate lang fields when in lang modal
+  if (currentModalType === 'lang') {
+    const langTypeVal  = byId('langType')?.value || '';
+    const langLevelVal = byId('langLevel')?.value || '';
+    const levelTestVal = $('input[name="levelTest"]:checked')?.value || '';
+
+    if (!langTypeVal) {
+      const el = byId('langType');
+      el?.classList.add('error');
+      setTimeout(() => el?.classList.remove('error'), 1500);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (!langLevelVal) {
+      const el = byId('langLevel');
+      el?.classList.add('error');
+      setTimeout(() => el?.classList.remove('error'), 1500);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (!levelTestVal) {
+      const grp = byId('levelTestGroup');
+      grp?.classList.add('error');
+      setTimeout(() => grp?.classList.remove('error'), 1500);
+      grp?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+  }
+
   const selectedDays = $$('input[name="days"]:checked').map(c => c.value).join('، ');
   const vipTypeVal    = $('input[name="vipType"]:checked')?.value || '';
   const vipEduLevel   = byId('vipEduLevel')?.value || '';
