@@ -5710,6 +5710,17 @@ window.saveAttendance = async () => {
     const groupNames = new Set(activeGroup.students.map(s => s.trim().toLowerCase()));
     studentsToSave = currentAttStudents.filter(s => groupNames.has(s.name.trim().toLowerCase()));
   }
+  // ✅ إصلاح: قراءة الحضور مباشرة من DOM (att-students-list)
+  const attRows = document.querySelectorAll('#att-students-list .att-student-row');
+  if (attRows && attRows.length > 0) {
+    studentsToSave = Array.from(attRows).map(row => {
+      const sid = row.getAttribute('data-sid');
+      const s = currentAttStudents.find(x => x.id === sid) || { id: sid, name: row.querySelector('.att-student-name')?.textContent || '' };
+      const presentCheck = row.querySelectorAll('.att-check')[0];
+      const isPresent = presentCheck ? presentCheck.classList.contains('present') : !!s.present;
+      return { id: s.id, name: s.name, present: isPresent };
+    });
+  }
   const students = studentsToSave.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
   const existingSessions = _allRecordedSessionsByGroup[gi] || {};
   let sessionNum = 1;
@@ -6625,23 +6636,59 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
   }
   const groupSuffix = `_g${gi}`;
   const sessionKey  = `${currentAttTeacherId}${groupSuffix}_session_${sessionNum}`;
-  const todayDateKey = new Date().toISOString().slice(0, 10); // ✅ إصلاح: حفظ التاريخ دائماً
+  const todayDateKey = new Date().toISOString().slice(0, 10);
+
+  // ✅ إصلاح: نجمع تلاميذ الفوج المعروضين في الـ modal (وليس كل التلاميذ)
+  // الـ modal يعرض الأسطر بـ data-sid، نقرأ الحضور منها مباشرة
+  const rows = document.querySelectorAll('#session-modal-inner .att-student-row');
+  let studentsToSave;
+  if (rows && rows.length > 0) {
+    studentsToSave = Array.from(rows).map(row => {
+      const sid = row.getAttribute('data-sid');
+      const s = currentAttStudents.find(x => x.id === sid) || { id: sid, name: row.querySelector('.att-student-name')?.textContent || '' };
+      const presentCheck = row.querySelectorAll('.att-check')[0];
+      const isPresent = presentCheck ? presentCheck.classList.contains('present') : !!s.present;
+      return { id: s.id, name: s.name, present: isPresent };
+    });
+  } else {
+    // fallback: تلاميذ الفوج من currentAttStudents
+    const teacherRecord = window.currentTeacherData || (allTeachers||[]).find(x => x.id === currentAttTeacherId) || {};
+    const groupData = (teacherRecord.groups || window._activeAttGroups || [])[gi];
+    if (groupData && groupData.students && groupData.students.length > 0) {
+      const groupNames = new Set(groupData.students.map(s => s.trim().toLowerCase()));
+      studentsToSave = currentAttStudents
+        .filter(s => groupNames.has(s.name.trim().toLowerCase()))
+        .map(s => ({ id: s.id, name: s.name, present: !!s.present }));
+    } else {
+      studentsToSave = currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
+    }
+  }
+
   const record = {
     teacherId: currentAttTeacherId + groupSuffix,
     sessionNum,
     date: todayDateKey,
     savedAt: serverTimestamp(),
-    students: currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }))
+    students: studentsToSave
   };
   try {
     await setDoc(doc(db, 'sessionAttendance', sessionKey), record);
-    const present = currentAttStudents.filter(s => s.present).length;
-    const teacherGroups = window.currentTeacherData?.groups || [];
+    // ✅ تحديث الذاكرة المحلية فوراً حتى تتحدث الشبكة بدون انتظار
+    if (!_allRecordedSessionsByGroup[gi]) _allRecordedSessionsByGroup[gi] = {};
+    _allRecordedSessionsByGroup[gi][sessionNum] = { ...record, savedAt: new Date() };
+    if (gi === 0) _allRecordedSessions[sessionNum] = _allRecordedSessionsByGroup[gi][sessionNum];
+    const present = studentsToSave.filter(s => s.present).length;
+    const teacherGroups = window.currentTeacherData?.groups || (allTeachers||[]).find(x=>x.id===currentAttTeacherId)?.groups || [];
     const groupName = teacherGroups[gi]?.name || '';
-    await addLog('📋 تسجيل حضور', `حصة ${sessionNum}${groupName?' — '+groupName:''} — ${present}/${currentAttStudents.length} حاضر`, '✅');
+    await addLog('📋 تسجيل حضور', `حصة ${sessionNum}${groupName?' — '+groupName:''} — ${present}/${studentsToSave.length} حاضر`, '✅');
     showToast(`✅ تم حفظ حضور الحصة ${sessionNum}${groupName?' ('+groupName+')':''}`);
     closeSessionModal();
-  } catch(e) { showToast('خطأ: ' + e.message, true); }
+    // ✅ تحديث شبكة الحصص في الـ modal الرئيسي (للأدمين) بدون إغلاقه
+    if (!window.isTeacherMode) {
+      const teacher = (allTeachers||[]).find(x => x.id === currentAttTeacherId);
+      if (teacher) renderAdminAttGroupsGrid(teacher);
+    }
+  } catch(e) { showToast('خطأ في الحفظ: ' + e.message, true); console.error('saveSessionAttendance_g error:', e); }
 };
 
 // حفظ حضور حصة معينة (توافق قديم — للأدمين أو بدون أفواج)
