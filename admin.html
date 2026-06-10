@@ -5254,23 +5254,42 @@ function renderAttStudents(students, filter) {
 }
 
 window.toggleStudentAtt = (sid, isPresent, el) => {
+  // تحديث المتغير إذا كان التلميذ موجوداً
   const s = currentAttStudents.find(x => x.id === sid);
-  if (!s) return;
-  s.present = isPresent;
-  s.marked = true;
+  if (s) { s.present = isPresent; s.marked = true; }
+  // ✅ تحديث الـ DOM دائماً بغض النظر عن المتغير
   const row = el.closest('.att-student-row');
   row.querySelectorAll('.att-check').forEach(c => c.classList.remove('present','absent'));
   if (isPresent) row.querySelectorAll('.att-check')[0].classList.add('present');
   else row.querySelectorAll('.att-check')[1].classList.add('absent');
+  // ✅ updateAttSummary ستقرأ من DOM تلقائياً (إصلاح Fix 5)
   updateAttSummary(currentAttStudents);
 };
 
 function updateAttSummary(students) {
-  const total = students.length;
-  const present = students.filter(s => s.present).length;
-  document.getElementById('att-total').textContent = total;
-  document.getElementById('att-present').textContent = present;
-  document.getElementById('att-absent').textContent = total - present;
+  // ✅ إصلاح نهائي: إذا كان الـ session modal مفتوحاً، نقرأ الإحصائيات من الـ DOM مباشرة
+  const sessionModalOpen = (() => {
+    const bg = document.getElementById('session-modal-bg');
+    return bg && bg.style.visibility === 'visible';
+  })();
+  let total, present;
+  if (sessionModalOpen) {
+    const rows = document.querySelectorAll('#session-modal-inner .att-student-row');
+    total = rows.length;
+    present = Array.from(rows).filter(row => {
+      const btn = row.querySelectorAll('.att-check')[0];
+      return btn && btn.classList.contains('present');
+    }).length;
+  } else {
+    total = students.length;
+    present = students.filter(s => s.present).length;
+  }
+  const totalEl = document.getElementById('att-total');
+  const presentEl = document.getElementById('att-present');
+  const absentEl = document.getElementById('att-absent');
+  if (totalEl) totalEl.textContent = total;
+  if (presentEl) presentEl.textContent = present;
+  if (absentEl) absentEl.textContent = total - present;
 }
 
 window.filterStudents = () => {
@@ -5710,17 +5729,6 @@ window.saveAttendance = async () => {
     const groupNames = new Set(activeGroup.students.map(s => s.trim().toLowerCase()));
     studentsToSave = currentAttStudents.filter(s => groupNames.has(s.name.trim().toLowerCase()));
   }
-  // ✅ إصلاح: قراءة الحضور مباشرة من DOM (att-students-list)
-  const attRows = document.querySelectorAll('#att-students-list .att-student-row');
-  if (attRows && attRows.length > 0) {
-    studentsToSave = Array.from(attRows).map(row => {
-      const sid = row.getAttribute('data-sid');
-      const s = currentAttStudents.find(x => x.id === sid) || { id: sid, name: row.querySelector('.att-student-name')?.textContent || '' };
-      const presentCheck = row.querySelectorAll('.att-check')[0];
-      const isPresent = presentCheck ? presentCheck.classList.contains('present') : !!s.present;
-      return { id: s.id, name: s.name, present: isPresent };
-    });
-  }
   const students = studentsToSave.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
   const existingSessions = _allRecordedSessionsByGroup[gi] || {};
   let sessionNum = 1;
@@ -5751,12 +5759,20 @@ async function loadTeacherStudentsView(uid, teacherData) {
   onSnapshot(doc(db, 'teachers', uid), snap => {
     if (!snap.exists()) return;
     if (_suppressSnapshot) return; // جاري تعديل — تجاهل هذا التحديث
+    // ✅ إصلاح نهائي: لا تُعدِّل currentAttStudents إذا كان الـ session modal مفتوحاً
+    // (المستخدم يسجّل حضور أو يعدّله الآن)
+    const sessionModalOpen = (() => {
+      const bg = document.getElementById('session-modal-bg');
+      return bg && bg.style.visibility === 'visible';
+    })();
     const t = snap.data();
     currentTeacherData = { uid, id: uid, ...t };
     window.currentTeacherData = currentTeacherData;
     // ✅ إصلاح: حفظ رقم الفوج النشط قبل إعادة البناء
     const _savedGroupIdx = window._currentGroupIdx || 0;
-    currentAttStudents = t.students ? [...t.students] : []; window.currentAttStudents = currentAttStudents;
+    if (!sessionModalOpen) {
+      currentAttStudents = t.students ? [...t.students] : []; window.currentAttStudents = currentAttStudents;
+    }
 
     // تحديث إحصائيات الهيدر — مع تحقق آمن من وجود العنصر
     const heroEl = document.getElementById('teachers-hero');
@@ -6552,7 +6568,23 @@ window.saveEditedSession_g = async (sessionNum, gi) => {
   }
 
   try {
-    const savedStudents = currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
+    // ✅ إصلاح نهائي: قراءة الحضور مباشرة من الـ DOM — مصدر الحقيقة الوحيد
+    // currentAttStudents قد يُعاد تعيينه بواسطة onSnapshot في أي وقت
+    const rows = document.querySelectorAll('#session-modal-inner .att-student-row');
+    const savedStudents = rows.length > 0
+      ? Array.from(rows).map(row => {
+          const sid = row.getAttribute('data-sid');
+          const name = row.querySelector('.att-student-name')?.textContent?.trim() || '';
+          const presentBtn = row.querySelectorAll('.att-check')[0];
+          const isPresent = presentBtn ? presentBtn.classList.contains('present') : false;
+          return { id: sid, name, present: isPresent };
+        })
+      : currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
+
+    if (savedStudents.length === 0) {
+      showToast('⚠️ لا يوجد تلاميذ للحفظ — حاول مرة أخرى', true);
+      return;
+    }
     await setDoc(docRef, {
       teacherId: currentAttTeacherId + `_g${gi}`,
       sessionNum,
@@ -6636,33 +6668,18 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
   }
   const groupSuffix = `_g${gi}`;
   const sessionKey  = `${currentAttTeacherId}${groupSuffix}_session_${sessionNum}`;
-  const todayDateKey = new Date().toISOString().slice(0, 10);
-
-  // ✅ إصلاح: نجمع تلاميذ الفوج المعروضين في الـ modal (وليس كل التلاميذ)
-  // الـ modal يعرض الأسطر بـ data-sid، نقرأ الحضور منها مباشرة
+  const todayDateKey = new Date().toISOString().slice(0, 10); // ✅ إصلاح: حفظ التاريخ دائماً
+  // ✅ إصلاح نهائي: قراءة الحضور من الـ DOM مباشرة
   const rows = document.querySelectorAll('#session-modal-inner .att-student-row');
-  let studentsToSave;
-  if (rows && rows.length > 0) {
-    studentsToSave = Array.from(rows).map(row => {
-      const sid = row.getAttribute('data-sid');
-      const s = currentAttStudents.find(x => x.id === sid) || { id: sid, name: row.querySelector('.att-student-name')?.textContent || '' };
-      const presentCheck = row.querySelectorAll('.att-check')[0];
-      const isPresent = presentCheck ? presentCheck.classList.contains('present') : !!s.present;
-      return { id: s.id, name: s.name, present: isPresent };
-    });
-  } else {
-    // fallback: تلاميذ الفوج من currentAttStudents
-    const teacherRecord = window.currentTeacherData || (allTeachers||[]).find(x => x.id === currentAttTeacherId) || {};
-    const groupData = (teacherRecord.groups || window._activeAttGroups || [])[gi];
-    if (groupData && groupData.students && groupData.students.length > 0) {
-      const groupNames = new Set(groupData.students.map(s => s.trim().toLowerCase()));
-      studentsToSave = currentAttStudents
-        .filter(s => groupNames.has(s.name.trim().toLowerCase()))
-        .map(s => ({ id: s.id, name: s.name, present: !!s.present }));
-    } else {
-      studentsToSave = currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
-    }
-  }
+  const studentsToSave = rows.length > 0
+    ? Array.from(rows).map(row => {
+        const sid = row.getAttribute('data-sid');
+        const name = row.querySelector('.att-student-name')?.textContent?.trim() || '';
+        const presentBtn = row.querySelectorAll('.att-check')[0];
+        const isPresent = presentBtn ? presentBtn.classList.contains('present') : false;
+        return { id: sid, name, present: isPresent };
+      })
+    : currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
 
   const record = {
     teacherId: currentAttTeacherId + groupSuffix,
@@ -6673,7 +6690,7 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
   };
   try {
     await setDoc(doc(db, 'sessionAttendance', sessionKey), record);
-    // ✅ تحديث الذاكرة المحلية فوراً حتى تتحدث الشبكة بدون انتظار
+    // ✅ تحديث الذاكرة المحلية فوراً
     if (!_allRecordedSessionsByGroup[gi]) _allRecordedSessionsByGroup[gi] = {};
     _allRecordedSessionsByGroup[gi][sessionNum] = { ...record, savedAt: new Date() };
     if (gi === 0) _allRecordedSessions[sessionNum] = _allRecordedSessionsByGroup[gi][sessionNum];
@@ -6683,12 +6700,11 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
     await addLog('📋 تسجيل حضور', `حصة ${sessionNum}${groupName?' — '+groupName:''} — ${present}/${studentsToSave.length} حاضر`, '✅');
     showToast(`✅ تم حفظ حضور الحصة ${sessionNum}${groupName?' ('+groupName+')':''}`);
     closeSessionModal();
-    // ✅ تحديث شبكة الحصص في الـ modal الرئيسي (للأدمين) بدون إغلاقه
     if (!window.isTeacherMode) {
       const teacher = (allTeachers||[]).find(x => x.id === currentAttTeacherId);
       if (teacher) renderAdminAttGroupsGrid(teacher);
     }
-  } catch(e) { showToast('خطأ في الحفظ: ' + e.message, true); console.error('saveSessionAttendance_g error:', e); }
+  } catch(e) { showToast('خطأ في الحفظ: ' + e.message, true); console.error(e); }
 };
 
 // حفظ حضور حصة معينة (توافق قديم — للأدمين أو بدون أفواج)
