@@ -1897,6 +1897,9 @@
             <button class="ticket-filter-btn" onclick="setTicketFilter('pack:باقة تحضير',this)">🎓 تحضير بكالوريا</button>
             <button class="ticket-filter-btn" onclick="setTicketFilter('pack:باقة البالغين',this)">👤 بالغين</button>
             <span style="width:1px;height:20px;background:var(--border);margin:0 2px"></span>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('source:website',this)" style="border-color:rgba(20,184,166,0.3);color:var(--teal)">🌐 عبر الموقع</button>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('source:manual',this)" style="border-color:rgba(124,58,237,0.3);color:var(--primary)">✏️ مضاف يدوياً</button>
+            <span style="width:1px;height:20px;background:var(--border);margin:0 2px"></span>
             <button class="ticket-filter-btn" id="trash-filter-btn" onclick="setTicketFilter('trash',this)" style="border-color:rgba(239,68,68,0.3);color:#DC2626">🗑️ سلة المحذوفات <span id="trash-count-badge" style="display:none;background:#EF4444;color:white;border-radius:99px;padding:1px 7px;font-size:11px;margin-right:4px">0</span></button>
           </div>
           <div class="tbl-wrap">
@@ -1910,11 +1913,12 @@
                   <th>المتبقي</th>
                   <th>التاريخ</th>
                   <th id="th-status-col">الحالة</th>
+                  <th>المصدر</th>
                   <th>إجراء</th>
                 </tr>
               </thead>
               <tbody id="tickets-tbody">
-                <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">⏳ جاري تحميل التذاكر...</td></tr>
+                <tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted)">⏳ جاري تحميل التذاكر...</td></tr>
               </tbody>
             </table>
           </div>
@@ -3715,6 +3719,8 @@ function renderTicketRows(data) {
     if (f === 'paid')           filtered = filtered.filter(x => x.status === 'paid');
     else if (f === 'pending')   filtered = filtered.filter(x => x.status !== 'paid');
     else if (f.startsWith('pack:')) { const pk=norm(f.slice(5)); filtered=filtered.filter(x=>norm(x.pack).includes(pk)); }
+    else if (f === 'source:website') filtered = filtered.filter(x => x.receipt && x.receipt.trim() !== '');
+    else if (f === 'source:manual')  filtered = filtered.filter(x => !x.receipt || x.receipt.trim() === '');
   } else {
     filtered = q ? filtered.filter(x => norm(x.receipt).includes(q) || norm(x.name).includes(q)) : filtered;
   }
@@ -3727,7 +3733,7 @@ function renderTicketRows(data) {
   tbody.innerHTML = '';
   if (!filtered.length) {
     const msg = isTrash ? '🎉 سلة المحذوفات فارغة' : (q ? '🔍 لا توجد نتائج مطابقة' : '📭 لم يتم إصدار أي تذاكر بعد');
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">${msg}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted)">${msg}</td></tr>`;
     return;
   }
   filtered.forEach(x => {
@@ -3748,6 +3754,10 @@ function renderTicketRows(data) {
          <button class="tbl-action" onclick="openEditTicketModal('${x.id}')" style="background:var(--primary-light);color:var(--primary);border-color:var(--border-2)">✏️ تعديل</button>
          <button class="tbl-action del" onclick="deleteTicket('${x.id}')">🗑️</button>`;
 
+    const isWebSource = x.receipt && x.receipt.trim() !== '';
+    const sourceCell = isWebSource
+      ? '<span style="font-size:11px;font-weight:800;padding:3px 10px;border-radius:99px;background:rgba(20,184,166,0.1);color:var(--teal);border:1px solid rgba(20,184,166,0.25);white-space:nowrap">🌐 موقع</span>'
+      : '<span style="font-size:11px;font-weight:800;padding:3px 10px;border-radius:99px;background:var(--primary-light);color:var(--primary);border:1px solid var(--border-2);white-space:nowrap">✏️ يدوي</span>';
     tr.innerHTML = `
       <td><span class="receipt-code">${x.receipt || '—'}</span></td>
       <td style="font-weight:700;color:var(--text)">${x.name || '—'}</td>
@@ -3758,6 +3768,7 @@ function renderTicketRows(data) {
         : '<span style="font-size:12px;font-weight:800;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,0.1);color:#059669">✅ مكتمل</span>'}</td>
       <td style="color:var(--text-muted)">${dateStr}</td>
       <td>${statusCell}</td>
+      <td>${sourceCell}</td>
       <td style="display:flex;gap:6px">${actionsCell}</td>`;
     tbody.appendChild(tr);
   });
@@ -5366,7 +5377,11 @@ window.searchStudentSuggestions = async (val) => {
     try {
       const sheetRows = await loadSheetStudentsCache();
       // sheetRows الآن objects — نبحث في الاسم
-      sheetMatches = sheetRows.filter(s => norm(s.name).includes(q) || normSort(s.name).includes(qSort)).slice(0, 8);
+      sheetMatches = sheetRows.filter(s => {
+        const sn = norm(s.name); const ss = normSort(s.name);
+        return sn.includes(q) || ss.includes(qSort) || qSort.includes(ss) ||
+               q.split(' ').every(part => part.length > 0 && sn.includes(part));
+      }).slice(0, 8);
     } catch(e) { console.warn('sheet search error:', e); }
 
     // إذا تغيّر النص أثناء الانتظار — تجاهل
