@@ -10,7 +10,7 @@ const CAMP_MIN_AGE = 5;
 
 // URL حق باقات المخيم الصيفي — SummerPlus
 const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzGcJb8TVAfyyGjlvbXKwsbELBeYI831KU09cpit7k4smSgZ0kRmSPhdjC_m4NO5tcw4g/exec";
+  "https://script.google.com/macros/s/AKfycbwUKsK9jYYUAqhpb4-ZMLx26ktgkxPyxp8O54mdy7hyzOdUDDSbaQVzkf0DpGeXxk5n6A/exec";
 
 // URL حق البرامج الخاصة — programsummerschool
 const SPECIAL_SCRIPT_URL =
@@ -105,24 +105,65 @@ function resetSubmitBtn(btnId, resetMsg) {
   if (span) span.textContent = resetMsg;
 }
 
+// ✅ إرسال مع retry تلقائي (3 محاولات)
+async function fetchWithRetry(url, payload, attempts = 3) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await fetch(url, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify(payload)
+      });
+      return true; // نجح
+    } catch (err) {
+      console.warn(`محاولة ${i + 1} فشلت:`, err);
+      if (i < attempts - 1) {
+        await new Promise(r => setTimeout(r, 1500 * (i + 1))); // انتظر قبل إعادة المحاولة
+      }
+    }
+  }
+  throw new Error("فشل الإرسال بعد " + attempts + " محاولات");
+}
+
+// ✅ حفظ احتياطي في Firestore مباشرة من المتصفح
+async function saveToFirestoreBackup(collectionName, data) {
+  try {
+    const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js");
+    const { getFirestore, collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js");
+
+    const cfg = {
+      apiKey: "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
+      authDomain: "eplus-center-39.firebaseapp.com",
+      projectId: "eplus-center-39"
+    };
+
+    const app = getApps().find(a => a.name === "camp-backup") ||
+                initializeApp(cfg, "camp-backup");
+    const db = getFirestore(app);
+
+    await addDoc(collection(db, collectionName), {
+      ...data,
+      savedAt: serverTimestamp()
+    });
+    console.log("✅ حُفظ في Firestore backup");
+  } catch (err) {
+    console.warn("⚠️ Firestore backup فشل (مش مشكلة، الشيت اتكتب):", err);
+  }
+}
+
 // يرسل للجدول الكبير (باقات المخيم)
 async function submitPayload(payload) {
-  return await fetch(APPS_SCRIPT_URL, {
-    method: "POST",
-    mode: "no-cors",
-    headers: { "Content-Type": "text/plain" },
-    body: JSON.stringify(payload)
-  });
+  await fetchWithRetry(APPS_SCRIPT_URL, payload);
+  // حفظ احتياطي في Firestore
+  await saveToFirestoreBackup("campRegistrations", payload);
 }
 
 // يرسل للجدول الخاص بالبرامج الخاصة
 async function submitSpecialPayload(payload) {
-  return await fetch(SPECIAL_SCRIPT_URL, {
-    method: "POST",
-    mode: "no-cors",
-    headers: { "Content-Type": "text/plain" },
-    body: JSON.stringify(payload)
-  });
+  await fetchWithRetry(SPECIAL_SCRIPT_URL, payload);
+  // حفظ احتياطي في Firestore
+  await saveToFirestoreBackup("specialRegistrations", payload);
 }
 
 /* ═══════════════════════════════════════════
