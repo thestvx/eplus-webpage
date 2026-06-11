@@ -3401,8 +3401,8 @@ window.generateTicket = async () => {
   const amount = document.getElementById('sc-amount').value;
   const note = getSelectedLanguages();
   const now = new Date();
-  const dateRaw = now.toISOString().split('T')[0]; // تاريخ اليوم تلقائياً
-  const status = 'paid'; // التذاكر تُصدر مفعّلة دائماً
+  const dateRaw = now.toISOString().split('T')[0];
+  const status = 'paid';
   if (!name || !pack || !amount) { showToast('يرجى ملء الحقول الإلزامية', true); return; }
   const btn = document.getElementById('sc-gen-btn');
   btn.disabled = true; btn.textContent = '⏳ جاري التوليد...';
@@ -3415,16 +3415,19 @@ window.generateTicket = async () => {
     const paidCalc = parseFloat(document.getElementById('sc-paid-amount').value) || 0;
     const remainingAmount = fullPrice > 0 ? Math.max(0, fullPrice - paidCalc) : 0;
     const paidAmount = Number(amount);
+    const finalFullPrice = fullPrice > 0 ? fullPrice : paidAmount;
 
-    // ── حفظ التذكرة في summerTickets ──
-    await addDoc(collection(db,'summerTickets'), {
+    // ── حفظ التذكرة في summerTickets والحصول على ticketId ──
+    const ticketRef = await addDoc(collection(db,'summerTickets'), {
       name, pack, amount: paidAmount,
-      fullPrice: fullPrice || paidAmount,
+      fullPrice: finalFullPrice,
       remainingAmount, date: dateRaw, status, receipt, note, verifyURL,
+      financeSynced: false,
       createdAt: serverTimestamp()
     });
+    const ticketId = ticketRef.id;
 
-    // ── تسجيل المبلغ المدفوع تلقائياً في الموارد المالية ──
+    // ── تسجيل المبلغ في الموارد المالية (مع ticketId لمنع التكرار) ──
     if (paidAmount > 0) {
       try {
         await addDoc(collection(db,'financeTx'), {
@@ -3433,10 +3436,13 @@ window.generateTicket = async () => {
           amount: paidAmount,
           date: dateRaw,
           receipt,
+          ticketId,
           source: 'summer_ticket',
           createdAt: serverTimestamp()
         });
-        console.log('✅ financeTx saved for', name, paidAmount);
+        // وضع علامة أن التذكرة مسجّلة مالياً
+        await updateDoc(ticketRef, { financeSynced: true }).catch(() => {});
+        console.log('✅ financeTx saved for', name, paidAmount, 'ticketId:', ticketId);
       } catch(finErr) {
         console.error('financeTx save failed:', finErr.code, finErr.message);
         showToast('⚠️ التذكرة حُفظت لكن المبلغ لم يُسجَّل في الموارد المالية — ' + finErr.message, true);
@@ -7738,19 +7744,33 @@ window.renderFinanceKPIs = function renderFinanceKPIs() {
   // ── KPI تذاكر المخيم الصيفي ──
   const summerTxs = _finTxs.filter(t => t.type === 'income' && t.source === 'summer_ticket');
   const summerTotal = summerTxs.reduce((a,t) => a + (t.amount||0), 0);
-  const importedReceipts = new Set(summerTxs.map(t => t.receipt).filter(Boolean));
 
-  // حساب التذاكر المدفوعة غير المستوردة بعد
+  // مجموعة المراجع المُسجَّلة (ticketId أولاً، ثم receipt للتوافق مع القديم)
+  const importedTicketIds = new Set(summerTxs.map(t => t.ticketId).filter(Boolean));
+  const importedReceipts  = new Set(summerTxs.map(t => t.receipt).filter(Boolean));
+
+  // حساب التذاكر المدفوعة غير المستوردة — نفس منطق importSummerTicketsToFinance
   const allTickets = window._allTicketsData || [];
-  const pendingImport = allTickets.filter(t =>
-    t.status === 'paid' && Number(t.amount || 0) > 0 && !importedReceipts.has(t.receipt)
-  );
+  const pendingImport = allTickets.filter(t => {
+    if (t.status !== 'paid') return false;
+    if (Number(t.amount || 0) <= 0) return false;
+    if (t.id && importedTicketIds.has(t.id)) return false;
+    if (t.receipt && importedReceipts.has(t.receipt)) return false;
+    return true;
+  });
+
+  const registeredCount = allTickets.filter(t => {
+    if (t.status !== 'paid' || Number(t.amount||0) <= 0) return false;
+    if (t.id && importedTicketIds.has(t.id)) return true;
+    if (t.receipt && importedReceipts.has(t.receipt)) return true;
+    return false;
+  }).length;
 
   const sumTotalEl  = document.getElementById('fin-summer-total');
   const sumMetaEl   = document.getElementById('fin-summer-meta');
   const importBtn   = document.getElementById('btn-import-summer');
   if (sumTotalEl)  sumTotalEl.textContent  = fmt(summerTotal);
-  if (sumMetaEl)   sumMetaEl.textContent   = `${importedReceipts.size} تذكرة مسجّلة كمدخول — ${pendingImport.length} بانتظار الاستيراد`;
+  if (sumMetaEl)   sumMetaEl.textContent   = `${registeredCount} تذكرة مسجّلة كمدخول — ${pendingImport.length} بانتظار الاستيراد`;
   if (importBtn) {
     if (pendingImport.length > 0) {
       importBtn.style.opacity = '1';
@@ -7900,20 +7920,30 @@ window.importSummerTicketsToFinance = async () => {
   const allTickets = window._allTicketsData || [];
   if (!allTickets.length) { showToast && showToast('⚠️ لا توجد تذاكر بعد', true); return; }
 
-  // التذاكر المستوردة مسبقاً (بناءً على رقم الوصل)
+  // ── مجموعة التذاكر المُسجَّلة مسبقاً بكلا المرجعين (ticketId + receipt) ──
+  const importedTicketIds = new Set(
+    _finTxs
+      .filter(t => t.type === 'income' && t.source === 'summer_ticket' && t.ticketId)
+      .map(t => t.ticketId)
+  );
   const importedReceipts = new Set(
     _finTxs
       .filter(t => t.type === 'income' && t.source === 'summer_ticket' && t.receipt)
       .map(t => t.receipt)
   );
 
-  // التذاكر المدفوعة التي لم تُستورد بعد
-  const toImport = allTickets.filter(t =>
-    t.status === 'paid' &&
-    Number(t.amount || 0) > 0 &&
-    t.receipt &&
-    !importedReceipts.has(t.receipt)
-  );
+  // ── التذاكر المدفوعة غير المستوردة بعد ──
+  // نعتبر التذكرة مستوردة إذا كان ticketId موجوداً في السجلات
+  // أو receipt موجود (للتوافق مع التذاكر القديمة)
+  const toImport = allTickets.filter(t => {
+    if (t.status !== 'paid') return false;
+    if (Number(t.amount || 0) <= 0) return false;
+    // إذا ticket موجود بـ ticketId → تجاهل
+    if (t.id && importedTicketIds.has(t.id)) return false;
+    // إذا ticket موجود بـ receipt (تذاكر قديمة بدون ticketId في financeTx) → تجاهل
+    if (t.receipt && importedReceipts.has(t.receipt)) return false;
+    return true;
+  });
 
   if (!toImport.length) {
     showToast && showToast('✅ جميع التذاكر المدفوعة مسجَّلة بالفعل في الموارد المالية');
@@ -7943,8 +7973,13 @@ window.importSummerTicketsToFinance = async () => {
         amount: Number(ticket.amount),
         date: ticket.date || today,
         receipt: ticket.receipt || '',
+        ticketId: ticket.id || '',
         createdAt: serverTimestamp()
       });
+      // وضع علامة financeSynced على التذكرة
+      if (ticket.id) {
+        updateDoc(doc(finDb, 'summerTickets', ticket.id), { financeSynced: true }).catch(() => {});
+      }
       successCount++;
     } catch(e) {
       console.error('Import error for', ticket.name, e.message);
@@ -8113,10 +8148,19 @@ window.saveEditTicket = async () => {
   const pack      = document.getElementById('et-pack').value.trim();
   const amount    = parseFloat(document.getElementById('et-amount').value) || 0;
   const remaining = parseFloat(document.getElementById('et-remaining').value) || 0;
-  const fullPrice = parseFloat(document.getElementById('et-fullprice').value) || 0;
-  const status    = 'paid'; // التذاكر مفعّلة دائماً
+  const fullPriceInput = parseFloat(document.getElementById('et-fullprice').value) || 0;
+  const status    = 'paid';
 
   if (!name) return showToast && showToast('أدخل اسم المشترك', true);
+
+  // ── التحقق من صحة المبالغ ──
+  // fullPrice يجب أن يكون >= amount دائماً
+  const computedFullPrice = fullPriceInput > 0 ? fullPriceInput : (amount + remaining);
+  if (computedFullPrice < amount) {
+    return showToast && showToast('⚠️ السعر الكامل للباقة لا يمكن أن يكون أقل من المبلغ المدفوع', true);
+  }
+  // إعادة حساب المتبقي تلقائياً للتأكد من الاتساق
+  const finalRemaining = Math.max(0, computedFullPrice - amount);
 
   const btn = document.getElementById('et-save-btn');
   btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
@@ -8129,12 +8173,14 @@ window.saveEditTicket = async () => {
   try {
     await updateDoc(doc(_db, 'summerTickets', id), {
       name, receipt, date, pack,
-      amount, remainingAmount: remaining,
-      fullPrice: fullPrice || (amount + remaining),
+      amount,
+      remainingAmount: finalRemaining,
+      fullPrice: computedFullPrice,
       status
     });
 
-    // ── لو المبلغ المدفوع زاد، نسجّل الفرق في الموارد المالية ──
+    // ── لو المبلغ المدفوع زاد، نسجّل الفرق فقط في الموارد المالية ──
+    // (مع ticketId لضمان عدم التكرار)
     const diff = amount - oldAmount;
     if (diff > 0) {
       const finDb = (typeof getFinDb === 'function' ? getFinDb() : null) || _db;
@@ -8145,6 +8191,7 @@ window.saveEditTicket = async () => {
         amount: diff,
         date: date || new Date().toISOString().split('T')[0],
         receipt: receipt || '',
+        ticketId: id,
         createdAt: serverTimestamp()
       }).catch(e => console.warn('financeTx diff-save error:', e));
     }
