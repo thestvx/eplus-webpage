@@ -1149,9 +1149,7 @@ async function proceedToRegister() {
   );
   try {
     const formData = new FormData();
-    Object.entries(pendingFormData).forEach(([key, value]) => {
-      formData.append(key, value ?? '');
-    });
+    formData.append('payload', JSON.stringify(pendingFormData));
     await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formData });
     const regTypeLabel = currentLang === 'ar'
       ? (typeLabelsAr[pendingFormData.type] || 'الخدمة المطلوبة')
