@@ -14,7 +14,7 @@ const APPS_SCRIPT_URL =
 
 // URL حق البرامج الخاصة — programsummerschool
 const SPECIAL_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbz9z7yvkxhEdEQryA_U_xZLotfV3s_GzNZEaZm6pRXbliTUHonXvN_oQOwwxWenF7SvmQ/exec";
+  "https://script.google.com/macros/s/AKfycbxhm3re8cRHxPkY33mf4TmIDEitnpUqtBYG8yosDGWhtCF3S8nWE1gTEZmm1Mw4R5SsdQ/exec";
 
 const VIDEO_PUBLIC_ID   = "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab";
 const VIDEO_CLOUD_NAME  = "dac4mwuwe";
