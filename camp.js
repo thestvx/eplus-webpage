@@ -10,11 +10,11 @@ const CAMP_MIN_AGE = 5;
 
 // URL حق باقات المخيم الصيفي — SummerPlus
 const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxcCKK0I_CG1cpdKdCQaxxTGmiIGjjBH0sCsW-TMXJTcYU1yms7jdyLCQNlo24Z9hX_YA/exec";
+  "https://script.google.com/macros/s/AKfycbwkRAbwsa0KpxxKKCWgEmVkr_6eHvPVcvXRicl4IRSp2q9yGkbM-gS40EPQ0Y_k_eT-uw/exec";
 
 // URL حق البرامج الخاصة — programsummerschool
 const SPECIAL_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycby2JR9LFzqC54_wW2K3wsiRnjL7O9nrFH3HdeQ2wNwjOB1KofJenMLBJZ7urrCQ66ezoA/exec";
+  "https://script.google.com/macros/s/AKfycbx8HgWgcfu9PLi5WcDjcdqObpNr3fFgRcrPA-owQPfOe2lKelRbfNPssL31huhcusad5g/exec";
 
 const VIDEO_PUBLIC_ID   = "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab";
 const VIDEO_CLOUD_NAME  = "dac4mwuwe";
