@@ -131,6 +131,8 @@ window.doLogout = () => {
   if (_unsubTickets) { _unsubTickets(); _unsubTickets = null; }
   signOut(auth);
 };
+const email = document.getElementById('email-inp').value.trim();
+errEl.style.display = 'none';
 
 // NAV SWITCHING (sidebar-based, not tabs)
 window.switchNavSection = (section) => {
