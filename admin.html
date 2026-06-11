@@ -3807,6 +3807,8 @@ function loadTickets() {
       allTicketsData.push({ id: d.id, ...x });
     });
     window._allTicketsData = allTicketsData; // expose for edit modal
+    // تحديث الموارد المالية إذا كانت محمّلة — لضمان التزامن الفوري مع المخيم
+    if (typeof window.renderFinanceKPIs === 'function') window.renderFinanceKPIs();
     // إعادة رسم قائمة الحضور إذا كانت مفتوحة
     refreshAttendanceListIfOpen();
 
@@ -7729,9 +7731,20 @@ window.loadFinanceSection = async function loadFinanceSection() {
 }
 
 window.renderFinanceKPIs = function renderFinanceKPIs() {
-  const totalExpense = _finTxs.filter(t => t.type === 'expense').reduce((a,t) => a + (t.amount||0), 0);
-  const totalIncome  = _finTxs.filter(t => t.type === 'income' ).reduce((a,t) => a + (t.amount||0), 0);
-  const totalSalary  = _finTxs.filter(t => t.type === 'salary' ).reduce((a,t) => a + (t.amount||0), 0);
+  const totalExpense    = _finTxs.filter(t => t.type === 'expense').reduce((a,t) => a + (t.amount||0), 0);
+  const totalSalary     = _finTxs.filter(t => t.type === 'salary' ).reduce((a,t) => a + (t.amount||0), 0);
+  // الإيرادات غير المخيم الصيفي (مدخلة يدوياً)
+  const manualIncome    = _finTxs.filter(t => t.type === 'income' && t.source !== 'summer_ticket').reduce((a,t) => a + (t.amount||0), 0);
+
+  // ── KPI تذاكر المخيم الصيفي ──
+  // المصدر الوحيد للحقيقة: summerTickets مباشرة (window._allTicketsData)
+  // يضمن التطابق الكامل مع أرقام صفحة المخيم الصيفي
+  const allTickets = window._allTicketsData || [];
+  const paidTickets = allTickets.filter(t => !t.deleted && t.status === 'paid' && Number(t.amount||0) > 0);
+  const summerTotal = paidTickets.reduce((a,t) => a + Number(t.amount||0), 0);
+
+  // الإجمالي الكلي للإيرادات = إيرادات يدوية + مخيم صيفي (من المصدر الصحيح)
+  const totalIncome = manualIncome + summerTotal;
   const balance = _finTreasury + totalIncome - totalExpense - totalSalary;
 
   const fmt = n => n.toLocaleString('ar-DZ') + ' دج';
@@ -7741,26 +7754,19 @@ window.renderFinanceKPIs = function renderFinanceKPIs() {
   document.getElementById('fin-total-income').textContent  = fmt(totalIncome);
   document.getElementById('fin-total-salary').textContent  = fmt(totalSalary);
 
-  // ── KPI تذاكر المخيم الصيفي ──
+  // مجموعة المراجع المُسجَّلة في financeTx (للتحقق من ما تم استيراده)
   const summerTxs = _finTxs.filter(t => t.type === 'income' && t.source === 'summer_ticket');
-  const summerTotal = summerTxs.reduce((a,t) => a + (t.amount||0), 0);
-
-  // مجموعة المراجع المُسجَّلة (ticketId أولاً، ثم receipt للتوافق مع القديم)
   const importedTicketIds = new Set(summerTxs.map(t => t.ticketId).filter(Boolean));
   const importedReceipts  = new Set(summerTxs.map(t => t.receipt).filter(Boolean));
 
-  // حساب التذاكر المدفوعة غير المستوردة — نفس منطق importSummerTicketsToFinance
-  const allTickets = window._allTicketsData || [];
-  const pendingImport = allTickets.filter(t => {
-    if (t.status !== 'paid') return false;
-    if (Number(t.amount || 0) <= 0) return false;
+  // التذاكر المدفوعة غير المستوردة — نفس منطق importSummerTicketsToFinance
+  const pendingImport = paidTickets.filter(t => {
     if (t.id && importedTicketIds.has(t.id)) return false;
     if (t.receipt && importedReceipts.has(t.receipt)) return false;
     return true;
   });
 
-  const registeredCount = allTickets.filter(t => {
-    if (t.status !== 'paid' || Number(t.amount||0) <= 0) return false;
+  const registeredCount = paidTickets.filter(t => {
     if (t.id && importedTicketIds.has(t.id)) return true;
     if (t.receipt && importedReceipts.has(t.receipt)) return true;
     return false;
@@ -8179,21 +8185,49 @@ window.saveEditTicket = async () => {
       status
     });
 
-    // ── لو المبلغ المدفوع زاد، نسجّل الفرق فقط في الموارد المالية ──
-    // (مع ticketId لضمان عدم التكرار)
-    const diff = amount - oldAmount;
-    if (diff > 0) {
-      const finDb = (typeof getFinDb === 'function' ? getFinDb() : null) || _db;
-      addDoc(collection(finDb, 'financeTx'), {
-        type: 'income',
-        source: 'summer_ticket',
-        desc: `☀️ دفعة إضافية — ${name} (${pack || receipt || '—'})`,
-        amount: diff,
-        date: date || new Date().toISOString().split('T')[0],
-        receipt: receipt || '',
-        ticketId: id,
-        createdAt: serverTimestamp()
-      }).catch(e => console.warn('financeTx diff-save error:', e));
+    // ── مزامنة المبلغ في الموارد المالية — تحديث مباشر لضمان التطابق مع المخيم ──
+    if (amount !== oldAmount) {
+      try {
+        const finDb = (typeof getFinDb === 'function' ? getFinDb() : null) || _db;
+        if (finDb) {
+          // جلب كل سجلات هذه التذكرة المرتبطة بـ ticketId
+          const txSnap = await getDocs(
+            query(collection(finDb, 'financeTx'),
+              where('source', '==', 'summer_ticket'),
+              where('ticketId', '==', id)
+            )
+          );
+
+          if (!txSnap.empty) {
+            // يوجد سجل — نحدّث الأول بالمبلغ الجديد الكلي ونحذف أي سجلات زائدة
+            const txDocs = txSnap.docs;
+            await updateDoc(txDocs[0].ref, {
+              amount,
+              desc: `☀️ تذكرة مخيم — ${name} (${pack || '—'})`,
+              date: date || txDocs[0].data().date || new Date().toISOString().split('T')[0],
+              receipt: receipt || ''
+            });
+            // حذف السجلات المكررة الزائدة
+            for (let i = 1; i < txDocs.length; i++) {
+              await deleteDoc(txDocs[i].ref).catch(() => {});
+            }
+          } else {
+            // لا يوجد سجل — أنشئ واحداً بالمبلغ الكلي الحالي
+            await addDoc(collection(finDb, 'financeTx'), {
+              type: 'income',
+              source: 'summer_ticket',
+              desc: `☀️ تذكرة مخيم — ${name} (${pack || '—'})`,
+              amount,
+              date: date || new Date().toISOString().split('T')[0],
+              receipt: receipt || '',
+              ticketId: id,
+              createdAt: serverTimestamp()
+            });
+          }
+        }
+      } catch(finErr) {
+        console.warn('financeTx sync error:', finErr.message);
+      }
     }
 
     showToast && showToast('✅ تم تحديث التذكرة');
