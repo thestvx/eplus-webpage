@@ -14,7 +14,7 @@ const APPS_SCRIPT_URL =
 
 // URL حق البرامج الخاصة — programsummerschool
 const SPECIAL_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbx8HgWgcfu9PLi5WcDjcdqObpNr3fFgRcrPA-owQPfOe2lKelRbfNPssL31huhcusad5g/exec";
+  "https://script.google.com/macros/s/AKfycbw29G05wz2MczuLtVraFZqsIVrKCpGu82BPhjkRv7KhCbOQB031b_LouZBJYZy8mOvgLg/exec";
 
 const VIDEO_PUBLIC_ID   = "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab";
 const VIDEO_CLOUD_NAME  = "dac4mwuwe";
@@ -106,6 +106,7 @@ function resetSubmitBtn(btnId, resetMsg) {
 }
 
 // ✅ إرسال مع retry تلقائي (3 محاولات)
+// ملاحظة: mode:"no-cors" — إذا ما رمى خطأ يعني الإرسال وصل، نوقف فوراً
 async function fetchWithRetry(url, payload, attempts = 3) {
   for (let i = 0; i < attempts; i++) {
     try {
@@ -115,11 +116,11 @@ async function fetchWithRetry(url, payload, attempts = 3) {
         headers: { "Content-Type": "text/plain" },
         body: JSON.stringify(payload)
       });
-      return true; // نجح
+      return true; // نجح — نوقف ولا نكمل retry
     } catch (err) {
       console.warn(`محاولة ${i + 1} فشلت:`, err);
       if (i < attempts - 1) {
-        await new Promise(r => setTimeout(r, 1500 * (i + 1))); // انتظر قبل إعادة المحاولة
+        await new Promise(r => setTimeout(r, 1500 * (i + 1)));
       }
     }
   }
@@ -160,10 +161,9 @@ async function submitPayload(payload) {
 }
 
 // يرسل للجدول الخاص بالبرامج الخاصة
+// ⚠️ لا نضيف Firestore هنا — Apps Script يتكفل بالـ backup تلقائياً
 async function submitSpecialPayload(payload) {
   await fetchWithRetry(SPECIAL_SCRIPT_URL, payload);
-  // حفظ احتياطي في Firestore
-  await saveToFirestoreBackup("specialcampRegistrations", payload);
 }
 
 /* ═══════════════════════════════════════════
