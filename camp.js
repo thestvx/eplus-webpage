@@ -160,25 +160,9 @@ async function submitPayload(payload) {
   await saveToFirestoreBackup("campRegistrations", payload);
 }
 
-// يرسل للجدول الخاص بالبرامج الخاصة عبر GET (يضمن وصول البيانات مع no-cors)
-// + Firestore backup من المتصفح كطبقة أمان إضافية
+// يرسل للجدول الخاص بالبرامج الخاصة + Firestore backup
 async function submitSpecialPayload(payload) {
-  // نرسل عبر GET مع query string — الوحيد المضمون مع no-cors في Apps Script
-  const params = new URLSearchParams(payload).toString();
-  const urlWithParams = SPECIAL_SCRIPT_URL + "?" + params;
-
-  for (let i = 0; i < 3; i++) {
-    try {
-      await fetch(urlWithParams, { method: "GET", mode: "no-cors" });
-      break; // نجح
-    } catch (err) {
-      console.warn(`محاولة GET ${i + 1} فشلت:`, err);
-      if (i < 2) await new Promise(r => setTimeout(r, 1500 * (i + 1)));
-      else throw new Error("فشل الإرسال بعد 3 محاولات");
-    }
-  }
-
-  // Firestore backup من المتصفح — طبقة أمان ثانية
+  await fetchWithRetry(SPECIAL_SCRIPT_URL, payload);
   await saveToFirestoreBackup("specialcampRegistrations", payload);
 }
 
