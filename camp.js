@@ -14,7 +14,7 @@ const APPS_SCRIPT_URL =
 
 // URL حق البرامج الخاصة — programsummerschool
 const SPECIAL_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbys0HfktNpBAAQNE-1VQAzH7Bs8wPUrNVPCGYzVvYVLEyDraCU7jxke9s0bQqpMREuhfg/exec";
+  "https://script.google.com/macros/s/AKfycbxpGnYF0vb1noeum-saswiZJiQF2Q7wiF0YUyLy3hN9F6kOCH1pwogxbn8G8fQvZ-MkXQ/exec";
 
 const VIDEO_PUBLIC_ID   = "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab";
 const VIDEO_CLOUD_NAME  = "dac4mwuwe";
@@ -160,10 +160,26 @@ async function submitPayload(payload) {
   await saveToFirestoreBackup("campRegistrations", payload);
 }
 
-// يرسل للجدول الخاص بالبرامج الخاصة
-// ⚠️ لا نضيف Firestore هنا — Apps Script يتكفل بالـ backup تلقائياً
+// يرسل للجدول الخاص بالبرامج الخاصة عبر GET (يضمن وصول البيانات مع no-cors)
+// + Firestore backup من المتصفح كطبقة أمان إضافية
 async function submitSpecialPayload(payload) {
-  await fetchWithRetry(SPECIAL_SCRIPT_URL, payload);
+  // نرسل عبر GET مع query string — الوحيد المضمون مع no-cors في Apps Script
+  const params = new URLSearchParams(payload).toString();
+  const urlWithParams = SPECIAL_SCRIPT_URL + "?" + params;
+
+  for (let i = 0; i < 3; i++) {
+    try {
+      await fetch(urlWithParams, { method: "GET", mode: "no-cors" });
+      break; // نجح
+    } catch (err) {
+      console.warn(`محاولة GET ${i + 1} فشلت:`, err);
+      if (i < 2) await new Promise(r => setTimeout(r, 1500 * (i + 1)));
+      else throw new Error("فشل الإرسال بعد 3 محاولات");
+    }
+  }
+
+  // Firestore backup من المتصفح — طبقة أمان ثانية
+  await saveToFirestoreBackup("specialcampRegistrations", payload);
 }
 
 /* ═══════════════════════════════════════════
