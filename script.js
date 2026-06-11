@@ -85,7 +85,7 @@ function byId(id) {
    APPS SCRIPT URLS
 ────────────────────────────────────────────────────────── */
 const APPS_SCRIPT_URL =
-  'https://script.google.com/macros/s/AKfycbzkbrVJ7UmQvkXTmP1jJXudXrv4Z2pwm6hoK8K1IFVKgS-LcB__Q8q2k19pYqPdGrWZ6A/exec';
+  'https://script.google.com/macros/s/AKfycbyaVgysQI1qpUCg8X11FMRTmikBQrvFN9wkSVhOfGhHtD3FjAJfURhotvYycTvrbWwzSA/exec';
 
 const JOIN_APPS_SCRIPT_URL =
   'https://script.google.com/macros/s/AKfycbzo7_3ElBeyt88Cv6PsTDEp_DMu5i_PO-t54t8WAdRitoUf7HLzx9VF_GyEHPs9QcQx/exec';
