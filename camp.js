@@ -10,11 +10,11 @@ const CAMP_MIN_AGE = 5;
 
 // URL حق باقات المخيم الصيفي — SummerPlus
 const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzGkBJjc_DlONlLfyo62muaTkm517QHyUy0rmu9vuACKBnBEE_TJK-nRBLL3EQZZPOHig/exec";
+  "https://script.google.com/macros/s/AKfycbxcCKK0I_CG1cpdKdCQaxxTGmiIGjjBH0sCsW-TMXJTcYU1yms7jdyLCQNlo24Z9hX_YA/exec";
 
 // URL حق البرامج الخاصة — programsummerschool
 const SPECIAL_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbyJp48FX1vdn35zezbrsk_XHbeYksJ28n4T-5OpOrBTPzhsisx8gTubrlcOsaYbnu-kkg/exec";
+  "https://script.google.com/macros/s/AKfycby2JR9LFzqC54_wW2K3wsiRnjL7O9nrFH3HdeQ2wNwjOB1KofJenMLBJZ7urrCQ66ezoA/exec";
 
 const VIDEO_PUBLIC_ID   = "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab";
 const VIDEO_CLOUD_NAME  = "dac4mwuwe";
@@ -163,7 +163,7 @@ async function submitPayload(payload) {
 async function submitSpecialPayload(payload) {
   await fetchWithRetry(SPECIAL_SCRIPT_URL, payload);
   // حفظ احتياطي في Firestore
-  await saveToFirestoreBackup("specialRegistrations", payload);
+  await saveToFirestoreBackup("specialcampRegistrations", payload);
 }
 
 /* ═══════════════════════════════════════════
