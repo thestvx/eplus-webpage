@@ -830,8 +830,11 @@
     .att-check{width:24px;height:24px;border-radius:8px;border:2px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all 0.2s;flex-shrink:0;background:var(--card-bg)}
     .att-check.present{background:var(--success);border-color:var(--success);box-shadow:0 2px 8px rgba(16,185,129,0.3)}
     .att-check.absent{background:var(--danger-soft);border-color:rgba(239,68,68,0.4)}
+    .att-check.late{background:#FEF3C7;border-color:#F59E0B;box-shadow:0 2px 8px rgba(245,158,11,0.3);color:#92400E}
     .att-add-student{display:flex;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
     .student-suggest-item:hover{background:var(--primary-light)!important}
+    /* شبكة الإحصائيات — تدعم 3 أو 4 بطاقات */
+    .att-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:10px;margin-bottom:16px}
 
     /* Admin teacher form modal */
     .teacher-modal-bg{position:fixed;inset:0;background:rgba(30,27,75,0.6);backdrop-filter:blur(8px);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;visibility:hidden;transition:all 0.35s ease}
@@ -849,7 +852,6 @@
     .log-content{}
     .log-title{font-size:13px;font-weight:700;color:var(--text)}
     .log-meta{font-size:11px;color:var(--text-muted);margin-top:3px}
-    .att-summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
     .att-summary-card{background:var(--primary-light);border-radius:12px;padding:12px;text-align:center;border:1px solid var(--border-2)}
     .att-summary-n{font-size:22px;font-weight:900;color:var(--primary)}
     .att-summary-l{font-size:11px;color:var(--text-muted);font-weight:600;margin-top:2px}
@@ -5263,8 +5265,9 @@ function renderAttStudents(students, filter) {
       ${badgeHtml}
       ${receiptHtml}
       <div class="att-toggle" style="margin-right:auto">
-        <div class="att-check ${s.present ? 'present' : ''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
-        <div class="att-check ${!s.present && s.marked ? 'absent' : ''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
+        <div class="att-check ${s.present && !s.late ? 'present' : ''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
+        <div class="att-check ${!s.present && !s.late && s.marked ? 'absent' : ''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
+        <div class="att-check ${s.late ? 'late' : ''}" title="متأخر" onclick="toggleStudentLate('${s.id}',this)" style="font-size:11px">⏰</div>
       </div>
       <button style="padding:4px 8px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:var(--danger-soft);color:var(--danger);font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700;flex-shrink:0" onclick="removeStudent('${s.id}')">حذف</button>`;
     list.appendChild(row);
@@ -5275,40 +5278,69 @@ function renderAttStudents(students, filter) {
 window.toggleStudentAtt = (sid, isPresent, el) => {
   // تحديث المتغير إذا كان التلميذ موجوداً
   const s = currentAttStudents.find(x => x.id === sid);
-  if (s) { s.present = isPresent; s.marked = true; }
-  // ✅ تحديث الـ DOM دائماً بغض النظر عن المتغير
+  if (s) { s.present = isPresent; s.marked = true; s.late = false; } // ✅ إلغاء وضع "متأخر" عند تغيير الحضور
+  // ✅ تحديث الـ DOM دائماً
   const row = el.closest('.att-student-row');
-  row.querySelectorAll('.att-check').forEach(c => c.classList.remove('present','absent'));
+  row.querySelectorAll('.att-check').forEach(c => c.classList.remove('present','absent','late'));
   if (isPresent) row.querySelectorAll('.att-check')[0].classList.add('present');
-  else row.querySelectorAll('.att-check')[1].classList.add('absent');
-  // ✅ updateAttSummary ستقرأ من DOM تلقائياً (إصلاح Fix 5)
+  else           row.querySelectorAll('.att-check')[1].classList.add('absent');
+  updateAttSummary(currentAttStudents);
+};
+
+// ─── تبديل حالة "متأخر" ───
+// المتأخر = حاضر فعلياً + علامة تأخر (يُحسب في عداد الحضور كحاضر)
+window.toggleStudentLate = (sid, el) => {
+  const row = el.closest('.att-student-row');
+  const checks = row.querySelectorAll('.att-check');
+  const isCurrentlyLate = el.classList.contains('late');
+  // ✅ إزالة كل الحالات أولاً
+  checks.forEach(c => c.classList.remove('present','absent','late'));
+  const s = currentAttStudents.find(x => x.id === sid);
+  if (isCurrentlyLate) {
+    // إلغاء التأخر → يرجع لغير محدد (غائب)
+    if (s) { s.late = false; s.present = false; s.marked = true; }
+    checks[1].classList.add('absent');
+  } else {
+    // تفعيل المتأخر → حاضر + متأخر
+    if (s) { s.late = true; s.present = true; s.marked = true; }
+    checks[0].classList.add('present'); // ✓ يضيء (حاضر ضمنياً)
+    el.classList.add('late');           // ⏰ يضيء
+  }
   updateAttSummary(currentAttStudents);
 };
 
 function updateAttSummary(students) {
-  // ✅ إصلاح نهائي: إذا كان الـ session modal مفتوحاً، نقرأ الإحصائيات من الـ DOM مباشرة
+  // ✅ إذا كان الـ session modal مفتوحاً، نقرأ الإحصائيات من الـ DOM مباشرة
   const sessionModalOpen = (() => {
     const bg = document.getElementById('session-modal-bg');
     return bg && bg.style.visibility === 'visible';
   })();
-  let total, present;
+  let total = 0, present = 0, absent = 0, late = 0;
   if (sessionModalOpen) {
     const rows = document.querySelectorAll('#session-modal-inner .att-student-row');
     total = rows.length;
-    present = Array.from(rows).filter(row => {
-      const btn = row.querySelectorAll('.att-check')[0];
-      return btn && btn.classList.contains('present');
-    }).length;
+    rows.forEach(row => {
+      const checks = row.querySelectorAll('.att-check');
+      const isLate    = checks[2] && checks[2].classList.contains('late');
+      const isPresent = checks[0] && checks[0].classList.contains('present');
+      if (isLate)         { late++; present++; }
+      else if (isPresent) { present++; }
+      else                { absent++; }
+    });
   } else {
-    total = students.length;
-    present = students.filter(s => s.present).length;
+    total   = students.length;
+    late    = students.filter(s => s.late).length;
+    present = students.filter(s => s.present).length; // شامل المتأخرين
+    absent  = total - present;
   }
-  const totalEl = document.getElementById('att-total');
+  const totalEl   = document.getElementById('att-total');
   const presentEl = document.getElementById('att-present');
-  const absentEl = document.getElementById('att-absent');
-  if (totalEl) totalEl.textContent = total;
-  if (presentEl) presentEl.textContent = present;
-  if (absentEl) absentEl.textContent = total - present;
+  const absentEl  = document.getElementById('att-absent');
+  const lateEl    = document.getElementById('att-late');
+  if (totalEl)   totalEl.textContent   = total;
+  if (presentEl) presentEl.textContent = present - late; // الحاضرون فقط (بدون المتأخرين)
+  if (absentEl)  absentEl.textContent  = absent;
+  if (lateEl)    lateEl.textContent    = late;
 }
 
 window.filterStudents = () => {
@@ -5615,7 +5647,18 @@ window.addStudent = async () => {
   const idx = currentAttStudents.length;
   const id  = receipt || genStudentId(currentAttTeacherId.slice(-4).toUpperCase(), idx);
 
-  const newStudent = { id, name, present: false, marked: false, payStatus, receipt: receipt || null };
+  // ✅ إصلاح التلميذ المتأخر:
+  // إذا كانت حصة مفتوحة الآن، فأي تلميذ يُضاف خلالها يُعتبر "متأخراً" تلقائياً
+  const isSessionCurrentlyOpen = !!window._buildSessionModalHtml;
+  const newStudent = {
+    id,
+    name,
+    present: isSessionCurrentlyOpen, // متأخر = حاضر ضمنياً
+    late:    isSessionCurrentlyOpen, // علامة التأخر
+    marked:  isSessionCurrentlyOpen,
+    payStatus,
+    receipt: receipt || null
+  };
 
   currentAttStudents.push(newStudent);
 
@@ -5697,9 +5740,10 @@ window.addStudent = async () => {
     window.scrollTo({ top: scrollY });
   }
 
-  if (isPaid)         showToast(`✅ تمت إضافة ${name} — التذكرة مفعّلة ✔`);
-  else if (isUnpaid)  showToast(`⚠️ تمت إضافة ${name} — التذكرة غير مفعّلة`, true);
-  else                showToast(`✅ تمت إضافة ${name} — لا توجد تذكرة مسجّلة`);
+  const lateNote = isSessionCurrentlyOpen ? ' — ⏰ مُضاف كمتأخر' : '';
+  if (isPaid)         showToast(`✅ تمت إضافة ${name}${lateNote} — التذكرة مفعّلة ✔`);
+  else if (isUnpaid)  showToast(`⚠️ تمت إضافة ${name}${lateNote} — التذكرة غير مفعّلة`, true);
+  else                showToast(`✅ تمت إضافة ${name}${lateNote} — لا توجد تذكرة مسجّلة`);
 };
 
 window.removeStudent = async (sid) => {
@@ -6142,7 +6186,11 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
       chipEl.innerHTML = `<span class="session-status-chip done-chip">✅ مسجّلة</span>${recDate ? `<div style="font-size:9px;color:#059669;font-weight:700;margin-top:3px">${recDate}</div>` : ''}${editHint}`;
       const recStudents = recordedSessions[i].students || [];
       dotsEl.innerHTML = recStudents.length
-        ? recStudents.map(s => `<span class="sdot ${s.present ? 'recorded' : ''}" title="${s.name}: ${s.present ? 'حاضر' : 'غائب'}"></span>`).join('')
+        ? recStudents.map(s => {
+            if (s.late)    return `<span class="sdot" style="background:#F59E0B;border-color:#F59E0B" title="${s.name}: متأخر"></span>`;
+            if (s.present) return `<span class="sdot recorded" title="${s.name}: حاضر"></span>`;
+            return `<span class="sdot" title="${s.name}: غائب"></span>`;
+          }).join('')
         : `<span class="sdot recorded"></span>`;
     } else if (isMissed) {
       card.classList.add('missed');
@@ -6212,13 +6260,16 @@ window.viewSessionHistory = (sessionNum) => {
         <div style="font-size:12px;color:var(--text-muted)">انتهى وقت تسجيل هذه الحصة — تم قفلها تلقائياً</div>
       </div>`
     : (record.students || []).map(s => `
-        <div class="att-student-row" style="pointer-events:none;opacity:${s.present?1:0.6}">
+        <div class="att-student-row" style="pointer-events:none;opacity:${(s.present||s.late)?1:0.6}">
           <span class="att-student-id">${s.id || '—'}</span>
           <span class="att-student-name">${s.name}</span>
-          <span class="pay-badge ${s.present?'paid':'unpaid'}" style="margin-right:auto">${s.present ? '✅ حاضر' : '❌ غائب'}</span>
+          <span class="pay-badge" style="margin-right:auto;${s.late?'background:rgba(245,158,11,0.1);color:#d97706;border:1px solid rgba(245,158,11,0.3)':s.present?'background:var(--success-soft);color:#059669;border:1px solid rgba(16,185,129,0.25)':'background:var(--danger-soft);color:#DC2626;border:1px solid rgba(239,68,68,0.2)'}">
+            ${s.late ? '⏰ متأخر' : s.present ? '✅ حاضر' : '❌ غائب'}
+          </span>
         </div>`).join('') || `<div style="text-align:center;padding:20px;color:var(--text-muted)">لا يوجد تلاميذ</div>`;
 
-  const presentCount = isMissed ? 0 : (record.students || []).filter(s => s.present).length;
+  const presentCount = isMissed ? 0 : (record.students || []).filter(s => s.present || s.late).length;
+  const lateCountV   = isMissed ? 0 : (record.students || []).filter(s => s.late).length;
   const totalCount   = isMissed ? 0 : (record.students || []).length;
 
   openSessionModal(`
@@ -6228,7 +6279,7 @@ window.viewSessionHistory = (sessionNum) => {
         <div style="font-size:16px;font-weight:900;color:var(--text)">سجل الحصة ${sessionNum} — ${isMissed ? 'فائتة' : 'مسجّلة'}</div>
         ${recDate ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px">📅 ${recDate}</div>` : ''}
       </div>
-      ${!isMissed ? `<div style="font-size:13px;font-weight:800;color:var(--success)">${presentCount}/${totalCount} حاضر</div>` : ''}
+      ${!isMissed ? `<div style="font-size:13px;font-weight:800;color:var(--success)">${presentCount}/${totalCount} حاضر${lateCountV ? ` <span style="color:#d97706;font-size:11px">(${lateCountV} متأخر)</span>` : ''}</div>` : ''}
       <button onclick="closeSessionModal()" style="padding:8px 16px;border-radius:12px;border:1px solid var(--border-2);background:var(--card);color:var(--text-muted);font-size:13px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">✕</button>
     </div>
     <div style="padding:20px 24px">
@@ -6278,8 +6329,9 @@ window.openSession_g = (sessionNum, gi) => {
               ${Array.from({length:12},(_,i)=>`<span class="sdot ${i===sessionNum-1?'current-dot':''}"></span>`).join('')}
             </div>
             <div class="att-toggle" style="margin-right:auto">
-              <div class="att-check ${s.present?'present':''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
-              <div class="att-check ${!s.present&&s.marked?'absent':''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
+              <div class="att-check ${s.present&&!s.late?'present':''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
+              <div class="att-check ${(!s.present&&s.marked)||(!s.present&&!s.late&&s.marked)?'absent':''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
+              <div class="att-check ${s.late?'late':''}" title="متأخر" onclick="toggleStudentLate('${s.id}',this)" style="font-size:11px">⏰</div>
             </div>
             <button style="padding:4px 8px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:var(--danger-soft);color:var(--danger);font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700;flex-shrink:0" onclick="removeStudent('${s.id}')">حذف</button>
           </div>`;
@@ -6302,6 +6354,7 @@ window.openSession_g = (sessionNum, gi) => {
           <div class="att-summary-card"><div class="att-summary-n" id="att-total">0</div><div class="att-summary-l">إجمالي</div></div>
           <div class="att-summary-card" style="background:var(--success-soft);border-color:rgba(16,185,129,0.2)"><div class="att-summary-n" id="att-present" style="color:var(--success)">0</div><div class="att-summary-l">حاضر</div></div>
           <div class="att-summary-card" style="background:var(--danger-soft);border-color:rgba(239,68,68,0.15)"><div class="att-summary-n" id="att-absent" style="color:var(--danger)">0</div><div class="att-summary-l">غائب</div></div>
+          <div class="att-summary-card" style="background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.2)"><div class="att-summary-n" id="att-late" style="color:#d97706">0</div><div class="att-summary-l">متأخر</div></div>
         </div>
         <div class="att-search-wrap" style="margin-bottom:12px">
           <span class="att-search-icon">🔍</span>
@@ -6505,8 +6558,9 @@ window.editSession_g = async (sessionNum, gi) => {
           <span class="att-student-name">${s.name}</span>
           ${badgeHtml}${receiptHtml}
           <div class="att-toggle" style="margin-right:auto">
-            <div class="att-check ${s.present?'present':''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
-            <div class="att-check ${!s.present&&s.marked?'absent':''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
+            <div class="att-check ${s.present&&!s.late?'present':''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
+            <div class="att-check ${!s.present&&!s.late&&s.marked?'absent':''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
+            <div class="att-check ${s.late?'late':''}" title="متأخر" onclick="toggleStudentLate('${s.id}',this)" style="font-size:11px">⏰</div>
           </div>
           <button style="padding:4px 8px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:var(--danger-soft);color:var(--danger);font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700;flex-shrink:0" onclick="removeStudent('${s.id}')">حذف</button>
         </div>`;
@@ -6528,6 +6582,7 @@ window.editSession_g = async (sessionNum, gi) => {
         <div class="att-summary-card"><div class="att-summary-n" id="att-total">0</div><div class="att-summary-l">إجمالي</div></div>
         <div class="att-summary-card" style="background:var(--success-soft);border-color:rgba(16,185,129,0.2)"><div class="att-summary-n" id="att-present" style="color:var(--success)">0</div><div class="att-summary-l">حاضر</div></div>
         <div class="att-summary-card" style="background:var(--danger-soft);border-color:rgba(239,68,68,0.15)"><div class="att-summary-n" id="att-absent" style="color:var(--danger)">0</div><div class="att-summary-l">غائب</div></div>
+        <div class="att-summary-card" style="background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.2)"><div class="att-summary-n" id="att-late" style="color:#d97706">0</div><div class="att-summary-l">متأخر</div></div>
       </div>
       <div class="att-search-wrap" style="margin-bottom:12px">
         <span class="att-search-icon">🔍</span>
@@ -6591,18 +6646,11 @@ window.saveEditedSession_g = async (sessionNum, gi) => {
   }
 
   try {
-    // ✅ إصلاح نهائي: قراءة الحضور مباشرة من الـ DOM — مصدر الحقيقة الوحيد
-    // currentAttStudents قد يُعاد تعيينه بواسطة onSnapshot في أي وقت
-    const rows = document.querySelectorAll('#session-modal-inner .att-student-row');
-    const savedStudents = rows.length > 0
-      ? Array.from(rows).map(row => {
-          const sid = row.getAttribute('data-sid');
-          const name = row.querySelector('.att-student-name')?.textContent?.trim() || '';
-          const presentBtn = row.querySelectorAll('.att-check')[0];
-          const isPresent = presentBtn ? presentBtn.classList.contains('present') : false;
-          return { id: sid, name, present: isPresent };
-        })
-      : currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
+    // ✅ قراءة الحضور من DOM — المصدر الوحيد للحقيقة (يشمل وضع "متأخر")
+    const domData = readAttendanceFromDOM();
+    const savedStudents = domData
+      ? domData
+      : currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present, late: !!s.late }));
 
     if (savedStudents.length === 0) {
       showToast('⚠️ لا يوجد تلاميذ للحفظ — حاول مرة أخرى', true);
@@ -6649,12 +6697,15 @@ window.viewSessionHistory_g = (sessionNum, gi) => {
         <div style="font-size:12px;color:var(--text-muted)">انتهى وقت تسجيل هذه الحصة — تم قفلها تلقائياً</div>
       </div>`
     : (record.students || []).map(s => `
-        <div class="att-student-row" style="pointer-events:none;opacity:${s.present?1:0.6}">
+        <div class="att-student-row" style="pointer-events:none;opacity:${(s.present||s.late)?1:0.6}">
           <span class="att-student-id">${s.id || '—'}</span>
           <span class="att-student-name">${s.name}</span>
-          <span class="pay-badge ${s.present?'paid':'unpaid'}" style="margin-right:auto">${s.present ? '✅ حاضر' : '❌ غائب'}</span>
+          <span class="pay-badge ${s.late ? '' : s.present ? 'paid' : 'unpaid'}" style="margin-right:auto;${s.late ? 'background:rgba(245,158,11,0.1);color:#d97706;border:1px solid rgba(245,158,11,0.3)' : ''}">
+            ${s.late ? '⏰ متأخر' : s.present ? '✅ حاضر' : '❌ غائب'}
+          </span>
         </div>`).join('') || `<div style="text-align:center;padding:20px;color:var(--text-muted)">لا يوجد تلاميذ</div>`;
-  const presentCount = isMissed ? 0 : (record.students || []).filter(s => s.present).length;
+  const presentCount = isMissed ? 0 : (record.students || []).filter(s => s.present || s.late).length;
+  const lateCount    = isMissed ? 0 : (record.students || []).filter(s => s.late).length;
   const totalCount   = isMissed ? 0 : (record.students || []).length;
   openSessionModal(`
     <div class="session-att-header" style="background:${isMissed?'rgba(245,158,11,0.08)':'var(--success-soft)'};border-radius:24px 24px 0 0;border-bottom:1px solid var(--border)">
@@ -6678,9 +6729,27 @@ window.viewSessionHistory = (sessionNum) => {
   viewSessionHistory_g(sessionNum, window._currentGroupIdx || 0);
 };
 
+// ═══════════════════════════════════════════════════════════════════════
+// ── دالة قراءة حالة الحضور من DOM — المصدر الوحيد للحقيقة ──
+// تُرجع: { id, name, present, late } لكل صف
+// ═══════════════════════════════════════════════════════════════════════
+function readAttendanceFromDOM() {
+  const rows = document.querySelectorAll('#session-modal-inner .att-student-row');
+  if (!rows.length) return null;
+  return Array.from(rows).map(row => {
+    const sid  = row.getAttribute('data-sid') || '';
+    const name = row.querySelector('.att-student-name')?.textContent?.trim() || '';
+    const btns = row.querySelectorAll('.att-check');
+    const presentBtn = btns[0];
+    const lateBtn    = btns[2];
+    const isLate     = lateBtn    ? lateBtn.classList.contains('late')    : false;
+    const isPresent  = presentBtn ? presentBtn.classList.contains('present') : false;
+    return { id: sid, name, present: isPresent || isLate, late: isLate };
+  });
+}
+
 // حفظ حضور حصة معينة — مع الفوج
 window.saveSessionAttendance_g = async (sessionNum, gi) => {
-  // ── fallback للأستاذ ──
   if (!currentAttTeacherId && window.currentTeacherData?.uid) {
     currentAttTeacherId = window.currentTeacherData.uid;
     window.currentAttTeacherId = currentAttTeacherId;
@@ -6689,20 +6758,20 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
     showToast('⚠️ خطأ: لم يتم تحديد الأستاذ، يرجى إعادة تحميل الصفحة', true);
     return;
   }
-  const groupSuffix = `_g${gi}`;
-  const sessionKey  = `${currentAttTeacherId}${groupSuffix}_session_${sessionNum}`;
-  const todayDateKey = new Date().toISOString().slice(0, 10); // ✅ إصلاح: حفظ التاريخ دائماً
-  // ✅ إصلاح نهائي: قراءة الحضور من الـ DOM مباشرة
-  const rows = document.querySelectorAll('#session-modal-inner .att-student-row');
-  const studentsToSave = rows.length > 0
-    ? Array.from(rows).map(row => {
-        const sid = row.getAttribute('data-sid');
-        const name = row.querySelector('.att-student-name')?.textContent?.trim() || '';
-        const presentBtn = row.querySelectorAll('.att-check')[0];
-        const isPresent = presentBtn ? presentBtn.classList.contains('present') : false;
-        return { id: sid, name, present: isPresent };
-      })
-    : currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
+  const groupSuffix  = `_g${gi}`;
+  const sessionKey   = `${currentAttTeacherId}${groupSuffix}_session_${sessionNum}`;
+  const todayDateKey = new Date().toISOString().slice(0, 10);
+
+  // ✅ القراءة من DOM أولاً، fallback للذاكرة
+  const domData = readAttendanceFromDOM();
+  const studentsToSave = domData
+    ? domData
+    : currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present, late: !!s.late }));
+
+  if (!studentsToSave.length) {
+    showToast('⚠️ لا يوجد تلاميذ للحفظ', true);
+    return;
+  }
 
   const record = {
     teacherId: currentAttTeacherId + groupSuffix,
@@ -6713,14 +6782,15 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
   };
   try {
     await setDoc(doc(db, 'sessionAttendance', sessionKey), record);
-    // ✅ تحديث الذاكرة المحلية فوراً
     if (!_allRecordedSessionsByGroup[gi]) _allRecordedSessionsByGroup[gi] = {};
     _allRecordedSessionsByGroup[gi][sessionNum] = { ...record, savedAt: new Date() };
     if (gi === 0) _allRecordedSessions[sessionNum] = _allRecordedSessionsByGroup[gi][sessionNum];
     const present = studentsToSave.filter(s => s.present).length;
+    const late    = studentsToSave.filter(s => s.late).length;
     const teacherGroups = window.currentTeacherData?.groups || (allTeachers||[]).find(x=>x.id===currentAttTeacherId)?.groups || [];
     const groupName = teacherGroups[gi]?.name || '';
-    await addLog('📋 تسجيل حضور', `حصة ${sessionNum}${groupName?' — '+groupName:''} — ${present}/${studentsToSave.length} حاضر`, '✅');
+    const lateNote  = late ? ` (${late} متأخر)` : '';
+    await addLog('📋 تسجيل حضور', `حصة ${sessionNum}${groupName?' — '+groupName:''} — ${present}/${studentsToSave.length} حاضر${lateNote}`, '✅');
     showToast(`✅ تم حفظ حضور الحصة ${sessionNum}${groupName?' ('+groupName+')':''}`);
     closeSessionModal();
     if (!window.isTeacherMode) {
@@ -6767,8 +6837,17 @@ window.openSummaryModal = () => {
     if (rec && rec.students) {
       rec.students.forEach(s => {
         if (!studentStats[s.id]) studentStats[s.id] = { name: s.name, present: 0, absent: 0, dots: [] };
-        if (s.present) { studentStats[s.id].present++; studentStats[s.id].dots.push(true); }
-        else { studentStats[s.id].absent++; studentStats[s.id].dots.push(false); }
+        if (s.late) {
+          // متأخر = يُحسب ضمن الحضور + علامة خاصة في الدوت
+          studentStats[s.id].present++;
+          studentStats[s.id].dots.push('late');
+        } else if (s.present) {
+          studentStats[s.id].present++;
+          studentStats[s.id].dots.push(true);
+        } else {
+          studentStats[s.id].absent++;
+          studentStats[s.id].dots.push(false);
+        }
       });
     } else {
       // حصة غير مسجلة — نضيف فراغ
@@ -6779,15 +6858,18 @@ window.openSummaryModal = () => {
   const contentEl = document.getElementById('summary-modal-content');
   contentEl.innerHTML = Object.values(studentStats).map(st => {
     const dotsHtml = st.dots.map((d,i) =>
-      d === true  ? `<span class="sdot recorded" title="حصة ${i+1}: حاضر"></span>` :
-      d === false ? `<span class="sdot" style="border-color:rgba(239,68,68,0.4)" title="حصة ${i+1}: غائب"></span>` :
-                   `<span class="sdot" style="opacity:0.3" title="حصة ${i+1}: لم تُسجَّل"></span>`
+      d === 'late'  ? `<span class="sdot" style="background:#F59E0B;border-color:#F59E0B;box-shadow:0 1px 4px rgba(245,158,11,0.4)" title="حصة ${i+1}: متأخر">⏰</span>` :
+      d === true    ? `<span class="sdot recorded" title="حصة ${i+1}: حاضر"></span>` :
+      d === false   ? `<span class="sdot" style="border-color:rgba(239,68,68,0.4)" title="حصة ${i+1}: غائب"></span>` :
+                     `<span class="sdot" style="opacity:0.3" title="حصة ${i+1}: لم تُسجَّل"></span>`
     ).join('');
+    const lateCount2 = st.dots.filter(d => d === 'late').length;
     return `
       <div class="student-summary-row">
         <div class="student-summary-name">${st.name}</div>
         <div class="student-summary-dots">${dotsHtml}</div>
         <span class="student-summary-stat stat-present">✅ ${st.present}</span>
+        ${lateCount2 ? `<span class="student-summary-stat" style="color:#d97706;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2)">⏰ ${lateCount2}</span>` : ''}
         <span class="student-summary-stat stat-absent">❌ ${st.absent}</span>
       </div>`;
   }).join('') || `<div style="text-align:center;padding:30px;color:var(--text-muted)">لا توجد بيانات بعد</div>`;
