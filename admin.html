@@ -7104,17 +7104,45 @@ function _buildStudentSummaryRow(st) {
     : '';
 
   const dotsHtml = dots.map((d,i) => {
-    const title = `حصة ${i+1}: ${d === 'late' ? 'متأخر' : d === 'joined_late' ? 'انضم لاحقاً' : d === true ? 'حاضر' : d === false ? 'غائب' : 'لم تُسجَّل'}`;
-    const editAttr = _summaryEditMode ? `onclick="toggleSummaryDot('${st.id}',${i})" class="sdot ${d==='late'?'':''}  editable"` : `class="sdot"`;
+    // في وضع التعديل: كل الدوتات قابلة للنقر بدون استثناء
+    // الدوران: غائب → حاضر → متأخر → غائب
+    const stateLabel =
+      d === 'late'        ? 'متأخر ⏰'   :
+      d === 'joined_late' ? 'غائب ❌'    : // joined_late تُعرض كغائب في العرض
+      d === true          ? 'حاضر ✅'    :
+      d === false         ? 'غائب ❌'    : 'لم تُسجَّل ○';
+    const nextLabel =
+      (d === false || d === null || d === 'joined_late') ? '← اضغط: حاضر' :
+      d === true          ? '← اضغط: متأخر' :
+      d === 'late'        ? '← اضغط: غائب'  : '← اضغط: حاضر';
+    const title = `ح${i+1}: ${stateLabel}${_summaryEditMode ? '  ' + nextLabel : ''}`;
+
+    if (_summaryEditMode) {
+      // ── وضع التعديل: كل دوت قابل للنقر ومع hover واضح ──
+      const baseClick = `onclick="toggleSummaryDot('${st.id}',${i})"`;
+      const hoverStyle = `onmouseenter="this.style.transform='scale(1.5)';this.style.zIndex='10'" onmouseleave="this.style.transform='';this.style.zIndex=''"`; 
+      const cursorStyle = `cursor:pointer;transition:transform 0.15s ease;`;
+
+      if (d === 'late')
+        return `<span class="sdot" ${baseClick} ${hoverStyle} style="${cursorStyle}background:#F59E0B;border-color:#F59E0B;box-shadow:0 1px 4px rgba(245,158,11,0.4)" title="${title}">⏰</span>`;
+      if (d === true)
+        return `<span class="sdot recorded" ${baseClick} ${hoverStyle} style="${cursorStyle}" title="${title}"></span>`;
+      if (d === false)
+        return `<span class="sdot" ${baseClick} ${hoverStyle} style="${cursorStyle}border-color:rgba(239,68,68,0.5);background:rgba(239,68,68,0.08)" title="${title}"></span>`;
+      // null أو joined_late — تظهر بشكل مختلف لتوضيح أنها غير مسجّلة لكن قابلة للتعديل
+      return `<span class="sdot" ${baseClick} ${hoverStyle} style="${cursorStyle}opacity:0.45;border-style:dashed;border-color:var(--primary)" title="${title}"></span>`;
+    }
+
+    // ── وضع العرض العادي ──
     if (d === 'late')
-      return `<span ${editAttr} style="background:#F59E0B;border-color:#F59E0B;box-shadow:0 1px 4px rgba(245,158,11,0.4)" title="${title}">⏰</span>`;
+      return `<span class="sdot" style="background:#F59E0B;border-color:#F59E0B;box-shadow:0 1px 4px rgba(245,158,11,0.4)" title="${title}">⏰</span>`;
     if (d === 'joined_late')
-      return `<span ${editAttr} style="background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);font-size:7px;color:#6366f1;font-weight:900;display:inline-flex;align-items:center;justify-content:center" title="${title}">➖</span>`;
+      return `<span class="sdot" style="background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);font-size:7px;color:#6366f1;font-weight:900;display:inline-flex;align-items:center;justify-content:center" title="ح${i+1}: انضم لاحقاً">➖</span>`;
     if (d === true)
-      return `<span ${editAttr} style="${_summaryEditMode?'cursor:pointer':''}" class="sdot recorded" title="${title}"></span>`;
+      return `<span class="sdot recorded" title="${title}"></span>`;
     if (d === false)
-      return `<span ${editAttr} style="border-color:rgba(239,68,68,0.4);${_summaryEditMode?'cursor:pointer':''}" title="${title}"></span>`;
-    return `<span class="sdot" style="opacity:0.3" title="${title}"></span>`;
+      return `<span class="sdot" style="border-color:rgba(239,68,68,0.4)" title="${title}"></span>`;
+    return `<span class="sdot" style="opacity:0.3" title="ح${i+1}: لم تُسجَّل"></span>`;
   }).join('');
 
   const isExpanded = _summaryExpandedId === st.id;
@@ -7194,10 +7222,11 @@ window.toggleSummaryDot = (studentId, sessionIdx) => {
     _summaryEdits[studentId] = { dots: [...st.dots] };
   }
   const current = _summaryEdits[studentId].dots[sessionIdx];
-  // دوران: null → false → true → 'late' → null
-  const cycle = { null: false, false: true, true: 'late', late: null };
-  const next = cycle[current === null ? 'null' : String(current)];
-  _summaryEdits[studentId].dots[sessionIdx] = next === 'null' ? null : (next === 'false' ? false : (next === 'true' ? true : next));
+  // دوران ثلاثي فقط: غائب (false) → حاضر (true) → متأخر ('late') → غائب
+  // أي حالة أخرى (null / joined_late) تبدأ من غائب مباشرة
+  const cycle = { false: true, true: 'late', late: false };
+  const key = (current === false) ? 'false' : (current === true) ? 'true' : (current === 'late') ? 'late' : null;
+  _summaryEdits[studentId].dots[sessionIdx] = key ? cycle[key] : false;
 
   // إعادة حساب الإحصائيات المعدّلة
   const newDots = _summaryEdits[studentId].dots;
