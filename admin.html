@@ -876,7 +876,6 @@
     .sdot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:all 0.4s ease;border:1.5px solid rgba(0,0,0,0.08)}
     .sdot.recorded{background:var(--success);border-color:var(--success);box-shadow:0 0 6px rgba(16,185,129,0.5)}
     .sdot.current-dot{background:var(--primary);border-color:var(--primary);animation:dotPulse 1.5s infinite}
-    .sdot.joined-late{background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);font-size:8px;display:inline-flex;align-items:center;justify-content:center;color:#6366f1;font-weight:900}
     @keyframes dotPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.3)}}
     .session-status-chip{font-size:10px;font-weight:800;padding:3px 8px;border-radius:99px;margin-top:8px;display:inline-block}
     .session-status-chip.done-chip{background:var(--success-soft);color:#059669}
@@ -2325,7 +2324,6 @@
       <button class="att-modal-close" onclick="closeSummaryModal()">✕</button>
     </div>
     <div class="summary-modal-body">
-      <div id="summary-legend"></div>
       <div id="summary-modal-content"></div>
       <!-- حالة الراتب — للأدمين فقط -->
       <div class="payment-status-bar" id="payment-status-bar" style="display:none">
@@ -5261,23 +5259,15 @@ function renderAttStudents(students, filter) {
     const row = document.createElement('div');
     row.className = 'att-student-row';
     row.dataset.sid = s.id;
-    const joinedBadge = (s.joinedFromSession && s.joinedFromSession > 1)
-      ? `<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:99px;background:rgba(99,102,241,0.1);color:#6366f1;border:1px solid rgba(99,102,241,0.25);flex-shrink:0">انضم ح${s.joinedFromSession}</span>`
-      : '';
     row.innerHTML = `
       <span class="att-student-id">${s.id}</span>
-      <div style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1">
-        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-          <span class="att-student-name">${s.name}</span>
-          ${joinedBadge}
-        </div>
-      </div>
+      <span class="att-student-name">${s.name}</span>
       ${badgeHtml}
       ${receiptHtml}
       <div class="att-toggle" style="margin-right:auto">
         <div class="att-check ${s.present && !s.late ? 'present' : ''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
         <div class="att-check ${!s.present && !s.late && s.marked ? 'absent' : ''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
-        <div class="att-check ${s.late ? 'late' : ''}" title="تأخر نفس اليوم" onclick="toggleStudentLate('${s.id}',this)" style="font-size:11px">⏰</div>
+        <div class="att-check ${s.late ? 'late' : ''}" title="متأخر" onclick="toggleStudentLate('${s.id}',this)" style="font-size:11px">⏰</div>
       </div>
       <button style="padding:4px 8px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:var(--danger-soft);color:var(--danger);font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700;flex-shrink:0" onclick="removeStudent('${s.id}')">حذف</button>`;
     list.appendChild(row);
@@ -5660,19 +5650,14 @@ window.addStudent = async () => {
   // ✅ إصلاح التلميذ المتأخر:
   // إذا كانت حصة مفتوحة الآن، فأي تلميذ يُضاف خلالها يُعتبر "متأخراً" تلقائياً
   const isSessionCurrentlyOpen = !!window._buildSessionModalHtml;
-  // رقم الحصة اللي انضم فيها التلميذ — يُستخدم في ملخص الشهر لعرض ➖ بدل ❌ للحصص السابقة
-  const joinedFromSession = isSessionCurrentlyOpen
-    ? (typeof currentOpenSession === 'number' ? currentOpenSession : (window._currentGroupIdx !== undefined ? (currentOpenSession || 1) : 1))
-    : null;
   const newStudent = {
     id,
     name,
-    present: isSessionCurrentlyOpen, // حاضر ضمنياً لأنه في الحصة الحالية
-    late:    false,                   // لا يُعتبر متأخراً — انضم لاحقاً للكورس
+    present: isSessionCurrentlyOpen, // متأخر = حاضر ضمنياً
+    late:    isSessionCurrentlyOpen, // علامة التأخر
     marked:  isSessionCurrentlyOpen,
     payStatus,
-    receipt: receipt || null,
-    joinedFromSession: joinedFromSession  // الحصة اللي انضم فيها (null = من البداية)
+    receipt: receipt || null
   };
 
   currentAttStudents.push(newStudent);
@@ -5755,11 +5740,10 @@ window.addStudent = async () => {
     window.scrollTo({ top: scrollY });
   }
 
-  const sessionNote = (isSessionCurrentlyOpen && joinedFromSession)
-    ? ` — انضم من الحصة ${joinedFromSession}` : '';
-  if (isPaid)         showToast(`✅ تمت إضافة ${name}${sessionNote} — التذكرة مفعّلة ✔`);
-  else if (isUnpaid)  showToast(`⚠️ تمت إضافة ${name}${sessionNote} — التذكرة غير مفعّلة`, true);
-  else                showToast(`✅ تمت إضافة ${name}${sessionNote} — لا توجد تذكرة مسجّلة`);
+  const lateNote = isSessionCurrentlyOpen ? ' — ⏰ مُضاف كمتأخر' : '';
+  if (isPaid)         showToast(`✅ تمت إضافة ${name}${lateNote} — التذكرة مفعّلة ✔`);
+  else if (isUnpaid)  showToast(`⚠️ تمت إضافة ${name}${lateNote} — التذكرة غير مفعّلة`, true);
+  else                showToast(`✅ تمت إضافة ${name}${lateNote} — لا توجد تذكرة مسجّلة`);
 };
 
 window.removeStudent = async (sid) => {
@@ -6203,12 +6187,8 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
       const recStudents = recordedSessions[i].students || [];
       dotsEl.innerHTML = recStudents.length
         ? recStudents.map(s => {
-            if (s.late)    return `<span class="sdot" style="background:#F59E0B;border-color:#F59E0B" title="${s.name}: متأخر في نفس اليوم"></span>`;
+            if (s.late)    return `<span class="sdot" style="background:#F59E0B;border-color:#F59E0B" title="${s.name}: متأخر"></span>`;
             if (s.present) return `<span class="sdot recorded" title="${s.name}: حاضر"></span>`;
-            // تحقق: هل غياب حقيقي أم انضم لاحقاً في حصة أخرى؟
-            if (s.joinedFromSession && i < s.joinedFromSession) {
-              return `<span class="sdot joined-late" title="${s.name}: انضم من الحصة ${s.joinedFromSession}">➖</span>`;
-            }
             return `<span class="sdot" title="${s.name}: غائب"></span>`;
           }).join('')
         : `<span class="sdot recorded"></span>`;
@@ -6351,7 +6331,7 @@ window.openSession_g = (sessionNum, gi) => {
             <div class="att-toggle" style="margin-right:auto">
               <div class="att-check ${s.present&&!s.late?'present':''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
               <div class="att-check ${(!s.present&&s.marked)||(!s.present&&!s.late&&s.marked)?'absent':''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
-              <div class="att-check ${s.late?'late':''}" title="⏰ تأخر نفس اليوم (وصل متأخراً لهذه الحصة)" onclick="toggleStudentLate('${s.id}',this)" style="font-size:11px">⏰</div>
+              <div class="att-check ${s.late?'late':''}" title="متأخر" onclick="toggleStudentLate('${s.id}',this)" style="font-size:11px">⏰</div>
             </div>
             <button style="padding:4px 8px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:var(--danger-soft);color:var(--danger);font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700;flex-shrink:0" onclick="removeStudent('${s.id}')">حذف</button>
           </div>`;
@@ -6716,35 +6696,17 @@ window.viewSessionHistory_g = (sessionNum, gi) => {
         <div style="font-size:15px;font-weight:800;color:#d97706;margin-bottom:6px">لم يُسجَّل الحضور لهذه الحصة</div>
         <div style="font-size:12px;color:var(--text-muted)">انتهى وقت تسجيل هذه الحصة — تم قفلها تلقائياً</div>
       </div>`
-    : (record.students || []).map(s => {
-        const isJoinedLater = s.joinedFromSession && sessionNum < s.joinedFromSession;
-        const opacity = isJoinedLater ? 0.5 : (s.present || s.late) ? 1 : 0.65;
-        let statusBg, statusBorder, statusColor, statusLabel;
-        if (isJoinedLater) {
-          statusBg = 'rgba(99,102,241,0.08)'; statusBorder = 'rgba(99,102,241,0.2)';
-          statusColor = '#6366f1'; statusLabel = `➖ انضم من ح${s.joinedFromSession}`;
-        } else if (s.late) {
-          statusBg = 'rgba(245,158,11,0.1)'; statusBorder = 'rgba(245,158,11,0.3)';
-          statusColor = '#d97706'; statusLabel = '⏰ متأخر';
-        } else if (s.present) {
-          statusBg = 'var(--success-soft)'; statusBorder = 'rgba(16,185,129,0.25)';
-          statusColor = '#059669'; statusLabel = '✅ حاضر';
-        } else {
-          statusBg = 'var(--danger-soft)'; statusBorder = 'rgba(239,68,68,0.2)';
-          statusColor = '#DC2626'; statusLabel = '❌ غائب';
-        }
-        return `
-        <div class="att-student-row" style="pointer-events:none;opacity:${opacity};">
+    : (record.students || []).map(s => `
+        <div class="att-student-row" style="pointer-events:none;opacity:${(s.present||s.late)?1:0.6}">
           <span class="att-student-id">${s.id || '—'}</span>
           <span class="att-student-name">${s.name}</span>
-          <span class="pay-badge" style="margin-right:auto;background:${statusBg};color:${statusColor};border:1px solid ${statusBorder}">${statusLabel}</span>
-        </div>`;
-      }).join('') || `<div style="text-align:center;padding:20px;color:var(--text-muted)">لا يوجد تلاميذ</div>`;
-  // الحضور يُحسب بدون التلاميذ اللي انضموا بعد هذه الحصة
-  const presentCount = isMissed ? 0 : (record.students || []).filter(s => (s.present || s.late) && !(s.joinedFromSession && sessionNum < s.joinedFromSession)).length;
+          <span class="pay-badge ${s.late ? '' : s.present ? 'paid' : 'unpaid'}" style="margin-right:auto;${s.late ? 'background:rgba(245,158,11,0.1);color:#d97706;border:1px solid rgba(245,158,11,0.3)' : ''}">
+            ${s.late ? '⏰ متأخر' : s.present ? '✅ حاضر' : '❌ غائب'}
+          </span>
+        </div>`).join('') || `<div style="text-align:center;padding:20px;color:var(--text-muted)">لا يوجد تلاميذ</div>`;
+  const presentCount = isMissed ? 0 : (record.students || []).filter(s => s.present || s.late).length;
   const lateCount    = isMissed ? 0 : (record.students || []).filter(s => s.late).length;
-  const totalCount   = isMissed ? 0 : (record.students || []).filter(s => !(s.joinedFromSession && sessionNum < s.joinedFromSession)).length;
-  const joinedLaterCount = isMissed ? 0 : (record.students || []).filter(s => s.joinedFromSession && sessionNum < s.joinedFromSession).length;
+  const totalCount   = isMissed ? 0 : (record.students || []).length;
   openSessionModal(`
     <div class="session-att-header" style="background:${isMissed?'rgba(245,158,11,0.08)':'var(--success-soft)'};border-radius:24px 24px 0 0;border-bottom:1px solid var(--border)">
       <div style="font-size:22px">${isMissed ? '⚠️' : '📋'}</div>
@@ -6752,7 +6714,7 @@ window.viewSessionHistory_g = (sessionNum, gi) => {
         <div style="font-size:16px;font-weight:900;color:var(--text)">سجل الحصة ${sessionNum} — ${isMissed ? 'فائتة' : 'مسجّلة'}</div>
         ${recDate ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px">📅 ${recDate}</div>` : ''}
       </div>
-      ${!isMissed ? `<div style="font-size:13px;font-weight:800;color:var(--success);display:flex;flex-direction:column;align-items:flex-end;gap:2px">${presentCount}/${totalCount} حاضر${joinedLaterCount?`<span style="font-size:10px;color:#6366f1;font-weight:700">${joinedLaterCount} انضموا لاحقاً</span>`:''}` + `</div>` : ''}
+      ${!isMissed ? `<div style="font-size:13px;font-weight:800;color:var(--success)">${presentCount}/${totalCount} حاضر</div>` : ''}
       <button onclick="closeSessionModal()" style="padding:8px 16px;border-radius:12px;border:1px solid var(--border-2);background:var(--card);color:var(--text-muted);font-size:13px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">✕</button>
     </div>
     <div style="padding:20px 24px">
@@ -6782,10 +6744,7 @@ function readAttendanceFromDOM() {
     const lateBtn    = btns[2];
     const isLate     = lateBtn    ? lateBtn.classList.contains('late')    : false;
     const isPresent  = presentBtn ? presentBtn.classList.contains('present') : false;
-    // نحفظ joinedFromSession من بيانات التلميذ في الذاكرة إذا موجود
-    const memStudent = currentAttStudents.find(s => s.id === sid);
-    const joinedFromSession = memStudent?.joinedFromSession || null;
-    return { id: sid, name, present: isPresent || isLate, late: isLate, joinedFromSession };
+    return { id: sid, name, present: isPresent || isLate, late: isLate };
   });
 }
 
@@ -6807,11 +6766,7 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
   const domData = readAttendanceFromDOM();
   const studentsToSave = domData
     ? domData
-    : currentAttStudents.map(s => ({
-        id: s.id, name: s.name,
-        present: !!s.present, late: !!s.late,
-        joinedFromSession: s.joinedFromSession || null
-      }));
+    : currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present, late: !!s.late }));
 
   if (!studentsToSave.length) {
     showToast('⚠️ لا يوجد تلاميذ للحفظ', true);
@@ -6875,94 +6830,97 @@ window.openSummaryModal = () => {
   const recordedCount = Object.keys(mergedSessions).length;
   const subEl = document.getElementById('summary-modal-sub');
   if (subEl) subEl.textContent = recordedCount + ' حصة مسجّلة من أصل 12';
-  // legend يشرح الرموز — يُبنى مرة واحدة
-  const legendEl = document.getElementById('summary-legend');
-  if (legendEl) legendEl.innerHTML = `
-    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;background:var(--bg);border-radius:10px;border:1px solid var(--border);margin-bottom:14px;font-size:11px;font-weight:700;color:var(--text-muted)">
-      <span style="display:flex;align-items:center;gap:4px"><span class="sdot recorded" style="width:10px;height:10px;flex-shrink:0"></span> حاضر</span>
-      <span style="display:flex;align-items:center;gap:4px"><span class="sdot" style="width:10px;height:10px;border-color:rgba(239,68,68,0.4);flex-shrink:0"></span> غائب</span>
-      <span style="display:flex;align-items:center;gap:4px"><span class="sdot" style="width:10px;height:10px;background:#F59E0B;border-color:#F59E0B;flex-shrink:0;font-size:7px;display:inline-flex;align-items:center;justify-content:center">⏰</span> تأخر نفس اليوم</span>
-      <span style="display:flex;align-items:center;gap:4px"><span class="sdot" style="width:10px;height:10px;background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);font-size:7px;color:#6366f1;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">➖</span> انضم لاحقاً</span>
-      <span style="display:flex;align-items:center;gap:4px"><span class="sdot" style="width:10px;height:10px;opacity:0.3;flex-shrink:0"></span> لم تُسجَّل</span>
-    </div>`;
+  // ── البناء صح: لكل تلميذ امشِ على الـ 12 حصة — ضمان أن كل تلميذ عنده 12 دوت بالضبط
   const studentStats = {};
-  // نبني خريطة joinedFromSession لكل تلميذ بـ id
-  const joinedMap = {};
   students.forEach(s => {
-    joinedMap[s.id] = s.joinedFromSession || null;
-    studentStats[s.id] = { name: s.name, present: 0, absent: 0, dots: [], joinedFrom: s.joinedFromSession || null };
+    studentStats[s.id] = { name: s.name, present: 0, absent: 0, dots: [] };
   });
+
   for (let i = 1; i <= 12; i++) {
     const rec = mergedSessions[i];
+    // نبني lookup سريع: id التلميذ → بيانات حضوره في هذه الحصة
+    const sessionLookup = {};
     if (rec && rec.students) {
-      // نبني set لمن هو في هذه الحصة (بالـ id)
-      const sessionStudentIds = new Set(rec.students.map(s => s.id).filter(Boolean));
-      rec.students.forEach(s => {
-        if (!studentStats[s.id]) {
-          studentStats[s.id] = { name: s.name, present: 0, absent: 0, dots: Array(i-1).fill(null), joinedFrom: joinedMap[s.id] || null };
-        }
-        if (s.late) {
+      rec.students.forEach(s => { if (s.id) sessionLookup[s.id] = s; });
+    }
+
+    // لكل تلميذ مسجّل — نحدد دوته في هذه الحصة
+    students.forEach(s => {
+      if (!studentStats[s.id]) return;
+      if (!rec) {
+        // الحصة لم تُسجَّل بعد
+        studentStats[s.id].dots.push(null);
+        return;
+      }
+      const found = sessionLookup[s.id];
+      if (found) {
+        // التلميذ موجود في سجل هذه الحصة
+        if (found.late) {
           studentStats[s.id].present++;
           studentStats[s.id].dots.push('late');
-        } else if (s.present) {
+        } else if (found.present) {
           studentStats[s.id].present++;
           studentStats[s.id].dots.push(true);
         } else {
           studentStats[s.id].absent++;
           studentStats[s.id].dots.push(false);
         }
-      });
-      // التلاميذ اللي ما كانوا في هذه الحصة
-      students.forEach(s => {
-        if (studentStats[s.id] && !sessionStudentIds.has(s.id)) {
-          const jf = studentStats[s.id].joinedFrom;
-          // إذا الحصة قبل موعد انضمامه → ➖
-          if (jf && i < jf) {
-            studentStats[s.id].dots.push('joined_late');
-          } else {
-            studentStats[s.id].absent++;
-            studentStats[s.id].dots.push(false);
+      } else {
+        // التلميذ غير موجود في هذه الحصة —
+        // إما لأنه أُضيف بعدها، أو لأنه غائب ولم يُدرج في السجل
+        // نحاول نعرف: هل هو "جديد" (لم يكن مسجلاً وقت هذه الحصة)؟
+        // الحكم: إذا كان أول ظهور له (بـ id) في أي حصة أحدث من i → ➖
+        // وإذا ما نعرف → غائب (لأنه كان مسجلاً ولم يحضر)
+        let firstSessionWithStudent = 13;
+        for (let j = 1; j <= 12; j++) {
+          const r = mergedSessions[j];
+          if (r && r.students && r.students.some(x => x.id === s.id)) {
+            firstSessionWithStudent = j;
+            break;
           }
         }
-      });
-    } else {
-      // حصة غير مسجلة — نضيف فراغ أو ➖ حسب موعد انضمام التلميذ
-      students.forEach(s => {
-        if (studentStats[s.id]) {
-          const jf = studentStats[s.id].joinedFrom;
-          if (jf && i < jf) {
-            studentStats[s.id].dots.push('joined_late');
-          } else {
-            studentStats[s.id].dots.push(null);
-          }
+        if (i < firstSessionWithStudent) {
+          // لم يكن في القائمة بعد — ➖ "انضم لاحقاً"
+          studentStats[s.id].dots.push('joined_late');
+        } else {
+          // كان مفروض يكون وغائب
+          studentStats[s.id].absent++;
+          studentStats[s.id].dots.push(false);
         }
-      });
-    }
+      }
+    });
   }
 
   const contentEl = document.getElementById('summary-modal-content');
-  contentEl.innerHTML = Object.values(studentStats).map(st => {
+  // legend الرموز — يظهر فوق القائمة
+  const hasJoinedLate = Object.values(studentStats).some(st => st.dots.includes('joined_late'));
+  contentEl.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;background:var(--bg);border-radius:10px;border:1px solid var(--border);margin-bottom:14px;font-size:11px;font-weight:700;color:var(--text-muted)">
+      <span style="display:flex;align-items:center;gap:5px"><span class="sdot recorded" style="width:10px;height:10px;flex-shrink:0;display:inline-block"></span> حاضر</span>
+      <span style="display:flex;align-items:center;gap:5px"><span class="sdot" style="width:10px;height:10px;border-color:rgba(239,68,68,0.4);flex-shrink:0;display:inline-block"></span> غائب</span>
+      <span style="display:flex;align-items:center;gap:5px"><span class="sdot" style="width:10px;height:10px;background:#F59E0B;border-color:#F59E0B;flex-shrink:0;font-size:7px;display:inline-flex;align-items:center;justify-content:center">⏰</span> تأخر</span>
+      ${hasJoinedLate ? `<span style="display:flex;align-items:center;gap:5px"><span class="sdot" style="width:10px;height:10px;background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);font-size:7px;color:#6366f1;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">➖</span> انضم لاحقاً</span>` : ''}
+      <span style="display:flex;align-items:center;gap:5px"><span class="sdot" style="width:10px;height:10px;opacity:0.3;flex-shrink:0;display:inline-block"></span> لم تُسجَّل</span>
+    </div>` +
+  (Object.values(studentStats).map(st => {
     const dotsHtml = st.dots.map((d,i) =>
-      d === 'late'        ? `<span class="sdot" style="background:#F59E0B;border-color:#F59E0B;box-shadow:0 1px 4px rgba(245,158,11,0.4)" title="حصة ${i+1}: متأخر في نفس الحصة">⏰</span>` :
-      d === 'joined_late' ? `<span class="sdot" style="background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);font-size:8px;display:inline-flex;align-items:center;justify-content:center;color:#6366f1;font-weight:900" title="حصة ${i+1}: انضم لاحقاً — قبل تسجيله">➖</span>` :
+      d === 'late'        ? `<span class="sdot" style="background:#F59E0B;border-color:#F59E0B;box-shadow:0 1px 4px rgba(245,158,11,0.4)" title="حصة ${i+1}: متأخر">⏰</span>` :
+      d === 'joined_late' ? `<span class="sdot" style="background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);font-size:7px;color:#6366f1;font-weight:900;display:inline-flex;align-items:center;justify-content:center" title="حصة ${i+1}: انضم لاحقاً">➖</span>` :
       d === true          ? `<span class="sdot recorded" title="حصة ${i+1}: حاضر"></span>` :
       d === false         ? `<span class="sdot" style="border-color:rgba(239,68,68,0.4)" title="حصة ${i+1}: غائب"></span>` :
                            `<span class="sdot" style="opacity:0.3" title="حصة ${i+1}: لم تُسجَّل"></span>`
     ).join('');
     const lateCount2    = st.dots.filter(d => d === 'late').length;
-    const joinedLateCount = st.dots.filter(d => d === 'joined_late').length;
-    // النسبة تُحسب فقط من الحصص اللي كان فيها التلميذ (بعد انضمامه)
+    const joinedAfter   = st.dots.filter(d => d === 'joined_late').length;
+    // النسبة تُحسب فقط من الحصات الحقيقية (بعد انضمامه)
     const validSessions = st.present + st.absent;
     const absRate = validSessions > 0 ? Math.round(st.present / validSessions * 100) : null;
     const rateColor = absRate === null ? 'var(--text-muted)' : absRate >= 80 ? 'var(--success)' : absRate >= 60 ? '#d97706' : 'var(--danger)';
-    const joinedBadge = st.joinedFrom && st.joinedFrom > 1
-      ? `<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:99px;background:rgba(99,102,241,0.1);color:#6366f1;border:1px solid rgba(99,102,241,0.25)">انضم من ح${st.joinedFrom}</span>`
-      : '';
     return `
       <div class="student-summary-row">
-        <div class="student-summary-name" style="display:flex;flex-direction:column;gap:3px">
+        <div class="student-summary-name" style="display:flex;flex-direction:column;gap:2px">
           <span>${st.name}</span>
-          ${joinedBadge}
+          ${joinedAfter > 0 ? `<span style="font-size:9px;color:#6366f1;font-weight:800">انضم ➖ ${joinedAfter} ح</span>` : ''}
         </div>
         <div class="student-summary-dots">${dotsHtml}</div>
         <span class="student-summary-stat stat-present">✅ ${st.present}</span>
@@ -6970,7 +6928,7 @@ window.openSummaryModal = () => {
         <span class="student-summary-stat stat-absent">❌ ${st.absent}</span>
         ${absRate !== null ? `<span class="student-summary-stat" style="background:rgba(99,102,241,0.07);color:${rateColor};border:1px solid rgba(99,102,241,0.15);font-size:10px">${absRate}%</span>` : ''}
       </div>`;
-  }).join('') || `<div style="text-align:center;padding:30px;color:var(--text-muted)">لا توجد بيانات بعد</div>`;
+  }).join('') || `<div style="text-align:center;padding:30px;color:var(--text-muted)">لا توجد بيانات بعد</div>`);
 
   // تحديث حالة الراتب — للأدمين فقط
   const payBar = document.getElementById('payment-status-bar');
