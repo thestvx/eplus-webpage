@@ -1838,6 +1838,17 @@ body.camp-redesign {
         سيتم التواصل معكم عبر الرقم المدخل لتأكيد التسجيل في البرنامج المختار.
       </div>
 
+      <!-- ─── PRICE SUMMARY: SPECIAL PROGRAMS ─── -->
+      <div class="price-summary-box" id="specialPriceSummaryBox">
+        <div class="price-summary-header">💰 ملخص المبلغ الإجمالي</div>
+        <div class="price-summary-lines" id="specialPriceSummaryLines"></div>
+        <div class="price-divider"></div>
+        <div class="price-total-row">
+          <div class="price-total-label">المجموع الكلي</div>
+          <div class="price-total-amount"><span id="specialPriceTotalAmount">0</span><span class="dz"> دج</span></div>
+        </div>
+      </div>
+
       <button type="submit" class="form-submit" id="special-submit-btn">
         <span>إرسال طلب التسجيل</span>
       </button>
@@ -2170,6 +2181,49 @@ document.addEventListener('DOMContentLoaded', function() {
   const form      = document.getElementById('special-program-form');
   const submitBtn = document.getElementById('special-submit-btn');
   if (!form) return;
+
+  // ─── أسعار البرامج الخاصة ───
+  const SPECIAL_PRICES = {
+    'تحسين الخط':       null,
+    'الحساب الذهني':    null,
+    'البرمجة':          null,
+    'التصوير والمونتاج': 12000
+  };
+
+  // ─── تحديث ملخص المبلغ ───
+  function updateSpecialSummary() {
+    const checked = [...document.querySelectorAll('input[name="specialProgramType"]:checked')];
+    const box     = document.getElementById('specialPriceSummaryBox');
+    const lines   = document.getElementById('specialPriceSummaryLines');
+    const total   = document.getElementById('specialPriceTotalAmount');
+    if (!box || !lines || !total) return;
+
+    const priced = checked.filter(c => SPECIAL_PRICES[c.value] !== null && SPECIAL_PRICES[c.value] !== undefined);
+
+    if (priced.length === 0) {
+      box.classList.remove('visible');
+      return;
+    }
+
+    let sum = 0;
+    lines.innerHTML = '';
+    priced.forEach(c => {
+      const price = SPECIAL_PRICES[c.value];
+      sum += price;
+      const div = document.createElement('div');
+      div.className = 'price-line';
+      div.innerHTML = '<span>' + c.value + '</span><span class="price-val">' + price.toLocaleString('ar-DZ') + ' د.ج</span>';
+      lines.appendChild(div);
+    });
+
+    total.textContent = sum.toLocaleString('ar-DZ');
+    box.classList.add('visible');
+  }
+
+  // ─── ربط الـ checkboxes بالدالة ───
+  document.querySelectorAll('input[name="specialProgramType"]').forEach(cb => {
+    cb.addEventListener('change', updateSpecialSummary);
+  });
 
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
