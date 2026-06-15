@@ -154,15 +154,17 @@ async function saveToFirestoreBackup(collectionName, data) {
 }
 
 // يرسل للجدول الكبير (باقات المخيم)
+// ⚠️ attempts=1: mode:"no-cors" لا يرمي خطأ → retry يسبب تكراراً
 async function submitPayload(payload) {
-  await fetchWithRetry(APPS_SCRIPT_URL, payload);
+  await fetchWithRetry(APPS_SCRIPT_URL, payload, 1);
   // حفظ احتياطي في Firestore
   await saveToFirestoreBackup("campRegistrations", payload);
 }
 
 // يرسل للجدول الخاص بالبرامج الخاصة + Firestore backup
+// ⚠️ attempts=1 مهم: mode:"no-cors" لا يرمي خطأ أبداً → retry يسبب تكراراً في الشيت
 async function submitSpecialPayload(payload) {
-  await fetchWithRetry(SPECIAL_SCRIPT_URL, payload);
+  await fetchWithRetry(SPECIAL_SCRIPT_URL, payload, 1);
   await saveToFirestoreBackup("specialcampRegistrations", payload);
 }
 
@@ -829,6 +831,8 @@ function initSpecialForm() {
     const payload = {
       source: "special-programs",
       timestamp: buildTimestamp(),
+      // 🔑 مفتاح فريد لمنع التكرار — Apps Script يتجاهل أي طلب بنفس الـ key
+      submissionKey: `sp_${data.parentPhone}_${Date.now()}`,
       page: "summer-camp",
       formType: "special-program",
       specialPrograms: data.programs.join(" + "),
@@ -1013,10 +1017,12 @@ function init() {
   initTiltEffect();
 }
 
+// ✅ نشغّل init مرة واحدة فقط — بغض النظر عن وقت تحميل الـ script
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", init, { once: true });
 } else {
-  init();
+  // DOM جاهز — نشغّل مباشرة لكن داخل microtask لضمان اكتمال HTML
+  Promise.resolve().then(init);
 }
 
 /* ─── redesign scroll & nav polish ─── */
