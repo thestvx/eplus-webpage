@@ -1787,7 +1787,7 @@
                 <button type="button" class="prog-btn" id="prog-btn-mental"   onclick="selectProgram('برنامج الحساب الذهني', this)">🧮 برنامج الحساب الذهني</button>
                 <button type="button" class="prog-btn" id="prog-btn-handwrite" onclick="selectProgram('برنامج تحسين الخط', this)">✍️ برنامج تحسين الخط</button>
                 <button type="button" class="prog-btn" id="prog-btn-coding"   onclick="selectProgram('برنامج البرمجة', this)">💻 برنامج البرمجة</button>
-                <button type="button" class="prog-btn" id="prog-btn-photo"    onclick="selectProgramFixed('برنامج التصوير والمونتاج', 12000, this)">🎬 برنامج التصوير والمونتاج<br><span style="font-size:15px;font-weight:900;color:#F59E0B"></span></button>
+                <button type="button" class="prog-btn" id="prog-btn-photo"    onclick="selectProgramFixed('برنامج التصوير والمونتاج', 12000, this)">🎬 برنامج التصوير والمونتاج<br><span style="font-size:15px;font-weight:900;color:#F59E0B">12,000 دج</span></button>
               </div>
             </div>
 
@@ -5789,13 +5789,21 @@ window.addStudent = async () => {
 
   // ── إذا كان المستخدم في تاب فوج معين، أضف التلميذ في groups[x].students أيضاً ──
   const activeGidx  = window._activeAttGroupIdx;
-  const activeGroups = window._activeAttGroups ? [...window._activeAttGroups.map(g => ({...g, students: [...(g.students||[])]}))] : [];
+  // في وضع الأستاذ يكون _activeAttGroups غير محدد — نأخذ الأفواج من currentTeacherData
+  const _rawGroups = (window._activeAttGroups && window._activeAttGroups.length > 0)
+    ? window._activeAttGroups
+    : (window.currentTeacherData?.groups || []);
+  const activeGroups = _rawGroups.map(g => ({...g, students: [...(g.students||[])]}));
   if (activeGidx !== 'all' && activeGidx !== undefined && activeGroups[activeGidx]) {
     const gStudents = activeGroups[activeGidx].students;
     const alreadyInGroup = gStudents.some(s => s.trim().toLowerCase() === name.trim().toLowerCase());
     if (!alreadyInGroup) {
       gStudents.push(name);
       window._activeAttGroups = activeGroups;
+      // تحديث currentTeacherData محلياً حتى يبقى الفلتر دقيقاً قبل Firestore snapshot
+      if (window.currentTeacherData?.groups?.[activeGidx]) {
+        window.currentTeacherData.groups[activeGidx].students = activeGroups[activeGidx].students;
+      }
     }
   }
 
@@ -5849,7 +5857,15 @@ window.addStudent = async () => {
   if (window._buildSessionModalHtml) {
     // وضع الأستاذ: نعيد بناء session modal بالكامل مع القائمة المحدثة
     openSessionModal(window._buildSessionModalHtml());
-    updateAttSummary(currentAttStudents);
+    // ملخص الحضور على تلاميذ الفوج النشط فقط
+    const _gi = window._activeAttGroupIdx;
+    const _grpData = (window.currentTeacherData?.groups || [])[_gi];
+    if (_grpData && _grpData.students && _grpData.students.length > 0) {
+      const _gSet = new Set(_grpData.students.map(s => s.trim().toLowerCase()));
+      updateAttSummary(currentAttStudents.filter(s => _gSet.has(s.name.trim().toLowerCase())));
+    } else {
+      updateAttSummary(currentAttStudents);
+    }
   } else {
     // وضع الأدمين: نستخدم renderAttStudents العادية
     const scrollY = window.scrollY;
