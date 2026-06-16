@@ -5291,8 +5291,8 @@ function buildSessionGridHtml(tid, gi, group, teacherDays) {
       ? `<button class="admin-session-lock-btn unlock" onclick="event.stopPropagation();adminToggleSessionLock('${tid}',${gi},${s.num},false)" style="margin-top:6px">🔓 فتح</button>`
       : `<button class="admin-session-lock-btn lock" onclick="event.stopPropagation();adminToggleSessionLock('${tid}',${gi},${s.num},true)" style="margin-top:6px">🔒 قفل</button>`;
     return `<div onclick="${isLocked ? '' : clickFn}" style="padding:10px 8px;border-radius:12px;border:1.5px solid;${bg};cursor:${isLocked?'default':'pointer'};text-align:center;transition:all 0.2s;min-width:0;position:relative"
-        ${isLocked ? '' : 'onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(124,58,237,0.15)'"'}
-        ${isLocked ? '' : 'onmouseout="this.style.transform='';this.style.boxShadow=''"'}>
+        ${isLocked ? '' : "onmouseover=\"this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(124,58,237,0.15)'\""}
+        ${isLocked ? '' : "onmouseout=\"this.style.transform='';this.style.boxShadow=''\""}>
       <div style="font-size:11px;font-weight:900;color:var(--text)">${isLocked?'🔒':''} حصة ${s.num}</div>
       <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${s.day}</div>
       ${isDone
@@ -7851,9 +7851,28 @@ import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTim
    }
 ══════════════════════════════════════════════════ */
 
-const existingApp = getApps()[0];
-if (!existingApp) { console.warn('Messaging: Firebase not ready'); }
-const _db = existingApp ? getFirestore(existingApp) : null;
+let _db;
+try {
+  const existingApp = getApps().find(a => a.name === '[DEFAULT]') || getApps()[0];
+  if (existingApp) {
+    _db = getFirestore(existingApp);
+  } else {
+    // fallback: تهيئة Firebase مستقلة إذا لم يكن الـ app الرئيسي جاهزاً بعد
+    const _fbApp = initializeApp({
+      apiKey: "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
+      authDomain: "eplus-center-39.firebaseapp.com",
+      projectId: "eplus-center-39",
+      storageBucket: "eplus-center-39.firebasestorage.app",
+      messagingSenderId: "191532732034",
+      appId: "1:191532732034:web:b11449a2f0595db5d02e9b"
+    }, 'messaging');
+    _db = getFirestore(_fbApp);
+  }
+} catch(e) {
+  const fallbackApp = getApps().find(a => a.name === 'messaging') || getApps()[0];
+  _db = fallbackApp ? getFirestore(fallbackApp) : null;
+  if (!_db) console.warn('Messaging: Firebase not ready', e);
+}
 
 // ─── State ───
 let _me = null;           // { uid, name, isAdmin }
