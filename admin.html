@@ -5573,35 +5573,33 @@ window.toggleStudentLate = (sid, el) => {
 };
 
 function updateAttSummary(students) {
-  // ✅ إذا كان الـ session modal مفتوحاً، نقرأ الإحصائيات من الـ DOM مباشرة
-  const sessionModalOpen = (() => {
-    const bg = document.getElementById('session-modal-bg');
-    return bg && bg.style.visibility === 'visible';
-  })();
-  let total = 0, present = 0, absent = 0, late = 0;
-  if (sessionModalOpen) {
-    const rows = document.querySelectorAll('#session-modal-inner .att-student-row');
-    total = rows.length;
-    rows.forEach(row => {
-      const checks = row.querySelectorAll('.att-check');
-      const isLate    = checks[2] && checks[2].classList.contains('late');
-      const isPresent = checks[0] && checks[0].classList.contains('present');
-      if (isLate)         { late++; present++; }
-      else if (isPresent) { present++; }
-      else                { absent++; }
-    });
-  } else {
-    total   = students.length;
-    late    = students.filter(s => s.late).length;
-    present = students.filter(s => s.present).length; // شامل المتأخرين
-    absent  = total - present;
-  }
-  const totalEl   = document.getElementById('att-total');
-  const presentEl = document.getElementById('att-present');
-  const absentEl  = document.getElementById('att-absent');
-  const lateEl    = document.getElementById('att-late');
+  // ─── تحديد الحاوية النشطة ───
+  // نعطي الأولوية لـ session-modal-inner إذا كان مرئياً، وإلا نرجع للـ att-modal
+  const sessionModalBg = document.getElementById('session-modal-bg');
+  const sessionModalOpen = sessionModalBg && sessionModalBg.style.visibility === 'visible';
+
+  // اختر الحاوية الصحيحة لقراءة العناصر منها
+  const container = sessionModalOpen
+    ? document.getElementById('session-modal-inner')
+    : document.getElementById('att-modal');
+
+  // دالة مساعدة: تجلب عنصراً بـ ID من داخل الحاوية النشطة فقط
+  const getEl = (id) => container ? container.querySelector('#' + id) : document.getElementById(id);
+
+  // ✅ نحسب دائماً من الـ array (أدق وأسرع)
+  // currentAttStudents يُحدَّث في toggleStudentAtt و toggleStudentLate قبل استدعاء هذه الدالة
+  const src = (students && students.length > 0) ? students : (window.currentAttStudents || []);
+  const total   = src.length;
+  const late    = src.filter(s => s.late).length;
+  const present = src.filter(s => s.present).length; // شامل المتأخرين
+  const absent  = total - present;
+
+  const totalEl   = getEl('att-total');
+  const presentEl = getEl('att-present');
+  const absentEl  = getEl('att-absent');
+  const lateEl    = getEl('att-late');
   if (totalEl)   totalEl.textContent   = total;
-  if (presentEl) presentEl.textContent = present - late; // الحاضرون فقط (بدون المتأخرين)
+  if (presentEl) presentEl.textContent = present - late; // حاضر فقط (بدون المتأخرين)
   if (absentEl)  absentEl.textContent  = absent;
   if (lateEl)    lateEl.textContent    = late;
 }
