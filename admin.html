@@ -909,6 +909,30 @@
     .session-status-chip.done-chip{background:var(--success-soft);color:#059669}
     .session-status-chip.current-chip{background:var(--primary-light);color:var(--primary)}
     .session-status-chip.locked-chip{background:#f1f0f0;color:#aaa}
+
+    /* ===== ADMIN SESSION LOCK TOGGLE ===== */
+    .admin-session-lock-btn{padding:4px 9px;border-radius:8px;border:1.5px solid;font-size:10px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;white-space:nowrap}
+    .admin-session-lock-btn.unlock{background:var(--success-soft);border-color:rgba(16,185,129,0.35);color:#059669}
+    .admin-session-lock-btn.lock{background:var(--danger-soft);border-color:rgba(239,68,68,0.3);color:#DC2626}
+
+    /* ===== GROUP ATTENDANCE STATS ===== */
+    .group-att-stats{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px;padding:10px 14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)}
+    .gas-item{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800}
+    .gas-dot{width:9px;height:9px;border-radius:50%}
+    .gas-dot.present{background:var(--success)}
+    .gas-dot.absent{background:var(--danger)}
+    .gas-dot.late{background:#F59E0B}
+    .gas-dot.total{background:var(--primary)}
+    .gas-num{font-weight:900}
+
+    /* ===== PAYMENT FILTER BAR ===== */
+    .pay-filter-bar{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 6px;align-items:center}
+    .pay-filter-btn{padding:5px 13px;border-radius:99px;border:1.5px solid var(--border-2);background:var(--card-bg);font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;color:var(--text-2);transition:all 0.18s}
+    .pay-filter-btn:hover{border-color:var(--primary);color:var(--primary)}
+    .pay-filter-btn.active{background:var(--primary);border-color:var(--primary);color:white}
+    .pay-filter-btn.active-green{background:#059669;border-color:#059669;color:white}
+    .pay-filter-btn.active-red{background:#DC2626;border-color:#DC2626;color:white}
+    [data-theme="dark"] .pay-filter-btn{background:var(--bg-2);border-color:var(--border-2);color:var(--text-2)}
     
     /* Attendance within session */
     .session-att-wrap{background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden;margin-top:10px}
@@ -2309,6 +2333,7 @@
           <div><div id="att-total">0</div></div>
           <div><div id="att-present">0</div></div>
           <div><div id="att-absent">0</div></div>
+          <div><div id="att-late">0</div></div>
         </div>
         <div id="att-groups-tabs-wrap"><div id="att-groups-tabs"></div><div id="att-group-header"><div id="att-group-header-name"></div><div id="att-group-header-meta"></div></div></div>
         <input type="text" id="att-search">
@@ -2320,6 +2345,29 @@
 
       <!-- ✅ شبكة الأفواج والحصص — للأدمين فقط -->
       <div id="admin-att-groups-grid" style="margin-bottom:12px"></div>
+
+      <!-- ✅ إحصائيات الحضور الكلية للفوج -->
+      <div id="admin-group-att-stats-wrap" style="margin-bottom:10px">
+        <div class="group-att-stats">
+          <div style="font-size:12px;font-weight:900;color:var(--text-muted);margin-left:4px">📊 إحصائيات الفوج:</div>
+          <div class="gas-item"><span class="gas-dot total"></span><span id="gas-total" class="gas-num">0</span><span style="color:var(--text-muted)">إجمالي</span></div>
+          <div class="gas-item"><span class="gas-dot present"></span><span id="gas-present" class="gas-num" style="color:var(--success)">0</span><span style="color:var(--text-muted)">حاضر</span></div>
+          <div class="gas-item"><span class="gas-dot absent"></span><span id="gas-absent" class="gas-num" style="color:var(--danger)">0</span><span style="color:var(--text-muted)">غائب</span></div>
+          <div class="gas-item"><span class="gas-dot late"></span><span id="gas-late" class="gas-num" style="color:#F59E0B">0</span><span style="color:var(--text-muted)">متأخر</span></div>
+          <div class="gas-item" style="margin-right:auto"><span style="font-size:11px;color:var(--text-muted)">نسبة الحضور:</span><span id="gas-pct" style="font-weight:900;color:var(--primary)">—</span></div>
+        </div>
+      </div>
+
+      <!-- ✅ فلتر التلاميذ حسب حالة الدفع -->
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:5px">🎫 تصفية حسب حالة التذكرة:</div>
+        <div class="pay-filter-bar" id="admin-pay-filter-bar">
+          <button class="pay-filter-btn active" onclick="adminFilterByPayment('all',this)">الكل</button>
+          <button class="pay-filter-btn" onclick="adminFilterByPayment('paid',this)">✅ مفعّلين</button>
+          <button class="pay-filter-btn" onclick="adminFilterByPayment('unpaid',this)">⏳ غير مفعّلين</button>
+        </div>
+        <div id="admin-pay-filter-count" style="font-size:11px;color:var(--text-muted);margin-top:3px"></div>
+      </div>
 
       <!-- أزرار الأدمين -->
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
@@ -5126,8 +5174,35 @@ window.openAttModal = async (teacherId) => {
   renderAttStudents(currentAttStudents, '');
   updateAttSummary(currentAttStudents);
 
-  // ✅ رسم شبكة الأفواج والحصص للأدمين
-  renderAdminAttGroupsGrid(t);
+  // ✅ تهيئة فلتر الدفع
+  window._adminPayFilter = 'all';
+  document.querySelectorAll('#admin-pay-filter-bar .pay-filter-btn').forEach((b,i) => {
+    b.classList.remove('active','active-green','active-red');
+    if (i===0) b.classList.add('active');
+  });
+  adminApplyPayFilter();
+
+  // ✅ تحميل حالة القفل من Firestore ثم رسم الشبكة
+  (async () => {
+    try {
+      const tDoc = await getDoc(doc(db, 'teachers', t.id));
+      if (tDoc.exists()) {
+        const locked = tDoc.data().lockedSessions || {};
+        if (!window._lockedSessions) window._lockedSessions = {};
+        // بناء cache: key = tid_gi, val = { sessionNum: true }
+        const groups = t.groups || [];
+        groups.forEach((_, gi) => {
+          window._lockedSessions[t.id + '_' + gi] = {};
+          Object.entries(locked).forEach(([k, v]) => {
+            const [gStr, sStr] = k.split('_');
+            if (parseInt(gStr) === gi && v === true)
+              window._lockedSessions[t.id + '_' + gi][parseInt(sStr)] = true;
+          });
+        });
+      }
+    } catch(e) { console.warn('lock load error', e); }
+    renderAdminAttGroupsGrid(t);
+  })();
 
   document.getElementById('att-modal').classList.add('open');
 };
@@ -5192,32 +5267,95 @@ function buildSessionGridHtml(tid, gi, group, teacherDays) {
   const sessions = [];
   for (let i = 0; i < 12; i++) sessions.push({ num: i+1, day: gDays[i % (gDays.length||1)] || '—' });
 
+  // ── قراءة حالة القفل من Firestore cache ──
+  const lockedSessions = (window._lockedSessions || {})[tid + '_' + gi] || {};
+
   const sessionCards = sessions.map(s => {
     const rec = (_allRecordedSessionsByGroup[gi] || {})[s.num];
     const isDone = !!rec;
+    const isLocked = !!lockedSessions[s.num];
     const pres = isDone ? (rec.students||[]).filter(x=>x.present).length : 0;
     const tot  = isDone ? (rec.students||[]).length : 0;
-    const bg   = isDone ? 'background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.06));border-color:rgba(16,185,129,0.35)'
-                        : 'background:white;border-color:var(--border-2)';
-    const clickFn = isDone
-      ? `editSession_g(${s.num},${gi})`
-      : `adminOpenSession(${s.num},${gi})`;
-    return `<div onclick="${clickFn}" style="padding:10px 8px;border-radius:12px;border:1.5px solid;${bg};cursor:pointer;text-align:center;transition:all 0.2s;min-width:0"
-        onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(124,58,237,0.15)'"
-        onmouseout="this.style.transform='';this.style.boxShadow=''">
-      <div style="font-size:11px;font-weight:900;color:var(--text)">حصة ${s.num}</div>
+    let bg, clickFn;
+    if (isLocked) {
+      bg = 'background:rgba(107,114,128,0.08);border-color:rgba(107,114,128,0.3);pointer-events:none;opacity:0.55';
+      clickFn = '';
+    } else if (isDone) {
+      bg = 'background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.06));border-color:rgba(16,185,129,0.35)';
+      clickFn = `editSession_g(${s.num},${gi})`;
+    } else {
+      bg = 'background:white;border-color:var(--border-2)';
+      clickFn = `adminOpenSession(${s.num},${gi})`;
+    }
+    const lockBtnHtml = isLocked
+      ? `<button class="admin-session-lock-btn unlock" onclick="event.stopPropagation();adminToggleSessionLock('${tid}',${gi},${s.num},false)" style="margin-top:6px">🔓 فتح</button>`
+      : `<button class="admin-session-lock-btn lock" onclick="event.stopPropagation();adminToggleSessionLock('${tid}',${gi},${s.num},true)" style="margin-top:6px">🔒 قفل</button>`;
+    return `<div onclick="${isLocked ? '' : clickFn}" style="padding:10px 8px;border-radius:12px;border:1.5px solid;${bg};cursor:${isLocked?'default':'pointer'};text-align:center;transition:all 0.2s;min-width:0;position:relative"
+        ${isLocked ? '' : 'onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(124,58,237,0.15)'"'}
+        ${isLocked ? '' : 'onmouseout="this.style.transform='';this.style.boxShadow=''"'}>
+      <div style="font-size:11px;font-weight:900;color:var(--text)">${isLocked?'🔒':''} حصة ${s.num}</div>
       <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${s.day}</div>
       ${isDone
         ? `<div style="margin-top:5px;font-size:10px;font-weight:800;color:#059669">✅ ${pres}/${tot}</div>
-           <div style="font-size:9px;color:var(--text-muted)">تعديل ✏️</div>`
-        : `<div style="margin-top:5px;font-size:18px;opacity:0.3">+</div>`}
+           ${isLocked ? '' : '<div style="font-size:9px;color:var(--text-muted)">تعديل ✏️</div>'}`
+        : `<div style="margin-top:5px;font-size:18px;opacity:0.3">${isLocked?'—':'+'}</div>`}
+      ${lockBtnHtml}
     </div>`;
   }).join('');
 
+  // ── إحصائيات الفوج (حضور تراكمي عبر كل الحصص) ──
+  const allGroupSessions = _allRecordedSessionsByGroup[gi] || {};
+  let totalPresent = 0, totalAbsent = 0, totalLate = 0, recordedCount = 0;
+  Object.values(allGroupSessions).forEach(sess => {
+    if (!sess || !sess.students) return;
+    recordedCount++;
+    sess.students.forEach(st => {
+      if (st.late) { totalLate++; totalPresent++; }
+      else if (st.present) totalPresent++;
+      else totalAbsent++;
+    });
+  });
+  const totalStudents = (group.students||[]).length || (Object.values(allGroupSessions)[0]?.students?.length || 0);
+  const totalExpectedAttendance = totalStudents * recordedCount;
+  const attPct = totalExpectedAttendance > 0 ? Math.round((totalPresent / totalExpectedAttendance) * 100) : null;
+  const statsHtml = recordedCount > 0 ? `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:8px 12px;background:var(--bg);border-radius:10px;border:1px solid var(--border);margin-bottom:8px;font-size:12px;font-weight:800">
+      <span style="color:var(--text-muted)">📊 تراكمي (${recordedCount} حصة):</span>
+      <span style="color:var(--success)">✅ ${totalPresent} حضر</span>
+      <span style="color:var(--danger)">❌ ${totalAbsent} غائب</span>
+      <span style="color:#F59E0B">⏱ ${totalLate} متأخر</span>
+      ${attPct !== null ? `<span style="color:var(--primary);margin-right:auto">نسبة: ${attPct}%</span>` : ''}
+    </div>` : '';
+
   const groupLabel = group.name ? `<div style="font-size:12px;font-weight:800;color:var(--text-2);margin-bottom:8px;padding:6px 12px;background:var(--primary-light);border-radius:8px;border:1px solid var(--border-2)">🏫 ${group.name} — ${(group.students||[]).length} تلميذ — 📅 ${(group.days||teacherDays).join('، ')}</div>` : '';
 
-  return `${groupLabel}<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">${sessionCards}</div>`;
+  return `${groupLabel}${statsHtml}<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">${sessionCards}</div>`;
 }
+
+// ─── قفل/فتح حصة ───
+window.adminToggleSessionLock = async (tid, gi, sessionNum, lock) => {
+  try {
+    const key = `lockedSessions.${gi}_${sessionNum}`;
+    const updateData = {};
+    // نقرأ الـ locked sessions الحالية ثم نعدّلها كـ object كامل
+    const snap = await getDoc(doc(db, 'teachers', tid));
+    const existing = snap.exists() ? (snap.data().lockedSessions || {}) : {};
+    const lockKey = gi + '_' + sessionNum;
+    if (lock) existing[lockKey] = true;
+    else delete existing[lockKey];
+    await updateDoc(doc(db, 'teachers', tid), { lockedSessions: existing });
+    // تحديث cache
+    if (!window._lockedSessions) window._lockedSessions = {};
+    const cacheKey = tid + '_' + gi;
+    if (!window._lockedSessions[cacheKey]) window._lockedSessions[cacheKey] = {};
+    if (lock) window._lockedSessions[cacheKey][sessionNum] = true;
+    else delete window._lockedSessions[cacheKey][sessionNum];
+    // إعادة رسم الشبكة
+    const teacher = allTeachers.find(x => x.id === tid);
+    if (teacher) renderAdminAttGroupsGrid(teacher);
+    showToast(lock ? `🔒 تم قفل الحصة ${sessionNum}` : `🔓 تم فتح الحصة ${sessionNum}`);
+  } catch(e) { showToast('خطأ: ' + e.message, true); }
+};
 
 // ─── فتح حصة للأدمين مباشرة من att-modal ───
 window.adminOpenSession = (sessionNum, gi) => {
@@ -5481,6 +5619,77 @@ window.filterStudents = () => {
     renderAttStudents(currentAttStudents, val);
   }
 };
+
+// ─── فلتر التلاميذ حسب حالة الدفع (خاص بالأدمين في att-modal) ───
+window._adminPayFilter = 'all';
+window.adminFilterByPayment = (type, btn) => {
+  window._adminPayFilter = type;
+  // تحديث الأزرار
+  document.querySelectorAll('#admin-pay-filter-bar .pay-filter-btn').forEach(b => {
+    b.classList.remove('active','active-green','active-red');
+  });
+  if (type === 'paid')   btn.classList.add('active-green');
+  else if (type === 'unpaid') btn.classList.add('active-red');
+  else btn.classList.add('active');
+  // تطبيق الفلتر
+  adminApplyPayFilter();
+};
+
+function adminApplyPayFilter() {
+  // جلب تلاميذ الفوج الحالي
+  const activeGidx = window._activeAttGroupIdx;
+  const activeGroups = window._activeAttGroups || [];
+  let students = currentAttStudents;
+  if (activeGidx !== 'all' && activeGidx !== undefined && activeGroups[activeGidx]) {
+    const groupNames = new Set((activeGroups[activeGidx].students || []).map(s => s.trim().toLowerCase()));
+    students = currentAttStudents.filter(s => groupNames.has(s.name.trim().toLowerCase()));
+  }
+  const filter = window._adminPayFilter || 'all';
+  let filtered;
+  if (filter === 'paid') {
+    filtered = students.filter(s => getLivePayStatus(s).ps === 'paid');
+  } else if (filter === 'unpaid') {
+    filtered = students.filter(s => getLivePayStatus(s).ps !== 'paid');
+  } else {
+    filtered = students;
+  }
+  // تحديث العداد
+  const countEl = document.getElementById('admin-pay-filter-count');
+  if (countEl) {
+    const paidCount   = students.filter(s => getLivePayStatus(s).ps === 'paid').length;
+    const unpaidCount = students.filter(s => getLivePayStatus(s).ps !== 'paid').length;
+    countEl.innerHTML = `✅ <b>${paidCount}</b> مفعّل &nbsp;|&nbsp; ⏳ <b>${unpaidCount}</b> غير مفعّل &nbsp;/&nbsp; 👥 <b>${students.length}</b> إجمالي`;
+  }
+  renderAttStudents(filtered, '');
+  // تحديث الإحصائيات
+  adminUpdateGroupStats(filtered);
+}
+
+function adminUpdateGroupStats(students) {
+  // حضور الحصة الأخيرة المسجّلة
+  const gi = window._activeAttGroupIdx;
+  const allGroupSessions = _allRecordedSessionsByGroup[typeof gi === 'number' ? gi : 0] || {};
+  const sessionNums = Object.keys(allGroupSessions).map(Number).sort((a,b) => b-a);
+  const lastSession = sessionNums.length ? allGroupSessions[sessionNums[0]] : null;
+  let total = students.length, present = 0, absent = 0, late = 0;
+  if (lastSession && lastSession.students) {
+    const names = new Set(students.map(s => s.name.trim().toLowerCase()));
+    lastSession.students.forEach(st => {
+      if (!names.has(st.name.trim().toLowerCase())) return;
+      if (st.late) { late++; present++; }
+      else if (st.present) present++;
+      else absent++;
+    });
+    absent = total - present;
+  }
+  const pct = total > 0 ? Math.round((present / total) * 100) : null;
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setEl('gas-total', total);
+  setEl('gas-present', present - late);
+  setEl('gas-absent', absent);
+  setEl('gas-late', late);
+  setEl('gas-pct', pct !== null ? pct + '%' : '—');
+}
 
 // ─── إعادة رسم قائمة الحضور عند تحديث التذاكر ───
 function refreshAttendanceListIfOpen() {
@@ -5976,6 +6185,18 @@ async function loadTeacherStudentsView(uid, teacherData) {
     const t = snap.data();
     currentTeacherData = { uid, id: uid, ...t };
     window.currentTeacherData = currentTeacherData;
+    // ── تحميل حالة قفل الحصص للأستاذ ──
+    const lockedData = t.lockedSessions || {};
+    if (!window._lockedSessions) window._lockedSessions = {};
+    const groups = t.groups || [];
+    groups.forEach((_, gi) => {
+      window._lockedSessions[uid + '_' + gi] = {};
+      Object.entries(lockedData).forEach(([k, v]) => {
+        const parts = k.split('_');
+        if (parts.length === 2 && parseInt(parts[0]) === gi && v === true)
+          window._lockedSessions[uid + '_' + gi][parseInt(parts[1])] = true;
+      });
+    });
     // ✅ إصلاح: حفظ رقم الفوج النشط قبل إعادة البناء
     const _savedGroupIdx = window._currentGroupIdx || 0;
     if (!sessionModalOpen) {
@@ -6278,6 +6499,17 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
     const isMissed = !isRecorded && !sessionIsOpen && i < currentSession;
 
     card.classList.remove('locked', 'current', 'done', 'missed');
+
+    // ── فحص القفل الذي يضعه الأدمين ──
+    const _lockedKey = (window._lockedSessions || {})[currentTeacherData?.id + '_' + gi] || {};
+    const isAdminLocked = !!_lockedKey[i] && isTeacherMode; // القفل يؤثر على الأستاذ فقط
+    if (isAdminLocked) {
+      card.classList.add('locked');
+      card.setAttribute('onclick', '');
+      chipEl.innerHTML = `<span class="session-status-chip locked-chip">🔒 مغلقة</span>`;
+      dotsEl.innerHTML = '';
+      continue;
+    }
 
     if (isRecorded) {
       // مسجّلة — الأدمين يعدّل دائماً، الأستاذ خلال 24 ساعة فقط
