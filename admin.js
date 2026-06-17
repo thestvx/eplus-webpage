@@ -8,7 +8,7 @@
 /* ─────────────── [الجزء 1] نظام المصادقة + لوحة التحكم الرئيسية ─────────────── */
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, setDoc, getDoc, getDocs, query, orderBy, where, onSnapshot, serverTimestamp, Timestamp, writeBatch } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, setDoc, getDoc, getDocs, query, orderBy, where, onSnapshot, serverTimestamp, Timestamp, writeBatch, limit } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -5301,8 +5301,7 @@ window.switchNavSection = (section) => {
 
 
 /* ─────────────── [الجزء 2] نظام التواصل (Messaging) ─────────────── */
-import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, doc, setDoc, getDoc, getDocs, where, updateDoc, deleteDoc, limit, writeBatch } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+/* (الاستيراد موجود في أعلى الملف ضمن الجزء 1، لا حاجة لتكراره) */
 
 /* ══════════════════════════════════════════════════
    نظام التواصل — E-PLUS Academy
