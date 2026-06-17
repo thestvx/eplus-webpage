@@ -6828,29 +6828,53 @@ function buildSovData() {
   const tickets  = window.allTicketsData || window._allTicketsData || [];
   if (!teachers.length) return [];
 
+  // ── تطبيع الاسم: lowercase + ترتيب الكلمات أبجدياً (يحل مشكلة "فاروق كير" vs "كير فاروق")
   const normName = n => String(n || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const sortedNorm = n => normName(n).split(' ').sort().join(' ');
+
+  // ── مطابقة التذكرة بالاسم المرتّب (يتجاهل ترتيب الكلمات)
   const findTicket = name => {
-    const norm = normName(name);
-    return tickets.find(t => normName(t.name) === norm)
-        || tickets.find(t => normName(t.name).includes(norm) || norm.includes(normName(t.name)));
+    const sn = sortedNorm(name);
+    // 1. تطابق تام بعد الترتيب
+    let found = tickets.find(t => sortedNorm(t.name) === sn);
+    if (found) return found;
+    // 2. تطابق جزئي (الاسم جزء من اسم التذكرة أو العكس)
+    found = tickets.find(t => {
+      const tn = sortedNorm(t.name);
+      return tn.includes(sn) || sn.includes(tn);
+    });
+    return found || null;
   };
 
-  const seen = new Set();
+  // ── dedup بالاسم المرتّب فقط (يمنع تكرار نفس التلميذ عند أكثر من أستاذ)
+  const seenNames = new Set();   // dedup عالمي بالاسم (بغض النظر عن الأستاذ)
+  const seenPerTeacher = new Set(); // dedup داخل نفس الأستاذ
+
   const rows = [];
 
   for (const teacher of teachers) {
     const groups = teacher.groups || [];
     for (const stu of (teacher.students || [])) {
       if (!stu.name) continue;
-      const key = normName(stu.name) + '|' + teacher.id;
-      if (seen.has(key)) continue;
-      seen.add(key);
+
+      const sn = sortedNorm(stu.name);
+
+      // منع التكرار داخل نفس الأستاذ
+      const teacherKey = sn + '|' + teacher.id;
+      if (seenPerTeacher.has(teacherKey)) continue;
+      seenPerTeacher.add(teacherKey);
+
+      // إذا التلميذ موجود عند أستاذ آخر بالفعل — نتحقق إذا عنده تذكرة
+      // إذا عنده تذكرة: نكتفي بأول مرة ظهر فيها
+      // إذا ما عنده تذكرة: نضيفه لكل أستاذ (لأن قد يكون شخص مختلف)
+      const ticket = findTicket(stu.name);
+      if (ticket && seenNames.has(sn)) continue; // نفس الشخص عند أكثر من أستاذ — تجاهل التكرار
+      if (ticket) seenNames.add(sn);
 
       const groupNames = groups
-        .filter(g => (g.students || []).some(gs => normName(gs) === normName(stu.name)))
+        .filter(g => (g.students || []).some(gs => sortedNorm(gs) === sn))
         .map(g => g.name).join(', ') || '—';
 
-      const ticket = findTicket(stu.name);
       let status, badgeClass, badgeLabel;
       if (!ticket) {
         status = 'noticket'; badgeClass = 'sov-no-ticket'; badgeLabel = '⛔ بدون تذكرة';
