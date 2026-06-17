@@ -1489,6 +1489,7 @@ function loadTickets() {
       allTicketsData.push({ id: d.id, ...x });
     });
     window._allTicketsData = allTicketsData; // expose for edit modal
+    window.allTicketsData = allTicketsData; // expose for SOV panel
     // تحديث الموارد المالية إذا كانت محمّلة — لضمان التزامن الفوري مع المخيم
     if (typeof window.renderFinanceKPIs === 'function') window.renderFinanceKPIs();
     // إعادة رسم قائمة الحضور إذا كانت مفتوحة
@@ -2455,6 +2456,7 @@ function loadTeachers() {
   onSnapshot(query(collection(db, 'teachers'), orderBy('createdAt', 'desc')), async snap => {
     allTeachers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     window._allTeachersCache = allTeachers; // for finance salary dropdown
+    window.allTeachers = allTeachers; // expose for SOV panel
     document.getElementById('nav-badge-teachers').textContent = allTeachers.length;
     document.getElementById('t-stat-total').textContent = allTeachers.length;
     // Count total students
@@ -6806,7 +6808,9 @@ window.setGreeting = function(name) {
   }
 })();
 
-// ===== STUDENTS OVERVIEW PANEL =====
+// ═══════════════════════════════════════════════════════════
+// ===== STUDENTS OVERVIEW PANEL (نظرة عامة على التلاميذ) =====
+// ═══════════════════════════════════════════════════════════
 window._sovTab = 'all';
 
 window.setSovTab = function(tab, btn) {
@@ -6820,25 +6824,32 @@ window.setSovTab = function(tab, btn) {
 };
 
 function buildSovData() {
-  if (!window.allTeachers || !window.allTicketsData) return [];
+  const teachers = window.allTeachers || window._allTeachersCache || [];
+  const tickets  = window.allTicketsData || window._allTicketsData || [];
+  if (!teachers.length) return [];
+
   const normName = n => String(n || '').trim().toLowerCase().replace(/\s+/g, ' ');
   const findTicket = name => {
     const norm = normName(name);
-    return window.allTicketsData.find(t => normName(t.name) === norm)
-        || window.allTicketsData.find(t => normName(t.name).includes(norm) || norm.includes(normName(t.name)));
+    return tickets.find(t => normName(t.name) === norm)
+        || tickets.find(t => normName(t.name).includes(norm) || norm.includes(normName(t.name)));
   };
+
   const seen = new Set();
   const rows = [];
-  for (const teacher of window.allTeachers) {
+
+  for (const teacher of teachers) {
     const groups = teacher.groups || [];
     for (const stu of (teacher.students || [])) {
       if (!stu.name) continue;
       const key = normName(stu.name) + '|' + teacher.id;
       if (seen.has(key)) continue;
       seen.add(key);
+
       const groupNames = groups
         .filter(g => (g.students || []).some(gs => normName(gs) === normName(stu.name)))
         .map(g => g.name).join(', ') || '—';
+
       const ticket = findTicket(stu.name);
       let status, badgeClass, badgeLabel;
       if (!ticket) {
@@ -6848,9 +6859,13 @@ function buildSovData() {
       } else {
         status = 'active'; badgeClass = 'sov-pending'; badgeLabel = '⏳ معلّق';
       }
+
       rows.push({
-        name: stu.name, teacherName: teacher.name, teacherId: teacher.id,
-        groupNames, status, badgeClass, badgeLabel,
+        name: stu.name,
+        teacherName: teacher.name,
+        teacherId: teacher.id,
+        groupNames,
+        status, badgeClass, badgeLabel,
         pack: ticket?.pack || '—',
         remaining: ticket ? (Number(ticket.remainingAmount) || 0) : null,
         receipt: ticket?.receipt || null
@@ -6862,26 +6877,32 @@ function buildSovData() {
 
 window.populateSovTeacherFilter = function() {
   const sel = document.getElementById('sov-teacher-filter');
-  if (!sel || !window.allTeachers) return;
+  if (!sel) return;
+  const teachers = window.allTeachers || window._allTeachersCache || [];
   const current = sel.value;
   sel.innerHTML = '<option value="">كل الأساتذة</option>';
-  window.allTeachers.forEach(t => {
+  teachers.forEach(t => {
     const opt = document.createElement('option');
-    opt.value = t.id; opt.textContent = t.name;
+    opt.value = t.id;
+    opt.textContent = t.name;
     if (t.id === current) opt.selected = true;
     sel.appendChild(opt);
   });
 };
 
 window.sovFilter = function() {
-  const searchVal = (document.getElementById('sov-search-inp')?.value || '').trim().toLowerCase();
+  const searchVal    = (document.getElementById('sov-search-inp')?.value || '').trim().toLowerCase();
   const teacherFilter = document.getElementById('sov-teacher-filter')?.value || '';
-  const tab = window._sovTab || 'all';
-  const allRows = buildSovData();
+  const tab          = window._sovTab || 'all';
+  const allRows      = buildSovData();
 
-  document.getElementById('sov-stat-active').textContent    = allRows.filter(r => r.status === 'active').length;
-  document.getElementById('sov-stat-no-ticket').textContent = allRows.filter(r => r.status === 'noticket').length;
-  document.getElementById('sov-stat-total').textContent     = allRows.length;
+  // Update stat counters (always unfiltered)
+  const sovActive    = document.getElementById('sov-stat-active');
+  const sovNoTicket  = document.getElementById('sov-stat-no-ticket');
+  const sovTotal     = document.getElementById('sov-stat-total');
+  if (sovActive)   sovActive.textContent   = allRows.filter(r => r.status === 'active').length;
+  if (sovNoTicket) sovNoTicket.textContent = allRows.filter(r => r.status === 'noticket').length;
+  if (sovTotal)    sovTotal.textContent    = allRows.length;
 
   const filtered = allRows.filter(r => {
     if (tab === 'active'   && r.status !== 'active')   return false;
@@ -6894,10 +6915,16 @@ window.sovFilter = function() {
   const tbody = document.getElementById('sov-tbody');
   const empty = document.getElementById('sov-empty');
   const table = document.getElementById('sov-table');
+  if (!tbody) return;
+
   if (!filtered.length) {
-    tbody.innerHTML = ''; table.style.display = 'none'; empty.style.display = 'block'; return;
+    tbody.innerHTML = '';
+    if (table) table.style.display = 'none';
+    if (empty) empty.style.display = 'block';
+    return;
   }
-  table.style.display = ''; empty.style.display = 'none';
+  if (table) table.style.display = '';
+  if (empty) empty.style.display = 'none';
 
   tbody.innerHTML = filtered.map((r, i) => `
     <tr>
@@ -6914,23 +6941,28 @@ window.sovFilter = function() {
     </tr>`).join('');
 };
 
-// Auto-refresh عند تحديث الأساتذة أو التذاكر
-(function() {
+// ── Hook into renderTeachersGrid للتحديث التلقائي ──
+(function _sovHookRender() {
   const _origRender = window.renderTeachersGrid;
-  if (_origRender) {
+  if (typeof _origRender === 'function') {
     window.renderTeachersGrid = function(teachers) {
       _origRender(teachers);
       window.populateSovTeacherFilter();
       window.sovFilter();
     };
   }
-  // Polling fallback للتحميل الأولي
+})();
+
+// ── Polling للتحميل الأولي (يشتغل مرة واحدة) ──
+(function _sovInitPoll() {
   const poll = setInterval(() => {
-    if (window.allTeachers && window.allTicketsData) {
+    const teachers = window.allTeachers || window._allTeachersCache;
+    const tickets  = window.allTicketsData || window._allTicketsData;
+    if (teachers && tickets) {
       clearInterval(poll);
       window.populateSovTeacherFilter();
       window.sovFilter();
     }
-  }, 800);
+  }, 600);
 })();
 // ===== END STUDENTS OVERVIEW PANEL =====
