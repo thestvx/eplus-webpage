@@ -6890,11 +6890,31 @@ window.populateSovTeacherFilter = function() {
   });
 };
 
+window.populateSovPackFilter = function() {
+  const sel = document.getElementById('sov-pack-filter');
+  if (!sel) return;
+  const tickets = window.allTicketsData || window._allTicketsData || [];
+  const current = sel.value;
+  // جمع الباقات الفريدة من التذاكر فقط (مش '—')
+  const packs = [...new Set(
+    tickets.map(t => t.pack).filter(p => p && p.trim() && p !== '—')
+  )].sort();
+  sel.innerHTML = '<option value="">كل الباقات</option>';
+  packs.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = p;
+    if (p === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+};
+
 window.sovFilter = function() {
-  const searchVal    = (document.getElementById('sov-search-inp')?.value || '').trim().toLowerCase();
+  const searchVal     = (document.getElementById('sov-search-inp')?.value || '').trim().toLowerCase();
   const teacherFilter = document.getElementById('sov-teacher-filter')?.value || '';
-  const tab          = window._sovTab || 'all';
-  const allRows      = buildSovData();
+  const packFilter    = document.getElementById('sov-pack-filter')?.value || '';
+  const tab           = window._sovTab || 'all';
+  const allRows       = buildSovData();
 
   // Update stat counters (always unfiltered)
   const sovActive    = document.getElementById('sov-stat-active');
@@ -6908,6 +6928,7 @@ window.sovFilter = function() {
     if (tab === 'active'   && r.status !== 'active')   return false;
     if (tab === 'noticket' && r.status !== 'noticket') return false;
     if (teacherFilter && r.teacherId !== teacherFilter) return false;
+    if (packFilter && r.pack !== packFilter) return false;
     if (searchVal && !r.name.toLowerCase().includes(searchVal)) return false;
     return true;
   });
@@ -6948,6 +6969,7 @@ window.sovFilter = function() {
     window.renderTeachersGrid = function(teachers) {
       _origRender(teachers);
       window.populateSovTeacherFilter();
+      window.populateSovPackFilter();
       window.sovFilter();
     };
   }
@@ -6961,6 +6983,7 @@ window.sovFilter = function() {
     if (teachers && tickets) {
       clearInterval(poll);
       window.populateSovTeacherFilter();
+      window.populateSovPackFilter();
       window.sovFilter();
     }
   }, 600);
