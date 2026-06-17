@@ -6893,14 +6893,27 @@ window.populateSovTeacherFilter = function() {
 window.populateSovPackFilter = function() {
   const sel = document.getElementById('sov-pack-filter');
   if (!sel) return;
-  const tickets = window.allTicketsData || window._allTicketsData || [];
   const current = sel.value;
-  // جمع الباقات الفريدة من التذاكر فقط (مش '—')
-  const packs = [...new Set(
-    tickets.map(t => t.pack).filter(p => p && p.trim() && p !== '—')
-  )].sort();
+  const PACKS = [
+    'الباقة الأساسية (5-10)',
+    'باقة النخبة (5-10)',
+    'الباقة الأساسية (11-14)',
+    'باقة النخبة (11-14)',
+    'الباقة الأساسية (15-18)',
+    'باقة النخبة (15-18)',
+    'باقة تحضير البكالوريا (15-18)',
+    'باقة البالغين',
+    'باقة البالغين المتقدمة',
+    'English Communication Class',
+    'English for Specific Purposes',
+    'IELTS Preparation',
+    'تعلم التصوير والمونتاج',
+    'تحسين الخط',
+    'الحساب الذهني',
+    'البرمجة',
+  ];
   sel.innerHTML = '<option value="">كل الباقات</option>';
-  packs.forEach(p => {
+  PACKS.forEach(p => {
     const opt = document.createElement('option');
     opt.value = p;
     opt.textContent = p;
