@@ -2734,21 +2734,29 @@ window.openAttModal = async (teacherId) => {
   });
   adminApplyPayFilter();
 
-  // ✅ تحميل حالة القفل من Firestore ثم رسم الشبكة
+  // ✅ تحميل حالة القفل والفتح اليدوي من Firestore ثم رسم الشبكة
   (async () => {
     try {
       const tDoc = await getDoc(doc(db, 'teachers', t.id));
       if (tDoc.exists()) {
         const locked = tDoc.data().lockedSessions || {};
+        const opened = tDoc.data().openedSessions || {};
         if (!window._lockedSessions) window._lockedSessions = {};
+        if (!window._openedSessions) window._openedSessions = {};
         // بناء cache: key = tid_gi, val = { sessionNum: true }
         const groups = t.groups || [];
         groups.forEach((_, gi) => {
           window._lockedSessions[t.id + '_' + gi] = {};
+          window._openedSessions[t.id + '_' + gi] = {};
           Object.entries(locked).forEach(([k, v]) => {
             const [gStr, sStr] = k.split('_');
             if (parseInt(gStr) === gi && v === true)
               window._lockedSessions[t.id + '_' + gi][parseInt(sStr)] = true;
+          });
+          Object.entries(opened).forEach(([k, v]) => {
+            const [gStr, sStr] = k.split('_');
+            if (parseInt(gStr) === gi && v === true)
+              window._openedSessions[t.id + '_' + gi][parseInt(sStr)] = true;
           });
         });
       }
@@ -2819,22 +2827,27 @@ function buildSessionGridHtml(tid, gi, group, teacherDays) {
   const sessions = [];
   for (let i = 0; i < 12; i++) sessions.push({ num: i+1, day: gDays[i % (gDays.length||1)] || '—' });
 
-  // ── قراءة حالة القفل من Firestore cache ──
+  // ── قراءة حالة القفل وحالة الفتح اليدوي من Firestore cache ──
   const lockedSessions = (window._lockedSessions || {})[tid + '_' + gi] || {};
+  const openedSessions = (window._openedSessions || {})[tid + '_' + gi] || {};
 
   const sessionCards = sessions.map(s => {
     const rec = (_allRecordedSessionsByGroup[gi] || {})[s.num];
     const isDone = !!rec;
     const isLocked = !!lockedSessions[s.num];
+    const isManuallyOpened = !!openedSessions[s.num];
     const pres = isDone ? (rec.students||[]).filter(x=>x.present).length : 0;
     const tot  = isDone ? (rec.students||[]).length : 0;
     let bg, clickFn;
     if (isLocked) {
-      bg = 'background:rgba(107,114,128,0.08);border-color:rgba(107,114,128,0.3);pointer-events:none;opacity:0.55';
+      bg = 'background:rgba(107,114,128,0.08);border-color:rgba(107,114,128,0.3);opacity:0.7';
       clickFn = '';
     } else if (isDone) {
       bg = 'background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.06));border-color:rgba(16,185,129,0.35)';
       clickFn = `editSession_g(${s.num},${gi})`;
+    } else if (isManuallyOpened) {
+      bg = 'background:linear-gradient(135deg,rgba(59,130,246,0.12),rgba(59,130,246,0.06));border-color:rgba(59,130,246,0.4)';
+      clickFn = `adminOpenSession(${s.num},${gi})`;
     } else {
       bg = 'background:white;border-color:var(--border-2)';
       clickFn = `adminOpenSession(${s.num},${gi})`;
@@ -2842,16 +2855,24 @@ function buildSessionGridHtml(tid, gi, group, teacherDays) {
     const lockBtnHtml = isLocked
       ? `<button class="admin-session-lock-btn unlock" onclick="event.stopPropagation();adminToggleSessionLock('${tid}',${gi},${s.num},false)" style="margin-top:6px">🔓 فتح</button>`
       : `<button class="admin-session-lock-btn lock" onclick="event.stopPropagation();adminToggleSessionLock('${tid}',${gi},${s.num},true)" style="margin-top:6px">🔒 قفل</button>`;
+    // ── زر فتح/إغلاق الحصة يدوياً للأستاذ (مستقل عن قفل الأدمين أعلاه) ──
+    const teacherOpenBtnHtml = (!isLocked && !isDone)
+      ? (isManuallyOpened
+          ? `<button class="admin-session-lock-btn unlock" onclick="event.stopPropagation();adminToggleSessionOpenForTeacher('${tid}',${gi},${s.num},false)" style="margin-top:4px;background:rgba(59,130,246,0.12);color:#2563EB">🔵 مفتوحة — إلغاء</button>`
+          : `<button class="admin-session-lock-btn" onclick="event.stopPropagation();adminToggleSessionOpenForTeacher('${tid}',${gi},${s.num},true)" style="margin-top:4px;background:rgba(59,130,246,0.08);color:#2563EB;border:1px dashed rgba(59,130,246,0.4)">🔓 فتح للأستاذ</button>`)
+      : '';
     return `<div onclick="${isLocked ? '' : clickFn}" style="padding:10px 8px;border-radius:12px;border:1.5px solid;${bg};cursor:${isLocked?'default':'pointer'};text-align:center;transition:all 0.2s;min-width:0;position:relative"
         ${isLocked ? '' : "onmouseover=\"this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(124,58,237,0.15)'\""}
         ${isLocked ? '' : "onmouseout=\"this.style.transform='';this.style.boxShadow=''\""}>
-      <div style="font-size:11px;font-weight:900;color:var(--text)">${isLocked?'🔒':''} حصة ${s.num}</div>
+      <div style="font-size:11px;font-weight:900;color:var(--text)">${isLocked?'🔒':(isManuallyOpened?'🔵':'')} حصة ${s.num}</div>
       <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${s.day}</div>
       ${isDone
         ? `<div style="margin-top:5px;font-size:10px;font-weight:800;color:#059669">✅ ${pres}/${tot}</div>
            ${isLocked ? '' : '<div style="font-size:9px;color:var(--text-muted)">تعديل ✏️</div>'}`
-        : `<div style="margin-top:5px;font-size:18px;opacity:0.3">${isLocked?'—':'+'}</div>`}
+        : `<div style="margin-top:5px;font-size:18px;opacity:0.3">${isLocked?'—':'+'}</div>
+           ${isManuallyOpened && !isLocked ? '<div style="font-size:9px;color:#2563EB;font-weight:800;margin-top:2px">مفتوحة يدوياً للأستاذ</div>' : ''}`}
       ${lockBtnHtml}
+      ${teacherOpenBtnHtml}
     </div>`;
   }).join('');
 
@@ -2906,6 +2927,31 @@ window.adminToggleSessionLock = async (tid, gi, sessionNum, lock) => {
     const teacher = allTeachers.find(x => x.id === tid);
     if (teacher) renderAdminAttGroupsGrid(teacher);
     showToast(lock ? `🔒 تم قفل الحصة ${sessionNum}` : `🔓 تم فتح الحصة ${sessionNum}`);
+  } catch(e) { showToast('خطأ: ' + e.message, true); }
+};
+
+// ─── فتح/إلغاء فتح حصة يدوياً للأستاذ (بغض النظر عن يومها أو نافذتها الزمنية) ───
+// مستقل تماماً عن adminToggleSessionLock أعلاه:
+// - القفل (lockedSessions) = يمنع الأستاذ من الوصول للحصة نهائياً
+// - الفتح اليدوي (openedSessions) = يسمح للأستاذ بتسجيل الحصة حتى لو لم يحن يومها/وقتها الطبيعي
+window.adminToggleSessionOpenForTeacher = async (tid, gi, sessionNum, open) => {
+  try {
+    const snap = await getDoc(doc(db, 'teachers', tid));
+    const existing = snap.exists() ? (snap.data().openedSessions || {}) : {};
+    const openKey = gi + '_' + sessionNum;
+    if (open) existing[openKey] = true;
+    else delete existing[openKey];
+    await updateDoc(doc(db, 'teachers', tid), { openedSessions: existing });
+    // تحديث cache
+    if (!window._openedSessions) window._openedSessions = {};
+    const cacheKey = tid + '_' + gi;
+    if (!window._openedSessions[cacheKey]) window._openedSessions[cacheKey] = {};
+    if (open) window._openedSessions[cacheKey][sessionNum] = true;
+    else delete window._openedSessions[cacheKey][sessionNum];
+    // إعادة رسم الشبكة
+    const teacher = allTeachers.find(x => x.id === tid);
+    if (teacher) renderAdminAttGroupsGrid(teacher);
+    showToast(open ? `🔓 تم فتح الحصة ${sessionNum} للأستاذ` : `تم إلغاء الفتح اليدوي للحصة ${sessionNum}`);
   } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
 
@@ -3735,16 +3781,24 @@ async function loadTeacherStudentsView(uid, teacherData) {
     const t = snap.data();
     currentTeacherData = { uid, id: uid, ...t };
     window.currentTeacherData = currentTeacherData;
-    // ── تحميل حالة قفل الحصص للأستاذ ──
+    // ── تحميل حالة قفل الحصص والفتح اليدوي للأستاذ ──
     const lockedData = t.lockedSessions || {};
+    const openedData = t.openedSessions || {};
     if (!window._lockedSessions) window._lockedSessions = {};
+    if (!window._openedSessions) window._openedSessions = {};
     const groups = t.groups || [];
     groups.forEach((_, gi) => {
       window._lockedSessions[uid + '_' + gi] = {};
+      window._openedSessions[uid + '_' + gi] = {};
       Object.entries(lockedData).forEach(([k, v]) => {
         const parts = k.split('_');
         if (parts.length === 2 && parseInt(parts[0]) === gi && v === true)
           window._lockedSessions[uid + '_' + gi][parseInt(parts[1])] = true;
+      });
+      Object.entries(openedData).forEach(([k, v]) => {
+        const parts = k.split('_');
+        if (parts.length === 2 && parseInt(parts[0]) === gi && v === true)
+          window._openedSessions[uid + '_' + gi][parseInt(parts[1])] = true;
       });
     });
     // ✅ إصلاح: حفظ رقم الفوج النشط قبل إعادة البناء
@@ -3991,12 +4045,20 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
   // الأيام المسموح بها لهذا الفوج
   const allowedDays = groupData && groupData.days && groupData.days.length ? groupData.days : (teacherData.days || []);
 
+  // ─── دالة مساعدة: هل هذه الحصة مفتوحة يدوياً من الأدمين؟ (تتجاوز اليوم/الوقت) ──
+  const isManuallyOpened = (sessionNum) => {
+    const _openedKey = (window._openedSessions || {})[(currentTeacherData?.id || teacherData?.id) + '_' + gi] || {};
+    return !!_openedKey[sessionNum];
+  };
+
   // ─── دالة مساعدة: هل نافذة تسجيل هذه الحصة مفتوحة الآن؟
   // القاعدة (بتوقيت الجزائر):
   //   • الحصة تنفتح من 01:00 صباحاً ليوم تدريسها
   //   • تُقفل عند 23:59:59 من نفس اليوم
   //   • فقط الحصة الأولى بالترتيب (isCurrent) هي التي تفتح
-  const isSessionOpen = (sessionDay) => {
+  //   • استثناء: إذا فتحها الأدمين يدوياً (isManuallyOpened) فهي مفتوحة دائماً بغض النظر عن اليوم/الوقت
+  const isSessionOpen = (sessionDay, sessionNum) => {
+    if (sessionNum != null && isManuallyOpened(sessionNum)) return true;
     if (!allowedDays.includes(sessionDay)) return false;
     const dayIdx = arabicDayNames.indexOf(sessionDay);
     if (dayIdx === -1) return false;
@@ -4012,17 +4074,17 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
   const adminCanRecord = !isTeacherMode;
 
   // ─── تحديد "الحصة الحالية" بشكل صحيح:
-  // هي أول حصة غير مسجّلة يومها هو اليوم الحالي (بتوقيت الجزائر).
+  // هي أول حصة غير مسجّلة يومها هو اليوم الحالي (بتوقيت الجزائر)، أو فُتحت يدوياً من الأدمين.
   // إذا لم توجد حصة اليوم → نأخذ أول حصة غير مسجّلة بالترتيب (للعرض فقط).
   let firstUnrecorded = 13; // أول حصة غير مسجّلة بالترتيب المطلق
   for (let i = 1; i <= 12; i++) {
     if (!recordedSessions[i]) { firstUnrecorded = i; break; }
   }
-  // الحصة الحالية: أول حصة غير مسجّلة يومها اليوم، بشرط ألا تكون قبل firstUnrecorded
+  // الحصة الحالية: أول حصة غير مسجّلة (يومها اليوم أو مفتوحة يدوياً)، بشرط ألا تكون قبل firstUnrecorded
   let currentSession = 13;
   for (let i = firstUnrecorded; i <= 12; i++) {
     const sDay = sessions[i - 1]?.day || '';
-    if (!recordedSessions[i] && isSessionOpen(sDay)) { currentSession = i; break; }
+    if (!recordedSessions[i] && isSessionOpen(sDay, i)) { currentSession = i; break; }
   }
   // إذا ما لقينا حصة مفتوحة اليوم، نرجع لأول حصة غير مسجّلة (للعرض)
   if (currentSession === 13) currentSession = firstUnrecorded;
@@ -4042,10 +4104,10 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
     const sessionDay  = sessions[i - 1]?.day || '';
     const isCurrent   = i === currentSession;
 
-    // ── الحصة مفتوحة: هي الحصة الحالية (بالمنطق أعلاه) = يومها اليوم + النافذة مفتوحة
-    const sessionIsOpen = isCurrent && isSessionOpen(sessionDay);
+    // ── الحصة مفتوحة: هي الحصة الحالية (بالمنطق أعلاه) = يومها اليوم + النافذة مفتوحة، أو مفتوحة يدوياً
+    const sessionIsOpen = (isCurrent && isSessionOpen(sessionDay, i)) || isManuallyOpened(i);
 
-    // ── الحصة "فائتة": لم تُسجّل، قبل الحصة الحالية، ونافذتها مغلقة
+    // ── الحصة "فائتة": لم تُسجّل، قبل الحصة الحالية، ونافذتها مغلقة، وغير مفتوحة يدوياً
     const isMissed = !isRecorded && !sessionIsOpen && i < currentSession;
 
     card.classList.remove('locked', 'current', 'done', 'missed');
@@ -4127,13 +4189,19 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
         : `<span class="sdot" style="opacity:0.4"></span>`;
     } else if (sessionIsOpen) {
       card.classList.add('current');
-      // الوقت المتبقي حتى قفل الحصة (23:59 بتوقيت الجزائر)
-      const minsLeft2 = Math.max(0, (23 * 60 + 59) - (nowDZ.getHours() * 60 + nowDZ.getMinutes()));
-      const timeHint2 = minsLeft2 > 60
-        ? `${Math.ceil(minsLeft2/60)}س متبقية`
-        : `${minsLeft2} دقيقة`;
-      const todayStr = nowDZ.toLocaleDateString('ar-DZ', {day:'numeric', month:'short'});
-      chipEl.innerHTML = `<span class="session-status-chip current-chip">▶ الحصة الحالية</span><div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">${todayStr} — ⏳ ${timeHint2}</div>`;
+      const openedManually = isManuallyOpened(i);
+      if (openedManually) {
+        // فُتحت يدوياً من الأدمين — لا قيد وقت/يوم
+        chipEl.innerHTML = `<span class="session-status-chip current-chip" style="background:rgba(59,130,246,0.12);color:#2563EB;border-color:rgba(59,130,246,0.3)">🔓 فُتحت لك من الإدارة</span><div style="font-size:9px;color:#2563EB;font-weight:700;margin-top:3px">يمكنك تسجيلها الآن</div>`;
+      } else {
+        // الوقت المتبقي حتى قفل الحصة (23:59 بتوقيت الجزائر)
+        const minsLeft2 = Math.max(0, (23 * 60 + 59) - (nowDZ.getHours() * 60 + nowDZ.getMinutes()));
+        const timeHint2 = minsLeft2 > 60
+          ? `${Math.ceil(minsLeft2/60)}س متبقية`
+          : `${minsLeft2} دقيقة`;
+        const todayStr = nowDZ.toLocaleDateString('ar-DZ', {day:'numeric', month:'short'});
+        chipEl.innerHTML = `<span class="session-status-chip current-chip">▶ الحصة الحالية</span><div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:3px">${todayStr} — ⏳ ${timeHint2}</div>`;
+      }
       dotsEl.innerHTML = students.length
         ? students.map((s,idx) => `<span class="sdot ${idx===0?'current-dot':''}" title="${s.name}"></span>`).join('')
         : `<span class="sdot current-dot"></span>`;
