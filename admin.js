@@ -2377,8 +2377,16 @@ window.crossSearchStudent = async (rawVal) => {
     } catch(e) {}
 
     // ── 3. ابحث في التذاكر عن حالة الدفع ──
-    const ticketData = (window._allTicketsData || allTicketsData || [])
-      .find(tk => tk.name?.trim().toLowerCase() === student.name?.trim().toLowerCase());
+    const ticketData = (() => {
+      const _tks = window._allTicketsData || allTicketsData || [];
+      const _norm = s => String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+      const _sortNorm = s => _norm(s).split(' ').sort().join(' ');
+      const _t = _norm(student.name), _ts = _sortNorm(student.name);
+      return _tks.find(tk => _norm(tk.name) === _t)
+          || _tks.find(tk => _sortNorm(tk.name) === _ts)
+          || _tks.find(tk => _norm(tk.name).includes(_t) || _t.includes(_norm(tk.name)))
+          || undefined;
+    })();
 
     const packLabel  = ticketData?.pack || student.pack || '—';
     const noteLabel  = ticketData?.note || '';
@@ -3055,7 +3063,11 @@ function getStudentSourceInfo(s) {
   // التلاميذ اليدويين: fromTicket=false أو id يبدأ بـ gs_ أو لا يوجد receipt
   const ticket = (allTicketsData||[]).find(t =>
     (s.receipt && t.receipt === s.receipt) ||
-    (t.name && t.name.trim().toLowerCase() === s.name.trim().toLowerCase())
+    (t.name && (() => {
+      const _n = x => String(x||'').trim().toLowerCase().replace(/\s+/g,' ');
+      const _sn = x => _n(x).split(' ').sort().join(' ');
+      return _n(t.name) === _n(s.name) || _sn(t.name) === _sn(s.name);
+    })())
   );
   // نحاول البحث في بيانات الشيت المحفوظة
   const sheetEntry = (window._lastSheetRows||[]).find(r => {
@@ -3515,11 +3527,15 @@ function getLivePayStatus(student) {
 
 function findStudentTicket(name) {
   if (!allTicketsData || !allTicketsData.length) return null;
-  const norm = s => String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
-  const target = norm(name);
-  // مطابقة كاملة أولاً
+  const norm     = s => String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+  const sortNorm = s => norm(s).split(' ').sort().join(' ');
+  const target     = norm(name);
+  const targetSort = sortNorm(name);
+  // 1. تطابق تام
   let match = allTicketsData.find(t => norm(t.name) === target);
-  // مطابقة جزئية إذا لم تُوجد
+  // 2. تطابق بعد ترتيب الكلمات (يحل مشكلة "فاروق كير" vs "كير فاروق")
+  if (!match) match = allTicketsData.find(t => sortNorm(t.name) === targetSort);
+  // 3. تطابق جزئي
   if (!match) match = allTicketsData.find(t => norm(t.name).includes(target) || target.includes(norm(t.name)));
   return match || null;
 }
