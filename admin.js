@@ -1382,6 +1382,38 @@ window.copyReceiptNum = () => {
 
 // store tickets globally for export
 let allTicketsData = [];
+
+// ══════════════════════════════════════════════════════════════
+// 🎯 توحيد الأسماء — يحل مشكلة ترتيب الاسم واللقب
+//    "فاروق كير" === "كير فاروق" دائماً
+// ══════════════════════════════════════════════════════════════
+function normalizeName(n) {
+  return String(n || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/[آأإ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/[ىيئ]/g, "ي")
+    .toLowerCase();
+}
+
+function matchNames(a, b) {
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
+  if (na === nb) return true;
+  const sa = na.split(" ").sort().join(" ");
+  const sb = nb.split(" ").sort().join(" ");
+  if (sa === sb) return true;
+  const wa = na.split(" ").filter(w => w.length > 1);
+  const wb = nb.split(" ").filter(w => w.length > 1);
+  if (wa.length > 0 && wb.length > 0) {
+    if (wa.every(w => wb.some(x => x === w || x.includes(w) || w.includes(x)))) return true;
+    if (wb.every(w => wa.some(x => x === w || x.includes(w) || w.includes(x)))) return true;
+  }
+  if (na.includes(nb) || nb.includes(na)) return true;
+  return false;
+}
+
 let _ticketsSearchVal = '';
 let _ticketsFilterVal = 'all';
 
@@ -3058,34 +3090,26 @@ window.switchAttGroupTab = (gidx, teacher, groups) => {
 };
 
 function getStudentSourceInfo(s) {
-  // هل التلميذ من جدول Google Sheet؟
-  // التلاميذ من الشيت عندهم payStatus من ticket أو لديهم receipt
-  // التلاميذ اليدويين: fromTicket=false أو id يبدأ بـ gs_ أو لا يوجد receipt
-  const ticket = (allTicketsData||[]).find(t =>
+  const ticket = (allTicketsData || []).find(t =>
     (s.receipt && t.receipt === s.receipt) ||
-    (t.name && (() => {
-      const _n = x => String(x||'').trim().toLowerCase().replace(/\s+/g,' ');
-      const _sn = x => _n(x).split(' ').sort().join(' ');
-      return _n(t.name) === _n(s.name) || _sn(t.name) === _sn(s.name);
-    })())
+    matchNames(t.name, s.name)
   );
-  // نحاول البحث في بيانات الشيت المحفوظة
-  const sheetEntry = (window._lastSheetRows||[]).find(r => {
-    const fn = String(r['الاسم']||'').trim();
-    const ln = String(r['اللقب']||'').trim();
-    const full = [fn,ln].filter(Boolean).join(' ').toLowerCase();
-    return full === s.name.trim().toLowerCase() || fn.toLowerCase() === s.name.trim().toLowerCase();
+
+  const sheetEntry = (window._lastSheetRows || []).find(r => {
+    const fn = String(r['الاسم'] || "").trim();
+    const ln = String(r['اللقب'] || "").trim();
+    const full = [fn, ln].filter(Boolean).join(" ");
+    return matchNames(full, s.name) || matchNames(fn, s.name);
   });
 
-  let source = 'manual'; // مضاف يدوياً
-  if (ticket) source = 'ticket';       // من التذاكر
-  if (sheetEntry) source = 'sheet';    // من جدول Google Sheet
+  let source = "manual";
+  if (ticket) source = "ticket";
+  if (sheetEntry) source = "sheet";
 
-  // الباقة
-  let pack = '';
+  let pack = "";
   if (ticket && ticket.pack) pack = ticket.pack;
   else if (sheetEntry) {
-    const pk = ['الباقة','نوع البرنامج','الباقة المختارة','pack'].find(k => sheetEntry[k]);
+    const pk = ["الباقة", "نوع البرنامج", "الباقة المختارة", "pack"].find(k => sheetEntry[k]);
     if (pk) pack = String(sheetEntry[pk]).trim();
   }
 
@@ -3527,17 +3551,7 @@ function getLivePayStatus(student) {
 
 function findStudentTicket(name) {
   if (!allTicketsData || !allTicketsData.length) return null;
-  const norm     = s => String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
-  const sortNorm = s => norm(s).split(' ').sort().join(' ');
-  const target     = norm(name);
-  const targetSort = sortNorm(name);
-  // 1. تطابق تام
-  let match = allTicketsData.find(t => norm(t.name) === target);
-  // 2. تطابق بعد ترتيب الكلمات (يحل مشكلة "فاروق كير" vs "كير فاروق")
-  if (!match) match = allTicketsData.find(t => sortNorm(t.name) === targetSort);
-  // 3. تطابق جزئي
-  if (!match) match = allTicketsData.find(t => norm(t.name).includes(target) || target.includes(norm(t.name)));
-  return match || null;
+  return allTicketsData.find(t => matchNames(t.name, name)) || null;
 }
 
 window.addStudent = async () => {
@@ -7042,3 +7056,35 @@ window.sovFilter = function() {
   }, 600);
 })();
 // ===== END STUDENTS OVERVIEW PANEL =====
+
+// ═══════════════════════════════════════════════════════════
+// 🔍 فحص شامل — يقارن التلاميذ في قوائم الحضور مع التذاكر
+// ═══════════════════════════════════════════════════════════
+window.sovFullCheck = function() {
+  const data = buildSovData();
+  const withTicket = data.filter(r => r.status === "active");
+  const withoutTicket = data.filter(r => r.status === "noticket");
+  
+  let report = "📊 **تقرير فحص التلاميذ**\n\n";
+  report += "✅ " + withTicket.length + " تلميذ عندهم تذكرة (مفعّلة)\n";
+  report += "⛔ " + withoutTicket.length + " تلميذ بدون تذكرة\n";
+  report += "📋 " + data.length + " تلميذ إجمالاً\n\n";
+  
+  if (withoutTicket.length > 0) {
+    report += "⛔ **تلاميذ بدون تذاكر:**\n";
+    withoutTicket.forEach(function(r, i) {
+      report += (i+1) + ". " + r.name + " — مع الأستاذ: " + r.teacherName + "\n";
+    });
+  }
+  
+  alert(report);
+  
+  window._sovTab = "noticket";
+  document.querySelectorAll("#sov-tab-all, #sov-tab-active, #sov-tab-noticket").forEach(function(b) { b.classList.remove("active"); });
+  var noticketBtn = document.getElementById("sov-tab-noticket");
+  if (noticketBtn) noticketBtn.classList.add("active");
+  window.sovFilter();
+  
+  showToast("🔍 الفحص اكتمل — " + withoutTicket.length + " بدون تذكرة من " + data.length + " تلميذ");
+};
+
