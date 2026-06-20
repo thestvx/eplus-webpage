@@ -815,7 +815,19 @@
     .so-empty{text-align:center;padding:40px 20px;color:var(--text-muted)}
     .so-empty-icon{font-size:48px;opacity:0.3;margin-bottom:12px}
     .so-tbl-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--border)}
-    @media(max-width:640px){.so-hero{padding:18px 16px}.so-body{padding:14px 12px}.so-search-wrap{flex-direction:column}.so-stat{min-width:70px;padding:6px 12px}.so-stat-n{font-size:16px}.so-tbl td,.so-tbl th{padding:7px 8px;font-size:11px}}
+    .so-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .so-filters select{padding:8px 14px;border-radius:10px;border:1px solid var(--border-2);background:white;font-family:'Tajawal',sans-serif;font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;min-width:130px;flex:1}
+    .so-page-nav{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap}
+    .so-page-btn{padding:6px 16px;border-radius:10px;border:1.5px solid var(--border-2);background:white;font-family:'Tajawal',sans-serif;font-size:12px;font-weight:800;color:var(--text-2);cursor:pointer;transition:all 0.2s}
+    .so-page-btn:hover:not(:disabled){border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+    .so-page-btn:disabled{opacity:0.35;cursor:default}
+    .so-page-info{font-size:12px;font-weight:700;color:var(--text-muted)}
+    @media(max-width:640px){
+      .so-hero{padding:18px 16px}.so-body{padding:14px 12px}
+      .so-search-wrap{flex-direction:column}.so-filters{flex-direction:column}.so-filters select{width:100%}
+      .so-stat{min-width:70px;padding:6px 12px}.so-stat-n{font-size:16px}
+      .so-tbl td,.so-tbl th{padding:7px 8px;font-size:11px}
+    }
 
     /* Attendance modal */
     .att-modal-bg{position:fixed;inset:0;background:rgba(30,27,75,0.6);backdrop-filter:blur(8px);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;visibility:hidden;transition:all 0.35s ease}
@@ -2124,10 +2136,24 @@
             </div>
           </div>
           <div class="so-body">
+            <div class="so-filters">
+              <select id="so-filter-teacher" onchange="filterStudentOverview()">
+                <option value="">👨‍🏫 جميع الأساتذة</option>
+              </select>
+              <select id="so-filter-pack" onchange="filterStudentOverview()">
+                <option value="">📦 جميع الباقات</option>
+              </select>
+              <select id="so-filter-status" onchange="filterStudentOverview()">
+                <option value="">✅ الجميع</option>
+                <option value="paid">مفعّل فقط</option>
+                <option value="noticket">بدون تذكرة فقط</option>
+                <option value="unpaid">متبقي فقط</option>
+              </select>
+            </div>
             <div class="so-search-wrap">
               <div style="position:relative;flex:1">
                 <span style="position:absolute;top:50%;right:12px;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
-                <input class="inp" type="text" id="so-search" placeholder="ابحث باسم التلميذ أو الأستاذ أو الباقة..." style="padding-right:40px;padding-top:10px;padding-bottom:10px;font-size:13px" oninput="filterStudentOverview(this.value)">
+                <input class="inp" type="text" id="so-search" placeholder="ابحث باسم التلميذ..." style="padding-right:40px;padding-top:10px;padding-bottom:10px;font-size:13px" oninput="filterStudentOverview()">
               </div>
               <span style="font-size:12px;font-weight:700;color:var(--text-muted);white-space:nowrap" id="so-filter-count"></span>
             </div>
@@ -2150,6 +2176,7 @@
                 </tbody>
               </table>
             </div>
+            <div class="so-page-nav" id="so-page-nav"></div>
           </div>
         </div>
 
@@ -2749,6 +2776,11 @@ onAuthStateChanged(auth, async user => {
         // إخفاء البانر البنفسجي كاملاً في حساب الأستاذ
         const teachersHero = document.getElementById('teachers-hero');
         if (teachersHero) teachersHero.style.display = 'none';
+        // إخفاء قائمة التلاميذ الكاملة والموارد المالية عن الأستاذ
+        const soPanel = document.getElementById('student-overview-panel');
+        if (soPanel) soPanel.style.display = 'none';
+        const finSection = document.getElementById('section-finance');
+        if (finSection) finSection.style.display = 'none';
         // عرض نافذة الترحيب
         currentTeacherData = { uid: user.uid, id: user.uid, ...td };
         window.currentTeacherData = currentTeacherData;
@@ -2781,6 +2813,9 @@ onAuthStateChanged(auth, async user => {
     if (tfp) tfp.style.display = '';
     const lp = document.getElementById('admin-log-panel');
     if (lp) lp.style.display = '';
+    // إظهار قائمة التلاميذ الكاملة (قد تكون مخفية من جلسة أستاذ سابقة)
+    const soPanel = document.getElementById('student-overview-panel');
+    if (soPanel) soPanel.style.display = '';
     // تحميل البيانات
     loadRegistrations();
     loadVisitorStats();
@@ -5257,15 +5292,38 @@ window.renderStudentOverview = () => {
   document.getElementById('so-noticket').textContent = totalNoTicket;
 
   window._soData = _soData;
+  window._soPage = 1;
+
+  // تعبئة فلتر الأساتذة
+  const teacherSelect = document.getElementById('so-filter-teacher');
+  if (teacherSelect) {
+    const teachers = [...new Set(_soData.map(r => r.teacherName))].sort();
+    teacherSelect.innerHTML = '<option value="">👨‍🏫 جميع الأساتذة</option>' +
+      teachers.map(t => `<option value="${t.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">${t}</option>`).join('');
+  }
+
+  // تعبئة فلتر الباقات
+  const packSelect = document.getElementById('so-filter-pack');
+  if (packSelect) {
+    const packs = [...new Set(_soData.map(r => r.pkg).filter(p => p !== '—'))].sort();
+    packSelect.innerHTML = '<option value="">📦 جميع الباقات</option>' +
+      packs.map(p => `<option value="${p.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">📦 ${p}</option>`).join('');
+  }
+
   _renderSoTable(_soData, document.getElementById('so-search')?.value || '');
 };
 
-function _renderSoTable(data, filter) {
+function _renderSoTable(data, searchFilter) {
   const tbody = document.getElementById('so-tbody');
+  const teacherFilter = document.getElementById('so-filter-teacher')?.value || '';
+  const packFilter = document.getElementById('so-filter-pack')?.value || '';
+  const statusFilter = document.getElementById('so-filter-status')?.value || '';
+
   let filtered = data;
-  if (filter && filter.trim().length >= 1) {
-    const q = filter.trim().toLowerCase();
-    filtered = data.filter(r =>
+
+  if (searchFilter && searchFilter.trim().length >= 1) {
+    const q = searchFilter.trim().toLowerCase();
+    filtered = filtered.filter(r =>
       r.studentName.toLowerCase().includes(q) ||
       r.teacherName.toLowerCase().includes(q) ||
       r.pkg.toLowerCase().includes(q) ||
@@ -5273,19 +5331,37 @@ function _renderSoTable(data, filter) {
       r.receipt.toLowerCase().includes(q)
     );
   }
-  document.getElementById('so-filter-count').textContent = filtered.length < data.length
+
+  if (teacherFilter) filtered = filtered.filter(r => r.teacherName === teacherFilter);
+  if (packFilter) filtered = filtered.filter(r => r.pkg === packFilter);
+  if (statusFilter) filtered = filtered.filter(r => r.status === statusFilter);
+
+  const countEl = document.getElementById('so-filter-count');
+  if (countEl) countEl.textContent = filtered.length < data.length
     ? `${filtered.length} من ${data.length}`
     : '';
 
+  // Pagination
+  const perPage = 10;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  if (typeof window._soPage !== 'number' || window._soPage < 1) window._soPage = 1;
+  if (window._soPage > totalPages) window._soPage = totalPages;
+  const page = window._soPage;
+  const start = (page - 1) * perPage;
+  const pageData = filtered.slice(start, start + perPage);
+  const pageNavEl = document.getElementById('so-page-nav');
+
   if (!filtered.length) {
     tbody.innerHTML = `<tr><td colspan="8" class="so-empty"><div class="so-empty-icon">🔍</div><div style="font-weight:700;font-size:15px;color:var(--text-muted)">لا توجد نتائج</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px">حاول تغيير كلمة البحث</div></td></tr>`;
+    if (pageNavEl) pageNavEl.innerHTML = '';
     return;
   }
 
-  tbody.innerHTML = filtered.map((r, i) => {
+  tbody.innerHTML = pageData.map((r, i) => {
+    const idx = start + i + 1;
     const badgeClass = r.status === 'paid' ? 'so-badge paid' : r.status === 'unpaid' ? 'so-badge unpaid' : 'so-badge noticket';
     return `<tr>
-      <td style="font-weight:700;color:var(--text-muted)">${i+1}</td>
+      <td style="font-weight:700;color:var(--text-muted)">${idx}</td>
       <td style="font-weight:800">${r.studentName}</td>
       <td>${r.teacherName}</td>
       <td><span style="font-size:11px;background:rgba(245,158,11,0.1);color:#92400e;padding:2px 8px;border-radius:99px;font-weight:700">🏫 ${r.groupName}</span></td>
@@ -5295,10 +5371,20 @@ function _renderSoTable(data, filter) {
       <td><span class="${badgeClass}">${r.statusLabel}</span></td>
     </tr>`;
   }).join('');
+
+  if (pageNavEl) {
+    pageNavEl.innerHTML = `
+      <button class="so-page-btn" onclick="window._soPage=1;filterStudentOverview()" ${page===1?'disabled':''}>⏮</button>
+      <button class="so-page-btn" onclick="window._soPage=Math.max(1,window._soPage-1);filterStudentOverview()" ${page===1?'disabled':''}>◀ السابق</button>
+      <span class="so-page-info">الصفحة ${page} من ${totalPages} (${filtered.length})</span>
+      <button class="so-page-btn" onclick="window._soPage=Math.min(${totalPages},window._soPage+1);filterStudentOverview()" ${page===totalPages?'disabled':''}>التالي ▶</button>
+      <button class="so-page-btn" onclick="window._soPage=${totalPages};filterStudentOverview()" ${page===totalPages?'disabled':''}>⏭</button>`;
+  }
 }
 
-window.filterStudentOverview = (val) => {
-  _renderSoTable(_soData || [], val);
+window.filterStudentOverview = () => {
+  const searchVal = document.getElementById('so-search')?.value || '';
+  _renderSoTable(_soData || [], searchVal);
 };
 
 // ─── Delete teacher ───
