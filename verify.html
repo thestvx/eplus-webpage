@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>التحقق من التذكرة — Summer Plus</title>
+  <link rel="icon" type="image/x-icon" href="images/eplus-icon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --green:        #11295f;
+      --green-2:      #11295f;
+      --green-light:  rgba(17,41,95,0.15);
+      --green-glow:   rgba(17,41,95,0.35);
+      --green-soft:   rgba(17,41,95,0.08);
+      --purple:       #7C3AED;
+      --purple-light: rgba(124,58,237,0.12);
+      --gold:         #fbbf24;
+      --danger:       #ef4444;
+      --warning:      #f59e0b;
+      --bg:           #eef0fa;
+      --white:        #ffffff;
+      --text:         #0a1a3f;
+      --text-2:       #0d2050;
+      --text-muted:   #6b7280;
+      --border:       rgba(17,41,95,0.2);
+      --shadow:       0 20px 60px rgba(17,41,95,0.12);
+      --radius:       28px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Cairo', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* ── BACKGROUND ── */
+    .bg-mesh {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(17,41,95,0.25) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(42,74,138,0.2) 0%, transparent 50%),
+        radial-gradient(ellipse 50% 50% at 0% 80%, rgba(200,210,240,0.3) 0%, transparent 50%);
+      animation: meshShift 12s ease-in-out infinite alternate;
+    }
+    @keyframes meshShift {
+      from { transform: scale(1); }
+      to   { transform: scale(1.04) translate(1%, -1%); }
+    }
+
+    /* Sunburst rays */
+    .sunburst {
+      position: fixed; top: -30%; left: 50%; transform: translateX(-50%);
+      width: 800px; height: 800px;
+      z-index: 0; pointer-events: none; opacity: 0.18;
+      background: conic-gradient(
+        from 0deg,
+        transparent 0deg, rgba(17,41,95,0.6) 5deg, transparent 10deg,
+        transparent 20deg, rgba(42,74,138,0.5) 25deg, transparent 30deg,
+        transparent 40deg, rgba(17,41,95,0.4) 45deg, transparent 50deg,
+        transparent 60deg, rgba(42,74,138,0.5) 65deg, transparent 70deg,
+        transparent 80deg, rgba(17,41,95,0.4) 85deg, transparent 90deg,
+        transparent 100deg, rgba(42,74,138,0.3) 105deg, transparent 110deg,
+        transparent 120deg, rgba(17,41,95,0.4) 125deg, transparent 130deg,
+        transparent 140deg, rgba(42,74,138,0.3) 145deg, transparent 150deg,
+        transparent 160deg, rgba(17,41,95,0.4) 165deg, transparent 170deg,
+        transparent 180deg, rgba(42,74,138,0.3) 185deg, transparent 190deg,
+        transparent 200deg, rgba(17,41,95,0.4) 205deg, transparent 210deg,
+        transparent 220deg, rgba(42,74,138,0.3) 225deg, transparent 230deg,
+        transparent 240deg, rgba(17,41,95,0.4) 245deg, transparent 250deg,
+        transparent 260deg, rgba(42,74,138,0.3) 265deg, transparent 270deg,
+        transparent 280deg, rgba(17,41,95,0.4) 285deg, transparent 290deg,
+        transparent 300deg, rgba(42,74,138,0.3) 305deg, transparent 310deg,
+        transparent 320deg, rgba(17,41,95,0.4) 325deg, transparent 330deg,
+        transparent 340deg, rgba(42,74,138,0.3) 345deg, transparent 350deg,
+        transparent 360deg
+      );
+      border-radius: 50%;
+      animation: sunSpin 30s linear infinite;
+    }
+    @keyframes sunSpin { to { transform: translateX(-50%) rotate(360deg); } }
+
+    /* Floating dots */
+    .dots { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+    .dot {
+      position: absolute; border-radius: 50%;
+      background: rgba(17,41,95,0.15);
+      animation: dotFloat linear infinite;
+    }
+    @keyframes dotFloat {
+      0%   { transform: translateY(100vh) scale(0); opacity: 0; }
+      10%  { opacity: 1; }
+      90%  { opacity: 0.5; }
+      100% { transform: translateY(-20vh) scale(1); opacity: 0; }
+    }
+
+    /* ── MAIN CARD (phone frame) ── */
+    .phone-wrap {
+      position: relative; z-index: 10;
+      width: 100%; max-width: 400px;
+      animation: phoneUp 0.8s cubic-bezier(0.2,0.8,0.2,1);
+    }
+    @keyframes phoneUp {
+      from { opacity: 0; transform: translateY(60px) scale(0.93); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .phone-card {
+      background: var(--white);
+      border-radius: 36px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px rgba(17,41,95,0.15),
+        0 32px 80px rgba(17,41,95,0.18),
+        0 8px 24px rgba(0,0,0,0.06);
+    }
+
+    /* ── HERO SECTION (green top) ── */
+    .hero {
+      background: linear-gradient(160deg, #d0d9f0 0%, #2a4a8a 40%, #1a3a7a 100%);
+      padding: 44px 32px 36px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.5) 0%, transparent 60%);
+    }
+    .hero-orb {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: linear-gradient(135deg, #11295f, #11295f);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px;
+      box-shadow:
+        0 0 0 12px rgba(17,41,95,0.2),
+        0 0 0 24px rgba(17,41,95,0.1),
+        0 12px 32px rgba(17,41,95,0.4);
+      position: relative; z-index: 1;
+      animation: orbPulse 2.5s ease-in-out infinite;
+    }
+    @keyframes orbPulse {
+      0%, 100% { box-shadow: 0 0 0 12px rgba(17,41,95,0.2), 0 0 0 24px rgba(17,41,95,0.1), 0 12px 32px rgba(17,41,95,0.4); }
+      50%       { box-shadow: 0 0 0 16px rgba(17,41,95,0.25), 0 0 0 32px rgba(17,41,95,0.08), 0 16px 40px rgba(17,41,95,0.5); }
+    }
+    .hero-orb svg { width: 36px; height: 36px; }
+
+    /* loading orb */
+    .loading-orb {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: linear-gradient(135deg, #1a3a7a, #11295f);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px;
+      position: relative; z-index: 1;
+    }
+    .loading-ring {
+      position: absolute; inset: -8px; border-radius: 50%;
+      border: 3px solid transparent;
+      border-top-color: rgba(255,255,255,0.8);
+      border-right-color: rgba(255,255,255,0.4);
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hero-title {
+      font-size: 22px; font-weight: 900;
+      color: #0a1a3f;
+      position: relative; z-index: 1;
+      margin-bottom: 4px;
+    }
+    .hero-sub {
+      font-size: 13px; color: #0d2050; opacity: 0.75;
+      position: relative; z-index: 1;
+    }
+
+    /* ── BODY ── */
+    .card-body { padding: 28px 24px; }
+
+    /* ── EVENT INFO ROW ── */
+    .event-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 16px 18px;
+      background: linear-gradient(135deg, #eef0fa, #e8ecf8);
+      border-radius: 18px;
+      border: 1px solid rgba(17,41,95,0.2);
+      margin-bottom: 20px;
+    }
+    .event-icon {
+      width: 44px; height: 44px; border-radius: 14px;
+      background: linear-gradient(135deg, #11295f, #11295f);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(17,41,95,0.3);
+    }
+    .event-name { font-size: 15px; font-weight: 800; color: var(--text); }
+    .event-meta { font-size: 12px; color: var(--text-muted); font-weight: 500; margin-top: 2px; }
+
+    /* ── GRID DETAILS ── */
+    .detail-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px; margin-bottom: 20px;
+    }
+    .detail-cell {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+    .detail-cell.full { grid-column: 1 / -1; }
+    .cell-label { font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .cell-value { font-size: 14px; font-weight: 800; color: #111827; }
+
+    /* ── QR + INFO ROW ── */
+    .qr-row {
+      display: flex; align-items: center; gap: 16px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 18px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    .qr-box {
+      width: 80px; height: 80px; border-radius: 12px;
+      background: #fff;
+      border: 2px solid #e5e7eb;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .qr-box svg { width: 60px; height: 60px; opacity: 0.3; }
+    .qr-info { flex: 1; }
+    .qr-receipt { font-size: 15px; font-weight: 900; color: #111827; letter-spacing: 1px; }
+    .qr-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .qr-tag {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 700; color: var(--text-muted);
+    }
+    .qr-tag::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: #d1d5db; }
+
+    /* ── STATUS BADGE ── */
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 16px; border-radius: 999px;
+      font-size: 12px; font-weight: 800;
+    }
+    .status-badge.active {
+      background: rgba(17,41,95,0.12);
+      border: 1px solid rgba(17,41,95,0.3);
+      color: #11295f;
+    }
+    .status-badge.active::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: #11295f;
+      box-shadow: 0 0 6px #11295f;
+      animation: blink 1.5s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .status-badge.pending {
+      background: rgba(245,158,11,0.1);
+      border: 1px solid rgba(245,158,11,0.3);
+      color: #d97706;
+    }
+    .status-badge.pending::before {
+      content: '⏳'; font-size: 10px;
+    }
+
+    /* ── BUTTONS ── */
+    .btn-activate {
+      width: 100%; padding: 18px;
+      border: none; border-radius: 18px;
+      background: linear-gradient(135deg, #11295f, #11295f);
+      color: #fff; font-size: 16px; font-weight: 900;
+      font-family: inherit; cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 24px rgba(17,41,95,0.35);
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .btn-activate:hover:not(:disabled) {
+      transform: translateY(-3px);
+      box-shadow: 0 14px 36px rgba(17,41,95,0.45);
+    }
+    .btn-activate:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .btn-wallet {
+      width: 100%; padding: 16px;
+      border: none; border-radius: 18px;
+      background: #111827;
+      color: #fff; font-size: 15px; font-weight: 800;
+      font-family: inherit; cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .btn-wallet:hover { background: #1f2937; transform: translateY(-2px); }
+
+    /* ── FOOTER ── */
+    .card-footer {
+      padding: 14px 24px 24px;
+      text-align: center;
+      font-size: 11px; color: #9ca3af; letter-spacing: 1.5px; font-weight: 600;
+    }
+
+    /* ── LOADING STATE ── */
+    .state-loading { display: block; }
+    .state-result  { display: none; }
+    .state-error   { display: none; }
+    .state-search  { display: none; }
+    .state-pin     { display: none; }
+
+    /* ── NOT FOUND HERO ── */
+    .hero-error {
+      background: linear-gradient(160deg, #fef2f2 0%, #fecaca 40%, #f87171 100%);
+    }
+    .error-orb {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      box-shadow: 0 0 0 12px rgba(239,68,68,0.2), 0 0 0 24px rgba(239,68,68,0.1), 0 12px 32px rgba(239,68,68,0.4);
+    }
+    .hero-error .hero-title { color: #7f1d1d; }
+    .hero-error .hero-sub { color: #991b1b; }
+
+    /* ── SEARCH CARD ── */
+    .search-wrap { padding: 28px 24px 8px; }
+    .search-label { font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; }
+    .search-inp {
+      width: 100%; padding: 16px 20px; border-radius: 14px;
+      border: 2px solid #e5e7eb;
+      background: #f9fafb; color: #111827;
+      font-size: 15px; font-family: inherit; font-weight: 700;
+      outline: none; transition: all 0.3s;
+      text-align: center; letter-spacing: 2px;
+      margin-bottom: 12px;
+    }
+    .search-inp:focus { border-color: var(--green); background: #eef0fa; box-shadow: 0 0 0 4px rgba(17,41,95,0.1); }
+    .btn-search {
+      width: 100%; padding: 16px; border: none; border-radius: 14px;
+      background: linear-gradient(135deg, #11295f, #11295f);
+      color: #fff; font-size: 16px; font-weight: 900;
+      font-family: inherit; cursor: pointer;
+      box-shadow: 0 8px 24px rgba(17,41,95,0.3);
+      transition: all 0.3s;
+    }
+    .btn-search:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(17,41,95,0.4); }
+
+    /* ── PIN OVERLAY ── */
+    .pin-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      background: rgba(240,253,244,0.85);
+      backdrop-filter: blur(20px);
+    }
+    .pin-overlay.hidden { display: none; }
+    .pin-card {
+      background: #fff;
+      border-radius: 32px;
+      padding: 48px 36px;
+      width: 100%; max-width: 380px;
+      text-align: center;
+      box-shadow: 0 40px 80px rgba(17,41,95,0.18), 0 0 0 1px rgba(17,41,95,0.15);
+      animation: phoneUp 0.5s cubic-bezier(0.2,0.8,0.2,1);
+      position: relative; overflow: hidden;
+    }
+    .pin-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+      background: linear-gradient(90deg, #11295f, #1a3a7a, #11295f);
+    }
+    .pin-shield {
+      width: 70px; height: 70px; border-radius: 22px;
+      background: linear-gradient(135deg, #eef0fa, #e8ecf8);
+      border: 2px solid rgba(17,41,95,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px; margin: 0 auto 20px;
+    }
+    .pin-title { font-size: 20px; font-weight: 900; color: #0a1a3f; margin-bottom: 6px; }
+    .pin-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; line-height: 1.7; }
+    .pin-dots {
+      display: flex; justify-content: center; gap: 12px;
+      margin-bottom: 20px;
+    }
+    .pin-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #e5e7eb; transition: all 0.2s;
+    }
+    .pin-dot.filled { background: #11295f; box-shadow: 0 0 8px rgba(17,41,95,0.5); transform: scale(1.1); }
+    .pin-inp {
+      width: 100%; padding: 16px 20px; border-radius: 14px;
+      border: 2px solid #e5e7eb;
+      background: #f9fafb; color: #111827;
+      font-size: 22px; font-family: inherit;
+      outline: none; transition: all 0.3s;
+      text-align: center; letter-spacing: 12px;
+      margin-bottom: 14px;
+    }
+    .pin-inp:focus { border-color: var(--green); background: #eef0fa; box-shadow: 0 0 0 4px rgba(17,41,95,0.1); }
+    .pin-error {
+      color: #dc2626; font-size: 13px; font-weight: 700;
+      background: #fef2f2; border: 1px solid #fecaca;
+      padding: 10px 16px; border-radius: 12px;
+      margin-top: 10px; display: none;
+      animation: shake 0.4s ease;
+    }
+    @keyframes shake {
+      0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 60%{transform:translateX(6px)}
+    }
+    .btn-pin {
+      width: 100%; padding: 16px; border: none; border-radius: 14px;
+      background: linear-gradient(135deg, #11295f, #11295f);
+      color: #fff; font-size: 16px; font-weight: 900;
+      font-family: inherit; cursor: pointer;
+      box-shadow: 0 8px 24px rgba(17,41,95,0.3);
+      transition: all 0.3s;
+    }
+    .btn-pin:hover { transform: translateY(-2px); }
+
+    /* ── CONFETTI ── */
+    .confetti-wrap {
+      position: fixed; inset: 0; z-index: 5; pointer-events: none; overflow: hidden;
+    }
+    .confetti-piece {
+      position: absolute; top: -20px;
+      width: 10px; height: 10px;
+      border-radius: 2px;
+      animation: confettiFall linear forwards;
+    }
+    @keyframes confettiFall {
+      0%   { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
+      100% { transform: translateY(110vh) rotate(720deg) scale(0.5); opacity: 0; }
+    }
+
+    /* ── BACK LINK ── */
+    .back-wrap { text-align: center; margin-top: 16px; }
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--text-muted); font-size: 13px; font-weight: 700;
+      text-decoration: none; padding: 10px 20px; border-radius: 12px;
+      transition: all 0.2s;
+    }
+    .back-link:hover { background: rgba(17,41,95,0.08); color: var(--green-2); }
+
+    /* ── SUCCESS ANIMATION ── */
+    @keyframes checkPop {
+      0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+      70%  { transform: scale(1.15) rotate(5deg); }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    .check-animate { animation: checkPop 0.6s cubic-bezier(0.2,0.8,0.2,1) forwards; }
+
+    @media (max-width: 440px) {
+      .phone-wrap { max-width: 100%; }
+      .card-body { padding: 20px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- BACKGROUND -->
+<div class="bg-mesh"></div>
+<div class="sunburst"></div>
+<div class="dots" id="dots"></div>
+<div class="confetti-wrap" id="confetti-wrap"></div>
+
+<!-- PIN OVERLAY -->
+<div class="pin-overlay hidden" id="pin-overlay">
+  <div class="pin-card">
+    <div class="pin-shield">🔐</div>
+    <div class="pin-title">تأكيد صلاحية الإدارة</div>
+    <div class="pin-sub">هذه العملية مقتصرة على الإدارة<br>أدخل كود PIN للمتابعة</div>
+    <div class="pin-dots" id="pin-dots">
+      <div class="pin-dot" id="dot-0"></div>
+      <div class="pin-dot" id="dot-1"></div>
+      <div class="pin-dot" id="dot-2"></div>
+      <div class="pin-dot" id="dot-3"></div>
+    </div>
+    <input class="pin-inp" type="password" id="pin-input"
+      placeholder="••••" inputmode="numeric" pattern="[0-9]*"
+      autocomplete="one-time-code" maxlength="10"
+      oninput="updatePinDots(this.value)"
+      onkeydown="if(event.key==='Enter') confirmPin()">
+    <button class="btn-pin" onclick="confirmPin()">✅ تأكيد الدخول</button>
+    <div class="pin-error" id="pin-error">❌ الكود غير صحيح، حاول مجدداً</div>
+  </div>
+</div>
+
+<!-- MAIN PHONE CARD -->
+<div class="phone-wrap">
+  <div class="phone-card" id="phone-card">
+
+    <!-- LOADING STATE -->
+    <div id="state-loading">
+      <div class="hero">
+        <div class="loading-orb">
+          <div class="loading-ring"></div>
+          <span style="font-size:32px; position:relative; z-index:1;">🎫</span>
+        </div>
+        <div class="hero-title">جاري التحقق...</div>
+        <div class="hero-sub">يرجى الانتظار لحظة</div>
+      </div>
+      <div class="card-body">
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div style="height:72px; background:#f3f4f6; border-radius:18px; animation:shimmer 1.5s ease-in-out infinite;"></div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div style="height:72px; background:#f3f4f6; border-radius:14px; animation:shimmer 1.5s ease-in-out infinite 0.1s;"></div>
+            <div style="height:72px; background:#f3f4f6; border-radius:14px; animation:shimmer 1.5s ease-in-out infinite 0.2s;"></div>
+          </div>
+          <div style="height:72px; background:#f3f4f6; border-radius:14px; animation:shimmer 1.5s ease-in-out infinite 0.3s;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESULT STATE -->
+    <div id="state-result" style="display:none;">
+      <div class="hero" id="result-hero">
+        <div class="hero-orb check-animate" id="result-orb">
+          <svg viewBox="0 0 36 36" fill="none">
+            <path d="M8 18L15 25L28 12" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="hero-title" id="result-title">تم التأكيد!</div>
+        <div class="hero-sub" id="result-sub">التذكرة موثّقة ومفعّلة</div>
+      </div>
+      <div class="card-body">
+        <div class="event-row">
+          <div class="event-icon">☀️</div>
+          <div>
+            <div class="event-name">المخيم الصيفي — Summer Plus</div>
+            <div class="event-meta" id="d-date-meta">الطبعة الخامسة · 2026</div>
+          </div>
+        </div>
+
+        <div class="detail-grid">
+          <div class="detail-cell">
+            <div class="cell-label">👤 الاسم</div>
+            <div class="cell-value" id="d-name">—</div>
+          </div>
+          <div class="detail-cell">
+            <div class="cell-label">💳 الحالة</div>
+            <div class="cell-value" id="d-status-cell">—</div>
+          </div>
+          <div class="detail-cell full">
+            <div class="cell-label">📦 الباقة</div>
+            <div class="cell-value" id="d-pack">—</div>
+          </div>
+          <div class="detail-cell">
+            <div class="cell-label">💰 المبلغ</div>
+            <div class="cell-value" id="d-amount">—</div>
+          </div>
+          <div class="detail-cell">
+            <div class="cell-label">📅 التاريخ</div>
+            <div class="cell-value" id="d-date">—</div>
+          </div>
+        </div>
+
+        <div class="qr-row">
+          <div class="qr-box">
+            <svg viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="4" y="4" width="22" height="22" rx="3" stroke="#374151" stroke-width="2.5" fill="none"/>
+              <rect x="10" y="10" width="10" height="10" fill="#374151"/>
+              <rect x="34" y="4" width="22" height="22" rx="3" stroke="#374151" stroke-width="2.5" fill="none"/>
+              <rect x="40" y="10" width="10" height="10" fill="#374151"/>
+              <rect x="4" y="34" width="22" height="22" rx="3" stroke="#374151" stroke-width="2.5" fill="none"/>
+              <rect x="10" y="40" width="10" height="10" fill="#374151"/>
+              <rect x="34" y="34" width="8" height="8" fill="#374151"/>
+              <rect x="46" y="34" width="8" height="8" fill="#374151"/>
+              <rect x="34" y="46" width="8" height="8" fill="#374151"/>
+              <rect x="46" y="46" width="8" height="8" fill="#374151"/>
+            </svg>
+          </div>
+          <div class="qr-info">
+            <div class="qr-receipt" id="d-receipt">SP26-XXXXX</div>
+            <div class="qr-tags">
+              <div class="qr-tag">E+ Education Plus</div>
+              <div class="qr-tag">Summer Plus 2026</div>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-activate" id="activate-btn" onclick="activateTicket()">
+          🚀 تفعيل التذكرة الآن
+        </button>
+
+        <button class="btn-wallet">
+          🌟 E+ Education Plus Center
+        </button>
+      </div>
+      <div class="card-footer">E+ EDUCATION PLUS CENTER — SUMMER PLUS 2026</div>
+    </div>
+
+    <!-- ERROR STATE -->
+    <div id="state-error" style="display:none;">
+      <div class="hero hero-error">
+        <div class="hero-orb error-orb" style="animation:none;">
+          <svg viewBox="0 0 36 36" fill="none" width="36" height="36">
+            <path d="M11 11L25 25M25 11L11 25" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="hero-title" id="error-title">تذكرة غير صالحة</div>
+        <div class="hero-sub" id="error-sub">لم يتم العثور على هذه التذكرة</div>
+      </div>
+      <div class="card-body">
+        <div style="text-align:center; padding: 12px 0 20px;">
+          <div style="font-size:13px; color:#6b7280; line-height:1.7;" id="error-detail">
+            قد تكون التذكرة مزوّرة أو تم حذفها من النظام
+          </div>
+          <div style="margin-top:14px; font-family:monospace; font-size:13px; color:#ef4444; letter-spacing:2px; background:#fef2f2; padding:10px 16px; border-radius:12px; border:1px solid #fecaca;" id="error-code">—</div>
+        </div>
+        <div class="search-wrap" style="padding-top:0;">
+          <div class="search-label">🔍 تحقق من تذكرة أخرى</div>
+          <input class="search-inp" type="text" id="manual-input-err"
+            placeholder="SP-XXXXXX-XXXX"
+            onkeydown="if(event.key==='Enter') manualSearch('manual-input-err')">
+          <button class="btn-search" onclick="manualSearch('manual-input-err')">تحقق الآن</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEARCH STATE -->
+    <div id="state-search" style="display:none;">
+      <div class="hero">
+        <div class="hero-orb" style="animation:none;">
+          <span style="font-size:36px;">🔍</span>
+        </div>
+        <div class="hero-title">التحقق من التذكرة</div>
+        <div class="hero-sub">أدخل رقم الوصل للتحقق</div>
+      </div>
+      <div class="search-wrap">
+        <div class="search-label">رقم الوصل</div>
+        <input class="search-inp" type="text" id="manual-input"
+          placeholder="SP-XXXXXX-XXXX"
+          onkeydown="if(event.key==='Enter') manualSearch('manual-input')">
+        <button class="btn-search" onclick="manualSearch('manual-input')">🔍 تحقق الآن</button>
+      </div>
+      <div style="height:20px;"></div>
+    </div>
+
+  </div>
+
+  <div class="back-wrap">
+    <a href="index.html" class="back-link">← العودة للموقع</a>
+  </div>
+</div>
+
+<style>
+@keyframes shimmer {
+  0%,100% { opacity:0.6; }
+  50%      { opacity:1; }
+}
+</style>
+
+<script>
+// ── Floating dots ──
+(function(){
+  const wrap = document.getElementById('dots');
+  const colors = ['rgba(17,41,95,0.2)','rgba(42,74,138,0.25)','rgba(200,210,240,0.3)','rgba(17,41,95,0.15)'];
+  for (let i = 0; i < 18; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot';
+    const size = 6 + Math.random() * 14;
+    d.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random()*100}%;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      animation-duration:${8 + Math.random()*12}s;
+      animation-delay:${Math.random()*10}s;
+    `;
+    wrap.appendChild(d);
+  }
+})();
+
+// ── PIN dots feedback ──
+window.updatePinDots = (val) => {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('dot-' + i).classList.toggle('filled', i < val.length);
+  }
+};
+
+// ── State helpers ──
+function showState(name) {
+  ['loading','result','error','search'].forEach(s => {
+    document.getElementById('state-' + s).style.display = s === name ? 'block' : 'none';
+  });
+}
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getFirestore, collection, query, where, getDocs, doc, updateDoc }
+  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey:            "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
+  authDomain:        "eplus-center-39.firebaseapp.com",
+  projectId:         "eplus-center-39",
+  storageBucket:     "eplus-center-39.firebasestorage.app",
+  messagingSenderId: "191532732034",
+  appId:             "1:191532732034:web:b11449a2f0595db5d02e9b",
+  databaseURL:       "https://eplus-center-39-default-rtdb.firebaseio.com"
+});
+const db = getFirestore(app);
+const ADMIN_PIN = '2019';
+
+const params  = new URLSearchParams(window.location.search);
+const receipt = params.get('r');
+
+let pendingDocId = null;
+let pendingData  = null;
+
+if (receipt) {
+  showState('loading');
+  lookupTicket(receipt.trim().toUpperCase());
+} else {
+  showState('search');
+}
+
+async function lookupTicket(code) {
+  showState('loading');
+  try {
+    const q    = query(collection(db, 'summerTickets'), where('receipt', '==', code));
+    const snap = await getDocs(q);
+
+    if (snap.empty) {
+      document.getElementById('error-code').textContent = code;
+      showState('error');
+      return;
+    }
+
+    const docSnap = snap.docs[0];
+    pendingDocId  = docSnap.id;
+    pendingData   = docSnap.data();
+    showPinOverlay();
+
+  } catch (e) {
+    const isPermErr = e.code === 'permission-denied';
+    document.getElementById('error-title').textContent  = isPermErr ? 'خطأ في الصلاحيات' : 'خطأ في التحقق';
+    document.getElementById('error-detail').textContent = isPermErr
+      ? 'يجب تفعيل قراءة مجموعة summerTickets في Firestore Rules'
+      : 'خطأ: ' + e.message;
+    document.getElementById('error-code').textContent = code;
+    showState('error');
+  }
+}
+
+function showPinOverlay() {
+  document.getElementById('pin-overlay').classList.remove('hidden');
+  setTimeout(() => {
+    const inp = document.getElementById('pin-input');
+    inp.focus(); inp.click();
+  }, 300);
+}
+
+window.confirmPin = async () => {
+  const entered = document.getElementById('pin-input').value.trim();
+  const errEl   = document.getElementById('pin-error');
+  if (entered !== ADMIN_PIN) {
+    errEl.style.display = 'block';
+    document.getElementById('pin-input').value = '';
+    updatePinDots('');
+    // shake card
+    const card = document.querySelector('.pin-card');
+    card.style.animation = 'none';
+    setTimeout(() => { card.style.animation = 'shake 0.4s ease'; }, 10);
+    setTimeout(() => { document.getElementById('pin-input').focus(); }, 100);
+    return;
+  }
+  document.getElementById('pin-overlay').classList.add('hidden');
+  errEl.style.display = 'none';
+  document.getElementById('pin-input').value = '';
+  updatePinDots('');
+  renderResult(pendingData);
+};
+
+window.activateTicket = async () => {
+  if (!pendingDocId) { alert('خطأ: لم يتم تحديد معرف التذكرة'); return; }
+  const btn = document.getElementById('activate-btn');
+  btn.disabled = true; btn.textContent = '⏳ جاري التفعيل...';
+  try {
+    await updateDoc(doc(db, 'summerTickets', pendingDocId), {
+      status: 'paid', activatedAt: new Date().toISOString()
+    });
+    pendingData = { ...pendingData, status: 'paid' };
+    renderResult(pendingData);
+    launchConfetti();
+  } catch(e) {
+    btn.disabled = false; btn.textContent = '🚀 تفعيل التذكرة الآن';
+    const msg = e.code === 'permission-denied'
+      ? 'خطأ في الصلاحيات — تأكد من Firestore Rules'
+      : 'خطأ: ' + e.message;
+    alert(msg);
+  }
+};
+
+function renderResult(x) {
+  const isActive = x.status === 'paid';
+
+  // Hero
+  if (isActive) {
+    document.getElementById('result-hero').style.background = 'linear-gradient(160deg,#d0d9f0 0%,#2a4a8a 40%,#1a3a7a 100%)';
+    document.getElementById('result-orb').style.cssText += ';background:linear-gradient(135deg,#11295f,#11295f)';
+    document.getElementById('result-title').textContent = 'تم التأكيد! ✅';
+    document.getElementById('result-sub').textContent   = 'التذكرة فعّالة — الدخول مسموح';
+    document.getElementById('d-status-cell').innerHTML  = '<span class="status-badge active">مفعّلة</span>';
+    document.getElementById('activate-btn').style.display = 'none';
+    launchConfetti();
+  } else {
+    document.getElementById('result-hero').style.background = 'linear-gradient(160deg,#fef9c3 0%,#fde68a 40%,#fbbf24 100%)';
+    document.getElementById('result-orb').style.cssText += ';background:linear-gradient(135deg,#f59e0b,#d97706);box-shadow:0 0 0 12px rgba(245,158,11,0.2),0 0 0 24px rgba(245,158,11,0.1),0 12px 32px rgba(245,158,11,0.4)';
+    document.getElementById('result-orb').innerHTML = '<svg viewBox="0 0 36 36" fill="none" width="36" height="36"><circle cx="18" cy="18" r="12" stroke="white" stroke-width="3"/><path d="M18 10v8" stroke="white" stroke-width="3" stroke-linecap="round"/><circle cx="18" cy="24" r="1.5" fill="white"/></svg>';
+    document.getElementById('result-title').textContent = 'قيد المراجعة ⏳';
+    document.getElementById('result-sub').textContent   = 'التذكرة لم يتم تفعيلها بعد';
+    document.getElementById('d-status-cell').innerHTML  = '<span class="status-badge pending">قيد المراجعة</span>';
+    const btn = document.getElementById('activate-btn');
+    btn.style.display = 'block'; btn.disabled = false;
+    btn.textContent = '🚀 تفعيل التذكرة الآن';
+  }
+
+  document.getElementById('d-name').textContent   = x.name   || '—';
+  document.getElementById('d-pack').textContent   = x.pack   || '—';
+  document.getElementById('d-amount').textContent = x.amount ? Number(x.amount).toLocaleString('ar-DZ') + ' دج' : '—';
+  document.getElementById('d-date').textContent   = x.date
+    ? new Date(x.date).toLocaleDateString('ar', { year:'numeric', month:'short', day:'numeric' }) : '—';
+  document.getElementById('d-date-meta').textContent = x.date
+    ? new Date(x.date).toLocaleDateString('ar', { weekday:'long', year:'numeric', month:'long', day:'numeric' }) : 'Summer Plus · 2026';
+  document.getElementById('d-receipt').textContent = x.receipt || '—';
+
+  showState('result');
+}
+
+window.manualSearch = (inputId) => {
+  const val = document.getElementById(inputId).value.trim().toUpperCase();
+  if (!val) return;
+  lookupTicket(val);
+};
+
+// ── Confetti ──
+function launchConfetti() {
+  const wrap = document.getElementById('confetti-wrap');
+  wrap.innerHTML = '';
+  const colors = ['#11295f','#1a3a7a','#2a4a8a','#fbbf24','#2255aa','#4477cc','#fff'];
+  for (let i = 0; i < 60; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti-piece';
+    const size = 6 + Math.random() * 10;
+    c.style.cssText = `
+      left: ${Math.random()*100}%;
+      width: ${size}px; height: ${size}px;
+      background: ${colors[Math.floor(Math.random()*colors.length)]};
+      border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
+      animation-duration: ${1.5 + Math.random()*2}s;
+      animation-delay: ${Math.random()*0.8}s;
+    `;
+    wrap.appendChild(c);
+    setTimeout(() => c.remove(), 4000);
+  }
+}
+
+function showState(n) {
+  ['loading','result','error','search'].forEach(s => {
+    document.getElementById('state-'+s).style.display = s===n ? 'block' : 'none';
+  });
+}
+</script>
+</body>
+</html>

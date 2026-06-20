@@ -1,0 +1,1593 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة الإدارة — أكاديمية E-PLUS</title>
+  <link rel="icon" type="image/x-icon" href="images/eplus-icon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div class="bg-blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+
+<!-- hidden iframe for printing -->
+<div id="print-frame-wrapper" style="display:none"><iframe id="print-frame" style="width:0;height:0;border:none;position:absolute"></iframe></div>
+
+<!-- Print Preview Modal -->
+<div id="print-preview-modal">
+  <div class="print-preview-inner">
+    <div class="print-preview-toolbar">
+      <div class="print-preview-title">🖨️ معاينة قبل الطباعة</div>
+      <div class="print-mode-tabs">
+        <button class="print-mode-tab active" id="pmt-single" onclick="setPrintMode('single')">📄 تذكرة واحدة</button>
+        <button class="print-mode-tab" id="pmt-double" onclick="setPrintMode('double')">📑 تذكرتان</button>
+      </div>
+      <button class="print-preview-btn print" onclick="executePrint()">🖨️ طباعة الآن</button>
+      <button class="print-preview-btn close" onclick="closePrintPreview()">✕ إغلاق</button>
+    </div>
+    <div class="print-preview-page-wrap">
+      <div class="print-preview-page a4-landscape" id="print-preview-page">
+        <!-- يتم ملؤها ديناميكياً -->
+      </div>
+    </div>
+  </div>
+</div>
+<div id="qr-gen-hidden" style="position:absolute;visibility:hidden;width:0;height:0;overflow:hidden"></div>
+
+<!-- ===== LOGIN ===== -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-logo-wrap">
+      <img src="images/eplus-logo.png" alt="E-PLUS" onerror="this.parentElement.innerHTML='<span class=\'login-logo-icon\'>🎓</span>'">
+    </div>
+    <div class="login-title">مرحباً بك</div>
+    <div class="login-sub">لوحة تحكم أكاديمية E-PLUS — الدخول للإدارة فقط</div>
+    <div style="position:relative;margin-bottom:14px">
+      <div id="email-inp-wrap" style="display:flex;align-items:center;border:2px solid var(--border);border-radius:14px;background:#FAFAFA;transition:all 0.3s ease;overflow:hidden">
+        <span style="padding:0 14px;font-size:18px;flex-shrink:0">✉️</span>
+        <input
+          style="flex:1;border:none;background:transparent;padding:14px 0;color:var(--text);font-size:15px;font-family:'Tajawal',sans-serif;outline:none;min-width:0;direction:rtl"
+          type="text" id="email-user-inp" placeholder="اسم المستخدم"
+          oninput="syncEmailInp()"
+          onkeydown="if(event.key==='Enter')doLogin()"
+          onfocus="this.closest('#email-inp-wrap').style.borderColor='var(--primary)';this.closest('#email-inp-wrap').style.background='#fff';this.closest('#email-inp-wrap').style.boxShadow='0 0 0 4px var(--primary-light)'"
+          onblur="this.closest('#email-inp-wrap').style.borderColor='var(--border)';this.closest('#email-inp-wrap').style.background='#FAFAFA';this.closest('#email-inp-wrap').style.boxShadow='none'">
+        <span style="padding:0 12px;font-size:13px;font-weight:800;color:var(--primary);white-space:nowrap;flex-shrink:0;border-right:1.5px solid var(--border-2)">@epluscenter.com</span>
+      </div>
+      <input type="hidden" id="email-inp">
+    </div>
+    <div class="inp-wrap">
+      <span class="inp-icon">🔐</span>
+      <input class="inp" type="password" id="password-inp" placeholder="كلمة المرور" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn-login" onclick="doLogin()">🚀 تسجيل الدخول</button>
+    <div class="login-error" id="login-error">❌ بيانات غير صحيحة، حاول مجدداً.</div>
+  </div>
+</div>
+
+<!-- ===== DASHBOARD ===== -->
+<div class="dashboard" id="dashboard">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">
+        <img src="images/eplus-logo.png" alt="E-PLUS" onerror="this.parentElement.innerHTML='<span class=\'sidebar-logo-icon-emoji\'>🎓</span>'">
+      </div>
+      <div>
+        <div class="sidebar-logo-text">E-PLUS</div>
+        <div class="sidebar-logo-sub" data-i18n="ctrl_panel">لوحة التحكم</div>
+      </div>
+    </div>
+
+    <div class="sidebar-admin">
+      <div class="admin-avatar">👤</div>
+      <div class="admin-info">
+        <div class="admin-name" id="admin-name">Admin</div>
+        <div class="admin-role" data-i18n="sys_admin">مشرف النظام</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section" data-i18n="main_menu">القائمة الرئيسية</div>
+      <div class="nav-item active" onclick="switchNavSection('home')">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label" data-i18n="stats_dashboard">لوحة الإحصائيات</span>
+      </div>
+      <div class="nav-item" onclick="switchNavSection('announcements')">
+        <span class="nav-icon">📢</span>
+        <span class="nav-label" data-i18n="announcements">الإعلانات</span>
+      </div>
+      <div class="nav-section" data-i18n="events">الفعاليات</div>
+      <div class="nav-item" onclick="switchNavSection('summer')">
+        <span class="nav-icon">☀️</span>
+        <span class="nav-label" data-i18n="summer_camp">المخيم الصيفي</span>
+        <span class="nav-badge" id="nav-badge-summer">0</span>
+      </div>
+      <div class="nav-section" data-i18n="teachers_mgmt">إدارة الأساتذة</div>
+      <div class="nav-item" onclick="switchNavSection('teachers')">
+        <span class="nav-icon">👨‍🏫</span>
+        <span class="nav-label" data-i18n="teachers_att">الأساتذة والحضور</span>
+        <span class="nav-badge" id="nav-badge-teachers">0</span>
+      </div>
+      <div class="nav-section" data-i18n="communication">التواصل</div>
+      <div class="nav-item" onclick="openMsgModal()">
+        <span class="nav-icon">💬</span>
+        <span class="nav-label" data-i18n="messages">الرسائل</span>
+        <span class="nav-badge" id="nav-badge-msgs" style="display:none">0</span>
+      </div>
+      <div class="nav-section" data-i18n="finance">المالية</div>
+      <div class="nav-item" onclick="switchNavSection('finance')" id="nav-finance">
+        <span class="nav-icon">💰</span>
+        <span class="nav-label" data-i18n="financial_res">الموارد المالية</span>
+      </div>
+      <div class="nav-section" data-i18n="system">النظام</div>
+      <div class="nav-item" onclick="switchNavSection('settings')">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label" data-i18n="settings">الإعدادات</span>
+      </div>
+      <a href="index.html" class="nav-item">
+        <span class="nav-icon">🌐</span>
+        <span class="nav-label" data-i18n="visit_site">زيارة الموقع</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="btn-logout-side" onclick="doLogout()">
+        <span>🚪</span>
+        <span data-i18n="logout">تسجيل الخروج</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-greeting" id="topbar-greeting">أهلاً، Admin 👋</div>
+        <div class="topbar-sub" id="topbar-date"></div>
+      </div>
+      <div class="topbar-right">
+      <div class="theme-lang-wrap">
+        <button class="theme-toggle-btn" onclick="toggleTheme()" id="theme-toggle-btn" title="Dark / Light">🌙</button>
+        <div class="lang-switcher">
+          <button class="lang-btn active" id="lang-ar" onclick="setLang('ar')">ع</button>
+          <button class="lang-btn" id="lang-fr" onclick="setLang('fr')">FR</button>
+          <button class="lang-btn" id="lang-en" onclick="setLang('en')">EN</button>
+        </div>
+      </div>
+        <a href="index.html" class="topbar-btn"><span data-i18n="main_site">🏠 الموقع الرئيسي</span></a>
+        <button class="topbar-btn" onclick="doLogout()" style="border-color:rgba(239,68,68,0.25);color:#DC2626;background:var(--danger-soft)"><span data-i18n="logout_short">🚪 خروج</span></button>
+      </div>
+    </div>
+
+    <div class="dashboard-body">
+
+      <!-- Maintenance Banner -->
+      <div class="maintenance-banner" id="maintenance-card">
+        <div class="maint-left">
+          <div class="maint-icon-wrap" id="maint-icon">🔧</div>
+          <div>
+            <div class="maint-title" data-i18n="platform_status">حالة المنصة</div>
+            <div class="maint-status">
+              <div class="dot" id="status-dot"></div>
+              <span id="status-text">المنصة تعمل ومتاحة للزوار</span>
+            </div>
+          </div>
+        </div>
+        <button class="btn-toggle" id="btn-maintenance" onclick="toggleMaintenance()">🔒 إغلاق المنصة للصيانة</button>
+      </div>
+
+      <!-- ===== SECTION: HOME (Stats) ===== -->
+      <div id="section-home">
+        <div class="section-header">
+          <div class="section-title">
+            <div class="section-icon">📊</div>
+            إحصائيات التسجيلات
+          </div>
+        </div>
+        <div class="stats-grid" style="margin-bottom:24px">
+          <div class="stat-card">
+            <div class="stat-card-glow"></div>
+            <div class="stat-top">
+              <div class="stat-icon-wrap">📋</div>
+              <div class="stat-trend">+12%</div>
+            </div>
+            <div class="stat-num" id="stat-total">0</div>
+            <div class="stat-label">إجمالي التسجيلات</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-glow"></div>
+            <div class="stat-top">
+              <div class="stat-icon-wrap">📚</div>
+              <div class="stat-trend">نشط</div>
+            </div>
+            <div class="stat-num" id="stat-support">0</div>
+            <div class="stat-label">تسجيلات الدعم</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-glow"></div>
+            <div class="stat-top">
+              <div class="stat-icon-wrap">🌍</div>
+              <div class="stat-trend">نشط</div>
+            </div>
+            <div class="stat-num" id="stat-lang">0</div>
+            <div class="stat-label">دورات اللغات</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-glow"></div>
+            <div class="stat-top">
+              <div class="stat-icon-wrap">⭐</div>
+              <div class="stat-trend">VIP</div>
+            </div>
+            <div class="stat-num" id="stat-vip">0</div>
+            <div class="stat-label">دروس VIP</div>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <div class="section-title">
+            <div class="section-icon" style="background:rgba(20,184,166,0.1);border-color:rgba(20,184,166,0.2)">👁️</div>
+            إحصائيات الزوار
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="visitor-card">
+            <div class="stat-top">
+              <div class="stat-icon-wrap" style="background:rgba(16,185,129,0.1)">🟢</div>
+              <div class="stat-trend">مباشر</div>
+            </div>
+            <div class="stat-num" id="vis-online" style="color:var(--success)">0</div>
+            <div class="stat-label">متصل الآن</div>
+          </div>
+          <div class="visitor-card">
+            <div class="stat-top">
+              <div class="stat-icon-wrap" style="background:rgba(59,130,246,0.1)">📅</div>
+            </div>
+            <div class="stat-num" id="vis-24h">0</div>
+            <div class="stat-label">زوار ٢٤ ساعة</div>
+          </div>
+          <div class="visitor-card">
+            <div class="stat-top">
+              <div class="stat-icon-wrap" style="background:rgba(168,85,247,0.1)">📆</div>
+            </div>
+            <div class="stat-num" id="vis-week">0</div>
+            <div class="stat-label">زوار هذا الأسبوع</div>
+          </div>
+          <div class="visitor-card">
+            <div class="stat-top">
+              <div class="stat-icon-wrap" style="background:rgba(245,158,11,0.1)">🌐</div>
+            </div>
+            <div class="stat-num" id="vis-total">0</div>
+            <div class="stat-label">إجمالي الزيارات</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SECTION: ANNOUNCEMENTS ===== -->
+      <div id="section-announcements" style="display:none">
+
+        <!-- stats mini bar -->
+        <div class="ann-stats-bar">
+          <div class="ann-stat-mini"><div class="n" id="ann-stat-total">0</div><div class="l">إجمالي الإعلانات</div></div>
+          <div class="ann-stat-mini"><div class="n" id="ann-stat-visible" style="color:var(--success)">0</div><div class="l">مرئية</div></div>
+          <div class="ann-stat-mini"><div class="n" id="ann-stat-hidden" style="color:var(--danger)">0</div><div class="l">مخفية</div></div>
+          <div class="ann-stat-mini"><div class="n" id="ann-stat-urgent" style="color:#EF4444">0</div><div class="l">عاجلة</div></div>
+        </div>
+
+        <!-- compose panel -->
+        <div class="ann-compose">
+          <div class="ann-compose-header">
+            <div class="ann-compose-icon">✨</div>
+            <div>
+              <div class="ann-compose-title">إنشاء إعلان جديد</div>
+              <div class="ann-compose-sub">أضف صورة، نوع، وجدولة — ينشر فورياً على الموقع</div>
+            </div>
+          </div>
+
+          <!-- type selector -->
+          <div class="form-group" style="margin-bottom:16px">
+            <label class="form-label">نوع الإعلان</label>
+            <div class="ann-type-row">
+              <button type="button" class="ann-type-chip active" data-type="general" onclick="setAnnType('general',this)">📢 عام</button>
+              <button type="button" class="ann-type-chip" data-type="event" onclick="setAnnType('event',this)">🎉 فعالية</button>
+              <button type="button" class="ann-type-chip" data-type="urgent" onclick="setAnnType('urgent',this)">🚨 عاجل</button>
+              <button type="button" class="ann-type-chip" data-type="offer" onclick="setAnnType('offer',this)">🎁 عرض</button>
+              <button type="button" class="ann-type-chip" data-type="news" onclick="setAnnType('news',this)">📰 خبر</button>
+            </div>
+            <input type="hidden" id="ann-type" value="general">
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <!-- left col: text fields -->
+            <div>
+              <div class="form-group">
+                <label class="form-label">عنوان الإعلان <span class="required">*</span></label>
+                <input class="inp" type="text" id="ann-title" placeholder="مثال: دورات جديدة قريباً...">
+              </div>
+              <div class="form-group">
+                <label class="form-label">نص الإعلان (اختياري)</label>
+                <textarea class="inp" id="ann-text" placeholder="اكتب تفاصيل الإعلان هنا..." style="min-height:130px"></textarea>
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">رابط خارجي (اختياري)</label>
+                <input class="inp" type="url" id="ann-link" placeholder="https://...">
+              </div>
+            </div>
+            <!-- right col: image upload -->
+            <div>
+              <div class="form-group">
+                <label class="form-label">صورة الإعلان (اختيارية)</label>
+                <div class="img-upload-zone" id="ann-img-zone" onclick="document.getElementById('ann-img-input').click()">
+                  <input type="file" id="ann-img-input" accept="image/*" style="display:none" onchange="onAnnImageChange(event)">
+                  <div class="img-upload-placeholder" id="ann-img-placeholder">
+                    <div class="img-upload-icon">🖼️</div>
+                    <div class="img-upload-text">اضغط لاختيار صورة</div>
+                    <div class="img-upload-hint">PNG, JPG, WebP — حتى 5MB</div>
+                  </div>
+                  <img id="ann-img-preview" class="img-upload-preview" style="display:none" alt="preview">
+                  <button type="button" class="img-remove-btn" id="ann-img-remove" style="display:none" onclick="removeAnnImage(event)">✕</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ann-publish-bar">
+            <button class="btn-primary" id="submit-ann-btn" onclick="publishAnnouncement()" style="flex:1;max-width:220px;padding:13px">🚀 نشر الإعلان</button>
+            <div style="font-size:12px;color:var(--text-muted);font-weight:600">ينشر فورياً ومرئي لزوار الموقع</div>
+          </div>
+        </div>
+
+        <!-- list panel -->
+        <div class="panel">
+          <div class="ann-list-header">
+            <div class="ann-list-title">
+              <div class="panel-icon" style="background:rgba(59,130,246,0.1);border-color:rgba(59,130,246,0.2);width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:16px">📋</div>
+              الإعلانات النشطة
+            </div>
+            <div class="ann-filter-row">
+              <button class="ann-filter-btn active" onclick="filterAnn('all',this)">الكل</button>
+              <button class="ann-filter-btn" onclick="filterAnn('visible',this)">مرئية</button>
+              <button class="ann-filter-btn" onclick="filterAnn('hidden',this)">مخفية</button>
+              <button class="ann-filter-btn" onclick="filterAnn('urgent',this)">عاجلة</button>
+            </div>
+          </div>
+          <div class="ann-grid" id="admin-ann-list">
+            <div class="empty-state" style="grid-column:1/-1">
+              <div class="empty-icon">⏳</div>
+              <h3>جاري التحميل...</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SECTION: SUMMER ===== -->
+      <div id="section-summer" style="display:none">
+        <div class="summer-hero">
+          <div>
+            <div class="summer-hero-title">☀️ المخيم الصيفي — Summer Plus</div>
+            <div class="summer-hero-sub">توليد التذاكر الرسمية للمشاركين مع QR كود موثّق يُتحقق منه فورياً عبر الموقع.</div>
+          </div>
+          <div class="summer-stats-row">
+            <div class="summer-mini">
+              <div class="n" id="sc-count">0</div>
+              <div class="l">تذكرة صدرت</div>
+            </div>
+            <div class="summer-mini paid">
+              <div class="n" id="sc-paid">0</div>
+              <div class="l">مفعّلة</div>
+            </div>
+            <div class="summer-mini pending">
+              <div class="n" id="sc-pending">0</div>
+              <div class="l">قيد المراجعة</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== FINANCIAL DASHBOARD ===== -->
+
+        <!-- Hero: بطاقة الإيرادات الرئيسية -->
+        <div class="fin-hero">
+          <div class="fin-hero-orb fin-hero-orb-1"></div>
+          <div class="fin-hero-orb fin-hero-orb-2"></div>
+          <div class="fin-hero-body">
+            <div class="fin-hero-left">
+              <div class="fin-hero-eyebrow">
+                <span class="fin-hero-dot"></span>
+                إجمالي المحصّل — المخيم الصيفي
+              </div>
+              <div class="fin-hero-big" id="fc-collected-amount">0 <span class="fin-hero-currency">دج</span></div>
+              <div class="fin-hero-meta">
+                <div class="fin-hero-badge green" id="fin-hero-pct-badge">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 9 L5 5 L8 7.5 L10 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <span id="fin-hero-pct-val">0%</span> نسبة التحصيل
+                </div>
+                <div class="fin-hero-badge grey" id="fin-hero-paid-count">0 دفعة مكتملة</div>
+              </div>
+            </div>
+            <div class="fin-hero-right">
+              <!-- Period Toggle -->
+              <div class="fin-period-pill">
+                <button class="fin-pp-btn active" data-period="weekly"  onclick="finSwitchPeriod(this)">أسبوعي</button>
+                <button class="fin-pp-btn"         data-period="monthly" onclick="finSwitchPeriod(this)">شهري</button>
+                <button class="fin-pp-btn"         data-period="all"     onclick="finSwitchPeriod(this)">الكل</button>
+              </div>
+              <div class="fin-period-display">
+                <div class="fin-period-label" id="fin-period-label">المدخول هذا الأسبوع</div>
+                <div class="fin-period-val"   id="fin-period-amount">0 دج</div>
+                <div class="fin-period-sub"   id="fin-period-count">0 تسجيل</div>
+              </div>
+              <button class="btn-export" onclick="exportFinancialReport()" style="margin-top:auto">📥 تصدير CSV</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI Cards: إجمالي / محصّل / متبقي -->
+        <div class="fin-kpi-grid">
+
+          <!-- الإجمالي المفترض -->
+          <div class="fin-kpi-card total">
+            <div class="fin-kpi-stripe"></div>
+            <div class="fin-kpi-head">
+              <div class="fin-kpi-ico" style="background:linear-gradient(135deg,#EDE9FE,#DDD6FE)">💰</div>
+              <span class="fin-kpi-tag" id="fc-total-count">0 طالب</span>
+            </div>
+            <div class="fin-kpi-main" id="fc-total-amount">0 دج</div>
+            <div class="fin-kpi-title">إجمالي المبالغ المفترضة</div>
+            <div class="fin-kpi-divider"></div>
+            <div class="fin-kpi-periods">
+              <div class="fin-kpi-period">
+                <div class="fin-kpi-period-val" id="fin-week-total">0 دج</div>
+                <div class="fin-kpi-period-lbl">📅 هذا الأسبوع</div>
+              </div>
+              <div class="fin-kpi-period-sep"></div>
+              <div class="fin-kpi-period">
+                <div class="fin-kpi-period-val" id="fin-month-total">0 دج</div>
+                <div class="fin-kpi-period-lbl">🗓️ هذا الشهر</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- المبلغ المحصّل -->
+          <div class="fin-kpi-card collected">
+            <div class="fin-kpi-stripe"></div>
+            <div class="fin-kpi-head">
+              <div class="fin-kpi-ico" style="background:linear-gradient(135deg,#D1FAE5,#A7F3D0)">✅</div>
+              <span class="fin-kpi-tag green" id="fc-paid-count">0 دفعة</span>
+            </div>
+            <div class="fin-kpi-main green" id="fc-collected-amount-kpi">0 دج</div>
+            <div class="fin-kpi-title">المبلغ المحصّل فعلياً</div>
+            <div class="fin-kpi-pill green" id="fc-collected-sub">📈 0% من الإجمالي</div>
+            <div class="fin-kpi-divider"></div>
+            <div class="fin-kpi-periods">
+              <div class="fin-kpi-period">
+                <div class="fin-kpi-period-val green" id="fin-week-collected">0 دج</div>
+                <div class="fin-kpi-period-lbl">📅 هذا الأسبوع</div>
+              </div>
+              <div class="fin-kpi-period-sep"></div>
+              <div class="fin-kpi-period">
+                <div class="fin-kpi-period-val green" id="fin-month-collected">0 دج</div>
+                <div class="fin-kpi-period-lbl">🗓️ هذا الشهر</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- المبلغ المتبقي -->
+          <div class="fin-kpi-card remaining">
+            <div class="fin-kpi-stripe"></div>
+            <div class="fin-kpi-head">
+              <div class="fin-kpi-ico" style="background:linear-gradient(135deg,#FEE2E2,#FECACA)">⏳</div>
+              <span class="fin-kpi-tag red" id="fc-remaining-count">0 طالب</span>
+            </div>
+            <div class="fin-kpi-main red" id="fc-remaining-amount">0 دج</div>
+            <div class="fin-kpi-title">المبلغ المتبقي غير المحصّل</div>
+            <div class="fin-kpi-pill red" id="fc-remaining-sub">⚠️ 0% من الإجمالي</div>
+            <div class="fin-kpi-divider"></div>
+            <div class="fin-kpi-periods">
+              <div class="fin-kpi-period">
+                <div class="fin-kpi-period-val red" id="fin-week-remaining">0 دج</div>
+                <div class="fin-kpi-period-lbl">📅 هذا الأسبوع</div>
+              </div>
+              <div class="fin-kpi-period-sep"></div>
+              <div class="fin-kpi-period">
+                <div class="fin-kpi-period-val red" id="fin-month-remaining">0 دج</div>
+                <div class="fin-kpi-period-lbl">🗓️ هذا الشهر</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- شريط التقدم + مخطط إحصائي -->
+        <div class="fin-chart-card" id="collection-progress-wrap">
+          <div class="fin-chart-topbar">
+            <div class="fin-chart-title-wrap">
+              <div class="fin-chart-icon-wrap">📊</div>
+              <div>
+                <div class="fin-chart-title">المخطط الإحصائي للمدفوعات</div>
+                <div class="fin-chart-sub">تتبع المبالغ المحصّلة أسبوعياً وشهرياً</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <div class="fin-pct-wrap">
+                <span class="progress-pct" id="fc-pct">0%</span>
+                <span class="fin-pct-lbl">محصّل</span>
+              </div>
+              <div class="fin-chart-tabs">
+                <button class="fin-ct active" data-view="weekly"  onclick="finSwitchChart(this)">أسبوعي</button>
+                <button class="fin-ct"         data-view="monthly" onclick="finSwitchChart(this)">شهري</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="progress-track" id="progress-track" style="margin-bottom:6px">
+            <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+          </div>
+          <div class="progress-labels">
+            <span>0 دج</span>
+            <span id="progress-mid-label"></span>
+            <span id="progress-total-label">0 دج</span>
+          </div>
+
+          <!-- SVG Chart -->
+          <div class="fin-svg-wrap" style="position:relative;margin-top:20px">
+            <div id="fin-tooltip" class="fin-tooltip"></div>
+            <svg id="fin-chart-svg" class="fin-svg" viewBox="0 0 700 180" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="fin-legend">
+            <div class="fin-leg-item"><span class="fin-leg-dot" style="background:#7C3AED"></span>المحصّل</div>
+            <div class="fin-leg-item"><span class="fin-leg-dot" style="background:#DDD6FE"></span>الإجمالي المتوقع</div>
+            <div class="fin-leg-item"><span class="fin-leg-dot" style="background:#FECACA"></span>المتبقي</div>
+          </div>
+        </div>
+
+        <div class="ticket-grid">
+          <div class="panel" style="margin-bottom:0">
+            <div class="panel-header">
+              <div class="panel-icon orange">🎟️</div>
+              بيانات المشارك
+            </div>
+            <!-- ══ بحث عن الطالب في Google Sheets ══ -->
+            <div class="form-group" style="background:linear-gradient(135deg,rgba(124,58,237,0.06),rgba(59,130,246,0.06));border:2px solid rgba(124,58,237,0.2);border-radius:16px;padding:18px;margin-bottom:18px">
+              <div style="font-size:13px;font-weight:800;color:var(--text-2);margin-bottom:12px;display:flex;align-items:center;gap:8px">
+                <span style="width:30px;height:30px;border-radius:10px;background:rgba(124,58,237,0.12);display:inline-flex;align-items:center;justify-content:center;font-size:16px">🔍</span>
+                البحث عن طالب مسجّل
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input class="inp" type="text" id="student-search-inp" placeholder="اكتب اسم الطالب للبحث..." style="flex:1" onkeydown="if(event.key==='Enter')searchStudent()">
+                <button type="button" onclick="searchStudent()" id="student-search-btn" style="flex-shrink:0;padding:12px 20px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--primary),#9333EA);color:white;font-size:14px;font-weight:800;font-family:'Tajawal',sans-serif;cursor:pointer;white-space:nowrap;transition:all 0.25s ease;box-shadow:0 4px 14px var(--primary-glow)">🔍 بحث</button>
+              </div>
+              <div id="student-search-results" style="margin-top:10px;display:none"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">الاسم الكامل <span class="required">*</span></label>
+              <input class="inp" type="text" id="sc-name" placeholder="مثال: أحمد محمد بن علي">
+            </div>
+            <!-- ── اسم الباقة (الخيار الأول) ── -->
+            <div class="form-group" id="pack-group">
+              <label class="form-label">اسم الباقة <span class="required">*</span></label>
+              <div class="inp-wrap" style="margin-bottom:0">
+                <select class="inp" id="sc-pack-select" onchange="onPackSelect(this.value)">
+                  <option value="" disabled selected>— اختر الباقة —</option>
+                  <optgroup label="الفئة 5–10 سنوات">
+                    <option value="الباقة الأساسية (5-10)">الباقة الأساسية (5-10)</option>
+                    <option value="باقة النخبة (5-10)">باقة النخبة (5-10)</option>
+                  </optgroup>
+                  <optgroup label="الفئة 11–14 سنة">
+                    <option value="الباقة الأساسية (11-14)">الباقة الأساسية (11-14)</option>
+                    <option value="باقة النخبة (11-14)">باقة النخبة (11-14)</option>
+                  </optgroup>
+                  <optgroup label="الفئة 15–18 سنة">
+                    <option value="الباقة الأساسية (15-18)">الباقة الأساسية (15-18)</option>
+                    <option value="باقة النخبة (15-18)">باقة النخبة (15-18)</option>
+                    <option value="باقة تحضير البكالوريا (15-18)">باقة تحضير البكالوريا (15-18)</option>
+                  </optgroup>
+                  <optgroup label="فئة الكبار">
+                    <option value="باقة البالغين">باقة البالغين</option>
+                    <option value="باقة البالغين المتقدمة">باقة البالغين المتقدمة</option>
+                  </optgroup>
+                  <optgroup label="✦ E-Plus Special">
+                    <option value="English Communication Class">English Communication Class</option>
+                    <option value="English for Specific Purposes (ESP)">English for Specific Purposes (ESP)</option>
+                    <option value="IELTS Preparation">IELTS Preparation</option>
+                  </optgroup>
+                </select>
+              </div>
+            </div>
+
+            <!-- ── الفاصل ── -->
+            <div style="display:flex;align-items:center;gap:10px;margin:4px 0 16px">
+              <div style="flex:1;height:1px;background:var(--border)"></div>
+              <span id="or-divider" style="font-size:12px;font-weight:700;color:var(--text-muted);white-space:nowrap">— أو اختر برنامجاً —</span>
+              <div style="flex:1;height:1px;background:var(--border)"></div>
+            </div>
+
+            <!-- ── البرامج (الخيار الثاني) ── -->
+            <div class="form-group" id="program-group">
+              <label class="form-label">البرنامج</label>
+              <div style="display:flex;flex-direction:column;gap:8px" id="program-btns">
+                <button type="button" class="prog-btn" id="prog-btn-mental"   onclick="selectProgram('برنامج الحساب الذهني', this)">🧮 برنامج الحساب الذهني</button>
+                <button type="button" class="prog-btn" id="prog-btn-handwrite" onclick="selectProgram('برنامج تحسين الخط', this)">✍️ برنامج تحسين الخط</button>
+                <button type="button" class="prog-btn" id="prog-btn-coding"   onclick="selectProgram('برنامج البرمجة', this)">💻 برنامج البرمجة</button>
+                <button type="button" class="prog-btn" id="prog-btn-photo"    onclick="selectProgramFixed('برنامج التصوير والمونتاج', 12000, this)">🎬 برنامج التصوير والمونتاج<br><span style="font-size:15px;font-weight:900;color:#F59E0B"></span></button>
+              </div>
+            </div>
+
+            <!-- ── فئة البرنامج (تظهر بعد اختيار برنامج) ── -->
+            <div class="form-group" id="category-group" style="display:none">
+              <label class="form-label">فئة البرنامج <span class="required">*</span></label>
+              <div style="display:flex;gap:10px" id="category-btns">
+                <button type="button" class="prog-btn cat-btn" style="flex:1" onclick="selectCategory('الصغار', 2000, this)">👧 فئة الصغار<br><span style="font-size:18px;font-weight:900;color:#F59E0B">2000 دج</span></button>
+                <button type="button" class="prog-btn cat-btn" style="flex:1" onclick="selectCategory('الكبار', 2500, this)">👨 فئة الكبار<br><span style="font-size:18px;font-weight:900;color:#F59E0B">2500 دج</span></button>
+              </div>
+            </div>
+
+            <!-- ── زر إعادة الضبط (يظهر فقط لما يكون في اختيار) ── -->
+            <div id="reset-row" style="display:none;margin-bottom:16px">
+              <button type="button" onclick="resetSelection()" style="background:none;border:1px solid var(--border-2);color:var(--primary);font-family:'Tajawal',sans-serif;font-size:12px;font-weight:700;padding:7px 16px;border-radius:10px;cursor:pointer;width:100%">↩️ إعادة الاختيار</button>
+            </div>
+
+            <input type="hidden" id="sc-pack" value="">
+
+            <!-- ══ حقل المبلغ اليدوي ══ -->
+            <div class="form-group">
+              <label class="form-label">المبلغ المدفوع (دج) <span class="required">*</span></label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input class="inp" type="number" id="sc-amount" placeholder="مثال: 8000" style="flex:1" oninput="onAmountChange()">
+                <button type="button" onclick="toggleManualAmount()" id="manual-amount-btn" title="إدخال المبلغ يدوياً" style="flex-shrink:0;padding:12px 16px;border-radius:12px;border:2px dashed var(--border-2);background:var(--primary-light);color:var(--primary);font-size:13px;font-weight:800;font-family:'Tajawal',sans-serif;cursor:pointer;white-space:nowrap;transition:all 0.25s ease">✏️ يدوي</button>
+              </div>
+              <div id="manual-amount-note" style="display:none;margin-top:6px;font-size:12px;color:var(--primary);font-weight:600;background:var(--primary-light);padding:8px 12px;border-radius:10px;border:1px solid var(--border-2)">
+                📝 أدخل المبلغ يدوياً في الحقل أعلاه — سيُسجَّل في التذكرة كما كتبته
+              </div>
+            </div>
+
+            <!-- ══ حاسبة المبلغ المتبقي ══ -->
+            <div class="form-group" style="background:linear-gradient(135deg,rgba(245,158,11,0.06),rgba(249,115,22,0.06));border:2px solid rgba(245,158,11,0.25);border-radius:16px;padding:18px;position:relative">
+              <div style="font-size:13px;font-weight:800;color:var(--text-2);margin-bottom:12px;display:flex;align-items:center;gap:8px">
+                <span style="width:30px;height:30px;border-radius:10px;background:rgba(245,158,11,0.15);display:inline-flex;align-items:center;justify-content:center;font-size:16px">🧮</span>
+                حاسبة المبلغ المتبقي
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+                <div>
+                  <label class="form-label" style="font-size:12px">سعر الباقة الكامل (دج)</label>
+                  <input class="inp" type="number" id="sc-full-price" placeholder="مثال: 8000" oninput="calcRemaining()" style="font-size:14px">
+                </div>
+                <div>
+                  <label class="form-label" style="font-size:12px">المبلغ الذي دفعه الطالب (دج)</label>
+                  <input class="inp" type="number" id="sc-paid-amount" placeholder="مثال: 6000" oninput="calcRemaining()" style="font-size:14px">
+                </div>
+              </div>
+              <div id="remaining-result" style="display:none;padding:14px;border-radius:12px;background:white;border:1px solid var(--border);text-align:center">
+                <div style="font-size:12px;color:var(--text-muted);font-weight:600;margin-bottom:4px">المبلغ المتبقي على الطالب</div>
+                <div id="remaining-value" style="font-size:26px;font-weight:900;color:var(--danger)">0 دج</div>
+                <div id="remaining-note" style="font-size:12px;color:var(--text-muted);margin-top:4px"></div>
+                <button type="button" onclick="applyRemainingToTicket()" id="apply-remaining-btn" style="margin-top:10px;padding:9px 20px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--summer),#EA580C);color:white;font-size:13px;font-weight:800;font-family:'Tajawal',sans-serif;cursor:pointer;width:100%">
+                  📋 تسجيل هذا المبلغ في التذكرة
+                </button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">تاريخ الدفع</label>
+              <input class="inp" type="date" id="sc-date" value="2026-06-03">
+            </div>
+
+            <!-- ══ اللغات المختارة ══ -->
+            <div class="form-group" style="background:linear-gradient(135deg,rgba(20,184,166,0.06),rgba(59,130,246,0.06));border:2px solid rgba(20,184,166,0.25);border-radius:16px;padding:18px">
+              <div style="font-size:13px;font-weight:800;color:var(--text-2);margin-bottom:12px;display:flex;align-items:center;gap:8px">
+                <span style="width:30px;height:30px;border-radius:10px;background:rgba(20,184,166,0.12);display:inline-flex;align-items:center;justify-content:center;font-size:16px">🌍</span>
+                اللغة المختارة
+                <span style="font-size:11px;color:var(--text-muted);font-weight:600">(تظهر في خانة الملاحظة)</span>
+              </div>
+              <div class="lang-options">
+                <label class="lang-chip" id="chip-en" onclick="toggleLangChip(this)">
+                  <input type="checkbox" id="tick-lang-en" value="الإنجليزية" onchange="updateLangChips()">
+                  🇬🇧 الإنجليزية
+                </label>
+                <label class="lang-chip" id="chip-fr" onclick="toggleLangChip(this)">
+                  <input type="checkbox" id="tick-lang-fr" value="الفرنسية" onchange="updateLangChips()">
+                  🇫🇷 الفرنسية
+                </label>
+                <label class="lang-chip" id="chip-es" onclick="toggleLangChip(this)">
+                  <input type="checkbox" id="tick-lang-es" value="الإسبانية" onchange="updateLangChips()">
+                  🇪🇸 الإسبانية
+                </label>
+              </div>
+              <div id="lang-preview" style="display:none;margin-top:12px;padding:10px 14px;background:white;border-radius:10px;border:1px solid rgba(20,184,166,0.3);font-size:13px;font-weight:700;color:var(--teal)">
+                📝 الملاحظة: <span id="lang-preview-text"></span>
+              </div>
+              <div style="margin-top:12px">
+                <label style="font-size:12px;font-weight:800;color:var(--text-muted);display:block;margin-bottom:5px">✏️ الملاحظة في التذكرة (تعبئة تلقائية أو يدوية)</label>
+                <input class="inp" type="text" id="sc-note-manual" placeholder="مثال: الإنجليزية + الفرنسية" style="font-size:13px;padding:9px 14px" oninput="syncNoteFromManual(this.value)">
+              </div>
+            </div>
+
+            <button class="btn-primary btn-summer" id="sc-gen-btn" onclick="generateTicket()">🎟️ توليد التذكرة وحفظها</button>
+          </div>
+
+          <div class="ticket-preview-sticky">
+            <div class="panel-header" style="margin-bottom:14px">
+              <div class="panel-icon orange">👁️</div>
+              معاينة التذكرة
+            </div>
+            <div id="ticket-empty" style="min-height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-muted);background:#FAFAFA;border:1px solid var(--border);border-radius:20px">
+              <div style="font-size:40px;opacity:0.3">🎟️</div>
+              <span style="font-size:13px;font-weight:600">أدخل البيانات لمعاينة التذكرة</span>
+            </div>
+            <div id="ticket-canvas-wrap" style="display:none">
+              <canvas id="ticket-canvas" style="width:100%;border-radius:16px;box-shadow:0 16px 48px rgba(124,58,237,0.12);display:block"></canvas>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
+                <button class="btn-ticket primary" onclick="downloadTicket()">⬇️ تحميل التذكرة</button>
+                <button class="btn-ticket" onclick="openPrintPreview()">🖨️ طباعة</button>
+                <button class="btn-ticket" onclick="copyReceiptNum()" style="grid-column:span 2">📋 نسخ رقم الوصل</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-icon orange">📋</div>
+            سجل التذاكر الصادرة
+          </div>
+          <div class="tickets-stats-mini">
+            <div class="tsm-card green"><div><div class="tsm-card-num" id="tsm-active">0</div><div class="tsm-card-lbl">✅ تذكرة مفعّلة</div></div></div>
+            <div class="tsm-card amber"><div><div class="tsm-card-num" id="tsm-pending">0</div><div class="tsm-card-lbl">⏳ قيد المراجعة</div></div></div>
+            <div class="tsm-card" style="background:rgba(99,102,241,0.07);border-color:rgba(99,102,241,0.25);flex:2;min-width:180px">
+              <div><div class="tsm-card-num" id="tsm-total-amount" style="color:#4f46e5;font-size:18px">0 دج</div><div class="tsm-card-lbl">💰 إجمالي المفعّلة</div></div>
+            </div>
+          </div>
+          <div style="position:relative;margin-bottom:12px">
+            <span style="position:absolute;top:50%;right:14px;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
+            <input class="inp" type="text" id="tickets-search-inp" placeholder="بحث برقم الوصل أو الاسم واللقب..." style="padding-right:42px" oninput="filterTicketsTable(this.value)">
+          </div>
+          <div class="tickets-filter-bar" id="tickets-filter-bar">
+            <button class="ticket-filter-btn active" onclick="setTicketFilter('all',this)">الكل</button>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('paid',this)">✅ مفعّلة</button>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('pending',this)">⏳ قيد المراجعة</button>
+            <span style="width:1px;height:20px;background:var(--border);margin:0 2px"></span>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('pack:الباقة الأساسية',this)">📦 أساسية</button>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('pack:باقة النخبة',this)">⭐ نخبة</button>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('pack:باقة تحضير',this)">🎓 تحضير بكالوريا</button>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('pack:باقة البالغين',this)">👤 بالغين</button>
+            <span style="width:1px;height:20px;background:var(--border);margin:0 2px"></span>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('source:website',this)" style="border-color:rgba(20,184,166,0.3);color:var(--teal)">🌐 عبر الموقع</button>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('source:manual',this)" style="border-color:rgba(124,58,237,0.3);color:var(--primary)">✏️ مضاف يدوياً</button>
+            <span style="width:1px;height:20px;background:var(--border);margin:0 2px"></span>
+            <button class="ticket-filter-btn" id="trash-filter-btn" onclick="setTicketFilter('trash',this)" style="border-color:rgba(239,68,68,0.3);color:#DC2626">🗑️ سلة المحذوفات <span id="trash-count-badge" style="display:none;background:#EF4444;color:white;border-radius:99px;padding:1px 7px;font-size:11px;margin-right:4px">0</span></button>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl" id="tickets-table">
+              <thead>
+                <tr>
+                  <th>رقم الوصل</th>
+                  <th>الاسم الكامل</th>
+                  <th>الباقة</th>
+                  <th>المدفوع</th>
+                  <th>المتبقي</th>
+                  <th>التاريخ</th>
+                  <th id="th-status-col">الحالة</th>
+                  <th>المصدر</th>
+                  <th>إجراء</th>
+                </tr>
+              </thead>
+              <tbody id="tickets-tbody">
+                <tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted)">⏳ جاري تحميل التذاكر...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SECTION: TEACHERS ===== -->
+      <div id="section-teachers" style="display:none">
+
+        <!-- Hero -->
+        <div class="teachers-hero" id="teachers-hero">
+          <div>
+            <div class="teachers-hero-title" id="teachers-hero-title">👨‍🏫 إدارة الأساتذة والحضور</div>
+            <div class="teachers-hero-sub" id="teachers-hero-sub">أضف حسابات الأساتذة، حدد أيامهم وتخصصاتهم، وتابع حضور تلاميذهم يومياً.</div>
+          </div>
+          <div class="teachers-stats-row">
+            <div class="teachers-mini"><div class="n" id="t-stat-total">0</div><div class="l">أستاذ</div></div>
+            <div class="teachers-mini"><div class="n" id="t-stat-students">0</div><div class="l">تلميذ مسجّل</div></div>
+            <div class="teachers-mini"><div class="n" id="t-stat-today">0</div><div class="l">حصة اليوم</div></div>
+          </div>
+        </div>
+
+        <!-- Add teacher button -->
+        <div class="teacher-form-panel" style="display:flex;align-items:center;justify-content:space-between;padding:20px 28px;flex-wrap:wrap;gap:12px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <div class="panel-icon" style="background:rgba(79,70,229,0.1);border-color:rgba(79,70,229,0.2)">👨‍🏫</div>
+            <div>
+              <div style="font-size:15px;font-weight:800;color:var(--text)">إدارة الأساتذة</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:2px">أنشئ حسابات للأساتذة وتابع حضورهم</div>
+            </div>
+          </div>
+          <button class="btn-primary" style="width:auto;padding:12px 24px" onclick="openAddTeacherModal()">➕ إضافة أستاذ جديد</button>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════
+             بحث التلميذ عبر جميع الأساتذة
+        ══════════════════════════════════════════════════ -->
+        <div class="panel" style="margin-bottom:20px" id="student-cross-search-panel">
+          <div class="panel-header">
+            <div class="panel-icon" style="background:rgba(20,184,166,0.12);border-color:rgba(20,184,166,0.25)">🔍</div>
+            <div>
+              <div style="font-size:15px;font-weight:800;color:var(--text)">بحث عن تلميذ</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:2px">اكتب اسم التلميذ لمعرفة أستاذه، فوجه، حضوره، وحالة الدفع</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+            <div style="position:relative;flex:1">
+              <span style="position:absolute;top:50%;right:14px;transform:translateY(-50%);font-size:17px;pointer-events:none">🔍</span>
+              <input class="inp" type="text" id="cross-search-inp"
+                placeholder="اكتب اسم التلميذ..."
+                style="padding-right:44px"
+                oninput="crossSearchStudent(this.value)">
+            </div>
+            <button style="padding:12px 20px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--teal),#0891b2);color:white;font-size:14px;font-weight:800;font-family:'Tajawal',sans-serif;cursor:pointer;white-space:nowrap;box-shadow:0 4px 14px rgba(20,184,166,0.35);transition:all 0.2s"
+              onclick="crossSearchStudent(document.getElementById('cross-search-inp').value)">
+              بحث
+            </button>
+          </div>
+
+          <div id="cross-search-results" style="display:none"></div>
+        </div>
+
+        <!-- ===== STUDENTS OVERVIEW PANEL ===== -->
+        <div class="panel stu-overview-panel" id="stu-overview-panel" style="margin-bottom:20px">
+          <div class="panel-header">
+            <div class="panel-icon" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.25);font-size:18px">📋</div>
+            <div>
+              <div style="font-size:15px;font-weight:800;color:var(--text)">نظرة عامة على التلاميذ</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:2px">جميع التلاميذ المسجلين عند الأساتذة مع حالة التذكرة</div>
+            </div>
+            <div style="display:flex;gap:10px;margin-right:auto;align-items:center;flex-wrap:wrap">
+              <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:6px 14px;text-align:center">
+                <div style="font-size:18px;font-weight:900;color:var(--success)" id="sov-stat-active">0</div>
+                <div style="font-size:11px;color:var(--text-muted);font-weight:700">مفعّل</div>
+              </div>
+              <div style="background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:6px 14px;text-align:center">
+                <div style="font-size:18px;font-weight:900;color:var(--danger)" id="sov-stat-no-ticket">0</div>
+                <div style="font-size:11px;color:var(--text-muted);font-weight:700">بدون تذكرة</div>
+              </div>
+              <div style="background:var(--primary-light);border:1px solid var(--border-2);border-radius:10px;padding:6px 14px;text-align:center">
+                <div style="font-size:18px;font-weight:900;color:var(--primary)" id="sov-stat-total">0</div>
+                <div style="font-size:11px;color:var(--text-muted);font-weight:700">الإجمالي</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filters Row -->
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+            <!-- بحث بالاسم -->
+            <div style="position:relative;flex:1;min-width:180px">
+              <span style="position:absolute;top:50%;right:14px;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
+              <input class="inp" type="text" id="sov-search-inp" placeholder="ابحث باسم التلميذ..."
+                style="padding-right:44px;width:100%" oninput="sovFilter()">
+            </div>
+            <!-- فلتر الأستاذ -->
+            <div style="min-width:160px">
+              <select class="inp" id="sov-teacher-filter" onchange="sovFilter()"
+                style="padding:11px 16px;font-size:13px;width:100%">
+                <option value="">كل الأساتذة</option>
+              </select>
+            </div>
+            <!-- فلتر الباقة -->
+            <div style="min-width:160px">
+              <select class="inp" id="sov-pack-filter" onchange="sovFilter()"
+                style="padding:11px 16px;font-size:13px;width:100%">
+                <option value="">كل الباقات</option>
+              </select>
+            </div>
+            <!-- تابز الحالة -->
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="ticket-filter-btn active" id="sov-tab-all" onclick="setSovTab('all',this)">الكل</button>
+              <button class="ticket-filter-btn" id="sov-tab-active"
+                onclick="setSovTab('active',this)"
+                style="border-color:rgba(16,185,129,0.3);color:var(--success)">✅ مفعّل</button>
+              <button class="ticket-filter-btn" 
+              <button onclick="sovFullCheck()" style="padding:6px 14px;border-radius:99px;border:2px solid var(--summer);background:var(--summer-soft);color:var(--summer);font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">🔍 فحص شامل</button>
+              id="sov-tab-noticket"
+                onclick="setSovTab('noticket',this)"
+                style="border-color:rgba(239,68,68,0.3);color:var(--danger)">⛔ بدون تذكرة</button>
+            </div>
+          </div>
+
+          <!-- الجدول -->
+          <div class="tbl-wrap" style="max-height:420px;overflow-y:auto;border-radius:12px;border:1px solid var(--border)">
+            <table class="tbl" id="sov-table">
+              <thead>
+                <tr>
+                  <th style="width:36px">#</th>
+                  <th>اسم التلميذ</th>
+                  <th>الأستاذ</th>
+                  <th>المجموعة</th>
+                  <th>حالة التذكرة</th>
+                  <th>الباقة</th>
+                  <th>المتبقي</th>
+                  <th>رقم الوصل</th>
+                </tr>
+              </thead>
+              <tbody id="sov-tbody">
+                <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">جاري التحميل...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <!-- Empty state -->
+          <div id="sov-empty" style="display:none;text-align:center;padding:40px;color:var(--text-muted)">
+            <div style="font-size:40px;opacity:0.3;margin-bottom:10px">🎓</div>
+            <div style="font-weight:700">لا توجد نتائج</div>
+            <div style="font-size:12px;margin-top:4px">جرّب تغيير الفلتر أو كلمة البحث</div>
+          </div>
+        </div>
+        <!-- ===== END STUDENTS OVERVIEW PANEL ===== -->
+
+                <!-- Teachers grid -->
+        <div class="section-header">
+          <div class="section-title"><div class="section-icon">👥</div> قائمة الأساتذة</div>
+          <div id="t-today-label" style="font-size:13px;font-weight:700;color:var(--primary);background:var(--primary-light);padding:6px 14px;border-radius:99px"></div>
+        </div>
+        <div class="teachers-grid" id="teachers-grid">
+          <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted)">
+            <div style="font-size:48px;opacity:0.3;margin-bottom:10px">👨‍🏫</div>
+            <div style="font-weight:700">لا يوجد أساتذة بعد</div>
+          </div>
+        </div>
+
+        <!-- Admin Log — أدمين فقط -->
+        <div class="panel" id="admin-log-panel">
+          <div class="panel-header"><div class="panel-icon">📋</div> سجل النشاطات</div>
+          <div id="admin-log-list" style="max-height:300px;overflow-y:auto">
+            <div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px">لا توجد نشاطات بعد</div>
+          </div>
+        </div>
+
+      </div>
+      <!-- ===== SECTION: FINANCE ===== -->
+      <div id="section-finance" style="display:none">
+
+        <!-- Hero -->
+        <div class="finance-hero">
+          <div>
+            <div class="finance-hero-title">💰 الموارد المالية</div>
+            <div class="finance-hero-sub">إدارة خزينة الأكاديمية — المصاريف والإيرادات ورواتب الأساتذة</div>
+          </div>
+          <button onclick="openTreasuryModal()" style="padding:10px 20px;border-radius:13px;border:1.5px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:white;font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;backdrop-filter:blur(6px)">
+            ⚙️ تعديل رصيد الخزينة
+          </button>
+        </div>
+
+        <!-- KPIs -->
+        <div class="finance-kpis">
+          <div class="finance-kpi">
+            <div class="finance-kpi-icon" style="background:#D1FAE5">💵</div>
+            <div>
+              <div class="finance-kpi-val" id="fin-treasury">0 دج</div>
+              <div class="finance-kpi-lbl">رصيد الخزينة الحالي</div>
+            </div>
+          </div>
+          <div class="finance-kpi">
+            <div class="finance-kpi-icon" style="background:var(--danger-soft)">📤</div>
+            <div>
+              <div class="finance-kpi-val" id="fin-total-expense" style="color:#DC2626">0 دج</div>
+              <div class="finance-kpi-lbl">إجمالي المصاريف</div>
+            </div>
+          </div>
+          <div class="finance-kpi">
+            <div class="finance-kpi-icon" style="background:var(--success-soft)">📥</div>
+            <div>
+              <div class="finance-kpi-val" id="fin-total-income" style="color:#059669">0 دج</div>
+              <div class="finance-kpi-lbl">إجمالي الإيرادات</div>
+            </div>
+          </div>
+          <div class="finance-kpi">
+            <div class="finance-kpi-icon" style="background:var(--accent-soft)">👨‍🏫</div>
+            <div>
+              <div class="finance-kpi-val" id="fin-total-salary" style="color:#D97706">0 دج</div>
+              <div class="finance-kpi-lbl">إجمالي الرواتب</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ☀️ بطاقة إيرادات المخيم الصيفي -->
+        <div style="background:linear-gradient(135deg,rgba(249,115,22,0.08),rgba(234,88,12,0.04));border:1.5px solid rgba(249,115,22,0.22);border-radius:var(--radius-sm);padding:20px 24px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;position:relative;overflow:hidden">
+          <div style="position:absolute;left:-20px;top:-20px;width:100px;height:100px;background:radial-gradient(circle,rgba(249,115,22,0.15),transparent);border-radius:50%;pointer-events:none"></div>
+          <div style="display:flex;align-items:center;gap:16px">
+            <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#FED7AA,#FDBA74);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;box-shadow:0 4px 14px rgba(249,115,22,0.25)">☀️</div>
+            <div>
+              <div style="font-size:12px;font-weight:800;color:#EA580C;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">مخيم صيفي — Summer Plus</div>
+              <div style="font-size:26px;font-weight:900;color:#C2410C;line-height:1" id="fin-summer-total">0 دج</div>
+              <div style="font-size:12px;color:#9A3412;margin-top:4px;font-weight:600" id="fin-summer-meta">0 تذكرة مسجّلة كمدخول — 0 بانتظار الاستيراد</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+            <button onclick="importSummerTicketsToFinance()" id="btn-import-summer" style="padding:11px 20px;border-radius:12px;border:none;background:linear-gradient(135deg,#F97316,#EA580C);color:white;font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;display:flex;align-items:center;gap:8px;transition:all 0.25s;box-shadow:0 6px 18px rgba(249,115,22,0.35)">
+              ☀️ استيراد تذاكر المخيم
+            </button>
+            <div style="font-size:11px;color:#9A3412;font-weight:600;text-align:left">يُضيف التذاكر المدفوعة غير المسجَّلة بعد</div>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="finance-actions-row">
+          <button class="finance-btn expense" onclick="openFinanceModal('expense')">📤 إضافة مصروف</button>
+          <button class="finance-btn income" onclick="openFinanceModal('income')">📥 إضافة إيراد</button>
+          <button class="finance-btn salary" onclick="openFinanceModal('salary')">👨‍🏫 صرف راتب</button>
+        </div>
+
+        <!-- Filter row -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+          <div style="font-size:14px;font-weight:800;color:var(--text);flex:1">📋 سجل المعاملات</div>
+          <select id="fin-filter" class="inp" style="width:auto;padding:9px 16px;font-size:13px" onchange="renderFinanceTable()">
+            <option value="">الكل</option>
+            <option value="expense">مصاريف</option>
+            <option value="income">إيرادات</option>
+            <option value="income_summer">☀️ تذاكر المخيم فقط</option>
+            <option value="salary">رواتب</option>
+          </select>
+        </div>
+
+        <!-- Transactions table -->
+        <div class="finance-tx-table">
+          <div class="finance-tx-head">
+            <div>التاريخ</div>
+            <div>التفاصيل</div>
+            <div>النوع</div>
+            <div>المبلغ</div>
+            <div>حذف</div>
+          </div>
+          <div id="fin-tx-body">
+            <div class="finance-empty">
+              <div style="font-size:40px;margin-bottom:10px">📒</div>
+              <div style="font-weight:700">لا توجد معاملات بعد</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ===== SECTION: SETTINGS ===== -->
+      <div id="section-settings" style="display:none">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-icon purple">⚙️</div>
+            الإعدادات الإضافية
+          </div>
+          <div class="settings-grid">
+            <div class="setting-card">
+              <div class="setting-icon">🖼️</div>
+              <div class="setting-name">المعرض الربيعي</div>
+              <div class="setting-desc">رفع وإدارة الصور الخاصة بمعرض الأنشطة والفعاليات للمركز.</div>
+              <span class="setting-tag">قريباً</span>
+            </div>
+            <div class="setting-card">
+              <div class="setting-icon" style="background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.2)">📧</div>
+              <div class="setting-name">قوالب البريد</div>
+              <div class="setting-desc">تخصيص قوالب رسائل التأكيد والتنبيهات المرسلة للطلاب وأولياء الأمور.</div>
+              <span class="setting-tag">قريباً</span>
+            </div>
+            <div class="setting-card">
+              <div class="setting-icon" style="background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.2)">🔒</div>
+              <div class="setting-name">الأمان والصلاحيات</div>
+              <div class="setting-desc">إدارة حسابات المشرفين ومستويات الوصول لأقسام لوحة التحكم.</div>
+              <span class="setting-tag">قريباً</span>
+            </div>
+            <div class="setting-card">
+              <div class="setting-icon" style="background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.2)">🎨</div>
+              <div class="setting-name">تخصيص المظهر</div>
+              <div class="setting-desc">تغيير الألوان الرئيسية والشعار للموقع بضغطة واحدة.</div>
+              <span class="setting-tag">قريباً</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /dashboard-body -->
+  </div><!-- /main -->
+</div><!-- /dashboard -->
+
+<!-- ===== ADD TEACHER MODAL ===== -->
+<div class="teacher-modal-bg" id="add-teacher-modal">
+  <div class="teacher-modal" style="max-width:600px">
+    <div class="teacher-modal-header">
+      <div class="panel-icon" style="background:rgba(79,70,229,0.1);border-color:rgba(79,70,229,0.2)">➕</div>
+      <div class="teacher-modal-title">إضافة أستاذ جديد</div>
+      <button class="att-modal-close" onclick="closeAddTeacherModal()">✕</button>
+    </div>
+    <div class="teacher-modal-body">
+      <div style="display:grid;grid-template-columns:110px 1fr;gap:20px;align-items:start;margin-bottom:16px">
+        <div>
+          <label class="form-label" style="text-align:center;display:block">الصورة</label>
+          <div class="teacher-photo-zone" id="teacher-photo-zone" onclick="document.getElementById('teacher-photo-input').click()">
+            <input type="file" id="teacher-photo-input" accept="image/*" style="display:none" onchange="onTeacherPhotoChange(event)">
+            <span style="font-size:28px">👤</span>
+            <span style="font-size:11px;color:var(--text-muted);margin-top:4px;font-weight:600">اضغط</span>
+            <img id="teacher-photo-preview" class="teacher-photo-preview" style="display:none" alt="">
+            <div class="teacher-photo-overlay">🔄</div>
+          </div>
+        </div>
+        <div>
+          <div class="form-group"><label class="form-label">اسم الأستاذ <span class="required">*</span></label><input class="inp" type="text" id="t-name" placeholder="مثال: عمر بن علي"></div>
+          <div class="form-group"><label class="form-label">البريد الإلكتروني <span class="required">*</span></label><input class="inp" type="email" id="t-email" placeholder="exemple@email.com"></div>
+          <div class="form-group"><label class="form-label">كلمة المرور <span class="required">*</span></label><input class="inp" type="password" id="t-password" placeholder="6 أحرف على الأقل"></div>
+          <div class="form-group"><label class="form-label">التخصص <span class="required">*</span></label><input class="inp" type="text" id="t-spec" placeholder="مثال: رياضيات / فيزياء"></div>
+          <div class="form-group" style="margin-bottom:0"><label class="form-label">الأطوار الدراسية</label><input class="inp" type="text" id="t-levels" placeholder="مثال: الطور الثالث، المتوسط"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">أيام التدريس <span class="required">*</span></label>
+        <div class="days-picker" id="t-days-picker">
+          <button type="button" class="day-pick-btn" data-day="السبت">السبت</button>
+          <button type="button" class="day-pick-btn" data-day="الأحد">الأحد</button>
+          <button type="button" class="day-pick-btn" data-day="الاثنين">الاثنين</button>
+          <button type="button" class="day-pick-btn" data-day="الثلاثاء">الثلاثاء</button>
+          <button type="button" class="day-pick-btn" data-day="الأربعاء">الأربعاء</button>
+          <button type="button" class="day-pick-btn" data-day="الخميس">الخميس</button>
+          <button type="button" class="day-pick-btn" data-day="الجمعة">الجمعة</button>
+        </div>
+      </div>
+      <!-- ===== الأفواج ===== -->
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label" style="display:flex;align-items:center;justify-content:space-between">
+          <span>🏫 الأفواج <span class="required">*</span></span>
+          <button type="button" onclick="addGroupRow('t-groups-list')" style="padding:5px 12px;border-radius:9px;border:1.5px solid var(--border-2);background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">+ إضافة فوج</button>
+        </label>
+        <div id="t-groups-list" style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+          <!-- تُضاف الأفواج هنا ديناميكياً -->
+        </div>
+        <div id="t-groups-empty" style="font-size:12px;color:var(--text-muted);margin-top:6px;text-align:center;padding:10px;border:1.5px dashed var(--border);border-radius:10px">لم تُضف أي فوج بعد — اضغط "+ إضافة فوج"</div>
+      </div>
+
+      <button class="btn-primary" id="add-teacher-btn" onclick="addTeacher()" style="margin-top:16px">👨‍🏫 إنشاء حساب الأستاذ</button>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:10px;text-align:center">سيتمكن الأستاذ من الدخول بالبريد وكلمة المرور المحددة</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TEACHER EDIT MODAL ===== -->
+<div class="teacher-modal-bg" id="teacher-edit-modal">
+  <div class="teacher-modal">
+    <div class="teacher-modal-header">
+      <div class="panel-icon" style="background:rgba(79,70,229,0.1);border-color:rgba(79,70,229,0.2)">✏️</div>
+      <div class="teacher-modal-title">تعديل بيانات الأستاذ</div>
+      <button class="att-modal-close" onclick="closeTeacherEditModal()">✕</button>
+    </div>
+    <div class="teacher-modal-body">
+      <input type="hidden" id="edit-teacher-id">
+      <div style="display:grid;grid-template-columns:100px 1fr;gap:20px;align-items:start;margin-bottom:16px">
+        <div>
+          <div class="teacher-photo-zone" id="edit-photo-zone" onclick="document.getElementById('edit-photo-input').click()" style="max-width:100%">
+            <input type="file" id="edit-photo-input" accept="image/*" style="display:none" onchange="onEditPhotoChange(event)">
+            <span style="font-size:28px">👤</span>
+            <img id="edit-photo-preview" class="teacher-photo-preview" style="display:none" alt="">
+            <div class="teacher-photo-overlay">🔄</div>
+          </div>
+        </div>
+        <div>
+          <div class="form-group"><label class="form-label">الاسم</label><input class="inp" type="text" id="edit-t-name"></div>
+          <div class="form-group"><label class="form-label">التخصص</label><input class="inp" type="text" id="edit-t-spec"></div>
+          <div class="form-group" style="margin-bottom:0"><label class="form-label">الأطوار</label><input class="inp" type="text" id="edit-t-levels"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">أيام التدريس</label>
+        <div class="days-picker" id="edit-days-picker">
+          <button type="button" class="day-pick-btn" data-day="السبت">السبت</button>
+          <button type="button" class="day-pick-btn" data-day="الأحد">الأحد</button>
+          <button type="button" class="day-pick-btn" data-day="الاثنين">الاثنين</button>
+          <button type="button" class="day-pick-btn" data-day="الثلاثاء">الثلاثاء</button>
+          <button type="button" class="day-pick-btn" data-day="الأربعاء">الأربعاء</button>
+          <button type="button" class="day-pick-btn" data-day="الخميس">الخميس</button>
+          <button type="button" class="day-pick-btn" data-day="الجمعة">الجمعة</button>
+        </div>
+      </div>
+      <!-- ===== الأفواج (تعديل) ===== -->
+      <div class="form-group" style="margin-bottom:0;margin-top:4px">
+        <label class="form-label" style="display:flex;align-items:center;justify-content:space-between">
+          <span>🏫 الأفواج</span>
+          <button type="button" onclick="addGroupRow('edit-groups-list')" style="padding:5px 12px;border-radius:9px;border:1.5px solid var(--border-2);background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">+ إضافة فوج</button>
+        </label>
+        <div id="edit-groups-list" style="display:flex;flex-direction:column;gap:10px;margin-top:8px"></div>
+        <div id="edit-groups-empty" style="font-size:12px;color:var(--text-muted);margin-top:6px;text-align:center;padding:10px;border:1.5px dashed var(--border);border-radius:10px;display:none">لم تُضف أي فوج</div>
+      </div>
+
+      <button class="btn-primary" onclick="saveTeacherEdit()" style="margin-top:16px">💾 حفظ التعديلات</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ATTENDANCE MODAL ===== -->
+<div class="att-modal-bg" id="att-modal">
+  <div class="att-modal">
+    <div class="att-modal-header">
+      <div id="att-modal-avatar-wrap"></div>
+      <div>
+        <div class="att-modal-title" id="att-modal-teacher-name">الأستاذ</div>
+        <div class="att-modal-sub" id="att-modal-date-label">تسجيل الحضور</div>
+      </div>
+      <button class="att-modal-close" onclick="closeAttModal()">✕</button>
+    </div>
+    <div class="att-modal-body">
+
+      <!-- بانر حالة الحصة الحالية -->
+      <div id="att-session-status-banner" style="display:none;padding:14px 16px;border-radius:14px;font-size:13px;font-weight:700;line-height:1.7;margin-bottom:4px"></div>
+
+      <!-- عناصر مخفية يحتاجها الكود (لا تُظهر للمستخدم) -->
+      <div style="display:none">
+        <div id="att-summary-grid">
+          <div><div id="att-total">0</div></div>
+          <div><div id="att-present">0</div></div>
+          <div><div id="att-absent">0</div></div>
+          <div><div id="att-late">0</div></div>
+        </div>
+        <div id="att-groups-tabs-wrap"><div id="att-groups-tabs"></div><div id="att-group-header"><div id="att-group-header-name"></div><div id="att-group-header-meta"></div></div></div>
+        <input type="text" id="att-search">
+        <div id="att-students-list"></div>
+        <input type="text" id="new-student-name">
+        <div id="student-suggestions"></div>
+        <div id="selected-student-info"></div>
+      </div>
+
+      <!-- ✅ شبكة الأفواج والحصص — للأدمين فقط -->
+      <div id="admin-att-groups-grid" style="margin-bottom:12px"></div>
+
+      <!-- ✅ إحصائيات الحضور الكلية للفوج -->
+      <div id="admin-group-att-stats-wrap" style="margin-bottom:10px">
+        <div class="group-att-stats">
+          <div style="font-size:12px;font-weight:900;color:var(--text-muted);margin-left:4px">📊 إحصائيات الفوج:</div>
+          <div class="gas-item"><span class="gas-dot total"></span><span id="gas-total" class="gas-num">0</span><span style="color:var(--text-muted)">إجمالي</span></div>
+          <div class="gas-item"><span class="gas-dot present"></span><span id="gas-present" class="gas-num" style="color:var(--success)">0</span><span style="color:var(--text-muted)">حاضر</span></div>
+          <div class="gas-item"><span class="gas-dot absent"></span><span id="gas-absent" class="gas-num" style="color:var(--danger)">0</span><span style="color:var(--text-muted)">غائب</span></div>
+          <div class="gas-item"><span class="gas-dot late"></span><span id="gas-late" class="gas-num" style="color:#F59E0B">0</span><span style="color:var(--text-muted)">متأخر</span></div>
+          <div class="gas-item" style="margin-right:auto"><span style="font-size:11px;color:var(--text-muted)">نسبة الحضور:</span><span id="gas-pct" style="font-weight:900;color:var(--primary)">—</span></div>
+        </div>
+      </div>
+
+      <!-- ✅ فلتر التلاميذ حسب حالة الدفع -->
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:5px">🎫 تصفية حسب حالة التذكرة:</div>
+        <div class="pay-filter-bar" id="admin-pay-filter-bar">
+          <button class="pay-filter-btn active" onclick="adminFilterByPayment('all',this)">الكل</button>
+          <button class="pay-filter-btn" onclick="adminFilterByPayment('paid',this)">✅ مفعّلين</button>
+          <button class="pay-filter-btn" onclick="adminFilterByPayment('unpaid',this)">⏳ غير مفعّلين</button>
+        </div>
+        <div id="admin-pay-filter-count" style="font-size:11px;color:var(--text-muted);margin-top:3px"></div>
+      </div>
+
+      <!-- أزرار الأدمين -->
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+        <button onclick="openEditSessionPicker()" style="width:100%;padding:13px;border-radius:14px;border:2px solid rgba(217,119,6,0.4);background:rgba(245,158,11,0.08);color:#b45309;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">✏️ تعديل حصة مسجّلة</button>
+        <button onclick="resetAttendance()" style="width:100%;padding:13px;border-radius:14px;border:2px solid rgba(239,68,68,0.35);background:rgba(239,68,68,0.07);color:#DC2626;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">🔄 إعادة تسجيل الحضور من الصفر</button>
+        <button onclick="openSummaryModal()" style="width:100%;padding:13px;border-radius:14px;border:2px dashed var(--primary);background:var(--primary-light);color:var(--primary);font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">📊 ملخص الشهر</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== WELCOME MODAL (for teachers) ===== -->
+<div class="welcome-modal-bg" id="welcome-modal">
+  <div class="welcome-modal">
+    <span class="welcome-emoji">👋</span>
+    <div class="welcome-title" id="welcome-teacher-name">أهلاً بك!</div>
+    <div class="welcome-sub">مرحباً في نظام تسجيل الحضور.<br>اضغط الزر أدناه للتأكيد على حضورك وبدء الحصة.</div>
+    <button class="btn-present" onclick="confirmTeacherPresence()">✅ أنا حاضر — لنبدأ!</button>
+  </div>
+</div>
+
+<!-- ===== SUMMARY MODAL ===== -->
+<div class="summary-modal-bg" id="summary-modal">
+  <div class="summary-modal" style="max-width:900px">
+    <div class="summary-modal-header">
+      <div class="panel-icon" style="background:var(--primary-light);border-color:var(--border-2)">📊</div>
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:900;color:var(--text)">ملخص حضور التلاميذ</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px" id="summary-modal-sub">إجمالي 12 حصة</div>
+      </div>
+      <!-- زر تبديل وضع التعديل -->
+      <button id="summary-edit-toggle-btn" onclick="toggleSummaryEditMode()" style="padding:8px 16px;border-radius:12px;border:2px solid var(--primary);background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;white-space:nowrap">
+        ✏️ تعديل
+      </button>
+      <button class="att-modal-close" onclick="closeSummaryModal()">✕</button>
+    </div>
+
+    <!-- شريط الفلاتر والبحث -->
+    <div style="padding:12px 20px;border-bottom:1px solid var(--border);background:var(--bg);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <div style="position:relative;flex:1;min-width:160px">
+        <span style="position:absolute;top:50%;right:12px;transform:translateY(-50%);font-size:14px;pointer-events:none">🔍</span>
+        <input id="summary-search-inp" type="text" placeholder="ابحث باسم التلميذ..." class="inp" style="padding:9px 36px 9px 12px;font-size:13px;width:100%" oninput="filterSummaryRows(this.value)">
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button onclick="sortSummary('name',this)"     class="summary-sort-btn active" id="sort-btn-name">🔤 الاسم</button>
+        <button onclick="sortSummary('present',this)"  class="summary-sort-btn" id="sort-btn-present">✅ الأكثر حضوراً</button>
+        <button onclick="sortSummary('absent',this)"   class="summary-sort-btn" id="sort-btn-absent">❌ الأكثر غياباً</button>
+        <button onclick="sortSummary('rate',this)"     class="summary-sort-btn" id="sort-btn-rate">📈 النسبة</button>
+      </div>
+      <button onclick="exportSummaryCSV()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--border-2);background:white;color:var(--text-2);font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;white-space:nowrap">📥 تصدير CSV</button>
+    </div>
+
+    <!-- شريط التحرير (يظهر فقط في وضع التعديل) -->
+    <div id="summary-edit-bar" style="display:none;padding:12px 20px;background:rgba(245,158,11,0.07);border-bottom:2px solid rgba(245,158,11,0.3)">
+      <div style="font-size:13px;font-weight:800;color:#92400e;margin-bottom:10px">✏️ وضع التعديل — اضغط على أي دوت لتغيير حالة الحضور</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <div style="font-size:12px;color:var(--text-muted);font-weight:700">إضافة تلميذ جديد للملخص:</div>
+        <input id="summary-add-student-inp" type="text" class="inp" placeholder="اسم التلميذ..." style="flex:1;min-width:140px;padding:8px 12px;font-size:13px">
+        <button onclick="summaryAddStudent()" style="padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--primary),#9333EA);color:white;font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;white-space:nowrap">➕ إضافة</button>
+        <button onclick="saveSummaryEdits()" style="padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--success),#059669);color:white;font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;white-space:nowrap">💾 حفظ التعديلات</button>
+      </div>
+    </div>
+
+    <div class="summary-modal-body">
+      <div id="summary-modal-content"></div>
+      <!-- حالة الراتب — للأدمين فقط -->
+      <div class="payment-status-bar" id="payment-status-bar" style="display:none">
+        <div>
+          <div class="payment-status-label">💰 حالة صرف الراتب</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">هل تم دفع مستحقات الأستاذ هذا الشهر؟</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="payment-chip unpaid" id="payment-chip">⏳ لم يُصرف بعد</span>
+          <button class="btn-payment-toggle" id="payment-toggle-btn" onclick="toggleTeacherPayment()" style="background:linear-gradient(135deg,var(--success),#059669);color:white">✅ تأكيد الصرف</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <div class="toast-icon" id="toast-icon">✓</div>
+  <span id="toast-msg"></span>
+</div>
+
+<!-- ===== MESSAGING MODAL ===== -->
+<div class="msg-modal-bg" id="msg-modal-bg">
+  <div class="msg-modal">
+    <!-- Header -->
+    <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;background:white;border-radius:28px 28px 0 0">
+      <div style="width:40px;height:40px;border-radius:13px;background:linear-gradient(135deg,var(--primary),#9333EA);display:flex;align-items:center;justify-content:center;font-size:18px">💬</div>
+      <div>
+        <div style="font-size:15px;font-weight:900;color:var(--text)">نظام التواصل</div>
+        <div style="font-size:12px;color:var(--text-muted)" id="msg-header-sub">الرسائل والمحادثات</div>
+      </div>
+      <button onclick="closeMsgModal()" style="margin-right:auto;padding:8px 14px;border:1px solid var(--border);background:white;color:var(--text-muted);border-radius:10px;cursor:pointer;font-size:13px;font-family:'Tajawal',sans-serif;font-weight:700">✕ إغلاق</button>
+    </div>
+    <div class="msg-layout">
+      <!-- Sidebar -->
+      <div class="msg-sidebar">
+        <div class="msg-sidebar-header">
+          <div class="msg-sidebar-title">📬 المحادثات</div>
+          <!-- General room -->
+          <div class="msg-room-btn active" id="msg-room-general" onclick="openMsgRoom('general')">
+            <div class="msg-room-icon">👥</div>
+            <div>
+              <div class="msg-room-name">غرفة الأساتذة</div>
+              <div class="msg-room-sub">للجميع</div>
+            </div>
+          </div>
+        </div>
+        <!-- Private conversations list -->
+        <div style="padding:8px 10px;flex:1;overflow-y:auto" id="msg-private-list">
+          <div style="font-size:10px;font-weight:800;color:var(--text-muted);letter-spacing:0.08em;padding:6px 4px 4px;text-transform:uppercase">خاص</div>
+          <!-- سيُضاف ديناميكياً -->
+        </div>
+        <!-- New conversation button (admin only) -->
+        <div id="msg-new-btn-wrap" style="padding:10px;border-top:1px solid var(--border)">
+          <button onclick="openNewConvPicker()" style="width:100%;padding:10px;border-radius:12px;border:1.5px dashed var(--border-2);background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">+ محادثة جديدة</button>
+        </div>
+      </div>
+      <!-- Chat area -->
+      <div class="msg-chat" id="msg-chat-area">
+        <div class="msg-no-conv">
+          <div class="msg-no-conv-icon">💬</div>
+          <div style="font-size:14px;font-weight:700">اختر محادثة للبدء</div>
+          <div style="font-size:12px;color:var(--text-muted)">أو تصفّح غرفة الأساتذة</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- New Conversation Picker (Admin) -->
+<div id="msg-new-conv-bg" style="position:fixed;inset:0;background:rgba(15,10,40,0.6);backdrop-filter:blur(8px);z-index:4000;display:none;align-items:center;justify-content:center;padding:20px">
+  <div style="background:white;border-radius:24px;padding:0;max-width:460px;width:100%;box-shadow:0 28px 70px rgba(0,0,0,0.3);overflow:hidden;max-height:90vh;display:flex;flex-direction:column">
+    <!-- Header -->
+    <div style="padding:22px 24px 16px;background:linear-gradient(135deg,var(--primary-light),rgba(236,72,153,0.06));border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+        <div style="width:40px;height:40px;border-radius:13px;background:linear-gradient(135deg,var(--primary),#9333EA);display:flex;align-items:center;justify-content:center;font-size:18px">💬</div>
+        <div>
+          <div style="font-size:15px;font-weight:900;color:var(--text)">مراسلة أستاذ</div>
+          <div style="font-size:12px;color:var(--text-muted)">اختر الأستاذ الذي تريد مراسلته</div>
+        </div>
+        <button onclick="window.closeNewConvPicker()" style="margin-right:auto;padding:7px;border:none;background:rgba(0,0,0,0.06);color:var(--text-muted);border-radius:9px;cursor:pointer;font-size:16px;line-height:1">✕</button>
+      </div>
+      <!-- Search -->
+      <div style="position:relative">
+        <span style="position:absolute;top:50%;right:13px;transform:translateY(-50%);font-size:15px;pointer-events:none">🔍</span>
+        <input id="msg-teacher-search"
+          type="text"
+          placeholder="ابحث بالاسم أو التخصص..."
+          style="width:100%;padding:10px 38px 10px 14px;border:2px solid var(--border);border-radius:12px;font-size:13px;font-family:'Tajawal',sans-serif;color:var(--text);background:#FAFAFA;outline:none;transition:all 0.25s"
+          oninput="_buildTeacherPicker ? _buildTeacherPicker() : window._buildTP && window._buildTP()"
+          onfocus="this.style.borderColor='var(--primary)';this.style.background='#fff'"
+          onblur="this.style.borderColor='var(--border)';this.style.background='#FAFAFA'">
+      </div>
+    </div>
+    <!-- List -->
+    <div id="msg-teacher-picker-list" style="padding:14px 16px;flex:1;overflow-y:auto;max-height:420px"></div>
+  </div>
+</div>
+
+
+<!-- ─── تعليمات Firestore Rules ─── -->
+<!-- 
+  أضف هذه القواعد في Firebase Console ← Firestore ← Rules:
+  ─────────────────────────────────────────────────────────
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      match /{document=**} {
+        allow read, write: if request.auth != null;
+      }
+    }
+  }
+  ─────────────────────────────────────────────────────────
+-->
+
+
+<!-- ===== FINANCE MODAL ===== -->
+<div class="finance-modal-bg" id="finance-tx-modal">
+  <div class="finance-modal">
+    <div class="finance-modal-header">
+      <div class="panel-icon" id="fin-modal-icon">💰</div>
+      <div class="finance-modal-title" id="fin-modal-title">إضافة معاملة</div>
+      <button class="att-modal-close" onclick="closeFinanceModal()">✕</button>
+    </div>
+    <div class="finance-modal-body">
+      <input type="hidden" id="fin-tx-type">
+      <div class="form-group">
+        <label class="form-label">التفاصيل / الوصف</label>
+        <input class="inp" type="text" id="fin-tx-desc" placeholder="مثال: شراء لوازم مكتبية">
+      </div>
+      <div class="form-group" id="fin-teacher-row" style="display:none">
+        <label class="form-label">الأستاذ</label>
+        <select class="inp" id="fin-tx-teacher">
+          <option value="">— اختر الأستاذ —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">المبلغ (دج)</label>
+        <input class="inp" type="number" id="fin-tx-amount" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">التاريخ</label>
+        <input class="inp" type="date" id="fin-tx-date">
+      </div>
+      <button class="btn-primary" onclick="saveFinanceTx()" style="margin-top:8px" id="fin-save-btn">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TREASURY MODAL ===== -->
+<div class="finance-modal-bg" id="treasury-modal">
+  <div class="finance-modal">
+    <div class="finance-modal-header">
+      <div class="panel-icon" style="background:#D1FAE5">💵</div>
+      <div class="finance-modal-title">تعديل رصيد الخزينة</div>
+      <button class="att-modal-close" onclick="closeTreasuryModal()">✕</button>
+    </div>
+    <div class="finance-modal-body">
+      <div class="form-group">
+        <label class="form-label">الرصيد الجديد للخزينة (دج)</label>
+        <input class="inp" type="number" id="treasury-amount" placeholder="0" min="0">
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;padding:10px;background:var(--bg-2);border-radius:10px;font-weight:600">
+        ⚠️ هذا يحدد الرصيد الابتدائي للخزينة. المعاملات اللاحقة ستُضاف أو تُطرح منه تلقائياً.
+      </div>
+      <button class="btn-primary" onclick="saveTreasuryBalance()">💾 حفظ الرصيد</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CHANGE CREDENTIALS MODAL ===== -->
+<div class="finance-modal-bg" id="change-cred-modal">
+  <div class="finance-modal">
+    <div class="finance-modal-header">
+      <div class="panel-icon" style="background:rgba(79,70,229,0.1)">🔐</div>
+      <div>
+        <div class="finance-modal-title">تغيير بيانات الدخول</div>
+        <div style="font-size:11px;color:var(--text-muted);font-weight:700" id="cred-teacher-name"></div>
+      </div>
+      <button class="att-modal-close" onclick="closeChangeCredentialsModal()">✕</button>
+    </div>
+    <div class="finance-modal-body">
+      <input type="hidden" id="cred-teacher-id">
+      <div style="background:var(--bg-2);border-radius:12px;padding:12px 14px;font-size:12px;color:var(--text-2);font-weight:600;margin-bottom:16px">
+        💡 اترك الحقل فارغاً إذا لا تريد تغييره
+      </div>
+      <div class="form-group" id="cred-current-password-row" style="display:none">
+        <label class="form-label" style="color:var(--danger)">🔑 الباسوورد الحالي للأستاذ <span style="font-size:11px;font-weight:500">(مطلوب مرة وحدة فقط)</span></label>
+        <input class="inp" type="password" id="cred-current-password" placeholder="أدخل الباسوورد الحالي للأستاذ" style="border-color:rgba(239,68,68,0.4)">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px;font-weight:600">⚠️ بعد الحفظ لن يُطلب منك هذا مجدداً</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">الإيميل الجديد</label>
+        <input class="inp" type="email" id="cred-email" placeholder="example@email.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">الباسوورد الجديد</label>
+        <input class="inp" type="password" id="cred-password" placeholder="6 أحرف على الأقل">
+      </div>
+      <button class="btn-primary" id="cred-save-btn" onclick="saveTeacherCredentials()" style="margin-top:8px">💾 حفظ التغييرات</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== EDIT TICKET MODAL ===== -->
+<div class="finance-modal-bg" id="edit-ticket-modal">
+  <div class="finance-modal" style="max-width:540px">
+    <div class="finance-modal-header">
+      <div class="panel-icon" style="background:var(--accent-soft)">✏️</div>
+      <div class="finance-modal-title">تعديل بيانات التذكرة</div>
+      <button class="att-modal-close" onclick="closeEditTicketModal()">✕</button>
+    </div>
+    <div class="finance-modal-body" style="display:flex;flex-direction:column;gap:12px">
+      <input type="hidden" id="et-id">
+
+      <div class="form-group" style="margin:0">
+        <label class="form-label">اسم المشترك</label>
+        <input class="inp" type="text" id="et-name" placeholder="الاسم الكامل">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">رقم الوصل</label>
+          <input class="inp" type="text" id="et-receipt" placeholder="رقم الوصل">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">التاريخ</label>
+          <input class="inp" type="date" id="et-date">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin:0">
+        <label class="form-label">الباقة</label>
+        <input class="inp" type="text" id="et-pack" placeholder="اسم الباقة">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">المبلغ المدفوع (دج)</label>
+          <input class="inp" type="number" id="et-amount" min="0" placeholder="0">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">المبلغ المتبقي (دج)</label>
+          <input class="inp" type="number" id="et-remaining" min="0" placeholder="0">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin:0">
+        <label class="form-label">السعر الكامل للباقة (دج)</label>
+        <input class="inp" type="number" id="et-fullprice" min="0" placeholder="0">
+      </div>
+
+      <button class="btn-primary" id="et-save-btn" onclick="saveEditTicket()" style="margin-top:4px">💾 حفظ التعديلات</button>
+    </div>
+  </div>
+</div>
+
+
+
+<script type="module" src="admin.js"></script>
+</body>
+</html>
