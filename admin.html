@@ -822,6 +822,8 @@
     .so-page-btn:hover:not(:disabled){border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
     .so-page-btn:disabled{opacity:0.35;cursor:default}
     .so-page-info{font-size:12px;font-weight:700;color:var(--text-muted)}
+    .so-sync-btn{padding:8px 18px;border-radius:12px;border:1.5px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.08);color:#b45309;font-family:'Tajawal',sans-serif;font-size:12px;font-weight:800;cursor:pointer;transition:all 0.2s;white-space:nowrap;display:flex;align-items:center;gap:6px}
+    .so-sync-btn:hover{background:rgba(245,158,11,0.18);border-color:rgba(245,158,11,0.5)}
     @media(max-width:640px){
       .so-hero{padding:18px 16px}.so-body{padding:14px 12px}
       .so-search-wrap{flex-direction:column}.so-filters{flex-direction:column}.so-filters select{width:100%}
@@ -2129,10 +2131,14 @@
               <div class="so-hero-title">📋 جميع التلاميذ المسجّلين</div>
               <div class="so-hero-sub">عرض كل التلاميذ عبر جميع الأساتذة مع حالة الباقة والاشتراك</div>
             </div>
-            <div class="so-stats" id="so-stats">
-              <div class="so-stat"><div class="so-stat-n" id="so-total">0</div><div class="so-stat-l">👥 الإجمالي</div></div>
-              <div class="so-stat"><div class="so-stat-n" id="so-activated">0</div><div class="so-stat-l">✅ مفعّل</div></div>
-              <div class="so-stat"><div class="so-stat-n" id="so-noticket">0</div><div class="so-stat-l">❌ بدون تذكرة</div></div>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <button class="so-sync-btn" onclick="syncStudentNamesWithTickets()" title="مزامنة أسماء التلاميذ حسب المخيم الصيفي لتصحيح حالة التفعيل">🔄 مزامنة الأسماء</button>
+              <button class="so-sync-btn" id="so-restore-btn" onclick="restoreSyncBackup()" style="display:none;border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.08);color:#dc2626" title="استعادة أسماء التلاميذ إلى ما قبل آخر مزامنة">↩️ استعادة</button>
+              <div class="so-stats" id="so-stats">
+                <div class="so-stat"><div class="so-stat-n" id="so-total">0</div><div class="so-stat-l">👥 الإجمالي</div></div>
+                <div class="so-stat"><div class="so-stat-n" id="so-activated">0</div><div class="so-stat-l">✅ مفعّل</div></div>
+                <div class="so-stat"><div class="so-stat-n" id="so-noticket">0</div><div class="so-stat-l">❌ بدون تذكرة</div></div>
+              </div>
             </div>
           </div>
           <div class="so-body">
@@ -2823,6 +2829,11 @@ onAuthStateChanged(auth, async user => {
     loadAnnouncements();
     loadTickets();
     loadTeachers();
+    // التحقق من وجود نسخة احتياطية لمزامنة الأسماء
+    getDoc(doc(db, 'settings', 'nameSyncBackup')).then(snap => {
+      const btn = document.getElementById('so-restore-btn');
+      if (btn) btn.style.display = snap.exists() ? '' : 'none';
+    }).catch(() => {});
     const isEmpAdmin = !empCfg; // الأدمين الحقيقي فقط
     setTimeout(() => { if (window.initMessaging) window.initMessaging(user.uid, empCfg ? empCfg.name : 'الإدارة', isEmpAdmin); }, 800);
     if (empCfg) {
@@ -5385,6 +5396,137 @@ function _renderSoTable(data, searchFilter) {
 window.filterStudentOverview = () => {
   const searchVal = document.getElementById('so-search')?.value || '';
   _renderSoTable(_soData || [], searchVal);
+};
+
+// ─── مزامنة أسماء التلاميذ في الأساتذة مع أسمائهم في المخيم الصيفي ───
+window.syncStudentNamesWithTickets = async () => {
+  if (!allTeachers || !allTeachers.length) { showToast('⚠️ لا يوجد أساتذة', true); return; }
+  if (!allTicketsData || !allTicketsData.length) { showToast('⚠️ لا توجد تذاكر في المخيم الصيفي', true); return; }
+
+  const norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const changes = [];
+
+  allTeachers.forEach(t => {
+    if (!t.students || !t.students.length) return;
+    t.students.forEach((s, si) => {
+      if (!s.name) return;
+      let ticket = s.receipt ? allTicketsData.find(tk => tk.receipt && tk.receipt === s.receipt) : null;
+      if (!ticket) ticket = allTicketsData.find(tk => norm(tk.name) === norm(s.name));
+      if (!ticket) {
+        const target = norm(s.name);
+        ticket = allTicketsData.find(tk => {
+          const tn = norm(tk.name);
+          return tn.includes(target) || target.includes(tn);
+        });
+      }
+      if (ticket && norm(ticket.name) !== norm(s.name)) {
+        changes.push({ teacherId: t.id, teacherName: t.name, oldName: s.name, newName: ticket.name, receipt: ticket.receipt });
+      }
+    });
+  });
+
+  if (!changes.length) { showToast('✅ جميع الأسماء متطابقة مع المخيم الصيفي'); return; }
+
+  const summary = changes.map((c, i) => `${i+1}. ${c.teacherName}: "${c.oldName}" ← "${c.newName}"`).join('\n');
+  if (!confirm(`🔄 مزامنة الأسماء مع المخيم الصيفي\n\nسيتم تعديل ${changes.length} اسماً:\n\n${summary}\n\nهل أنت متأكد من تطبيق التغييرات؟`)) return;
+
+  // ── حفظ نسخة احتياطية في Firestore قبل التعديل ──
+  const backupEntries = [];
+  allTeachers.forEach(t => {
+    if (changes.some(c => c.teacherId === t.id)) {
+      backupEntries.push({
+        teacherId: t.id,
+        teacherName: t.name,
+        students: JSON.parse(JSON.stringify(t.students || [])),
+        groups: JSON.parse(JSON.stringify(t.groups || []))
+      });
+    }
+  });
+  try {
+    await setDoc(doc(db, 'settings', 'nameSyncBackup'), {
+      timestamp: serverTimestamp(),
+      changes: backupEntries
+    });
+  } catch (e) {
+    showToast('⚠️ فشل حفظ النسخة الاحتياطية: ' + e.message, true);
+    return;
+  }
+
+  // تجميع التغييرات حسب الأستاذ
+  const groups = {};
+  changes.forEach(c => {
+    if (!groups[c.teacherId]) groups[c.teacherId] = { teacherName: c.teacherName, renames: {} };
+    groups[c.teacherId].renames[c.oldName] = c.newName;
+  });
+
+  let applied = 0;
+  _suppressSnapshot = true;
+  for (const teacher of allTeachers) {
+    const g = groups[teacher.id];
+    if (!g) continue;
+
+    const renameKeys = Object.keys(g.renames);
+    const updatedStudents = teacher.students.map(s =>
+      renameKeys.includes(s.name) ? { ...s, name: g.renames[s.name], receipt: changes.find(c => c.teacherId === teacher.id && c.oldName === s.name)?.receipt || s.receipt } : s
+    );
+    const updatedGroups = teacher.groups ? teacher.groups.map(gr => ({
+      ...gr,
+      students: (gr.students || []).map(sn => g.renames[sn] || sn)
+    })) : [];
+
+    try {
+      await updateDoc(doc(db, 'teachers', teacher.id), { students: updatedStudents, groups: updatedGroups });
+      applied++;
+    } catch (e) { showToast(`⚠️ خطأ في تحديث ${teacher.name}: ${e.message}`, true); }
+  }
+  _suppressSnapshot = false;
+
+  await addLog('🔄 مزامنة أسماء', `تمت مزامنة ${changes.length} اسم مع المخيم الصيفي (${applied} أستاذ)`, '✅');
+  showToast(`✅ تمت مزامنة ${changes.length} اسم — جارٍ إعادة حساب الإحصائيات...`);
+
+  const restoreBtn = document.getElementById('so-restore-btn');
+  if (restoreBtn) restoreBtn.style.display = '';
+
+  loadTeachers();
+  loadTickets();
+};
+
+// ─── استعادة آخر مزامنة من النسخة الاحتياطية ───
+window.restoreSyncBackup = async () => {
+  const snap = await getDoc(doc(db, 'settings', 'nameSyncBackup'));
+  if (!snap.exists() || !snap.data().changes?.length) {
+    showToast('⚠️ لا توجد نسخة احتياطية سابقة', true);
+    return;
+  }
+
+  if (!confirm('↩️ استعادة آخر مزامنة\n\nسيتم إرجاع أسماء التلاميذ إلى حالتها قبل المزامنة الأخيرة.\n\nهل أنت متأكد؟')) return;
+
+  const backupChanges = snap.data().changes;
+  let restored = 0;
+  _suppressSnapshot = true;
+  for (const bc of backupChanges) {
+    try {
+      await updateDoc(doc(db, 'teachers', bc.teacherId), {
+        students: bc.students,
+        groups: bc.groups
+      });
+      restored++;
+    } catch (e) {
+      showToast(`⚠️ خطأ في استعادة ${bc.teacherName}: ${e.message}`, true);
+    }
+  }
+  _suppressSnapshot = false;
+
+  try { await deleteDoc(doc(db, 'settings', 'nameSyncBackup')); } catch (e) {}
+
+  const restoreBtn = document.getElementById('so-restore-btn');
+  if (restoreBtn) restoreBtn.style.display = 'none';
+
+  await addLog('↩️ استعادة أسماء', `تمت استعادة أسماء ${restored} أستاذ من آخر مزامنة`, '↩️');
+  showToast(`✅ تمت استعادة ${restored} أستاذ بنجاح`);
+
+  loadTeachers();
+  loadTickets();
 };
 
 // ─── Delete teacher ───
