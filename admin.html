@@ -2128,16 +2128,16 @@
         <div class="so-panel" id="student-overview-panel">
           <div class="so-hero">
             <div>
-              <div class="so-hero-title">📋 جميع التلاميذ المسجّلين</div>
-              <div class="so-hero-sub">عرض كل التلاميذ عبر جميع الأساتذة مع حالة الباقة والاشتراك</div>
+              <div class="so-hero-title">📋 توزيع التلاميذ على الأساتذة</div>
+              <div class="so-hero-sub">ربط تذاكر المخيم الصيفي بالأساتذة والأفواج — لمعرفة من هو مسجّل ومن لا يزال غير موزّع</div>
             </div>
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
               <button class="so-sync-btn" onclick="syncStudentNamesWithTickets()" title="مزامنة أسماء التلاميذ حسب المخيم الصيفي لتصحيح حالة التفعيل">🔄 مزامنة الأسماء</button>
               <button class="so-sync-btn" id="so-restore-btn" onclick="restoreSyncBackup()" style="display:none;border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.08);color:#dc2626" title="استعادة أسماء التلاميذ إلى ما قبل آخر مزامنة">↩️ استعادة</button>
               <div class="so-stats" id="so-stats">
-                <div class="so-stat"><div class="so-stat-n" id="so-total">0</div><div class="so-stat-l">👥 الإجمالي</div></div>
-                <div class="so-stat"><div class="so-stat-n" id="so-activated">0</div><div class="so-stat-l">✅ مفعّل</div></div>
-                <div class="so-stat"><div class="so-stat-n" id="so-noticket">0</div><div class="so-stat-l">❌ بدون تذكرة</div></div>
+                <div class="so-stat"><div class="so-stat-n" id="so-total">0</div><div class="so-stat-l">🎫 إجمالي التذاكر</div></div>
+                <div class="so-stat"><div class="so-stat-n" id="so-activated">0</div><div class="so-stat-l">✅ مفعّلة</div></div>
+                <div class="so-stat"><div class="so-stat-n" id="so-noticket">0</div><div class="so-stat-l">❌ غير موزّعة</div></div>
               </div>
             </div>
           </div>
@@ -2151,9 +2151,9 @@
               </select>
               <select id="so-filter-status" onchange="filterStudentOverview()">
                 <option value="">✅ الجميع</option>
-                <option value="paid">مفعّل فقط</option>
-                <option value="noticket">بدون تذكرة فقط</option>
-                <option value="unpaid">متبقي فقط</option>
+                <option value="paid">مفعّلة فقط</option>
+                <option value="unassigned">غير موزّعة فقط</option>
+                <option value="unpaid">غير مدفوعة فقط</option>
               </select>
             </div>
             <div class="so-search-wrap">
@@ -5265,51 +5265,59 @@ let _soData = [];
 window.renderStudentOverview = () => {
   const tbody = document.getElementById('so-tbody');
   if (!tbody) return;
-  if (!allTeachers || !allTeachers.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="so-empty"><div class="so-empty-icon">📋</div><div>لا يوجد تلاميض مسجّلين بعد</div></td></tr>`;
+
+  const activeTickets = (allTicketsData || []).filter(tk => !tk.deleted);
+  if (!activeTickets.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="so-empty"><div class="so-empty-icon">🎫</div><div>لا توجد تذاكر في المخيم الصيفي بعد</div></td></tr>`;
+    document.getElementById('so-total').textContent = '0';
+    document.getElementById('so-activated').textContent = '0';
+    document.getElementById('so-noticket').textContent = '0';
+    window._soData = []; window._soPage = 1;
     return;
   }
 
+  // بناء خريطة سريعة: اسم التلميذ الطبيع → بياناته عند الأستاذ
+  const _normOv = s => String(s||'').trim().toLowerCase()
+    .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+    .replace(/[ًٌٍَُِّْٰ]/g,'').replace(/ـ/g,'').replace(/\s+/g,' ');
+  const teacherMap = {};
+  (allTeachers||[]).forEach(t => {
+    (t.students||[]).forEach(s => {
+      if (!s.name) return;
+      const key = _normOv(s.name);
+      if (!teacherMap[key]) {
+        teacherMap[key] = { teacherName: t.name, groupName: _findStudentGroup(s.name, t) };
+      }
+    });
+  });
+
   _soData = [];
-  let totalActivated = 0, totalNoTicket = 0;
+  let totalActivated = 0, totalUnmatched = 0;
 
-  allTeachers.forEach(t => {
-    const students = t.students || [];
-    students.forEach(s => {
-      // البحث بالوصل أولاً (أدق)، ثم بالاسم
-      let ticket = s.receipt ? (allTicketsData||[]).find(tk => !tk.deleted && tk.receipt && tk.receipt === s.receipt) : null;
-      if (!ticket) ticket = _findStudentTicket(s.name);
-      const hasTicket = !!ticket;
-      const isPaid = hasTicket && ticket.status === 'paid';
-      const hasRemaining = hasTicket && ticket.status !== 'paid';
-      let status = 'noticket';
-      let statusLabel = '❌ بدون تذكرة';
-      if (isPaid) { status = 'paid'; statusLabel = '✅ مفعّل'; totalActivated++; }
-      else if (hasRemaining) { status = 'unpaid'; statusLabel = '⏳ متبقي'; }
-      else { totalNoTicket++; }
+  activeTickets.forEach(ticket => {
+    const key = _normOv(ticket.name);
+    const match = teacherMap[key];
+    const isPaid = ticket.status === 'paid';
 
-      const groupName = _findStudentGroup(s.name, t);
-      const pkg = ticket?.pack || (s.pack || '—');
-      const amt = ticket ? Number(ticket.amount || 0) : (s.amount || 0);
-      const receipt = ticket?.receipt || s.receipt || '—';
+    if (isPaid) totalActivated++;
+    if (!match) totalUnmatched++;
 
-      _soData.push({
-        studentName: s.name,
-        teacherName: t.name,
-        groupName,
-        status,
-        statusLabel,
-        pkg,
-        amount: amt,
-        receipt
-      });
+    _soData.push({
+      studentName: ticket.name,
+      teacherName: match ? match.teacherName : '—',
+      groupName: match ? match.groupName : '—',
+      status: isPaid ? 'paid' : 'unpaid',
+      statusLabel: isPaid ? '✅ مفعّل' : '⏳ غير مدفوع',
+      pkg: ticket.pack || '—',
+      amount: Number(ticket.amount || 0),
+      receipt: ticket.receipt || '—'
     });
   });
 
   // إحصائيات
-  document.getElementById('so-total').textContent = _soData.length;
+  document.getElementById('so-total').textContent = activeTickets.length;
   document.getElementById('so-activated').textContent = totalActivated;
-  document.getElementById('so-noticket').textContent = totalNoTicket;
+  document.getElementById('so-noticket').textContent = totalUnmatched;
 
   window._soData = _soData;
   window._soPage = 1;
@@ -5317,7 +5325,7 @@ window.renderStudentOverview = () => {
   // تعبئة فلتر الأساتذة
   const teacherSelect = document.getElementById('so-filter-teacher');
   if (teacherSelect) {
-    const teachers = [...new Set(_soData.map(r => r.teacherName))].sort();
+    const teachers = [...new Set(_soData.map(r => r.teacherName).filter(n => n !== '—'))].sort();
     teacherSelect.innerHTML = '<option value="">👨‍🏫 جميع الأساتذة</option>' +
       teachers.map(t => `<option value="${t.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">${t}</option>`).join('');
   }
@@ -5354,7 +5362,8 @@ function _renderSoTable(data, searchFilter) {
 
   if (teacherFilter) filtered = filtered.filter(r => r.teacherName === teacherFilter);
   if (packFilter) filtered = filtered.filter(r => r.pkg === packFilter);
-  if (statusFilter) filtered = filtered.filter(r => r.status === statusFilter);
+  if (statusFilter === 'unassigned') filtered = filtered.filter(r => r.teacherName === '—');
+  else if (statusFilter) filtered = filtered.filter(r => r.status === statusFilter);
 
   const countEl = document.getElementById('so-filter-count');
   if (countEl) countEl.textContent = filtered.length < data.length
