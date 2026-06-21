@@ -8172,12 +8172,11 @@ function _renderRoomsList() {
   if (!listEl) return;
 
   _roomsUnsub = onSnapshot(
-    query(collection(_db, 'msgRooms'), orderBy('lastAt', 'desc')),
+    query(collection(_db, 'msgRooms'), where('participants', 'array-contains', _me.uid), orderBy('lastAt', 'desc')),
     snap => {
       const myRooms = snap.docs.filter(d => {
-        const p = d.data().participants || [];
         const hidden = d.data().hiddenBy || {};
-        return p.includes(_me.uid) && !hidden[_me.uid];
+        return !hidden[_me.uid];
       });
       // حذف العناصر القديمة
       listEl.querySelectorAll('.msg-room-btn').forEach(e => e.remove());
