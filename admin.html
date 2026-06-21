@@ -5236,18 +5236,25 @@ function renderTeachersGrid(teachers) {
 
 // ─── Student Overview ───
 function _findStudentTicket(studentName) {
-  const norm = s => String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
-  const target = norm(studentName);
-  let match = (allTicketsData||[]).find(t => norm(t.name) === target);
-  if (!match) match = (allTicketsData||[]).find(t => norm(t.name).includes(target) || target.includes(norm(t.name)));
+  const _normTicket = s => String(s||'')
+    .trim().toLowerCase()
+    .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+    .replace(/[ًٌٍَُِّْٰ]/g,'').replace(/ـ/g,'').replace(/\s+/g,' ');
+  const target = _normTicket(studentName);
+  const tickets = (allTicketsData||[]).filter(t => !t.deleted);
+  let match = tickets.find(t => _normTicket(t.name) === target);
+  if (!match) match = tickets.find(t => _normTicket(t.name).includes(target) || target.includes(_normTicket(t.name)));
   return match || null;
 }
 
 function _findStudentGroup(studentName, teacher) {
+  const _normGroup = s => String(s||'').trim().toLowerCase()
+    .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+    .replace(/[ًٌٍَُِّْٰ]/g,'').replace(/ـ/g,'').replace(/\s+/g,' ');
   const groups = teacher.groups || [];
-  const target = studentName.trim().toLowerCase();
+  const target = _normGroup(studentName);
   for (let i = 0; i < groups.length; i++) {
-    if ((groups[i].students||[]).some(s => s.trim().toLowerCase() === target)) {
+    if ((groups[i].students||[]).some(s => _normGroup(s) === target)) {
       return groups[i].name;
     }
   }
@@ -5269,10 +5276,12 @@ window.renderStudentOverview = () => {
   allTeachers.forEach(t => {
     const students = t.students || [];
     students.forEach(s => {
-      const ticket = _findStudentTicket(s.name);
+      // البحث بالوصل أولاً (أدق)، ثم بالاسم
+      let ticket = s.receipt ? (allTicketsData||[]).find(tk => !tk.deleted && tk.receipt && tk.receipt === s.receipt) : null;
+      if (!ticket) ticket = _findStudentTicket(s.name);
       const hasTicket = !!ticket;
-      const isPaid = hasTicket && Number(ticket.remainingAmount || 0) === 0;
-      const hasRemaining = hasTicket && Number(ticket.remainingAmount || 0) > 0;
+      const isPaid = hasTicket && ticket.status === 'paid';
+      const hasRemaining = hasTicket && ticket.status !== 'paid';
       let status = 'noticket';
       let statusLabel = '❌ بدون تذكرة';
       if (isPaid) { status = 'paid'; statusLabel = '✅ مفعّل'; totalActivated++; }
@@ -6057,17 +6066,19 @@ window.searchStudentSuggestions = async (val) => {
   // إذا كان التلميذ مختاراً مسبقاً والاسم لا يزال نفسه — لا نتدخل
   if (_selectedStudentData && _selectedStudentData.name === val.trim()) return;
 
-  const norm  = s => String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
-  const normSort = s => norm(s).split(' ').sort().join(' ');
-  const q     = norm(val);
+  const _normSug = s => String(s||'').trim().toLowerCase()
+    .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+    .replace(/[ًٌٍَُِّْٰ]/g,'').replace(/ـ/g,'').replace(/\s+/g,' ');
+  const normSort = s => _normSug(s).split(' ').sort().join(' ');
+  const q     = _normSug(val);
   const qSort = normSort(val);
 
   // ── 1. البحث في التذاكر (Firebase) ──
   const ticketMatches = (allTicketsData || []).filter(t => {
-    const tn = norm(t.name);
+    const tn = _normSug(t.name);
     const ts = normSort(t.name);
     return tn.includes(q) || ts.includes(qSort) || qSort.includes(ts) ||
-           (t.receipt && norm(t.receipt).includes(q));
+           (t.receipt && _normSug(t.receipt).includes(q));
   }).slice(0, 8);
 
   // ── 2. إذا لم توجد نتائج في التذاكر — ابحث في Google Sheet ──
@@ -6080,12 +6091,12 @@ window.searchStudentSuggestions = async (val) => {
     try {
       const sheetRows = await loadSheetStudentsCache();
       // sheetRows الآن objects — نبحث في الاسم
-      sheetMatches = sheetRows.filter(s => norm(s.name).includes(q) || normSort(s.name).includes(qSort)).slice(0, 8);
+      sheetMatches = sheetRows.filter(s => _normSug(s.name).includes(q) || normSort(s.name).includes(qSort)).slice(0, 8);
     } catch(e) { console.warn('sheet search error:', e); }
 
     // إذا تغيّر النص أثناء الانتظار — تجاهل
     const curVal = findVisible('#new-student-name');
-    if (curVal && norm(curVal.value) !== q) return;
+    if (curVal && _normSug(curVal.value) !== q) return;
 
     if (!sheetMatches.length) {
       // لا نتائج في أي مكان — عرض إضافة يدوية
@@ -6103,7 +6114,7 @@ window.searchStudentSuggestions = async (val) => {
     // ── عرض نتائج الشيت مع الباقة واللغة والعمر ──
     const esc2 = s => s.replace(/'/g, "\\'");
     const hlQ = (text) => {
-      const idx = norm(text).indexOf(q);
+      const idx = _normSug(text).indexOf(q);
       if (idx === -1) return text;
       return text.slice(0, idx) + `<mark style="background:rgba(124,58,237,0.15);color:var(--primary);border-radius:3px;padding:0 1px">${text.slice(idx, idx+q.length)}</mark>` + text.slice(idx+q.length);
     };
@@ -6227,9 +6238,10 @@ window.selectManualStudent = (name) => {
 // ─── حالة الدفع الحية — تتجاهل القيمة المحفوظة وتبحث دائماً في التذاكر ───
 function getLivePayStatus(student) {
   if (!allTicketsData || !allTicketsData.length) return { ps: 'unknown', rc: student.receipt || null };
+  const activeTickets = allTicketsData.filter(t => !t.deleted);
   // البحث أولاً برقم الوصل (أدق)
   let ticket = student.receipt
-    ? allTicketsData.find(t => t.receipt && t.receipt === student.receipt)
+    ? activeTickets.find(t => t.receipt && t.receipt === student.receipt)
     : null;
   // ثم بالاسم
   if (!ticket) ticket = findStudentTicket(student.name);
@@ -6242,12 +6254,14 @@ function getLivePayStatus(student) {
 
 function findStudentTicket(name) {
   if (!allTicketsData || !allTicketsData.length) return null;
-  const norm = s => String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
-  const target = norm(name);
-  // مطابقة كاملة أولاً
-  let match = allTicketsData.find(t => norm(t.name) === target);
-  // مطابقة جزئية إذا لم تُوجد
-  if (!match) match = allTicketsData.find(t => norm(t.name).includes(target) || target.includes(norm(t.name)));
+  const _normTicket = s => String(s||'')
+    .trim().toLowerCase()
+    .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+    .replace(/[ًٌٍَُِّْٰ]/g,'').replace(/ـ/g,'').replace(/\s+/g,' ');
+  const target = _normTicket(name);
+  const tickets = allTicketsData.filter(t => !t.deleted);
+  let match = tickets.find(t => _normTicket(t.name) === target);
+  if (!match) match = tickets.find(t => _normTicket(t.name).includes(target) || target.includes(_normTicket(t.name)));
   return match || null;
 }
 
