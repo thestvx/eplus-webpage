@@ -2572,8 +2572,19 @@
       <!-- أزرار الأدمين -->
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
         <button onclick="openEditSessionPicker()" style="width:100%;padding:13px;border-radius:14px;border:2px solid rgba(217,119,6,0.4);background:rgba(245,158,11,0.08);color:#b45309;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">✏️ تعديل حصة مسجّلة</button>
+        <button onclick="openAddExtraSessionModal()" style="width:100%;padding:13px;border-radius:14px;border:2px solid rgba(16,185,129,0.35);background:rgba(16,185,129,0.07);color:#059669;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">📅 + حصة إضافية</button>
         <button onclick="resetAttendance()" style="width:100%;padding:13px;border-radius:14px;border:2px solid rgba(239,68,68,0.35);background:rgba(239,68,68,0.07);color:#DC2626;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">🔄 إعادة تسجيل الحضور من الصفر</button>
         <button onclick="openSummaryModal()" style="width:100%;padding:13px;border-radius:14px;border:2px dashed var(--primary);background:var(--primary-light);color:var(--primary);font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">📊 ملخص الشهر</button>
+      </div>
+
+      <!-- الحصص الإضافية -->
+      <div id="extra-sessions-section" style="margin-top:12px;display:none">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-top:10px;border-top:1px dashed var(--border-2)">
+          <span style="font-size:16px">📅</span>
+          <span style="font-size:13px;font-weight:800;color:var(--text-2)">حصص إضافية</span>
+          <span style="font-size:11px;color:var(--text-muted)" id="extra-sessions-count">(0)</span>
+        </div>
+        <div id="extra-sessions-grid" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px"></div>
       </div>
 
       <!-- ❗ Emergency Controls — للأدمين فقط -->
@@ -2604,6 +2615,48 @@
     </div>
     <div class="ctrl-modal-body">
       <div id="ctrl-modal-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ADD EXTRA SESSION MODAL ===== -->
+<div class="ctrl-modal-bg" id="extra-session-modal">
+  <div class="ctrl-modal" style="max-width:460px">
+    <div class="ctrl-modal-header">
+      <div style="font-size:22px">📅</div>
+      <div class="ctrl-modal-title">إضافة حصة إضافية</div>
+      <button class="att-modal-close" onclick="closeExtraSessionModal()">✕</button>
+    </div>
+    <div class="ctrl-modal-body">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px">إضافة حصة خارج جدول الحصص العادي (13+).</div>
+      <div class="ctrl-field">
+        <label>📆 اليوم</label>
+        <select id="extra-session-day" class="inp" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);font-family:'Tajawal',sans-serif;font-size:13px">
+          <option value="الأحد">الأحد</option>
+          <option value="الاثنين">الاثنين</option>
+          <option value="الثلاثاء">الثلاثاء</option>
+          <option value="الأربعاء">الأربعاء</option>
+          <option value="الخميس">الخميس</option>
+          <option value="الجمعة">الجمعة</option>
+          <option value="السبت">السبت</option>
+        </select>
+      </div>
+      <div class="ctrl-field">
+        <label>📅 التاريخ</label>
+        <input type="date" id="extra-session-date" class="inp" value="">
+      </div>
+      <div class="ctrl-field">
+        <label>🏫 الفوج</label>
+        <select id="extra-session-group" class="inp" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);font-family:'Tajawal',sans-serif;font-size:13px"></select>
+      </div>
+      <div class="ctrl-field">
+        <label>🏷️ تسمية (اختياري)</label>
+        <input type="text" id="extra-session-label" class="inp" placeholder="مثال: حصة مراجعة" value="">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button onclick="closeExtraSessionModal()" style="flex:1;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text-muted);font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">إلغاء</button>
+        <button onclick="createExtraSession()" class="btn-primary" style="flex:3">✅ إنشاء الحصة الإضافية</button>
+      </div>
     </div>
   </div>
 </div>
@@ -5921,6 +5974,9 @@ window.openAttModal = async (teacherId) => {
   // ✅ رسم شبكة الأفواج والحصص للأدمين
   renderAdminAttGroupsGrid(t);
 
+  // تحميل الحصص الإضافية
+  loadExtraSessions();
+
   document.getElementById('att-modal').classList.add('open');
 };
 window.closeAttModal = () => {
@@ -7153,6 +7209,294 @@ function refreshAdminGrid() {
 }
 
 // ═══════════════════════════════════════════════
+// EXTRA SESSIONS — الحصص الإضافية
+// ═══════════════════════════════════════════════
+
+let _extraSessionsIds = {}; // { gi: [ {sessionNum, label, day, date, docId} ] }
+
+// فتح مودال إضافة حصة إضافية
+window.openAddExtraSessionModal = () => {
+  const teacherId = currentAttTeacherId;
+  if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
+  const teacherData = allTeachers.find(x => x.id === teacherId) || {};
+  const groups = teacherData.groups || [];
+
+  // تعبئة قائمة الأفواج
+  const groupSelect = document.getElementById('extra-session-group');
+  if (groupSelect) {
+    groupSelect.innerHTML = groups.length
+      ? groups.map((g, i) => `<option value="${i}">${g.name}</option>`).join('')
+      : '<option value="0">لا يوجد أفواج (افتراضي)</option>';
+  }
+
+  // تعيين تاريخ اليوم كقيمة افتراضية
+  const dateInput = document.getElementById('extra-session-date');
+  if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
+
+  const bg = document.getElementById('extra-session-modal');
+  if (bg) {
+    bg.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+};
+
+window.closeExtraSessionModal = () => {
+  const bg = document.getElementById('extra-session-modal');
+  if (bg) {
+    bg.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+};
+
+// إنشاء حصة إضافية
+window.createExtraSession = async () => {
+  const teacherId = currentAttTeacherId;
+  if (!teacherId) { showToast('⚠️ لا يوجد أستاذ محدد', true); return; }
+
+  const day = document.getElementById('extra-session-day')?.value || 'الأحد';
+  const date = document.getElementById('extra-session-date')?.value || '';
+  const gi = parseInt(document.getElementById('extra-session-group')?.value || '0');
+  const label = document.getElementById('extra-session-label')?.value?.trim() || `حصة إضافية`;
+
+  if (!date) { showToast('⚠️ الرجاء اختيار تاريخ', true); return; }
+
+  try {
+    // توليد رقم حصة إضافية فريد (1000+)
+    const existing = await getDocs(query(
+      collection(db, 'sessionAttendance'),
+      where('teacherId', '==', teacherId + `_g${gi}`)
+    ));
+    let maxExtraNum = 1000;
+    existing.docs.forEach(d => {
+      const data = d.data();
+      if (data.isExtra) {
+        const sn = parseInt(data.sessionNum) || 0;
+        if (sn > maxExtraNum) maxExtraNum = sn;
+      }
+    });
+    const newSn = maxExtraNum + 1;
+
+    // إنشاء سجل الحضور الفارغ
+    const groupSuffix = `_g${gi}`;
+    const docId = `${teacherId}${groupSuffix}_extra_${newSn}`;
+    await setDoc(doc(db, 'sessionAttendance', docId), {
+      teacherId: teacherId + groupSuffix,
+      sessionNum: newSn,
+      isExtra: true,
+      extraDay: day,
+      extraLabel: label,
+      date: date,
+      savedAt: serverTimestamp(),
+      students: []
+    });
+
+    showToast(`✅ تم إنشاء "${label}" — ${day} ${date}`);
+    closeExtraSessionModal();
+    // إعادة تحميل الشبكة
+    refreshAdminGrid();
+    loadExtraSessions();
+    addLog('📅 حصة إضافية', `تم إنشاء "${label}" للأستاذ — ${day} ${date}`, '📅');
+  } catch (e) {
+    showToast('❌ خطأ: ' + e.message, true);
+  }
+};
+
+// تحميل وعرض الحصص الإضافية
+async function loadExtraSessions() {
+  const teacherId = currentAttTeacherId;
+  if (!teacherId) { return; }
+
+  const section = document.getElementById('extra-sessions-section');
+  const grid = document.getElementById('extra-sessions-grid');
+  if (!section || !grid) return;
+
+  try {
+    const snap = await getDocs(query(
+      collection(db, 'sessionAttendance'),
+      where('teacherId', '>=', teacherId + '_g'),
+      where('teacherId', '<=', teacherId + '_g\uf8ff')
+    ));
+
+    const extras = [];
+    snap.docs.forEach(d => {
+      const data = d.data();
+      if (data.isExtra && data.sessionNum >= 1000) {
+        const gStr = String(data.teacherId || '');
+        const gi = parseInt((gStr.match(/_g(\d+)$/) || [0, 0])[1]);
+        extras.push({ id: d.id, gi, ...data, sessionNum: data.sessionNum || 0 });
+      }
+    });
+
+    // تخزين في الكاش
+    _extraSessionsIds = {};
+    extras.forEach(e => {
+      if (!_extraSessionsIds[e.gi]) _extraSessionsIds[e.gi] = [];
+      _extraSessionsIds[e.gi].push(e);
+    });
+
+    const countEl = document.getElementById('extra-sessions-count');
+    if (countEl) countEl.textContent = `(${extras.length})`;
+
+    if (extras.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = 'block';
+
+    // رسم البطاقات
+    const teacherData = allTeachers.find(x => x.id === teacherId) || {};
+    const groups = teacherData.groups || [];
+
+    grid.innerHTML = extras.map(e => {
+      const gi = e.gi || 0;
+      const groupName = groups[gi]?.name || `فوج ${gi + 1}`;
+      const pres = (e.students || []).filter(s => s.present).length;
+      const tot = (e.students || []).length;
+      const hasAttendance = e.students && e.students.length > 0;
+      const clickFn = hasAttendance
+        ? `editExtraSession(${e.sessionNum}, ${gi})`
+        : `openExtraSession(${e.sessionNum}, ${gi})`;
+      return `<div onclick="${clickFn}"
+        style="flex-shrink:0;padding:10px 14px;border-radius:12px;border:1.5px solid ${hasAttendance ? 'rgba(16,185,129,0.35)' : 'var(--border-2)'};background:${hasAttendance ? 'rgba(16,185,129,0.06)' : 'white'};cursor:pointer;min-width:140px;text-align:center;transition:all 0.2s"
+        onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(124,58,237,0.15)'"
+        onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="font-size:16px">📅</div>
+        <div style="font-size:12px;font-weight:900;color:var(--text);margin-top:4px">${e.extraLabel || `حصة ${e.sessionNum}`}</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${e.extraDay || ''} — ${(e.date || '').slice(0,10)}</div>
+        <div style="font-size:10px;color:var(--primary);font-weight:700;margin-top:2px">🏫 ${groupName}</div>
+        ${hasAttendance
+          ? `<div style="margin-top:5px;font-size:11px;font-weight:800;color:#059669">✅ ${pres}/${tot}</div>`
+          : `<div style="margin-top:5px;font-size:16px;opacity:0.3">+</div>`}
+      </div>`;
+    }).join('');
+  } catch (e) {
+    console.warn('loadExtraSessions error:', e);
+    section.style.display = 'none';
+  }
+}
+
+// فتح حصة إضافية للتسجيل أو التعديل
+window.openExtraSession = (sessionNum, gi) => {
+  currentOpenSession = sessionNum;
+  window._currentGroupIdx = gi;
+  window._activeAttGroupIdx = gi;
+  if (!currentAttTeacherId && window.currentTeacherData?.uid) {
+    currentAttTeacherId = window.currentTeacherData.uid;
+    window.currentAttTeacherId = currentAttTeacherId;
+  }
+
+  const teacherRecord = window.currentTeacherData || (allTeachers || []).find(x => x.id === currentAttTeacherId) || {};
+  const extras = (_extraSessionsIds[gi] || []).filter(e => e.sessionNum === sessionNum);
+  const extra = extras[0] || {};
+  const students = currentAttStudents || [];
+  const groupNames = new Set((teacherRecord.groups || [])[gi]?.students?.map(s => s.trim().toLowerCase()) || []);
+  const groupStudents = groupNames.size > 0
+    ? students.filter(s => groupNames.has(s.name.trim().toLowerCase()))
+    : students;
+
+  // تطبيق الحضور المسجّل إن وجد
+  const recordedStudents = extra.students || [];
+  const recordedMap = {};
+  recordedStudents.forEach(s => { recordedMap[s.id] = s.present; });
+
+  const studentsHtml = (groupStudents.length
+    ? groupStudents.map(s => {
+        const recordedPresent = recordedMap[s.id];
+        const isPresent = recordedPresent === true;
+        const isMarked = recordedPresent !== undefined;
+        const { ps, rc } = getLivePayStatus(s);
+        const badgeHtml =
+          ps === 'paid'   ? `<span class="pay-badge paid">✅ مفعّلة</span>` :
+          ps === 'unpaid' ? `<span class="pay-badge unpaid">⏳ غير مفعّلة</span>` :
+                           `<span class="pay-badge unknown">— لا تذكرة</span>`;
+        return `
+        <div class="att-student-row" data-sid="${s.id}">
+          <span class="att-student-id">${s.id}</span>
+          <span class="att-student-name">${s.name}</span>
+          ${badgeHtml}
+          <div class="att-toggle" style="margin-right:auto">
+            <div class="att-check ${isPresent?'present':''}" title="حاضر" onclick="toggleStudentAtt('${s.id}',true,this)">✓</div>
+            <div class="att-check ${(!isPresent&&isMarked)?'absent':''}" title="غائب" onclick="toggleStudentAtt('${s.id}',false,this)" style="font-size:12px">✗</div>
+          </div>
+          <button style="padding:4px 8px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:var(--danger-soft);color:var(--danger);font-size:11px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700;flex-shrink:0" onclick="removeStudent('${s.id}')">حذف</button>
+        </div>`;
+      }).join('')
+    : `<div style="text-align:center;padding:30px;color:var(--text-muted)">لا يوجد تلاميذ</div>`
+  );
+
+  const html = `
+    <div class="session-att-header" style="border-radius:24px 24px 0 0">
+      <div style="font-size:22px">📅</div>
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:900;color:var(--text)">${extra.extraLabel || `حصة إضافية ${sessionNum}`}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${extra.extraDay || ''} — ${(extra.date || '').slice(0,10)}</div>
+      </div>
+      <button onclick="closeSessionModal()" style="padding:8px 16px;border-radius:12px;border:1px solid var(--border-2);background:var(--card);color:var(--text-muted);font-size:13px;cursor:pointer;font-family:'Tajawal',sans-serif;font-weight:700">✕</button>
+    </div>
+    <div style="padding:20px 24px">
+      <div class="att-summary-grid" style="margin-bottom:16px">
+        <div class="att-summary-card"><div class="att-summary-n" id="att-total">0</div><div class="att-summary-l">إجمالي</div></div>
+        <div class="att-summary-card" style="background:var(--success-soft);border-color:rgba(16,185,129,0.2)"><div class="att-summary-n" id="att-present" style="color:var(--success)">0</div><div class="att-summary-l">حاضر</div></div>
+        <div class="att-summary-card" style="background:var(--danger-soft);border-color:rgba(239,68,68,0.15)"><div class="att-summary-n" id="att-absent" style="color:var(--danger)">0</div><div class="att-summary-l">غائب</div></div>
+      </div>
+      <div class="att-students-list">${studentsHtml}</div>
+      <button class="btn-primary" onclick="saveExtraSessionAttendance(${sessionNum}, ${gi})" style="margin-top:14px;width:100%">💾 حفظ الحضور</button>
+    </div>`;
+
+  openSessionModal(html);
+  updateAttSummary(groupStudents);
+};
+
+// تعديل حصة إضافية مسجّلة (نفس الفتح)
+window.editExtraSession = (sessionNum, gi) => {
+  openExtraSession(sessionNum, gi);
+};
+
+// حفظ حضور حصة إضافية
+window.saveExtraSessionAttendance = async (sessionNum, gi) => {
+  const teacherId = currentAttTeacherId;
+  if (!teacherId) { showToast('⚠️ لا يوجد أستاذ محدد', true); return; }
+
+  // قراءة الحضور من الـ DOM مباشرة
+  const rows = document.querySelectorAll('#session-modal-inner .att-student-row');
+  const students = rows.length > 0
+    ? Array.from(rows).map(row => {
+        const sid = row.getAttribute('data-sid');
+        const name = row.querySelector('.att-student-name')?.textContent?.trim() || '';
+        const presentBtn = row.querySelectorAll('.att-check')[0];
+        const isPresent = presentBtn ? presentBtn.classList.contains('present') : false;
+        return { id: sid, name, present: isPresent };
+      })
+    : [];
+
+  // استخراج التسمية من العنوان
+  const headerText = document.querySelector('.session-att-header div:nth-child(2) div:first-child')?.textContent?.replace('📅', '').trim() || `حصة إضافية ${sessionNum}`;
+  const dayText = document.querySelector('.session-att-header div:nth-child(2) div:nth-child(2)')?.textContent?.split('—')[0]?.trim() || '';
+
+  const docId = `${teacherId}_g${gi}_extra_${sessionNum}`;
+  await setDoc(doc(db, 'sessionAttendance', docId), {
+    teacherId: teacherId + `_g${gi}`,
+    sessionNum,
+    isExtra: true,
+    extraDay: dayText,
+    extraLabel: headerText,
+    date: new Date().toISOString().slice(0, 10),
+    savedAt: serverTimestamp(),
+    students
+  }, { merge: true });
+
+  // تحديث الكاش المحلي
+  if (!_allRecordedSessionsByGroup[gi]) _allRecordedSessionsByGroup[gi] = {};
+  _allRecordedSessionsByGroup[gi][sessionNum] = { teacherId: teacherId + `_g${gi}`, sessionNum, isExtra: true, savedAt: new Date(), students };
+
+  showToast(`✅ تم حفظ حضور الحصة الإضافية`);
+  closeSessionModal();
+  refreshAdminGrid();
+  loadExtraSessions();
+};
+
+// ═══════════════════════════════════════════════
 // emergency Controls — تحكم طارئ
 // ═══════════════════════════════════════════════
 
@@ -7242,9 +7586,8 @@ async function loadSessionsDataForGroup(teacherId, teacherData, sessions, gi, gr
           _sessionControlCache[gi][data.sessionNum] = { id: d.id, ...data };
         }
       });
-      if (changed) {
+      if (changed && _allRecordedSessionsByGroup[gi]) {
         // إعادة رسم بطاقات الحصص بتطبيق الإعدادات الجديدة
-        const snap2 = null; // لا نحتاج recordedSessions جديدة، فقط نمرر null لإعادة الرسم
         updateSessionCardsForGroup(sessions, null, teacherData, gi, groupData);
       }
     }
