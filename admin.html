@@ -9857,13 +9857,14 @@ async function _startPrivateConv(teacherUid, teacherName) {
   if (!_db || !_me) return;
   closeNewConvPicker();
 
-  // البحث عن غرفة موجودة
+  // البحث عن غرفة موجودة (باستخدام query آمن مع array-contains)
   let roomId = null;
   try {
-    const snap = await getDocs(collection(_db, 'msgRooms'));
+    const q = query(collection(_db, 'msgRooms'), where('participants', 'array-contains', _me.uid));
+    const snap = await getDocs(q);
     snap.docs.forEach(d => {
       const p = d.data().participants || [];
-      if (p.includes(_me.uid) && p.includes(teacherUid)) roomId = d.id;
+      if (p.includes(teacherUid)) roomId = d.id;
     });
   } catch(e) { console.warn('msgRooms read error:', e.code); }
 
