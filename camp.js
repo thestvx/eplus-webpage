@@ -10,18 +10,17 @@ const CAMP_MIN_AGE = 5;
 
 // URL حق باقات المخيم الصيفي — SummerPlus
 const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwkRAbwsa0KpxxKKCWgEmVkr_6eHvPVcvXRicl4IRSp2q9yGkbM-gS40EPQ0Y_k_eT-uw/exec";
+  "https://script.google.com/macros/s/AKfycbzGcJb8TVAfyyGjlvbXKwsbELBeYI831KU09cpit7k4smSgZ0kRmSPhdjC_m4NO5tcw4g/exec";
 
 // URL حق البرامج الخاصة — programsummerschool
 const SPECIAL_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxx7iQIlah29cPHETPbLM_Tq7cwKsZFs2gxJTQHRvfOzciSujahYGq4uxfnPTdM4tPETw/exec";
+  "https://script.google.com/macros/s/AKfycbyJp48FX1vdn35zezbrsk_XHbeYksJ28n4T-5OpOrBTPzhsisx8gTubrlcOsaYbnu-kkg/exec";
 
 const VIDEO_PUBLIC_ID   = "copy_B61063D2-D03E-41C1-AB91-1B692AB1F686_rvphab";
 const VIDEO_CLOUD_NAME  = "dac4mwuwe";
 const VIDEO_FALLBACK_SRC =
   `https://res.cloudinary.com/${VIDEO_CLOUD_NAME}/video/upload/q_auto,f_auto/${VIDEO_PUBLIC_ID}.mp4`;
 
-const GALLERY_FOLDER  = "eplus-gallery";
 const GALLERY_MAX     = 24;
 
 const prefersReducedMotion =
@@ -105,67 +104,24 @@ function resetSubmitBtn(btnId, resetMsg) {
   if (span) span.textContent = resetMsg;
 }
 
-// ✅ إرسال مع retry تلقائي (3 محاولات)
-// ملاحظة: mode:"no-cors" — إذا ما رمى خطأ يعني الإرسال وصل، نوقف فوراً
-async function fetchWithRetry(url, payload, attempts = 3) {
-  for (let i = 0; i < attempts; i++) {
-    try {
-      await fetch(url, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify(payload)
-      });
-      return true; // نجح — نوقف ولا نكمل retry
-    } catch (err) {
-      console.warn(`محاولة ${i + 1} فشلت:`, err);
-      if (i < attempts - 1) {
-        await new Promise(r => setTimeout(r, 1500 * (i + 1)));
-      }
-    }
-  }
-  throw new Error("فشل الإرسال بعد " + attempts + " محاولات");
-}
-
-// ✅ حفظ احتياطي في Firestore مباشرة من المتصفح
-async function saveToFirestoreBackup(collectionName, data) {
-  try {
-    const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js");
-    const { getFirestore, collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js");
-
-    const cfg = {
-      apiKey: "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
-      authDomain: "eplus-center-39.firebaseapp.com",
-      projectId: "eplus-center-39"
-    };
-
-    const app = getApps().find(a => a.name === "camp-backup") ||
-                initializeApp(cfg, "camp-backup");
-    const db = getFirestore(app);
-
-    await addDoc(collection(db, collectionName), {
-      ...data,
-      savedAt: serverTimestamp()
-    });
-    console.log("✅ حُفظ في Firestore backup");
-  } catch (err) {
-    console.warn("⚠️ Firestore backup فشل (مش مشكلة، الشيت اتكتب):", err);
-  }
-}
-
 // يرسل للجدول الكبير (باقات المخيم)
-// ⚠️ attempts=1: mode:"no-cors" لا يرمي خطأ → retry يسبب تكراراً
 async function submitPayload(payload) {
-  await fetchWithRetry(APPS_SCRIPT_URL, payload, 1);
-  // حفظ احتياطي في Firestore
-  await saveToFirestoreBackup("campRegistrations", payload);
+  return await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(payload)
+  });
 }
 
-// يرسل للجدول الخاص بالبرامج الخاصة + Firestore backup
-// ⚠️ attempts=1 مهم: mode:"no-cors" لا يرمي خطأ أبداً → retry يسبب تكراراً في الشيت
+// يرسل للجدول الخاص بالبرامج الخاصة
 async function submitSpecialPayload(payload) {
-  await fetchWithRetry(SPECIAL_SCRIPT_URL, payload, 1);
-  await saveToFirestoreBackup("specialcampRegistrations", payload);
+  return await fetch(SPECIAL_SCRIPT_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(payload)
+  });
 }
 
 /* ═══════════════════════════════════════════
@@ -831,8 +787,6 @@ function initSpecialForm() {
     const payload = {
       source: "special-programs",
       timestamp: buildTimestamp(),
-      // 🔑 مفتاح فريد لمنع التكرار — Apps Script يتجاهل أي طلب بنفس الـ key
-      submissionKey: `sp_${data.parentPhone}_${Date.now()}`,
       page: "summer-camp",
       formType: "special-program",
       specialPrograms: data.programs.join(" + "),
@@ -895,32 +849,43 @@ async function loadCampGallery() {
   const container = $("camp-gallery-grid");
   if (!container) return;
 
+  // قائمة صور المخيم من المجلد المحلي
+  const imageNames = [
+    "IMG_4628.jpg","IMG_4629.jpg","IMG_4631.jpg","IMG_4632.jpg",
+    "IMG_4633.jpg","IMG_4634.jpg","IMG_4635.jpg","IMG_4636.jpg",
+    "IMG_4637.jpg","IMG_4638.jpg","IMG_4639.jpg","IMG_4640.jpg",
+    "IMG_4641.jpg"
+  ];
+
   try {
-    const res = await fetch(
-      `https://res.cloudinary.com/${VIDEO_CLOUD_NAME}/image/list/${GALLERY_FOLDER}.json`
-    );
-    if (!res.ok) throw new Error("Gallery fetch failed");
-
-    const data = await res.json();
-    const resources = (data.resources || []).slice(0, GALLERY_MAX);
-
-    if (!resources.length) {
-      container.innerHTML = `<div class="gallery-empty">لا توجد صور بعد.</div>`;
-      return;
-    }
-
     container.innerHTML = "";
-    resources.forEach(r => {
+    let loaded = 0;
+    const total = imageNames.length;
+
+    imageNames.forEach((fname, i) => {
       const item = document.createElement("div");
       item.className = "gallery-item reveal";
-      const src = `https://res.cloudinary.com/${VIDEO_CLOUD_NAME}/image/upload/c_fill,w_480,h_360,q_auto,f_auto/${r.public_id}`;
-      const full = `https://res.cloudinary.com/${VIDEO_CLOUD_NAME}/image/upload/q_auto,f_auto/${r.public_id}`;
-      item.innerHTML = `<img src="${src}" alt="صورة من المخيم" loading="lazy" decoding="async">`;
-      item.addEventListener("click", () => openLightbox(full));
+      item.style.setProperty("--i", i);
+      const src = `summerplusgallery/${fname}?v=2`;
+      const img = document.createElement("img");
+      img.src = src;
+      img.alt = "صورة من المخيم";
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.onerror = () => {
+        loaded++;
+        if (loaded >= total) {
+          container.innerHTML = `<div class="gallery-empty">تعذّر تحميل الصور — تأكد من وجود المجلد <strong>summerplusgallery</strong> في نفس مسار الملف.</div>`;
+        }
+      };
+      img.onload = () => {
+        loaded++;
+        if (loaded >= total) initRevealOnScroll();
+      };
+      item.appendChild(img);
+      item.addEventListener("click", () => openLightbox(src));
       container.appendChild(item);
     });
-
-    initRevealOnScroll();
   } catch (err) {
     console.warn("Gallery load error:", err);
     container.innerHTML = `<div class="gallery-empty">تعذّر تحميل الصور.</div>`;
@@ -1017,12 +982,10 @@ function init() {
   initTiltEffect();
 }
 
-// ✅ نشغّل init مرة واحدة فقط — بغض النظر عن وقت تحميل الـ script
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", init, { once: true });
 } else {
-  // DOM جاهز — نشغّل مباشرة لكن داخل microtask لضمان اكتمال HTML
-  Promise.resolve().then(init);
+  init();
 }
 
 /* ─── redesign scroll & nav polish ─── */
