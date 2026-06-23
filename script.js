@@ -1,4 +1,7 @@
-
+/* ══════════════════════════════════════════════════════════
+   E-PLUS CENTER — script.js
+   Version 2.2 — Main site active, maintenance removed
+══════════════════════════════════════════════════════════ */
 
 /* ──────────────────────────────────────────────────────────
    DOM HELPERS
@@ -82,7 +85,7 @@ function byId(id) {
    APPS SCRIPT URLS
 ────────────────────────────────────────────────────────── */
 const APPS_SCRIPT_URL =
-  'https://script.google.com/macros/s/AKfycbyaVgysQI1qpUCg8X11FMRTmikBQrvFN9wkSVhOfGhHtD3FjAJfURhotvYycTvrbWwzSA/exec';
+  'https://script.google.com/macros/s/AKfycbwidCYkiWYlCSkMNUwbo1ZLM8XCGh8y5lWD7M_lS-J5cX35-Xd8kHhrwO4ktZiN5_vhIg/exec';
 
 const JOIN_APPS_SCRIPT_URL =
   'https://script.google.com/macros/s/AKfycbzo7_3ElBeyt88Cv6PsTDEp_DMu5i_PO-t54t8WAdRitoUf7HLzx9VF_GyEHPs9QcQx/exec';
@@ -106,6 +109,15 @@ const typeLabelsEn = {
   ielts: 'IELTS Test',
   online: 'Online Courses',
   takwini: 'Training Courses'
+};
+
+const typeLabelsFr = {
+  support: 'Soutien Scolaire',
+  lang: 'Cours de Langues',
+  vip: 'Leçons VIP',
+  ielts: 'Test IELTS',
+  online: 'Cours en Ligne',
+  takwini: 'Formations'
 };
 
 /* ──────────────────────────────────────────────────────────
@@ -147,24 +159,243 @@ window.toggleTheme = toggleTheme;
 })();
 
 
-let currentLang = 'ar';
+let currentLang = localStorage.getItem('ep-lang') || 'ar';
+
+function __(key, fallback) {
+  const val = i18n[currentLang]?.[key];
+  return val !== undefined ? val : (fallback ?? key);
+}
 
 const i18n = {
   ar: {
-    title: 'وجهتك الأولى نحو التعليم والتطوير',
-    badge: '✦ رحلتك نحو النجاح تبدأ من هنا ✦',
-    subtitle: 'التسجيل في الدورات والبرامج التعليمية',
-    btn1: 'تسجيلات الدعم',
-    btn2: 'دورات اللغات',
-    btn3: 'دروس VIP',
-    btn4: 'اختبار IELTS',
-    btn5: 'دورات أونلاين',
-    btn6: 'دورات تكوينية',
-    annTitle: 'إعلانات المركز التعليمي',
+    // Nav
+    nav_home: 'الرئيسية',
+    nav_programs: 'البرامج',
+    nav_teachers: 'الأساتذة',
+    nav_paths: 'المسارات',
+    nav_steps: 'كيف تنضم',
+    nav_announcements: 'الإعلانات',
+    nav_gallery: 'المعرض',
+    nav_faq: 'الأسئلة الشائعة',
+    nav_join: 'انضم لفريقنا',
+    nav_register: 'سجّل الآن ✦',
+    // Mobile menu
+    mob_home: '🏠 الرئيسية',
+    mob_programs: '📚 البرامج',
+    mob_teachers: '👨‍🏫 الأساتذة',
+    mob_paths: '🛤️ المسارات',
+    mob_steps: '📝 كيف تنضم',
+    mob_announcements: '📢 الإعلانات',
+    mob_gallery: '🖼️ المعرض',
+    mob_faq: '❓ الأسئلة الشائعة',
+    mob_join: '🤝 انضم لفريقنا',
+    // Topbar
+    topbar_new: 'جديد',
+    topbar_camp: '🏕️ المخيم الصيفي 2026 — التسجيل مفتوح الآن',
+    topbar_location: 'قمار، ولاية الوادي — الجزائر',
+    // Hero
+    hero_tag: 'مركز التميز التعليمي · قمار، الوادي',
+    hero_title: 'وجهتك الأولى<br />نحو <span class="ep-text-gold">التعليم</span> والتطوير',
+    hero_subtitle: 'دورات اللغات · الدعم الدراسي · IELTS · VIP · دورات تكوينية · برامج أونلاين<br />انطلق نحو مستقبلك مع أساتذة متميزين وتجربة تعليمية حديثة ومتكاملة.',
+    hero_btn_register: 'سجّل الآن ✦',
+    hero_btn_camp: '🏕️ المخيم الصيفي',
+    hero_btn_lang: 'ابدأ اللغات',
+    hero_btn_support: 'ابدأ الدعم',
+    hero_btn_vip: 'احجز VIP',
+    hero_card_kicker: 'E-PLUS EXPERIENCE',
+    hero_card_title: 'تجربة تعليمية تجمع بين الجودة، الوضوح، والنتائج',
+    hero_card_desc: 'برامج متنوعة للغات، الدعم الدراسي، التحضير للاختبارات، والتعليم الفردي ضمن بيئة حديثة ومنظمة.',
+    hero_list_1: 'متابعة مستمرة للطلاب',
+    hero_list_2: 'أساتذة أكفاء وخطط واضحة',
+    hero_list_3: 'مستويات مناسبة لكل الأعمار',
+    hero_list_4: 'دروس حضورية وأونلاين',
+    hero_btn_ielts: 'IELTS',
+    hero_btn_online: 'أونلاين',
+    // Stats
+    stat_1: 'برنامجاً تعليمياً',
+    stat_2: 'طالباً ومستفيداً',
+    stat_3: 'أستاذاً ومؤطراً',
+    stat_4: 'مسارات رئيسية',
+    // Trust strip
+    trust_1_title: 'أهداف واضحة',
+    trust_1_desc: 'كل برنامج مبني على مخرجات تعليمية محددة وسهلة المتابعة.',
+    trust_2_title: 'إشراف أكاديمي',
+    trust_2_desc: 'أساتذة مختصون وخبرة في التعامل مع مختلف المستويات.',
+    trust_3_title: 'أسلوب حديث',
+    trust_3_desc: 'تجربة تعليمية مرنة وتفاعلية داخل الصف وخارجه.',
+    trust_4_title: 'نتائج ملموسة',
+    trust_4_desc: 'تركيز على التطور الحقيقي للطالب في المهارة والثقة.',
+    // Achievement badges
+    achieve_1: 'مركز معتمد',
+    achieve_2: 'تقييم ممتاز',
+    achieve_3: 'IELTS Partner',
+    achieve_4: '+3 سنوات خبرة',
+    achieve_5: 'دروس أونلاين',
+    // Programs section
+    prog_pretitle: 'Programs',
+    prog_title: 'برامجنا التعليمية',
+    prog_desc: 'اختر البرنامج الذي يناسب مستواك وهدفك، وابدأ رحلة تعليمية منظمة وواضحة.',
+    prog_lang_title: 'دورات اللغات',
+    prog_lang_desc: 'تعلم الإنجليزية والفرنسية وغيرهما عبر مستويات متدرجة وتطبيق عملي مستمر.',
+    prog_lang_chip1: 'A0 - C2',
+    prog_lang_chip2: 'صغار وكبار',
+    prog_lang_chip3: 'حضوري',
+    prog_lang_btn: 'سجل الآن',
+    prog_support_title: 'الدعم الدراسي',
+    prog_support_desc: 'حصص مرافقة ومراجعة للطلاب مع تنظيم، متابعة، وتقوية في المواد الأساسية.',
+    prog_support_chip1: 'ابتدائي',
+    prog_support_chip2: 'متوسط',
+    prog_support_chip3: 'ثانوي',
+    prog_support_btn: 'سجل الآن',
+    prog_vip_title: 'دروس VIP',
+    prog_vip_desc: 'تعليم فردي أو بمجموعات صغيرة جداً مع تركيز كامل على احتياج الطالب.',
+    prog_vip_chip1: 'مرونة عالية',
+    prog_vip_chip2: 'خطة خاصة',
+    prog_vip_chip3: 'نتائج أسرع',
+    prog_vip_btn: 'سجل الآن',
+    prog_ielts_title: 'التحضير لاختبار IELTS',
+    prog_ielts_desc: 'برنامج متخصص لتقوية المهارات الأربع وفهم بنية الاختبار والتدريب عليه.',
+    prog_ielts_chip1: 'Listening',
+    prog_ielts_chip2: 'Reading',
+    prog_ielts_chip3: 'Writing & Speaking',
+    prog_ielts_btn: 'سجل الآن',
+    prog_online_title: 'الدورات الأونلاين',
+    prog_online_desc: 'تعلم من أي مكان عبر حصص مباشرة ومحتوى منظم ومتابعة رقمية.',
+    prog_online_chip1: 'عن بعد',
+    prog_online_chip2: 'مرن',
+    prog_online_chip3: 'تفاعلي',
+    prog_online_btn: 'سجل الآن',
+    prog_training_title: 'الدورات التكوينية',
+    prog_training_desc: 'برامج مهارية وتكوينية تساعدك على تطوير نفسك أكاديمياً ومهنياً.',
+    prog_training_chip1: 'مهارات',
+    prog_training_chip2: 'تطوير ذات',
+    prog_training_chip3: 'تأهيل',
+    prog_training_btn: 'سجل الآن',
+    prog_camp_title: 'المخيم الصيفي 2026',
+    prog_camp_desc: 'أنشطة تعليمية وترفيهية وتطويرية ضمن تجربة صيفية مميزة.',
+    prog_camp_badge: 'سجل الآن',
+    // Paths section
+    path_pretitle: 'Paths',
+    path_title: 'المسارات التعليمية',
+    path_desc: 'اختر المسار الذي يناسب عمرك، مستواك، وهدفك الدراسي أو اللغوي.',
+    path_kids_kicker: 'Kids',
+    path_kids_title: 'مسار الأطفال',
+    path_kids_desc: 'بناء أساس قوي في اللغة والتعلّم بأسلوب ممتع وتفاعلي.',
+    path_kids_1: 'أنشطة مناسبة للعمر',
+    path_kids_2: 'تعلم تدريجي وواضح',
+    path_kids_3: 'تحفيز وثقة بالنفس',
+    path_students_kicker: 'Students',
+    path_students_title: 'مسار التلاميذ',
+    path_students_desc: 'مرافقة دراسية حقيقية وتحسين النتائج مع متابعة دورية.',
+    path_students_1: 'شرح مبسط ومنظم',
+    path_students_2: 'مراجعة وتمارين',
+    path_students_3: 'استعداد أفضل للاختبارات',
+    path_adults_kicker: 'Adults',
+    path_adults_title: 'مسار الشباب والكبار',
+    path_adults_desc: 'تطوير لغوي ومهاري يناسب الدراسة، العمل، والسفر.',
+    path_adults_1: 'برامج مرنة',
+    path_adults_2: 'تركيز على التطبيق',
+    path_adults_3: 'محتوى عملي',
+    // Steps section
+    step_pretitle: 'How it works',
+    step_title: 'كيف تنضم إلينا',
+    step_desc: 'خطوات بسيطة وواضحة للبدء في البرنامج المناسب لك.',
+    step_1_title: 'تواصل معنا',
+    step_1_desc: 'راسلنا أو زر المركز لمعرفة البرامج المتاحة.',
+    step_2_title: 'تحديد المستوى',
+    step_2_desc: 'نساعدك على اختيار المسار أو البرنامج الأنسب.',
+    step_3_title: 'التسجيل',
+    step_3_desc: 'أكمل معلوماتك وثبّت مقعدك في البرنامج.',
+    step_4_title: 'ابدأ رحلتك',
+    step_4_desc: 'انطلق ضمن تجربة تعليمية حديثة ومتكاملة.',
+    // Why us section
+    why_pretitle: 'Why E-PLUS',
+    why_title: 'لماذا E-PLUS؟',
+    why_main_title: 'بيئة تعليمية حديثة وواضحة',
+    why_main_desc: 'نعمل على تقديم تجربة منظمة، أنيقة، وعملية تساعد الطالب على التقدم بثقة.',
+    why_point_1: 'محتوى مناسب لكل فئة',
+    why_point_2: 'تنظيم ومتابعة مستمرة',
+    why_point_3: 'توازن بين الفهم والتطبيق',
+    why_point_4: 'اهتمام بالتفاصيل والجودة',
+    why_mini_1_title: 'تنوع البرامج',
+    why_mini_1_desc: 'لغات، دعم، VIP، IELTS، أونلاين، ودورات تكوينية.',
+    why_mini_2_title: 'مرونة',
+    why_mini_2_desc: 'خيارات تناسب الوقت والهدف ومستوى الطالب.',
+    why_mini_3_title: 'جودة',
+    why_mini_3_desc: 'تركيز على تجربة راقية ونتائج ملموسة.',
+    // Teachers section
+    teacher_pretitle: 'Teachers',
+    teacher_title: 'فريق الأساتذة',
+    teacher_desc: 'طاقم متميز يعمل على تقديم تعليم منظم وفعال بمستوى احترافي.',
+    // Announcements section
+    ann_live: 'آخر الإعلانات والتحديثات',
+    ann_title: 'الإعلانات',
+    ann_subtitle: 'تابع آخر أخبار وعروض المركز',
+    ann_filter_all: 'الكل',
+    ann_filter_general: '📢 عام',
+    ann_filter_event: '🎉 فعالية',
+    ann_filter_urgent: '🚨 عاجل',
+    ann_filter_offer: '🎁 عرض',
+    ann_filter_news: '📰 خبر',
+    ann_loading: 'جاري تحميل الإعلانات...',
+    ann_empty: 'لا توجد إعلانات في هذه الفئة',
+    ann_read_more: 'اقرأ المزيد',
+    // Testimonials section
+    test_pretitle: 'Testimonials',
+    test_title: 'آراء المستفيدين',
+    // Gallery section
+    gal_pretitle: 'Gallery',
+    gal_title: 'معرض صور المركز',
+    gal_desc: 'لحظات حقيقية من داخل مركز E-PLUS — بيئة تعليمية متكاملة وحديثة.',
+    gal_lightbox_label: 'عرض الصورة',
+    gal_lightbox_close: 'إغلاق',
+    gal_lightbox_prev: 'السابق',
+    gal_lightbox_next: 'التالي',
+    // FAQ section
+    faq_pretitle: 'FAQ',
+    faq_title: 'الأسئلة الشائعة',
+    faq_q1: 'ما هي الفئات التي يمكنها التسجيل؟',
+    faq_a1: 'تتوفر برامج تناسب الأطفال، التلاميذ، الشباب، والكبار حسب نوع البرنامج والمستوى.',
+    faq_q2: 'هل توجد برامج أونلاين؟',
+    faq_a2: 'نعم، نوفر برامج أونلاين في بعض المسارات مع متابعة مناسبة.',
+    faq_q3: 'هل يمكن التسجيل في دروس VIP؟',
+    faq_a3: 'نعم، يمكن طلب دروس فردية أو شبه فردية حسب التوفر والاحتياج.',
+    faq_q4: 'كيف أعرف البرنامج المناسب لي؟',
+    faq_a4: 'تواصل معنا وسنساعدك في اختيار البرنامج الأنسب بناءً على المستوى والهدف.',
+    // Contact section
+    contact_pretitle: 'Contact',
+    contact_title: 'تواصل معنا',
+    contact_desc: 'يسعدنا استقبال استفساراتكم ومساعدتكم في اختيار البرنامج الأنسب.',
+    contact_btn_call: 'اتصال مباشر',
+    contact_btn_whatsapp: 'واتساب',
+    contact_address_label: 'العنوان',
+    contact_address: 'حي الشهداء، مقابل الطريق الوطني رقم 48 — قمار، الوادي، الجزائر',
+    contact_phone_label: 'الهاتف',
+    contact_email_label: 'البريد',
+    contact_hours_title: 'أوقات العمل',
+    contact_hours_morning: 'الفترة الصباحية',
+    contact_hours_evening: 'الفترة المسائية',
+    contact_hours_days: 'السبت — الجمعة',
+    contact_hours_note: 'يُرجى الحضور خلال أوقات العمل الرسمية للاستفسار والتسجيل.',
+    // Join CTA
+    join_title: 'هل ترغب في الانضمام لفريقنا؟',
+    join_desc: 'نرحب بالأساتذة، المؤطرين، والمبدعين الراغبين في المساهمة في تجربة تعليمية مميزة.',
+    join_btn: 'انضم لفريقنا',
+    join_btn_terms: 'الشروط',
+    // Footer
+    footer_copy: '© 2026 E-PLUS Center — جميع الحقوق محفوظة.',
+    footer_programs: 'البرامج',
+    footer_faq: 'الأسئلة الشائعة',
+    footer_contact: 'التواصل',
+    // Form — general
+    form_title: 'استمارة التسجيل',
+    form_lang_warning_ar: 'يرجى إدخال جميع المعلومات باللغة العربية فقط',
+    form_lang_warning_en: 'Please enter all information in English only',
+    form_lang_warning_fr: 'Veuillez saisir toutes les informations en français uniquement',
     firstName: 'الاسم',
     lastName: 'اللقب',
     birthDate: 'تاريخ الميلاد',
-    birthPlace: 'العنوان',
+    birthPlace: 'مكان الميلاد / العنوان',
     phone: 'رقم الهاتف',
     motivation: 'ما الذي دفعك إلى اختيار التسجيل في مركز E-PLUS؟',
     motivationVip: 'ما الذي جعلك تختار الدراسة عبر نظام الدروس الخاصة VIP؟',
@@ -191,9 +422,51 @@ const i18n = {
     chooseDays: 'اختر الأيام',
     daysSelected: 'يوم محدد',
     submitBtn: 'إتمام التسجيل ✦',
+    // Form — support type
+    form_support_type: 'نوع التسجيل في الدعم',
+    form_support_school: 'دعم دراسي',
+    form_support_course: 'دروس حرة',
+    form_support_select: '-- اختر --',
+    form_support_select_subject: '-- اختر المادة --',
+    form_support_select_teacher: '-- اختر الأستاذ/ة --',
+    form_support_select_specialty: '-- اختر التخصص --',
+    // Form — training
+    form_training_title: 'الدورة التكوينية',
+    form_training_graphic: 'التصميم الجرافيكي',
+    form_training_prog: 'البرمجة',
+    form_training_comm: 'مهارات التواصل',
+    form_training_accounting: 'المحاسبة والإدارة',
+    form_training_marketing: 'التسويق الرقمي',
+    form_training_other: 'أخرى',
+    form_training_level: 'مستواك في الدورة',
+    form_training_beginner: '🔰 مبتدئ',
+    form_training_intermediate: '📈 لدي بعض الأساس',
+    form_training_advanced: '🚀 متقدم — أريد التعمق أكثر',
+    form_training_mode: 'طريقة التعلم المفضلة',
+    form_training_presential: '🏫 حضوري في المركز',
+    form_training_online: '💻 أونلاين عن بعد',
+    form_training_mixed: '🔄 مختلط (حضوري + أونلاين)',
+    // Form — VIP
+    form_vip_support: 'VIP دعم دراسي',
+    form_vip_lang: 'VIP لغات',
+    form_vip_days: 'كم يوم تريد الحضور في الأسبوع؟',
+    form_vip_choose_days_prefix: 'اختر',
+    form_vip_choose_days_suffix: 'للحضور في الأسبوع',
+    // Form — lang levels
+    form_lang_select: '-- اختر اللغة --',
+    form_level_select: '-- اختر مستواك --',
+    form_cefr_hint: 'اختر المستوى المناسب — يمكننا مساعدتك باختبار تحديد المستوى إن لم تكن متأكداً',
+    form_level_test_note: '🧪 الاختبار يستغرق ~15 دقيقة ويساعدنا على وضعك في المجموعة المناسبة تماماً',
+    form_level_test_yes: '✅ نعم، أريد إجراء الاختبار',
+    form_level_test_no: '❌ لا، أنا متأكد من مستواي',
+    form_coming_soon: 'الدورات لهذا المستوى ستُضاف قريباً',
+    form_course_select: 'اختر الدورة',
+    form_course_placeholder: '-- اختر الدورة --',
+    // Terms
     termsTitle: 'قوانين وشروط المركز التعليمي',
     termsAgree: 'لقد قرأت جميع القوانين والشروط وأوافق عليها',
     termsProceed: 'تأكيد التسجيل ✦',
+    terms_scroll_hint: 'اقرأ القوانين كاملاً للمتابعة',
     t1: 'يعتبر المتعلم مسجلاً بصفة رسمية بالمركز عند قيامه بتسديد رسوم التسجيل في التاريخ المحدد.',
     t2: 'يجب أن يتسم المتعلم بحسن الأخلاق والنظافة والهندام الملائم.',
     t3: 'يجب احترام جميع الأفراد في المركز التعليمي، الزملاء، المدرسين والطاقم الإداري.',
@@ -207,23 +480,256 @@ const i18n = {
     t11: 'يمنع لمس أو تشغيل أدوات وأجهزة التعليم المختلفة دون إذن.',
     t12: 'أي عملية إتلاف لتجهيزات المركز تعرض صاحبها للعقوبة وتعويض الخسائر.',
     t13: 'في حالة السلوكات غير المقبولة، ينذر الولي كتابياً عند تكرر المخالفة.',
-    t14: 'الموافقة على نشر صور المتعلم في شبكات التواصل الاجتماعي، ومقاطع الفيديو التربوية الخاصة بالمركز.'
+    t14: 'الموافقة على نشر صور المتعلم في شبكات التواصل الاجتماعي، ومقاطع الفيديو التربوية الخاصة بالمركز.',
+    // Join modal
+    join_modal_title: 'انضم لفريق E-PLUS',
+    join_firstName: 'الاسم',
+    join_lastName: 'اللقب',
+    join_phone: 'رقم الهاتف',
+    join_email: 'البريد الإلكتروني',
+    join_role: 'الدور المطلوب',
+    join_role_teacher: '👨‍🏫 أستاذ',
+    join_role_supervisor: '🧑‍💼 مؤطر',
+    join_role_admin: '📋 إداري',
+    join_specialty: 'التخصص / المادة',
+    join_experience: 'الخبرة والمؤهلات',
+    join_cv: 'السيرة الذاتية (PDF أو Word)',
+    join_cv_choose: 'اختر الملف',
+    join_submit: 'إرسال الطلب ✦',
+    join_success: 'تم إرسال الطلب بنجاح',
+    // Loading popup
+    loading_title: 'جاري المعالجة...',
+    loading_msg: 'يرجى الانتظار',
+    requested_service: 'الخدمة المطلوبة',
+    loading_submitting: 'جاري إرسال التسجيل...',
+    loading_wait_moment: 'يرجى الانتظار قليلاً',
+    loading_join_submitting: 'جاري إرسال طلب الانضمام...',
+    loading_join_wait: 'يرجى الانتظار قليلاً',
+    // Success popup
+    success_title: 'تم بنجاح',
+    success_ok: 'حسناً ✦',
+    success_reg_number: 'رقم التسجيل:',
+    success_msg: 'تم تنفيذ العملية بنجاح.',
+    success_reg_done: 'تم التسجيل بنجاح',
+    // Theme toggle
+    theme_aria: 'تغيير المظهر',
+    theme_title: 'تغيير المظهر',
+    // Hamburger
+    hamburger_aria: 'القائمة',
+    // Language toggle
+    lang_ar: 'AR',
+    lang_en: 'EN',
+    lang_fr: 'FR',
   },
   en: {
-    title: 'Your first destination for education and growth',
-    badge: '✦ Your journey to success starts here ✦',
-    subtitle: 'Register for courses and educational programs',
-    btn1: 'Support Registration',
-    btn2: 'Language Courses',
-    btn3: 'VIP Lessons',
-    btn4: 'IELTS Test',
-    btn5: 'Online Courses',
-    btn6: 'Training Courses',
-    annTitle: 'Center Announcements',
+    nav_home: 'Home',
+    nav_programs: 'Programs',
+    nav_teachers: 'Teachers',
+    nav_paths: 'Paths',
+    nav_steps: 'How to Join',
+    nav_announcements: 'Announcements',
+    nav_gallery: 'Gallery',
+    nav_faq: 'FAQ',
+    nav_join: 'Join Our Team',
+    nav_register: 'Register Now ✦',
+    mob_home: '🏠 Home',
+    mob_programs: '📚 Programs',
+    mob_teachers: '👨‍🏫 Teachers',
+    mob_paths: '🛤️ Paths',
+    mob_steps: '📝 How to Join',
+    mob_announcements: '📢 Announcements',
+    mob_gallery: '🖼️ Gallery',
+    mob_faq: '❓ FAQ',
+    mob_join: '🤝 Join Our Team',
+    topbar_new: 'New',
+    topbar_camp: '🏕️ Summer Camp 2026 — Registration Open Now',
+    topbar_location: 'Ghamar, El Oued — Algeria',
+    hero_tag: 'Educational Excellence Center · Ghamar, El Oued',
+    hero_title: 'Your First Destination<br />for <span class="ep-text-gold">Education</span> & Growth',
+    hero_subtitle: 'Language Courses · Academic Support · IELTS · VIP · Training · Online Programs<br />Start your journey with expert teachers and a modern, integrated learning experience.',
+    hero_btn_register: 'Register Now ✦',
+    hero_btn_camp: '🏕️ Summer Camp',
+    hero_btn_lang: 'Start Languages',
+    hero_btn_support: 'Start Support',
+    hero_btn_vip: 'Book VIP',
+    hero_card_kicker: 'E-PLUS EXPERIENCE',
+    hero_card_title: 'An educational experience combining quality, clarity, and results',
+    hero_card_desc: 'Diverse programs for languages, academic support, test preparation, and individual tutoring in a modern, organized environment.',
+    hero_list_1: 'Continuous student follow-up',
+    hero_list_2: 'Competent teachers with clear plans',
+    hero_list_3: 'Levels suitable for all ages',
+    hero_list_4: 'In-person and online lessons',
+    hero_btn_ielts: 'IELTS',
+    hero_btn_online: 'Online',
+    stat_1: 'Educational Programs',
+    stat_2: 'Students & Beneficiaries',
+    stat_3: 'Teachers & Supervisors',
+    stat_4: 'Main Paths',
+    trust_1_title: 'Clear Goals',
+    trust_1_desc: 'Each program is built on specific, trackable educational outcomes.',
+    trust_2_title: 'Academic Supervision',
+    trust_2_desc: 'Specialized teachers experienced with all levels.',
+    trust_3_title: 'Modern Approach',
+    trust_3_desc: 'Flexible, interactive learning inside and outside the classroom.',
+    trust_4_title: 'Tangible Results',
+    trust_4_desc: 'Focus on real student progress in skill and confidence.',
+    achieve_1: 'Accredited Center',
+    achieve_2: 'Excellent Rating',
+    achieve_3: 'IELTS Partner',
+    achieve_4: '+3 Years Experience',
+    achieve_5: 'Online Lessons',
+    prog_pretitle: 'Programs',
+    prog_title: 'Our Educational Programs',
+    prog_desc: 'Choose the program that fits your level and goal, and start an organized learning journey.',
+    prog_lang_title: 'Language Courses',
+    prog_lang_desc: 'Learn English, French, and more through progressive levels and continuous practice.',
+    prog_lang_chip1: 'A0 - C2',
+    prog_lang_chip2: 'Kids & Adults',
+    prog_lang_chip3: 'In-Person',
+    prog_lang_btn: 'Register Now',
+    prog_support_title: 'Academic Support',
+    prog_support_desc: 'Guided review sessions for students with organization, follow-up, and core subject reinforcement.',
+    prog_support_chip1: 'Primary',
+    prog_support_chip2: 'Middle',
+    prog_support_chip3: 'Secondary',
+    prog_support_btn: 'Register Now',
+    prog_vip_title: 'VIP Lessons',
+    prog_vip_desc: 'One-on-one or small group instruction with complete focus on student needs.',
+    prog_vip_chip1: 'High Flexibility',
+    prog_vip_chip2: 'Custom Plan',
+    prog_vip_chip3: 'Faster Results',
+    prog_vip_btn: 'Register Now',
+    prog_ielts_title: 'IELTS Test Preparation',
+    prog_ielts_desc: 'Specialized program to strengthen all four skills and understand the test structure.',
+    prog_ielts_chip1: 'Listening',
+    prog_ielts_chip2: 'Reading',
+    prog_ielts_chip3: 'Writing & Speaking',
+    prog_ielts_btn: 'Register Now',
+    prog_online_title: 'Online Courses',
+    prog_online_desc: 'Learn from anywhere with live sessions, organized content, and digital follow-up.',
+    prog_online_chip1: 'Remote',
+    prog_online_chip2: 'Flexible',
+    prog_online_chip3: 'Interactive',
+    prog_online_btn: 'Register Now',
+    prog_training_title: 'Training Courses',
+    prog_training_desc: 'Skill-building programs to help you grow academically and professionally.',
+    prog_training_chip1: 'Skills',
+    prog_training_chip2: 'Self-Development',
+    prog_training_chip3: 'Qualification',
+    prog_training_btn: 'Register Now',
+    prog_camp_title: 'Summer Camp 2026',
+    prog_camp_desc: 'Educational, recreational, and developmental activities in a unique summer experience.',
+    prog_camp_badge: 'Register Now',
+    path_pretitle: 'Paths',
+    path_title: 'Learning Paths',
+    path_desc: 'Choose the path that suits your age, level, and academic or language goals.',
+    path_kids_kicker: 'Kids',
+    path_kids_title: 'Kids Path',
+    path_kids_desc: 'Build a strong foundation in language and learning through fun, interactive methods.',
+    path_kids_1: 'Age-appropriate activities',
+    path_kids_2: 'Gradual, clear learning',
+    path_kids_3: 'Encouragement and confidence',
+    path_students_kicker: 'Students',
+    path_students_title: 'Students Path',
+    path_students_desc: 'Real academic support and result improvement with regular follow-up.',
+    path_students_1: 'Simplified, organized explanations',
+    path_students_2: 'Review and exercises',
+    path_students_3: 'Better exam readiness',
+    path_adults_kicker: 'Adults',
+    path_adults_title: 'Youth & Adults Path',
+    path_adults_desc: 'Language and skill development for study, work, and travel.',
+    path_adults_1: 'Flexible programs',
+    path_adults_2: 'Focus on application',
+    path_adults_3: 'Practical content',
+    step_pretitle: 'How it works',
+    step_title: 'How to Join Us',
+    step_desc: 'Simple, clear steps to start the right program for you.',
+    step_1_title: 'Contact Us',
+    step_1_desc: 'Message us or visit the center to learn about available programs.',
+    step_2_title: 'Level Assessment',
+    step_2_desc: 'We help you choose the most suitable path or program.',
+    step_3_title: 'Registration',
+    step_3_desc: 'Complete your information and secure your spot.',
+    step_4_title: 'Start Your Journey',
+    step_4_desc: 'Begin a modern, integrated learning experience.',
+    why_pretitle: 'Why E-PLUS',
+    why_title: 'Why E-PLUS?',
+    why_main_title: 'A modern, clear learning environment',
+    why_main_desc: 'We provide an organized, elegant, and practical experience that helps students progress with confidence.',
+    why_point_1: 'Content suitable for all ages',
+    why_point_2: 'Organization and continuous follow-up',
+    why_point_3: 'Balance between understanding and application',
+    why_point_4: 'Attention to detail and quality',
+    why_mini_1_title: 'Program Variety',
+    why_mini_1_desc: 'Languages, support, VIP, IELTS, online, and training courses.',
+    why_mini_2_title: 'Flexibility',
+    why_mini_2_desc: 'Options to fit your time, goals, and level.',
+    why_mini_3_title: 'Quality',
+    why_mini_3_desc: 'Focus on a premium experience with tangible results.',
+    teacher_pretitle: 'Teachers',
+    teacher_title: 'Our Teaching Team',
+    teacher_desc: 'An exceptional team dedicated to providing organized, effective education at a professional level.',
+    ann_live: 'Latest Announcements & Updates',
+    ann_title: 'Announcements',
+    ann_subtitle: 'Follow the latest news and offers from the center',
+    ann_filter_all: 'All',
+    ann_filter_general: '📢 General',
+    ann_filter_event: '🎉 Event',
+    ann_filter_urgent: '🚨 Urgent',
+    ann_filter_offer: '🎁 Offer',
+    ann_filter_news: '📰 News',
+    ann_loading: 'Loading announcements...',
+    ann_empty: 'No announcements in this category',
+    ann_read_more: 'Read more',
+    test_pretitle: 'Testimonials',
+    test_title: 'What Our Students Say',
+    gal_pretitle: 'Gallery',
+    gal_title: 'Center Photo Gallery',
+    gal_desc: 'Real moments from inside E-PLUS Center — a modern, integrated learning environment.',
+    gal_lightbox_label: 'View image',
+    gal_lightbox_close: 'Close',
+    gal_lightbox_prev: 'Previous',
+    gal_lightbox_next: 'Next',
+    faq_pretitle: 'FAQ',
+    faq_title: 'Frequently Asked Questions',
+    faq_q1: 'Who can register?',
+    faq_a1: 'Programs are available for children, students, youth, and adults depending on the program type and level.',
+    faq_q2: 'Are there online programs?',
+    faq_a2: 'Yes, we offer online programs in some paths with appropriate follow-up.',
+    faq_q3: 'Can I register for VIP lessons?',
+    faq_a3: 'Yes, you can request individual or semi-private lessons based on availability and need.',
+    faq_q4: 'How do I know which program suits me?',
+    faq_a4: 'Contact us and we will help you choose the most suitable program based on your level and goal.',
+    contact_pretitle: 'Contact',
+    contact_title: 'Get in Touch',
+    contact_desc: 'We are happy to answer your inquiries and help you choose the right program.',
+    contact_btn_call: 'Call Us',
+    contact_btn_whatsapp: 'WhatsApp',
+    contact_address_label: 'Address',
+    contact_address: 'Hay Echouhada, opposite National Road 48 — Ghamar, El Oued, Algeria',
+    contact_phone_label: 'Phone',
+    contact_email_label: 'Email',
+    contact_hours_title: 'Working Hours',
+    contact_hours_morning: 'Morning Hours',
+    contact_hours_evening: 'Evening Hours',
+    contact_hours_days: 'Saturday — Friday',
+    contact_hours_note: 'Please visit during official working hours for inquiries and registration.',
+    join_title: 'Would you like to join our team?',
+    join_desc: 'We welcome teachers, supervisors, and creatives who want to contribute to an exceptional educational experience.',
+    join_btn: 'Join Our Team',
+    join_btn_terms: 'Terms',
+    footer_copy: '© 2026 E-PLUS Center — All rights reserved.',
+    footer_programs: 'Programs',
+    footer_faq: 'FAQ',
+    footer_contact: 'Contact',
+    form_title: 'Registration Form',
+    form_lang_warning_en: 'Please enter all information in English only',
+    form_lang_warning_ar: 'يرجى إدخال جميع المعلومات باللغة العربية فقط',
+    form_lang_warning_fr: 'Veuillez saisir toutes les informations en français uniquement',
     firstName: 'First Name',
     lastName: 'Last Name',
     birthDate: 'Date of Birth',
-    birthPlace: 'Address',
+    birthPlace: 'Place of Birth / Address',
     phone: 'Phone Number',
     motivation: 'What motivated you to choose E-PLUS Center?',
     motivationVip: 'What led you to choose studying through the VIP private lessons system?',
@@ -250,9 +756,46 @@ const i18n = {
     chooseDays: 'Choose Days',
     daysSelected: 'day(s) selected',
     submitBtn: 'Complete Registration ✦',
+    form_support_type: 'Support Registration Type',
+    form_support_school: 'Academic Support',
+    form_support_course: 'Free Lessons',
+    form_support_select: '-- Select --',
+    form_support_select_subject: '-- Choose subject --',
+    form_support_select_teacher: '-- Choose teacher --',
+    form_support_select_specialty: '-- Choose specialty --',
+    form_training_title: 'Training Course',
+    form_training_graphic: 'Graphic Design',
+    form_training_prog: 'Programming',
+    form_training_comm: 'Communication Skills',
+    form_training_accounting: 'Accounting & Management',
+    form_training_marketing: 'Digital Marketing',
+    form_training_other: 'Other',
+    form_training_level: 'Your Level',
+    form_training_beginner: '🔰 Beginner',
+    form_training_intermediate: '📈 Some Basics',
+    form_training_advanced: '🚀 Advanced — I want to go deeper',
+    form_training_mode: 'Preferred Learning Method',
+    form_training_presential: '🏫 In-Center',
+    form_training_online: '💻 Online',
+    form_training_mixed: '🔄 Blended (In-person + Online)',
+    form_vip_support: 'VIP Academic Support',
+    form_vip_lang: 'VIP Languages',
+    form_vip_days: 'How many days per week?',
+    form_vip_choose_days_prefix: 'Choose',
+    form_vip_choose_days_suffix: 'day(s) per week',
+    form_lang_select: '-- Choose language --',
+    form_level_select: '-- Choose your level --',
+    form_cefr_hint: 'Choose the appropriate level — we can help with a placement test if you are unsure.',
+    form_level_test_note: '🧪 The test takes ~15 minutes and helps us place you in the right group.',
+    form_level_test_yes: '✅ Yes, I want the test',
+    form_level_test_no: '❌ No, I am sure of my level',
+    form_coming_soon: 'Courses for this level will be added soon',
+    form_course_select: 'Choose course',
+    form_course_placeholder: '-- Choose course --',
     termsTitle: 'Center Terms & Conditions',
     termsAgree: 'I have read all terms and conditions and I agree',
     termsProceed: 'Confirm Registration ✦',
+    terms_scroll_hint: 'Scroll down to read all terms',
     t1: 'The learner is officially registered upon payment of registration fees on the specified date.',
     t2: 'The learner must demonstrate good conduct, cleanliness, and appropriate dress.',
     t3: 'All individuals at the center must be respected: peers, teachers, and administrative staff.',
@@ -266,7 +809,363 @@ const i18n = {
     t11: 'Touching or operating educational equipment without permission is prohibited.',
     t12: 'Any damage to center equipment will result in punishment and compensation for losses.',
     t13: 'In case of unacceptable behavior, the guardian will be formally warned upon repeated violations.',
-    t14: 'Agreement to publish learner photos on social networks and educational videos related to the center.'
+    t14: 'Agreement to publish learner photos on social networks and educational videos related to the center.',
+    join_modal_title: 'Join E-PLUS Team',
+    join_firstName: 'First Name',
+    join_lastName: 'Last Name',
+    join_phone: 'Phone Number',
+    join_email: 'Email Address',
+    join_role: 'Desired Role',
+    join_role_teacher: '👨‍🏫 Teacher',
+    join_role_supervisor: '🧑‍💼 Supervisor',
+    join_role_admin: '📋 Admin',
+    join_specialty: 'Specialty / Subject',
+    join_experience: 'Experience & Qualifications',
+    join_cv: 'Resume (PDF or Word)',
+    join_cv_choose: 'Choose file',
+    join_submit: 'Submit Application ✦',
+    join_success: 'Request sent successfully',
+    loading_title: 'Processing...',
+    loading_msg: 'Please wait',
+    requested_service: 'Requested service',
+    loading_submitting: 'Submitting registration...',
+    loading_wait_moment: 'Please wait a moment',
+    loading_join_submitting: 'Submitting join request...',
+    loading_join_wait: 'Please wait a moment',
+    success_title: 'Completed Successfully',
+    success_ok: 'OK ✦',
+    success_reg_number: 'Registration No.:',
+    success_msg: 'Operation completed successfully.',
+    success_reg_done: 'Registration completed successfully',
+    theme_aria: 'Toggle theme',
+    theme_title: 'Toggle theme',
+    hamburger_aria: 'Menu',
+    lang_ar: 'AR',
+    lang_en: 'EN',
+    lang_fr: 'FR',
+  },
+  fr: {
+    nav_home: 'Accueil',
+    nav_programs: 'Programmes',
+    nav_teachers: 'Enseignants',
+    nav_paths: 'Parcours',
+    nav_steps: 'Comment Rejoindre',
+    nav_announcements: 'Annonces',
+    nav_gallery: 'Galerie',
+    nav_faq: 'FAQ',
+    nav_join: 'Rejoignez Notre Équipe',
+    nav_register: 'Inscrivez-vous ✦',
+    mob_home: '🏠 Accueil',
+    mob_programs: '📚 Programmes',
+    mob_teachers: '👨‍🏫 Enseignants',
+    mob_paths: '🛤️ Parcours',
+    mob_steps: '📝 Comment Rejoindre',
+    mob_announcements: '📢 Annonces',
+    mob_gallery: '🖼️ Galerie',
+    mob_faq: '❓ FAQ',
+    mob_join: '🤝 Rejoignez Notre Équipe',
+    topbar_new: 'Nouveau',
+    topbar_camp: '🏕️ Camp d\'Été 2026 — Inscriptions Ouvertes',
+    topbar_location: 'Ghamar, El Oued — Algérie',
+    hero_tag: 'Centre d\'Excellence Éducative · Ghamar, El Oued',
+    hero_title: 'Votre Première Destination<br />pour l\'<span class="ep-text-gold">Éducation</span> et le Développement',
+    hero_subtitle: 'Cours de Langues · Soutien Scolaire · IELTS · VIP · Formations · Programmes en Ligne<br />Commencez votre voyage avec des enseignants experts et une expérience d\'apprentissage moderne et intégrée.',
+    hero_btn_register: 'Inscrivez-vous ✦',
+    hero_btn_camp: '🏕️ Camp d\'Été',
+    hero_btn_lang: 'Commencer les Langues',
+    hero_btn_support: 'Commencer le Soutien',
+    hero_btn_vip: 'Réserver VIP',
+    hero_card_kicker: 'EXPÉRIENCE E-PLUS',
+    hero_card_title: 'Une expérience éducative alliant qualité, clarté et résultats',
+    hero_card_desc: 'Programmes variés de langues, soutien scolaire, préparation aux tests et tutorat individuel dans un environnement moderne et organisé.',
+    hero_list_1: 'Suivi continu des étudiants',
+    hero_list_2: 'Enseignants compétents avec des plans clairs',
+    hero_list_3: 'Niveaux adaptés à tous les âges',
+    hero_list_4: 'Cours en présentiel et en ligne',
+    hero_btn_ielts: 'IELTS',
+    hero_btn_online: 'En Ligne',
+    stat_1: 'Programmes Éducatifs',
+    stat_2: 'Étudiants & Bénéficiaires',
+    stat_3: 'Enseignants & Superviseurs',
+    stat_4: 'Parcours Principaux',
+    trust_1_title: 'Objectifs Clairs',
+    trust_1_desc: 'Chaque programme est construit sur des résultats éducatifs spécifiques et mesurables.',
+    trust_2_title: 'Supervision Académique',
+    trust_2_desc: 'Enseignants spécialisés expérimentés avec tous les niveaux.',
+    trust_3_title: 'Approche Moderne',
+    trust_3_desc: 'Apprentissage flexible et interactif en classe et en dehors.',
+    trust_4_title: 'Résultats Tangibles',
+    trust_4_desc: 'Accent sur le progrès réel de l\'élève en compétence et confiance.',
+    achieve_1: 'Centre Agréé',
+    achieve_2: 'Excellent Rating',
+    achieve_3: 'Partenaire IELTS',
+    achieve_4: '+3 Ans d\'Expérience',
+    achieve_5: 'Cours en Ligne',
+    prog_pretitle: 'Programmes',
+    prog_title: 'Nos Programmes Éducatifs',
+    prog_desc: 'Choisissez le programme qui correspond à votre niveau et à votre objectif, et commencez un parcours d\'apprentissage organisé.',
+    prog_lang_title: 'Cours de Langues',
+    prog_lang_desc: 'Apprenez l\'anglais, le français et plus encore à travers des niveaux progressifs et une pratique continue.',
+    prog_lang_chip1: 'A0 - C2',
+    prog_lang_chip2: 'Enfants & Adultes',
+    prog_lang_chip3: 'En Présentiel',
+    prog_lang_btn: 'Inscrivez-vous',
+    prog_support_title: 'Soutien Scolaire',
+    prog_support_desc: 'Séances de révision guidées avec organisation, suivi et renforcement des matières essentielles.',
+    prog_support_chip1: 'Primaire',
+    prog_support_chip2: 'Moyen',
+    prog_support_chip3: 'Secondaire',
+    prog_support_btn: 'Inscrivez-vous',
+    prog_vip_title: 'Leçons VIP',
+    prog_vip_desc: 'Enseignement individuel ou en très petits groupes avec une concentration totale sur les besoins de l\'élève.',
+    prog_vip_chip1: 'Haute Flexibilité',
+    prog_vip_chip2: 'Plan Personnalisé',
+    prog_vip_chip3: 'Résultats Rapides',
+    prog_vip_btn: 'Inscrivez-vous',
+    prog_ielts_title: 'Préparation au Test IELTS',
+    prog_ielts_desc: 'Programme spécialisé pour renforcer les quatre compétences et comprendre la structure du test.',
+    prog_ielts_chip1: 'Listening',
+    prog_ielts_chip2: 'Reading',
+    prog_ielts_chip3: 'Writing & Speaking',
+    prog_ielts_btn: 'Inscrivez-vous',
+    prog_online_title: 'Cours en Ligne',
+    prog_online_desc: 'Apprenez de n\'importe où avec des sessions en direct, du contenu organisé et un suivi numérique.',
+    prog_online_chip1: 'À Distance',
+    prog_online_chip2: 'Flexible',
+    prog_online_chip3: 'Interactif',
+    prog_online_btn: 'Inscrivez-vous',
+    prog_training_title: 'Formations',
+    prog_training_desc: 'Programmes de développement des compétences pour vous aider à grandir académiquement et professionnellement.',
+    prog_training_chip1: 'Compétences',
+    prog_training_chip2: 'Développement',
+    prog_training_chip3: 'Qualification',
+    prog_training_btn: 'Inscrivez-vous',
+    prog_camp_title: 'Camp d\'Été 2026',
+    prog_camp_desc: 'Activités éducatives, récréatives et de développement dans une expérience estivale unique.',
+    prog_camp_badge: 'Inscrivez-vous',
+    path_pretitle: 'Parcours',
+    path_title: 'Parcours d\'Apprentissage',
+    path_desc: 'Choisissez le parcours qui correspond à votre âge, votre niveau et vos objectifs académiques ou linguistiques.',
+    path_kids_kicker: 'Enfants',
+    path_kids_title: 'Parcours Enfants',
+    path_kids_desc: 'Construisez une base solide en langue et en apprentissage avec des méthodes amusantes et interactives.',
+    path_kids_1: 'Activités adaptées à l\'âge',
+    path_kids_2: 'Apprentissage progressif et clair',
+    path_kids_3: 'Encouragement et confiance',
+    path_students_kicker: 'Élèves',
+    path_students_title: 'Parcours Élèves',
+    path_students_desc: 'Un véritable soutien scolaire et une amélioration des résultats avec un suivi régulier.',
+    path_students_1: 'Explications simplifiées et organisées',
+    path_students_2: 'Révision et exercices',
+    path_students_3: 'Meilleure préparation aux examens',
+    path_adults_kicker: 'Adultes',
+    path_adults_title: 'Parcours Jeunes & Adultes',
+    path_adults_desc: 'Développement linguistique et de compétences pour les études, le travail et les voyages.',
+    path_adults_1: 'Programmes flexibles',
+    path_adults_2: 'Accent sur l\'application',
+    path_adults_3: 'Contenu pratique',
+    step_pretitle: 'Comment ça marche',
+    step_title: 'Comment Nous Rejoindre',
+    step_desc: 'Des étapes simples et claires pour commencer le programme qui vous convient.',
+    step_1_title: 'Contactez-Nous',
+    step_1_desc: 'Envoyez-nous un message ou visitez le centre pour découvrir les programmes disponibles.',
+    step_2_title: 'Évaluation du Niveau',
+    step_2_desc: 'Nous vous aidons à choisir le parcours ou le programme le plus adapté.',
+    step_3_title: 'Inscription',
+    step_3_desc: 'Complétez vos informations et réservez votre place.',
+    step_4_title: 'Commencez Votre Voyage',
+    step_4_desc: 'Débutez une expérience d\'apprentissage moderne et intégrée.',
+    why_pretitle: 'Pourquoi E-PLUS',
+    why_title: 'Pourquoi E-PLUS ?',
+    why_main_title: 'Un environnement d\'apprentissage moderne et clair',
+    why_main_desc: 'Nous offrons une expérience organisée, élégante et pratique qui aide les étudiants à progresser avec confiance.',
+    why_point_1: 'Contenu adapté à tous les âges',
+    why_point_2: 'Organisation et suivi continu',
+    why_point_3: 'Équilibre entre compréhension et application',
+    why_point_4: 'Attention aux détails et à la qualité',
+    why_mini_1_title: 'Variété de Programmes',
+    why_mini_1_desc: 'Langues, soutien, VIP, IELTS, en ligne et formations.',
+    why_mini_2_title: 'Flexibilité',
+    why_mini_2_desc: 'Des options adaptées à votre temps, vos objectifs et votre niveau.',
+    why_mini_3_title: 'Qualité',
+    why_mini_3_desc: 'Accent sur une expérience premium avec des résultats tangibles.',
+    teacher_pretitle: 'Enseignants',
+    teacher_title: 'Notre Équipe Pédagogique',
+    teacher_desc: 'Une équipe exceptionnelle dédiée à fournir une éducation organisée et efficace à un niveau professionnel.',
+    ann_live: 'Dernières Annonces & Mises à Jour',
+    ann_title: 'Annonces',
+    ann_subtitle: 'Suivez les dernières nouvelles et offres du centre',
+    ann_filter_all: 'Tout',
+    ann_filter_general: '📢 Général',
+    ann_filter_event: '🎉 Événement',
+    ann_filter_urgent: '🚨 Urgent',
+    ann_filter_offer: '🎁 Offre',
+    ann_filter_news: '📰 Actualité',
+    ann_loading: 'Chargement des annonces...',
+    ann_empty: 'Aucune annonce dans cette catégorie',
+    ann_read_more: 'Lire la suite',
+    test_pretitle: 'Témoignages',
+    test_title: 'Ce Que Disent Nos Étudiants',
+    gal_pretitle: 'Galerie',
+    gal_title: 'Galerie Photos du Centre',
+    gal_desc: 'Des moments réels de l\'intérieur du Centre E-PLUS — un environnement d\'apprentissage moderne et intégré.',
+    gal_lightbox_label: 'Voir l\'image',
+    gal_lightbox_close: 'Fermer',
+    gal_lightbox_prev: 'Précédent',
+    gal_lightbox_next: 'Suivant',
+    faq_pretitle: 'FAQ',
+    faq_title: 'Questions Fréquentes',
+    faq_q1: 'Qui peut s\'inscrire ?',
+    faq_a1: 'Des programmes sont disponibles pour les enfants, les élèves, les jeunes et les adultes selon le type de programme et le niveau.',
+    faq_q2: 'Y a-t-il des programmes en ligne ?',
+    faq_a2: 'Oui, nous proposons des programmes en ligne dans certains parcours avec un suivi approprié.',
+    faq_q3: 'Puis-je m\'inscrire aux leçons VIP ?',
+    faq_a3: 'Oui, vous pouvez demander des leçons individuelles ou semi-individuelles selon la disponibilité et les besoins.',
+    faq_q4: 'Comment savoir quel programme me convient ?',
+    faq_a4: 'Contactez-nous et nous vous aiderons à choisir le programme le plus adapté à votre niveau et à votre objectif.',
+    contact_pretitle: 'Contact',
+    contact_title: 'Prenez Contact',
+    contact_desc: 'Nous sommes heureux de répondre à vos questions et de vous aider à choisir le bon programme.',
+    contact_btn_call: 'Appelez-Nous',
+    contact_btn_whatsapp: 'WhatsApp',
+    contact_address_label: 'Adresse',
+    contact_address: 'Hay Echouhada, en face de la Route Nationale 48 — Ghamar, El Oued, Algérie',
+    contact_phone_label: 'Téléphone',
+    contact_email_label: 'Email',
+    contact_hours_title: 'Heures d\'Ouverture',
+    contact_hours_morning: 'Heures du Matin',
+    contact_hours_evening: 'Heures du Soir',
+    contact_hours_days: 'Samedi — Vendredi',
+    contact_hours_note: 'Veuillez visiter pendant les heures d\'ouverture officielles pour les demandes de renseignements et les inscriptions.',
+    join_title: 'Souhaitez-vous rejoindre notre équipe ?',
+    join_desc: 'Nous accueillons les enseignants, les superviseurs et les créatifs qui souhaitent contribuer à une expérience éducative exceptionnelle.',
+    join_btn: 'Rejoignez Notre Équipe',
+    join_btn_terms: 'Conditions',
+    footer_copy: '© 2026 E-PLUS Center — Tous droits réservés.',
+    footer_programs: 'Programmes',
+    footer_faq: 'FAQ',
+    footer_contact: 'Contact',
+    form_title: 'Formulaire d\'Inscription',
+    form_lang_warning_fr: 'Veuillez saisir toutes les informations en français uniquement',
+    form_lang_warning_ar: 'يرجى إدخال جميع المعلومات باللغة العربية فقط',
+    form_lang_warning_en: 'Please enter all information in English only',
+    firstName: 'Prénom',
+    lastName: 'Nom de Famille',
+    birthDate: 'Date de Naissance',
+    birthPlace: 'Lieu de Naissance / Adresse',
+    phone: 'Numéro de Téléphone',
+    motivation: 'Qu\'est-ce qui vous a motivé à choisir le Centre E-PLUS ?',
+    motivationVip: 'Qu\'est-ce qui vous a amené à choisir d\'étudier via le système de leçons privées VIP ?',
+    optional: '(optionnel)',
+    eduLevel: 'Niveau d\'Études',
+    specialty: 'Spécialité',
+    subject: 'Matière',
+    teacher: 'Enseignant(e)',
+    candidateType: 'Type de Candidat',
+    enrolled: 'Inscrit',
+    freeCandidate: 'Libre',
+    parentInfo: 'Infos Parent / Tuteur',
+    parentName: 'Nom du Parent',
+    parentPhone: 'Téléphone du Parent',
+    langType: 'Choisir la Langue',
+    langLevel: 'Niveau de Langue (CEFR)',
+    levelTest: 'Souhaitez-vous un test de niveau ?',
+    yes: 'Oui',
+    no: 'Non',
+    vipType: 'Type de Leçon VIP',
+    vipSupport: '📚 Soutien Scolaire',
+    vipLang: '🌍 Langues',
+    vipDaysCount: 'Combien de jours par semaine ?',
+    chooseDays: 'Choisir les Jours',
+    daysSelected: 'jour(s) sélectionné(s)',
+    submitBtn: 'Finaliser l\'Inscription ✦',
+    form_support_type: "Type d'inscription au Soutien",
+    form_support_school: 'Soutien Scolaire',
+    form_support_course: 'Cours Libres',
+    form_support_select: '-- Sélectionnez --',
+    form_support_select_subject: '-- Choisir la matière --',
+    form_support_select_teacher: '-- Choisir l\'enseignant(e) --',
+    form_support_select_specialty: '-- Choisir la spécialité --',
+    form_training_title: 'Formation',
+    form_training_graphic: 'Design Graphique',
+    form_training_prog: 'Programmation',
+    form_training_comm: 'Compétences en Communication',
+    form_training_accounting: 'Comptabilité & Gestion',
+    form_training_marketing: 'Marketing Digital',
+    form_training_other: 'Autre',
+    form_training_level: 'Votre Niveau',
+    form_training_beginner: '🔰 Débutant',
+    form_training_intermediate: '📈 Quelques Bases',
+    form_training_advanced: '🚀 Avancé — Je veux approfondir',
+    form_training_mode: 'Méthode d\'Apprentissage Préférée',
+    form_training_presential: '🏫 Au Centre',
+    form_training_online: '💻 En Ligne',
+    form_training_mixed: '🔄 Mixte (Présentiel + En Ligne)',
+    form_vip_support: 'VIP Soutien Scolaire',
+    form_vip_lang: 'VIP Langues',
+    form_vip_days: 'Combien de jours par semaine ?',
+    form_vip_choose_days_prefix: 'Choisir',
+    form_vip_choose_days_suffix: 'jour(s) par semaine',
+    form_lang_select: '-- Choisir la langue --',
+    form_level_select: '-- Choisissez votre niveau --',
+    form_cefr_hint: 'Choisissez le niveau approprié — nous pouvons vous aider avec un test de placement si vous n\'êtes pas sûr.',
+    form_level_test_note: '🧪 Le test prend ~15 minutes et nous aide à vous placer dans le bon groupe.',
+    form_level_test_yes: '✅ Oui, je veux le test',
+    form_level_test_no: '❌ Non, je suis sûr de mon niveau',
+    form_coming_soon: 'Les cours pour ce niveau seront bientôt disponibles',
+    form_course_select: 'Choisir le cours',
+    form_course_placeholder: '-- Choisir le cours --',
+    termsTitle: 'Conditions Générales du Centre',
+    termsAgree: 'J\'ai lu toutes les conditions générales et je les accepte',
+    termsProceed: 'Confirmer l\'Inscription ✦',
+    terms_scroll_hint: 'Faites défiler pour lire toutes les conditions',
+    t1: 'L\'apprenant est officiellement inscrit après paiement des frais d\'inscription à la date spécifiée.',
+    t2: 'L\'apprenant doit faire preuve de bonne conduite, de propreté et d\'une tenue appropriée.',
+    t3: 'Toutes les personnes au centre doivent être respectées : camarades, enseignants et personnel administratif.',
+    t4: 'Les horaires d\'étude doivent être respectés et le départ sans autorisation préalable n\'est pas autorisé.',
+    t5: 'L\'absence aux séances n\'est autorisée que pour des raisons urgentes avec notification préalable à l\'administration.',
+    t6: 'En cas d\'absence sans raison, le tuteur sera informé.',
+    t7: 'Les frais de séance ne sont pas compensés en cas d\'absences répétées ou d\'arrêt des études.',
+    t8: 'En cas d\'arrêt des études, seulement 80% de la valeur restante sera remboursée.',
+    t9: 'En cas d\'absence prolongée, veuillez contacter l\'administration pour régulariser la situation.',
+    t10: 'Le centre n\'est pas responsable de la perte d\'objets de valeur (argent, téléphone, bijoux...).',
+    t11: 'Il est interdit de toucher ou d\'utiliser l\'équipement éducatif sans autorisation.',
+    t12: 'Tout dommage à l\'équipement du centre entraînera une sanction et une compensation des pertes.',
+    t13: 'En cas de comportement inacceptable, le tuteur sera averti par écrit en cas de récidive.',
+    t14: 'Accord pour publier des photos de l\'apprenant sur les réseaux sociaux et les vidéos éducatives liées au centre.',
+    join_modal_title: 'Rejoindre l\'Équipe E-PLUS',
+    join_firstName: 'Prénom',
+    join_lastName: 'Nom de Famille',
+    join_phone: 'Numéro de Téléphone',
+    join_email: 'Adresse Email',
+    join_role: 'Rôle Souhaité',
+    join_role_teacher: '👨‍🏫 Enseignant',
+    join_role_supervisor: '🧑‍💼 Superviseur',
+    join_role_admin: '📋 Administrateur',
+    join_specialty: 'Spécialité / Matière',
+    join_experience: 'Expérience & Qualifications',
+    join_cv: 'CV (PDF ou Word)',
+    join_cv_choose: 'Choisir le fichier',
+    join_submit: 'Soumettre la Candidature ✦',
+    join_success: 'Candidature envoyée avec succès',
+    loading_title: 'Traitement en cours...',
+    loading_msg: 'Veuillez patienter',
+    requested_service: 'Service demandé',
+    loading_submitting: 'Envoi de l\'inscription...',
+    loading_wait_moment: 'Veuillez patienter un instant',
+    loading_join_submitting: 'Envoi de la candidature...',
+    loading_join_wait: 'Veuillez patienter un instant',
+    success_title: 'Réussi',
+    success_ok: 'OK ✦',
+    success_reg_number: 'N° d\'inscription :',
+    success_msg: 'Opération effectuée avec succès.',
+    success_reg_done: 'Inscription effectuée avec succès',
+    theme_aria: 'Changer le thème',
+    theme_title: 'Changer le thème',
+    hamburger_aria: 'Menu',
+    lang_ar: 'AR',
+    lang_en: 'EN',
+    lang_fr: 'FR',
   }
 };
 
@@ -282,33 +1181,51 @@ function showLogo() {
 
 function setLang(lang) {
   currentLang = lang;
-  document.documentElement.lang = lang;
+  document.documentElement.lang = lang === 'ar' ? 'ar' : 'en';
   document.documentElement.dir  = lang === 'ar' ? 'rtl' : 'ltr';
-  byId('btn-ar')?.classList.toggle('active', lang === 'ar');
-  byId('btn-en')?.classList.toggle('active', lang === 'en');
-  byId('btn-ar-old')?.classList.toggle('active', lang === 'ar');
-  byId('btn-en-old')?.classList.toggle('active', lang === 'en');
-  byId('btn-ar-mob')?.classList.toggle('active', lang === 'ar');
-  byId('btn-en-mob')?.classList.toggle('active', lang === 'en');
+  // Update desktop lang buttons
+  $$('.ep-lang-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === lang);
+  });
   localStorage.setItem('ep-lang', lang);
   const t = i18n[lang];
+  // Translate all data-i18n elements
   $$('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
-    if (t[key] !== undefined) el.textContent = t[key];
+    if (t[key] !== undefined) {
+      el.innerHTML = t[key];
+    }
   });
+  // Translate data-i18n-html elements (for HTML content)
+  $$('[data-i18n-html]').forEach(el => {
+    const key = el.getAttribute('data-i18n-html');
+    if (t[key] !== undefined) {
+      el.innerHTML = t[key];
+    }
+  });
+  // Language warning in registration form
   const warnIcon = byId('lang-warning-icon');
   const warnText = byId('lang-warning-text');
-  if (warnIcon && warnText) {
-    if (lang === 'ar') {
-      warnIcon.textContent = '🇩🇿';
-      warnText.textContent = 'يرجى إدخال جميع المعلومات باللغة العربية فقط';
-    } else {
-      warnIcon.textContent = '🇬🇧';
-      warnText.textContent = 'Please enter all information in English only';
-    }
+  if (warnIcon) {
+    warnIcon.textContent = lang === 'ar' ? '🇩🇿' : lang === 'fr' ? '🇫🇷' : '🇬🇧';
   }
+  if (warnText) {
+    const key = 'form_lang_warning_' + lang;
+    warnText.textContent = t[key] || (lang === 'ar' ? 'يرجى إدخال جميع المعلومات باللغة العربية فقط' : lang === 'fr' ? 'Veuillez saisir toutes les informations en français uniquement' : 'Please enter all information in English only');
+  }
+  // Re-render announcements if cached
   if (window._annCache && window._annCache.length > 0) {
     renderAnnouncementSlider(window._annCache);
+  }
+  // Update theme toggle aria label
+  $$('#ep-theme-toggle, #ep-theme-toggle-mob').forEach(el => {
+    if (t.theme_aria) el.setAttribute('aria-label', t.theme_aria);
+    if (t.theme_title) el.setAttribute('title', t.theme_title);
+  });
+  // Update hamburger aria-label
+  const hamburger = byId('ep-hamburger');
+  if (hamburger && t.hamburger_aria) {
+    hamburger.setAttribute('aria-label', t.hamburger_aria);
   }
 }
 
@@ -323,10 +1240,15 @@ function isEnglish(text) {
   return /[a-zA-Z]/.test(text);
 }
 
+function isFrench(text) {
+  return /[a-zA-Zàâäéèêëïîôöùûüÿçœæ]/i.test(text) && /[àâäéèêëïîôöùûüÿçœæ]/i.test(text);
+}
+
 function validateLang(text) {
   if (!text.trim()) return true;
   if (currentLang === 'ar') return isArabic(text) && !isEnglish(text);
   if (currentLang === 'en') return isEnglish(text) && !isArabic(text);
+  if (currentLang === 'fr') return isFrench(text) || (isEnglish(text) && !isArabic(text));
   return true;
 }
 
@@ -508,14 +1430,12 @@ function unlockPageScroll() {
 function openModal(type) {
   currentModalType = type;
   resetForm();
-  const titles = {
-    support: currentLang === 'ar' ? 'تسجيل — دعم دراسي'     : 'Registration — Academic Support',
-    lang:    currentLang === 'ar' ? 'تسجيل — دورات اللغات'  : 'Registration — Language Courses',
-    vip:     currentLang === 'ar' ? 'تسجيل — دروس VIP'      : 'Registration — VIP Lessons',
-    ielts:   currentLang === 'ar' ? 'تسجيل — اختبار IELTS'  : 'Registration — IELTS Test',
-    online:  currentLang === 'ar' ? 'تسجيل — دورات أونلاين' : 'Registration — Online Courses',
-    takwini: currentLang === 'ar' ? 'تسجيل — دورات تكوينية' : 'Registration — Training Courses'
+  const modalTitles = {
+    ar: { support: 'تسجيل — دعم دراسي', lang: 'تسجيل — دورات اللغات', vip: 'تسجيل — دروس VIP', ielts: 'تسجيل — اختبار IELTS', online: 'تسجيل — دورات أونلاين', takwini: 'تسجيل — دورات تكوينية' },
+    en: { support: 'Registration — Academic Support', lang: 'Registration — Language Courses', vip: 'Registration — VIP Lessons', ielts: 'Registration — IELTS Test', online: 'Registration — Online Courses', takwini: 'Registration — Training Courses' },
+    fr: { support: 'Inscription — Soutien Scolaire', lang: 'Inscription — Cours de Langues', vip: 'Inscription — Leçons VIP', ielts: 'Inscription — Test IELTS', online: 'Inscription — Cours en Ligne', takwini: 'Inscription — Formations' }
   };
+  const titles = modalTitles[currentLang] || modalTitles.ar;
   const modalTitle = byId('program-modal-title');
   if (modalTitle) modalTitle.textContent = titles[type] || 'نموذج التسجيل';
   const motivationLabel = $('label[for="motivation"] span[data-i18n="motivation"]');
@@ -647,9 +1567,9 @@ function onVipDaysCountChange() {
   if (daysOfLabel) daysOfLabel.textContent = `/${val}`;
   const chooseLabel = $('[data-i18n="chooseDays"]');
   if (chooseLabel) {
-    chooseLabel.textContent = currentLang === 'ar'
-      ? `اختر ${val} ${val === 1 ? 'يوم' : 'أيام'} للحضور في الأسبوع`
-      : `Choose ${val} day${val > 1 ? 's' : ''} per week`;
+    if (currentLang === 'ar') chooseLabel.textContent = `اختر ${val} ${val === 1 ? 'يوم' : 'أيام'} للحضور في الأسبوع`;
+    else if (currentLang === 'fr') chooseLabel.textContent = `Choisir ${val} jour${val > 1 ? 's' : ''} par semaine`;
+    else chooseLabel.textContent = `Choose ${val} day${val > 1 ? 's' : ''} per week`;
   }
   const countEl = byId('days-count');
   if (countEl) countEl.textContent = '0';
@@ -667,7 +1587,7 @@ function showComingSoon(afterEl) {
   note.className = 'coming-soon-note field-appear';
   note.innerHTML = `
     <span>🚧</span>
-    <span>${currentLang === 'ar' ? 'الدورات لهذا المستوى ستُضاف قريباً' : 'Courses for this level will be added soon'}</span>
+    <span>${__('form_coming_soon', 'Courses for this level will be added soon')}</span>
   `;
   afterEl.insertAdjacentElement('afterend', note);
 }
@@ -680,13 +1600,13 @@ function showCoursesList(level, courses) {
   wrap.className = 'form-group field-appear';
   const label = document.createElement('label');
   label.className = 'form-label';
-  label.innerHTML = `<span>${currentLang === 'ar' ? 'اختر الدورة' : 'Choose course'}</span><span>*</span>`;
+  label.innerHTML = `<span>${__('form_course_select', 'Choose course')}</span><span>*</span>`;
   wrap.appendChild(label);
   const select = document.createElement('select');
   select.className = 'form-input';
   select.id = 'courseSelect';
   select.setAttribute('required', 'required');
-  select.innerHTML = `<option value="">${currentLang === 'ar' ? '-- اختر الدورة --' : '-- Choose course --'}</option>`;
+  select.innerHTML = `<option value="">${__('form_course_placeholder', '-- Choose course --')}</option>`;
   courses.forEach(item => {
     const opt = document.createElement('option');
     opt.value = `${item.course} — ${item.teacher}`;
@@ -713,7 +1633,7 @@ function populateSubjects(key) {
     return;
   }
   if (!subSel) return;
-  subSel.innerHTML = `<option value="">${currentLang === 'ar' ? '-- اختر المادة --' : '-- Choose subject --'}</option>`;
+  subSel.innerHTML = `<option value="">${__('form_support_select_subject', '-- Choose subject --')}</option>`;
   subjects.forEach(item => {
     const opt = document.createElement('option');
     opt.value = item.subject;
@@ -830,7 +1750,7 @@ function showSpecialtyField(level) {
   const specialtySel = byId('specialty');
   const specs = specialties[level] || [];
   if (!specialtySel) return;
-  specialtySel.innerHTML = `<option value="">${currentLang === 'ar' ? '-- اختر التخصص --' : '-- Choose specialty --'}</option>`;
+  specialtySel.innerHTML = `<option value="">${__('form_support_select_specialty', '-- Choose specialty --')}</option>`;
   specs.forEach(sp => {
     const opt = document.createElement('option');
     opt.value = sp;
@@ -865,7 +1785,7 @@ function onSubjectChange() {
   const subjects = curriculum[key] || [];
   const found    = subjects.find(s => s.subject === subjectVal);
   if (!found || !found.teachers.length) return;
-  teachSel.innerHTML = `<option value="">${currentLang === 'ar' ? '-- اختر الأستاذ/ة --' : '-- Choose teacher --'}</option>`;
+  teachSel.innerHTML = `<option value="">${__('form_support_select_teacher', '-- Choose teacher --')}</option>`;
   found.teachers.forEach(teacher => {
     const opt = document.createElement('option');
     opt.value = teacher;
@@ -952,7 +1872,7 @@ function showTakwiniOptions() {
   wrap.className = 'form-group field-appear';
   const label = document.createElement('label');
   label.className = 'form-label';
-  label.innerHTML = `<span>${currentLang === 'ar' ? 'اختر الدورة التكوينية' : 'Choose training course'}</span><span>*</span>`;
+  label.innerHTML = `<span>${__('form_training_title', 'Training Course')}</span><span>*</span>`;
   wrap.appendChild(label);
   const radioWrap = document.createElement('div');
   radioWrap.className = 'check-options';
@@ -992,36 +1912,6 @@ async function submitForm(e) {
     }
   });
   if (hasError) return;
-
-  // Validate lang fields when in lang modal
-  if (currentModalType === 'lang') {
-    const langTypeVal  = byId('langType')?.value || '';
-    const langLevelVal = byId('langLevel')?.value || '';
-    const levelTestVal = $('input[name="levelTest"]:checked')?.value || '';
-
-    if (!langTypeVal) {
-      const el = byId('langType');
-      el?.classList.add('error');
-      setTimeout(() => el?.classList.remove('error'), 1500);
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    if (!langLevelVal) {
-      const el = byId('langLevel');
-      el?.classList.add('error');
-      setTimeout(() => el?.classList.remove('error'), 1500);
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    if (!levelTestVal) {
-      const grp = byId('levelTestGroup');
-      grp?.classList.add('error');
-      setTimeout(() => grp?.classList.remove('error'), 1500);
-      grp?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-  }
-
   const selectedDays = $$('input[name="days"]:checked').map(c => c.value).join('، ');
   const vipTypeVal    = $('input[name="vipType"]:checked')?.value || '';
   const vipEduLevel   = byId('vipEduLevel')?.value || '';
@@ -1095,7 +1985,7 @@ function openTermsForSubmit(data) {
   hint.className = 'scroll-hint';
   hint.innerHTML = `
     <span>⬇</span>
-    <span>${currentLang === 'ar' ? 'اقرأ القوانين كاملاً للمتابعة' : 'Scroll down to read all terms'}</span>
+    <span>${__('terms_scroll_hint', 'Scroll down to read all terms')}</span>
   `;
   const footer = $('.terms-footer');
   if (footer) footer.insertBefore(hint, footer.firstChild);
@@ -1141,35 +2031,36 @@ async function proceedToRegister() {
   const btn = byId('terms-proceed-btn');
   btn?.classList.add('loading');
   showLoadingPopup(
-    currentLang === 'ar' ? 'جاري إرسال التسجيل...' : 'Submitting registration...',
-    currentLang === 'ar' ? 'يرجى الانتظار قليلاً' : 'Please wait a moment'
+    __('loading_submitting'),
+    __('loading_wait_moment')
   );
   try {
-    const payload = encodeURIComponent(JSON.stringify(pendingFormData));
-    await fetch(`${APPS_SCRIPT_URL}?payload=${payload}`, {
-      method: 'GET',
-      mode: 'no-cors'
+    const formData = new FormData();
+    Object.entries(pendingFormData).forEach(([key, value]) => {
+      formData.append(key, value ?? '');
     });
-    const regTypeLabel = currentLang === 'ar'
-      ? (typeLabelsAr[pendingFormData.type] || 'الخدمة المطلوبة')
-      : (typeLabelsEn[pendingFormData.type] || 'Requested service');
+    await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formData });
+    const typeLabelsAll = { ar: typeLabelsAr, en: typeLabelsEn, fr: typeLabelsFr };
+    const regTypeLabel = (typeLabelsAll[currentLang]?.[pendingFormData.type]) || __('requested_service', 'Requested service');
     btn?.classList.remove('loading');
     hideLoadingPopup();
     pendingFormData = null;
     unlockPageScroll();
     resetForm();
     showSuccessModal(
-      currentLang === 'ar' ? 'تم التسجيل بنجاح' : 'Registration completed successfully',
+      __('success_reg_done', 'Registration completed successfully'),
       currentLang === 'ar'
         ? `تم استلام طلبك في ${regTypeLabel} بنجاح، وسيتم التواصل معك قريباً.`
-        : `Your ${regTypeLabel} request has been received successfully. We will contact you soon.`,
+        : currentLang === 'fr'
+          ? `Votre demande de ${regTypeLabel} a été reçue avec succès. Nous vous contacterons bientôt.`
+          : `Your ${regTypeLabel} request has been received successfully. We will contact you soon.`,
       null
     );
   } catch (error) {
     console.error('❌ Registration error:', error);
     btn?.classList.remove('loading');
     hideLoadingPopup();
-    alert(currentLang === 'ar' ? 'حدث خطأ أثناء الإرسال، حاول مرة أخرى.' : 'An error occurred, please try again.');
+    alert(__('submit_error', 'An error occurred, please try again.'));
     unlockPageScroll();
   }
 }
@@ -1184,11 +2075,11 @@ function showLoadingPopup(title, message) {
   const msgEl   = byId('loading-popup-msg');
   if (titleEl) {
     titleEl.textContent =
-      title || (currentLang === 'ar' ? 'جاري المعالجة...' : 'Processing...');
+      title || __('loading_title', 'Processing...');
   }
   if (msgEl) {
     msgEl.textContent =
-      message || (currentLang === 'ar' ? 'يرجى الانتظار' : 'Please wait');
+      message || __('loading_msg', 'Please wait');
   }
   overlay.classList.add('active');
   lockPageScroll();
@@ -1229,8 +2120,8 @@ function showSuccessModal(title, message, regNumber = null) {
   const msgEl    = byId('success-popup-msg');
   const regWrap  = byId('success-popup-reg');
   const regNumEl = byId('success-popup-reg-number');
-  if (titleEl) titleEl.textContent = title   || (currentLang === 'ar' ? 'تم بنجاح' : 'Success');
-  if (msgEl)   msgEl.textContent   = message || (currentLang === 'ar' ? 'تم تنفيذ العملية بنجاح.' : 'Operation completed successfully.');
+  if (titleEl) titleEl.textContent = title   || __('success_title', 'Success');
+  if (msgEl)   msgEl.textContent   = message || __('success_msg', 'Operation completed successfully.');
   if (regWrap && regNumEl) {
     regWrap.style.display = regNumber ? 'block' : 'none';
     regNumEl.textContent  = regNumber || '';
@@ -1313,8 +2204,8 @@ async function submitJoinForm(e) {
     submitBtn.disabled = true;
   }
   showLoadingPopup(
-    currentLang === 'ar' ? 'جاري إرسال طلب الانضمام...' : 'Submitting join request...',
-    currentLang === 'ar' ? 'يرجى الانتظار قليلاً' : 'Please wait a moment'
+    __('loading_join_submitting'),
+    __('loading_join_wait')
   );
   try {
     const firstName  = byId('joinFirstName')?.value.trim() || '';
@@ -1357,7 +2248,7 @@ async function submitJoinForm(e) {
     hideLoadingPopup();
     closeJoinModal();
     showSuccessModal(
-      currentLang === 'ar' ? 'تم إرسال الطلب بنجاح' : 'Request sent successfully',
+      __('join_success', 'Request sent successfully'),
       currentLang === 'ar'
         ? 'تم استلام طلب الانضمام إلى الفريق، وسيتم مراجعة ملفك والتواصل معك قريباً.'
         : 'Your team join request has been received successfully. We will review your application and contact you soon.'
@@ -1399,7 +2290,7 @@ function buildAnnouncementCard(item) {
       </div>
     ` : ''}
     <div class="ann-card-body">
-      <span class="ann-card-badge">${currentLang === 'ar' ? 'إعلان' : 'Announcement'}</span>
+      <span class="ann-card-badge">${__('ann_badge', 'Announcement')}</span>
       <div class="ann-card-title">${title}</div>
       <div class="ann-card-text">${text}</div>
       ${date ? `<div class="ann-card-date">${date}</div>` : ''}
@@ -1503,8 +2394,9 @@ document.addEventListener('DOMContentLoaded', () => {
   setLang(savedLang);
 
   /* ── WIRE LANG BUTTONS ── */
-  byId('btn-ar')?.addEventListener('click', () => setLang('ar'));
-  byId('btn-en')?.addEventListener('click', () => setLang('en'));
+  document.querySelectorAll('.ep-lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => setLang(btn.dataset.lang));
+  });
 
   /* ── WIRE THEME TOGGLE ── */
   byId('ep-theme-toggle')?.addEventListener('click', toggleTheme);
