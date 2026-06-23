@@ -4367,6 +4367,7 @@ function renderTicketRows(data) {
     const remaining = Number(x.remainingAmount || 0);
     const dateStr   = x.date ? new Date(x.date).toLocaleDateString('ar-DZ') : '—';
     const tr = document.createElement('tr');
+    tr.dataset.date = x.date || '';
     if (isTrash) tr.style.cssText = 'opacity:0.75;background:rgba(239,68,68,0.03)';
 
     const statusCell = isTrash
@@ -4414,12 +4415,9 @@ window.filterTicketsByDate = function(dateVal) {
   let count = 0, total = 0;
   rows.forEach(row => {
     if (row.querySelector('td[colspan]')) return;
-    const dateCell = row.children[5];
-    if (!dateCell) return;
-    const cellText = dateCell.textContent.trim();
+    const rowDate = row.dataset.date || '';
     let show = true;
     if (dateVal) {
-      const rowDate = cellText.split(' ')[0];
       show = rowDate === dateVal;
     }
     row.style.display = show ? '' : 'none';
@@ -5057,6 +5055,21 @@ window.removeGroupStudent = (btn) => {
 let _sheetStudentsCache = null;
 let _sheetStudentsLoading = false;
 
+function _mapSheetRow(r) {
+  const first = String(r['الاسم'] || '').trim();
+  const last  = String(r['اللقب'] || '').trim();
+  const fullName = [first, last].filter(Boolean).join(' ');
+  if (!fullName) return null;
+  return {
+    name:     fullName,
+    pack:     String(r['الباقة'] || r['نوع البرنامج'] || r['الباقة المختارة'] || '').trim(),
+    langs:    String(r['اللغة المختارة'] || r['اللغات'] || r['languages'] || '').trim(),
+    age:      String(r['العمر'] || r['age'] || '').trim(),
+    phone:    String(r['رقم هاتف ولي الأمر'] || r['رقم الهاتف'] || '').trim(),
+    parent:   String(r['اسم ولي الأمر'] || '').trim(),
+  };
+}
+
 async function loadSheetStudentsCache() {
   if (_sheetStudentsCache !== null) return _sheetStudentsCache;
   if (_sheetStudentsLoading) {
@@ -5065,23 +5078,13 @@ async function loadSheetStudentsCache() {
   }
   _sheetStudentsLoading = true;
   try {
-    const rows = await fetchSheetData(SHEET_ID_1, SHEET_NAME_1);
-    // نحفظ objects كاملة — اسم + كل بيانات الصف
-    _sheetStudentsCache = rows.map(r => {
-      const first = String(r['الاسم'] || '').trim();
-      const last  = String(r['اللقب'] || '').trim();
-      const fullName = [first, last].filter(Boolean).join(' ');
-      if (!fullName) return null;
-      return {
-        name:     fullName,
-        pack:     String(r['الباقة'] || r['نوع البرنامج'] || r['الباقة المختارة'] || '').trim(),
-        langs:    String(r['اللغة المختارة'] || r['اللغات'] || r['languages'] || '').trim(),
-        age:      String(r['العمر'] || r['age'] || '').trim(),
-        phone:    String(r['رقم هاتف ولي الأمر'] || r['رقم الهاتف'] || '').trim(),
-        parent:   String(r['اسم ولي الأمر'] || '').trim(),
-      };
-    }).filter(Boolean);
-    console.log('✅ Sheet cache loaded:', _sheetStudentsCache.length, 'students');
+    const [rows1, rows2] = await Promise.all([
+      fetchSheetData(SHEET_ID_1, SHEET_NAME_1),
+      fetchSheetData(SHEET_ID_2, SHEET_NAME_2),
+    ]);
+    const allRows = [...rows1, ...rows2];
+    _sheetStudentsCache = allRows.map(_mapSheetRow).filter(Boolean);
+    console.log('✅ Sheet cache loaded:', _sheetStudentsCache.length, 'students (sheet1:', rows1.length, '+ sheet2:', rows2.length, ')');
     return _sheetStudentsCache;
   } catch(e) {
     console.warn('⚠️ تعذّر تحميل بيانات الشيت:', e.message);
