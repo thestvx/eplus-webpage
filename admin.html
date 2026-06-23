@@ -5745,15 +5745,6 @@ window.renderStudentOverview = async () => {
   }
 
   const activeTickets = (allTicketsData || []).filter(tk => !tk.deleted);
-  if (!activeTickets.length) {
-    tbody.innerHTML = `<tr><td colspan="17" class="so-empty"><div class="so-empty-icon">🎫</div><div>لا توجد تذاكر في المخيم الصيفي بعد</div></td></tr>`;
-    document.getElementById('so-total').textContent = '0';
-    document.getElementById('so-activated').textContent = '0';
-    document.getElementById('so-noticket').textContent = '0';
-    document.getElementById('so-in-sheet').textContent = '0';
-    window._soData = []; window._soPage = 1;
-    return;
-  }
 
   // بناء خريطة سريعة: اسم التلميذ الطبيع → بياناته عند الأستاذ
   const teacherMap = {};
@@ -5767,11 +5758,15 @@ window.renderStudentOverview = async () => {
     });
   });
 
+  // Track which normalized names already have a ticket entry
+  const ticketKeys = new Set();
   _soData = [];
-  let totalActivated = 0, totalUnpaid = 0, totalInSheet = 0;
+  let totalActivated = 0, totalUnpaid = 0, totalInSheet = 0, totalSheetOnly = 0;
 
-  activeTickets.forEach(ticket => {
+  // ── Part 1: Students with tickets ──
+  (activeTickets || []).forEach(ticket => {
     const key = _normOv(ticket.name);
+    ticketKeys.add(key);
     const match = teacherMap[key];
     const isPaid = ticket.status === 'paid';
     const sheetMatch = window._sheetNormCache ? window._sheetNormCache[key] : null;
@@ -5804,11 +5799,45 @@ window.renderStudentOverview = async () => {
     });
   });
 
+  // ── Part 2: Sheet-only students (no ticket) ──
+  if (window._sheetNormCache) {
+    Object.entries(window._sheetNormCache).forEach(([normKey, sheet]) => {
+      if (ticketKeys.has(normKey)) return; // already added via ticket
+      const match = teacherMap[normKey];
+      totalSheetOnly++;
+      _soData.push({
+        studentName: sheet._raw?.['الاسم'] && sheet._raw?.['اللقب']
+          ? String(sheet._raw['الاسم'] + ' ' + sheet._raw['اللقب']).trim()
+          : sheet.parentName ? '—' : normKey,
+        teacherName: match ? match.teacherName : '—',
+        groupName: match ? match.groupName : '—',
+        status: 'noticket',
+        statusLabel: '⚠️ لا توجد تذكرة',
+        pkg: sheet.pack || '—',
+        amount: 0,
+        paid: 0,
+        receipt: '—',
+        hasTicket: false,
+        parentName: sheet.parentName || '—',
+        parentPhone: sheet.parentPhone || '—',
+        age: sheet.age || '—',
+        langs: sheet.langs || '',
+        itTrack: sheet.itTrack || '',
+        sheetTotal: sheet.totalAmount || '',
+        inSheet: true,
+        sheetPack: sheet.pack || '',
+        sheetLangs: sheet.langs || '',
+        _sheetRaw: sheet._raw || null,
+      });
+    });
+  }
+
   // إحصائيات
-  document.getElementById('so-total').textContent = activeTickets.length;
+  const totalAll = _soData.length;
+  document.getElementById('so-total').textContent = totalAll;
   document.getElementById('so-activated').textContent = totalActivated;
-  document.getElementById('so-noticket').textContent = totalUnpaid;
-  document.getElementById('so-in-sheet').textContent = totalInSheet;
+  document.getElementById('so-noticket').textContent = totalUnpaid + totalSheetOnly;
+  document.getElementById('so-in-sheet').textContent = totalInSheet + totalSheetOnly;
 
   window._soData = _soData;
   window._soPage = 1;
@@ -5858,6 +5887,7 @@ function _renderSoTable(data, searchFilter) {
   if (statusFilter === 'unassigned') filtered = filtered.filter(r => r.teacherName === '—');
   else if (statusFilter === 'insheet') filtered = filtered.filter(r => r.inSheet);
   else if (statusFilter === 'notinsheet') filtered = filtered.filter(r => !r.inSheet);
+  else if (statusFilter === 'unpaid') filtered = filtered.filter(r => r.status === 'unpaid' || r.status === 'noticket');
   else if (statusFilter) filtered = filtered.filter(r => r.status === statusFilter);
 
   const countEl = document.getElementById('so-filter-count');
@@ -5883,7 +5913,7 @@ function _renderSoTable(data, searchFilter) {
 
   tbody.innerHTML = pageData.map((r, i) => {
     const idx = start + i + 1;
-    const badgeClass = r.status === 'paid' ? 'so-badge paid' : r.status === 'unpaid' ? 'so-badge unpaid' : 'so-badge noticket';
+    const badgeClass = r.status === 'paid' ? 'so-badge paid' : r.status === 'unpaid' || r.status === 'noticket' ? 'so-badge unpaid' : 'so-badge noticket';
     const sheetBadge = r.inSheet
       ? '<span class="so-badge sheet-yes" title="موجود في جدول التسجيلات">✅ نعم</span>'
       : '<span class="so-badge sheet-no" title="غير موجود في جدول التسجيلات">❌ لا</span>';
@@ -7541,7 +7571,7 @@ async function saveSessionControl(teacherId, gi, sessionNum, data) {
     attendanceFinalized: data.attendanceFinalized || false,
     notes: data.notes || '',
     updatedAt: serverTimestamp(),
-    updatedBy: currentUser?.uid || 'admin'
+    updatedBy: (auth.currentUser?.uid) || 'admin'
   };
   await setDoc(doc(db, 'sessionControl', docId), fullData, { merge: true });
   // تحديث الكاش المحلي
@@ -8109,11 +8139,11 @@ window.emergencyAll = async (action) => {
         status: newStatus,
         openAt: action === 'open' ? now : null,
         closeAt: action === 'close' ? now : null,
-        attendanceEnabled: action !== 'freeze',
-        updatedAt: serverTimestamp(),
-        updatedBy: currentUser?.uid || 'admin'
-      }, { merge: true });
-      count++;
+      attendanceEnabled: action !== 'freeze',
+      updatedAt: serverTimestamp(),
+      updatedBy: (auth.currentUser?.uid) || 'admin'
+    }, { merge: true });
+    count++;
       if (!_sessionControlCache[gi]) _sessionControlCache[gi] = {};
       _sessionControlCache[gi][sn] = { ...(_sessionControlCache[gi][sn]||{}), status: newStatus };
     }
