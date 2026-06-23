@@ -2267,7 +2267,9 @@
                     <th>👨‍🏫 الأستاذ</th>
                     <th>🏫 الفوج</th>
                     <th>📦 الباقة</th>
-                    <th>💰 المبلغ</th>
+                    <th>🌍 اللغات</th>
+                    <th>💻 مسار الإعلام الآلي</th>
+                    <th>💰 المبلغ (الشيت)</th>
                     <th>💳 المدفوع</th>
                     <th>🆔 رقم الوصل</th>
                     <th>✅ الحالة</th>
@@ -2279,7 +2281,7 @@
                   </tr>
                 </thead>
                 <tbody id="so-tbody">
-                  <tr><td colspan="14" class="so-empty"><div class="so-empty-icon">⏳</div><div>جاري تحميل البيانات...</div></td></tr>
+                  <tr><td colspan="16" class="so-empty"><div class="so-empty-icon">⏳</div><div>جاري تحميل البيانات...</div></td></tr>
                 </tbody>
               </table>
             </div>
@@ -3261,6 +3263,8 @@ window.switchNavSection = (section) => {
   const finNav = document.getElementById('nav-finance');
   if (finNav) finNav.classList.toggle('active', section === 'finance');
   if (section === 'finance') {
+    const finFilter = document.getElementById('fin-filter');
+    if (finFilter) finFilter.value = 'expense';
     if (window.loadFinanceSection) window.loadFinanceSection();
     else setTimeout(() => window.loadFinanceSection?.(), 600);
   }
@@ -4365,7 +4369,8 @@ function renderTicketRows(data) {
   }
   filtered.forEach(x => {
     const remaining = Number(x.remainingAmount || 0);
-    const dateStr   = x.date ? new Date(x.date).toLocaleDateString('ar-DZ') : '—';
+    const dObj     = x.date ? new Date(x.date) : null;
+    const dateStr   = dObj && !isNaN(dObj.getTime()) ? `${dObj.getFullYear()}-${String(dObj.getMonth()+1).padStart(2,'0')}-${String(dObj.getDate()).padStart(2,'0')}` : '—';
     const tr = document.createElement('tr');
     tr.dataset.date = x.date || '';
     if (isTrash) tr.style.cssText = 'opacity:0.75;background:rgba(239,68,68,0.03)';
@@ -5067,6 +5072,8 @@ function _mapSheetRow(r) {
     age:      String(r['العمر'] || r['age'] || '').trim(),
     phone:    String(r['رقم هاتف ولي الأمر'] || r['رقم الهاتف'] || '').trim(),
     parent:   String(r['اسم ولي الأمر'] || '').trim(),
+    itTrack:  String(r['مسار الإعلام الآلي'] || r['itTrack'] || '').trim(),
+    totalAmount: String(r['المبلغ الإجمالي'] || '').trim(),
   };
 }
 
@@ -5666,6 +5673,8 @@ function _buildSheetNormCache(sheetRows) {
         age: String(r.age || '').trim(),
         pack: String(r.pack || '').trim(),
         langs: String(r.langs || '').trim(),
+        itTrack: String(r.itTrack || '').trim(),
+        totalAmount: String(r.totalAmount || '').trim(),
       };
     }
   });
@@ -5690,7 +5699,7 @@ window.renderStudentOverview = async () => {
 
   const activeTickets = (allTicketsData || []).filter(tk => !tk.deleted);
   if (!activeTickets.length) {
-    tbody.innerHTML = `<tr><td colspan="14" class="so-empty"><div class="so-empty-icon">🎫</div><div>لا توجد تذاكر في المخيم الصيفي بعد</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="16" class="so-empty"><div class="so-empty-icon">🎫</div><div>لا توجد تذاكر في المخيم الصيفي بعد</div></td></tr>`;
     document.getElementById('so-total').textContent = '0';
     document.getElementById('so-activated').textContent = '0';
     document.getElementById('so-noticket').textContent = '0';
@@ -5738,6 +5747,9 @@ window.renderStudentOverview = async () => {
       parentName: sheetMatch ? sheetMatch.parentName : '—',
       parentPhone: sheetMatch ? sheetMatch.parentPhone : '—',
       age: sheetMatch ? sheetMatch.age : '—',
+      langs: sheetMatch ? sheetMatch.langs : '',
+      itTrack: sheetMatch ? sheetMatch.itTrack : '',
+      sheetTotal: sheetMatch ? sheetMatch.totalAmount : '',
       inSheet: !!sheetMatch,
       sheetPack: sheetMatch ? sheetMatch.pack : '',
       sheetLangs: sheetMatch ? sheetMatch.langs : '',
@@ -5816,7 +5828,7 @@ function _renderSoTable(data, searchFilter) {
   const pageNavEl = document.getElementById('so-page-nav');
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="14" class="so-empty"><div class="so-empty-icon">🔍</div><div style="font-weight:700;font-size:15px;color:var(--text-muted)">لا توجد نتائج</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px">حاول تغيير كلمة البحث</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="16" class="so-empty"><div class="so-empty-icon">🔍</div><div style="font-weight:700;font-size:15px;color:var(--text-muted)">لا توجد نتائج</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px">حاول تغيير كلمة البحث</div></td></tr>`;
     if (pageNavEl) pageNavEl.innerHTML = '';
     return;
   }
@@ -5827,13 +5839,18 @@ function _renderSoTable(data, searchFilter) {
     const sheetBadge = r.inSheet
       ? '<span class="so-badge sheet-yes" title="موجود في جدول التسجيلات">✅ نعم</span>'
       : '<span class="so-badge sheet-no" title="غير موجود في جدول التسجيلات">❌ لا</span>';
+    const langsHtml = r.langs ? `<span style="font-size:11px;background:rgba(99,102,241,0.1);color:#4f46e5;padding:2px 8px;border-radius:99px;font-weight:700;white-space:nowrap">🌍 ${r.langs}</span>` : '<span style="color:var(--text-muted);font-size:11px">—</span>';
+    const itTrackHtml = r.itTrack ? `<span style="font-size:11px;background:rgba(16,185,129,0.1);color:#059669;padding:2px 8px;border-radius:99px;font-weight:700;white-space:nowrap">💻 ${r.itTrack}</span>` : '<span style="color:var(--text-muted);font-size:11px">—</span>';
+    const sheetTotalNum = r.sheetTotal ? parseFloat(r.sheetTotal.replace(/[^\d.]/g,'')) : 0;
     return `<tr class="so-row" style="animation:fadeInRow 0.3s ease ${i*0.05}s both">
       <td style="font-weight:700;color:var(--text-muted)">${idx}</td>
       <td style="font-weight:800">${r.studentName}</td>
       <td>${r.teacherName}</td>
       <td><span class="so-group-badge">🏫 ${r.groupName}</span></td>
       <td>${r.pkg !== '—' ? `<span class="so-badge pack">📦 ${r.pkg}</span>` : '<span style="color:var(--text-muted);font-size:11px">—</span>'}</td>
-      <td class="so-amount-cell">${Number(r.amount) ? Number(r.amount).toLocaleString('ar-DZ') + ' دج' : '—'}</td>
+      <td style="text-align:center">${langsHtml}</td>
+      <td style="text-align:center">${itTrackHtml}</td>
+      <td class="so-amount-cell">${sheetTotalNum > 0 ? sheetTotalNum.toLocaleString('ar-DZ') + ' دج' : '—'}</td>
       <td class="so-amount-cell">${Number(r.paid) ? Number(r.paid).toLocaleString('ar-DZ') + ' دج' : '—'}</td>
       <td><span class="so-receipt-code">${r.receipt !== '—' ? r.receipt : '—'}</span></td>
       <td><span class="${badgeClass}">${r.statusLabel}</span></td>
@@ -6005,8 +6022,31 @@ window.loadAttendanceSummary = async function() {
     return;
   }
 
+  // Load FROM_DATE from teacher doc if available, else use default
+  let sessionStartDate = '2026-06-01';
+  try {
+    const teacherDoc = await getDoc(doc(db, 'teachers', teacherId));
+    if (teacherDoc.exists()) {
+      const td = teacherDoc.data();
+      if (td.startDate) {
+        const sd = td.startDate.toDate ? td.startDate.toDate() : new Date(td.startDate);
+        sessionStartDate = sd.toISOString().slice(0, 10);
+      } else if (td.fromDate) {
+        const sd = td.fromDate.toDate ? td.fromDate.toDate() : new Date(td.fromDate);
+        sessionStartDate = sd.toISOString().slice(0, 10);
+      }
+    }
+  } catch (e) { /* fallback */ }
+
+  const startDate = new Date(sessionStartDate);
+  const now = new Date();
+  const diffDays = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
+  const curSession = Math.min(12, Math.max(1, Math.floor(diffDays / 7) + 1));
+
   populateSessionSelect();
-  const curSession = _getCurrentSessionNum();
+  // override curSession display since we now have a teacher-specific value
+  const curEl = document.getElementById('att-sum-current');
+  if (curEl) curEl.innerHTML = `<span class="att-current-badge">▶ الحصة الحالية: ${curSession} / 12</span>`;
 
   const students = teacher.students || [];
   if (!students.length) {
@@ -6027,61 +6067,80 @@ window.loadAttendanceSummary = async function() {
         const data = d.data();
         if (!data.sessionNum) return;
         const gStr = String(data.teacherId || '');
-        const gi = parseInt((gStr.match(/_g(\d+)$/) || [0,0])[1]);
+        const gi = parseInt((gStr.match(/_g(\d+)$/) || [0, 0])[1]);
         if (!window._attSummaryCache[teacherId][gi]) window._attSummaryCache[teacherId][gi] = {};
         window._attSummaryCache[teacherId][gi][data.sessionNum] = data;
       });
-    } catch(e) { /* fallback */ }
+    } catch (e) { /* fallback */ }
   }
 
   const groupCache = window._attSummaryCache[teacherId] || {};
-  const allRows = [];
 
-  // Organize students by group
+  // Helper to normalize names for comparison
+  const normName = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+  // Build a set of known group names (lowercase) for matching
+  const groupNames = new Set((teacher.groups || []).map(g => normName(g.name || '')));
+
+  // Build student list with group assignment
   const groups = teacher.groups || [];
   let allStudents = [];
 
   if (groups.length > 1) {
     groups.forEach((g, gi) => {
       (g.students || []).forEach(sName => {
-        const sNameNorm = String(sName || '').trim().toLowerCase();
-        const match = students.find(s => String(s.name || '').trim().toLowerCase() === sNameNorm);
+        const sNameNorm = normName(sName);
+        // Try exact match first, then partial match
+        let match = students.find(s => normName(s.name || '') === sNameNorm);
+        if (!match) {
+          match = students.find(s => normName(s.name || '').includes(sNameNorm) || sNameNorm.includes(normName(s.name || '')));
+        }
         if (match) {
-          allStudents.push({ name: match.name, group: g.name || 'فوج ' + (gi+1), gi });
+          allStudents.push({ name: match.name, group: g.name || 'فوج ' + (gi + 1), gi });
         }
       });
     });
-  } else {
-    allStudents = students.map(s => ({
-      name: s.name || '—',
-      group: s.group || '—',
-      gi: 0
-    }));
   }
 
   if (!allStudents.length) {
-    allStudents = students.map(s => ({ name: s.name || '—', group: s.group || '—', gi: 0 }));
+    allStudents = students.map(s => {
+      const sName = normName(s.name || '');
+      // Find which group this student belongs to by name matching
+      let gi = 0;
+      let groupName = s.group || '—';
+      if (groups.length > 1) {
+        groups.forEach((g, idx) => {
+          if ((g.students || []).some(gs => normName(gs) === sName)) {
+            gi = idx;
+            groupName = g.name || 'فوج ' + (idx + 1);
+          }
+        });
+      }
+      return { name: s.name || '—', group: groupName, gi };
+    });
   }
+
+  // Build rows and count stats during rendering (fixes stale-DOM bug)
+  let totalPresent = 0, totalAbsent = 0, totalMissed = 0;
+  const allRows = [];
 
   allStudents.forEach(s => {
     const groupSessions = groupCache[s.gi] || {};
     const cells = [];
     for (let i = 1; i <= 12; i++) {
-      // If session filter is active, skip sessions that don't match
-      if (sessionFilter && parseInt(sessionFilter) !== i) {
-        continue;
-      }
       const rec = groupSessions[i];
       if (!rec) {
-        // Past sessions with no record = absent (overdue), future sessions = pending
         const isPast = i < curSession;
-        cells.push(isPast
-          ? '<td class="att-cell att-cell-missed" title="❌ لم يُسجَّل — حصة فائتة">⚠️</td>'
-          : '<td class="att-cell att-cell-future" title="⏳ حصة مستقبلية">⋯</td>');
+        if (isPast) {
+          cells.push('<td class="att-cell att-cell-missed" title="❌ لم يُسجَّل — حصة فائتة">⚠️</td>');
+        } else {
+          cells.push('<td class="att-cell att-cell-future" title="⏳ حصة مستقبلية">⋯</td>');
+        }
         continue;
       }
+      // Match student by name with flexible comparison
       const studentRec = (rec.students || []).find(st =>
-        String(st.name || '').trim().toLowerCase() === String(s.name || '').trim().toLowerCase()
+        normName(st.name || '') === normName(s.name || '')
       );
       if (!studentRec) {
         cells.push('<td class="att-cell att-cell-future" title="⏳ لم يُسجَّل بعد">⋯</td>');
@@ -6090,29 +6149,25 @@ window.loadAttendanceSummary = async function() {
       const date = rec.date || '';
       if (studentRec.present) {
         cells.push(`<td class="att-cell att-cell-present" title="✅ حضر — ${date}">✅</td>`);
+        totalPresent++;
       } else {
         cells.push(`<td class="att-cell att-cell-absent" title="❌ غائب — ${date}">❌</td>`);
+        totalAbsent++;
       }
     }
-    if (cells.length) {
-      allRows.push(`<tr>
-        <td style="font-weight:700">${s.name}</td>
-        <td>${teacher.name}</td>
-        <td><span class="att-sum-group">🏫 ${s.group}</span></td>
-        ${cells.join('')}
-      </tr>`);
-    }
+    allRows.push(`<tr>
+      <td style="font-weight:700">${s.name}</td>
+      <td>${teacher.name}</td>
+      <td><span class="att-sum-group">🏫 ${s.group}</span></td>
+      ${cells.join('')}
+    </tr>`);
   });
 
-  // Show attendance summary stats
-  let totalPresent = 0, totalAbsent = 0, totalMissed = 0;
-  document.querySelectorAll('#att-sum-tbody .att-cell-present').forEach(() => totalPresent++);
-  document.querySelectorAll('#att-sum-tbody .att-cell-absent').forEach(() => totalAbsent++);
-  document.querySelectorAll('#att-sum-tbody .att-cell-missed').forEach(() => totalMissed++);
+  tbody.innerHTML = allRows.length
+    ? allRows.join('')
+    : '<tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted)">لا توجد بيانات حضور متاحة</td></tr>';
 
-  tbody.innerHTML = allRows.join('') || '<tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted)">لا توجد بيانات حضور متاحة</td></tr>';
-
-  // Show/hide the stat bar
+  // Show/hide the stat bar (using correctly counted values)
   let statBar = document.getElementById('att-sum-stats');
   if (!statBar && allRows.length) {
     statBar = document.createElement('div');
@@ -6122,8 +6177,8 @@ window.loadAttendanceSummary = async function() {
     if (tblWrap) tblWrap.parentNode.insertBefore(statBar, tblWrap.nextSibling);
   }
   if (statBar) {
-    const total = totalPresent + totalAbsent + totalMissed;
-    const pct = total > 0 ? Math.round(totalPresent / total * 100) : 0;
+    const totalAll = totalPresent + totalAbsent + totalMissed;
+    const pct = totalAll > 0 ? Math.round(totalPresent / totalAll * 100) : 0;
     statBar.innerHTML = `
       <span class="att-stat-item att-stat-present">✅ حاضر: ${totalPresent}</span>
       <span class="att-stat-item att-stat-absent">❌ غائب: ${totalAbsent}</span>
