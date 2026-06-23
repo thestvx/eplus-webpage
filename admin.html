@@ -2254,7 +2254,7 @@
             <div class="so-search-wrap">
               <div style="position:relative;flex:1">
                 <span style="position:absolute;top:50%;right:12px;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
-                <input class="inp" type="text" id="so-search" placeholder="ابحث باسم التلميذ..." style="padding-right:40px;padding-top:10px;padding-bottom:10px;font-size:13px" oninput="filterStudentOverview()">
+                <input class="inp" type="text" id="so-search" placeholder="ابحث باسم التلميذ أو رقم الوصل..." style="padding-right:40px;padding-top:10px;padding-bottom:10px;font-size:13px" oninput="debouncedSearch()">
               </div>
               <span style="font-size:12px;font-weight:700;color:var(--text-muted);white-space:nowrap" id="so-filter-count"></span>
             </div>
@@ -3271,6 +3271,12 @@ window.switchNavSection = (section) => {
   if (section === 'students') {
     if (typeof renderStudentOverview === 'function' && !window._soData) renderStudentOverview();
     if (typeof populateAttSummaryTeachers === 'function') populateAttSummaryTeachers();
+  }
+  if (section === 'teachers') {
+    if (!window._adminLogLoaded) {
+      window._adminLogLoaded = true;
+      if (typeof loadAdminLog === 'function') loadAdminLog();
+    }
   }
 };
 
@@ -5070,8 +5076,8 @@ function _mapSheetRow(r) {
     pack:     String(r['الباقة'] || r['نوع البرنامج'] || r['الباقة المختارة'] || '').trim(),
     langs:    String(r['اللغة المختارة'] || r['اللغات'] || r['languages'] || '').trim(),
     age:      String(r['العمر'] || r['age'] || '').trim(),
-    phone:    String(r['رقم هاتف ولي الأمر'] || r['رقم الهاتف'] || '').trim(),
-    parent:   String(r['اسم ولي الأمر'] || '').trim(),
+    phone:    String(r['رقم هاتف ولي الأمر'] || r['رقم الهاتف'] || r['parentPhone'] || '').trim(),
+    parent:   String(r['اسم ولي الأمر'] || r['parentName'] || '').trim(),
     itTrack:  String(r['مسار الإعلام الآلي'] || r['itTrack'] || '').trim(),
     totalAmount: String(r['المبلغ الإجمالي'] || '').trim(),
   };
@@ -5721,7 +5727,7 @@ window.renderStudentOverview = async () => {
   });
 
   _soData = [];
-  let totalActivated = 0, totalUnmatched = 0, totalInSheet = 0;
+  let totalActivated = 0, totalUnpaid = 0, totalInSheet = 0;
 
   activeTickets.forEach(ticket => {
     const key = _normOv(ticket.name);
@@ -5730,7 +5736,7 @@ window.renderStudentOverview = async () => {
     const sheetMatch = window._sheetNormCache ? window._sheetNormCache[key] : null;
 
     if (isPaid) totalActivated++;
-    if (!match) totalUnmatched++;
+    else totalUnpaid++;
     if (sheetMatch) totalInSheet++;
 
     _soData.push({
@@ -5759,7 +5765,7 @@ window.renderStudentOverview = async () => {
   // إحصائيات
   document.getElementById('so-total').textContent = activeTickets.length;
   document.getElementById('so-activated').textContent = totalActivated;
-  document.getElementById('so-noticket').textContent = totalUnmatched;
+  document.getElementById('so-noticket').textContent = totalUnpaid;
   document.getElementById('so-in-sheet').textContent = totalInSheet;
 
   window._soData = _soData;
@@ -5872,6 +5878,11 @@ function _renderSoTable(data, searchFilter) {
   }
 }
 
+let _soSearchTimer;
+window.debouncedSearch = () => {
+  clearTimeout(_soSearchTimer);
+  _soSearchTimer = setTimeout(() => filterStudentOverview(), 250);
+};
 window.filterStudentOverview = () => {
   const searchVal = document.getElementById('so-search')?.value || '';
   _renderSoTable(_soData || [], searchVal);
@@ -5990,10 +6001,10 @@ function _getCurrentSessionNum() {
   return session;
 }
 
-function populateSessionSelect() {
+function populateSessionSelect(curSession) {
   const sel = document.getElementById('att-sum-session');
   if (!sel) return;
-  const curSession = _getCurrentSessionNum();
+  if (curSession === undefined) curSession = _getCurrentSessionNum();
   sel.innerHTML = '<option value="">📅 جميع الحصص</option>' +
     Array.from({length: curSession}, (_, i) => {
       const n = i + 1;
@@ -6043,10 +6054,7 @@ window.loadAttendanceSummary = async function() {
   const diffDays = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
   const curSession = Math.min(12, Math.max(1, Math.floor(diffDays / 7) + 1));
 
-  populateSessionSelect();
-  // override curSession display since we now have a teacher-specific value
-  const curEl = document.getElementById('att-sum-current');
-  if (curEl) curEl.innerHTML = `<span class="att-current-badge">▶ الحصة الحالية: ${curSession} / 12</span>`;
+  populateSessionSelect(curSession);
 
   const students = teacher.students || [];
   if (!students.length) {
@@ -6079,21 +6087,20 @@ window.loadAttendanceSummary = async function() {
   // Helper to normalize names for comparison
   const normName = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
 
-  // Build a set of known group names (lowercase) for matching
-  const groupNames = new Set((teacher.groups || []).map(g => normName(g.name || '')));
-
-  // Build student list with group assignment
+  // Build student list with group assignment — use teacher's student list directly
   const groups = teacher.groups || [];
   let allStudents = [];
 
-  if (groups.length > 1) {
+  if (groups.length) {
     groups.forEach((g, gi) => {
       (g.students || []).forEach(sName => {
         const sNameNorm = normName(sName);
-        // Try exact match first, then partial match
         let match = students.find(s => normName(s.name || '') === sNameNorm);
         if (!match) {
-          match = students.find(s => normName(s.name || '').includes(sNameNorm) || sNameNorm.includes(normName(s.name || '')));
+          match = students.find(s =>
+            normName(s.name || '').includes(sNameNorm) ||
+            sNameNorm.includes(normName(s.name || ''))
+          );
         }
         if (match) {
           allStudents.push({ name: match.name, group: g.name || 'فوج ' + (gi + 1), gi });
@@ -6103,24 +6110,22 @@ window.loadAttendanceSummary = async function() {
   }
 
   if (!allStudents.length) {
+    // Fallback: use teacher's flat student list
     allStudents = students.map(s => {
       const sName = normName(s.name || '');
-      // Find which group this student belongs to by name matching
       let gi = 0;
-      let groupName = s.group || '—';
-      if (groups.length > 1) {
-        groups.forEach((g, idx) => {
-          if ((g.students || []).some(gs => normName(gs) === sName)) {
-            gi = idx;
-            groupName = g.name || 'فوج ' + (idx + 1);
-          }
-        });
-      }
-      return { name: s.name || '—', group: groupName, gi };
+      let groupName = '—';
+      groups.forEach((g, idx) => {
+        if ((g.students || []).some(gs => normName(gs) === sName)) {
+          gi = idx;
+          groupName = g.name || 'فوج ' + (idx + 1);
+        }
+      });
+      return { name: s.name || '—', group: groupName || '—', gi };
     });
   }
 
-  // Build rows and count stats during rendering (fixes stale-DOM bug)
+  // Build rows and count stats during rendering
   let totalPresent = 0, totalAbsent = 0, totalMissed = 0;
   const allRows = [];
 
@@ -6132,9 +6137,10 @@ window.loadAttendanceSummary = async function() {
       if (!rec) {
         const isPast = i < curSession;
         if (isPast) {
-          cells.push('<td class="att-cell att-cell-missed" title="❌ لم يُسجَّل — حصة فائتة">⚠️</td>');
+          cells.push('<td class="att-cell att-cell-missed" title="⚠️ لم يُسجَّل — حصة فائتة">⚠️</td>');
+          totalMissed++;
         } else {
-          cells.push('<td class="att-cell att-cell-future" title="⏳ حصة مستقبلية">⋯</td>');
+          cells.push('<td class="att-cell att-cell-future" title="⋯ حصة مستقبلية">⋯</td>');
         }
         continue;
       }
@@ -6143,7 +6149,7 @@ window.loadAttendanceSummary = async function() {
         normName(st.name || '') === normName(s.name || '')
       );
       if (!studentRec) {
-        cells.push('<td class="att-cell att-cell-future" title="⏳ لم يُسجَّل بعد">⋯</td>');
+        cells.push('<td class="att-cell att-cell-future" title="⋯ لم يُسجَّل بعد">⋯</td>');
         continue;
       }
       const date = rec.date || '';
