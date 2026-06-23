@@ -1503,6 +1503,12 @@
         <span class="nav-label" data-i18n="summer_camp">المخيم الصيفي</span>
         <span class="nav-badge" id="nav-badge-summer">0</span>
       </div>
+      <div class="nav-section" data-i18n="students_mgmt">إدارة التلاميذ</div>
+      <div class="nav-item" onclick="switchNavSection('students')">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label" data-i18n="students_overview">قائمة التلاميذ</span>
+        <span class="nav-badge" id="nav-badge-students">0</span>
+      </div>
       <div class="nav-section" data-i18n="teachers_mgmt">إدارة الأساتذة</div>
       <div class="nav-item" onclick="switchNavSection('teachers')">
         <span class="nav-icon">👨‍🏫</span>
@@ -2152,6 +2158,12 @@
             <span style="width:1px;height:20px;background:var(--border);margin:0 2px"></span>
             <button class="ticket-filter-btn" id="trash-filter-btn" onclick="setTicketFilter('trash',this)" style="border-color:rgba(239,68,68,0.3);color:#DC2626">🗑️ سلة المحذوفات <span id="trash-count-badge" style="display:none;background:#EF4444;color:white;border-radius:99px;padding:1px 7px;font-size:11px;margin-right:4px">0</span></button>
           </div>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+            <span style="font-size:12px;font-weight:700;color:var(--text-muted)">📅 فلترة بالتاريخ:</span>
+            <input class="inp" type="date" id="tickets-date-filter" onchange="filterTicketsByDate(this.value)" style="width:180px;padding:7px 12px;font-size:13px">
+            <button class="ticket-filter-btn" onclick="document.getElementById('tickets-date-filter').value='';filterTicketsByDate('')" style="font-size:11px">إلغاء الفلترة</button>
+            <span id="tickets-date-summary" style="font-size:12px;font-weight:700;color:var(--primary);margin-right:8px"></span>
+          </div>
           <div class="tbl-wrap">
             <table class="tbl" id="tickets-table">
               <thead>
@@ -2170,6 +2182,111 @@
                 <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">⏳ جاري تحميل التذاكر...</td></tr>
               </tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SECTION: STUDENTS ===== -->
+      <div id="section-students" style="display:none">
+        <!-- Student overview panel -->
+        <div class="so-panel" id="student-overview-panel">
+          <div class="so-hero">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;width:100%">
+              <div>
+                <div class="so-hero-title">📋 قائمة التلاميذ المسجّلين</div>
+                <div class="so-hero-sub">جميع تلاميذ المخيم الصيفي مع معلومات الدفع والتسجيل</div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="so-sync-btn" onclick="syncStudentNamesWithTickets()" title="مزامنة أسماء التلاميذ حسب المخيم الصيفي لتصحيح حالة التفعيل">🔄 مزامنة الأسماء</button>
+                <button class="so-sync-btn" id="so-restore-btn" onclick="restoreSyncBackup()" style="display:none;border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.08);color:#dc2626" title="استعادة أسماء التلاميذ إلى ما قبل آخر مزامنة">↩️ استعادة</button>
+                <button class="so-sync-btn" onclick="openSessionRebuilder()" style="border-color:rgba(16,185,129,0.3);background:rgba(16,185,129,0.08);color:#059669" title="تحليل وإعادة ترتيب الحصص تلقائياً حسب التواريخ الفعلية">🧠 إعادة بناء الحصص</button>
+              </div>
+            </div>
+            <div class="so-stats" id="so-stats" style="margin-top:16px">
+              <div class="so-stat"><div class="so-stat-n" id="so-total">0</div><div class="so-stat-l">👥 إجمالي الطلاب</div></div>
+              <div class="so-stat"><div class="so-stat-n" id="so-activated">0</div><div class="so-stat-l">✅ لهم تذكرة (مسجّلين)</div></div>
+              <div class="so-stat"><div class="so-stat-n" id="so-noticket">0</div><div class="so-stat-l">❌ بدون تذكرة (غير مسجّلين)</div></div>
+            </div>
+          </div>
+          <div class="so-body">
+            <div class="so-filters">
+              <select id="so-filter-teacher" onchange="filterStudentOverview()">
+                <option value="">👨‍🏫 جميع الأساتذة</option>
+              </select>
+              <select id="so-filter-pack" onchange="filterStudentOverview()">
+                <option value="">📦 جميع الباقات</option>
+              </select>
+              <select id="so-filter-status" onchange="filterStudentOverview()">
+                <option value="">✅ الجميع</option>
+                <option value="paid">مسجّل في الموقع</option>
+                <option value="unassigned">غير موزّع</option>
+                <option value="unpaid">بدون تذكرة</option>
+              </select>
+            </div>
+            <div class="so-search-wrap">
+              <div style="position:relative;flex:1">
+                <span style="position:absolute;top:50%;right:12px;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
+                <input class="inp" type="text" id="so-search" placeholder="ابحث باسم التلميذ..." style="padding-right:40px;padding-top:10px;padding-bottom:10px;font-size:13px" oninput="filterStudentOverview()">
+              </div>
+              <span style="font-size:12px;font-weight:700;color:var(--text-muted);white-space:nowrap" id="so-filter-count"></span>
+            </div>
+            <div class="so-tbl-wrap">
+              <table class="so-tbl" id="so-tbl">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>📛 التلميذ</th>
+                    <th>👨‍🏫 الأستاذ</th>
+                    <th>🏫 الفوج</th>
+                    <th>📦 الباقة</th>
+                    <th>💰 المبلغ</th>
+                    <th>💳 المدفوع</th>
+                    <th>🆔 رقم الوصل</th>
+                    <th>✅ الحالة</th>
+                    <th>📋 مسجّل في الموقع</th>
+                  </tr>
+                </thead>
+                <tbody id="so-tbody">
+                  <tr><td colspan="10" class="so-empty"><div class="so-empty-icon">⏳</div><div>جاري تحميل البيانات...</div></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="so-page-nav" id="so-page-nav"></div>
+          </div>
+        </div>
+        <!-- Attendance summary -->
+        <div class="panel" style="margin-top:20px">
+          <div class="panel-header">
+            <div class="panel-icon" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.2)">📅</div>
+            سجل حضور التلاميذ اليومي
+            <span style="font-size:12px;font-weight:400;color:var(--text-muted);margin-right:8px">— لكل تلميذ لكل حصة</span>
+          </div>
+          <div style="padding:0 24px 24px">
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+              <select id="att-sum-teacher" onchange="loadAttendanceSummary()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">
+                <option value="">👨‍🏫 جميع الأساتذة</option>
+              </select>
+              <select id="att-sum-session" onchange="loadAttendanceSummary()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">
+                <option value="">📅 جميع الحصص</option>
+              </select>
+              <span style="font-size:12px;color:var(--text-muted);align-self:center" id="att-sum-current">الحصة الحالية: —</span>
+            </div>
+            <div class="tbl-wrap">
+              <table class="tbl" id="att-sum-tbl">
+                <thead>
+                  <tr>
+                    <th>التلميذ</th>
+                    <th>الأستاذ</th>
+                    <th>الفوج</th>
+                    <th>ح1</th><th>ح2</th><th>ح3</th><th>ح4</th><th>ح5</th>
+                    <th>ح6</th><th>ح7</th><th>ح8</th><th>ح9</th><th>ح10</th><th>ح11</th><th>ح12</th>
+                  </tr>
+                </thead>
+                <tbody id="att-sum-tbody">
+                  <tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted)">اختر أستاذاً لعرض سجل الحضور</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -2215,72 +2332,7 @@
           </div>
         </div>
 
-        <!-- ════════════════════════════════════════
-             جدول جميع التلاميذ مع حالة الباقة
-        ════════════════════════════════════════ -->
-        <div class="so-panel" id="student-overview-panel">
-          <div class="so-hero">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;width:100%">
-              <div>
-                <div class="so-hero-title">📋 إجمالي الطلاب المسجّلين في المخيم</div>
-                <div class="so-hero-sub">ربط الطلاب بالأساتذة والأفواج — لمعرفة من هو مسجّل عند أستاذ ومن لا يزال غير موزّع</div>
-              </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <button class="so-sync-btn" onclick="syncStudentNamesWithTickets()" title="مزامنة أسماء التلاميذ حسب المخيم الصيفي لتصحيح حالة التفعيل">🔄 مزامنة الأسماء</button>
-                <button class="so-sync-btn" id="so-restore-btn" onclick="restoreSyncBackup()" style="display:none;border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.08);color:#dc2626" title="استعادة أسماء التلاميذ إلى ما قبل آخر مزامنة">↩️ استعادة</button>
-                <button class="so-sync-btn" onclick="openSessionRebuilder()" style="border-color:rgba(16,185,129,0.3);background:rgba(16,185,129,0.08);color:#059669" title="تحليل وإعادة ترتيب الحصص تلقائياً حسب التواريخ الفعلية">🧠 إعادة بناء الحصص</button>
-              </div>
-            </div>
-            <div class="so-stats" id="so-stats" style="margin-top:16px">
-              <div class="so-stat"><div class="so-stat-n" id="so-total">0</div><div class="so-stat-l">👥 إجمالي الطلاب</div></div>
-              <div class="so-stat"><div class="so-stat-n" id="so-activated">0</div><div class="so-stat-l">✅ دافعين</div></div>
-              <div class="so-stat"><div class="so-stat-n" id="so-noticket">0</div><div class="so-stat-l">❌ غير دافعين</div></div>
-            </div>
-          </div>
-          <div class="so-body">
-            <div class="so-filters">
-              <select id="so-filter-teacher" onchange="filterStudentOverview()">
-                <option value="">👨‍🏫 جميع الأساتذة</option>
-              </select>
-              <select id="so-filter-pack" onchange="filterStudentOverview()">
-                <option value="">📦 جميع الباقات</option>
-              </select>
-              <select id="so-filter-status" onchange="filterStudentOverview()">
-                <option value="">✅ الجميع</option>
-                <option value="paid">مفعّلة فقط</option>
-                <option value="unassigned">غير موزّعة فقط</option>
-                <option value="unpaid">غير مدفوعة فقط</option>
-              </select>
-            </div>
-            <div class="so-search-wrap">
-              <div style="position:relative;flex:1">
-                <span style="position:absolute;top:50%;right:12px;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
-                <input class="inp" type="text" id="so-search" placeholder="ابحث باسم التلميذ..." style="padding-right:40px;padding-top:10px;padding-bottom:10px;font-size:13px" oninput="filterStudentOverview()">
-              </div>
-              <span style="font-size:12px;font-weight:700;color:var(--text-muted);white-space:nowrap" id="so-filter-count"></span>
-            </div>
-            <div class="so-tbl-wrap">
-              <table class="so-tbl" id="so-tbl">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>📛 التلميذ</th>
-                    <th>👨‍🏫 الأستاذ</th>
-                    <th>🏫 الفوج</th>
-                    <th>📦 الباقة</th>
-                    <th>💰 المبلغ</th>
-                    <th>🆔 رقم الوصل</th>
-                    <th>✅ الحالة</th>
-                  </tr>
-                </thead>
-                <tbody id="so-tbody">
-                  <tr><td colspan="8" class="so-empty"><div class="so-empty-icon">⏳</div><div>جاري تحميل البيانات...</div></td></tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="so-page-nav" id="so-page-nav"></div>
-          </div>
-        </div>
+
 
         <!-- Teachers grid -->
         <div class="section-header">
@@ -3166,12 +3218,12 @@ document.addEventListener('click', (e) => {
 
 // NAV SWITCHING (sidebar-based, not tabs)
 window.switchNavSection = (section) => {
-  ['home','announcements','summer','teachers','finance','settings'].forEach(s => {
+  ['home','announcements','summer','students','teachers','finance','settings'].forEach(s => {
     const el = document.getElementById('section-' + s);
     if (el) el.style.display = s === section ? 'block' : 'none';
   });
   document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-  const navMap = {home:0, announcements:1, summer:2, teachers:3, settings:7};
+  const navMap = {home:0, announcements:1, summer:2, students:3, teachers:4, settings:8};
   const navItems = document.querySelectorAll('.nav-item');
   if (navMap[section] !== undefined) navItems[navMap[section]]?.classList.add('active');
   const finNav = document.getElementById('nav-finance');
@@ -3179,6 +3231,10 @@ window.switchNavSection = (section) => {
   if (section === 'finance') {
     if (window.loadFinanceSection) window.loadFinanceSection();
     else setTimeout(() => window.loadFinanceSection?.(), 600);
+  }
+  if (section === 'students') {
+    if (typeof renderStudentOverview === 'function' && !window._soData) renderStudentOverview();
+    if (typeof populateAttSummaryTeachers === 'function') populateAttSummaryTeachers();
   }
 };
 
@@ -4318,6 +4374,37 @@ window.setTicketFilter = (val, btn) => {
 };
 
 let _unsubTickets = null;
+
+// ── Ticket daily date filter ──
+window.filterTicketsByDate = function(dateVal) {
+  const tbody = document.getElementById('tickets-tbody');
+  const rows = tbody ? [...tbody.querySelectorAll('tr')] : [];
+  let count = 0, total = 0;
+  rows.forEach(row => {
+    if (row.querySelector('td[colspan]')) return;
+    const dateCell = row.children[5];
+    if (!dateCell) return;
+    const cellText = dateCell.textContent.trim();
+    let show = true;
+    if (dateVal) {
+      const rowDate = cellText.split(' ')[0];
+      show = rowDate === dateVal;
+    }
+    row.style.display = show ? '' : 'none';
+    if (show && row.children[3]) {
+      const amt = parseFloat(row.children[3].textContent.replace(/[^\d]/g,''));
+      if (!isNaN(amt)) { count++; total += amt; }
+    }
+  });
+  const summary = document.getElementById('tickets-date-summary');
+  if (summary) {
+    if (dateVal) {
+      summary.textContent = `📊 ${count} تذكرة — ${total.toLocaleString()} دج`;
+    } else {
+      summary.textContent = '';
+    }
+  }
+};
 
 function loadTickets() {
   // إلغاء الاشتراك السابق إن وُجد
@@ -5535,7 +5622,7 @@ window.renderStudentOverview = () => {
 
   const activeTickets = (allTicketsData || []).filter(tk => !tk.deleted);
   if (!activeTickets.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="so-empty"><div class="so-empty-icon">🎫</div><div>لا توجد تذاكر في المخيم الصيفي بعد</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="so-empty"><div class="so-empty-icon">🎫</div><div>لا توجد تذاكر في المخيم الصيفي بعد</div></td></tr>`;
     document.getElementById('so-total').textContent = '0';
     document.getElementById('so-activated').textContent = '0';
     document.getElementById('so-noticket').textContent = '0';
@@ -5577,7 +5664,9 @@ window.renderStudentOverview = () => {
       statusLabel: isPaid ? '✅ مفعّل' : '⏳ غير مدفوع',
       pkg: ticket.pack || '—',
       amount: Number(ticket.amount || 0),
-      receipt: ticket.receipt || '—'
+      paid: Number(ticket.paid || 0),
+      receipt: ticket.receipt || '—',
+      hasTicket: isPaid
     });
   });
 
@@ -5648,7 +5737,7 @@ function _renderSoTable(data, searchFilter) {
   const pageNavEl = document.getElementById('so-page-nav');
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="so-empty"><div class="so-empty-icon">🔍</div><div style="font-weight:700;font-size:15px;color:var(--text-muted)">لا توجد نتائج</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px">حاول تغيير كلمة البحث</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="so-empty"><div class="so-empty-icon">🔍</div><div style="font-weight:700;font-size:15px;color:var(--text-muted)">لا توجد نتائج</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px">حاول تغيير كلمة البحث</div></td></tr>`;
     if (pageNavEl) pageNavEl.innerHTML = '';
     return;
   }
@@ -5663,8 +5752,10 @@ function _renderSoTable(data, searchFilter) {
       <td><span style="font-size:11px;background:rgba(245,158,11,0.1);color:#92400e;padding:2px 8px;border-radius:99px;font-weight:700">🏫 ${r.groupName}</span></td>
       <td>${r.pkg !== '—' ? `<span class="so-badge pack">📦 ${r.pkg}</span>` : '<span style="color:var(--text-muted);font-size:11px">—</span>'}</td>
       <td style="font-weight:700;direction:ltr;text-align:right">${Number(r.amount) ? Number(r.amount).toLocaleString('ar-DZ') + ' دج' : '—'}</td>
+      <td style="font-weight:700;direction:ltr;text-align:right">${Number(r.paid) ? Number(r.paid).toLocaleString('ar-DZ') + ' دج' : '—'}</td>
       <td style="font-size:11px;direction:ltr;text-align:right">${r.receipt !== '—' ? r.receipt : '—'}</td>
       <td><span class="${badgeClass}">${r.statusLabel}</span></td>
+      <td style="text-align:center;font-size:16px">${r.hasTicket ? '✅' : '❌'}</td>
     </tr>`;
   }).join('');
 
@@ -5774,6 +5865,147 @@ window.syncStudentNamesWithTickets = async () => {
 
   loadTeachers();
   loadTickets();
+};
+
+// ─── Daily attendance summary ───
+function populateAttSummaryTeachers() {
+  const sel = document.getElementById('att-sum-teacher');
+  if (!sel || !allTeachers) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">👨‍🏫 جميع الأساتذة</option>' +
+    allTeachers.filter(t => t.name).map(t =>
+      `<option value="${t.id}">${t.name}</option>`
+    ).join('');
+  sel.value = current;
+}
+
+function populateSessionSelect() {
+  const sel = document.getElementById('att-sum-session');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">📅 جميع الحصص</option>' +
+    Array.from({length: 12}, (_, i) => {
+      const n = i + 1;
+      return `<option value="${n}">الحصة ${n}</option>`;
+    }).join('');
+  const cur = document.getElementById('att-sum-current');
+  if (cur) cur.textContent = `الحصة الحالية: 8`;
+}
+
+window._attSummaryCache = {}; // teacherId -> { gi: { sessionNum: data } }
+
+window.loadAttendanceSummary = async function() {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  const sessionFilter = document.getElementById('att-sum-session')?.value || '';
+  const tbody = document.getElementById('att-sum-tbody');
+  if (!tbody) return;
+
+  if (!teacherId) {
+    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted)">اختر أستاذاً لعرض سجل الحضور</td></tr>';
+    return;
+  }
+
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) {
+    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted)">لم يتم العثور على الأستاذ</td></tr>';
+    return;
+  }
+
+  populateSessionSelect();
+
+  const students = teacher.students || [];
+  if (!students.length) {
+    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted)">لا يوجد تلاميذ لهذا الأستاذ</td></tr>';
+    return;
+  }
+
+  // Load session attendance from Firestore if not cached
+  if (!window._attSummaryCache[teacherId]) {
+    window._attSummaryCache[teacherId] = {};
+    try {
+      const sessSnap = await getDocs(query(
+        collection(db, 'sessionAttendance'),
+        where('teacherId', '>=', teacherId + '_g'),
+        where('teacherId', '<=', teacherId + '_g')
+      ));
+      sessSnap.forEach(d => {
+        const data = d.data();
+        if (!data.sessionNum) return;
+        const gStr = String(data.teacherId || '');
+        const gi = parseInt((gStr.match(/_g(\d+)$/) || [0,0])[1]);
+        if (!window._attSummaryCache[teacherId][gi]) window._attSummaryCache[teacherId][gi] = {};
+        window._attSummaryCache[teacherId][gi][data.sessionNum] = data;
+      });
+    } catch(e) { /* fallback */ }
+  }
+
+  const groupCache = window._attSummaryCache[teacherId] || {};
+  const allRows = [];
+
+  // Organize students by group
+  const groups = teacher.groups || [];
+  let allStudents = [];
+
+  if (groups.length > 1) {
+    groups.forEach((g, gi) => {
+      (g.students || []).forEach(sName => {
+        const sNameNorm = String(sName || '').trim().toLowerCase();
+        const match = students.find(s => String(s.name || '').trim().toLowerCase() === sNameNorm);
+        if (match) {
+          allStudents.push({ name: match.name, group: g.name || 'فوج ' + (gi+1), gi });
+        }
+      });
+    });
+  } else {
+    allStudents = students.map(s => ({
+      name: s.name || '—',
+      group: s.group || '—',
+      gi: 0
+    }));
+  }
+
+  if (!allStudents.length) {
+    allStudents = students.map(s => ({ name: s.name || '—', group: s.group || '—', gi: 0 }));
+  }
+
+  allStudents.forEach(s => {
+    const groupSessions = groupCache[s.gi] || {};
+    const cells = [];
+    for (let i = 1; i <= 12; i++) {
+      const rec = groupSessions[i];
+      if (!rec) {
+        cells.push('<td style="text-align:center;font-size:11px;color:#d1d5db">⋯</td>');
+        continue;
+      }
+      const studentRec = (rec.students || []).find(st =>
+        String(st.name || '').trim().toLowerCase() === String(s.name || '').trim().toLowerCase()
+      );
+      if (!studentRec) {
+        cells.push('<td style="text-align:center;font-size:11px;color:#d1d5db">⋯</td>');
+        continue;
+      }
+      const date = rec.date || '';
+      if (studentRec.present) {
+        cells.push(`<td style="text-align:center;font-size:16px" title="✅ حضر — ${date}">✅</td>`);
+      } else {
+        cells.push(`<td style="text-align:center;font-size:16px" title="❌ غائب — ${date}">❌</td>`);
+      }
+    }
+    allRows.push(`<tr>
+      <td style="font-weight:700">${s.name}</td>
+      <td>${teacher.name}</td>
+      <td><span style="font-size:11px;background:rgba(245,158,11,0.1);color:#92400e;padding:2px 8px;border-radius:99px;font-weight:700">🏫 ${s.group}</span></td>
+      ${cells.join('')}
+    </tr>`);
+  });
+
+  tbody.innerHTML = allRows.join('') || '<tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted)">لا توجد بيانات حضور متاحة</td></tr>';
+};
+
+// Populate teacher select when teachers load
+const _origRenderTeachers = window.renderTeachersGrid;
+window.renderTeachersGrid = function(teachers) {
+  if (_origRenderTeachers) _origRenderTeachers(teachers);
+  populateAttSummaryTeachers();
 };
 
 // ─── استعادة آخر مزامنة من النسخة الاحتياطية ───
