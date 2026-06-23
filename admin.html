@@ -5653,19 +5653,16 @@ window._sheetNormCache = null; // normalized name → sheet data
 function _buildSheetNormCache(sheetRows) {
   const cache = {};
   (sheetRows || []).forEach(r => {
-    const first = String(r['الاسم'] || '').trim();
-    const last = String(r['اللقب'] || '').trim();
-    const fullName = [first, last].filter(Boolean).join(' ');
+    const fullName = String(r.name || '').trim();
     if (!fullName) return;
     const key = _normOv(fullName);
     if (!cache[key]) {
       cache[key] = {
-        parentName: String(r['اسم ولي الأمر'] || r['parentName'] || '').trim(),
-        parentPhone: String(r['رقم هاتف ولي الأمر'] || r['رقم الهاتف'] || r['parentPhone'] || '').trim(),
-        age: String(r['العمر'] || r['age'] || '').trim(),
-        pack: String(r['الباقة'] || r['نوع البرنامج'] || r['الباقة المختارة'] || '').trim(),
-        langs: String(r['اللغة المختارة'] || r['اللغات'] || r['languages'] || '').trim(),
-        totalAmount: String(r['المبلغ الإجمالي'] || '').trim(),
+        parentName: String(r.parent || '').trim(),
+        parentPhone: String(r.phone || '').trim(),
+        age: String(r.age || '').trim(),
+        pack: String(r.pack || '').trim(),
+        langs: String(r.langs || '').trim(),
       };
     }
   });
@@ -5683,7 +5680,9 @@ window.renderStudentOverview = async () => {
   // Load Google Sheet cache if not loaded
   if (!window._sheetNormCache) {
     const sheetRows = await loadSheetStudentsCache();
+    console.log('📊 Sheet rows loaded:', sheetRows?.length);
     window._sheetNormCache = _buildSheetNormCache(sheetRows);
+    console.log('📊 Norm cache built:', Object.keys(window._sheetNormCache).length, 'entries');
   }
 
   const activeTickets = (allTicketsData || []).filter(tk => !tk.deleted);
@@ -11026,6 +11025,7 @@ const I18N = {
     // nav sections
     main_menu:'القائمة الرئيسية',
     events:'الفعاليات',
+    students_mgmt:'إدارة التلاميذ',
     teachers_mgmt:'إدارة الأساتذة',
     communication:'التواصل',
     finance:'المالية',
@@ -11034,6 +11034,7 @@ const I18N = {
     stats_dashboard:'لوحة الإحصائيات',
     announcements:'الإعلانات',
     summer_camp:'المخيم الصيفي',
+    students_overview:'قائمة التلاميذ',
     teachers_att:'الأساتذة والحضور',
     messages:'الرسائل',
     financial_res:'الموارد المالية',
@@ -11052,6 +11053,7 @@ const I18N = {
     role_teacher:'👨‍\u200Dتعليم Professeur',
     main_menu:'Menu principal',
     events:'Événements',
+    students_mgmt:'Gestion des élèves',
     teachers_mgmt:'Gestion des profs',
     communication:'Communication',
     finance:'Finance',
@@ -11059,6 +11061,7 @@ const I18N = {
     stats_dashboard:'Statistiques',
     announcements:'Annonces',
     summer_camp:"Camp d'été",
+    students_overview:'Liste des élèves',
     teachers_att:'Profs & Présence',
     messages:'Messages',
     financial_res:'Ressources fin.',
@@ -11076,6 +11079,7 @@ const I18N = {
     role_teacher:'👨‍\u200Dتعليم Teacher',
     main_menu:'Main Menu',
     events:'Events',
+    students_mgmt:'Students Management',
     teachers_mgmt:'Teachers Mgmt',
     communication:'Communication',
     finance:'Finance',
@@ -11083,6 +11087,7 @@ const I18N = {
     stats_dashboard:'Statistics',
     announcements:'Announcements',
     summer_camp:'Summer Camp',
+    students_overview:'Students List',
     teachers_att:'Teachers & Attendance',
     messages:'Messages',
     financial_res:'Financial Resources',
