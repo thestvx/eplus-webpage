@@ -810,6 +810,10 @@
     .so-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
     .so-tbl th{text-align:right;padding:10px 12px;font-weight:800;color:var(--text-muted);font-size:11px;border-bottom:2px solid var(--border);white-space:nowrap}
     .so-tbl td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+    .so-detail-btn{cursor:pointer;padding:2px 6px;border-radius:6px;transition:all 0.2s;font-size:16px}
+    .so-detail-btn:hover{background:var(--primary-light)}
+    .so-detail-popup{position:fixed;z-index:9999;background:var(--card-bg);border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 50px rgba(0,0,0,0.3);width:340px;max-width:90vw;animation:fadeInRow 0.2s ease}
+    .so-detail-header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:800;font-size:12px;color:var(--text)}
     .so-tbl tr:hover td{background:var(--primary-light)}
     .so-badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap}
     .so-badge.paid{background:var(--success-soft);color:var(--success);border:1px solid rgba(16,185,129,0.2)}
@@ -2278,10 +2282,11 @@
                     <th>📞 رقم ولي الأمر</th>
                     <th>🎂 العمر</th>
                     <th>📊 مسجّل في الشيت</th>
+                    <th style="width:40px">🔍</th>
                   </tr>
                 </thead>
                 <tbody id="so-tbody">
-                  <tr><td colspan="16" class="so-empty"><div class="so-empty-icon">⏳</div><div>جاري تحميل البيانات...</div></td></tr>
+                  <tr><td colspan="17" class="so-empty"><div class="so-empty-icon">⏳</div><div>جاري تحميل البيانات...</div></td></tr>
                 </tbody>
               </table>
             </div>
@@ -3267,6 +3272,14 @@ window.switchNavSection = (section) => {
     if (finFilter) finFilter.value = 'expense';
     if (window.loadFinanceSection) window.loadFinanceSection();
     else setTimeout(() => window.loadFinanceSection?.(), 600);
+  }
+  if (section === 'summer') {
+    // Re-run ticket rendering to ensure all tickets show
+    if (typeof renderTicketRows === 'function' && typeof allTicketsData !== 'undefined') {
+      renderTicketRows(allTicketsData);
+    }
+    // Auto-restore any soft-deleted tickets from today
+    if (typeof _autoRestoreTodayTickets === 'function') _autoRestoreTodayTickets();
   }
   if (section === 'students') {
     if (typeof renderStudentOverview === 'function' && !window._soData) renderStudentOverview();
@@ -4852,6 +4865,21 @@ window.restoreTicket = async (id) => {
   } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
 
+// ── استعادة تذاكر اليوم المحذوفة تلقائياً ──
+window._autoRestoreTodayTickets = async () => {
+  const todayStr = new Date().toISOString().slice(0, 10); // '2026-06-23'
+  const trashTickets = (allTicketsData || []).filter(x => x.deleted && x.date === todayStr);
+  if (!trashTickets.length) return;
+  let restored = 0;
+  for (const t of trashTickets) {
+    try {
+      await updateDoc(doc(db, 'summerTickets', t.id), { deleted: false, deletedAt: null, deletedBy: null });
+      restored++;
+    } catch(e) {}
+  }
+  if (restored > 0) showToast(`✅ تم استرجاع ${restored} تذكرة من ${todayStr}`);
+};
+
 // ── نافذة تأكيد الحذف المخصصة ──
 function showDeleteConfirm() {
   return new Promise(resolve => {
@@ -5067,19 +5095,20 @@ let _sheetStudentsCache = null;
 let _sheetStudentsLoading = false;
 
 function _mapSheetRow(r) {
-  const first = String(r['الاسم'] || '').trim();
-  const last  = String(r['اللقب'] || '').trim();
+  const first = String(r['الاسم'] || r['first_name'] || r['firstName'] || r['First Name'] || '').trim();
+  const last  = String(r['اللقب'] || r['last_name'] || r['lastName'] || r['Last Name'] || '').trim();
   const fullName = [first, last].filter(Boolean).join(' ');
   if (!fullName) return null;
   return {
     name:     fullName,
-    pack:     String(r['الباقة'] || r['نوع البرنامج'] || r['الباقة المختارة'] || '').trim(),
-    langs:    String(r['اللغة المختارة'] || r['اللغات'] || r['languages'] || '').trim(),
-    age:      String(r['العمر'] || r['age'] || '').trim(),
-    phone:    String(r['رقم هاتف ولي الأمر'] || r['رقم الهاتف'] || r['parentPhone'] || '').trim(),
-    parent:   String(r['اسم ولي الأمر'] || r['parentName'] || '').trim(),
-    itTrack:  String(r['مسار الإعلام الآلي'] || r['itTrack'] || '').trim(),
-    totalAmount: String(r['المبلغ الإجمالي'] || '').trim(),
+    pack:     String(r['الباقة'] || r['نوع البرنامج'] || r['الباقة المختارة'] || r['Program'] || r['program'] || r['pack'] || '').trim(),
+    langs:    String(r['اللغة المختارة'] || r['اللغات'] || r['languages'] || r['Language'] || r['lang'] || '').trim(),
+    age:      String(r['العمر'] || r['age'] || r['Age'] || r['العمر'] || '').trim(),
+    phone:    String(r['رقم هاتف ولي الأمر'] || r['رقم الهاتف'] || r['parentPhone'] || r['Parent Phone'] || r['phone'] || r['Phone'] || r['هاتف ولي الأمر'] || r['جوال ولي الأمر'] || '').trim(),
+    parent:   String(r['اسم ولي الأمر'] || r['parentName'] || r['Parent Name'] || r['parent'] || r['ولي الأمر'] || r['Parent'] || '').trim(),
+    itTrack:  String(r['مسار الإعلام الآلي'] || r['itTrack'] || r['IT Track'] || r['it_track'] || r['Information Technology'] || '').trim(),
+    totalAmount: String(r['المبلغ الإجمالي'] || r['المبلغ'] || r['السعر'] || r['totalAmount'] || r['Total Amount'] || r['Price'] || r['price'] || r['Amount'] || r['amount'] || '').trim(),
+    _raw:     r,
   };
 }
 
@@ -5681,7 +5710,19 @@ function _buildSheetNormCache(sheetRows) {
         langs: String(r.langs || '').trim(),
         itTrack: String(r.itTrack || '').trim(),
         totalAmount: String(r.totalAmount || '').trim(),
+        _raw: r._raw || null,
       };
+    } else if (r._raw) {
+      // Merge — keep existing but fill any empty fields from later sheets
+      const existing = cache[key];
+      if (!existing.parentName && r.parent) existing.parentName = String(r.parent).trim();
+      if (!existing.parentPhone && r.phone) existing.parentPhone = String(r.phone).trim();
+      if (!existing.age && r.age) existing.age = String(r.age).trim();
+      if (!existing.pack && r.pack) existing.pack = String(r.pack).trim();
+      if (!existing.langs && r.langs) existing.langs = String(r.langs).trim();
+      if (!existing.itTrack && r.itTrack) existing.itTrack = String(r.itTrack).trim();
+      if (!existing.totalAmount && r.totalAmount) existing.totalAmount = String(r.totalAmount).trim();
+      if (!existing._raw) existing._raw = r._raw;
     }
   });
   return cache;
@@ -5705,7 +5746,7 @@ window.renderStudentOverview = async () => {
 
   const activeTickets = (allTicketsData || []).filter(tk => !tk.deleted);
   if (!activeTickets.length) {
-    tbody.innerHTML = `<tr><td colspan="16" class="so-empty"><div class="so-empty-icon">🎫</div><div>لا توجد تذاكر في المخيم الصيفي بعد</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="17" class="so-empty"><div class="so-empty-icon">🎫</div><div>لا توجد تذاكر في المخيم الصيفي بعد</div></td></tr>`;
     document.getElementById('so-total').textContent = '0';
     document.getElementById('so-activated').textContent = '0';
     document.getElementById('so-noticket').textContent = '0';
@@ -5747,7 +5788,7 @@ window.renderStudentOverview = async () => {
       statusLabel: isPaid ? '✅ مفعّل' : '⏳ غير مدفوع',
       pkg: ticket.pack || '—',
       amount: Number(ticket.amount || 0),
-      paid: Number(ticket.paid || 0),
+      paid: Number(ticket.paid || ticket.amount || 0),
       receipt: ticket.receipt || '—',
       hasTicket: isPaid,
       parentName: sheetMatch ? sheetMatch.parentName : '—',
@@ -5759,6 +5800,7 @@ window.renderStudentOverview = async () => {
       inSheet: !!sheetMatch,
       sheetPack: sheetMatch ? sheetMatch.pack : '',
       sheetLangs: sheetMatch ? sheetMatch.langs : '',
+      _sheetRaw: sheetMatch ? sheetMatch._raw : null,
     });
   });
 
@@ -5834,7 +5876,7 @@ function _renderSoTable(data, searchFilter) {
   const pageNavEl = document.getElementById('so-page-nav');
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="16" class="so-empty"><div class="so-empty-icon">🔍</div><div style="font-weight:700;font-size:15px;color:var(--text-muted)">لا توجد نتائج</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px">حاول تغيير كلمة البحث</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="17" class="so-empty"><div class="so-empty-icon">🔍</div><div style="font-weight:700;font-size:15px;color:var(--text-muted)">لا توجد نتائج</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px">حاول تغيير كلمة البحث</div></td></tr>`;
     if (pageNavEl) pageNavEl.innerHTML = '';
     return;
   }
@@ -5865,6 +5907,7 @@ function _renderSoTable(data, searchFilter) {
       <td style="font-size:11px;direction:ltr;text-align:left;white-space:nowrap">${r.parentPhone !== '—' ? r.parentPhone : '<span style="color:var(--text-muted)">—</span>'}</td>
       <td style="text-align:center">${r.age !== '—' ? r.age : '<span style="color:var(--text-muted)">—</span>'}</td>
       <td style="text-align:center">${sheetBadge}</td>
+      <td style="text-align:center">${r._sheetRaw ? `<span class="so-detail-btn" onclick="event.stopPropagation();_showSheetDetail('${encodeURIComponent(JSON.stringify(r._sheetRaw))}',this)" title="عرض بيانات الشيت الكاملة">📋</span>` : '<span style="color:var(--text-muted);font-size:11px">—</span>'}</td>
     </tr>`;
   }).join('');
 
@@ -5875,6 +5918,40 @@ function _renderSoTable(data, searchFilter) {
       <span class="so-page-info">الصفحة ${page} من ${totalPages} (${filtered.length})</span>
       <button class="so-page-btn" onclick="window._soPage=Math.min(${totalPages},window._soPage+1);filterStudentOverview()" ${page===totalPages?'disabled':''}>التالي ▶</button>
       <button class="so-page-btn" onclick="window._soPage=${totalPages};filterStudentOverview()" ${page===totalPages?'disabled':''}>⏭</button>`;
+  }
+}
+
+// ─── Raw sheet data detail popup ───
+window._showSheetDetail = (rawJson, btn) => {
+  try {
+    const raw = JSON.parse(decodeURIComponent(rawJson));
+    const rows = Object.entries(raw).filter(([k, v]) => String(v || '').trim());
+    if (!rows.length) return;
+    // Build popup content
+    const list = rows.map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px"><span style="font-weight:700;color:var(--text-muted);white-space:nowrap">${k}</span><span style="color:var(--text);text-align:left;direction:ltr;word-break:break-all">${v}</span></div>`).join('');
+    // Remove existing popup
+    const old = document.getElementById('so-detail-popup');
+    if (old) old.remove();
+    const popup = document.createElement('div');
+    popup.id = 'so-detail-popup';
+    popup.className = 'so-detail-popup';
+    popup.innerHTML = `<div class="so-detail-header"><span>📋 بيانات الشيت الكاملة</span><button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px">✕</button></div><div style="max-height:320px;overflow-y:auto;padding:8px 14px 14px">${list}</div>`;
+    document.body.appendChild(popup);
+    // Position near button
+    const rect = btn.getBoundingClientRect();
+    const top = rect.bottom + 6;
+    const left = Math.min(rect.left, window.innerWidth - 360);
+    popup.style.top = top + 'px';
+    popup.style.left = Math.max(8, left) + 'px';
+    // Close on click outside
+    setTimeout(() => document.addEventListener('click', _closeDetailPopup), 10);
+  } catch(e) {}
+};
+function _closeDetailPopup(e) {
+  const popup = document.getElementById('so-detail-popup');
+  if (popup && !popup.contains(e.target) && !e.target.closest('.so-detail-btn')) {
+    popup.remove();
+    document.removeEventListener('click', _closeDetailPopup);
   }
 }
 
