@@ -3032,7 +3032,7 @@
 <script type="module">
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, setDoc, getDoc, getDocs, query, orderBy, where, onSnapshot, serverTimestamp, Timestamp, writeBatch } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, setDoc, getDoc, getDocs, query, orderBy, where, onSnapshot, serverTimestamp, Timestamp, writeBatch, limit } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -10268,6 +10268,7 @@ window.rollbackRebuild = async () => {
 // ═══════════════════════════════════════════════════════════
 
 const RESEND_API_KEY = 're_Jo35xAob_BZWbKF7oSCZxudzdRYdzXRdk';
+const NOTIF_FUNCTION_URL = 'https://us-central1-eplus-center-39.cloudfunctions.net/sendEmail';
 let notifRecipients = [];
 
 window.notifAddTeacherEmails = function() {
@@ -10334,12 +10335,9 @@ window.notifSend = async function() {
   statusEl.textContent = gT('notif_sending');
 
   try {
-    const res = await fetch('https://api.resend.com/emails', {
+    const res = await fetch(NOTIF_FUNCTION_URL, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from,
         to: validTo,
@@ -10348,27 +10346,15 @@ window.notifSend = async function() {
       })
     });
     const result = await res.json();
-    if (res.ok) {
+    if (res.ok && result.success) {
       statusEl.textContent = gT('notif_sent');
       statusEl.style.color = 'var(--success)';
-      try {
-        const notifRef = doc(collection(db, 'notifications'));
-        await setDoc(notifRef, {
-          from,
-          to: validTo,
-          subject,
-          body,
-          sentAt: serverTimestamp(),
-          status: 'sent',
-          resendId: result.id || ''
-        });
-      } catch(e) { console.error('save notification error:', e); }
       subjectEl.value = '';
       bodyEl.value = '';
       customInput.value = '';
       notifLoadHistory();
     } else {
-      statusEl.textContent = gT('notif_send_error') + ' ' + (result.message || result.error || '');
+      statusEl.textContent = gT('notif_send_error') + ' ' + (result.error || '');
       statusEl.style.color = 'var(--danger)';
     }
   } catch(e) {
