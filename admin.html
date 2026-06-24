@@ -2317,14 +2317,15 @@
           </div>
           <div style="padding:0 24px 24px">
             <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
-              <select id="att-sum-teacher" onchange="loadAttendanceSummary()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">
-                <option value="">👨‍🏫 جميع الأساتذة</option>
-              </select>
-              <select id="att-sum-session" onchange="loadAttendanceSummary()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">
-                <option value="">📅 جميع الحصص</option>
-              </select>
-              <span style="font-size:12px;color:var(--text-muted);align-self:center" id="att-sum-current">الحصة الحالية: —</span>
-            </div>
+      <select id="att-sum-teacher" onchange="loadAttendanceSummary()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">
+        <option value="">👨‍🏫 جميع الأساتذة</option>
+      </select>
+      <select id="att-sum-session" onchange="loadAttendanceSummary()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">
+        <option value="">📅 جميع الحصص</option>
+      </select>
+      <span style="font-size:12px;color:var(--text-muted);align-self:center" id="att-sum-current">الحصة الحالية: —</span>
+      <button onclick="exportAttendanceCSV()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif" title="تصدير CSV">📥 CSV</button>
+    </div>
             <div class="tbl-wrap">
               <table class="tbl" id="att-sum-tbl">
                 <thead>
@@ -6429,6 +6430,62 @@ window.loadAttendanceSummary = async function() {
   }
 };
 
+// ─── تصدير سجل الحضور كـ CSV ───
+window.exportAttendanceCSV = () => {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
+
+  const rows = [];
+  // رأس CSV
+  const headers = ['التلميذ', 'الأستاذ', 'الفوج'];
+  for (let i = 1; i <= 12; i++) headers.push(`الحصة ${i}`);
+  rows.push(headers);
+
+  // قراءة البيانات من الجدول المعروض
+  const tbody = document.getElementById('att-sum-tbody');
+  if (!tbody) return;
+  const trs = tbody.querySelectorAll('tr');
+  trs.forEach(tr => {
+    const tds = tr.querySelectorAll('td');
+    if (tds.length < 15) return;
+    const row = [];
+    // الأعمدة النصية: التلميذ (0), الأستاذ (1), الفوج (2)
+    row.push(tds[0].textContent.trim());
+    row.push(tds[1].textContent.trim());
+    row.push(tds[2].textContent.replace(/🏫\s*/g,'').trim());
+    // الحصص (3-14): ✅=حاضر, ❌=غائب, ⚠️=فائتة, ⋯=—
+    for (let c = 3; c <= 14; c++) {
+      const txt = tds[c].textContent.trim();
+      if (txt === '✅') row.push('حاضر');
+      else if (txt === '❌') row.push('غائب');
+      else if (txt === '⚠️') row.push('فائتة');
+      else row.push('—');
+    }
+    rows.push(row);
+  });
+
+  if (rows.length < 2) { showToast('⚠️ لا توجد بيانات للتصدير', true); return; }
+
+  // تحويل إلى CSV
+  const csvContent = rows.map(row =>
+    row.map(cell => `"${cell.replace(/"/g,'""')}"`).join(',')
+  ).join('\r\n');
+
+  // إضافة BOM UTF-8 ليدعم العربية
+  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const teacherName = teacher.name.replace(/[\\/:*?"<>|]/g, '_');
+  a.download = `حضور_${teacherName}_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast(`✅ تم تصدير ملف CSV: ${a.download}`);
+};
+
 // Populate teacher select when teachers load
 const _origRenderTeachers = window.renderTeachersGrid;
 window.renderTeachersGrid = function(teachers) {
@@ -7991,9 +8048,14 @@ window.setCtrlStatus = (sessionNum, gi, status) => {
   if (!_sessionControlCache[gi]) _sessionControlCache[gi] = {};
   if (!_sessionControlCache[gi][sessionNum]) _sessionControlCache[gi][sessionNum] = {};
   _sessionControlCache[gi][sessionNum].status = status;
+  // حفظ فوري
+  saveSessionControl(teacherId, gi, sessionNum, _sessionControlCache[gi][sessionNum]);
   // إعادة رسم المحتوى
   const contentEl = document.getElementById('ctrl-modal-content');
   if (contentEl) contentEl.innerHTML = renderCtrlContent(sessionNum, gi);
+  showToast(`✅ تم تغيير حالة الحصة إلى ${status === 'open' ? 'مفتوحة' : status === 'closed' ? 'مغلقة' : status === 'locked' ? 'مقفلة' : 'مجدولة'}`);
+  // تحديث الشبكة
+  refreshAdminGrid();
 };
 
 // ─── فتح/إغلاق سريع ───
@@ -8042,6 +8104,15 @@ window.saveCtrlSettings = (sessionNum, gi) => {
   data.openAt = openAtVal || null;
   data.closeAt = closeAtVal || null;
   data.notes = notesVal;
+
+  // إذا وضع وقت إغلاق ولم تتغير الحالة → أغلق تلقائياً
+  if (closeAtVal && (!data.status || data.status === 'scheduled')) {
+    data.status = 'closed';
+  }
+  // إذا وضع وقت فتح ولم تتغير الحالة → افتح تلقائياً
+  if (openAtVal && (!data.status || data.status === 'scheduled')) {
+    data.status = 'open';
+  }
 
   saveSessionControl(teacherId, gi, sessionNum, data).then(() => {
     showToast(`✅ تم حفظ إعدادات الحصة ${sessionNum}`);
