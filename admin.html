@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --primary: #7C3AED;
@@ -804,6 +805,9 @@
     .so-stat:hover{background:rgba(255,255,255,0.18);transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,0.1)}
     .so-stat-n{font-size:22px;font-weight:900;line-height:1.2}
     .so-stat-l{font-size:10px;opacity:0.85;font-weight:700;margin-top:2px;white-space:nowrap}
+    .so-charts{display:flex;gap:16px;padding:16px 24px 0;flex-wrap:wrap}
+    .so-chart-card{flex:1;min-width:240px;background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;align-items:center;justify-content:center;min-height:180px}
+    .so-chart-card canvas{width:100%!important;max-height:200px}
     .so-body{padding:18px 24px 24px}
     .so-search-wrap{display:flex;gap:10px;align-items:center;margin-bottom:14px}
     .so-search-wrap .inp{flex:1;padding-right:40px}
@@ -2236,6 +2240,15 @@
               <div class="so-stat"><div class="so-stat-n" id="so-activated">0</div><div class="so-stat-l">✅ لهم تذكرة (مسجّلين)</div></div>
               <div class="so-stat"><div class="so-stat-n" id="so-noticket">0</div><div class="so-stat-l">❌ بدون تذكرة (غير مسجّلين)</div></div>
               <div class="so-stat"><div class="so-stat-n" id="so-in-sheet">0</div><div class="so-stat-l">📊 مسجّل في الشيت</div></div>
+            </div>
+          </div>
+          <!-- Charts panel -->
+          <div class="so-charts" id="so-charts" style="display:none">
+            <div class="so-chart-card">
+              <canvas id="so-pie-chart"></canvas>
+            </div>
+            <div class="so-chart-card">
+              <canvas id="so-bar-chart"></canvas>
             </div>
           </div>
           <div class="so-body">
@@ -5859,7 +5872,93 @@ window.renderStudentOverview = async () => {
   }
 
   _renderSoTable(_soData, document.getElementById('so-search')?.value || '');
+
+  // تحديث الرسوم البيانية
+  _updateStudentCharts(_soData);
 };
+
+// ─── تحديث الرسوم البيانية للطلاب ───
+let _soPieChart = null, _soBarChart = null;
+
+function _updateStudentCharts(data) {
+  const chartsEl = document.getElementById('so-charts');
+  if (!chartsEl) return;
+
+  // Only show charts when Chart.js loaded and we have data
+  if (typeof Chart === 'undefined' || !data.length) {
+    chartsEl.style.display = 'none';
+    return;
+  }
+  chartsEl.style.display = 'flex';
+
+  // ── Pie: distribution ──
+  const paid = data.filter(r => r.status === 'paid').length;
+  const unpaid = data.filter(r => r.status === 'unpaid').length;
+  const noTicket = data.filter(r => r.status === 'noticket').length;
+
+  const pieCtx = document.getElementById('so-pie-chart');
+  if (_soPieChart) { _soPieChart.destroy(); _soPieChart = null; }
+  if (pieCtx) {
+    _soPieChart = new Chart(pieCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['✅ مسجّلين', '⏳ غير مدفوع', '⚠️ بدون تذكرة'],
+        datasets: [{
+          data: [paid, unpaid, noTicket],
+          backgroundColor: ['#059669', '#D97706', '#6B7280'],
+          borderColor: ['#34D399', '#FBBF24', '#9CA3AF'],
+          borderWidth: 2,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        plugins: {
+          legend: { position: 'bottom', labels: { font: { family: 'Tajawal', size: 11 }, padding: 12 } }
+        }
+      }
+    });
+  }
+
+  // ── Bar: per-package ──
+  const packMap = {};
+  data.forEach(r => {
+    const p = r.pkg || '—';
+    if (!packMap[p]) packMap[p] = 0;
+    packMap[p]++;
+  });
+  const labels = Object.keys(packMap).filter(k => k !== '—').sort();
+  const vals = labels.map(l => packMap[l]);
+  if (!labels.length) { labels.push('الكل'); vals.push(data.length); }
+
+  const barCtx = document.getElementById('so-bar-chart');
+  if (_soBarChart) { _soBarChart.destroy(); _soBarChart = null; }
+  if (barCtx) {
+    _soBarChart = new Chart(barCtx, {
+      type: 'bar',
+      data: {
+        labels: labels.map(l => '📦 ' + l),
+        datasets: [{
+          label: 'عدد الطلاب',
+          data: vals,
+          backgroundColor: 'rgba(124,58,237,0.6)',
+          borderColor: 'rgba(124,58,237,1)',
+          borderWidth: 1,
+          borderRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 1, font: { family: 'Tajawal', size: 10 } } },
+          x: { ticks: { font: { family: 'Tajawal', size: 9 }, maxRotation: 30 } }
+        }
+      }
+    });
+  }
+}
 
 function _renderSoTable(data, searchFilter) {
   const tbody = document.getElementById('so-tbody');
