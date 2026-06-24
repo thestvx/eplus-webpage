@@ -3140,13 +3140,13 @@ onAuthStateChanged(auth, async user => {
         // إخفاء عناصر الأدمين، إظهار قسم الأساتذة فقط
         document.querySelectorAll('.nav-item').forEach(el => el.style.display = 'none');
         if (document.getElementById('nav-finance')) document.getElementById('nav-finance').style.display = 'none';
-        const teacherNav = document.querySelectorAll('.nav-item')[3];
+        const teacherNav = document.querySelectorAll('.nav-item')[4]; // قسم الأساتذة
         if (teacherNav) { teacherNav.style.display = 'flex'; teacherNav.classList.add('active'); }
         const msgsNav = document.getElementById('nav-messages') || document.querySelectorAll('.nav-item')[5];
         if (msgsNav) { msgsNav.style.display = 'flex'; }
         document.querySelectorAll('.nav-section').forEach(el => el.style.display = 'none');
         document.getElementById('maintenance-card').style.display = 'none';
-        ['home','announcements','summer','settings'].forEach(s => {
+        ['home','announcements','summer','students','settings'].forEach(s => {
           const el = document.getElementById('section-' + s);
           if (el) el.style.display = 'none';
         });
@@ -8789,6 +8789,10 @@ let _allRecordedSessions = {}; // نحتفظ بها لملخص الحضور
 let _allRecordedSessionsByGroup = {}; // per group
 
 function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi, groupData) {
+  // إذا استُدعيت من مستمع sessionControl (recordedSessions == null),
+  // نستخدم آخر recordedSessions معروف
+  if (!recordedSessions) recordedSessions = _allRecordedSessionsByGroup[gi] || {};
+
   _allRecordedSessionsByGroup[gi] = recordedSessions;
   if (gi === (window._currentGroupIdx || 0)) _allRecordedSessions = recordedSessions;
   const students = currentAttStudents;
@@ -8845,9 +8849,6 @@ function updateSessionCardsForGroup(sessions, recordedSessions, teacherData, gi,
   if (summaryEl) summaryEl.textContent = `${doneCount}/12`;
 
   // ─── التحقق من إعدادات التحكم (sessionControl) ───
-  // إذا استُدعيت updateSessionCardsForGroup من مستمع sessionControl (recordedSessions == null),
-  // نستخدم آخر recordedSessions معروف
-  if (!recordedSessions) recordedSessions = _allRecordedSessionsByGroup[gi] || {};
 
   for (let i = 1; i <= 12; i++) {
     const card    = document.getElementById(`session-card-g${gi}-${i}`);
@@ -9615,13 +9616,14 @@ window.openSummaryModal = () => {
 
   const mergedSessions = {};
   Object.values(_allRecordedSessionsByGroup).forEach(groupSessions => {
+    if (!groupSessions) return;
     Object.entries(groupSessions).forEach(([sNum, rec]) => {
       const n = parseInt(sNum);
       if (!mergedSessions[n]) mergedSessions[n] = { students: [] };
       mergedSessions[n].students.push(...(rec.students || []));
     });
   });
-  if (!Object.keys(mergedSessions).length) {
+  if (!Object.keys(mergedSessions).length && _allRecordedSessions) {
     Object.entries(_allRecordedSessions).forEach(([sNum, rec]) => { mergedSessions[parseInt(sNum)] = rec; });
   }
   const recordedCount = Object.keys(mergedSessions).length;
