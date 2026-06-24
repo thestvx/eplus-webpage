@@ -2578,7 +2578,7 @@
               <div style="font-weight:800;font-size:14px;margin-bottom:12px;color:var(--text)" data-i18n="notif_compose">✉️ إنشاء إشعار جديد</div>
               <div class="form-group">
                 <label class="form-label" data-i18n="notif_from_label">من (البريد الإلكتروني المرسل)</label>
-                <input class="inp" type="email" id="notif-from" placeholder="noreply@example.com" value="noreply@e-plus.academy">
+                <input class="inp" type="email" id="notif-from" placeholder="noreply@example.com" value="onboarding@resend.dev">
               </div>
               <div class="form-group">
                 <label class="form-label" data-i18n="notif_to_label">إلى (المستلمين)</label>
@@ -3050,6 +3050,7 @@ const auth = getAuth(app);
 window._auth = auth;
 const db = getFirestore(app);
 const rtdb = getDatabase(app);
+const NOTIF_PROXY_URL = 'https://email-worker.your-subdomain.workers.dev';
 
 // ── Secondary app لإنشاء حسابات الأساتذة دون إلغاء جلسة الأدمين ──
 let secondaryApp;
@@ -10267,8 +10268,6 @@ window.rollbackRebuild = async () => {
 //  NOTIFICATIONS CENTER
 // ═══════════════════════════════════════════════════════════
 
-const RESEND_API_KEY = 're_Jo35xAob_BZWbKF7oSCZxudzdRYdzXRdk';
-const NOTIF_FUNCTION_URL = 'https://us-central1-eplus-center-39.cloudfunctions.net/sendEmail';
 let notifRecipients = [];
 
 window.notifAddTeacherEmails = function() {
@@ -10335,18 +10334,23 @@ window.notifSend = async function() {
   statusEl.textContent = gT('notif_sending');
 
   try {
-    const res = await fetch(NOTIF_FUNCTION_URL, {
+    const res = await fetch(NOTIF_PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from,
-        to: validTo,
-        subject,
-        html: body
-      })
+      body: JSON.stringify({ from, to: validTo, subject, html: body })
     });
     const result = await res.json();
     if (res.ok && result.success) {
+      // Save to Firestore directly (admin is authenticated)
+      await addDoc(collection(db, 'notifications'), {
+        from,
+        to: validTo,
+        subject,
+        body: html,
+        sentAt: serverTimestamp(),
+        status: 'sent',
+        resendId: result.id || ''
+      });
       statusEl.textContent = gT('notif_sent');
       statusEl.style.color = 'var(--success)';
       subjectEl.value = '';
@@ -10354,11 +10358,11 @@ window.notifSend = async function() {
       customInput.value = '';
       notifLoadHistory();
     } else {
-      statusEl.textContent = gT('notif_send_error') + ' ' + (result.error || '');
+      statusEl.textContent = gT('notif_send_error') + ' ' + JSON.stringify(result.error || '');
       statusEl.style.color = 'var(--danger)';
     }
   } catch(e) {
-    statusEl.textContent = gT('notif_send_error') + ' ' + e.message;
+    statusEl.textContent = gT('notif_send_error') + ' ' + (e.message || '');
     statusEl.style.color = 'var(--danger)';
   }
   btnEl.disabled = false;
