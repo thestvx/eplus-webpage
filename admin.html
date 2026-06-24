@@ -159,6 +159,7 @@
     [data-theme="dark"] .att-student-row { background: var(--bg-2); border-color: var(--border); }
     [data-theme="dark"] .att-check { border-color: var(--border-2); background: var(--bg); }
     [data-theme="dark"] .att-students-list { background: transparent; }
+    [data-theme="dark"] .att-group-header-row td { background: var(--bg-2) !important; border-color: var(--border-2) !important; }
 
     /* teacher card footer */
     [data-theme="dark"] .teacher-card-footer { background: var(--bg-2); border-color: var(--border); }
@@ -939,6 +940,8 @@
     .att-summary-card{background:var(--primary-light);border-radius:12px;padding:12px;text-align:center;border:1px solid var(--border-2)}
     .att-summary-n{font-size:22px;font-weight:900;color:var(--primary)}
     .att-summary-l{font-size:11px;color:var(--text-muted);font-weight:600;margin-top:2px}
+    .att-group-header-row td{padding:10px 14px!important;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)}
+    .att-group-header-row:hover{background:var(--primary-light)!important}
 
     /* ===== SESSIONS SYSTEM ===== */
     .sessions-header{background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);padding:20px 24px;margin-bottom:16px;box-shadow:var(--shadow)}
@@ -2340,9 +2343,10 @@
                     <th>الفوج</th>
                     <th>ح1</th><th>ح2</th><th>ح3</th><th>ح4</th><th>ح5</th>
                     <th>ح6</th><th>ح7</th><th>ح8</th><th>ح9</th><th>ح10</th><th>ح11</th><th>ح12</th>
+                    <th data-i18n="att_th_action">إجراء</th>
                   </tr>
                   <tr id="att-sum-del-row" style="display:none">
-                    <td colspan="3" style="text-align:left;font-size:11px;color:var(--text-muted);border:none">🗑️ حذف حصة</td>
+                    <td colspan="4" style="text-align:left;font-size:11px;color:var(--text-muted);border:none">🗑️ حذف حصة</td>
                     <td style="border:none;padding:2px;text-align:center"><button class="att-del-session" onclick="deleteDailySession(1)" title="حذف الحصة 1">🗑️</button></td>
                     <td style="border:none;padding:2px;text-align:center"><button class="att-del-session" onclick="deleteDailySession(2)" title="حذف الحصة 2">🗑️</button></td>
                     <td style="border:none;padding:2px;text-align:center"><button class="att-del-session" onclick="deleteDailySession(3)" title="حذف الحصة 3">🗑️</button></td>
@@ -2358,7 +2362,7 @@
                   </tr>
                 </thead>
                 <tbody id="att-sum-tbody">
-                  <tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted)">اختر أستاذاً لعرض سجل الحضور</td></tr>
+                  <tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted)">اختر أستاذاً لعرض سجل الحضور</td></tr>
                 </tbody>
               </table>
             </div>
@@ -6298,14 +6302,14 @@ window.loadAttendanceSummary = async function() {
 
   const delRow = document.getElementById('att-sum-del-row');
   if (!teacherId) {
-    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('att_choose_teacher') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('att_choose_teacher') + '</td></tr>';
     if (delRow) delRow.style.display = 'none';
     return;
   }
 
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
   if (!teacher) {
-    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('teacher_not_found') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('teacher_not_found') + '</td></tr>';
     if (delRow) delRow.style.display = 'none';
     return;
   }
@@ -6336,7 +6340,7 @@ window.loadAttendanceSummary = async function() {
 
   const students = teacher.students || [];
   if (!students.length) {
-    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('no_students_for_teacher') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('no_students_for_teacher') + '</td></tr>';
     return;
   }
 
@@ -6403,56 +6407,71 @@ window.loadAttendanceSummary = async function() {
     });
   }
 
-  // Build rows and count stats during rendering
+  // Build rows grouped by group (فوج), count stats
   let totalPresent = 0, totalAbsent = 0, totalMissed = 0;
   const allRows = [];
-
   const teacherIdVal = teacherId;
+
+  // Group students by gi
+  const grouped = {};
   allStudents.forEach(s => {
-    const groupSessions = groupCache[s.gi] || {};
-    const cells = [];
-    for (let i = 1; i <= 12; i++) {
-      const rec = groupSessions[i];
-      const giVal = s.gi;
-      const sNameVal = s.name;
-      if (!rec) {
-        const isPast = i < curSession;
-        if (isPast) {
-          cells.push(`<td class="att-cell att-cell-missed att-cell-clickable" title="${t('att_missed_session')}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">⚠️</td>`);
-          totalMissed++;
-        } else {
-          cells.push(`<td class="att-cell att-cell-future" title="${t('att_future_session')}">⋯</td>`);
-        }
-        continue;
-      }
-      // Match student by name with flexible comparison
-      const studentRec = (rec.students || []).find(st =>
-        normName(st.name || '') === normName(s.name || '')
-      );
-      if (!studentRec) {
-        cells.push(`<td class="att-cell att-cell-future att-cell-clickable" title="${t('att_not_recorded')}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">⋯</td>`);
-        continue;
-      }
-      const date = rec.date || '';
-      if (studentRec.present) {
-        cells.push(`<td class="att-cell att-cell-present att-cell-clickable" title="${t('att_present_on')}${date}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">✅</td>`);
-        totalPresent++;
-      } else {
-        cells.push(`<td class="att-cell att-cell-absent att-cell-clickable" title="${t('att_absent_on')}${date}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">❌</td>`);
-        totalAbsent++;
-      }
-    }
-    allRows.push(`<tr>
-      <td style="font-weight:700">${s.name}</td>
-      <td>${teacher.name}</td>
-      <td><span class="att-sum-group" id="att-sum-group">${t('group_prefix')}${s.group}</span></td>
-      ${cells.join('')}
+    if (!grouped[s.gi]) grouped[s.gi] = { group: s.group, gi: s.gi, students: [] };
+    grouped[s.gi].students.push(s);
+  });
+  const groupKeys = Object.keys(grouped).map(Number).sort((a,b) => a - b);
+
+  groupKeys.forEach(gi => {
+    const g = grouped[gi];
+    allRows.push(`<tr class="att-group-header-row">
+      <td colspan="16" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}</td>
     </tr>`);
+
+    g.students.forEach(s => {
+      const groupSessions = groupCache[s.gi] || {};
+      const cells = [];
+      for (let i = 1; i <= 12; i++) {
+        const rec = groupSessions[i];
+        const giVal = s.gi;
+        const sNameVal = s.name;
+        if (!rec) {
+          const isPast = i < curSession;
+          if (isPast) {
+            cells.push(`<td class="att-cell att-cell-missed att-cell-clickable" title="${t('att_missed_session')}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">⚠️</td>`);
+            totalMissed++;
+          } else {
+            cells.push(`<td class="att-cell att-cell-future" title="${t('att_future_session')}">⋯</td>`);
+          }
+          continue;
+        }
+        const studentRec = (rec.students || []).find(st =>
+          normName(st.name || '') === normName(s.name || '')
+        );
+        if (!studentRec) {
+          cells.push(`<td class="att-cell att-cell-future att-cell-clickable" title="${t('att_not_recorded')}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">⋯</td>`);
+          continue;
+        }
+        const date = rec.date || '';
+        if (studentRec.present) {
+          cells.push(`<td class="att-cell att-cell-present att-cell-clickable" title="${t('att_present_on')}${date}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">✅</td>`);
+          totalPresent++;
+        } else {
+          cells.push(`<td class="att-cell att-cell-absent att-cell-clickable" title="${t('att_absent_on')}${date}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">❌</td>`);
+          totalAbsent++;
+        }
+      }
+      allRows.push(`<tr>
+        <td style="font-weight:700">${s.name}</td>
+        <td>${teacher.name}</td>
+        <td><span class="att-sum-group">${t('group_prefix')}${s.group}</span></td>
+        ${cells.join('')}
+        <td style="text-align:center"><button class="tbl-action del" onclick="removeStudentFromTeacher('${teacherIdVal}','${s.name.replace(/'/g,"\\'")}')" title="${t('att_delete_btn')}">🗑️</button></td>
+      </tr>`);
+    });
   });
 
   tbody.innerHTML = allRows.length
     ? allRows.join('')
-    : '<tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('att_no_data') + '</td></tr>';
+    : '<tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('att_no_data') + '</td></tr>';
 
   // Show/hide the stat bar (using correctly counted values)
   let statBar = document.getElementById('att-sum-stats');
@@ -6543,6 +6562,40 @@ window.deleteDailySession = async (sessionNum) => {
   await loadAttendanceSummary();
 };
 
+// ─── حذف تلميذ من قائمة الأستاذ ───
+window.removeStudentFromTeacher = async (teacherId, studentName) => {
+  const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const nsn = _norm(studentName);
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { showToast('⚠️ ' + t('teacher_not_found'), true); return; }
+  const msg = t('att_del_student_confirm').replace('{name}', studentName).replace('{teacher}', teacher.name);
+  if (!confirm(msg)) return;
+
+  try {
+    const teacherRef = doc(db, 'teachers', teacherId);
+    const snap = await getDoc(teacherRef);
+    if (!snap.exists()) { showToast('⚠️ ' + t('teacher_not_found'), true); return; }
+    const data = snap.data();
+    const students = (data.students || []).filter(s => _norm(s.name || '') !== nsn);
+    const groups = (data.groups || []).map(g => {
+      if (g.students) {
+        g.students = g.students.filter(s => _norm(s) !== nsn);
+      }
+      return g;
+    });
+    await updateDoc(teacherRef, { students, groups });
+    // Update local cache
+    if (teacher.students) teacher.students = students;
+    if (teacher.groups) teacher.groups = groups;
+    if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
+    showToast(t('att_student_deleted').replace('{name}', studentName));
+    await loadAttendanceSummary();
+  } catch (e) {
+    console.error('removeStudentFromTeacher error:', e);
+    showToast('⚠️ خطأ في حذف التلميذ: ' + e.message, true);
+  }
+};
+
 // ─── تصدير سجل الحضور كـ CSV ───
 window.exportAttendanceCSV = () => {
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
@@ -6561,12 +6614,13 @@ window.exportAttendanceCSV = () => {
   const trs = tbody.querySelectorAll('tr');
   trs.forEach(tr => {
     const tds = tr.querySelectorAll('td');
-    if (tds.length < 15) return;
+    // Skip group header rows (have colspan, not 16 individual cells)
+    if (tds.length < 16) return;
     const row = [];
     // الأعمدة النصية: التلميذ (0), الأستاذ (1), الفوج (2)
     row.push(tds[0].textContent.trim());
     row.push(tds[1].textContent.trim());
-    row.push(tds[2].textContent.replace(/🏫\s*/g,'').trim());
+    row.push(tds[2].textContent.trim());
     // الحصص (3-14): ✅=حاضر, ❌=غائب, ⚠️=فائتة, ⋯=—
     for (let c = 3; c <= 14; c++) {
       const txt = tds[c].textContent.trim();
@@ -11861,6 +11915,9 @@ const I18N = {
     att_present:'حاضر',
     att_absent:'غائب',
     att_delete_btn:'حذف',
+    att_th_action:'إجراء',
+    att_del_student_confirm:'⚠️ تأكيد حذف التلميذ\n\nهل أنت متأكد من حذف "{name}" من قائمة "{teacher}"؟',
+    att_student_deleted:'✅ تم حذف "{name}" من القائمة',
     // teachers section
     teachers_hero_title:'👨‍🏫 إدارة الأساتذة والحضور',
     teachers_hero_sub:'أضف حسابات الأساتذة، حدد أيامهم وتخصصاتهم، وتابع حضور تلاميذهم يومياً.',
@@ -12404,6 +12461,9 @@ const I18N = {
     att_present:'Présent',
     att_absent:'Absent',
     att_delete_btn:'Supprimer',
+    att_th_action:'Action',
+    att_del_student_confirm:'⚠️ Confirmation\n\nÊtes-vous sûr de vouloir supprimer "{name}" de la liste de "{teacher}" ?',
+    att_student_deleted:'✅ "{name}" a été supprimé(e) de la liste',
     teachers_hero_title:'👨‍🏫 Gestion des profs',
     teachers_hero_sub:'Ajoutez des comptes, définissez leurs jours et spécialités.',
     teachers_stat_total:'Professeur',
@@ -12928,6 +12988,9 @@ const I18N = {
     att_present:'Present',
     att_absent:'Absent',
     att_delete_btn:'Delete',
+    att_th_action:'Action',
+    att_del_student_confirm:'⚠️ Confirm Delete\n\nAre you sure you want to remove "{name}" from "{teacher}"\'s list?',
+    att_student_deleted:'✅ Removed "{name}" from the list',
     teachers_hero_title:'👨‍🏫 Teachers & Attendance',
     teachers_hero_sub:'Add teacher accounts, set days and specialties.',
     teachers_stat_total:'Teacher',
