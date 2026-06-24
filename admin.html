@@ -2274,6 +2274,8 @@
                 <input class="inp" type="text" id="so-search" placeholder="ابحث باسم التلميذ أو رقم الوصل..." style="padding-right:40px;padding-top:10px;padding-bottom:10px;font-size:13px" oninput="debouncedSearch()">
               </div>
               <span style="font-size:12px;font-weight:700;color:var(--text-muted);white-space:nowrap" id="so-filter-count"></span>
+              <button class="btn btn-sm" style="font-size:11px;padding:6px 10px;border-radius:8px" onclick="refreshSheetData()" title="تحديث بيانات الشيت">🔃</button>
+              <span style="font-size:10px;color:var(--text-muted)" id="so-sheet-ts"></span>
             </div>
             <div class="so-tbl-wrap">
               <table class="so-tbl" id="so-tbl">
@@ -5108,19 +5110,24 @@ let _sheetStudentsCache = null;
 let _sheetStudentsLoading = false;
 
 function _mapSheetRow(r) {
-  const first = String(r['الاسم'] || r['first_name'] || r['firstName'] || r['First Name'] || '').trim();
-  const last  = String(r['اللقب'] || r['last_name'] || r['lastName'] || r['Last Name'] || '').trim();
-  const fullName = [first, last].filter(Boolean).join(' ');
+  // Try separate first + last name columns first
+  const first = String(r['الاسم'] || r['first_name'] || r['firstName'] || r['First Name'] || r['الاسم الأول'] || r['الاسم الاول'] || r['اسم الطالب'] || r['Student Name'] || r['اسم التلميذ'] || r['name'] || r['Name'] || '').trim();
+  const last  = String(r['اللقب'] || r['last_name'] || r['lastName'] || r['Last Name'] || r['اسم العائلة'] || r['Family Name'] || r['family_name'] || r['familyName'] || '').trim();
+  let fullName = [first, last].filter(Boolean).join(' ');
+  // Fallback: single full-name column
+  if (!fullName) {
+    fullName = String(r['الاسم الكامل'] || r['Full Name'] || r['full_name'] || r['fullName'] || r['اسم الطالب'] || r['Student Name'] || r['اسم التلميذ'] || r['name'] || r['Name'] || '').trim();
+  }
   if (!fullName) return null;
   return {
     name:     fullName,
-    pack:     String(r['الباقة'] || r['نوع البرنامج'] || r['الباقة المختارة'] || r['Program'] || r['program'] || r['pack'] || '').trim(),
-    langs:    String(r['اللغة المختارة'] || r['اللغات'] || r['languages'] || r['Language'] || r['lang'] || '').trim(),
-    age:      String(r['العمر'] || r['age'] || r['Age'] || r['العمر'] || '').trim(),
-    phone:    String(r['رقم هاتف ولي الأمر'] || r['رقم الهاتف'] || r['parentPhone'] || r['Parent Phone'] || r['phone'] || r['Phone'] || r['هاتف ولي الأمر'] || r['جوال ولي الأمر'] || '').trim(),
-    parent:   String(r['اسم ولي الأمر'] || r['parentName'] || r['Parent Name'] || r['parent'] || r['ولي الأمر'] || r['Parent'] || '').trim(),
-    itTrack:  String(r['مسار الإعلام الآلي'] || r['itTrack'] || r['IT Track'] || r['it_track'] || r['Information Technology'] || '').trim(),
-    totalAmount: String(r['المبلغ الإجمالي'] || r['المبلغ'] || r['السعر'] || r['totalAmount'] || r['Total Amount'] || r['Price'] || r['price'] || r['Amount'] || r['amount'] || '').trim(),
+    pack:     String(r['الباقة'] || r['نوع البرنامج'] || r['الباقة المختارة'] || r['Program'] || r['program'] || r['pack'] || r['Package'] || r['package'] || '').trim(),
+    langs:    String(r['اللغة المختارة'] || r['اللغات'] || r['languages'] || r['Language'] || r['lang'] || r['اللغة'] || '').trim(),
+    age:      String(r['العمر'] || r['age'] || r['Age'] || '').trim(),
+    phone:    String(r['رقم هاتف ولي الأمر'] || r['رقم الهاتف'] || r['parentPhone'] || r['Parent Phone'] || r['phone'] || r['Phone'] || r['هاتف ولي الأمر'] || r['جوال ولي الأمر'] || r['الهاتف'] || r['رقم الجوال'] || '').trim(),
+    parent:   String(r['اسم ولي الأمر'] || r['parentName'] || r['Parent Name'] || r['parent'] || r['ولي الأمر'] || r['Parent'] || r['ولي الامر'] || r['اسم الاب'] || r['اسم الأم'] || '').trim(),
+    itTrack:  String(r['مسار الإعلام الآلي'] || r['itTrack'] || r['IT Track'] || r['it_track'] || r['Information Technology'] || r['المسار'] || r['التخصص'] || '').trim(),
+    totalAmount: String(r['المبلغ الإجمالي'] || r['المبلغ'] || r['السعر'] || r['totalAmount'] || r['Total Amount'] || r['Price'] || r['price'] || r['Amount'] || r['amount'] || r['الإجمالي'] || r['المجموع'] || '').trim(),
     _raw:     r,
   };
 }
@@ -5716,6 +5723,7 @@ function _buildSheetNormCache(sheetRows) {
     const key = _normOv(fullName);
     if (!cache[key]) {
       cache[key] = {
+        name: fullName,
         parentName: String(r.parent || '').trim(),
         parentPhone: String(r.phone || '').trim(),
         age: String(r.age || '').trim(),
@@ -5728,6 +5736,7 @@ function _buildSheetNormCache(sheetRows) {
     } else if (r._raw) {
       // Merge — keep existing but fill any empty fields from later sheets
       const existing = cache[key];
+      if (!existing.name) existing.name = fullName;
       if (!existing.parentName && r.parent) existing.parentName = String(r.parent).trim();
       if (!existing.parentPhone && r.phone) existing.parentPhone = String(r.phone).trim();
       if (!existing.age && r.age) existing.age = String(r.age).trim();
@@ -5755,6 +5764,9 @@ window.renderStudentOverview = async () => {
     console.log('📊 Sheet rows loaded:', sheetRows?.length);
     window._sheetNormCache = _buildSheetNormCache(sheetRows);
     console.log('📊 Norm cache built:', Object.keys(window._sheetNormCache).length, 'entries');
+    // Set initial timestamp
+    const tsEl = document.getElementById('so-sheet-ts');
+    if (tsEl) tsEl.textContent = '🕐 ' + new Date().toLocaleString('ar-DZ');
   }
 
   const activeTickets = (allTicketsData || []).filter(tk => !tk.deleted);
@@ -5819,9 +5831,7 @@ window.renderStudentOverview = async () => {
       const match = teacherMap[normKey];
       totalSheetOnly++;
       _soData.push({
-        studentName: sheet._raw?.['الاسم'] && sheet._raw?.['اللقب']
-          ? String(sheet._raw['الاسم'] + ' ' + sheet._raw['اللقب']).trim()
-          : sheet.parentName ? '—' : normKey,
+        studentName: sheet.name || normKey,
         teacherName: match ? match.teacherName : '—',
         groupName: match ? match.groupName : '—',
         status: 'noticket',
@@ -5851,6 +5861,7 @@ window.renderStudentOverview = async () => {
   document.getElementById('so-activated').textContent = totalActivated;
   document.getElementById('so-noticket').textContent = totalUnpaid + totalSheetOnly;
   document.getElementById('so-in-sheet').textContent = totalInSheet + totalSheetOnly;
+  document.getElementById('nav-badge-students').textContent = totalAll;
 
   window._soData = _soData;
   window._soPage = 1;
@@ -5875,6 +5886,22 @@ window.renderStudentOverview = async () => {
 
   // تحديث الرسوم البيانية
   _updateStudentCharts(_soData);
+};
+
+// ─── تحديث بيانات الشيت ───
+window.refreshSheetData = async () => {
+  const btn = document.querySelector('[onclick="refreshSheetData()"]');
+  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+  // إعادة ضبط الذاكرة المؤقتة
+  _sheetStudentsCache = null;
+  window._sheetNormCache = null;
+  await loadSheetStudentsCache();
+  const rows = _sheetStudentsCache || [];
+  window._sheetNormCache = _buildSheetNormCache(rows);
+  document.getElementById('so-sheet-ts').textContent = '🕐 ' + new Date().toLocaleString('ar-DZ');
+  if (btn) { btn.textContent = '🔃'; btn.disabled = false; }
+  showToast('✅ تم تحديث بيانات الشيت: ' + (Object.keys(window._sheetNormCache).length) + ' تلميذ');
+  renderStudentOverview();
 };
 
 // ─── تحديث الرسوم البيانية للطلاب ───
