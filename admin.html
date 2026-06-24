@@ -2372,6 +2372,7 @@
             </div>
           </div>
           <button class="btn-primary" style="width:auto;padding:12px 24px" onclick="openAddTeacherModal()">➕ إضافة أستاذ جديد</button>
+          <button style="width:auto;padding:12px 20px;font-size:12px;border-radius:12px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);cursor:pointer;font-weight:700;font-family:'Tajawal',sans-serif;transition:all 0.2s" onclick="checkTeachersGroups()" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='var(--card-bg)'">📋 فحص الأفواج</button>
         </div>
 
         <!-- CTA: فتح نافذة الفحص الشامل -->
@@ -5678,6 +5679,7 @@ function renderTeachersGrid(teachers) {
       <div class="teacher-card-footer">
         <button class="btn-sm-icon" onclick="openAttModal('${t.id}')">📋 الحضور</button>
         <button class="btn-sm-icon" onclick="openTeacherEditModal('${t.id}')">✏️ تعديل</button>
+        <button class="btn-sm-icon" onclick="restoreTeacherGroups('${t.id}','${t.name}')" title="استعادة الأفواج من آخر نسخة احتياطية" style="font-size:13px">📦</button>
         <button class="btn-sm-icon" onclick="openChangeCredentialsModal('${t.id}','${(t.name||'').replace(/'/g,String.fromCharCode(39))}')">🔐 دخول</button>
         <button class="btn-sm-icon danger" onclick="deleteTeacher('${t.id}','${t.name}')">🗑️</button>
       </div>`;
@@ -6511,8 +6513,36 @@ window.saveTeacherEdit = async () => {
   const groups = collectGroups('edit-groups-list');
   if (!name || !spec || !days.length) { showToast('❌ ملء الاسم والتخصص والأيام مطلوب', true); return; }
 
-  // ── مزامنة تلاميذ الأفواج مع قائمة students الرئيسية ──
+  // ── نسخ احتياطي للأفواج قبل الحفظ ──
   const teacher = allTeachers.find(t => t.id === id);
+  const oldGroups = teacher ? JSON.parse(JSON.stringify(teacher.groups || [])) : [];
+
+  // ── كشف التغييرات في الأفواج ──
+  const oldNames = new Set(oldGroups.map(g => g.name));
+  const newNames = new Set(groups.map(g => g.name));
+  const removed = oldGroups.filter(g => !newNames.has(g.name));
+  const added = groups.filter(g => !oldNames.has(g.name));
+  if (removed.length) {
+    console.warn('⚠️ أفواج محذوفة:', removed.map(g => g.name).join(', '), 'للاستاذ', name);
+  }
+
+  // ── حفظ نسخة احتياطية في Firestore ──
+  if (oldGroups.length) {
+    try {
+      const backupKey = 'groupBackup_' + id;
+      await setDoc(doc(db, 'settings', backupKey), {
+        teacherId: id,
+        teacherName: name,
+        groups: oldGroups,
+        savedAt: serverTimestamp()
+      });
+      console.log('✅ Group backup saved for', name);
+    } catch (e) {
+      console.warn('⚠️ فشل حفظ النسخة الاحتياطية للأفواج:', e.message);
+    }
+  }
+
+  // ── مزامنة تلاميذ الأفواج مع قائمة students الرئيسية ──
   const existingStudents = teacher ? [...(teacher.students || [])] : [];
 
   // جمع كل أسماء التلاميذ من جميع الأفواج
@@ -6542,10 +6572,102 @@ window.saveTeacherEdit = async () => {
   if (editTeacherPhotoBase64) updates.photo = editTeacherPhotoBase64;
   try {
     await updateDoc(doc(db, 'teachers', id), updates);
-    await addLog('✏️ تعديل بيانات', `تم تعديل بيانات الأستاذ ${name}`, '📝');
+    let logDetail = `تم تعديل بيانات الأستاذ ${name}`;
+    if (removed.length) logDetail += ` | ❌ أفواج محذوفة: ${removed.map(g => g.name).join(', ')}`;
+    if (added.length) logDetail += ` | ➕ أفواج جديدة: ${added.map(g => g.name).join(', ')}`;
+    await addLog('✏️ تعديل بيانات', logDetail, '📝');
     showToast('✅ تم حفظ التعديلات');
     closeTeacherEditModal();
   } catch(e) { showToast('خطأ: ' + e.message, true); }
+};
+
+// ─── استعادة أفواج أستاذ من آخر نسخة احتياطية ───
+window.restoreTeacherGroups = async (teacherId, teacherName) => {
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'groupBackup_' + teacherId));
+    if (!snap.exists()) {
+      // Also try the name sync backup
+      const syncSnap = await getDoc(doc(db, 'settings', 'nameSyncBackup'));
+      if (syncSnap.exists()) {
+        const changes = syncSnap.data().changes || [];
+        const match = changes.find(c => c.teacherId === teacherId);
+        if (match && match.groups?.length) {
+          if (!confirm(`📦 تم العثور على نسخة احتياطية للأستاذ "${teacherName}" من آخر مزامنة.\n\nالأفواج المحفوظة: ${match.groups.map(g => g.name).join(', ')}\n\nاسترجاعها؟`)) return;
+          await updateDoc(doc(db, 'teachers', teacherId), { groups: match.groups });
+          await addLog('📦 استعادة أفواج', `تم استعادة أفواج الأستاذ ${teacherName} من نسخة المزامنة`, '📦');
+          showToast('✅ تم استعادة الأفواج بنجاح');
+          loadTeachers();
+          return;
+        }
+      }
+      showToast('⚠️ لا توجد نسخة احتياطية للأفواج لهذا الأستاذ', true);
+      return;
+    }
+    const data = snap.data();
+    const backupGroups = data.groups || [];
+    if (!backupGroups.length) { showToast('⚠️ النسخة الاحتياطية فارغة', true); return; }
+    if (!confirm(`📦 استعادة أفواج "${teacherName}" من آخر نسخة احتياطية؟\n\nالأفواج: ${backupGroups.map(g => g.name).join(', ')}`)) return;
+    await updateDoc(doc(db, 'teachers', teacherId), { groups: backupGroups });
+    await addLog('📦 استعادة أفواج', `تم استعادة أفواج الأستاذ ${teacherName}: ${backupGroups.map(g => g.name).join(', ')}`, '📦');
+    showToast('✅ تم استعادة الأفواج بنجاح');
+    loadTeachers();
+  } catch(e) {
+    showToast('⚠️ خطأ: ' + e.message, true);
+  }
+};
+
+// ─── فحص سلامة الأفواج لكل الأساتذة ───
+window.checkTeachersGroups = () => {
+  if (!allTeachers || !allTeachers.length) { showToast('⚠️ لا يوجد أساتذة للفحص', true); return; }
+  const issues = [];
+  allTeachers.forEach(t => {
+    const groups = t.groups || [];
+    const students = t.students || [];
+
+    // أستاذ بدون أفواج
+    if (!groups.length) {
+      issues.push(`👨‍🏫 ${t.name} — ⚠️ لا يوجد أي فوج`);
+      return;
+    }
+
+    // أسماء أفواج مكررة
+    const names = groups.map(g => g.name.trim());
+    const dupes = names.filter((n, i) => names.indexOf(n) !== i);
+    if (dupes.length) {
+      issues.push(`👨‍🏫 ${t.name} — ❌ أسماء أفواج مكررة: ${[...new Set(dupes)].join(', ')}`);
+    }
+
+    // فوج بدون أيام (مع العلم أن للأستاذ أيام)
+    groups.forEach((g, gi) => {
+      if ((!g.days || !g.days.length) && t.days?.length) {
+        issues.push(`👨‍🏫 ${t.name} — ⚠️ فوج "${g.name}" ليس له أيام`);
+      }
+      if (!g.students || !g.students.length) {
+        issues.push(`👨‍🏫 ${t.name} — ⚠️ فوج "${g.name}" لا يوجد به تلاميذ`);
+      }
+    });
+
+    // تلاميذ في قائمة الأستاذ ليسوا في أي فوج
+    if (students.length && groups.length) {
+      const allGroupStudentNames = new Set();
+      groups.forEach(g => (g.students||[]).forEach(s => allGroupStudentNames.add(s.trim().toLowerCase())));
+      const notInGroup = students.filter(s => s.name && !allGroupStudentNames.has(s.name.trim().toLowerCase()));
+      if (notInGroup.length) {
+        issues.push(`👨‍🏫 ${t.name} — ⚠️ ${notInGroup.length} تلميذ غير موزّعين على أفواج`);
+      }
+    }
+  });
+
+  if (!issues.length) {
+    showToast('✅ جميع الأساتذة والأفواج سليمة');
+    return;
+  }
+
+  // عرض المشاكل
+  const msg = issues.slice(0, 10).join('\n');
+  if (issues.length > 10) alert(`⚠️ يوجد ${issues.length} مشكلة:\n\n${msg}\n\n... و ${issues.length - 10} مشكلة أخرى (انظر الـ Console)`);
+  else alert(`⚠️ يوجد ${issues.length} مشكلة:\n\n${msg}`);
+  console.warn('🔍 Group issues:', issues);
 };
 
 // ─── Attendance modal (admin view) ───
