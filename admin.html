@@ -2340,6 +2340,7 @@
         <option value="">📅 جميع الحصص</option>
       </select>
       <span style="font-size:12px;color:var(--text-muted);align-self:center" id="att-sum-current">الحصة الحالية: —</span>
+      <select id="att-sum-csv-group" style="display:none;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:600;cursor:pointer;font-family:'Tajawal',sans-serif"></select>
       <button onclick="exportAttendanceCSV()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif" title="تصدير CSV">📥 CSV</button>
     </div>
             <div class="tbl-wrap">
@@ -2373,9 +2374,9 @@
             <div class="teachers-hero-sub" id="teachers-hero-sub">أضف حسابات الأساتذة، حدد أيامهم وتخصصاتهم، وتابع حضور تلاميذهم يومياً.</div>
           </div>
           <div class="teachers-stats-row">
-            <div class="teachers-mini"><div class="n" id="t-stat-total">0</div><div class="l" data-i18n="teachers_stat_total">أستاذ</div></div>
-            <div class="teachers-mini"><div class="n" id="t-stat-students">0</div><div class="l" data-i18n="teachers_stat_students">تلميذ مسجّل</div></div>
-            <div class="teachers-mini"><div class="n" id="t-stat-today">0</div><div class="l" data-i18n="teachers_stat_today">حصة اليوم</div></div>
+            <div class="teachers-mini"><div class="n" id="t-stat-total">0</div><div class="l" data-i18n="teachers_stat_total">👨‍🏫 أساتذة</div></div>
+            <div class="teachers-mini"><div class="n" id="t-stat-students">0</div><div class="l" data-i18n="teachers_stat_students">👥 إجمالي التلاميذ المسجلين</div></div>
+            <div class="teachers-mini"><div class="n" id="t-stat-today">0</div><div class="l" data-i18n="teachers_stat_today">📅 حصة اليوم</div></div>
           </div>
           <button onclick="openExamModal()" style="margin-top:14px;padding:11px 20px;border-radius:13px;border:1.5px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.15);color:white;font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;backdrop-filter:blur(6px);display:flex;align-items:center;gap:8px;transition:all 0.2s" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">🔍 فحص شامل للتلاميذ</button>
         </div>
@@ -2569,7 +2570,13 @@
 
       <!-- ===== SECTION: NOTIFICATIONS CENTER ===== -->
       <div id="section-notifications" style="display:none">
-        <div class="panel">
+        <div class="panel" style="position:relative">
+          <div id="notif-blur-overlay" style="position:absolute;inset:0;z-index:10;background:rgba(255,255,255,0.001);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);border-radius:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:all 0.4s ease;animation:notifFadeIn 0.5s ease">
+            <div style="font-size:42px;margin-bottom:12px;animation:notifPulse 2s ease-in-out infinite">🚧</div>
+            <div style="font-size:20px;font-weight:900;color:var(--text);text-shadow:0 1px 4px rgba(0,0,0,0.05)" data-i18n="notif_coming_soon">قريباً — قيد التطوير</div>
+            <div style="font-size:13px;color:var(--text-muted);margin-top:6px;text-align:center;max-width:280px" data-i18n="notif_coming_soon_desc">نعمل على تجربة إشعارات متكاملة. سيتم تفعيلها في أقرب وقت.</div>
+          </div>
+          <style>@keyframes notifFadeIn{0%{opacity:0}100%{opacity:1}}@keyframes notifPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}</style>
           <div class="panel-header">
             <div class="panel-icon" style="background:rgba(59,130,246,0.1);border-color:rgba(59,130,246,0.2)">📨</div>
             <span data-i18n="notification_center">مركز الإشعارات</span>
@@ -5981,6 +5988,7 @@ window.renderStudentOverview = async () => {
   document.getElementById('so-in-sheet').textContent = inSheet;
   document.getElementById('so-out-sheet').textContent = outSheet;
   document.getElementById('nav-badge-students').textContent = totalAll;
+  document.getElementById('t-stat-students').textContent = totalAll;
 
   window._soData = _soData;
   window._soPage = 1;
@@ -6121,15 +6129,15 @@ function _renderSoTable(data, searchFilter) {
   let filtered = data;
 
   if (searchFilter && searchFilter.trim().length >= 1) {
-    const q = searchFilter.trim().toLowerCase();
+    const q = _normOv(searchFilter);
     filtered = filtered.filter(r =>
-      r.studentName.toLowerCase().includes(q) ||
-      r.teacherName.toLowerCase().includes(q) ||
-      r.pkg.toLowerCase().includes(q) ||
-      r.groupName.toLowerCase().includes(q) ||
+      _normOv(r.studentName).includes(q) ||
+      _normOv(r.teacherName).includes(q) ||
+      _normOv(r.pkg).includes(q) ||
+      _normOv(r.groupName).includes(q) ||
       r.receipt.toLowerCase().includes(q) ||
-      r.parentName.toLowerCase().includes(q) ||
-      r.parentPhone.toLowerCase().includes(q)
+      _normOv(r.parentName).includes(q) ||
+      r.parentPhone.includes(q)
     );
   }
 
@@ -6351,14 +6359,23 @@ window.syncStudentNamesWithTickets = async () => {
 
 // ─── Daily attendance summary ───
 window.onTeacherChange = function() {
-  const sel = document.getElementById('att-sum-group');
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+
+  // Populate table group filter
+  const sel = document.getElementById('att-sum-group');
   sel.style.display = 'none';
   sel.innerHTML = '<option value="">🏫 ' + t('att_all_groups') + '</option>';
+
+  // Populate CSV group selector
+  const csvSel = document.getElementById('att-sum-csv-group');
+  csvSel.style.display = 'none';
+  csvSel.innerHTML = '<option value="">🏫 ' + t('att_all_groups') + ' 📥</option>';
+
   if (teacherId) {
     const teacher = (allTeachers || []).find(t => t.id === teacherId);
     const groups = teacher?.groups || [];
     if (groups.length > 1) {
+      // Table filter
       groups.forEach((g, i) => {
         const opt = document.createElement('option');
         opt.value = String(i);
@@ -6366,6 +6383,16 @@ window.onTeacherChange = function() {
         sel.appendChild(opt);
       });
       sel.style.display = '';
+    }
+    // CSV selector — always show when teacher has groups
+    if (groups.length) {
+      groups.forEach((g, i) => {
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = '🏫 ' + (g.name || (t('att_group_prefix') + ' ' + (i + 1)));
+        csvSel.appendChild(opt);
+      });
+      csvSel.style.display = '';
     }
   }
   loadAttendanceSummary();
@@ -6723,8 +6750,9 @@ window.exportAttendanceCSV = () => {
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
   if (!teacher) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
 
-  const giFilter = document.getElementById('att-sum-group')?.value || '';
+  const giFilter = document.getElementById('att-sum-csv-group')?.value || '';
   const sessionFilter = document.getElementById('att-sum-session')?.value || '';
+  const groupLabel = document.getElementById('att-sum-csv-group')?.selectedOptions?.[0]?.textContent?.trim() || '';
 
   const rows = [];
   // رأس CSV
@@ -6806,7 +6834,7 @@ window.exportAttendanceCSV = () => {
   const a = document.createElement('a');
   a.href = url;
   const teacherName = teacher.name.replace(/[\\/:*?"<>|]/g, '_');
-  const groupSuffix = (giFilter !== '' && !isNaN(giNum)) ? `_فوج${giNum+1}` : '';
+  const groupSuffix = (giFilter !== '' && !isNaN(giNum) && groupLabel) ? `_${groupLabel.replace(/[^a-zA-Z0-9\u0600-\u06FF\s]/g,'').trim().replace(/\s+/g,'_')}` : '';
   a.download = `حضور_${teacherName}${groupSuffix}_${new Date().toISOString().slice(0,10)}.csv`;
   document.body.appendChild(a);
   a.click();
@@ -12013,6 +12041,8 @@ const I18N = {
     notif_send_error:'❌ فشل الإرسال',
     notif_history:'📋 سجل الإشعارات',
     notif_no_history:'لا توجد إشعارات مرسلة بعد',
+    notif_coming_soon:'قريباً — قيد التطوير',
+    notif_coming_soon_desc:'نعمل على تجربة إشعارات متكاملة. سيتم تفعيلها في أقرب وقت.',
     notif_empty_recipients:'⚠️ الرجاء إدخال مستلم واحد على الأقل',
     notif_empty_subject:'⚠️ الرجاء إدخال موضوع الرسالة',
     notif_empty_body:'⚠️ الرجاء إدخال محتوى الرسالة',
@@ -12242,9 +12272,9 @@ const I18N = {
     // teachers section
     teachers_hero_title:'👨‍🏫 إدارة الأساتذة والحضور',
     teachers_hero_sub:'أضف حسابات الأساتذة، حدد أيامهم وتخصصاتهم، وتابع حضور تلاميذهم يومياً.',
-    teachers_stat_total:'أستاذ',
-    teachers_stat_students:'تلميذ مسجّل',
-    teachers_stat_today:'حصة اليوم',
+    teachers_stat_total:'👨‍🏫 أساتذة',
+    teachers_stat_students:'👥 إجمالي التلاميذ المسجلين',
+    teachers_stat_today:'📅 حصة اليوم',
     teachers_exam_btn:'🔍 فحص شامل للتلاميذ',
     teachers_mgmt_title:'إدارة الأساتذة',
     teachers_mgmt_sub:'أنشئ حسابات للأساتذة وتابع حضورهم',
@@ -12598,6 +12628,8 @@ const I18N = {
     notif_send_error:'❌ Échec d\'envoi',
     notif_history:'📋 Historique',
     notif_no_history:'Aucune notification envoyée',
+    notif_coming_soon:'Bientôt disponible',
+    notif_coming_soon_desc:'Nous travaillons sur une expérience de notification complète. Elle sera activée dès que possible.',
     notif_empty_recipients:'⚠️ Veuillez saisir au moins un destinataire',
     notif_empty_subject:'⚠️ Veuillez saisir un sujet',
     notif_empty_body:'⚠️ Veuillez saisir le contenu',
@@ -12815,9 +12847,9 @@ const I18N = {
     att_student_deleted:'✅ "{name}" a été supprimé(e) de la liste',
     teachers_hero_title:'👨‍🏫 Gestion des profs',
     teachers_hero_sub:'Ajoutez des comptes, définissez leurs jours et spécialités.',
-    teachers_stat_total:'Professeur',
-    teachers_stat_students:'Élèves inscrits',
-    teachers_stat_today:'Séances aujourd\'hui',
+    teachers_stat_total:'👨‍🏫 Enseignants',
+    teachers_stat_students:'👥 Total des élèves inscrits',
+    teachers_stat_today:'📅 Séances aujourd\'hui',
     teachers_exam_btn:'🔍 Examen complet',
     teachers_mgmt_title:'Gestion des professeurs',
     teachers_mgmt_sub:'Créez des comptes et suivez leur présence.',
@@ -13153,6 +13185,8 @@ const I18N = {
     notif_send_error:'❌ Send failed',
     notif_history:'📋 History',
     notif_no_history:'No notifications sent yet',
+    notif_coming_soon:'Coming Soon',
+    notif_coming_soon_desc:'We are working on a complete notification experience. It will be activated as soon as possible.',
     notif_empty_recipients:'⚠️ Please enter at least one recipient',
     notif_empty_subject:'⚠️ Please enter a subject',
     notif_empty_body:'⚠️ Please enter content',
