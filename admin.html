@@ -2344,8 +2344,8 @@
     </div>
             <div class="tbl-wrap">
               <table class="tbl" id="att-sum-tbl">
-                <thead>
-                  <tr>
+                <thead id="att-sum-thead">
+                  <tr id="att-sum-header-row">
                     <th>التلميذ</th>
                     <th>الأستاذ</th>
                     <th>الفوج</th>
@@ -6450,6 +6450,20 @@ window.loadAttendanceSummary = async function() {
 
   populateSessionSelect(curSession);
 
+  // Build dynamic header based on session filter
+  const headerRow = document.getElementById('att-sum-header-row');
+  if (headerRow) {
+    const sessionNum = parseInt(sessionFilter);
+    let headerHtml = '<th>التلميذ</th><th>الأستاذ</th><th>الفوج</th>';
+    if (sessionFilter !== '' && !isNaN(sessionNum) && sessionNum >= 1 && sessionNum <= 12) {
+      headerHtml += `<th class="att-session-active">ح${sessionNum}</th>`;
+    } else {
+      for (let i = 1; i <= 12; i++) headerHtml += `<th>ح${i}</th>`;
+    }
+    headerHtml += '<th data-i18n="att_th_action">إجراء</th>';
+    headerRow.innerHTML = headerHtml;
+  }
+
   const students = teacher.students || [];
   if (!students.length) {
     tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('no_students_for_teacher') + '</td></tr>';
@@ -6538,16 +6552,23 @@ window.loadAttendanceSummary = async function() {
     groupKeys = groupKeys.filter(gi => gi === giNum);
   }
 
+  const sessionNum = parseInt(sessionFilter);
+  const isSingleSession = sessionFilter !== '' && !isNaN(sessionNum) && sessionNum >= 1 && sessionNum <= 12;
+  const sessionRange = isSingleSession ? [sessionNum] : Array.from({length: 12}, (_, i) => i + 1);
+  const colspan = isSingleSession ? 5 : 16;
+  const sessionLabel = isSingleSession ? 'ح' + sessionNum : '';
+
   groupKeys.forEach(gi => {
     const g = grouped[gi];
     allRows.push(`<tr class="att-group-header-row">
-      <td colspan="16" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}</td>
+      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}${sessionLabel ? ' — ' + sessionLabel : ''}</td>
     </tr>`);
 
     g.students.forEach(s => {
       const groupSessions = groupCache[s.gi] || {};
       const cells = [];
-      for (let i = 1; i <= 12; i++) {
+      for (let idx = 0; idx < sessionRange.length; idx++) {
+        const i = sessionRange[idx];
         const rec = groupSessions[i];
         const giVal = s.gi;
         const sNameVal = s.name;
@@ -6582,14 +6603,14 @@ window.loadAttendanceSummary = async function() {
         <td>${teacher.name}</td>
         <td><span class="att-sum-group">${t('group_prefix')}${s.group}</span></td>
         ${cells.join('')}
-        <td style="text-align:center"><button class="tbl-action del" onclick="removeStudentFromTeacher('${teacherIdVal}','${s.name.replace(/'/g,"\\'")}')" title="${t('att_delete_btn')}">🗑️</button></td>
+        ${!isSingleSession ? `<td style="text-align:center"><button class="tbl-action del" onclick="removeStudentFromTeacher('${teacherIdVal}','${s.name.replace(/'/g,"\\'")}')" title="${t('att_delete_btn')}">🗑️</button></td>` : ''}
       </tr>`);
     });
   });
 
   tbody.innerHTML = allRows.length
     ? allRows.join('')
-    : '<tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('att_no_data') + '</td></tr>';
+    : '<tr><td colspan="' + colspan + '" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('att_no_data') + '</td></tr>';
 
   // Show/hide the stat bar (using correctly counted values)
   let statBar = document.getElementById('att-sum-stats');
@@ -6700,33 +6721,69 @@ window.exportAttendanceCSV = () => {
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
   if (!teacher) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
 
+  const giFilter = document.getElementById('att-sum-group')?.value || '';
+  const sessionFilter = document.getElementById('att-sum-session')?.value || '';
+
   const rows = [];
   // رأس CSV
   const headers = ['التلميذ', 'الأستاذ', 'الفوج'];
-  for (let i = 1; i <= 12; i++) headers.push(`الحصة ${i}`);
+  const sessionNum = parseInt(sessionFilter);
+  const isSingleSession = sessionFilter !== '' && !isNaN(sessionNum) && sessionNum >= 1 && sessionNum <= 12;
+  const sessionRange = isSingleSession ? [sessionNum] : Array.from({length: 12}, (_, i) => i + 1);
+  sessionRange.forEach(i => headers.push(`الحصة ${i}`));
   rows.push(headers);
 
-  // قراءة البيانات من الجدول المعروض
-  const tbody = document.getElementById('att-sum-tbody');
-  if (!tbody) return;
-  const trs = tbody.querySelectorAll('tr');
-  trs.forEach(tr => {
-    const tds = tr.querySelectorAll('td');
-    // Skip group header rows (have colspan, not 16 individual cells)
-    if (tds.length < 16) return;
-    const row = [];
-    // الأعمدة النصية: التلميذ (0), الأستاذ (1), الفوج (2)
-    row.push(tds[0].textContent.trim());
-    row.push(tds[1].textContent.trim());
-    row.push(tds[2].textContent.trim());
-    // الحصص (3-14): ✅=حاضر, ❌=غائب, ⚠️=فائتة, ⋯=—
-    for (let c = 3; c <= 14; c++) {
-      const txt = tds[c].textContent.trim();
-      if (txt === '✅') row.push('حاضر');
-      else if (txt === '❌') row.push('غائب');
-      else if (txt === '⚠️') row.push('فائتة');
-      else row.push('—');
-    }
+  // قراءة البيانات من الـ cache مباشرة
+  const groups = teacher.groups || [];
+  const normName = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const groupCache = window._attSummaryCache[teacherId] || {};
+  const giNum = parseInt(giFilter);
+
+  let studentEntries = [];
+  groups.forEach((g, gi) => {
+    if (giFilter !== '' && !isNaN(giNum) && gi !== giNum) return;
+    (g.students || []).forEach(sName => {
+      const sNameNorm = normName(sName);
+      let match = (teacher.students || []).find(s => normName(s.name || '') === sNameNorm);
+      if (!match) {
+        match = (teacher.students || []).find(s =>
+          normName(s.name || '').includes(sNameNorm) || sNameNorm.includes(normName(s.name || ''))
+        );
+      }
+      if (match) {
+        studentEntries.push({ name: match.name, group: g.name || 'فوج ' + (gi + 1), gi });
+      }
+    });
+  });
+
+  if (!studentEntries.length) {
+    // Flat list fallback
+    (teacher.students || []).forEach(s => {
+      let gi = 0;
+      let groupName = '—';
+      groups.forEach((g, idx) => {
+        if ((g.students || []).some(gs => normName(gs) === normName(s.name || ''))) {
+          gi = idx;
+          groupName = g.name || 'فوج ' + (idx + 1);
+        }
+      });
+      studentEntries.push({ name: s.name || '—', group: groupName, gi });
+    });
+  }
+
+  studentEntries.forEach(s => {
+    const row = [s.name, teacher.name, s.group];
+    const groupSessions = groupCache[s.gi] || {};
+    sessionRange.forEach(i => {
+      const rec = groupSessions[i];
+      if (!rec) {
+        row.push('—');
+        return;
+      }
+      const studentRec = (rec.students || []).find(st => normName(st.name || '') === normName(s.name));
+      if (!studentRec) { row.push('—'); return; }
+      row.push(studentRec.present ? 'حاضر' : 'غائب');
+    });
     rows.push(row);
   });
 
@@ -6743,7 +6800,8 @@ window.exportAttendanceCSV = () => {
   const a = document.createElement('a');
   a.href = url;
   const teacherName = teacher.name.replace(/[\\/:*?"<>|]/g, '_');
-  a.download = `حضور_${teacherName}_${new Date().toISOString().slice(0,10)}.csv`;
+  const groupSuffix = (giFilter !== '' && !isNaN(giNum)) ? `_فوج${giNum+1}` : '';
+  a.download = `حضور_${teacherName}${groupSuffix}_${new Date().toISOString().slice(0,10)}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
