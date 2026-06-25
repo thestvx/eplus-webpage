@@ -2248,10 +2248,11 @@
               </div>
             </div>
             <div class="so-stats" id="so-stats" style="margin-top:16px">
-              <div class="so-stat"><div class="so-stat-n" id="so-total">0</div><div class="so-stat-l">👥 إجمالي الطلاب</div></div>
-              <div class="so-stat"><div class="so-stat-n" id="so-activated">0</div><div class="so-stat-l">✅ لهم تذكرة (مسجّلين)</div></div>
-              <div class="so-stat"><div class="so-stat-n" id="so-noticket">0</div><div class="so-stat-l">❌ بدون تذكرة (غير مسجّلين)</div></div>
-              <div class="so-stat"><div class="so-stat-n" id="so-in-sheet">0</div><div class="so-stat-l">📊 مسجّل في الشيت</div></div>
+              <div class="so-stat"><div class="so-stat-n" id="so-total">0</div><div class="so-stat-l" data-i18n="so_total_label">👥 إجمالي التلاميذ المسجلين</div></div>
+              <div class="so-stat"><div class="so-stat-n" id="so-in-group">0</div><div class="so-stat-l" data-i18n="so_in_group_label">🏫 في الأفواج</div></div>
+              <div class="so-stat"><div class="so-stat-n" id="so-not-group">0</div><div class="so-stat-l" data-i18n="so_not_group_label">❌ بدون فوج</div></div>
+              <div class="so-stat"><div class="so-stat-n" id="so-in-sheet">0</div><div class="so-stat-l" data-i18n="so_in_sheet_label">📊 في الشيت</div></div>
+              <div class="so-stat"><div class="so-stat-n" id="so-out-sheet">0</div><div class="so-stat-l" data-i18n="so_out_sheet_label">📋 خارج الشيت</div></div>
             </div>
           </div>
           <!-- Charts panel -->
@@ -2330,8 +2331,11 @@
           </div>
           <div style="padding:0 24px 24px">
             <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
-      <select id="att-sum-teacher" onchange="loadAttendanceSummary()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">
+      <select id="att-sum-teacher" onchange="onTeacherChange()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">
         <option value="">👨‍🏫 جميع الأساتذة</option>
+      </select>
+      <select id="att-sum-group" onchange="loadAttendanceSummary()" style="display:none;padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">
+        <option value="">🏫 جميع الأفواج</option>
       </select>
       <select id="att-sum-session" onchange="loadAttendanceSummary()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">
         <option value="">📅 جميع الحصص</option>
@@ -5865,27 +5869,22 @@ window.renderStudentOverview = async () => {
       if (!s.name) return;
       const key = _normOv(s.name);
       if (!teacherMap[key]) {
-        teacherMap[key] = { teacherName: t.name, groupName: _findStudentGroup(s.name, t) };
+        teacherMap[key] = { studentName: s.name, teacherName: t.name, groupName: _findStudentGroup(s.name, t) };
       }
     });
   });
 
   // Track which normalized names already have a ticket entry
-  const ticketKeys = new Set();
+  const allKeys = new Set();
   _soData = [];
-  let totalActivated = 0, totalUnpaid = 0, totalInSheet = 0, totalSheetOnly = 0;
 
   // ── Part 1: Students with tickets ──
   (activeTickets || []).forEach(ticket => {
     const key = _normOv(ticket.name);
-    ticketKeys.add(key);
+    allKeys.add(key);
     const match = teacherMap[key];
     const isPaid = ticket.status === 'paid';
     const sheetMatch = window._sheetNormCache ? window._sheetNormCache[key] : null;
-
-    if (isPaid) totalActivated++;
-    else totalUnpaid++;
-    if (sheetMatch) totalInSheet++;
 
     _soData.push({
       studentName: ticket.name,
@@ -5914,9 +5913,9 @@ window.renderStudentOverview = async () => {
   // ── Part 2: Sheet-only students (no ticket) ──
   if (window._sheetNormCache) {
     Object.entries(window._sheetNormCache).forEach(([normKey, sheet]) => {
-      if (ticketKeys.has(normKey)) return; // already added via ticket
+      if (allKeys.has(normKey)) return;
       const match = teacherMap[normKey];
-      totalSheetOnly++;
+      allKeys.add(normKey);
       _soData.push({
         studentName: sheet.name || normKey,
         teacherName: match ? match.teacherName : '—',
@@ -5942,12 +5941,46 @@ window.renderStudentOverview = async () => {
     });
   }
 
+  // ── Part 3: Teacher-group students not in tickets or sheet ──
+  Object.entries(teacherMap).forEach(([key, match]) => {
+    if (allKeys.has(key)) return;
+    allKeys.add(key);
+    _soData.push({
+      studentName: match.studentName || key,
+      teacherName: match.teacherName,
+      groupName: match.groupName,
+      status: 'noteacher',
+      statusLabel: '📋 من الأفواج فقط',
+      pkg: '—',
+      amount: 0,
+      paid: 0,
+      receipt: '—',
+      hasTicket: false,
+      parentName: '—',
+      parentPhone: '—',
+      age: '—',
+      langs: '',
+      itTrack: '',
+      sheetTotal: '',
+      inSheet: false,
+      sheetPack: '',
+      sheetLangs: '',
+      _sheetRaw: null,
+    });
+  });
+
   // إحصائيات
   const totalAll = _soData.length;
+  const inGroup = _soData.filter(r => r.groupName && r.groupName !== '—').length;
+  const notInGroup = totalAll - inGroup;
+  const inSheet = _soData.filter(r => r.inSheet).length;
+  const outSheet = totalAll - inSheet;
+
   document.getElementById('so-total').textContent = totalAll;
-  document.getElementById('so-activated').textContent = totalActivated;
-  document.getElementById('so-noticket').textContent = totalUnpaid + totalSheetOnly;
-  document.getElementById('so-in-sheet').textContent = totalInSheet + totalSheetOnly;
+  document.getElementById('so-in-group').textContent = inGroup;
+  document.getElementById('so-not-group').textContent = notInGroup;
+  document.getElementById('so-in-sheet').textContent = inSheet;
+  document.getElementById('so-out-sheet').textContent = outSheet;
   document.getElementById('nav-badge-students').textContent = totalAll;
 
   window._soData = _soData;
@@ -6005,10 +6038,11 @@ function _updateStudentCharts(data) {
   }
   chartsEl.style.display = 'flex';
 
-  // ── Pie: distribution ──
-  const paid = data.filter(r => r.status === 'paid').length;
-  const unpaid = data.filter(r => r.status === 'unpaid').length;
-  const noTicket = data.filter(r => r.status === 'noticket').length;
+  // ── Pie: distribution (4-way: group x sheet) ──
+  const inGroupInSheet = data.filter(r => r.groupName && r.groupName !== '—' && r.inSheet).length;
+  const inGroupOutSheet = data.filter(r => r.groupName && r.groupName !== '—' && !r.inSheet).length;
+  const noGroupInSheet = data.filter(r => (!r.groupName || r.groupName === '—') && r.inSheet).length;
+  const noGroupOutSheet = data.filter(r => (!r.groupName || r.groupName === '—') && !r.inSheet).length;
 
   const pieCtx = document.getElementById('so-pie-chart');
   if (_soPieChart) { _soPieChart.destroy(); _soPieChart = null; }
@@ -6016,11 +6050,16 @@ function _updateStudentCharts(data) {
     _soPieChart = new Chart(pieCtx, {
       type: 'doughnut',
       data: {
-        labels: ['✅ مسجّلين', '⏳ غير مدفوع', '⚠️ بدون تذكرة'],
+        labels: [
+          '🏫 في فوج + في الشيت',
+          '🏫 في فوج + خارج الشيت',
+          '📋 بدون فوج + في الشيت',
+          '❌ بدون فوج + خارج الشيت'
+        ],
         datasets: [{
-          data: [paid, unpaid, noTicket],
-          backgroundColor: ['#059669', '#D97706', '#6B7280'],
-          borderColor: ['#34D399', '#FBBF24', '#9CA3AF'],
+          data: [inGroupInSheet, inGroupOutSheet, noGroupInSheet, noGroupOutSheet],
+          backgroundColor: ['#059669', '#10B981', '#F59E0B', '#6B7280'],
+          borderColor: ['#34D399', '#6EE7B7', '#FCD34D', '#9CA3AF'],
           borderWidth: 2,
         }]
       },
@@ -6313,6 +6352,27 @@ window.syncStudentNamesWithTickets = async () => {
 };
 
 // ─── Daily attendance summary ───
+function onTeacherChange() {
+  const sel = document.getElementById('att-sum-group');
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  sel.style.display = 'none';
+  sel.innerHTML = '<option value="">🏫 ' + t('att_all_groups') + '</option>';
+  if (teacherId) {
+    const teacher = (allTeachers || []).find(t => t.id === teacherId);
+    const groups = teacher?.groups || [];
+    if (groups.length > 1) {
+      groups.forEach((g, i) => {
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = '🏫 ' + (g.name || (t('att_group_prefix') + ' ' + (i + 1)));
+        sel.appendChild(opt);
+      });
+      sel.style.display = '';
+    }
+  }
+  loadAttendanceSummary();
+}
+
 function populateAttSummaryTeachers() {
   const sel = document.getElementById('att-sum-teacher');
   if (!sel || !allTeachers) return;
@@ -6349,6 +6409,7 @@ window._attSummaryCache = {}; // teacherId -> { gi: { sessionNum: data } }
 
 window.loadAttendanceSummary = async function() {
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  const giFilter = document.getElementById('att-sum-group')?.value || '';
   const sessionFilter = document.getElementById('att-sum-session')?.value || '';
   const tbody = document.getElementById('att-sum-tbody');
   if (!tbody) return;
@@ -6471,7 +6532,13 @@ window.loadAttendanceSummary = async function() {
     if (!grouped[s.gi]) grouped[s.gi] = { group: s.group, gi: s.gi, students: [] };
     grouped[s.gi].students.push(s);
   });
-  const groupKeys = Object.keys(grouped).map(Number).sort((a,b) => a - b);
+  let groupKeys = Object.keys(grouped).map(Number).sort((a,b) => a - b);
+
+  // Filter by selected group if non-empty
+  const giNum = parseInt(giFilter);
+  if (giFilter !== '' && !isNaN(giNum)) {
+    groupKeys = groupKeys.filter(gi => gi === giNum);
+  }
 
   groupKeys.forEach(gi => {
     const g = grouped[gi];
@@ -12392,6 +12459,14 @@ const I18N = {
     write_message_text:'⚠️ الرجاء كتابة نص الرسالة',
     no_such_record:'خطأ: لم يُحدد سجل للتعديل',
     no_students_yet:'لا يوجد تلاميذ بعد',
+    // stats labels
+    so_total_label:'👥 إجمالي التلاميذ المسجلين',
+    so_in_group_label:'🏫 في الأفواج',
+    so_not_group_label:'❌ بدون فوج',
+    so_in_sheet_label:'📊 في الشيت',
+    so_out_sheet_label:'📋 خارج الشيت',
+    att_group_prefix:'فوج',
+    att_all_groups:'جميع الأفواج',
     att_no_data:'لا توجد بيانات حضور متاحة',
     att_present_count:'✅ حاضر:',
     att_absent_count:'❌ غائب:',
@@ -12958,6 +13033,14 @@ const I18N = {
     ctrl_status_closed:'🔴 Fermée',
     ctrl_status_locked:'⚫ Verrouillée',
     no_students_yet:'Aucun élève',
+    // stats labels
+    so_total_label:'👥 Total des élèves inscrits',
+    so_in_group_label:'🏫 Dans les groupes',
+    so_not_group_label:'❌ Sans groupe',
+    so_in_sheet_label:'📊 Dans le sheet',
+    so_out_sheet_label:'📋 Hors sheet',
+    att_group_prefix:'Groupe',
+    att_all_groups:'Tous les groupes',
     att_no_data:'Aucune présence disponible',
     att_present_count:'✅ Présent:',
     att_absent_count:'❌ Absent:',
@@ -13505,6 +13588,14 @@ const I18N = {
     ctrl_status_closed:'🔴 Closed',
     ctrl_status_locked:'⚫ Locked',
     no_students_yet:'No students yet',
+    // stats labels
+    so_total_label:'👥 Total enrolled students',
+    so_in_group_label:'🏫 In groups',
+    so_not_group_label:'❌ Without group',
+    so_in_sheet_label:'📊 In sheet',
+    so_out_sheet_label:'📋 Outside sheet',
+    att_group_prefix:'Group',
+    att_all_groups:'All groups',
     att_no_data:'No attendance data available',
     att_present_count:'✅ Present:',
     att_absent_count:'❌ Absent:',
