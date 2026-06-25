@@ -6495,43 +6495,45 @@ window.loadAttendanceSummary = async function() {
   // Helper to normalize names for comparison
   const normName = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
 
-  // Build student list with group assignment — use teacher's student list directly
+  // Build student list with group assignment
   const groups = teacher.groups || [];
   let allStudents = [];
+  const matchedNames = new Set();
 
-  if (groups.length) {
-    groups.forEach((g, gi) => {
-      (g.students || []).forEach(sName => {
-        const sNameNorm = normName(sName);
-        let match = students.find(s => normName(s.name || '') === sNameNorm);
-        if (!match) {
-          match = students.find(s =>
-            normName(s.name || '').includes(sNameNorm) ||
-            sNameNorm.includes(normName(s.name || ''))
-          );
-        }
-        if (match) {
-          allStudents.push({ name: match.name, group: g.name || 'فوج ' + (gi + 1), gi });
-        }
-      });
+  groups.forEach((g, gi) => {
+    (g.students || []).forEach(sName => {
+      const sNameNorm = normName(sName);
+      let match = students.find(s => normName(s.name || '') === sNameNorm);
+      if (!match) {
+        match = students.find(s =>
+          normName(s.name || '').includes(sNameNorm) ||
+          sNameNorm.includes(normName(s.name || ''))
+        );
+      }
+      if (match) {
+        matchedNames.add(normName(match.name || ''));
+        allStudents.push({ name: match.name, group: g.name || 'فوج ' + (gi + 1), gi });
+      } else {
+        // Student name in group doesn't match teacher.students — use as-is
+        allStudents.push({ name: sName, group: g.name || 'فوج ' + (gi + 1), gi });
+      }
     });
-  }
+  });
 
-  if (!allStudents.length) {
-    // Fallback: use teacher's flat student list
-    allStudents = students.map(s => {
-      const sName = normName(s.name || '');
-      let gi = 0;
-      let groupName = '—';
-      groups.forEach((g, idx) => {
-        if ((g.students || []).some(gs => normName(gs) === sName)) {
-          gi = idx;
-          groupName = g.name || 'فوج ' + (idx + 1);
-        }
-      });
-      return { name: s.name || '—', group: groupName || '—', gi };
+  // Add remaining teacher flat-list students not in any group
+  students.forEach(s => {
+    const key = normName(s.name || '');
+    if (matchedNames.has(key)) return;
+    let gi = 0;
+    let groupName = '—';
+    groups.forEach((g, idx) => {
+      if ((g.students || []).some(gs => normName(gs) === key)) {
+        gi = idx;
+        groupName = g.name || 'فوج ' + (idx + 1);
+      }
     });
-  }
+    allStudents.push({ name: s.name || '—', group: groupName || '—', gi });
+  });
 
   // Build rows grouped by group (فوج), count stats
   let totalPresent = 0, totalAbsent = 0, totalMissed = 0;
@@ -6740,6 +6742,7 @@ window.exportAttendanceCSV = () => {
   const giNum = parseInt(giFilter);
 
   let studentEntries = [];
+  const csvMatched = new Set();
   groups.forEach((g, gi) => {
     if (giFilter !== '' && !isNaN(giNum) && gi !== giNum) return;
     (g.students || []).forEach(sName => {
@@ -6751,25 +6754,28 @@ window.exportAttendanceCSV = () => {
         );
       }
       if (match) {
+        csvMatched.add(normName(match.name || ''));
         studentEntries.push({ name: match.name, group: g.name || 'فوج ' + (gi + 1), gi });
+      } else {
+        studentEntries.push({ name: sName, group: g.name || 'فوج ' + (gi + 1), gi });
       }
     });
   });
 
-  if (!studentEntries.length) {
-    // Flat list fallback
-    (teacher.students || []).forEach(s => {
-      let gi = 0;
-      let groupName = '—';
-      groups.forEach((g, idx) => {
-        if ((g.students || []).some(gs => normName(gs) === normName(s.name || ''))) {
-          gi = idx;
-          groupName = g.name || 'فوج ' + (idx + 1);
-        }
-      });
-      studentEntries.push({ name: s.name || '—', group: groupName, gi });
+  // Add remaining teacher flat-list students
+  (teacher.students || []).forEach(s => {
+    const key = normName(s.name || '');
+    if (csvMatched.has(key)) return;
+    let gi = 0;
+    let groupName = '—';
+    groups.forEach((g, idx) => {
+      if ((g.students || []).some(gs => normName(gs) === key)) {
+        gi = idx;
+        groupName = g.name || 'فوج ' + (idx + 1);
+      }
     });
-  }
+    studentEntries.push({ name: s.name || '—', group: groupName, gi });
+  });
 
   studentEntries.forEach(s => {
     const row = [s.name, teacher.name, s.group];
