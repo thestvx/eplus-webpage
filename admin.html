@@ -2273,12 +2273,11 @@
                 <option value="">📦 جميع الباقات</option>
               </select>
               <select id="so-filter-status" onchange="filterStudentOverview()">
-                <option value="">✅ الجميع</option>
-                <option value="paid">مسجّل في الموقع</option>
-                <option value="unassigned">غير موزّع</option>
-                <option value="unpaid">بدون تذكرة</option>
-                <option value="insheet">📊 مسجّل في الشيت</option>
-                <option value="notinsheet">❌ غير مسجّل في الشيت</option>
+                <option value="">👥 الجميع</option>
+                <option value="ingroup">🏫 في الأفواج</option>
+                <option value="notingroup">❌ بدون فوج</option>
+                <option value="insheet">📊 في الشيت</option>
+                <option value="notinsheet">📋 خارج الشيت</option>
               </select>
             </div>
             <div class="so-search-wrap">
@@ -6136,11 +6135,10 @@ function _renderSoTable(data, searchFilter) {
 
   if (teacherFilter) filtered = filtered.filter(r => r.teacherName === teacherFilter);
   if (packFilter) filtered = filtered.filter(r => r.pkg === packFilter);
-  if (statusFilter === 'unassigned') filtered = filtered.filter(r => r.teacherName === '—');
+  if (statusFilter === 'ingroup') filtered = filtered.filter(r => r.groupName && r.groupName !== '—');
+  else if (statusFilter === 'notingroup') filtered = filtered.filter(r => !r.groupName || r.groupName === '—');
   else if (statusFilter === 'insheet') filtered = filtered.filter(r => r.inSheet);
   else if (statusFilter === 'notinsheet') filtered = filtered.filter(r => !r.inSheet);
-  else if (statusFilter === 'unpaid') filtered = filtered.filter(r => r.status === 'unpaid' || r.status === 'noticket');
-  else if (statusFilter) filtered = filtered.filter(r => r.status === statusFilter);
 
   const countEl = document.getElementById('so-filter-count');
   if (countEl) countEl.textContent = filtered.length < data.length
@@ -6352,7 +6350,7 @@ window.syncStudentNamesWithTickets = async () => {
 };
 
 // ─── Daily attendance summary ───
-function onTeacherChange() {
+window.onTeacherChange = function() {
   const sel = document.getElementById('att-sum-group');
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   sel.style.display = 'none';
