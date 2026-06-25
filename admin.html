@@ -2195,6 +2195,7 @@
             <button class="ticket-filter-btn active" onclick="setTicketFilter('all',this)">الكل</button>
             <button class="ticket-filter-btn" onclick="setTicketFilter('paid',this)">✅ مفعّلة</button>
             <button class="ticket-filter-btn" onclick="setTicketFilter('pending',this)">⏳ قيد المراجعة</button>
+            <button class="ticket-filter-btn" onclick="setTicketFilter('underpaid',this)" style="border-color:rgba(239,68,68,0.3);color:#DC2626">💰 غير مكتمل</button>
             <span style="width:1px;height:20px;background:var(--border);margin:0 2px"></span>
             <button class="ticket-filter-btn" onclick="setTicketFilter('pack:الباقة الأساسية',this)">📦 أساسية</button>
             <button class="ticket-filter-btn" onclick="setTicketFilter('pack:باقة النخبة',this)">⭐ نخبة</button>
@@ -2250,7 +2251,6 @@
             <div class="so-stats" id="so-stats" style="margin-top:16px">
               <div class="so-stat"><div class="so-stat-n" id="so-total">0</div><div class="so-stat-l" data-i18n="so_total_label">👥 إجمالي التلاميذ المسجلين</div></div>
               <div class="so-stat"><div class="so-stat-n" id="so-in-group">0</div><div class="so-stat-l" data-i18n="so_in_group_label">🏫 في الأفواج</div></div>
-              <div class="so-stat"><div class="so-stat-n" id="so-not-group">0</div><div class="so-stat-l" data-i18n="so_not_group_label">❌ بدون فوج</div></div>
               <div class="so-stat"><div class="so-stat-n" id="so-in-sheet">0</div><div class="so-stat-l" data-i18n="so_in_sheet_label">📊 في الشيت</div></div>
               <div class="so-stat"><div class="so-stat-n" id="so-out-sheet">0</div><div class="so-stat-l" data-i18n="so_out_sheet_label">📋 خارج الشيت</div></div>
             </div>
@@ -2275,7 +2275,6 @@
               <select id="so-filter-status" onchange="filterStudentOverview()">
                 <option value="">👥 الجميع</option>
                 <option value="ingroup">🏫 في الأفواج</option>
-                <option value="notingroup">❌ بدون فوج</option>
                 <option value="insheet">📊 في الشيت</option>
                 <option value="notinsheet">📋 خارج الشيت</option>
               </select>
@@ -2296,7 +2295,6 @@
                     <th>#</th>
                     <th>📛 التلميذ</th>
                     <th>👨‍🏫 الأستاذ</th>
-                    <th>👥 إجمالي تلاميذه</th>
                     <th>🏫 الفوج</th>
                     <th>📦 الباقة</th>
                     <th>🌍 اللغات</th>
@@ -2314,7 +2312,7 @@
                   </tr>
                 </thead>
                 <tbody id="so-tbody">
-                  <tr><td colspan="18" class="so-empty"><div class="so-empty-icon">⏳</div><div>جاري تحميل البيانات...</div></td></tr>
+                  <tr><td colspan="17" class="so-empty"><div class="so-empty-icon">⏳</div><div>جاري تحميل البيانات...</div></td></tr>
                 </tbody>
               </table>
             </div>
@@ -2340,7 +2338,6 @@
         <option value="">📅 جميع الحصص</option>
       </select>
       <span style="font-size:12px;color:var(--text-muted);align-self:center" id="att-sum-current">الحصة الحالية: —</span>
-      <select id="att-sum-csv-group" style="display:none;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:600;cursor:pointer;font-family:'Tajawal',sans-serif"></select>
       <button onclick="exportAttendanceCSV()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif" title="تصدير CSV">📥 CSV</button>
     </div>
             <div class="tbl-wrap">
@@ -4481,6 +4478,7 @@ function renderTicketRows(data) {
     filtered = q ? filtered.filter(x => norm(x.receipt).includes(q) || norm(x.name).includes(q)) : filtered;
     if (f === 'paid')           filtered = filtered.filter(x => x.status === 'paid');
     else if (f === 'pending')   filtered = filtered.filter(x => x.status !== 'paid');
+    else if (f === 'underpaid') filtered = filtered.filter(x => Number(x.remainingAmount || 0) > 0);
     else if (f.startsWith('pack:')) { const pk=norm(f.slice(5)); filtered=filtered.filter(x=>norm(x.pack).includes(pk)); }
   } else {
     filtered = q ? filtered.filter(x => norm(x.receipt).includes(q) || norm(x.name).includes(q)) : filtered;
@@ -5795,14 +5793,35 @@ function _findStudentTicket(studentName) {
   return match || null;
 }
 
+function _nameVariants(name) {
+  const n = String(name||'').trim();
+  const parts = n.split(/\s+/).filter(Boolean);
+  const set = new Set();
+  set.add(n);
+  if (parts.length >= 2) {
+    set.add([...parts].reverse().join(' '));
+    set.add(parts[0] + ' ' + parts[parts.length-1]);
+    set.add(parts[parts.length-1] + ' ' + parts[0]);
+    // Also try full permutation for 3-part names
+    if (parts.length === 3) {
+      set.add(parts[0] + ' ' + parts[2] + ' ' + parts[1]);
+      set.add(parts[1] + ' ' + parts[0] + ' ' + parts[2]);
+      set.add(parts[1] + ' ' + parts[2] + ' ' + parts[0]);
+      set.add(parts[2] + ' ' + parts[0] + ' ' + parts[1]);
+      set.add(parts[2] + ' ' + parts[1] + ' ' + parts[0]);
+    }
+  }
+  return [...set];
+}
+
 function _findStudentGroup(studentName, teacher) {
   const _normGroup = s => String(s||'').trim().toLowerCase()
     .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
     .replace(/[ًٌٍَُِّْٰ]/g,'').replace(/ـ/g,'').replace(/\s+/g,' ');
   const groups = teacher.groups || [];
-  const target = _normGroup(studentName);
+  const targets = _nameVariants(studentName).map(_normGroup);
   for (let i = 0; i < groups.length; i++) {
-    if ((groups[i].students||[]).some(s => _normGroup(s) === target)) {
+    if ((groups[i].students||[]).some(s => targets.includes(_normGroup(s)))) {
       return groups[i].name;
     }
   }
@@ -5817,32 +5836,23 @@ function _buildSheetNormCache(sheetRows) {
   (sheetRows || []).forEach(r => {
     const fullName = String(r.name || '').trim();
     if (!fullName) return;
-    const key = _normOv(fullName);
-    if (!cache[key]) {
-      cache[key] = {
-        name: fullName,
-        parentName: String(r.parent || '').trim(),
-        parentPhone: String(r.phone || '').trim(),
-        age: String(r.age || '').trim(),
-        pack: String(r.pack || '').trim(),
-        langs: String(r.langs || '').trim(),
-        itTrack: String(r.itTrack || '').trim(),
-        totalAmount: String(r.totalAmount || '').trim(),
-        _raw: r._raw || null,
-      };
-    } else if (r._raw) {
-      // Merge — keep existing but fill any empty fields from later sheets
-      const existing = cache[key];
-      if (!existing.name) existing.name = fullName;
-      if (!existing.parentName && r.parent) existing.parentName = String(r.parent).trim();
-      if (!existing.parentPhone && r.phone) existing.parentPhone = String(r.phone).trim();
-      if (!existing.age && r.age) existing.age = String(r.age).trim();
-      if (!existing.pack && r.pack) existing.pack = String(r.pack).trim();
-      if (!existing.langs && r.langs) existing.langs = String(r.langs).trim();
-      if (!existing.itTrack && r.itTrack) existing.itTrack = String(r.itTrack).trim();
-      if (!existing.totalAmount && r.totalAmount) existing.totalAmount = String(r.totalAmount).trim();
-      if (!existing._raw) existing._raw = r._raw;
-    }
+    // Store under all name variants for better matching
+    const variants = _nameVariants(fullName);
+    const val = {
+      name: fullName,
+      parentName: String(r.parent || '').trim(),
+      parentPhone: String(r.phone || '').trim(),
+      age: String(r.age || '').trim(),
+      pack: String(r.pack || '').trim(),
+      langs: String(r.langs || '').trim(),
+      itTrack: String(r.itTrack || '').trim(),
+      totalAmount: String(r.totalAmount || '').trim(),
+      _raw: r._raw || null,
+    };
+    variants.forEach(v => {
+      const key = _normOv(v);
+      if (!cache[key]) cache[key] = val;
+    });
   });
   return cache;
 }
@@ -5978,13 +5988,11 @@ window.renderStudentOverview = async () => {
   // إحصائيات
   const totalAll = _soData.length;
   const inGroup = _soData.filter(r => r.groupName && r.groupName !== '—').length;
-  const notInGroup = totalAll - inGroup;
   const inSheet = _soData.filter(r => r.inSheet).length;
   const outSheet = totalAll - inSheet;
 
   document.getElementById('so-total').textContent = totalAll;
   document.getElementById('so-in-group').textContent = inGroup;
-  document.getElementById('so-not-group').textContent = notInGroup;
   document.getElementById('so-in-sheet').textContent = inSheet;
   document.getElementById('so-out-sheet').textContent = outSheet;
   document.getElementById('nav-badge-students').textContent = totalAll;
@@ -6144,7 +6152,6 @@ function _renderSoTable(data, searchFilter) {
   if (teacherFilter) filtered = filtered.filter(r => r.teacherName === teacherFilter);
   if (packFilter) filtered = filtered.filter(r => r.pkg === packFilter);
   if (statusFilter === 'ingroup') filtered = filtered.filter(r => r.groupName && r.groupName !== '—');
-  else if (statusFilter === 'notingroup') filtered = filtered.filter(r => !r.groupName || r.groupName === '—');
   else if (statusFilter === 'insheet') filtered = filtered.filter(r => r.inSheet);
   else if (statusFilter === 'notinsheet') filtered = filtered.filter(r => !r.inSheet);
 
@@ -6163,14 +6170,8 @@ function _renderSoTable(data, searchFilter) {
   const pageData = filtered.slice(start, start + perPage);
   const pageNavEl = document.getElementById('so-page-nav');
 
-  // Build teacher student count map
-  const _teacherCountMap = {};
-  (allTeachers || []).forEach(t => {
-    _teacherCountMap[t.name] = (t.students || []).length;
-  });
-
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="18" class="so-empty"><div class="so-empty-icon">🔍</div><div style="font-weight:700;font-size:15px;color:var(--text-muted)">لا توجد نتائج</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px">حاول تغيير كلمة البحث</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="17" class="so-empty"><div class="so-empty-icon">🔍</div><div style="font-weight:700;font-size:15px;color:var(--text-muted)">لا توجد نتائج</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px">حاول تغيير كلمة البحث</div></td></tr>`;
     if (pageNavEl) pageNavEl.innerHTML = '';
     return;
   }
@@ -6184,15 +6185,10 @@ function _renderSoTable(data, searchFilter) {
     const langsHtml = r.langs ? `<span style="font-size:11px;background:rgba(99,102,241,0.1);color:#4f46e5;padding:2px 8px;border-radius:99px;font-weight:700;white-space:nowrap">🌍 ${r.langs}</span>` : '<span style="color:var(--text-muted);font-size:11px">—</span>';
     const itTrackHtml = r.itTrack ? `<span style="font-size:11px;background:rgba(16,185,129,0.1);color:#059669;padding:2px 8px;border-radius:99px;font-weight:700;white-space:nowrap">💻 ${r.itTrack}</span>` : '<span style="color:var(--text-muted);font-size:11px">—</span>';
     const sheetTotalNum = r.sheetTotal ? parseFloat(r.sheetTotal.replace(/[^\d.]/g,'')) : 0;
-    const totalStudents = _teacherCountMap[r.teacherName];
-    const totalStudentsHtml = totalStudents !== undefined
-      ? `<span style="font-weight:800;font-size:13px;color:var(--primary)">${totalStudents}</span>`
-      : '<span style="color:var(--text-muted)">—</span>';
     return `<tr class="so-row" style="animation:fadeInRow 0.3s ease ${i*0.05}s both">
       <td style="font-weight:700;color:var(--text-muted)">${idx}</td>
       <td style="font-weight:800">${r.studentName}</td>
       <td>${r.teacherName}</td>
-      <td style="text-align:center">${totalStudentsHtml}</td>
       <td><span class="so-group-badge">🏫 ${r.groupName}</span></td>
       <td>${r.pkg !== '—' ? `<span class="so-badge pack">📦 ${r.pkg}</span>` : '<span style="color:var(--text-muted);font-size:11px">—</span>'}</td>
       <td style="text-align:center">${langsHtml}</td>
@@ -6366,16 +6362,10 @@ window.onTeacherChange = function() {
   sel.style.display = 'none';
   sel.innerHTML = '<option value="">🏫 ' + t('att_all_groups') + '</option>';
 
-  // Populate CSV group selector
-  const csvSel = document.getElementById('att-sum-csv-group');
-  csvSel.style.display = 'none';
-  csvSel.innerHTML = '<option value="">🏫 ' + t('att_all_groups') + ' 📥</option>';
-
   if (teacherId) {
     const teacher = (allTeachers || []).find(t => t.id === teacherId);
     const groups = teacher?.groups || [];
     if (groups.length > 1) {
-      // Table filter
       groups.forEach((g, i) => {
         const opt = document.createElement('option');
         opt.value = String(i);
@@ -6383,16 +6373,6 @@ window.onTeacherChange = function() {
         sel.appendChild(opt);
       });
       sel.style.display = '';
-    }
-    // CSV selector — always show when teacher has groups
-    if (groups.length) {
-      groups.forEach((g, i) => {
-        const opt = document.createElement('option');
-        opt.value = String(i);
-        opt.textContent = '🏫 ' + (g.name || (t('att_group_prefix') + ' ' + (i + 1)));
-        csvSel.appendChild(opt);
-      });
-      csvSel.style.display = '';
     }
   }
   loadAttendanceSummary();
@@ -6527,16 +6507,17 @@ window.loadAttendanceSummary = async function() {
   let allStudents = [];
   const matchedNames = new Set();
 
+  // Helper: match names using variants
+  const namesMatchLocal = (a, b) => {
+    if (!a || !b) return false;
+    const va = _nameVariants(a).map(normName);
+    const vb = _nameVariants(b).map(normName);
+    return va.some(v => vb.includes(v));
+  };
+
   groups.forEach((g, gi) => {
     (g.students || []).forEach(sName => {
-      const sNameNorm = normName(sName);
-      let match = students.find(s => normName(s.name || '') === sNameNorm);
-      if (!match) {
-        match = students.find(s =>
-          normName(s.name || '').includes(sNameNorm) ||
-          sNameNorm.includes(normName(s.name || ''))
-        );
-      }
+      let match = students.find(s => namesMatchLocal(s.name, sName));
       if (match) {
         matchedNames.add(normName(match.name || ''));
         allStudents.push({ name: match.name, group: g.name || 'فوج ' + (gi + 1), gi });
@@ -6554,7 +6535,7 @@ window.loadAttendanceSummary = async function() {
     let gi = 0;
     let groupName = '—';
     groups.forEach((g, idx) => {
-      if ((g.students || []).some(gs => normName(gs) === key)) {
+      if ((g.students || []).some(gs => namesMatchLocal(gs, s.name))) {
         gi = idx;
         groupName = g.name || 'فوج ' + (idx + 1);
       }
@@ -6612,7 +6593,7 @@ window.loadAttendanceSummary = async function() {
           continue;
         }
         const studentRec = (rec.students || []).find(st =>
-          normName(st.name || '') === normName(s.name || '')
+          namesMatchLocal(st.name || '', s.name || '')
         );
         if (!studentRec) {
           cells.push(`<td class="att-cell att-cell-future att-cell-clickable" title="${t('att_not_recorded')}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">⋯</td>`);
@@ -6744,15 +6725,57 @@ window.removeStudentFromTeacher = async (teacherId, studentName) => {
   }
 };
 
+// ─── نافذة اختيار الفوج للـ CSV ───
+function _showGroupPicker(teacher, groups, callback) {
+  // Remove existing picker
+  const old = document.getElementById('csv-group-picker');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'csv-group-picker';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease';
+
+  const box = document.createElement('div');
+  box.style.cssText = 'background:var(--card);border-radius:16px;padding:24px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.2);text-align:center';
+
+  box.innerHTML = `<div style="font-size:16px;font-weight:900;margin-bottom:6px;color:var(--text)">📥 ${t('att_export_csv_title') || 'تصدير CSV'}</div>
+<div style="font-size:13px;color:var(--text-muted);margin-bottom:18px">${t('att_export_csv_pick_group') || 'اختر الفوج الذي تريد تصدير حضورهم:'}</div>
+<button class="csv-gp-btn" data-gi="" data-label="" style="display:block;width:100%;padding:12px;margin-bottom:8px;border-radius:10px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text);font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">🏫 ${t('att_all_groups') || 'جميع الأفواج'}</button>
+${groups.map((g,i) => `<button class="csv-gp-btn" data-gi="${i}" data-label="${(g.name || (t('att_group_prefix') + ' ' + (i+1))).replace(/"/g,'&quot;')}" style="display:block;width:100%;padding:12px;margin-bottom:6px;border-radius:10px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">🏫 ${g.name || (t('att_group_prefix') + ' ' + (i+1))}</button>`).join('')}
+<button class="csv-gp-cancel" style="display:block;width:100%;padding:10px;margin-top:4px;border:none;background:none;color:var(--text-muted);font-size:12px;cursor:pointer;font-family:inherit">${t('cancel') || 'إلغاء'}</button>`;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  box.querySelectorAll('.csv-gp-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      overlay.remove();
+      callback(btn.dataset.gi, btn.dataset.label);
+    });
+  });
+  box.querySelector('.csv-gp-cancel').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+}
+
 // ─── تصدير سجل الحضور كـ CSV ───
-window.exportAttendanceCSV = () => {
+window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride) => {
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
   if (!teacher) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
 
-  const giFilter = document.getElementById('att-sum-csv-group')?.value || '';
+  const groups = teacher.groups || [];
+  const giFilter = giFilterOverride !== undefined ? giFilterOverride : '';
+  const groupLabel = groupLabelOverride || '';
+
+  // If teacher has multiple groups and no group was selected yet, show picker
+  if (groups.length > 1 && giFilter === '') {
+    _showGroupPicker(teacher, groups, (gi, label) => {
+      window.exportAttendanceCSV(gi, label);
+    });
+    return;
+  }
+
   const sessionFilter = document.getElementById('att-sum-session')?.value || '';
-  const groupLabel = document.getElementById('att-sum-csv-group')?.selectedOptions?.[0]?.textContent?.trim() || '';
 
   const rows = [];
   // رأس CSV
@@ -6764,23 +6787,24 @@ window.exportAttendanceCSV = () => {
   rows.push(headers);
 
   // قراءة البيانات من الـ cache مباشرة
-  const groups = teacher.groups || [];
   const normName = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const groupCache = window._attSummaryCache[teacherId] || {};
   const giNum = parseInt(giFilter);
+
+  // Helper: check if two names match using name variants
+  const namesMatch = (a, b) => {
+    if (!a || !b) return false;
+    const va = _nameVariants(a).map(normName);
+    const vb = _nameVariants(b).map(normName);
+    return va.some(v => vb.includes(v));
+  };
 
   let studentEntries = [];
   const csvMatched = new Set();
   groups.forEach((g, gi) => {
     if (giFilter !== '' && !isNaN(giNum) && gi !== giNum) return;
     (g.students || []).forEach(sName => {
-      const sNameNorm = normName(sName);
-      let match = (teacher.students || []).find(s => normName(s.name || '') === sNameNorm);
-      if (!match) {
-        match = (teacher.students || []).find(s =>
-          normName(s.name || '').includes(sNameNorm) || sNameNorm.includes(normName(s.name || ''))
-        );
-      }
+      let match = (teacher.students || []).find(s => namesMatch(s.name, sName));
       if (match) {
         csvMatched.add(normName(match.name || ''));
         studentEntries.push({ name: match.name, group: g.name || 'فوج ' + (gi + 1), gi });
@@ -6797,7 +6821,7 @@ window.exportAttendanceCSV = () => {
     let gi = 0;
     let groupName = '—';
     groups.forEach((g, idx) => {
-      if ((g.students || []).some(gs => normName(gs) === key)) {
+      if ((g.students || []).some(gs => namesMatch(gs, s.name))) {
         gi = idx;
         groupName = g.name || 'فوج ' + (idx + 1);
       }
@@ -6814,7 +6838,7 @@ window.exportAttendanceCSV = () => {
         row.push('—');
         return;
       }
-      const studentRec = (rec.students || []).find(st => normName(st.name || '') === normName(s.name));
+      const studentRec = (rec.students || []).find(st => namesMatch(st.name || '', s.name));
       if (!studentRec) { row.push('—'); return; }
       row.push(studentRec.present ? 'حاضر' : 'غائب');
     });
@@ -12201,6 +12225,7 @@ const I18N = {
     ticket_filter_adult:'👤 بالغين',
     ticket_filter_trash:'🗑️ سلة المحذوفات',
     ticket_filter_date:'📅 فلترة بالتاريخ:',
+    cancel:'إلغاء',
     ticket_filter_cancel:'إلغاء الفلترة',
     ticket_th_receipt:'رقم الوصل',
     ticket_th_name:'الاسم الكامل',
@@ -12234,7 +12259,6 @@ const I18N = {
     so_th_num:'#',
     so_th_student:'📛 التلميذ',
     so_th_teacher:'👨‍🏫 الأستاذ',
-    so_th_total_students:'👥 إجمالي تلاميذه',
     so_th_group:'🏫 الفوج',
     so_th_pack:'📦 الباقة',
     so_th_langs:'🌍 اللغات',
@@ -12257,6 +12281,8 @@ const I18N = {
     att_filter_all_sessions:'📅 جميع الحصص',
     att_current_session:'الحصة الحالية:',
     att_export_csv:'📥 CSV',
+    att_export_csv_title:'تصدير CSV',
+    att_export_csv_pick_group:'اختر الفوج الذي تريد تصدير حضوره:',
     att_th_student:'التلميذ',
     att_th_teacher:'الأستاذ',
     att_th_group:'الفوج',
@@ -12554,7 +12580,7 @@ const I18N = {
     // stats labels
     so_total_label:'👥 إجمالي التلاميذ المسجلين',
     so_in_group_label:'🏫 في الأفواج',
-    so_not_group_label:'❌ بدون فوج',
+
     so_in_sheet_label:'📊 في الشيت',
     so_out_sheet_label:'📋 خارج الشيت',
     att_group_prefix:'فوج',
@@ -12779,6 +12805,7 @@ const I18N = {
     ticket_filter_adult:'👤 Adultes',
     ticket_filter_trash:'🗑️ Corbeille',
     ticket_filter_date:'📅 Filtre date:',
+    cancel:'Annuler',
     ticket_filter_cancel:'Annuler filtre',
     ticket_th_receipt:'Reçu',
     ticket_th_name:'Nom complet',
@@ -12811,7 +12838,7 @@ const I18N = {
     so_th_num:'#',
     so_th_student:'📛 Élève',
     so_th_teacher:'👨‍🏫 Professeur',
-    so_th_total_students:'👥 Total élèves',
+
     so_th_group:'🏫 Groupe',
     so_th_pack:'📦 Forfait',
     so_th_langs:'🌍 Langues',
@@ -12833,6 +12860,8 @@ const I18N = {
     att_filter_all_sessions:'📅 Toutes séances',
     att_current_session:'Séance en cours:',
     att_export_csv:'📥 CSV',
+    att_export_csv_title:'Exporter CSV',
+    att_export_csv_pick_group:'Choisissez le groupe à exporter:',
     att_th_student:'Élève',
     att_th_teacher:'Professeur',
     att_th_group:'Groupe',
@@ -13130,7 +13159,7 @@ const I18N = {
     // stats labels
     so_total_label:'👥 Total des élèves inscrits',
     so_in_group_label:'🏫 Dans les groupes',
-    so_not_group_label:'❌ Sans groupe',
+
     so_in_sheet_label:'📊 Dans le sheet',
     so_out_sheet_label:'📋 Hors sheet',
     att_group_prefix:'Groupe',
@@ -13336,6 +13365,7 @@ const I18N = {
     ticket_filter_adult:'👤 Adults',
     ticket_filter_trash:'🗑️ Trash',
     ticket_filter_date:'📅 Filter by date:',
+    cancel:'Cancel',
     ticket_filter_cancel:'Clear Filter',
     ticket_th_receipt:'Receipt',
     ticket_th_name:'Full Name',
@@ -13368,7 +13398,7 @@ const I18N = {
     so_th_num:'#',
     so_th_student:'📛 Student',
     so_th_teacher:'👨‍🏫 Teacher',
-    so_th_total_students:'👥 Total Students',
+
     so_th_group:'🏫 Group',
     so_th_pack:'📦 Package',
     so_th_langs:'🌍 Languages',
@@ -13390,6 +13420,8 @@ const I18N = {
     att_filter_all_sessions:'📅 All Sessions',
     att_current_session:'Current session:',
     att_export_csv:'📥 CSV',
+    att_export_csv_title:'Export CSV',
+    att_export_csv_pick_group:'Choose the group to export:',
     att_th_student:'Student',
     att_th_teacher:'Teacher',
     att_th_group:'Group',
@@ -13687,7 +13719,7 @@ const I18N = {
     // stats labels
     so_total_label:'👥 Total enrolled students',
     so_in_group_label:'🏫 In groups',
-    so_not_group_label:'❌ Without group',
+
     so_in_sheet_label:'📊 In sheet',
     so_out_sheet_label:'📋 Outside sheet',
     att_group_prefix:'Group',
