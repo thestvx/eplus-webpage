@@ -5900,7 +5900,15 @@ window.renderStudentOverview = async () => {
     allKeys.add(key);
     const match = teacherMap[key];
     const isPaid = ticket.status === 'paid';
-    const sheetMatch = window._sheetNormCache ? window._sheetNormCache[key] : null;
+    // Try matching with all name variants
+    let sheetMatch = null;
+    if (window._sheetNormCache) {
+      const variants = _nameVariants(ticket.name).map(_normOv);
+      for (const v of variants) {
+        if (window._sheetNormCache[v]) { sheetMatch = window._sheetNormCache[v]; break; }
+      }
+      if (!sheetMatch) sheetMatch = window._sheetNormCache[key] || null;
+    }
 
     _soData.push({
       studentName: ticket.name,
@@ -5930,7 +5938,14 @@ window.renderStudentOverview = async () => {
   if (window._sheetNormCache) {
     Object.entries(window._sheetNormCache).forEach(([normKey, sheet]) => {
       if (allKeys.has(normKey)) return;
-      const match = teacherMap[normKey];
+      // Try finding teacher match with name variants
+      let match = teacherMap[normKey];
+      if (!match) {
+        const sheetVariants = _nameVariants(sheet.name).map(_normOv);
+        for (const v of sheetVariants) {
+          if (teacherMap[v]) { match = teacherMap[v]; break; }
+        }
+      }
       allKeys.add(normKey);
       _soData.push({
         studentName: sheet.name || normKey,
@@ -5961,27 +5976,36 @@ window.renderStudentOverview = async () => {
   Object.entries(teacherMap).forEach(([key, match]) => {
     if (allKeys.has(key)) return;
     allKeys.add(key);
+    // Also try to match against sheet cache with name variants
+    let sheetMatch3 = null;
+    if (window._sheetNormCache) {
+      const tVariants = _nameVariants(match.studentName || key).map(_normOv);
+      for (const v of tVariants) {
+        if (window._sheetNormCache[v]) { sheetMatch3 = window._sheetNormCache[v]; break; }
+      }
+      if (!sheetMatch3) sheetMatch3 = window._sheetNormCache[key] || null;
+    }
     _soData.push({
       studentName: match.studentName || key,
       teacherName: match.teacherName,
       groupName: match.groupName,
       status: 'noteacher',
       statusLabel: '📋 من الأفواج فقط',
-      pkg: '—',
+      pkg: sheetMatch3 ? sheetMatch3.pack : '—',
       amount: 0,
       paid: 0,
       receipt: '—',
       hasTicket: false,
-      parentName: '—',
-      parentPhone: '—',
-      age: '—',
-      langs: '',
-      itTrack: '',
-      sheetTotal: '',
-      inSheet: false,
-      sheetPack: '',
-      sheetLangs: '',
-      _sheetRaw: null,
+      parentName: sheetMatch3 ? sheetMatch3.parentName : '—',
+      parentPhone: sheetMatch3 ? sheetMatch3.parentPhone : '—',
+      age: sheetMatch3 ? sheetMatch3.age : '—',
+      langs: sheetMatch3 ? sheetMatch3.langs : '',
+      itTrack: sheetMatch3 ? sheetMatch3.itTrack : '',
+      sheetTotal: sheetMatch3 ? sheetMatch3.totalAmount : '',
+      inSheet: !!sheetMatch3,
+      sheetPack: sheetMatch3 ? sheetMatch3.pack : '',
+      sheetLangs: sheetMatch3 ? sheetMatch3.langs : '',
+      _sheetRaw: sheetMatch3 ? sheetMatch3._raw : null,
     });
   });
 
@@ -6202,7 +6226,7 @@ function _renderSoTable(data, searchFilter) {
       <td style="font-size:11px;direction:ltr;text-align:left;white-space:nowrap">${r.parentPhone !== '—' ? r.parentPhone : '<span style="color:var(--text-muted)">—</span>'}</td>
       <td style="text-align:center">${r.age !== '—' ? r.age : '<span style="color:var(--text-muted)">—</span>'}</td>
       <td style="text-align:center">${sheetBadge}</td>
-      <td style="text-align:center">${r._sheetRaw ? `<span class="so-detail-btn" onclick="event.stopPropagation();_showSheetDetail('${encodeURIComponent(JSON.stringify(r._sheetRaw))}',this)" title="عرض بيانات الشيت الكاملة">📋</span>` : '<span style="color:var(--text-muted);font-size:11px">—</span>'}</td>
+      <td style="text-align:center"><span class="so-detail-btn" onclick="event.stopPropagation();_showStudentDetail('${encodeURIComponent(JSON.stringify(r))}',this)" title="عرض جميع البيانات">🔍</span></td>
     </tr>`;
   }).join('');
 
@@ -6216,39 +6240,66 @@ function _renderSoTable(data, searchFilter) {
   }
 }
 
-// ─── Raw sheet data detail popup ───
-window._showSheetDetail = (rawJson, btn) => {
+// ─── Student detail popup (all sources) ───
+window._showStudentDetail = (json, btn) => {
   try {
-    const raw = JSON.parse(decodeURIComponent(rawJson));
-    const rows = Object.entries(raw).filter(([k, v]) => String(v || '').trim());
-    if (!rows.length) return;
-    // Build popup content
-    const list = rows.map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px"><span style="font-weight:700;color:var(--text-muted);white-space:nowrap">${k}</span><span style="color:var(--text);text-align:left;direction:ltr;word-break:break-all">${v}</span></div>`).join('');
-    // Remove existing popup
+    const r = JSON.parse(decodeURIComponent(json));
+    const fields = [
+      ['👤 الاسم', r.studentName],
+      ['👨‍🏫 الأستاذ', r.teacherName],
+      ['🏫 الفوج', r.groupName],
+      ['📦 الباقة', r.pkg === '—' ? (r.sheetPack || '—') : r.pkg],
+      ['💰 المبلغ (الشيت)', r.sheetTotal ? Number(r.sheetTotal.replace(/[^\d.]/g,'')).toLocaleString('ar-DZ') + ' دج' : '—'],
+      ['💳 المدفوع', r.paid ? Number(r.paid).toLocaleString('ar-DZ') + ' دج' : '0 دج'],
+      ['🆔 رقم الوصل', r.receipt || '—'],
+      ['✅ الحالة', r.statusLabel],
+      ['📋 مسجل في الموقع', r.hasTicket ? '✅' : '❌'],
+      ['📊 في الشيت', r.inSheet ? '✅' : '❌'],
+      ['🌍 اللغات', r.langs || r.sheetLangs || '—'],
+      ['💻 مسار الإعلام الآلي', r.itTrack || '—'],
+      ['👪 ولي الأمر', r.parentName || '—'],
+      ['📞 رقم ولي الأمر', r.parentPhone || '—'],
+      ['🎂 العمر', r.age || '—'],
+    ].filter(([,v]) => String(v||'').trim() !== '' && v !== undefined && v !== null && v !== '—');
+
+    // Add raw sheet data if available
+    if (r._sheetRaw) {
+      try {
+        const raw = typeof r._sheetRaw === 'object' ? r._sheetRaw : JSON.parse(r._sheetRaw);
+        Object.entries(raw).forEach(([k, v]) => {
+          if (String(v||'').trim()) fields.push([`📋 ${k}`, v]);
+        });
+      } catch(e) {}
+    }
+
+    if (!fields.length) return;
+    const list = fields.map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="font-weight:700;color:var(--text-muted);white-space:nowrap;flex-shrink:0">${k}</span><span style="color:var(--text);text-align:left;direction:ltr;word-break:break-word">${v}</span></div>`).join('');
+
     const old = document.getElementById('so-detail-popup');
     if (old) old.remove();
     const popup = document.createElement('div');
     popup.id = 'so-detail-popup';
     popup.className = 'so-detail-popup';
-    popup.innerHTML = `<div class="so-detail-header"><span>📋 بيانات الشيت الكاملة</span><button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px">✕</button></div><div style="max-height:320px;overflow-y:auto;padding:8px 14px 14px">${list}</div>`;
+    popup.innerHTML = `<div class="so-detail-header"><span>🔍 ${r.studentName}</span><button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px">✕</button></div><div style="max-height:340px;overflow-y:auto;padding:8px 16px 14px">${list}</div>`;
     document.body.appendChild(popup);
-    // Position near button
     const rect = btn.getBoundingClientRect();
     const top = rect.bottom + 6;
-    const left = Math.min(rect.left, window.innerWidth - 360);
+    const left = Math.min(rect.left, window.innerWidth - 380);
     popup.style.top = top + 'px';
     popup.style.left = Math.max(8, left) + 'px';
-    // Close on click outside
     setTimeout(() => document.addEventListener('click', _closeDetailPopup), 10);
-  } catch(e) {}
+  } catch(e) { console.warn('Detail error:', e); }
 };
 function _closeDetailPopup(e) {
   const popup = document.getElementById('so-detail-popup');
-  if (popup && !popup.contains(e.target) && !e.target.closest('.so-detail-btn')) {
+  if (popup && !popup.contains(e.target) && !e.target.closest('.so-detail-btn') && !e.target.closest('[onclick*="_showStudentDetail"]')) {
     popup.remove();
     document.removeEventListener('click', _closeDetailPopup);
   }
 }
+
+// Legacy alias
+window._showSheetDetail = window._showStudentDetail;
 
 let _soSearchTimer;
 window.debouncedSearch = () => {
@@ -6407,7 +6458,7 @@ function populateSessionSelect(curSession) {
       return `<option value="${n}">${t('att_th_session_prefix')}${n}</option>`;
     }).join('');
   const cur = document.getElementById('att-sum-current');
-  if (cur) cur.innerHTML = `<span class="att-current-badge">▶ ${t('att_current_session')} ${curSession} / 12</span>`;
+  if (cur) cur.innerHTML = `<span class="att-current-badge">▶ ${t('att_current_session')} ${curSession}</span>`;
 }
 
 window._attSummaryCache = {}; // teacherId -> { gi: { sessionNum: data } }
@@ -6457,23 +6508,25 @@ window.loadAttendanceSummary = async function() {
 
   populateSessionSelect(curSession);
 
-  // Build dynamic header based on session filter
+  // Build dynamic header based on session filter AND teacher's max sessions
+  const totalSessions = Math.min(curSession, 12);
   const headerRow = document.getElementById('att-sum-header-row');
   if (headerRow) {
     const sessionNum = parseInt(sessionFilter);
     let headerHtml = '<th>التلميذ</th><th>الأستاذ</th><th>الفوج</th>';
-    if (sessionFilter !== '' && !isNaN(sessionNum) && sessionNum >= 1 && sessionNum <= 12) {
+    if (sessionFilter !== '' && !isNaN(sessionNum) && sessionNum >= 1 && sessionNum <= totalSessions) {
       headerHtml += `<th class="att-session-active">ح${sessionNum}</th>`;
     } else {
-      for (let i = 1; i <= 12; i++) headerHtml += `<th>ح${i}</th>`;
+      for (let i = 1; i <= totalSessions; i++) headerHtml += `<th>ح${i}</th>`;
     }
     headerHtml += '<th data-i18n="att_th_action">إجراء</th>';
     headerRow.innerHTML = headerHtml;
   }
 
   const students = teacher.students || [];
+  const colspanNum = 3 + totalSessions + 1; // name + teacher + group + sessions + action
   if (!students.length) {
-    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('no_students_for_teacher') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="' + colspanNum + '" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('no_students_for_teacher') + '</td></tr>';
     return;
   }
 
@@ -6563,9 +6616,9 @@ window.loadAttendanceSummary = async function() {
   }
 
   const sessionNum = parseInt(sessionFilter);
-  const isSingleSession = sessionFilter !== '' && !isNaN(sessionNum) && sessionNum >= 1 && sessionNum <= 12;
-  const sessionRange = isSingleSession ? [sessionNum] : Array.from({length: 12}, (_, i) => i + 1);
-  const colspan = isSingleSession ? 5 : 16;
+  const isSingleSession = sessionFilter !== '' && !isNaN(sessionNum) && sessionNum >= 1 && sessionNum <= totalSessions;
+  const sessionRange = isSingleSession ? [sessionNum] : Array.from({length: totalSessions}, (_, i) => i + 1);
+  const colspan = isSingleSession ? 5 : (3 + totalSessions + 1);
   const sessionLabel = isSingleSession ? 'ح' + sessionNum : '';
 
   groupKeys.forEach(gi => {
@@ -6725,29 +6778,57 @@ window.removeStudentFromTeacher = async (teacherId, studentName) => {
   }
 };
 
-// ─── نافذة اختيار الفوج للـ CSV ───
+// ─── نافذة اختيار الفوج للـ CSV (إبداعية) ───
 function _showGroupPicker(teacher, groups, callback) {
-  // Remove existing picker
   const old = document.getElementById('csv-group-picker');
   if (old) old.remove();
 
   const overlay = document.createElement('div');
   overlay.id = 'csv-group-picker';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.25s ease;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)';
 
   const box = document.createElement('div');
-  box.style.cssText = 'background:var(--card);border-radius:16px;padding:24px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.2);text-align:center';
+  box.style.cssText = 'background:linear-gradient(145deg,var(--card),rgba(255,255,255,0.02));border-radius:20px;padding:0;max-width:420px;width:92%;box-shadow:0 25px 80px rgba(0,0,0,0.3);overflow:hidden;animation:slideUp 0.3s ease';
 
-  box.innerHTML = `<div style="font-size:16px;font-weight:900;margin-bottom:6px;color:var(--text)">📥 ${t('att_export_csv_title') || 'تصدير CSV'}</div>
-<div style="font-size:13px;color:var(--text-muted);margin-bottom:18px">${t('att_export_csv_pick_group') || 'اختر الفوج الذي تريد تصدير حضورهم:'}</div>
-<button class="csv-gp-btn" data-gi="" data-label="" style="display:block;width:100%;padding:12px;margin-bottom:8px;border-radius:10px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text);font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">🏫 ${t('att_all_groups') || 'جميع الأفواج'}</button>
-${groups.map((g,i) => `<button class="csv-gp-btn" data-gi="${i}" data-label="${(g.name || (t('att_group_prefix') + ' ' + (i+1))).replace(/"/g,'&quot;')}" style="display:block;width:100%;padding:12px;margin-bottom:6px;border-radius:10px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">🏫 ${g.name || (t('att_group_prefix') + ' ' + (i+1))}</button>`).join('')}
-<button class="csv-gp-cancel" style="display:block;width:100%;padding:10px;margin-top:4px;border:none;background:none;color:var(--text-muted);font-size:12px;cursor:pointer;font-family:inherit">${t('cancel') || 'إلغاء'}</button>`;
+  // Gradient header
+  box.innerHTML = `<div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:22px 24px 18px;text-align:center">
+    <div style="font-size:36px;margin-bottom:6px">📥</div>
+    <div style="font-size:18px;font-weight:900;color:white;letter-spacing:0.3px">${t('att_export_csv_title') || 'تصدير CSV'}</div>
+    <div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:4px">${t('att_export_csv_pick_group') || 'اختر الفوج الذي تريد تصدير حضوره:'}</div>
+  </div>
+  <div style="padding:18px 20px 20px">
+    <button class="csv-gp-btn" data-gi="" data-label="" style="display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;margin-bottom:8px;border-radius:14px;border:2px dashed var(--border);background:var(--card-bg);color:var(--text);font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:all 0.2s">
+      <span style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(139,92,246,0.1));display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📊</span>
+      <span style="flex:1;text-align:right">🏫 ${t('att_all_groups') || 'جميع الأفواج'}</span>
+      <span style="font-size:11px;color:var(--text-muted);font-weight:600">${groups.length} ${t('att_group_prefix') || 'فوج'}</span>
+    </button>
+    ${groups.map((g,i) => `<button class="csv-gp-btn" data-gi="${i}" data-label="${(g.name || (t('att_group_prefix') + ' ' + (i+1))).replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 16px;margin-bottom:6px;border-radius:14px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:all 0.2s">
+      <span style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,rgba(251,191,36,0.15),rgba(245,158,11,0.1));display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🏫</span>
+      <span style="flex:1;text-align:right">${g.name || (t('att_group_prefix') + ' ' + (i+1))}</span>
+      <span style="font-size:11px;color:var(--text-muted);font-weight:600">${(g.students||[]).length} طالب</span>
+    </button>`).join('')}
+  </div>
+  <div style="padding:0 20px 16px;text-align:center">
+    <button class="csv-gp-cancel" style="padding:10px 24px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.2s">${t('cancel') || 'إلغاء'}</button>
+  </div>`;
 
   overlay.appendChild(box);
   document.body.appendChild(overlay);
 
+  // Hover effects
   box.querySelectorAll('.csv-gp-btn').forEach(btn => {
+    btn.addEventListener('mouseenter', () => {
+      btn.style.borderColor = btn.dataset.gi === '' ? '#6366f1' : '#f59e0b';
+      btn.style.background = 'var(--primary-light)';
+      btn.style.transform = 'translateY(-1px)';
+      btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+    });
+    btn.addEventListener('mouseleave', () => {
+      btn.style.borderColor = btn.dataset.gi === '' ? 'var(--border)' : 'var(--border)';
+      btn.style.background = 'var(--card-bg)';
+      btn.style.transform = '';
+      btn.style.boxShadow = '';
+    });
     btn.addEventListener('click', () => {
       overlay.remove();
       callback(btn.dataset.gi, btn.dataset.label);
