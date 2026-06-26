@@ -2335,10 +2335,6 @@
       <select id="att-sum-group" onchange="loadAttendanceSummary()" style="display:none;padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">
         <option value="">🏫 جميع الأفواج</option>
       </select>
-      <select id="att-sum-session" onchange="loadAttendanceSummary()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">
-        <option value="">📅 جميع الحصص</option>
-      </select>
-      <span style="font-size:12px;color:var(--text-muted);align-self:center" id="att-sum-current">الحصة الحالية: —</span>
       <button onclick="exportAttendanceCSV()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif" title="تصدير CSV">📥 CSV</button>
       <button onclick="refreshAttendanceSessions()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.3s" title="تحديث الحصص وضبطها حسب تاريخ الأستاذ" id="att-refresh-btn">🔄 تحديث</button>
     </div>
@@ -6592,7 +6588,6 @@ window._attSummaryCache = {}; // teacherId -> { gi: { sessionNum: data } }
 window.loadAttendanceSummary = async function() {
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   const giFilter = document.getElementById('att-sum-group')?.value || '';
-  const sessionFilter = document.getElementById('att-sum-session')?.value || '';
   const tbody = document.getElementById('att-sum-tbody');
   if (!tbody) return;
 
@@ -6611,7 +6606,7 @@ window.loadAttendanceSummary = async function() {
   }
   if (delRow) delRow.style.display = '';
 
-  // Load FROM_DATE from teacher doc if available, else use default
+  // Calculate current session from teacher start date for isPast check
   let sessionStartDate = '2026-06-01';
   try {
     const teacherDoc = await getDoc(doc(db, 'teachers', teacherId));
@@ -6626,35 +6621,10 @@ window.loadAttendanceSummary = async function() {
       }
     }
   } catch (e) { /* fallback */ }
-
   const startDate = new Date(sessionStartDate);
   const now = new Date();
   const diffDays = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
   const curSession = Math.min(12, Math.max(1, Math.floor(diffDays / 7) + 1));
-
-  populateSessionSelect(curSession);
-
-  // Build dynamic header based on session filter AND teacher's max sessions
-  const totalSessions = Math.min(curSession, 12);
-  const headerRow = document.getElementById('att-sum-header-row');
-  if (headerRow) {
-    const sessionNum = parseInt(sessionFilter);
-    let headerHtml = '<th>#</th><th>التلميذ</th><th>الأستاذ</th><th>الفوج</th>';
-    if (sessionFilter !== '' && !isNaN(sessionNum) && sessionNum >= 1 && sessionNum <= totalSessions) {
-      headerHtml += `<th class="att-session-active">ح${sessionNum}</th>`;
-    } else {
-      for (let i = 1; i <= totalSessions; i++) headerHtml += `<th>ح${i}</th>`;
-    }
-    headerHtml += '<th data-i18n="att_th_action">إجراء</th>';
-    headerRow.innerHTML = headerHtml;
-  }
-
-  const students = teacher.students || [];
-  const colspanNum = 4 + totalSessions + 1; // # + name + teacher + group + sessions + action
-  if (!students.length) {
-    tbody.innerHTML = '<tr><td colspan="' + colspanNum + '" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('no_students_for_teacher') + '</td></tr>';
-    return;
-  }
 
   // Load session attendance from Firestore if not cached
   if (!window._attSummaryCache[teacherId]) {
@@ -6677,6 +6647,32 @@ window.loadAttendanceSummary = async function() {
   }
 
   const groupCache = window._attSummaryCache[teacherId] || {};
+
+  // Determine total sessions from actual data across all groups
+  let totalSessions = 0;
+  Object.values(groupCache).forEach(gSessions => {
+    Object.keys(gSessions).forEach(sNum => {
+      const n = parseInt(sNum);
+      if (n > totalSessions) totalSessions = n;
+    });
+  });
+  if (totalSessions < 1) totalSessions = Math.min(curSession, 12);
+
+  const students = teacher.students || [];
+  const colspanNum = 4 + totalSessions + 1; // # + name + teacher + group + sessions + action
+  if (!students.length) {
+    tbody.innerHTML = '<tr><td colspan="' + colspanNum + '" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('no_students_for_teacher') + '</td></tr>';
+    return;
+  }
+
+  // Build header showing all sessions
+  const headerRow = document.getElementById('att-sum-header-row');
+  if (headerRow) {
+    let headerHtml = '<th>#</th><th>التلميذ</th><th>الأستاذ</th><th>الفوج</th>';
+    for (let i = 1; i <= totalSessions; i++) headerHtml += `<th>ح${i}</th>`;
+    headerHtml += '<th data-i18n="att_th_action">إجراء</th>';
+    headerRow.innerHTML = headerHtml;
+  }
 
   // Helper to normalize names for comparison
   const normName = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -6742,16 +6738,13 @@ window.loadAttendanceSummary = async function() {
     groupKeys = groupKeys.filter(gi => gi === giNum);
   }
 
-  const sessionNum = parseInt(sessionFilter);
-  const isSingleSession = sessionFilter !== '' && !isNaN(sessionNum) && sessionNum >= 1 && sessionNum <= totalSessions;
-  const sessionRange = isSingleSession ? [sessionNum] : Array.from({length: totalSessions}, (_, i) => i + 1);
-  const colspan = isSingleSession ? 6 : (4 + totalSessions + 1);
-  const sessionLabel = isSingleSession ? 'ح' + sessionNum : '';
+  const sessionRange = Array.from({length: totalSessions}, (_, i) => i + 1);
+  const colspan = 4 + totalSessions + 1;
 
   groupKeys.forEach(gi => {
     const g = grouped[gi];
     allRows.push(`<tr class="att-group-header-row">
-      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}${sessionLabel ? ' — ' + sessionLabel : ''}</td>
+      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}</td>
     </tr>`);
 
     let rowNum = 1;
@@ -6795,7 +6788,7 @@ window.loadAttendanceSummary = async function() {
         <td>${teacher.name}</td>
         <td><span class="att-sum-group">${t('group_prefix')}${s.group}</span></td>
         ${cells.join('')}
-        ${!isSingleSession ? `<td style="text-align:center"><button class="tbl-action del" onclick="removeStudentFromTeacher('${teacherIdVal}','${s.name.replace(/'/g,"\\'")}')" title="${t('att_delete_btn')}">🗑️</button></td>` : ''}
+        <td style="text-align:center"><button class="tbl-action del" onclick="removeStudentFromTeacher('${teacherIdVal}','${s.name.replace(/'/g,"\\'")}')" title="${t('att_delete_btn')}">🗑️</button></td>
       </tr>`);
     });
   });
@@ -7011,20 +7004,27 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride) => {
     return;
   }
 
-  const sessionFilter = document.getElementById('att-sum-session')?.value || '';
-
   const rows = [];
+  const groupCache = window._attSummaryCache[teacherId] || {};
+
+  // Determine total sessions from actual data
+  let csvTotalSessions = 0;
+  Object.values(groupCache).forEach(gSessions => {
+    Object.keys(gSessions).forEach(sNum => {
+      const n = parseInt(sNum);
+      if (n > csvTotalSessions) csvTotalSessions = n;
+    });
+  });
+  if (csvTotalSessions < 1) csvTotalSessions = 12;
+
   // رأس CSV
   const headers = ['التلميذ', 'الأستاذ', 'الفوج'];
-  const sessionNum = parseInt(sessionFilter);
-  const isSingleSession = sessionFilter !== '' && !isNaN(sessionNum) && sessionNum >= 1 && sessionNum <= 12;
-  const sessionRange = isSingleSession ? [sessionNum] : Array.from({length: 12}, (_, i) => i + 1);
+  const sessionRange = Array.from({length: csvTotalSessions}, (_, i) => i + 1);
   sessionRange.forEach(i => headers.push(`الحصة ${i}`));
   rows.push(headers);
 
   // قراءة البيانات من الـ cache مباشرة
   const normName = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
-  const groupCache = window._attSummaryCache[teacherId] || {};
   const giNum = parseInt(giFilter);
 
   // Helper: check if two names match using name variants
@@ -7059,7 +7059,7 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride) => {
     groups.forEach((g, idx) => {
       if ((g.students || []).some(gs => namesMatch(gs, s.name))) {
         gi = idx;
-        groupName = g.name || 'فوج ' + (idx + 1);
+        groupName = _cleanGroupName(g.name) || 'فوج ' + (idx + 1);
       }
     });
     studentEntries.push({ name: s.name || '—', group: _cleanGroupName(groupName) || '—', gi });
