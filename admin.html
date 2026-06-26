@@ -6841,6 +6841,12 @@ window.refreshAttendanceSessions = async () => {
 // ─── تبديل حالة الحضور في سجل الحضور اليومي (3 حالات: ✅←❌←⋯←✅) ───
 window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
   const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const namesMatch = (a, b) => {
+    if (!a || !b) return false;
+    const va = _nameVariants(a).map(_norm);
+    const vb = _nameVariants(b).map(_norm);
+    return va.some(v => vb.includes(v));
+  };
   const groupSuffix = `_g${gi}`;
   const sessionKey  = `${teacherId}${groupSuffix}_session_${sessionNum}`;
   const docRef = doc(db, 'sessionAttendance', sessionKey);
@@ -6850,7 +6856,7 @@ window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
     if (snap.exists()) {
       data = snap.data();
       let students = data.students || [];
-      const idx = students.findIndex(s => _norm(s.name || '') === _norm(studentName));
+      const idx = students.findIndex(s => namesMatch(s.name || '', studentName));
       if (idx !== -1) {
         const cur = students[idx].present;
         if (cur === true) {
@@ -6858,7 +6864,7 @@ window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
           students[idx].present = false;
         } else {
           // absent → unset (remove from array)
-          students = students.filter(s => _norm(s.name || '') !== _norm(studentName));
+          students = students.filter(s => !namesMatch(s.name || '', studentName));
         }
       } else {
         // unset → present
@@ -6889,7 +6895,12 @@ window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
 // ─── حذف تلميذ من قائمة الأستاذ ───
 window.removeStudentFromTeacher = async (teacherId, studentName) => {
   const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
-  const nsn = _norm(studentName);
+  const namesMatchDel = (a, b) => {
+    if (!a || !b) return false;
+    const va = _nameVariants(a).map(_norm);
+    const vb = _nameVariants(b).map(_norm);
+    return va.some(v => vb.includes(v));
+  };
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
   if (!teacher) { showToast('⚠️ ' + t('teacher_not_found'), true); return; }
   const msg = t('att_del_student_confirm').replace('{name}', studentName).replace('{teacher}', teacher.name);
@@ -6900,10 +6911,10 @@ window.removeStudentFromTeacher = async (teacherId, studentName) => {
     const snap = await getDoc(teacherRef);
     if (!snap.exists()) { showToast('⚠️ ' + t('teacher_not_found'), true); return; }
     const data = snap.data();
-    const students = (data.students || []).filter(s => _norm(s.name || '') !== nsn);
+    const students = (data.students || []).filter(s => !namesMatchDel(s.name || '', studentName));
     const groups = (data.groups || []).map(g => {
       if (g.students) {
-        g.students = g.students.filter(s => _norm(s) !== nsn);
+        g.students = g.students.filter(s => !namesMatchDel(s, studentName));
       }
       return g;
     });
