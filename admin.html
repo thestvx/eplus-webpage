@@ -6237,14 +6237,30 @@ window._showStudentDetail = (json, btn) => {
     // Find ALL raw sheet data by name match in _sheetStudentsCache
     let fullRaw = null;
     const stName = r.studentName || '';
+    const stNorm = _normOv(stName);
     const stVariants = _nameVariants(stName).map(_normOv);
-    const allSheet = window._sheetStudentsCache || [];
+    const stWords = stNorm.split(/\s+/).filter(Boolean);
+    const allSheet = typeof _sheetStudentsCache !== 'undefined' && _sheetStudentsCache ? _sheetStudentsCache : [];
     for (const entry of allSheet) {
-      const eVariants = _nameVariants(entry.name).map(_normOv);
-      const matched = stVariants.some(v => eVariants.includes(v));
-      if (matched && entry._raw) { fullRaw = entry._raw; break; }
+      const eName = entry.name || '';
+      const eNorm = _normOv(eName);
+      // Try exact normalized match first, then variant match, then partial word match
+      const exactMatch = eNorm === stNorm;
+      const variantMatch = stVariants.some(v => _nameVariants(eName).map(_normOv).includes(v));
+      const eWords = eNorm.split(/\s+/).filter(Boolean);
+      const partialMatch = stWords.length > 1 && eWords.length > 1 && stWords.some(w => eWords.includes(w)) && eWords.some(w => stWords.includes(w));
+      if (exactMatch || variantMatch || partialMatch) { fullRaw = entry._raw || entry; break; }
     }
-    // Fallback: use _sheetRaw from the row if cached lookup failed
+    // Fallback 2: try window._sheetNormCache with name variants
+    if (!fullRaw && window._sheetNormCache) {
+      for (const v of stVariants) {
+        if (window._sheetNormCache[v] && window._sheetNormCache[v]._raw) {
+          fullRaw = window._sheetNormCache[v]._raw;
+          break;
+        }
+      }
+    }
+    // Fallback 3: use _sheetRaw from the row if cached lookup failed
     if (!fullRaw && r._sheetRaw) fullRaw = r._sheetRaw;
 
     const fields = [];
