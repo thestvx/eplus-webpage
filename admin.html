@@ -829,8 +829,8 @@
     .so-badge.pack{background:rgba(124,58,237,0.08);color:var(--primary);border:1px solid var(--border-2)}
     .so-empty{text-align:center;padding:40px 20px;color:var(--text-muted)}
     .so-empty-icon{font-size:48px;opacity:0.3;margin-bottom:12px}
-    .so-tbl-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--border);position:relative}
-    .so-tbl-wrap::-webkit-scrollbar{height:6px}
+    .so-tbl-wrap{overflow-x:auto;overflow-y:auto;border-radius:12px;border:1px solid var(--border);position:relative;max-height:460px}
+    .so-tbl-wrap::-webkit-scrollbar{height:6px;width:6px}
     .so-tbl-wrap::-webkit-scrollbar-track{background:var(--bg);border-radius:3px}
     .so-tbl-wrap::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:3px}
     .so-tbl-wrap::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
@@ -844,11 +844,7 @@
     .so-receipt-code{font-family:monospace;font-size:11px;color:var(--primary);letter-spacing:1px;background:var(--primary-light);padding:2px 8px;border-radius:6px}
     @keyframes fadeInRow{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
     .so-filters select{padding:8px 14px;border-radius:10px;border:1px solid var(--border-2);background:white;font-family:'Tajawal',sans-serif;font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;min-width:130px;flex:1}
-    .so-page-nav{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap}
-    .so-page-btn{padding:6px 16px;border-radius:10px;border:1.5px solid var(--border-2);background:white;font-family:'Tajawal',sans-serif;font-size:12px;font-weight:800;color:var(--text-2);cursor:pointer;transition:all 0.2s}
-    .so-page-btn:hover:not(:disabled){border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
-    .so-page-btn:disabled{opacity:0.35;cursor:default}
-    .so-page-info{font-size:12px;font-weight:700;color:var(--text-muted)}
+    .so-page-nav{display:none}
     .so-sync-btn{padding:8px 18px;border-radius:12px;border:1.5px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.08);color:#b45309;font-family:'Tajawal',sans-serif;font-size:12px;font-weight:800;cursor:pointer;transition:all 0.2s;white-space:nowrap;display:flex;align-items:center;gap:6px}
     .so-sync-btn:hover{background:rgba(245,158,11,0.18);border-color:rgba(245,158,11,0.5)}
     @media(max-width:640px){
@@ -6032,7 +6028,6 @@ window.renderStudentOverview = async () => {
   document.getElementById('t-stat-students').textContent = totalAll;
 
   window._soData = _soData;
-  window._soPage = 1;
 
   // تعبئة فلتر الأساتذة
   const teacherSelect = document.getElementById('so-filter-teacher');
@@ -6193,14 +6188,6 @@ function _renderSoTable(data, searchFilter) {
     ? `${filtered.length} من ${data.length}`
     : '';
 
-  // Pagination
-  const perPage = 10;
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
-  if (typeof window._soPage !== 'number' || window._soPage < 1) window._soPage = 1;
-  if (window._soPage > totalPages) window._soPage = totalPages;
-  const page = window._soPage;
-  const start = (page - 1) * perPage;
-  const pageData = filtered.slice(start, start + perPage);
   const pageNavEl = document.getElementById('so-page-nav');
 
   if (!filtered.length) {
@@ -6209,8 +6196,8 @@ function _renderSoTable(data, searchFilter) {
     return;
   }
 
-  tbody.innerHTML = pageData.map((r, i) => {
-    const idx = start + i + 1;
+  tbody.innerHTML = filtered.map((r, i) => {
+    const idx = i + 1;
     const badgeClass = r.status === 'paid' ? 'so-badge paid' : r.status === 'unpaid' || r.status === 'noticket' ? 'so-badge unpaid' : 'so-badge noticket';
     const sheetBadge = r.inSheet
       ? '<span class="so-badge sheet-yes" title="موجود في جدول التسجيلات">✅ نعم</span>'
@@ -6239,14 +6226,7 @@ function _renderSoTable(data, searchFilter) {
     </tr>`;
   }).join('');
 
-  if (pageNavEl) {
-    pageNavEl.innerHTML = `
-      <button class="so-page-btn" onclick="window._soPage=1;filterStudentOverview()" ${page===1?'disabled':''}>⏮</button>
-      <button class="so-page-btn" onclick="window._soPage=Math.max(1,window._soPage-1);filterStudentOverview()" ${page===1?'disabled':''}>◀ السابق</button>
-      <span class="so-page-info">الصفحة ${page} من ${totalPages} (${filtered.length})</span>
-      <button class="so-page-btn" onclick="window._soPage=Math.min(${totalPages},window._soPage+1);filterStudentOverview()" ${page===totalPages?'disabled':''}>التالي ▶</button>
-      <button class="so-page-btn" onclick="window._soPage=${totalPages};filterStudentOverview()" ${page===totalPages?'disabled':''}>⏭</button>`;
-  }
+  if (pageNavEl) pageNavEl.innerHTML = '';
 }
 
 // ─── Student detail popup (all sources) ───
