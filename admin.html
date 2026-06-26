@@ -6234,18 +6234,24 @@ window._showStudentDetail = (json, btn) => {
   try {
     const r = JSON.parse(decodeURIComponent(json));
 
-    // Try to find raw sheet data via name lookup in _sheetNormCache
-    let rawSheetData = r._sheetRaw;
-    if (!rawSheetData && window._sheetNormCache) {
-      const nameVariants = _nameVariants(r.studentName).map(_normOv);
-      for (const v of nameVariants) {
-        const entry = window._sheetNormCache[v];
-        if (entry && entry._raw) { rawSheetData = entry._raw; break; }
-      }
+    // Find ALL raw sheet data by name match in _sheetStudentsCache
+    let fullRaw = null;
+    const stName = r.studentName || '';
+    const stVariants = _nameVariants(stName).map(_normOv);
+    const allSheet = window._sheetStudentsCache || [];
+    for (const entry of allSheet) {
+      const eVariants = _nameVariants(entry.name).map(_normOv);
+      const matched = stVariants.some(v => eVariants.includes(v));
+      if (matched && entry._raw) { fullRaw = entry._raw; break; }
     }
+    // Fallback: use _sheetRaw from the row if cached lookup failed
+    if (!fullRaw && r._sheetRaw) fullRaw = r._sheetRaw;
 
-    const fields = [
-      ['👤 الاسم', r.studentName],
+    const fields = [];
+
+    // 1) Basic compiled info
+    const basic = [
+      ['👤 الاسم', stName],
       ['👨‍🏫 الأستاذ', r.teacherName],
       ['🏫 الفوج', r.groupName],
       ['📦 الباقة', r.pkg === '—' ? (r.sheetPack || '—') : r.pkg],
@@ -6261,35 +6267,34 @@ window._showStudentDetail = (json, btn) => {
       ['📞 رقم ولي الأمر', r.parentPhone || '—'],
       ['🎂 العمر', r.age || '—'],
     ].filter(([,v]) => String(v||'').trim() !== '' && v !== undefined && v !== null && v !== '—');
+    basic.forEach(f => fields.push(f));
 
-    // Add ALL raw sheet columns
-    if (rawSheetData) {
+    // 2) ALL raw sheet columns (everything from the sheet row)
+    if (fullRaw) {
       try {
-        const raw = typeof rawSheetData === 'object' ? rawSheetData : JSON.parse(rawSheetData);
-        const sheetEntries = Object.entries(raw).filter(([k, v]) => {
-          if (!String(v||'').trim()) return false;
-          // Skip columns already shown above
-          const known = ['الاسم','الاسم الكامل','Full Name','name','Name','الاسم الأول','الاسم الاول','اللقب','first_name','firstName','First Name','last_name','lastName','Last Name','اسم الطالب','Student Name','اسم التلميذ','اسم العائلة','Family Name','family_name','familyName','اسم ولي الأمر','parentName','Parent Name','parent','ولي الأمر','Parent','ولي الامر','اسم الاب','اسم الأم','رقم هاتف ولي الأمر','رقم الهاتف','parentPhone','Parent Phone','phone','Phone','هاتف ولي الأمر','جوال ولي الأمر','الهاتف','رقم الجوال','العمر','age','Age','الباقة','نوع البرنامج','الباقة المختارة','Program','program','pack','Package','package','اللغة المختارة','اللغات','languages','Language','lang','اللغة','مسار الإعلام الآلي','itTrack','IT Track','it_track','Information Technology','المسار','التخصص','المبلغ الإجمالي','المبلغ','السعر','totalAmount','Total Amount','Price','price','Amount','amount','الإجمالي','المجموع'];
-          if (known.includes(k)) return false;
-          return true;
-        });
-        if (sheetEntries.length) {
-          sheetEntries.forEach(([k, v]) => {
-            fields.push([`📋 ${k}`, v]);
+        const raw = typeof fullRaw === 'object' ? fullRaw : JSON.parse(fullRaw);
+        const rawEntries = Object.entries(raw).filter(([, v]) => String(v||'').trim() !== '');
+        if (rawEntries.length) {
+          fields.push(['━━━ 📋 بيانات جدول الشيت ━━━', '']);
+          rawEntries.forEach(([k, v]) => {
+            fields.push([`📄 ${k}`, v]);
           });
         }
       } catch(e) {}
     }
 
     if (!fields.length) return;
-    const list = fields.map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="font-weight:700;color:var(--text-muted);white-space:nowrap;flex-shrink:0">${k}</span><span style="color:var(--text);text-align:left;direction:ltr;word-break:break-word">${v}</span></div>`).join('');
+    const list = fields.map(([k, v]) => {
+      if (k.includes('━━━')) return `<div style="font-size:11px;font-weight:800;color:var(--primary);padding:10px 0 4px;text-align:center;letter-spacing:1px">${k}</div>`;
+      return `<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="font-weight:700;color:var(--text-muted);white-space:nowrap;flex-shrink:0">${k}</span><span style="color:var(--text);text-align:left;direction:ltr;word-break:break-word">${v}</span></div>`;
+    }).join('');
 
     const old = document.getElementById('so-detail-popup');
     if (old) old.remove();
     const popup = document.createElement('div');
     popup.id = 'so-detail-popup';
     popup.className = 'so-detail-popup';
-    popup.innerHTML = `<div class="so-detail-header"><span>🔍 ${r.studentName}</span><button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px">✕</button></div><div style="max-height:400px;overflow-y:auto;padding:8px 16px 14px">${list}</div>`;
+    popup.innerHTML = `<div class="so-detail-header"><span>🔍 ${stName}</span><button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px">✕</button></div><div style="max-height:460px;overflow-y:auto;padding:8px 16px 14px">${list}</div>`;
     document.body.appendChild(popup);
     const rect = btn.getBoundingClientRect();
     const top = rect.bottom + 6;
