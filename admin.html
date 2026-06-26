@@ -2246,6 +2246,7 @@
                 <button class="so-sync-btn" onclick="syncStudentNamesWithTickets()" title="مزامنة أسماء التلاميذ حسب المخيم الصيفي لتصحيح حالة التفعيل">🔄 مزامنة الأسماء</button>
                 <button class="so-sync-btn" id="so-restore-btn" onclick="restoreSyncBackup()" style="display:none;border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.08);color:#dc2626" title="استعادة أسماء التلاميذ إلى ما قبل آخر مزامنة">↩️ استعادة</button>
                 <button class="so-sync-btn" onclick="openSessionRebuilder()" style="border-color:rgba(16,185,129,0.3);background:rgba(16,185,129,0.08);color:#059669" title="تحليل وإعادة ترتيب الحصص تلقائياً حسب التواريخ الفعلية">🧠 إعادة بناء الحصص</button>
+                <button class="so-sync-btn" onclick="_showDuplicateModal()" style="border-color:rgba(239,68,68,0.25);background:rgba(239,68,68,0.06);color:#e11d48" title="كشف التلاميذ المكررين">👥 كشف المكررات</button>
               </div>
             </div>
             <div class="so-stats" id="so-stats" style="margin-top:16px">
@@ -2339,6 +2340,7 @@
       </select>
       <span style="font-size:12px;color:var(--text-muted);align-self:center" id="att-sum-current">الحصة الحالية: —</span>
       <button onclick="exportAttendanceCSV()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif" title="تصدير CSV">📥 CSV</button>
+      <button onclick="refreshAttendanceSessions()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.3s" title="تحديث الحصص وضبطها حسب تاريخ الأستاذ" id="att-refresh-btn">🔄 تحديث</button>
     </div>
             <div class="tbl-wrap">
               <table class="tbl" id="att-sum-tbl">
@@ -6301,6 +6303,104 @@ function _closeDetailPopup(e) {
 // Legacy alias
 window._showSheetDetail = window._showStudentDetail;
 
+// ─── كشف التلاميذ المكررين (نفس الاسم بترتيب مختلف) ───
+function _findDuplicates() {
+  const groups = {};
+  (_soData || []).forEach((r, idx) => {
+    // Generate the canonical variant group key: sorted normalized parts
+    const parts = _normOv(r.studentName).split(/\s+/).filter(Boolean).sort().join(' ');
+    if (!groups[parts]) groups[parts] = [];
+    groups[parts].push({ idx, name: r.studentName, teacher: r.teacherName, group: r.groupName, status: r.statusLabel });
+  });
+  // Return only groups with more than one entry
+  return Object.values(groups).filter(g => g.length > 1);
+}
+
+window._showDuplicateModal = () => {
+  const dups = _findDuplicates();
+  if (!dups.length) { showToast('✅ لا توجد تلاميذ مكررون'); return; }
+
+  const old = document.getElementById('dup-modal');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'dup-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;backdrop-filter:blur(3px)';
+
+  let allIds = [];
+  const groupsHtml = dups.map((group, gi) => {
+    const itemsHtml = group.map((item, ii) => {
+      const id = `dup-${gi}-${ii}`;
+      allIds.push(id);
+      return `<label for="${id}" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:var(--card-bg);border:1px solid var(--border);margin-bottom:4px;cursor:pointer;transition:all 0.15s" onmouseenter="this.style.borderColor='var(--primary)'" onmouseleave="this.style.borderColor='var(--border)'">
+        <input type="checkbox" id="${id}" checked style="width:16px;height:16px;accent-color:#e11d48;cursor:pointer;flex-shrink:0">
+        <span style="flex:1;font-weight:700;font-size:13px;color:var(--text)">${item.name}</span>
+        <span style="font-size:11px;color:var(--text-muted)">${item.teacher || '—'} · ${item.group || '—'}</span>
+        <span style="font-size:10px;padding:2px 8px;border-radius:99px;background:rgba(99,102,241,0.1);color:#6366f1;font-weight:700">${item.status}</span>
+      </label>`;
+    }).join('');
+    return `<div style="margin-bottom:14px">
+      <div style="font-size:13px;font-weight:800;color:var(--text-muted);margin-bottom:6px;padding:0 4px">⚠️ المجموعة ${gi+1} — ${group.length} تكرارات</div>
+      ${itemsHtml}
+    </div>`;
+  }).join('');
+
+  const box = document.createElement('div');
+  box.style.cssText = 'background:var(--card);border-radius:20px;padding:0;max-width:560px;width:94%;max-height:85vh;overflow:hidden;box-shadow:0 25px 80px rgba(0,0,0,0.3);animation:slideUp 0.3s ease;display:flex;flex-direction:column';
+  box.innerHTML = `<div style="background:linear-gradient(135deg,#e11d48,#be123c);padding:18px 22px;text-align:center;flex-shrink:0">
+    <div style="font-size:32px;margin-bottom:4px">👥</div>
+    <div style="font-size:17px;font-weight:900;color:white">تم العثور على ${dups.reduce((s,g) => s + g.length, 0)} تلميذاً مكرراً</div>
+    <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:3px">${dups.length} مجموعة مكررة</div>
+  </div>
+  <div style="padding:16px 20px;display:flex;gap:10px;flex-shrink:0;border-bottom:1px solid var(--border)">
+    <button id="dup-select-all" style="flex:1;padding:9px;border-radius:10px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text);font-size:12px;font-weight:800;cursor:pointer;font-family:inherit">✅ تحديد الكل</button>
+    <button id="dup-deselect-all" style="flex:1;padding:9px;border-radius:10px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text-muted);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">⬜ إلغاء التحديد</button>
+  </div>
+  <div style="padding:12px 20px;overflow-y:auto;flex:1">${groupsHtml}</div>
+  <div style="padding:12px 20px 16px;display:flex;gap:10px;flex-shrink:0;border-top:1px solid var(--border)">
+    <button id="dup-delete" style="flex:1;padding:12px;border-radius:12px;border:none;background:linear-gradient(135deg,#e11d48,#be123c);color:white;font-size:14px;font-weight:900;cursor:pointer;font-family:inherit;transition:all 0.2s">🗑️ حذف المحدد (${allIds.length})</button>
+    <button id="dup-cancel" style="padding:12px 20px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">إلغاء</button>
+  </div>`;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  document.getElementById('dup-select-all').onclick = () => {
+    box.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+    updateDupCount();
+  };
+  document.getElementById('dup-deselect-all').onclick = () => {
+    box.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    updateDupCount();
+  };
+  function updateDupCount() {
+    const checked = box.querySelectorAll('input[type="checkbox"]:checked').length;
+    document.getElementById('dup-delete').textContent = '🗑️ حذف المحدد (' + checked + ')';
+  }
+  box.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', updateDupCount));
+
+  document.getElementById('dup-delete').onclick = () => {
+    const checkedIds = [...box.querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.id);
+    const toRemove = new Set();
+    dups.forEach((group, gi) => {
+      group.forEach((item, ii) => {
+        const id = `dup-${gi}-${ii}`;
+        if (checkedIds.includes(id)) toRemove.add(item.idx);
+      });
+    });
+    if (!toRemove.size) { showToast('⚠️ لم تختر أي تلميذ للحذف', true); return; }
+    window._soData = window._soData.filter((_, i) => !toRemove.has(i));
+    document.getElementById('so-total').textContent = window._soData.length;
+    _renderSoTable(window._soData, document.getElementById('so-search')?.value || '');
+    // Update charts
+    _updateStudentCharts(window._soData);
+    showToast('✅ تم حذف ' + toRemove.size + ' تلميذاً مكرراً');
+    overlay.remove();
+  };
+  document.getElementById('dup-cancel').onclick = () => overlay.remove();
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+};
+
 let _soSearchTimer;
 window.debouncedSearch = () => {
   clearTimeout(_soSearchTimer);
@@ -6694,6 +6794,32 @@ window.loadAttendanceSummary = async function() {
       <span class="att-stat-item" style="color:var(--text-muted)">${t('att_rate')} ${pct}%</span>
     `;
   }
+};
+
+// ─── تحديث الحصص وإعادة تحميلها ───
+window.refreshAttendanceSessions = async () => {
+  const btn = document.getElementById('att-refresh-btn');
+  if (btn) { btn.textContent = '⏳ جاري...'; btn.style.opacity = '0.6'; btn.disabled = true; }
+  // Clear cache to force re-fetch
+  window._attSummaryCache = {};
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (teacherId) {
+    // Force re-fetch teacher doc to get latest startDate
+    const allT = window._allTeachersCache || [];
+    const idx = allT.findIndex(t => t.id === teacherId);
+    if (idx !== -1) {
+      try {
+        const freshDoc = await getDoc(doc(db, 'teachers', teacherId));
+        if (freshDoc.exists()) {
+          allT[idx] = { id: freshDoc.id, ...freshDoc.data() };
+          window._allTeachersCache = allT;
+        }
+      } catch(e) {}
+    }
+  }
+  await loadAttendanceSummary();
+  showToast('✅ تم تحديث الحصص وضبطها');
+  if (btn) { btn.textContent = '🔄 تحديث'; btn.style.opacity = '1'; btn.disabled = false; }
 };
 
 // ─── تبديل حالة الحضور في سجل الحضور اليومي (3 حالات: ✅←❌←⋯←✅) ───
