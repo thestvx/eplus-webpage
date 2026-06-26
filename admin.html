@@ -2346,6 +2346,7 @@
               <table class="tbl" id="att-sum-tbl">
                 <thead id="att-sum-thead">
                   <tr id="att-sum-header-row">
+                    <th>#</th>
                     <th>التلميذ</th>
                     <th>الأستاذ</th>
                     <th>الفوج</th>
@@ -2355,7 +2356,7 @@
                   </tr>
                 </thead>
                 <tbody id="att-sum-tbody">
-                  <tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted)">اختر أستاذاً لعرض سجل الحضور</td></tr>
+                  <tr><td colspan="17" style="text-align:center;padding:40px;color:var(--text-muted)">اختر أستاذاً لعرض سجل الحضور</td></tr>
                 </tbody>
               </table>
             </div>
@@ -5892,15 +5893,25 @@ window.renderStudentOverview = async () => {
     });
   });
 
-  // Track which normalized names already have a ticket entry
+  // Track which normalized names already have an entry (with variant matching)
   const allKeys = new Set();
+  const _isKnown = (name) => {
+    return _nameVariants(name).map(_normOv).some(v => allKeys.has(v));
+  };
+  const _addKey = (name) => {
+    _nameVariants(name).map(_normOv).forEach(v => allKeys.add(v));
+  };
   _soData = [];
 
   // ── Part 1: Students with tickets ──
   (activeTickets || []).forEach(ticket => {
-    const key = _normOv(ticket.name);
-    allKeys.add(key);
-    const match = teacherMap[key];
+    if (_isKnown(ticket.name)) return;
+    _addKey(ticket.name);
+    let match = teacherMap[_normOv(ticket.name)];
+    if (!match) {
+      const tVars = _nameVariants(ticket.name).map(_normOv);
+      for (const v of tVars) { if (teacherMap[v]) { match = teacherMap[v]; break; } }
+    }
     const isPaid = ticket.status === 'paid';
     // Try matching with all name variants
     let sheetMatch = null;
@@ -5939,7 +5950,8 @@ window.renderStudentOverview = async () => {
   // ── Part 2: Sheet-only students (no ticket) ──
   if (window._sheetNormCache) {
     Object.entries(window._sheetNormCache).forEach(([normKey, sheet]) => {
-      if (allKeys.has(normKey)) return;
+      if (_isKnown(sheet.name || normKey)) return;
+      _addKey(sheet.name || normKey);
       // Try finding teacher match with name variants
       let match = teacherMap[normKey];
       if (!match) {
@@ -5948,7 +5960,6 @@ window.renderStudentOverview = async () => {
           if (teacherMap[v]) { match = teacherMap[v]; break; }
         }
       }
-      allKeys.add(normKey);
       _soData.push({
         studentName: sheet.name || normKey,
         teacherName: match ? match.teacherName : '—',
@@ -5976,8 +5987,8 @@ window.renderStudentOverview = async () => {
 
   // ── Part 3: Teacher-group students not in tickets or sheet ──
   Object.entries(teacherMap).forEach(([key, match]) => {
-    if (allKeys.has(key)) return;
-    allKeys.add(key);
+    if (_isKnown(match.studentName || key)) return;
+    _addKey(match.studentName || key);
     // Also try to match against sheet cache with name variants
     let sheetMatch3 = null;
     if (window._sheetNormCache) {
@@ -6390,9 +6401,17 @@ window._showDuplicateModal = () => {
     });
     if (!toRemove.size) { showToast('⚠️ لم تختر أي تلميذ للحذف', true); return; }
     window._soData = window._soData.filter((_, i) => !toRemove.has(i));
-    document.getElementById('so-total').textContent = window._soData.length;
+    // Recalculate all stats from cleaned _soData
+    const newTotal = window._soData.length;
+    const newInGroup = window._soData.filter(r => r.groupName && r.groupName !== '—').length;
+    const newInSheet = window._soData.filter(r => r.inSheet).length;
+    const newOutSheet = newTotal - newInSheet;
+    document.getElementById('so-total').textContent = newTotal;
+    document.getElementById('so-in-group').textContent = newInGroup;
+    document.getElementById('so-in-sheet').textContent = newInSheet;
+    document.getElementById('so-out-sheet').textContent = newOutSheet;
+    document.getElementById('nav-badge-students').textContent = newTotal;
     _renderSoTable(window._soData, document.getElementById('so-search')?.value || '');
-    // Update charts
     _updateStudentCharts(window._soData);
     showToast('✅ تم حذف ' + toRemove.size + ' تلميذاً مكرراً');
     overlay.remove();
@@ -6561,6 +6580,13 @@ function populateSessionSelect(curSession) {
   if (cur) cur.innerHTML = `<span class="att-current-badge">▶ ${t('att_current_session')} ${curSession}</span>`;
 }
 
+// ─── تنظيف اسم الفوج من القيم الخاطئة (#NAME? ...) ───
+const _cleanGroupName = (name) => {
+  const s = String(name || '').trim();
+  if (!s || s === '#NAME?' || s === '#REF!' || s === '#VALUE!' || s === '#N/A' || s === '—') return '';
+  return s;
+};
+
 window._attSummaryCache = {}; // teacherId -> { gi: { sessionNum: data } }
 
 window.loadAttendanceSummary = async function() {
@@ -6572,14 +6598,14 @@ window.loadAttendanceSummary = async function() {
 
   const delRow = document.getElementById('att-sum-del-row');
   if (!teacherId) {
-    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('att_choose_teacher') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('att_choose_teacher') + '</td></tr>';
     if (delRow) delRow.style.display = 'none';
     return;
   }
 
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
   if (!teacher) {
-    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('teacher_not_found') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('teacher_not_found') + '</td></tr>';
     if (delRow) delRow.style.display = 'none';
     return;
   }
@@ -6613,7 +6639,7 @@ window.loadAttendanceSummary = async function() {
   const headerRow = document.getElementById('att-sum-header-row');
   if (headerRow) {
     const sessionNum = parseInt(sessionFilter);
-    let headerHtml = '<th>التلميذ</th><th>الأستاذ</th><th>الفوج</th>';
+    let headerHtml = '<th>#</th><th>التلميذ</th><th>الأستاذ</th><th>الفوج</th>';
     if (sessionFilter !== '' && !isNaN(sessionNum) && sessionNum >= 1 && sessionNum <= totalSessions) {
       headerHtml += `<th class="att-session-active">ح${sessionNum}</th>`;
     } else {
@@ -6624,7 +6650,7 @@ window.loadAttendanceSummary = async function() {
   }
 
   const students = teacher.students || [];
-  const colspanNum = 3 + totalSessions + 1; // name + teacher + group + sessions + action
+  const colspanNum = 4 + totalSessions + 1; // # + name + teacher + group + sessions + action
   if (!students.length) {
     tbody.innerHTML = '<tr><td colspan="' + colspanNum + '" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('no_students_for_teacher') + '</td></tr>';
     return;
@@ -6671,12 +6697,13 @@ window.loadAttendanceSummary = async function() {
   groups.forEach((g, gi) => {
     (g.students || []).forEach(sName => {
       let match = students.find(s => namesMatchLocal(s.name, sName));
+      const cleanG = _cleanGroupName(g.name) || 'فوج ' + (gi + 1);
       if (match) {
         matchedNames.add(normName(match.name || ''));
-        allStudents.push({ name: match.name, group: g.name || 'فوج ' + (gi + 1), gi });
+        allStudents.push({ name: match.name, group: cleanG, gi });
       } else {
         // Student name in group doesn't match teacher.students — use as-is
-        allStudents.push({ name: sName, group: g.name || 'فوج ' + (gi + 1), gi });
+        allStudents.push({ name: sName, group: cleanG, gi });
       }
     });
   });
@@ -6686,11 +6713,11 @@ window.loadAttendanceSummary = async function() {
     const key = normName(s.name || '');
     if (matchedNames.has(key)) return;
     let gi = 0;
-    let groupName = '—';
+    let groupName = '';
     groups.forEach((g, idx) => {
       if ((g.students || []).some(gs => namesMatchLocal(gs, s.name))) {
         gi = idx;
-        groupName = g.name || 'فوج ' + (idx + 1);
+        groupName = _cleanGroupName(g.name) || 'فوج ' + (idx + 1);
       }
     });
     allStudents.push({ name: s.name || '—', group: groupName || '—', gi });
@@ -6718,7 +6745,7 @@ window.loadAttendanceSummary = async function() {
   const sessionNum = parseInt(sessionFilter);
   const isSingleSession = sessionFilter !== '' && !isNaN(sessionNum) && sessionNum >= 1 && sessionNum <= totalSessions;
   const sessionRange = isSingleSession ? [sessionNum] : Array.from({length: totalSessions}, (_, i) => i + 1);
-  const colspan = isSingleSession ? 5 : (3 + totalSessions + 1);
+  const colspan = isSingleSession ? 6 : (4 + totalSessions + 1);
   const sessionLabel = isSingleSession ? 'ح' + sessionNum : '';
 
   groupKeys.forEach(gi => {
@@ -6727,6 +6754,7 @@ window.loadAttendanceSummary = async function() {
       <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}${sessionLabel ? ' — ' + sessionLabel : ''}</td>
     </tr>`);
 
+    let rowNum = 1;
     g.students.forEach(s => {
       const groupSessions = groupCache[s.gi] || {};
       const cells = [];
@@ -6762,6 +6790,7 @@ window.loadAttendanceSummary = async function() {
         }
       }
       allRows.push(`<tr>
+        <td style="font-weight:700;color:var(--text-muted);text-align:center;width:32px;font-size:12px">${rowNum++}</td>
         <td style="font-weight:700">${s.name}</td>
         <td>${teacher.name}</td>
         <td><span class="att-sum-group">${t('group_prefix')}${s.group}</span></td>
@@ -7014,9 +7043,9 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride) => {
       let match = (teacher.students || []).find(s => namesMatch(s.name, sName));
       if (match) {
         csvMatched.add(normName(match.name || ''));
-        studentEntries.push({ name: match.name, group: g.name || 'فوج ' + (gi + 1), gi });
+        studentEntries.push({ name: match.name, group: _cleanGroupName(g.name) || 'فوج ' + (gi + 1), gi });
       } else {
-        studentEntries.push({ name: sName, group: g.name || 'فوج ' + (gi + 1), gi });
+        studentEntries.push({ name: sName, group: _cleanGroupName(g.name) || 'فوج ' + (gi + 1), gi });
       }
     });
   });
@@ -7033,7 +7062,7 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride) => {
         groupName = g.name || 'فوج ' + (idx + 1);
       }
     });
-    studentEntries.push({ name: s.name || '—', group: groupName, gi });
+    studentEntries.push({ name: s.name || '—', group: _cleanGroupName(groupName) || '—', gi });
   });
 
   studentEntries.forEach(s => {
