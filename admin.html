@@ -2332,8 +2332,20 @@
         <option value="">🏫 جميع الأفواج</option>
       </select>
       <button onclick="exportAttendanceCSV()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif" title="تصدير CSV">📥 CSV</button>
-      <button onclick="addStudentToTeacherAttendance()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #059669;background:rgba(5,150,105,0.08);color:#059669;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إضافة تلميذ جديد للأستاذ المختار" id="att-add-student-btn">➕ إضافة تلميذ</button>
+      <button onclick="toggleAttendanceStudentSearch()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #059669;background:rgba(5,150,105,0.08);color:#059669;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إضافة تلميذ جديد للأستاذ المختار" id="att-add-student-btn">➕ إضافة تلميذ</button>
       <button onclick="refreshAttendanceSessions()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.3s" title="تحديث الحصص وضبطها حسب تاريخ الأستاذ" id="att-refresh-btn">🔄 تحديث</button>
+    </div>
+    <!-- ─── شريط بحث إضافة التلميذ ─── -->
+    <div id="att-student-search-wrap" style="display:none;margin-bottom:16px;padding:14px 16px;background:var(--card-bg);border:1.5px solid var(--border);border-radius:12px;transition:all 0.3s">
+      <div style="display:flex;gap:10px;align-items:center">
+        <div style="position:relative;flex:1">
+          <input class="inp" type="text" id="att-add-student-input" placeholder="ابحث باسم التلميذ..." style="width:100%;padding-left:40px;font-size:13px" oninput="searchAttendanceSuggestions(this.value)" autocomplete="off">
+          <span style="position:absolute;top:50%;left:14px;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
+        </div>
+        <button class="btn-primary" id="att-add-student-confirm" style="width:auto;padding:10px 20px;white-space:nowrap;font-size:12px" onclick="confirmAddAttendanceStudent()">➕ إضافة</button>
+        <button style="padding:10px 14px;border-radius:10px;border:1px solid var(--border-2);background:var(--card);color:var(--text-muted);font-size:14px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;line-height:1" onclick="toggleAttendanceStudentSearch()" title="إغلاق">✕</button>
+      </div>
+      <div id="att-student-suggestions" style="display:none;margin-top:8px;background:white;border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;max-height:220px;overflow-y:auto;width:100%"></div>
     </div>
             <div class="tbl-wrap">
               <table class="tbl" id="att-sum-tbl">
@@ -6949,31 +6961,130 @@ window.removeStudentFromTeacher = async (teacherId, studentName) => {
   }
 };
 
-// ─── إضافة تلميذ يدوي لأستاذ من نافذة الحضور اليومي ───
-window.addStudentToTeacherAttendance = async () => {
-  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
-  if (!teacherId) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
-  const teacher = (allTeachers || []).find(t => t.id === teacherId);
-  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+let _attSelectedSuggestion = null; // { name, receipt, payStatus }
 
-  const rawName = prompt('👤 أدخل اسم التلميذ الجديد:');
-  if (!rawName || !rawName.trim()) return;
-  const name = rawName.trim();
+// ─── إظهار/إخفاء شريط بحث إضافة التلميذ ───
+window.toggleAttendanceStudentSearch = () => {
+  const wrap = document.getElementById('att-student-search-wrap');
+  const inp  = document.getElementById('att-add-student-input');
+  if (!wrap) return;
+  const isHidden = wrap.style.display === 'none' || !wrap.style.display;
+  wrap.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) {
+    setTimeout(() => inp?.focus(), 100);
+  } else {
+    if (inp) inp.value = '';
+    document.getElementById('att-student-suggestions').style.display = 'none';
+    _attSelectedSuggestion = null;
+  }
+};
 
-  // منع التكرار باستخدام مطابقة الـ variants
-  const _normA = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
-  const existing = (teacher.students || []).some(s => {
-    const va = _nameVariants(s.name || '').map(_normA);
-    const vb = _nameVariants(name).map(_normA);
-    return va.some(v => vb.includes(v));
-  });
-  if (existing) { showToast(`⚠️ "${name}" مضاف مسبقاً لهذا الأستاذ`, true); return; }
+// ─── البحث في التذاكر والشيت عند الكتابة ───
+window.searchAttendanceSuggestions = async (val) => {
+  const sugEl = document.getElementById('att-student-suggestions');
+  if (!sugEl) return;
+  if (!val || val.trim().length < 1) {
+    sugEl.style.display = 'none';
+    _attSelectedSuggestion = null;
+    return;
+  }
+  const _normS = s => String(s||'').trim().toLowerCase()
+    .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+    .replace(/[ًٌٍَُِّْٰ]/g,'').replace(/ـ/g,'').replace(/\s+/g,' ');
+  const q = _normS(val);
 
-  // البحث عن تذكرة للمخيم الصيفي
-  let receipt = null, payStatus = 'unknown';
+  // بحث في التذاكر
+  let results = [];
   if (window._allTicketsData && window._allTicketsData.length) {
+    results = window._allTicketsData
+      .filter(t => !t.deleted && _nameVariants(t.name).some(v => _normS(v).includes(q)))
+      .slice(0, 6)
+      .map(t => ({
+        name: t.name,
+        receipt: t.receipt || '',
+        payStatus: t.status === 'paid' ? 'paid' : 'unpaid',
+        source: '🎟️ تذكرة',
+        desc: t.receipt ? `رقم الوصل: ${t.receipt}` : ''
+      }));
+  }
+
+  // بحث في الشيت إذا كانت النتائج قليلة
+  if (results.length < 4 && window._sheetNormCache) {
+    try {
+      const allVariants = [];
+      window._sheetNormCache.forEach((v, k) => { allVariants.push({ key: k, val: v }); });
+      const sheetHits = allVariants
+        .filter(x => x.key.includes(q))
+        .slice(0, 6 - results.length)
+        .map(x => ({
+          name: x.val.name || x.key,
+          receipt: '',
+          payStatus: 'unknown',
+          source: '📋 شيت',
+          desc: x.val.pack || ''
+        }));
+      // de-duplicate
+      const seen = new Set(results.map(r => _normS(r.name)));
+      for (const sh of sheetHits) {
+        if (!seen.has(_normS(sh.name))) { results.push(sh); seen.add(_normS(sh.name)); }
+      }
+    } catch(e) { /* fallback */ }
+  }
+
+  if (!results.length) {
+    sugEl.style.display = 'block';
+    sugEl.innerHTML = `<div style="padding:14px 16px;text-align:center;font-size:13px;color:var(--text-muted);font-weight:600">🔍 لا توجد نتائج — اكتب الاسم كاملاً ثم اضغط "إضافة"</div>`;
+    return;
+  }
+
+  const esc = s => String(s||'').replace(/'/g, "\\'");
+  sugEl.style.display = 'block';
+  sugEl.innerHTML = results.map(r => `
+    <div class="att-suggest-item" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;transition:background 0.15s" onclick="selectAttendanceSuggestion('${esc(r.name)}','${esc(r.receipt)}','${esc(r.payStatus)}')" onmouseover="this.style.background='var(--primary-light)'" onmouseout="this.style.background=''">
+      <span style="font-size:14px;flex-shrink:0">${r.source === '🎟️ تذكرة' ? '🎟️' : '📋'}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:800;color:var(--text)">${r.name}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${r.source}${r.desc ? ' · ' + r.desc : ''}${r.payStatus === 'paid' ? ' · ✅ مدفوع' : r.payStatus === 'unpaid' ? ' · ⏳ غير مدفوع' : ''}</div>
+      </div>
+      <span style="font-size:11px;font-weight:700;color:var(--primary);flex-shrink:0">اختيار</span>
+    </div>
+  `).join('') + `
+    <div style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;border-top:1px dashed var(--border-2);transition:background 0.15s" onclick="selectAttendanceSuggestion('${esc(val.trim())}','','unknown')" onmouseover="this.style.background='var(--primary-light)'" onmouseout="this.style.background=''">
+      <span style="font-size:16px;flex-shrink:0">➕</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:800;color:var(--text)">${val.trim()}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">إضافة يدوية — بدون تذكرة</div>
+      </div>
+      <span style="font-size:11px;font-weight:700;color:#059669;flex-shrink:0">إضافة</span>
+    </div>`;
+};
+
+// ─── اختيار اقتراح من القائمة ───
+window.selectAttendanceSuggestion = (name, receipt, payStatus) => {
+  _attSelectedSuggestion = { name, receipt, payStatus };
+  const inp = document.getElementById('att-add-student-input');
+  if (inp) inp.value = name;
+  document.getElementById('att-student-suggestions').style.display = 'none';
+  // Focus the إضافة button
+  document.getElementById('att-add-student-confirm')?.focus();
+};
+
+// ─── تأكيد إضافة التلميذ المختار ───
+window.confirmAddAttendanceStudent = async () => {
+  const inp = document.getElementById('att-add-student-input');
+  const rawName = inp ? inp.value.trim() : '';
+  const name = _attSelectedSuggestion?.name || rawName;
+  if (!name) { showToast('⚠️ أدخل اسم التلميذ أولاً', true); return; }
+
+  const receipt = _attSelectedSuggestion?.receipt || null;
+  let payStatus = _attSelectedSuggestion?.payStatus || 'unknown';
+
+  // البحث عن التذكرة إذا لم تكن محددة مسبقاً
+  const _normA = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  if (!receipt && window._allTicketsData && window._allTicketsData.length) {
     const vn = _nameVariants(name).map(_normA);
     const ticket = window._allTicketsData.find(t => {
+      if (t.deleted) return false;
       const tv = _nameVariants(t.name || '').map(_normA);
       return vn.some(n => tv.includes(n));
     });
@@ -6983,8 +7094,35 @@ window.addStudentToTeacherAttendance = async () => {
     }
   }
 
+  // تنفيذ الإضافة
+  await addStudentToTeacherAttendance(name, receipt, payStatus);
+
+  // إعادة تعيين الحقل
+  _attSelectedSuggestion = null;
+  if (inp) inp.value = '';
+  document.getElementById('att-student-suggestions').style.display = 'none';
+};
+
+// ─── إضافة تلميذ يدوي لأستاذ من نافذة الحضور اليومي ───
+window.addStudentToTeacherAttendance = async (name, receipt, payStatus) => {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+  if (!name || !name.trim()) { showToast('⚠️ الاسم مطلوب', true); return; }
+
+  const _normA = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+  // منع التكرار باستخدام مطابقة الـ variants
+  const existing = (teacher.students || []).some(s => {
+    const va = _nameVariants(s.name || '').map(_normA);
+    const vb = _nameVariants(name).map(_normA);
+    return va.some(v => vb.includes(v));
+  });
+  if (existing) { showToast(`⚠️ "${name}" مضاف مسبقاً لهذا الأستاذ`, true); return; }
+
   const id = receipt || 'att_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
-  const newStudent = { id, name, present: false, marked: false, payStatus, receipt };
+  const newStudent = { id, name, present: false, marked: false, payStatus: payStatus || 'unknown', receipt: receipt || null };
 
   try {
     // قراءة آخر البيانات من Firestore لتجنب التعارض
