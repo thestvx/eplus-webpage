@@ -2516,6 +2516,7 @@
             <option value="income_summer">☀️ تذاكر المخيم فقط</option>
             <option value="salary">رواتب</option>
           </select>
+          <button onclick="exportFinanceCSV()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="تصدير CSV حسب الفلتر المحدد" id="fin-csv-btn">📥 CSV</button>
         </div>
 
         <!-- Transactions table -->
@@ -11971,6 +11972,72 @@ window.renderFinanceTable = function renderFinanceTable() {
     </div>`;
   }).join('');
 }
+
+// ── تصدير CSV حسب الفلتر المحدد ──
+window.exportFinanceCSV = () => {
+  const filter = document.getElementById('fin-filter')?.value || '';
+  let filtered;
+  if (filter === 'income_summer') {
+    filtered = _finTxs.filter(t => t.type === 'income' && t.source === 'summer_ticket');
+  } else if (filter) {
+    filtered = _finTxs.filter(t => t.type === filter);
+  } else {
+    filtered = _finTxs;
+  }
+
+  if (!filtered.length) { showToast('⚠️ لا توجد معاملات للتصدير', true); return; }
+
+  const filterLabels = {
+    '': 'الكل',
+    expense: 'مصاريف',
+    income: 'إيرادات',
+    income_summer: 'تذاكر المخيم',
+    salary: 'رواتب'
+  };
+  const filterName = filterLabels[filter] || filter;
+
+  const rows = [
+    ['التاريخ', 'التفاصيل', 'النوع', 'المبلغ (دج)', 'الأستاذ', 'رقم الوصل', 'المصدر']
+  ];
+
+  let totalAmount = 0;
+  filtered.forEach(t => {
+    const typeLabels = {
+      expense: 'مصروف',
+      income: 'إيراد',
+      salary: 'راتب'
+    };
+    const isSummer = t.type === 'income' && t.source === 'summer_ticket';
+    const typeStr = isSummer ? 'تذكرة مخيم' : (typeLabels[t.type] || t.type);
+    const amount = t.type === 'income' ? (t.amount || 0) : -(t.amount || 0);
+    totalAmount += t.amount || 0;
+    rows.push([
+      t.date ? new Date(t.date + 'T00:00:00').toLocaleDateString('ar-DZ') : '—',
+      t.desc || '—',
+      typeStr,
+      (t.amount || 0).toLocaleString('ar-DZ'),
+      t.teacher || '',
+      t.receipt || '',
+      isSummer ? 'المخيم الصيفي' : (t.source || 'يدوي')
+    ]);
+  });
+
+  rows.push([]);
+  const countLabel = filter === '' ? 'الإجمالي الكلي' : `إجمالي ${filterName}`;
+  rows.push([countLabel, '', '', totalAmount.toLocaleString('ar-DZ'), '', '', '']);
+
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const today = new Date().toLocaleDateString('ar-DZ').replace(/\//g, '-');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `السجل-المالي-${filterName}-${today}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`📥 تم تصدير "${filterName}" بنجاح`);
+};
 
 // ── فتح Modal المعاملة ──
 window.openFinanceModal = (type) => {
