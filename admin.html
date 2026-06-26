@@ -12000,7 +12000,7 @@ window.exportFinanceCSV = () => {
     ['التاريخ', 'التفاصيل', 'النوع', 'المبلغ (دج)', 'الأستاذ', 'رقم الوصل', 'المصدر']
   ];
 
-  let totalAmount = 0;
+  let totalIncome = 0, totalExpense = 0;
   filtered.forEach(t => {
     const typeLabels = {
       expense: 'مصروف',
@@ -12009,13 +12009,15 @@ window.exportFinanceCSV = () => {
     };
     const isSummer = t.type === 'income' && t.source === 'summer_ticket';
     const typeStr = isSummer ? 'تذكرة مخيم' : (typeLabels[t.type] || t.type);
-    const amount = t.type === 'income' ? (t.amount || 0) : -(t.amount || 0);
-    totalAmount += t.amount || 0;
+    const amt = t.amount || 0;
+    const amountSign = t.type === 'income' ? '+' : '-';
+    const amountStr = `${amountSign}${amt.toLocaleString('ar-DZ')} دج`;
+    if (t.type === 'income') totalIncome += amt; else totalExpense += amt;
     rows.push([
       t.date ? new Date(t.date + 'T00:00:00').toLocaleDateString('ar-DZ') : '—',
       t.desc || '—',
       typeStr,
-      (t.amount || 0).toLocaleString('ar-DZ'),
+      amountStr,
       t.teacher || '',
       t.receipt || '',
       isSummer ? 'المخيم الصيفي' : (t.source || 'يدوي')
@@ -12023,8 +12025,10 @@ window.exportFinanceCSV = () => {
   });
 
   rows.push([]);
-  const countLabel = filter === '' ? 'الإجمالي الكلي' : `إجمالي ${filterName}`;
-  rows.push([countLabel, '', '', totalAmount.toLocaleString('ar-DZ'), '', '', '']);
+  rows.push(['', '', 'إجمالي الإيرادات', `+${totalIncome.toLocaleString('ar-DZ')} دج`, '', '', '']);
+  rows.push(['', '', 'إجمالي المصاريف', `-${totalExpense.toLocaleString('ar-DZ')} دج`, '', '', '']);
+  const netBalance = totalIncome - totalExpense;
+  rows.push(['', '', 'صافي الرصيد', `${netBalance >= 0 ? '+' : ''}${netBalance.toLocaleString('ar-DZ')} دج`, '', '', '']);
 
   const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const bom = '\uFEFF';
