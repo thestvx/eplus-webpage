@@ -3278,7 +3278,10 @@ onAuthStateChanged(auth, async user => {
         const teacherNav = document.querySelectorAll('.nav-item')[3]; // قسم التلاميذ (students)
         if (teacherNav) { teacherNav.style.display = 'flex'; teacherNav.classList.add('active');
           // توجيه ضغطة الناف إلى قسم التلاميذ بدل الأساتذة
-          teacherNav.onclick = () => switchNavSection('students');
+          teacherNav.onclick = () => {
+            switchNavSection('students');
+            loadAttendanceSummary(user.uid);
+          };
         }
         const msgsNav = document.getElementById('nav-messages');
         if (msgsNav) { msgsNav.style.display = 'flex'; }
@@ -3309,6 +3312,7 @@ onAuthStateChanged(auth, async user => {
         // تهيئة جدول الحضور للاستاذ — اختر الأستاذ الحالي واخفي الأزرار الإدارية
         const attTeacherSel = document.getElementById('att-sum-teacher');
         if (attTeacherSel) {
+          attTeacherSel.innerHTML = `<option value="${user.uid}">${td.name}</option>`; // force single option
           attTeacherSel.value = user.uid;
           attTeacherSel.disabled = true;
           attTeacherSel.style.opacity = '0.7';
@@ -6738,7 +6742,8 @@ window.onTeacherChange = function() {
       sel.style.display = '';
     }
   }
-  loadAttendanceSummary();
+  // تمرير teacherId للأساتذة لتجنب الاعتماد على قيمة select (قد تُعدم)
+  loadAttendanceSummary(window._isTeacherAttendanceView ? teacherId : undefined);
 }
 
 function populateAttSummaryTeachers() {
@@ -6782,8 +6787,8 @@ const _cleanGroupName = (name) => {
 
 window._attSummaryCache = {}; // teacherId -> { gi: { sessionNum: data } }
 
-window.loadAttendanceSummary = async function() {
-  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+window.loadAttendanceSummary = async function(_teacherOverride) {
+  const teacherId = _teacherOverride || document.getElementById('att-sum-teacher')?.value || '';
   const giFilter = document.getElementById('att-sum-group')?.value || '';
   const tbody = document.getElementById('att-sum-tbody');
   if (!tbody) return;
@@ -7366,7 +7371,7 @@ window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
       await setDoc(docRef, data);
     }
     if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
-    await loadAttendanceSummary();
+    await loadAttendanceSummary(teacherId);
   } catch(e) {
     console.error('toggleDailyAttCell error:', e);
     showToast('⚠️ خطأ في تحديث الحضور', true);
