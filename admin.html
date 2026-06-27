@@ -3099,7 +3099,7 @@ const firebaseConfig = {
   storageBucket: "eplus-center-39.firebasestorage.app",
   messagingSenderId: "191532732034",
   appId: "1:191532732034:web:b11449a2f0595db5d02e9b",
-  databaseURL: "https://eplus-center-39-default-rtdb.firebaseio.com"
+  databaseURL: "https://eplus-center-39-default-rtdb.europe-west1.firebasedatabase.app"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -3304,6 +3304,8 @@ onAuthStateChanged(auth, async user => {
         if (soPanel) soPanel.style.display = 'none';
         const finSection = document.getElementById('section-finance');
         if (finSection) finSection.style.display = 'none';
+        // تأكد من أن الخلايا غير قابلة للنقر للأساتذة ما لم تكن الحصة مفتوحة — قبل onTeacherChange
+        window._isTeacherAttendanceView = true;
         // إضافة الأستاذ إلى allTeachers قبل استدعاء onTeacherChange
         if (allTeachers && !allTeachers.find(t => t.id === user.uid)) {
           allTeachers.push({ id: user.uid, ...td });
@@ -3335,8 +3337,6 @@ onAuthStateChanged(auth, async user => {
         if (teacherSelectEl) teacherSelectEl.style.display = 'none';
         const groupSelectEl = document.getElementById('att-sum-group');
         if (groupSelectEl) groupSelectEl.style.display = 'none';
-        // تأكد من أن الخلايا المستقبلية غير قابلة للنقر للأساتذة ما لم تكن الحصة مفتوحة
-        window._isTeacherAttendanceView = true;
         // فتح تلقائي للحصص المجدولة فوراً ودورياً
         autoOpenScheduledSessions(user.uid).then(opened => {
           if (opened > 0) onTeacherChange();
@@ -3366,6 +3366,19 @@ onAuthStateChanged(auth, async user => {
     const empCfg = EMPLOYEES[user.email];
     isTeacherMode = false;
     window._isTeacherAttendanceView = false;
+    // إعادة تعيين تأثيرات جلسة الأستاذ السابقة على DOM
+    const attTeacherSel = document.getElementById('att-sum-teacher');
+    if (attTeacherSel) {
+      attTeacherSel.style.display = '';
+      attTeacherSel.disabled = false;
+      attTeacherSel.style.opacity = '';
+      attTeacherSel.value = ''; // إلغاء تحديد الأستاذ السابق
+    }
+    const attGroupSel = document.getElementById('att-sum-group');
+    if (attGroupSel) { attGroupSel.style.display = ''; attGroupSel.value = ''; }
+    // تنظيف بيانات الجدول ليظهر رسالة اختر أستاذاً
+    const attTbody = document.getElementById('att-sum-tbody');
+    if (attTbody) attTbody.innerHTML = '';
     ls.classList.add('hidden');
     setTimeout(() => ls.style.display = 'none', 600);
     dash.style.display = 'flex';
