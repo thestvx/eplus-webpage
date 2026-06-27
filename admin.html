@@ -3365,6 +3365,7 @@ onAuthStateChanged(auth, async user => {
     // ── فحص هل هو موظف ──
     const empCfg = EMPLOYEES[user.email];
     isTeacherMode = false;
+    window._isTeacherAttendanceView = false;
     ls.classList.add('hidden');
     setTimeout(() => ls.style.display = 'none', 600);
     dash.style.display = 'flex';
@@ -6730,6 +6731,7 @@ window.syncStudentNamesWithTickets = async () => {
 // ─── Daily attendance summary ───
 window.onTeacherChange = function() {
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  currentAttTeacherId = teacherId || null; window.currentAttTeacherId = currentAttTeacherId;
 
   // Populate table group filter
   const sel = document.getElementById('att-sum-group');
@@ -6899,10 +6901,43 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   // Build header showing all sessions
   const headerRow = document.getElementById('att-sum-header-row');
   if (headerRow) {
+    // صف التحكم (للأدمين فقط) — أزرار فتح/جدولة/قفل لكل حصة
+    const teachersGroups = teacher.groups || [];
+    let controlHtml = '';
+    if (!window._isTeacherAttendanceView && teachersGroups.length > 0) {
+      // استخدم الفوج الأول كافتراضي لعناصر التحكم
+      const defaultGi = 0;
+      controlHtml += '<tr style="background:var(--bg);border-bottom:1px solid var(--border-2)">';
+      controlHtml += '<th colspan="4" style="font-size:10px;font-weight:700;color:var(--text-muted);text-align:center">🔓 التحكم بالحصص</th>';
+      for (let i = 1; i <= totalSessions; i++) {
+        const sn = i;
+        const ctrlData = sessionCtrlMap[defaultGi]?.[sn];
+        const st = ctrlData?.status || 'scheduled';
+        const hasScheduledDate = !!ctrlData?.scheduledDate;
+        const isOpen = st === 'open';
+        const isClosed = st === 'closed';
+        const isLockedS = st === 'locked';
+        const statusEmoji = isOpen ? '🟢' : isClosed ? '🔴' : isLockedS ? '⚫' : '🟡';
+        const statusTitle = isOpen ? t('ctrl_status_open') : isClosed ? t('ctrl_status_closed') : isLockedS ? t('ctrl_status_locked') : t('ctrl_status_scheduled');
+        controlHtml += `<th style="text-align:center;padding:4px 2px;vertical-align:middle;font-size:10px;white-space:nowrap">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+            <span style="font-size:9px;font-weight:900;color:${isOpen ? '#059669' : isClosed ? '#DC2626' : isLockedS ? '#6b7280' : '#d97706'}" title="${statusTitle}">${statusEmoji}</span>
+            <div style="display:flex;gap:3px">
+              <button onclick="showOpenChoiceFromTable(${sn},${defaultGi})" style="padding:2px 5px;border-radius:4px;border:1px solid rgba(16,185,129,0.3);background:rgba(16,185,129,0.08);color:#059669;font-size:9px;cursor:pointer;transition:all 0.15s;font-family:'Tajawal',sans-serif;line-height:1" title="${t('ctrl_open_session')}" onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform=''">🔓</button>
+              <button onclick="openCtrlFromTable(${sn},${defaultGi})" style="padding:2px 5px;border-radius:4px;border:1px solid var(--border-2);background:var(--card-bg);color:var(--text-muted);font-size:9px;cursor:pointer;transition:all 0.15s;font-family:'Tajawal',sans-serif;line-height:1" title="⚙️ ${t('ctrl_advanced')}" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border-2)'">⚙️</button>
+              <button onclick="setCtrlNowFromTable('closed',${sn},${defaultGi})" style="padding:2px 5px;border-radius:4px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.08);color:#DC2626;font-size:9px;cursor:pointer;transition:all 0.15s;font-family:'Tajawal',sans-serif;line-height:1" title="${t('ctrl_close_now')}" onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform=''">🔒</button>
+            </div>
+            ${hasScheduledDate ? `<span style="font-size:7px;color:#d97706;font-weight:700">📅${ctrlData.scheduledDate.slice(5)}</span>` : ''}
+          </div>
+        </th>`;
+      }
+      controlHtml += '<th style="padding:2px;font-size:9px"></th>';
+      controlHtml += '</tr>';
+    }
     let headerHtml = '<th>#</th><th>التلميذ</th><th>الأستاذ</th><th>الفوج</th>';
     for (let i = 1; i <= totalSessions; i++) headerHtml += `<th>ح${i}</th>`;
     headerHtml += '<th data-i18n="att_th_action">إجراء</th>';
-    headerRow.innerHTML = headerHtml;
+    headerRow.innerHTML = controlHtml + headerHtml;
   }
 
   // Helper to normalize names for comparison
@@ -9401,6 +9436,27 @@ window.openByDateConfirmed = async (sessionNum, gi) => {
   if (contentEl) contentEl.innerHTML = renderCtrlContent(sessionNum, gi);
   showToast(`📅 تمت جدولة الحصة ${sessionNum} للفتح في ${dateVal}`);
   refreshAdminGrid();
+};
+
+// ─── دوال مساعدة لأزرار التحكم في جدول الحضور ───
+window._tableCtrlSetTeacher = () => {
+  const tId = document.getElementById('att-sum-teacher')?.value;
+  if (!tId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return null; }
+  currentAttTeacherId = tId; window.currentAttTeacherId = tId;
+  return tId;
+};
+window.showOpenChoiceFromTable = (sessionNum, gi) => {
+  if (!window._tableCtrlSetTeacher()) return;
+  showOpenChoice(sessionNum, gi);
+};
+window.setCtrlNowFromTable = (status, sessionNum, gi) => {
+  if (!window._tableCtrlSetTeacher()) return;
+  closeOpenChoice();
+  setCtrlStatus(sessionNum, gi, status);
+};
+window.openCtrlFromTable = (sessionNum, gi) => {
+  if (!window._tableCtrlSetTeacher()) return;
+  openCtrlModal(sessionNum, gi);
 };
 
 // ─── فتح وإغلاق نافذة التحكم ───
