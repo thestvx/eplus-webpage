@@ -7000,19 +7000,21 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         const rec = groupSessions[i];
         const giVal = s.gi;
         const sNameVal = s.name;
-        // Check if session is locked for teacher view
+        // Check if session is locked for teacher view (no doc → locked)
         const ctrl = ctrlMap[i];
-        const isLocked = window._isTeacherAttendanceView && ctrl && ctrl.status !== 'open';
+        const isLocked = window._isTeacherAttendanceView && (!ctrl || ctrl.status !== 'open');
         const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')"`;
         const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
         if (!rec) {
           const isPast = i < curSession;
-          // إذا كان الأستاذ هو من يسجل، نظهر ⋯ قابلة للنقر بدل ⚠️ للماضية
-          if (isPast && !window._isTeacherAttendanceView) {
+          if (window._isTeacherAttendanceView) {
+            // الأستاذ لا يستطيع إنشاء تسجيل — الحصة مقفلة حتى يسجلها الادمن
+            cells.push(`<td class="att-cell att-cell-locked" title="${t('att_missed_session')}">🔒</td>`);
+          } else if (isPast) {
             cells.push(`<td class="${cellClass}" title="${t('att_missed_session')}" ${cellClick}>⚠️</td>`);
             totalMissed++;
           } else {
-            cells.push(`<td class="${isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-future att-cell-clickable'}" title="${t('att_future_session')}" ${isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')"`}>⋯</td>`);
+            cells.push(`<td class="${cellClass}" title="${t('att_future_session')}" ${cellClick}>⋯</td>`);
           }
           continue;
         }
@@ -7296,18 +7298,18 @@ window.confirmSyncAttendance = async () => {
 
 // ─── تبديل حالة الحضور في سجل الحضور اليومي (3 حالات: ✅←❌←⋯←✅) ───
 window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
-  // منع التعديل للأساتذة إذا كانت الحصة مقفلة
+  // منع التعديل للأساتذة إذا كانت الحصة مقفلة (أو لا يوجد سجل تحكم)
   if (window._isTeacherAttendanceView) {
     try {
       const ctrlSnap = await getDoc(doc(db, 'sessionControl', `${teacherId}_g${gi}_session_${sessionNum}`));
-      if (ctrlSnap.exists()) {
-        const ctrl = ctrlSnap.data();
-        if (ctrl.status !== 'open') {
-          showToast('🔒 هذه الحصة مقفلة — يرجى التواصل مع الإدارة', true);
-          return;
-        }
+      if (!ctrlSnap.exists() || ctrlSnap.data().status !== 'open') {
+        showToast('🔒 هذه الحصة مقفلة — يرجى التواصل مع الإدارة', true);
+        return;
       }
-    } catch(e) { /* fallback — allow toggle */ }
+    } catch(e) {
+      showToast('🔒 تعذر التحقق من حالة الحصة', true);
+      return;
+    }
   }
   const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const namesMatch = (a, b) => {
