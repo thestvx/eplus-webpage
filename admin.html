@@ -1378,6 +1378,22 @@
     .del-confirm-ok{flex:1;padding:12px;border-radius:12px;border:none;background:linear-gradient(135deg,#EF4444,#B91C1C);color:white;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;box-shadow:0 4px 14px rgba(239,68,68,0.3)}
     .del-confirm-ok:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(239,68,68,0.4)}
 
+    /* ===== SYNC CONFIRM MODAL (no blur) ===== */
+    .sync-confirm-bg{position:fixed;inset:0;background:rgba(30,27,75,0.55);z-index:3100;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;visibility:hidden;transition:all 0.3s ease}
+    .sync-confirm-bg.open{opacity:1;visibility:visible}
+    .sync-confirm-box{background:var(--card-bg);border-radius:28px;width:100%;max-width:400px;box-shadow:0 40px 80px rgba(220,38,38,0.15);transform:translateY(24px) scale(0.96);transition:all 0.35s cubic-bezier(0.2,0.8,0.2,1);overflow:hidden;text-align:center}
+    .sync-confirm-bg.open .sync-confirm-box{transform:translateY(0) scale(1)}
+    .sync-confirm-icon{font-size:44px;margin-bottom:10px}
+    .sync-confirm-title{font-size:17px;font-weight:900;color:var(--text);margin-bottom:4px}
+    .sync-confirm-sub{font-size:13px;color:var(--text-muted);font-weight:600;line-height:1.7;margin-bottom:20px}
+    .sync-confirm-btns{display:flex;gap:10px}
+    .sync-confirm-cancel{flex:1;padding:12px;border-radius:12px;border:2px solid var(--border);background:var(--card-bg);color:var(--text-2);font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s}
+    .sync-confirm-cancel:hover{border-color:var(--border-2);background:var(--bg)}
+    .sync-confirm-ok{flex:1;padding:12px;border-radius:12px;border:none;background:linear-gradient(135deg,#DC2626,#991B1B);color:white;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;box-shadow:0 4px 14px rgba(220,38,38,0.3)}
+    .sync-confirm-ok:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(220,38,38,0.4)}
+    [data-theme="dark"] .sync-confirm-bg{background:rgba(0,0,0,0.7)}
+    [data-theme="dark"] .sync-confirm-box{background:var(--card-bg)!important;color:var(--text)}
+
     /* ===== EDIT MODE INPUT INDICATOR ===== */
     .msg-edit-banner{display:none;padding:8px 16px;background:linear-gradient(135deg,var(--primary-light),rgba(147,51,234,0.08));border-top:2px solid var(--primary);font-size:12px;font-weight:700;color:var(--primary);align-items:center;gap:8px;flex-shrink:0}
     .msg-edit-banner.visible{display:flex}
@@ -3039,6 +3055,19 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SYNC CONFIRM MODAL ===== -->
+<div class="sync-confirm-bg" id="sync-confirm-modal">
+  <div class="sync-confirm-box">
+    <div class="sync-confirm-icon">⚠️</div>
+    <div class="sync-confirm-title">تأكيد مزامنة الحضور</div>
+    <div class="sync-confirm-sub" id="sync-confirm-msg"></div>
+    <div class="sync-confirm-btns">
+      <button class="sync-confirm-cancel" onclick="closeSyncConfirmModal()">إلغاء</button>
+      <button class="sync-confirm-ok" onclick="confirmSyncAttendance()">✅ تأكيد المزامنة</button>
     </div>
   </div>
 </div>
@@ -7042,6 +7071,9 @@ window.backupAttendanceData = async () => {
   if (btn) { btn.textContent = '💾 حفظ نسخة'; btn.style.opacity = '1'; btn.disabled = false; }
 };
 
+// ─── متغير لتخزين بيانات المزامنة المعلقة ───
+let _pendingSyncBackup = null;
+
 // ─── مزامنة الحضور من النسخة الاحتياطية ───
 window.syncAttendanceFromBackup = async () => {
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
@@ -7063,25 +7095,48 @@ window.syncAttendanceFromBackup = async () => {
     }
     const backupDate = latest.dateStr || new Date(latest.timestamp).toLocaleString('ar-DZ');
     const sessionCount = Object.keys(latest.sessions).length;
-    if (!confirm(`⚠️ هل أنت متأكد من مزامنة الحضور لـ ${teacher.name}؟\n\nسيتم استبدال جميع سجلات الحضور الحالية بنسخة ${backupDate} (${sessionCount} حصة).\n\nهذا الإجراء لا يمكن التراجع عنه!`)) return;
-    const btn = document.getElementById('att-sync-btn');
-    if (btn) { btn.textContent = '⏳ جاري...'; btn.style.opacity = '0.6'; btn.disabled = true; }
-    const batch = writeBatch(db);
-    let count = 0;
-    for (const [docId, data] of Object.entries(latest.sessions)) {
-      const ref = doc(db, 'sessionAttendance', docId);
-      batch.set(ref, { ...data, savedAt: serverTimestamp() });
-      count++;
-    }
-    await batch.commit();
-    if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
-    showToast(`✅ تمت مزامنة ${count} حصة من النسخة الاحتياطية`);
-    await loadAttendanceSummary();
+    // show modal instead of confirm()
+    _pendingSyncBackup = { teacherId, teacherName: teacher.name, sessions: latest.sessions, backupDate, sessionCount };
+    document.getElementById('sync-confirm-msg').innerHTML =
+      `👨‍🏫 الأستاذ: <strong>${teacher.name}</strong><br>` +
+      `📅 النسخة: <strong>${backupDate}</strong><br>` +
+      `📊 الحصص: <strong>${sessionCount}</strong><br><br>` +
+      `<span style="color:#DC2626;font-weight:800">⚠️ سيتم استبدال جميع سجلات الحضور الحالية<br>هذا الإجراء لا يمكن التراجع عنه!</span>`;
+    document.getElementById('sync-confirm-modal').classList.add('open');
   } catch (e) {
     console.error('syncAttendanceFromBackup error:', e);
     showToast('⚠️ خطأ في المزامنة: ' + e.message, true);
   }
+};
+
+window.closeSyncConfirmModal = () => {
+  document.getElementById('sync-confirm-modal').classList.remove('open');
+  _pendingSyncBackup = null;
+};
+
+window.confirmSyncAttendance = async () => {
+  document.getElementById('sync-confirm-modal').classList.remove('open');
+  const data = _pendingSyncBackup;
+  _pendingSyncBackup = null;
+  if (!data) return;
   const btn = document.getElementById('att-sync-btn');
+  if (btn) { btn.textContent = '⏳ جاري...'; btn.style.opacity = '0.6'; btn.disabled = true; }
+  try {
+    const batch = writeBatch(db);
+    let count = 0;
+    for (const [docId, sessionData] of Object.entries(data.sessions)) {
+      const ref = doc(db, 'sessionAttendance', docId);
+      batch.set(ref, { ...sessionData, savedAt: serverTimestamp() });
+      count++;
+    }
+    await batch.commit();
+    if (window._attSummaryCache) window._attSummaryCache[data.teacherId] = null;
+    showToast(`✅ تمت مزامنة ${count} حصة من النسخة الاحتياطية`);
+    await loadAttendanceSummary();
+  } catch (e) {
+    console.error('confirmSyncAttendance error:', e);
+    showToast('⚠️ خطأ في المزامنة: ' + e.message, true);
+  }
   if (btn) { btn.textContent = '🔄 مزامنة الحضور'; btn.style.opacity = '1'; btn.disabled = false; }
 };
 
