@@ -925,8 +925,7 @@
     .att-cell-absent{color:#DC2626}
     .att-cell-missed{color:#f59e0b;font-size:12px}
     .att-cell-future{color:#d1d5db;font-size:11px}
-    .att-cell-locked{color:#d1d5db;font-size:11px;cursor:not-allowed;opacity:0.6;position:relative}
-    .att-cell-locked::after{content:'🔒';font-size:9px;position:absolute;top:1px;right:2px;opacity:0.7}
+    .att-cell-locked{color:#d1d5db;font-size:11px;cursor:not-allowed;opacity:0.55;position:relative}
     .att-sum-group{font-size:11px;background:rgba(245,158,11,0.1);color:#92400e;padding:2px 8px;border-radius:99px;font-weight:700;white-space:nowrap}
     .att-sum-stats-bar{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;padding:10px 16px;background:var(--primary-light);border-radius:12px;border:1px solid var(--border-2);font-size:12px;font-weight:700;align-items:center}
     .att-stat-item{padding:4px 10px;border-radius:8px}
@@ -3962,27 +3961,28 @@ window.searchStudent = async () => {
       ...rows2.map(r => ({ ...r, _source: 'الجدول الثاني' })),
     ];
 
-    // بحث غير حساس لحالة الأحرف وللمسافات
+    // البحث في تذاكر Firestore (summerTickets)
+    const ticketRows = (allTicketsData || [])
+      .filter(t => !t.deleted)
+      .map(t => ({ _source: '🎟️ تذكرة', name: t.name || '', pack: t.pack || '', amount: t.amount || 0, fullPrice: t.fullPrice || 0, remainingAmount: t.remainingAmount || 0, receipt: t.receipt || '', status: t.status || '', date: t.date || '', id: t.id }));
+
+    // دمج الصفوف
+    const combined = [...allRows, ...ticketRows];
+
     const q = query.trim().toLowerCase();
 
-    // أسماء الأعمدة الحقيقية من الجدولين:
-    // جدول 1 (SummerPlus):        الاسم، اللقب، الباقة، اللغة المختارة
-    // جدول 2 (programsummerschool): الاسم، اللقب، نوع البرنامج
-    const nameKeys = ['الاسم', 'اللقب', 'الاسم الكامل', 'name', 'student', 'اسم الطالب', 'Student Name'];
-
-    const matches = allRows.filter(row => {
-      // بحث في عمودَي الاسم واللقب أولاً
-      const firstName  = String(row['الاسم']  || '').toLowerCase();
-      const lastName   = String(row['اللقب']  || '').toLowerCase();
-      const fullName   = (firstName + ' ' + lastName).trim();
-      if (firstName.includes(q) || lastName.includes(q) || fullName.includes(q)) return true;
-      // fallback: بحث في أي حقل آخر
+    const matches = combined.filter(row => {
+      // بحث في الاسم أولاً
+      const name = String(row['name'] || row['الاسم'] || '').toLowerCase();
+      const lastName = String(row['اللقب'] || '').toLowerCase();
+      const fullName = [name, lastName].filter(Boolean).join(' ').trim();
+      if (name.includes(q) || lastName.includes(q) || fullName.includes(q)) return true;
       return Object.values(row).some(v => String(v).toLowerCase().includes(q));
     });
 
     if (!matches.length) {
       resultsDiv.style.display = 'block';
-      resultsDiv.innerHTML = `<div style="text-align:center;padding:14px;color:var(--text-muted);font-weight:700;font-size:13px;background:rgba(239,68,68,0.05);border-radius:10px;border:1px solid rgba(239,68,68,0.15)">❌ لم يُعثر على طالب بهذا الاسم في كلا الجدولين</div>`;
+      resultsDiv.innerHTML = `<div style="text-align:center;padding:14px;color:var(--text-muted);font-weight:700;font-size:13px;background:rgba(239,68,68,0.05);border-radius:10px;border:1px solid rgba(239,68,68,0.15)">❌ لم يُعثر على طالب بهذا الاسم</div>`;
       return;
     }
 
@@ -3991,34 +3991,23 @@ window.searchStudent = async () => {
     resultsDiv.innerHTML = `<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px">🎯 ${matches.length} نتيجة — اختر الطالب:</div>`;
 
     matches.slice(0, 8).forEach((row, idx) => {
-      // ── استخلاص الاسم الكامل ──
-      const firstName   = String(row['الاسم']  || '').trim();
-      const lastName    = String(row['اللقب']  || '').trim();
-      const studentName = [firstName, lastName].filter(Boolean).join(' ') || Object.values(row)[0] || '—';
-
-      // ── الباقة ──
-      const packKey = ['الباقة', 'نوع البرنامج', 'الباقة المختارة', 'pack', 'Package', 'plan'].find(k => row[k]);
-      const pack = packKey ? String(row[packKey]).trim() : '';
-
-      // ── اللغات ──
-      const langsRaw = String(row['اللغات'] || row['اللغة المختارة'] || row['languages'] || '').trim();
-
-      // ── مسار الإعلام الآلي ──
-      const itTrack = String(row['مسار الإعلام الآلي'] || row['itTrack'] || '').trim();
-
-      // ── المبلغ الإجمالي من الشيت مباشرة (العمود J) ──
-      const sheetTotalRaw = String(row['المبلغ الإجمالي'] || '').trim();
-      // نستخرج الرقم: "16,000 دج" → 16000
-      const sheetTotalNum = parseFloat(sheetTotalRaw.replace(/[^\d.]/g, '')) || 0;
-
-      // ── معلومات ولي الأمر ──
+      const firstName   = String(row['الاسم'] || row['name'] || '').trim();
+      const lastName    = String(row['اللقب'] || '').trim();
+      const studentName = [firstName, lastName].filter(Boolean).join(' ') || row['name'] || '—';
+      const pack        = String(row['الباقة'] || row['pack'] || row['نوع البرنامج'] || '').trim();
+      const langsRaw    = String(row['اللغات'] || row['اللغة المختارة'] || row['languages'] || '').trim();
+      const itTrack     = String(row['مسار الإعلام الآلي'] || row['itTrack'] || '').trim();
       const parentName  = String(row['اسم ولي الأمر'] || row['parentName'] || '').trim();
       const parentPhone = String(row['رقم هاتف ولي الأمر'] || row['رقم الهاتف'] || row['parentPhone'] || '').trim();
       const age         = String(row['العمر'] || row['age'] || '').trim();
 
-      // ── حساب totalPrice: من الشيت أولاً، وإلا من جدول الأسعار ──
-      const langCount  = langsRaw ? (langsRaw.split('+').length || 1) : 1;
-      const totalPrice = sheetTotalNum > 0 ? sheetTotalNum : calcTotalPrice(pack, langCount);
+      const sheetTotalRaw = String(row['المبلغ الإجمالي'] || '').trim();
+      const sheetTotalNum = parseFloat(sheetTotalRaw.replace(/[^\d.]/g, '')) || 0;
+      const langCount     = langsRaw ? (langsRaw.split('+').length || 1) : 1;
+      const totalPrice    = sheetTotalNum > 0 ? sheetTotalNum : (Number(row['fullPrice']) || Number(row['amount']) || calcTotalPrice(pack, langCount));
+      const ticketAmount  = Number(row['amount']) || 0;
+      const ticketRemain  = Number(row['remainingAmount']) || 0;
+      const isTicket      = row._source === '🎟️ تذكرة';
 
       const card = document.createElement('div');
       card.style.cssText = 'padding:12px 14px;border-radius:12px;border:1px solid var(--border-2);background:white;cursor:pointer;transition:all 0.2s;margin-bottom:8px';
@@ -4034,17 +4023,35 @@ window.searchStudent = async () => {
             ${parentPhone ? `<div style="font-size:12px;color:var(--text-muted);margin-top:1px">📞 ${parentPhone}</div>` : ''}
             <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
               ${totalPrice > 0 ? `<span style="font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(124,58,237,0.1);color:var(--primary);font-weight:800">💰 ${totalPrice.toLocaleString('ar-DZ')} دج</span>` : ''}
-              ${sheetTotalRaw && sheetTotalRaw !== '—' && sheetTotalRaw !== 'غير محدد' ? `<span style="font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(34,197,94,0.1);color:#059669;font-weight:800">✅ مبلغ الشيت</span>` : ''}
+              ${ticketAmount > 0 ? `<span style="font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(34,197,94,0.1);color:#059669;font-weight:800">💳 مدفوع ${ticketAmount.toLocaleString('ar-DZ')} دج</span>` : ''}
+              ${ticketRemain > 0 ? `<span style="font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(239,68,68,0.1);color:#DC2626;font-weight:800">⏳ باقي ${ticketRemain.toLocaleString('ar-DZ')} دج</span>` : ''}
             </div>
           </div>
-          <span style="font-size:10px;padding:2px 7px;border-radius:6px;background:rgba(124,58,237,0.08);color:var(--primary);font-weight:700;white-space:nowrap">${row._source}</span>
+          <span style="font-size:10px;padding:2px 7px;border-radius:6px;background:${isTicket ? 'rgba(245,158,11,0.1)' : 'rgba(124,58,237,0.08)'};color:${isTicket ? '#d97706' : 'var(--primary)'};font-weight:700;white-space:nowrap">${row._source}</span>
         </div>`;
 
-      card.onclick = () => applyStudentData(
-        studentName, pack, langCount, totalPrice, 0, totalPrice,
-        row, firstName, lastName,
-        langsRaw, itTrack, parentName, parentPhone, age, sheetTotalNum
-      );
+      card.onclick = () => {
+        if (isTicket) {
+          // من تذكرة — نملأ البيانات من التذكرة
+          document.getElementById('sc-name').value = studentName;
+          document.getElementById('sc-pack').value = pack;
+          if (totalPrice > 0) {
+            document.getElementById('sc-full-price').value = totalPrice;
+            document.getElementById('sc-paid-amount').value = ticketAmount || totalPrice;
+            document.getElementById('sc-amount').value = ticketAmount || totalPrice;
+            calcRemaining();
+          }
+          // إخفاء نتائج البحث
+          resultsDiv.style.display = 'none';
+          showToast(`✅ تم تعبئة بيانات ${studentName} من التذكرة`);
+        } else {
+          applyStudentData(
+            studentName, pack, langCount, totalPrice, 0, totalPrice,
+            row, firstName, lastName,
+            langsRaw, itTrack, parentName, parentPhone, '', sheetTotalNum
+          );
+        }
+      };
       resultsDiv.appendChild(card);
     });
 
@@ -9246,37 +9253,41 @@ function renderCtrlContent(sessionNum, gi) {
   const cache = _sessionControlCache[gi] || {};
   const ctrl = cache[sessionNum] || { status: 'scheduled', attendanceEnabled: true, attendanceFinalized: false, openAt: null, closeAt: null, notes: '' };
 
-  // حالة الحصة حسب التسجيل
   const rec = (_allRecordedSessionsByGroup[gi] || {})[sessionNum];
   const isDone = !!rec;
 
-  // تحديد السيادة لزر الحالة
   const status = ctrl.status || 'scheduled';
-  const isOpen = status === 'open';
-  const isClosed = status === 'closed';
-  const isLocked = status === 'locked';
-  const isScheduled = status === 'scheduled';
-
   const attEnabled = ctrl.attendanceEnabled !== false;
   const finalized = ctrl.attendanceFinalized === true;
 
-  // تمييز قسم الحالة
-  const statusBtns = [
-    { val: 'open', label: t('ctrl_status_open'), cls: 'active-open' },
-    { val: 'scheduled', label: t('ctrl_status_scheduled'), cls: 'active-scheduled' },
-    { val: 'closed', label: t('ctrl_status_closed'), cls: 'active-closed' },
-    { val: 'locked', label: t('ctrl_status_locked'), cls: 'active-locked' }
-  ].map(b =>
-    `<button onclick="setCtrlStatus(${sessionNum},${gi},'${b.val}')"
-      class="ctrl-status-btn ${b.val === status ? 'active-' + b.val : ''}"
-      style="${b.val === status ? 'border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-light)' : ''}">${b.label}</button>`
-  ).join('');
-
-  // وقت الفتح/الإغلاق
   const openVal = ctrl.openAt ? (ctrl.openAt.toDate ? ctrl.openAt.toDate().toISOString().slice(0,16) : ctrl.openAt.slice(0,16)) : '';
   const closeVal = ctrl.closeAt ? (ctrl.closeAt.toDate ? ctrl.closeAt.toDate().toISOString().slice(0,16) : ctrl.closeAt.slice(0,16)) : '';
-
   const savedAtStr = isDone && rec.savedAt ? (rec.savedAt.toDate ? rec.savedAt.toDate().toLocaleString(window._currentLang === 'en' ? 'en-US' : window._currentLang === 'fr' ? 'fr-FR' : 'ar-DZ') : rec.savedAt) : '—';
+
+  const statusColors = { open: '#059669', scheduled: '#d97706', closed: '#DC2626', locked: '#6b7280' };
+  const statusLabels = { open: '✅ مفتوحة', scheduled: '🟡 مجدولة', closed: '🔴 مغلقة', locked: '⚫ مقفلة' };
+
+  const isOpenNow = status === 'open';
+
+  const openSection = isOpenNow
+    ? `<div style="display:flex;flex-direction:column;gap:10px">
+        <div style="padding:12px;border-radius:12px;background:rgba(16,185,129,0.1);border:2px solid rgba(16,185,129,0.3);text-align:center">
+          <div style="font-size:28px;margin-bottom:4px">✅</div>
+          <div style="font-weight:900;color:#059669;font-size:15px">${t('ctrl_status_open')}</div>
+          <div style="font-size:11px;color:#6b7280;margin-top:4px">${t('ctrl_teacher_can_edit')}</div>
+        </div>
+        <button onclick="setCtrlNow('closed',${sessionNum},${gi})" class="ctrl-emerg-btn danger" style="width:100%;padding:10px;font-size:13px">🔒 ${t('ctrl_close_now')}</button>
+       </div>`
+    : `<div style="display:flex;flex-direction:column;gap:10px">
+        <button onclick="showOpenChoice(${sessionNum},${gi})" class="ctrl-emerg-btn success" style="width:100%;padding:12px;font-size:14px">🔓 ${t('ctrl_open_session')}</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="setCtrlStatus(${sessionNum},${gi},'closed')" class="ctrl-emerg-btn danger" style="flex:1;padding:10px;font-size:12px">🔴 ${t('ctrl_status_closed')}</button>
+          <button onclick="setCtrlStatus(${sessionNum},${gi},'locked')" class="ctrl-emerg-btn warning" style="flex:1;padding:10px;font-size:12px">⚫ ${t('ctrl_status_locked')}</button>
+        </div>
+        <div style="text-align:center;font-size:12px;color:var(--text-muted);padding:4px 0">
+          ${status === 'closed' ? '🔴 ' + t('ctrl_status_closed') : status === 'locked' ? '⚫ ' + t('ctrl_status_locked') : '🟡 ' + t('ctrl_status_scheduled')}
+        </div>
+       </div>`;
 
   return `
     <div style="margin-bottom:16px;padding:12px 16px;border-radius:12px;background:var(--primary-light);border:1px solid var(--border-2);font-size:13px;font-weight:700">
@@ -9284,28 +9295,42 @@ function renderCtrlContent(sessionNum, gi) {
       ${isDone ? `<span style="font-size:11px;color:#059669">${t('ctrl_session_recorded')} (${savedAtStr})</span>` : `<span style="font-size:11px;color:#d97706">${t('ctrl_session_unrecorded')}</span>`}
     </div>
 
-    <div style="margin-bottom:16px">
-      <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:8px">${t('ctrl_status_label')}</div>
-      <div class="ctrl-status-group">${statusBtns}</div>
+    <div style="margin-bottom:16px;position:relative">
+      <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:8px">🔓 ${t('ctrl_status_label')}</div>
+      ${openSection}
+      <div id="ctrl-open-choice-container" style="display:none;margin-top:10px">
+        <div style="padding:16px;border-radius:14px;background:var(--card-bg);border:2px solid var(--border-2);box-shadow:0 10px 40px rgba(0,0,0,0.15);text-align:center">
+          <div style="font-size:15px;font-weight:900;color:var(--text);margin-bottom:14px">🔓 ${t('ctrl_open_how')}</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button onclick="openNow(${sessionNum},${gi})" style="padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#059669,#10B981);color:white;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform=''">🔓 ${t('ctrl_open_now')}</button>
+            <button onclick="showOpenDatePicker(${sessionNum},${gi})" style="padding:14px;border-radius:12px;border:2px solid var(--border-2);background:var(--card-bg);color:var(--text);font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border-2)'">📅 ${t('ctrl_open_by_date')}</button>
+          </div>
+          <button onclick="closeOpenChoice()" style="margin-top:12px;background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;font-family:'Tajawal',sans-serif">${t('cancel')}</button>
+        </div>
+      </div>
+      <div id="ctrl-date-picker-container" style="display:none;margin-top:10px">
+        <div style="padding:16px;border-radius:14px;background:var(--card-bg);border:2px solid #d97706;box-shadow:0 10px 40px rgba(0,0,0,0.15);text-align:center">
+          <div style="font-size:15px;font-weight:900;color:var(--text);margin-bottom:12px">📅 ${t('ctrl_scheduled_label')}</div>
+          <input type="date" id="ctrl-schedule-date-inp" class="inp" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid var(--border);font-size:14px;text-align:center;margin-bottom:12px" value="">
+          <button onclick="openByDateConfirmed(${sessionNum},${gi})" style="width:100%;padding:12px;border-radius:12px;border:none;background:linear-gradient(135deg,#d97706,#F59E0B);color:white;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">📅 ${t('ctrl_schedule_confirm')}</button>
+          <button onclick="backToOpenChoice()" style="margin-top:8px;background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;font-family:'Tajawal',sans-serif">↩️ ${t('back')}</button>
+        </div>
+      </div>
     </div>
 
     <div style="padding:14px;border-radius:12px;background:var(--bg);border:1px solid var(--border);margin-bottom:16px">
-      <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:10px">${t('ctrl_time_label')}</div>
+      <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:10px">⚙️ ${t('ctrl_advanced')}</div>
       <div class="ctrl-field">
         <label>${t('ctrl_open_label')}</label>
-        <input type="datetime-local" id="ctrl-open-at" class="inp" value="${openVal}" ${isOpen ? 'style="border-color:rgba(16,185,129,0.3)"' : ''}>
+        <input type="datetime-local" id="ctrl-open-at" class="inp" value="${openVal}">
       </div>
       <div class="ctrl-field">
         <label>${t('ctrl_close_label')}</label>
-        <input type="datetime-local" id="ctrl-close-at" class="inp" value="${closeVal}" ${isClosed ? 'style="border-color:rgba(239,68,68,0.3)"' : ''}>
+        <input type="datetime-local" id="ctrl-close-at" class="inp" value="${closeVal}">
       </div>
       <div class="ctrl-field" style="margin-top:6px">
         <label>📅 ${t('ctrl_scheduled_label')}</label>
-        <input type="date" id="ctrl-scheduled-date" class="inp" value="${ctrl.scheduledDate || ''}" ${isScheduled ? 'style="border-color:rgba(16,185,129,0.3)"' : ''}>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:6px">
-        <button onclick="setCtrlNow('open',${sessionNum},${gi})" class="ctrl-emerg-btn success" style="flex:1;padding:8px;font-size:12px">${t('ctrl_open_now')}</button>
-        <button onclick="setCtrlNow('closed',${sessionNum},${gi})" class="ctrl-emerg-btn danger" style="flex:1;padding:8px;font-size:12px">${t('ctrl_close_now')}</button>
+        <input type="date" id="ctrl-scheduled-date" class="inp" value="${ctrl.scheduledDate || ''}">
       </div>
     </div>
 
@@ -9329,6 +9354,54 @@ function renderCtrlContent(sessionNum, gi) {
     <button onclick="saveCtrlSettings(${sessionNum},${gi})" class="btn-primary" style="margin-top:16px;width:100%">${t('ctrl_save_btn')}</button>
   `;
 }
+
+// ─── فتح خانة الاختيار: فتح الآن أم فتح بالتاريخ ───
+window.showOpenChoice = (sessionNum, gi) => {
+  document.getElementById('ctrl-open-choice-container').style.display = 'block';
+  document.getElementById('ctrl-date-picker-container').style.display = 'none';
+};
+window.closeOpenChoice = () => {
+  document.getElementById('ctrl-open-choice-container').style.display = 'none';
+};
+window.backToOpenChoice = () => {
+  document.getElementById('ctrl-date-picker-container').style.display = 'none';
+  document.getElementById('ctrl-open-choice-container').style.display = 'block';
+};
+window.showOpenDatePicker = (sessionNum, gi) => {
+  const teacherId = currentAttTeacherId;
+  const td = allTeachers.find(x => x.id === teacherId);
+  const g = (td?.groups || [])[gi];
+  const days = (g?.days && g.days.length) ? g.days : (td?.days || []);
+  const dayNames = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const sessionDayName = days[(sessionNum - 1) % (days.length || 1)] || '';
+  // تعيين التاريخ الموصى به (اليوم التالي المناسب)
+  const inp = document.getElementById('ctrl-schedule-date-inp');
+  if (inp) inp.value = '';
+  document.getElementById('ctrl-open-choice-container').style.display = 'none';
+  document.getElementById('ctrl-date-picker-container').style.display = 'block';
+};
+window.openNow = async (sessionNum, gi) => {
+  closeOpenChoice();
+  setCtrlStatus(sessionNum, gi, 'open');
+};
+window.openByDateConfirmed = async (sessionNum, gi) => {
+  const dateVal = document.getElementById('ctrl-schedule-date-inp').value;
+  if (!dateVal) { showToast('⚠️ الرجاء اختيار تاريخ', true); return; }
+  const teacherId = currentAttTeacherId;
+  if (!teacherId) return;
+  if (!_sessionControlCache[gi]) _sessionControlCache[gi] = {};
+  if (!_sessionControlCache[gi][sessionNum]) _sessionControlCache[gi][sessionNum] = {};
+  _sessionControlCache[gi][sessionNum].scheduledDate = dateVal;
+  _sessionControlCache[gi][sessionNum].status = 'scheduled';
+  _sessionControlCache[gi][sessionNum].openAt = null;
+  _sessionControlCache[gi][sessionNum].closeAt = null;
+  await saveSessionControl(teacherId, gi, sessionNum, _sessionControlCache[gi][sessionNum]);
+  document.getElementById('ctrl-date-picker-container').style.display = 'none';
+  const contentEl = document.getElementById('ctrl-modal-content');
+  if (contentEl) contentEl.innerHTML = renderCtrlContent(sessionNum, gi);
+  showToast(`📅 تمت جدولة الحصة ${sessionNum} للفتح في ${dateVal}`);
+  refreshAdminGrid();
+};
 
 // ─── فتح وإغلاق نافذة التحكم ───
 window.openCtrlModal = (sessionNum, gi) => {
@@ -13671,7 +13744,15 @@ const I18N = {
     ctrl_status_scheduled:'🟡 مجدولة',
     ctrl_status_closed:'🔴 مغلقة',
     ctrl_status_locked:'⚫ مقفلة',
+    ctrl_open_session:'🔓 فتح الحصة',
+    ctrl_open_how:'اختيار طريقة الفتح',
+    ctrl_open_by_date:'📅 فتح بالتاريخ',
+    ctrl_schedule_confirm:'📅 تأكيد الجدولة',
+    ctrl_teacher_can_edit:'✏️ الأستاذ يستطيع تعديل الحضور',
+    ctrl_advanced:'⚙️ إعدادات متقدمة',
     no_teacher_selected_ctrl:'⚠️ الرجاء اختيار أستاذ أولاً',
+    cancel:'إلغاء',
+    back:'↩️ رجوع',
   },
   fr: {
     ctrl_panel:'Tableau de bord',
@@ -14211,6 +14292,12 @@ const I18N = {
     ctrl_status_scheduled:'🟡 Programmée',
     ctrl_status_closed:'🔴 Fermée',
     ctrl_status_locked:'⚫ Verrouillée',
+    ctrl_open_session:'🔓 Ouvrir la séance',
+    ctrl_open_how:'Choisir la méthode',
+    ctrl_open_by_date:'📅 Ouvrir par date',
+    ctrl_schedule_confirm:'📅 Confirmer la programmation',
+    ctrl_teacher_can_edit:"✏️ Le professeur peut modifier",
+    ctrl_advanced:'⚙️ Paramètres avancés',
     no_students_yet:'Aucun élève',
     // stats labels
     so_total_label:'👥 Total des élèves inscrits',
@@ -14772,6 +14859,12 @@ const I18N = {
     ctrl_status_scheduled:'🟡 Scheduled',
     ctrl_status_closed:'🔴 Closed',
     ctrl_status_locked:'⚫ Locked',
+    ctrl_open_session:'🔓 Open Session',
+    ctrl_open_how:'Choose opening method',
+    ctrl_open_by_date:'📅 Open by Date',
+    ctrl_schedule_confirm:'📅 Confirm Schedule',
+    ctrl_teacher_can_edit:'✏️ Teacher can edit attendance',
+    ctrl_advanced:'⚙️ Advanced Settings',
     no_students_yet:'No students yet',
     // stats labels
     so_total_label:'👥 Total enrolled students',
