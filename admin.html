@@ -7042,15 +7042,15 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         const rec = groupSessions[i];
         const giVal = s.gi;
         const sNameVal = s.name;
-        // Check if session is locked for teacher view (no doc → locked)
+        // Check if session is locked for teacher view (only if admin has explicitly set status ≠ open)
         const ctrl = ctrlMap[i];
-        const isLocked = window._isTeacherAttendanceView && (!ctrl || ctrl.status !== 'open');
+        const isLocked = window._isTeacherAttendanceView && ctrl && ctrl.status !== 'open';
         const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')"`;
         const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
         if (!rec) {
           const isPast = i < curSession;
-          if (window._isTeacherAttendanceView) {
-            // الأستاذ لا يستطيع إنشاء تسجيل — الحصة مقفلة حتى يسجلها الادمن
+          if (window._isTeacherAttendanceView && isLocked) {
+            // الأستاذ لا يستطيع إنشاء تسجيل — الحصة مقفلة من الأدمن
             cells.push(`<td class="att-cell att-cell-locked" title="${t('att_missed_session')}">🔒</td>`);
           } else if (isPast) {
             cells.push(`<td class="${cellClass}" title="${t('att_missed_session')}" ${cellClick}>⚠️</td>`);
@@ -7340,11 +7340,13 @@ window.confirmSyncAttendance = async () => {
 
 // ─── تبديل حالة الحضور في سجل الحضور اليومي (3 حالات: ✅←❌←⋯←✅) ───
 window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
-  // منع التعديل للأساتذة إذا كانت الحصة مقفلة (أو لا يوجد سجل تحكم)
+  // منع التعديل للأساتذة إذا كانت الحصة مقفلة صراحةً من الأدمن
   if (window._isTeacherAttendanceView) {
     try {
       const ctrlSnap = await getDoc(doc(db, 'sessionControl', `${teacherId}_g${gi}_session_${sessionNum}`));
-      if (!ctrlSnap.exists() || ctrlSnap.data().status !== 'open') {
+      // إذا كان هناك سجل تحكم والحالة ≠ open → مقفلة
+      // إذا لم يكن هناك سجل → الحصة مفتوحة افتراضياً (يسمح بالتعديل)
+      if (ctrlSnap.exists() && ctrlSnap.data().status !== 'open') {
         showToast('🔒 هذه الحصة مقفلة — يرجى التواصل مع الإدارة', true);
         return;
       }
