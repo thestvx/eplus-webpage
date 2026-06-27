@@ -3272,12 +3272,15 @@ onAuthStateChanged(auth, async user => {
         document.getElementById('admin-role-text') && (document.getElementById('admin-role-text').textContent = 'أستاذ');
         document.querySelector('.admin-role').textContent = '👨‍🏫 أستاذ';
         window.setGreeting(td.name || user.email);
-        // إخفاء عناصر الأدمين، إظهار قسم الأساتذة فقط
+        // إخفاء عناصر الأدمين، إظهار قسم التلاميذ فقط للأستاذ
         document.querySelectorAll('.nav-item').forEach(el => el.style.display = 'none');
         if (document.getElementById('nav-finance')) document.getElementById('nav-finance').style.display = 'none';
-        const teacherNav = document.querySelectorAll('.nav-item')[4]; // قسم الأساتذة
-        if (teacherNav) { teacherNav.style.display = 'flex'; teacherNav.classList.add('active'); }
-        const msgsNav = document.getElementById('nav-messages') || document.querySelectorAll('.nav-item')[5];
+        const teacherNav = document.querySelectorAll('.nav-item')[3]; // قسم التلاميذ (students)
+        if (teacherNav) { teacherNav.style.display = 'flex'; teacherNav.classList.add('active');
+          // توجيه ضغطة الناف إلى قسم التلاميذ بدل الأساتذة
+          teacherNav.onclick = () => switchNavSection('students');
+        }
+        const msgsNav = document.getElementById('nav-messages');
         if (msgsNav) { msgsNav.style.display = 'flex'; }
         document.querySelectorAll('.nav-section').forEach(el => el.style.display = 'none');
         document.getElementById('maintenance-card').style.display = 'none';
@@ -3299,6 +3302,10 @@ onAuthStateChanged(auth, async user => {
         if (soPanel) soPanel.style.display = 'none';
         const finSection = document.getElementById('section-finance');
         if (finSection) finSection.style.display = 'none';
+        // إضافة الأستاذ إلى allTeachers قبل استدعاء onTeacherChange
+        if (allTeachers && !allTeachers.find(t => t.id === user.uid)) {
+          allTeachers.push({ id: user.uid, ...td });
+        }
         // تهيئة جدول الحضور للاستاذ — اختر الأستاذ الحالي واخفي الأزرار الإدارية
         const attTeacherSel = document.getElementById('att-sum-teacher');
         if (attTeacherSel) {
@@ -3325,10 +3332,6 @@ onAuthStateChanged(auth, async user => {
         if (teacherSelectEl) teacherSelectEl.style.display = 'none';
         const groupSelectEl = document.getElementById('att-sum-group');
         if (groupSelectEl) groupSelectEl.style.display = 'none';
-        // إضافة الأستاذ إلى allTeachers ليتم العثور عليه في loadAttendanceSummary
-        if (!allTeachers.find(t => t.id === user.uid)) {
-          allTeachers.push({ id: user.uid, ...td });
-        }
         // تأكد من أن الخلايا المستقبلية غير قابلة للنقر للأساتذة ما لم تكن الحصة مفتوحة
         window._isTeacherAttendanceView = true;
         // فتح تلقائي للحصص المجدولة فوراً ودورياً
