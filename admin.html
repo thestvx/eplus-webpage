@@ -7429,7 +7429,12 @@ window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
       };
       await setDoc(docRef, data);
     }
-    if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
+    // تحديث الكاش مباشرة بدل مسحه وإعادة التحميل من Firestore
+    if (window._attSummaryCache) {
+      if (!window._attSummaryCache[teacherId]) window._attSummaryCache[teacherId] = {};
+      if (!window._attSummaryCache[teacherId][gi]) window._attSummaryCache[teacherId][gi] = {};
+      window._attSummaryCache[teacherId][gi][sessionNum] = data;
+    }
     await loadAttendanceSummary(teacherId);
   } catch(e) {
     console.error('toggleDailyAttCell error:', e);
