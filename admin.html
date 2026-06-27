@@ -3286,7 +3286,7 @@ onAuthStateChanged(auth, async user => {
           if (el) el.style.display = 'none';
         });
         document.getElementById('section-students').style.display = 'block';
-        document.getElementById('section-teachers').style.display = 'block';
+        document.getElementById('section-teachers').style.display = 'none'; // إخفاء نظام الحضور القديم
         // إخفاء نموذج إضافة أستاذ وسجل النشاطات
         document.querySelector('.teacher-form-panel').style.display = 'none';
         const logPanel = document.getElementById('admin-log-panel');
@@ -3311,6 +3311,20 @@ onAuthStateChanged(auth, async user => {
           const el = document.getElementById(id);
           if (el) el.style.display = 'none';
         });
+        // إخفاء عناصر الموقع غير اللازمة للاستاذ
+        document.querySelectorAll('.so-filters, .so-search-wrap, .so-page-nav, .so-charts').forEach(el => { if (el) el.style.display = 'none'; });
+        const soStats = document.getElementById('so-stats');
+        if (soStats) soStats.style.display = 'none';
+        // تغيير عنوان قسم الحضور للاستاذ
+        const attPanelHeader = document.querySelector('#section-students .panel .panel-header');
+        if (attPanelHeader) {
+          attPanelHeader.innerHTML = `<div class="panel-icon" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.2)">📅</div> سجل حضور تلاميذي — <span style="font-size:14px;font-weight:400;color:var(--text-muted)">${td.name}</span>`;
+        }
+        // إخفاء محدد الأستاذ للاستاذ (محدد تلقائياً)
+        const teacherSelectEl = document.getElementById('att-sum-teacher');
+        if (teacherSelectEl) teacherSelectEl.style.display = 'none';
+        const groupSelectEl = document.getElementById('att-sum-group');
+        if (groupSelectEl) groupSelectEl.style.display = 'none';
         // تأكد من أن الخلايا المستقبلية غير قابلة للنقر للأساتذة ما لم تكن الحصة مفتوحة
         window._isTeacherAttendanceView = true;
         // فتح تلقائي للحصص المجدولة فوراً ودورياً
@@ -8944,8 +8958,12 @@ async function loadTeacherStudentsView(uid, teacherData) {
     const statStudents = document.getElementById('t-stat-students');
     if (statStudents) statStudents.textContent = currentAttStudents.length;
 
-    // عرض قائمة حضور الأستاذ مباشرة في الصفحة (وليس في modal)
-    showTeacherInlineAttendance(uid, t);
+    // عرض قائمة حضور الأستاذ مباشرة في الصفحة (للمسؤولين فقط)
+    // للأستاذ: يتم عرض الحضور عبر onTeacherChange() في init
+    const teacherSection = document.getElementById('section-teachers');
+    if (teacherSection && teacherSection.style.display !== 'none') {
+      showTeacherInlineAttendance(uid, t);
+    }
     // ✅ إصلاح: استعادة الفوج النشط بعد إعادة البناء
     setTimeout(() => {
       if (_savedGroupIdx > 0 && window.switchGroupTab) {
@@ -11683,6 +11701,8 @@ function _renderRoomsList() {
   if (_roomsUnsub) { _roomsUnsub(); _roomsUnsub = null; }
   const listEl = document.getElementById('msg-private-list');
   if (!listEl) return;
+  // غير الإدمن لا يحتاج الاستماع للغرف
+  if (!_me.isAdmin) return;
 
   _roomsUnsub = onSnapshot(
     query(collection(_db, 'msgRooms'), where('participants', 'array-contains', _me.uid), orderBy('lastAt', 'desc')),
@@ -11787,7 +11807,12 @@ async function _openRoom(roomId, roomName, roomData) {
       <button class="msg-send-btn" id="msg-send-btn" onclick="window.sendMsg()">إرسال ←</button>
     </div>`;
 
-  // الاستماع للرسائل
+  // الاستماع للرسائل (للإدمن فقط)
+  if (!_me.isAdmin) {
+    const list = document.getElementById('msg-messages-list');
+    if (list) list.innerHTML = `<div class="msg-empty"><div class="msg-empty-icon">💬</div><div style="font-size:13px">نظام الرسائل للإدارة فقط</div></div>`;
+    return;
+  }
   if (_msgUnsub2) { _msgUnsub2(); _msgUnsub2 = null; }
   _msgUnsub2 = onSnapshot(
     query(collection(_db, 'messages'), where('roomId', '==', roomId), orderBy('sentAt', 'asc'), limit(200)),
