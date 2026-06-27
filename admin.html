@@ -925,6 +925,8 @@
     .att-cell-absent{color:#DC2626}
     .att-cell-missed{color:#f59e0b;font-size:12px}
     .att-cell-future{color:#d1d5db;font-size:11px}
+    .att-cell-locked{color:#d1d5db;font-size:11px;cursor:not-allowed;opacity:0.6;position:relative}
+    .att-cell-locked::after{content:'🔒';font-size:9px;position:absolute;top:1px;right:2px;opacity:0.7}
     .att-sum-group{font-size:11px;background:rgba(245,158,11,0.1);color:#92400e;padding:2px 8px;border-radius:99px;font-weight:700;white-space:nowrap}
     .att-sum-stats-bar{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;padding:10px 16px;background:var(--primary-light);border-radius:12px;border:1px solid var(--border-2);font-size:12px;font-weight:700;align-items:center}
     .att-stat-item{padding:4px 10px;border-radius:8px}
@@ -1564,7 +1566,7 @@
       <div class="nav-section" data-i18n="teachers_mgmt">إدارة الأساتذة</div>
       <div class="nav-item" onclick="switchNavSection('teachers')">
         <span class="nav-icon">👨‍🏫</span>
-        <span class="nav-label" data-i18n="teachers_att">الأساتذة والحضور</span>
+        <span class="nav-label" data-i18n="teachers_att">الأساتذة</span>
         <span class="nav-badge" id="nav-badge-teachers">0</span>
       </div>
       <div class="nav-section" data-i18n="communication">التواصل</div>
@@ -2347,7 +2349,7 @@
       <select id="att-sum-group" onchange="loadAttendanceSummary()" style="display:none;padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">
         <option value="">🏫 جميع الأفواج</option>
       </select>
-      <button onclick="exportAttendanceCSV()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif" title="تصدير CSV">📥 CSV</button>
+      <button onclick="exportAttendanceCSV()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif" title="تصدير CSV" id="att-csv-btn">📥 CSV</button>
       <button onclick="toggleAttendanceStudentSearch()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #059669;background:rgba(5,150,105,0.08);color:#059669;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إضافة تلميذ جديد للأستاذ المختار" id="att-add-student-btn">➕ إضافة تلميذ</button>
       <button onclick="refreshAttendanceSessions()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.3s" title="تحديث الحصص وضبطها حسب تاريخ الأستاذ" id="att-refresh-btn">🔄 تحديث</button>
       <button onclick="normalizeAttendanceNames()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #7C3AED;background:rgba(124,58,237,0.08);color:#7C3AED;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إعادة ربط أسماء التلاميذ بسجلات الحضور" id="att-normalize-btn">🔗 إعادة ربط الحضور</button>
@@ -2394,8 +2396,8 @@
         <!-- Hero -->
         <div class="teachers-hero" id="teachers-hero">
           <div>
-            <div class="teachers-hero-title" id="teachers-hero-title">👨‍🏫 إدارة الأساتذة والحضور</div>
-            <div class="teachers-hero-sub" id="teachers-hero-sub">أضف حسابات الأساتذة، حدد أيامهم وتخصصاتهم، وتابع حضور تلاميذهم يومياً.</div>
+            <div class="teachers-hero-title" id="teachers-hero-title">👨‍🏫 إدارة الأساتذة</div>
+            <div class="teachers-hero-sub" id="teachers-hero-sub">أضف حسابات الأساتذة وحدد أيامهم وتخصصاتهم.</div>
           </div>
           <div class="teachers-stats-row">
             <div class="teachers-mini"><div class="n" id="t-stat-total">0</div><div class="l" data-i18n="teachers_stat_total">👨‍🏫 أساتذة</div></div>
@@ -2566,10 +2568,18 @@
           </div>
           <div class="settings-grid">
             <div class="setting-card">
-              <div class="setting-icon">🖼️</div>
-              <div class="setting-name" data-i18n="setting_gallery">المعرض الربيعي</div>
-              <div class="setting-desc" data-i18n="setting_gallery_desc">رفع وإدارة الصور الخاصة بمعرض الأنشطة والفعاليات للمركز.</div>
-              <span class="setting-tag">قريباً</span>
+              <div class="setting-icon" style="background:rgba(124,58,237,0.1);border-color:rgba(124,58,237,0.2)">👁️</div>
+              <div class="setting-name">إظهار الأزرار في الأساتذة</div>
+              <div class="setting-desc">التحكم في الأزرار الظاهرة للمشرفين في قسم الأساتذة.</div>
+              <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer"><input type="checkbox" id="set-show-att-btn" checked onchange="saveBtnSettings()"> 📋 زر الحضور في بطاقة الأستاذ</label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer"><input type="checkbox" id="set-show-csv-btn" checked onchange="saveBtnSettings()"> 📥 زر CSV</label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer"><input type="checkbox" id="set-show-add-btn" checked onchange="saveBtnSettings()"> ➕ زر إضافة تلميذ</label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer"><input type="checkbox" id="set-show-refresh-btn" checked onchange="saveBtnSettings()"> 🔄 زر تحديث الحصص</label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer"><input type="checkbox" id="set-show-normalize-btn" checked onchange="saveBtnSettings()"> 🔗 زر إعادة ربط الحضور</label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer"><input type="checkbox" id="set-show-backup-btn" checked onchange="saveBtnSettings()"> 💾 زر حفظ نسخة</label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer"><input type="checkbox" id="set-show-sync-btn" checked onchange="saveBtnSettings()"> 🔄 زر مزامنة الحضور</label>
+              </div>
             </div>
             <div class="setting-card">
               <div class="setting-icon" style="background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.2)">📧</div>
@@ -2755,8 +2765,8 @@
           <button type="button" class="day-pick-btn" data-day="الجمعة">الجمعة</button>
         </div>
       </div>
-      <!-- ===== الأفواج (تعديل) ===== -->
-      <div class="form-group" style="margin-bottom:0;margin-top:4px">
+      <!-- ===== الأفواج (تعديل) — مخفي حسب طلب الإدارة ===== -->
+      <div class="form-group" style="margin-bottom:0;margin-top:4px;display:none" id="edit-groups-section">
         <label class="form-label" style="display:flex;align-items:center;justify-content:space-between">
           <span>🏫 الأفواج</span>
           <button type="button" onclick="addGroupRow('edit-groups-list')" style="padding:5px 12px;border-radius:9px;border:1.5px solid var(--border-2);background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">+ إضافة فوج</button>
@@ -3271,10 +3281,11 @@ onAuthStateChanged(auth, async user => {
         if (msgsNav) { msgsNav.style.display = 'flex'; }
         document.querySelectorAll('.nav-section').forEach(el => el.style.display = 'none');
         document.getElementById('maintenance-card').style.display = 'none';
-        ['home','announcements','summer','students','settings'].forEach(s => {
+        ['home','announcements','summer','settings'].forEach(s => {
           const el = document.getElementById('section-' + s);
           if (el) el.style.display = 'none';
         });
+        document.getElementById('section-students').style.display = 'block';
         document.getElementById('section-teachers').style.display = 'block';
         // إخفاء نموذج إضافة أستاذ وسجل النشاطات
         document.querySelector('.teacher-form-panel').style.display = 'none';
@@ -3288,6 +3299,32 @@ onAuthStateChanged(auth, async user => {
         if (soPanel) soPanel.style.display = 'none';
         const finSection = document.getElementById('section-finance');
         if (finSection) finSection.style.display = 'none';
+        // تهيئة جدول الحضور للاستاذ — اختر الأستاذ الحالي واخفي الأزرار الإدارية
+        const attTeacherSel = document.getElementById('att-sum-teacher');
+        if (attTeacherSel) {
+          attTeacherSel.value = user.uid;
+          attTeacherSel.disabled = true;
+          attTeacherSel.style.opacity = '0.7';
+          onTeacherChange();
+        }
+        ['att-csv-btn','att-normalize-btn','att-backup-btn','att-sync-btn'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = 'none';
+        });
+        // تأكد من أن الخلايا المستقبلية غير قابلة للنقر للأساتذة ما لم تكن الحصة مفتوحة
+        window._isTeacherAttendanceView = true;
+        // فتح تلقائي للحصص المجدولة فوراً ودورياً
+        autoOpenScheduledSessions(user.uid).then(opened => {
+          if (opened > 0) onTeacherChange();
+        }).catch(() => {});
+        if (window._sessionUnlockTimer) clearInterval(window._sessionUnlockTimer);
+        window._sessionUnlockTimer = setInterval(async () => {
+          try {
+            await autoOpenScheduledSessions(user.uid);
+            // إعادة تحميل جدول الحضور إذا كان مفتوحاً
+            if (document.getElementById('att-sum-tbody')?.innerHTML) onTeacherChange();
+          } catch(e) { /* skip */ }
+        }, 30000);
         // عرض نافذة الترحيب
         currentTeacherData = { uid: user.uid, id: user.uid, ...td };
         window.currentTeacherData = currentTeacherData;
@@ -3342,6 +3379,7 @@ onAuthStateChanged(auth, async user => {
       setTimeout(() => applyEmployeeMode(empCfg), 500);
     } else {
       // وضع الأدمين الكامل
+      loadBtnSettings();
       switchNavSection('home');
     }
   } else {
@@ -3351,6 +3389,59 @@ onAuthStateChanged(auth, async user => {
     dash.style.display = 'none';
   }
 });
+
+// ─── إظهار/إخفاء أزرار الحضور (الإعدادات) ───
+window.saveBtnSettings = async () => {
+  const ids = ['set-show-att-btn','set-show-csv-btn','set-show-add-btn','set-show-refresh-btn','set-show-normalize-btn','set-show-backup-btn','set-show-sync-btn'];
+  const settings = {};
+  ids.forEach(id => { settings[id.replace('set-show-','')] = document.getElementById(id)?.checked ?? true; });
+  try {
+    await setDoc(doc(db, 'settings', 'btnVisibility'), settings);
+    showToast('✅ تم حفظ الإعدادات');
+  } catch(e) { console.error(e); }
+  applyBtnSettings();
+};
+
+function applyBtnSettings() {
+  const btnMap = {
+    'att': { sel: '#teachers-grid .teacher-card-footer .btn-sm-icon', idx: 0, key: 'att-btn' },
+    'csv': { el: 'att-csv-btn', key: 'csv-btn' },
+    'add': { el: 'att-add-student-btn', key: 'add-btn' },
+    'refresh': { el: 'att-refresh-btn', key: 'refresh-btn' },
+    'normalize': { el: 'att-normalize-btn', key: 'normalize-btn' },
+    'backup': { el: 'att-backup-btn', key: 'backup-btn' },
+    'sync': { el: 'att-sync-btn', key: 'sync-btn' },
+  };
+  // Read saved settings (default to true)
+  const saved = window._btnSettings || {};
+  for (const [_, cfg] of Object.entries(btnMap)) {
+    if (cfg.el) {
+      const el = document.getElementById(cfg.el);
+      if (el) el.style.display = saved[cfg.key] !== false ? '' : 'none';
+    }
+  }
+  // Attendance buttons in teacher cards
+  const showAtt = saved['att-btn'] !== false;
+  document.querySelectorAll('#teachers-grid .teacher-card-footer .btn-sm-icon').forEach(btn => {
+    if (btn.textContent.includes('📋')) btn.style.display = showAtt ? '' : 'none';
+  });
+}
+
+window.loadBtnSettings = async () => {
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'btnVisibility'));
+    if (snap.exists()) {
+      window._btnSettings = snap.data();
+      // Sync checkboxes (keys match checkbox ID suffix)
+      const keys = ['att-btn','csv-btn','add-btn','refresh-btn','normalize-btn','backup-btn','sync-btn'];
+      for (const key of keys) {
+        const cb = document.getElementById('set-show-' + key);
+        if (cb) cb.checked = window._btnSettings[key] !== false;
+      }
+      applyBtnSettings();
+    }
+  } catch(e) { console.error('loadBtnSettings:', e); }
+};
 
 window.syncEmailInp = () => {
   const user = document.getElementById('email-user-inp').value.trim();
@@ -5856,6 +5947,7 @@ function renderTeachersGrid(teachers) {
       </div>`;
     grid.appendChild(card);
   });
+  applyBtnSettings();
 }
 
 // ─── Student Overview ───
@@ -6732,6 +6824,35 @@ window.loadAttendanceSummary = async function() {
 
   const groupCache = window._attSummaryCache[teacherId] || {};
 
+  // ── تحميل session controls لقفل/فتح الحصص ──
+  let sessionCtrlMap = {}; // { gi: { sessionNum: { status, scheduledDate } } }
+  if (teacher && teacher.groups) {
+    for (let gi = 0; gi < teacher.groups.length; gi++) {
+      try {
+        const ctrlQ = query(
+          collection(db, 'sessionControl'),
+          where('teacherId', '==', teacherId + '_g' + gi)
+        );
+        const ctrlSnap = await getDocs(ctrlQ);
+        sessionCtrlMap[gi] = {};
+        ctrlSnap.forEach(d => {
+          const cd = d.data();
+          if (cd.sessionNum) sessionCtrlMap[gi][cd.sessionNum] = cd;
+        });
+        // فتح تلقائي للحصص إذا انتهى التاريخ المجدول
+        const nowDate = new Date().toISOString().slice(0, 10);
+        for (const sn in sessionCtrlMap[gi]) {
+          const ctrl = sessionCtrlMap[gi][sn];
+          if (ctrl.status === 'scheduled' && ctrl.scheduledDate && ctrl.scheduledDate <= nowDate) {
+            ctrl.status = 'open';
+            const docId = getCtrlDocId(teacherId, gi, parseInt(sn));
+            setDoc(doc(db, 'sessionControl', docId), { status: 'open', updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
+          }
+        }
+      } catch (e) { /* fallback */ }
+    }
+  }
+
   // Always show 12 sessions (empty/editable)
   const totalSessions = 12;
 
@@ -6846,19 +6967,25 @@ window.loadAttendanceSummary = async function() {
     let rowNum = 1;
     g.students.forEach(s => {
       const groupSessions = groupCache[s.gi] || {};
+      const ctrlMap = sessionCtrlMap[s.gi] || {};
       const cells = [];
       for (let idx = 0; idx < sessionRange.length; idx++) {
         const i = sessionRange[idx];
         const rec = groupSessions[i];
         const giVal = s.gi;
         const sNameVal = s.name;
+        // Check if session is locked for teacher view
+        const ctrl = ctrlMap[i];
+        const isLocked = window._isTeacherAttendanceView && ctrl && ctrl.status !== 'open';
+        const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')"`;
+        const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
         if (!rec) {
           const isPast = i < curSession;
           if (isPast) {
-            cells.push(`<td class="att-cell att-cell-missed att-cell-clickable" title="${t('att_missed_session')}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">⚠️</td>`);
+            cells.push(`<td class="${cellClass}" title="${t('att_missed_session')}" ${cellClick}>⚠️</td>`);
             totalMissed++;
           } else {
-            cells.push(`<td class="att-cell att-cell-future att-cell-clickable" title="${t('att_future_session')}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">⋯</td>`);
+            cells.push(`<td class="${isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-future att-cell-clickable'}" title="${t('att_future_session')}" ${isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')"`}>⋯</td>`);
           }
           continue;
         }
@@ -6866,15 +6993,15 @@ window.loadAttendanceSummary = async function() {
           namesMatchLocal(st.name || '', s.name || '')
         );
         if (!studentRec) {
-          cells.push(`<td class="att-cell att-cell-future att-cell-clickable" title="${t('att_not_recorded')}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">⋯</td>`);
+          cells.push(`<td class="${isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-future att-cell-clickable'}" title="${t('att_not_recorded')}" ${isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')"`}>⋯</td>`);
           continue;
         }
         const date = rec.date || '';
         if (studentRec.present) {
-          cells.push(`<td class="att-cell att-cell-present att-cell-clickable" title="${t('att_present_on')}${date}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">✅</td>`);
+          cells.push(`<td class="${cellClass}" title="${t('att_present_on')}${date}" ${cellClick}>✅</td>`);
           totalPresent++;
         } else {
-          cells.push(`<td class="att-cell att-cell-absent att-cell-clickable" title="${t('att_absent_on')}${date}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">❌</td>`);
+          cells.push(`<td class="${cellClass}" title="${t('att_absent_on')}${date}" ${cellClick}>❌</td>`);
           totalAbsent++;
         }
       }
@@ -7142,6 +7269,19 @@ window.confirmSyncAttendance = async () => {
 
 // ─── تبديل حالة الحضور في سجل الحضور اليومي (3 حالات: ✅←❌←⋯←✅) ───
 window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
+  // منع التعديل للأساتذة إذا كانت الحصة مقفلة
+  if (window._isTeacherAttendanceView) {
+    try {
+      const ctrlSnap = await getDoc(doc(db, 'sessionControl', `${teacherId}_g${gi}_session_${sessionNum}`));
+      if (ctrlSnap.exists()) {
+        const ctrl = ctrlSnap.data();
+        if (ctrl.status !== 'open') {
+          showToast('🔒 هذه الحصة مقفلة — يرجى التواصل مع الإدارة', true);
+          return;
+        }
+      }
+    } catch(e) { /* fallback — allow toggle */ }
+  }
   const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const namesMatch = (a, b) => {
     if (!a || !b) return false;
@@ -8117,7 +8257,11 @@ function buildSessionGridHtml(tid, gi, group, teacherDays) {
         onmouseover="this.style.background='var(--primary-light)';this.style.borderColor='var(--primary)'"
         onmouseout="this.style.background='var(--card-bg)';this.style.borderColor='var(--border-2)'"
         title="التحكم في الحصة">⚙️</div>
-      ${ctrlStatus !== 'scheduled' ? `<div style="position:absolute;bottom:4px;right:4px;font-size:10px;opacity:0.6">${ctrlLabel}</div>` : ''}
+      ${ctrlStatus !== 'scheduled'
+        ? `<div style="position:absolute;bottom:4px;right:4px;font-size:10px;opacity:0.6">${ctrlLabel}</div>`
+        : ctrl.scheduledDate
+          ? `<div style="position:absolute;bottom:4px;right:4px;font-size:9px;opacity:0.8;color:#d97706" title="فتح في ${ctrl.scheduledDate}">📅 ${ctrl.scheduledDate.slice(5)}</div>`
+          : `<div style="position:absolute;bottom:4px;right:4px;font-size:10px;opacity:0.6">🟡</div>`}
     </div>`;
   }).join('');
 
@@ -9010,6 +9154,7 @@ async function saveSessionControl(teacherId, gi, sessionNum, data) {
     status: data.status || 'scheduled',
     openAt: data.openAt || null,
     closeAt: data.closeAt || null,
+    scheduledDate: data.scheduledDate || null,
     attendanceEnabled: data.attendanceEnabled !== false,
     attendanceFinalized: data.attendanceFinalized || false,
     notes: data.notes || '',
@@ -9120,6 +9265,10 @@ function renderCtrlContent(sessionNum, gi) {
       <div class="ctrl-field">
         <label>${t('ctrl_close_label')}</label>
         <input type="datetime-local" id="ctrl-close-at" class="inp" value="${closeVal}" ${isClosed ? 'style="border-color:rgba(239,68,68,0.3)"' : ''}>
+      </div>
+      <div class="ctrl-field" style="margin-top:6px">
+        <label>📅 ${t('ctrl_scheduled_label')}</label>
+        <input type="date" id="ctrl-scheduled-date" class="inp" value="${ctrl.scheduledDate || ''}" ${isScheduled ? 'style="border-color:rgba(16,185,129,0.3)"' : ''}>
       </div>
       <div style="display:flex;gap:8px;margin-top:6px">
         <button onclick="setCtrlNow('open',${sessionNum},${gi})" class="ctrl-emerg-btn success" style="flex:1;padding:8px;font-size:12px">${t('ctrl_open_now')}</button>
@@ -9237,11 +9386,13 @@ window.saveCtrlSettings = (sessionNum, gi) => {
   const openAtVal = document.getElementById('ctrl-open-at')?.value || null;
   const closeAtVal = document.getElementById('ctrl-close-at')?.value || null;
   const notesVal = document.getElementById('ctrl-notes')?.value || '';
+  const scheduledDateVal = document.getElementById('ctrl-scheduled-date')?.value || null;
 
   const data = _sessionControlCache[gi]?.[sessionNum] || {};
   data.openAt = openAtVal || null;
   data.closeAt = closeAtVal || null;
   data.notes = notesVal;
+  data.scheduledDate = scheduledDateVal || null;
 
   // إذا وضع وقت إغلاق ولم تتغير الحالة → أغلق تلقائياً
   if (closeAtVal && (!data.status || data.status === 'scheduled')) {
@@ -9250,6 +9401,10 @@ window.saveCtrlSettings = (sessionNum, gi) => {
   // إذا وضع وقت فتح ولم تتغير الحالة → افتح تلقائياً
   if (openAtVal && (!data.status || data.status === 'scheduled')) {
     data.status = 'open';
+  }
+  // إذا وضع تاريخ مجدول → حافظ على حالة scheduled
+  if (scheduledDateVal && (!data.status || data.status === 'scheduled')) {
+    data.status = 'scheduled';
   }
 
   saveSessionControl(teacherId, gi, sessionNum, data).then(() => {
@@ -9265,6 +9420,38 @@ window.saveCtrlSettings = (sessionNum, gi) => {
 function refreshAdminGrid() {
   const teacherData = allTeachers.find(x => x.id === currentAttTeacherId);
   if (teacherData) renderAdminAttGroupsGrid(teacherData);
+}
+
+// ─── فتح تلقائي للحصص المجدولة بناءً على التاريخ ───
+// تُستدعى دورياً وفي تحميل جدول الحضور
+async function autoOpenScheduledSessions(teacherId) {
+  if (!teacherId) return 0;
+  try {
+    const q = query(
+      collection(db, 'sessionControl'),
+      where('baseTeacherId', '==', teacherId),
+      where('status', '==', 'scheduled')
+    );
+    const snap = await getDocs(q);
+    const nowDate = new Date().toISOString().slice(0, 10);
+    let opened = 0;
+    for (const d of snap.docs) {
+      const cd = d.data();
+      if (cd.scheduledDate && cd.scheduledDate <= nowDate) {
+        await setDoc(doc(db, 'sessionControl', d.id), { status: 'open', updatedAt: serverTimestamp() }, { merge: true });
+        opened++;
+        // تحديث الكاش المحلي
+        const gi = cd.groupIndex;
+        const sn = cd.sessionNum;
+        if (_sessionControlCache[gi]) {
+          if (_sessionControlCache[gi][sn]) _sessionControlCache[gi][sn].status = 'open';
+        }
+      }
+    }
+    if (opened > 0) console.log(`autoOpenScheduledSessions: opened ${opened} session(s) for ${teacherId}`);
+    return opened;
+  } catch (e) { console.warn('autoOpenScheduledSessions error:', e); }
+  return 0;
 }
 
 // ═══════════════════════════════════════════════
@@ -13433,6 +13620,7 @@ const I18N = {
     ctrl_time_label:'⏰ التحكم الزمني',
     ctrl_open_label:'🟢 فتح الحصة في',
     ctrl_close_label:'🔴 إغلاق الحصة في',
+    ctrl_scheduled_label:'📅 فتح مجدول في',
     ctrl_open_now:'🚀 فتح الآن',
     ctrl_close_now:'⛔ إغلاق الآن',
     ctrl_att_toggle:'📋 تفعيل تسجيل الحضور',
@@ -13972,6 +14160,7 @@ const I18N = {
     ctrl_time_label:'⏰ Contrôle horaire',
     ctrl_open_label:'🟢 Ouvrir à',
     ctrl_close_label:'🔴 Fermer à',
+    ctrl_scheduled_label:'📅 Ouverture programmée le',
     ctrl_open_now:'🚀 Ouvrir maintenant',
     ctrl_close_now:'⛔ Fermer maintenant',
     ctrl_att_toggle:"📋 Activer l'enregistrement",
@@ -14532,6 +14721,7 @@ const I18N = {
     ctrl_time_label:'⏰ Time Control',
     ctrl_open_label:'🟢 Open at',
     ctrl_close_label:'🔴 Close at',
+    ctrl_scheduled_label:'📅 Scheduled on',
     ctrl_open_now:'🚀 Open Now',
     ctrl_close_now:'⛔ Close Now',
     ctrl_att_toggle:'📋 Enable Attendance',
