@@ -2334,6 +2334,7 @@
       <button onclick="exportAttendanceCSV()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif" title="تصدير CSV">📥 CSV</button>
       <button onclick="toggleAttendanceStudentSearch()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #059669;background:rgba(5,150,105,0.08);color:#059669;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إضافة تلميذ جديد للأستاذ المختار" id="att-add-student-btn">➕ إضافة تلميذ</button>
       <button onclick="refreshAttendanceSessions()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.3s" title="تحديث الحصص وضبطها حسب تاريخ الأستاذ" id="att-refresh-btn">🔄 تحديث</button>
+      <button onclick="normalizeAttendanceNames()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #7C3AED;background:rgba(124,58,237,0.08);color:#7C3AED;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إعادة ربط أسماء التلاميذ بسجلات الحضور" id="att-normalize-btn">🔗 إعادة ربط الحضور</button>
     </div>
     <!-- ─── شريط بحث إضافة التلميذ ─── -->
     <div id="att-student-search-wrap" style="display:none;margin-bottom:16px;padding:14px 16px;background:var(--card-bg);border:1.5px solid var(--border);border-radius:12px;transition:all 0.3s">
@@ -5846,12 +5847,8 @@ function _nameVariants(name) {
   set.add(n);
   if (parts.length >= 2) {
     set.add([...parts].reverse().join(' '));
-    // Only generate first+last sub-variants for exactly 2-part names
-    // (for 3+ parts they lose the middle word & cause false matches)
-    if (parts.length === 2) {
-      set.add(parts[0] + ' ' + parts[parts.length-1]);
-      set.add(parts[parts.length-1] + ' ' + parts[0]);
-    }
+    set.add(parts[0] + ' ' + parts[parts.length-1]);
+    set.add(parts[parts.length-1] + ' ' + parts[0]);
     // Also try full permutation for 3-part names
     if (parts.length === 3) {
       set.add(parts[0] + ' ' + parts[2] + ' ' + parts[1]);
@@ -6910,6 +6907,92 @@ window.refreshAttendanceSessions = async () => {
   if (btn) { btn.textContent = '🔄 تحديث'; btn.style.opacity = '1'; btn.disabled = false; }
 };
 
+// ─── إعادة ربط أسماء التلاميذ في سجلات الحضور القديمة ───
+window.normalizeAttendanceNames = async () => {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+  const btn = document.getElementById('att-normalize-btn');
+  if (btn) { btn.textContent = '⏳ جاري...'; btn.style.opacity = '0.6'; btn.disabled = true; }
+
+  const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const namesMatch = (a, b) => {
+    if (!a || !b) return false;
+    const va = _nameVariants(a).map(_norm);
+    const vb = _nameVariants(b).map(_norm);
+    return va.some(v => vb.includes(v));
+  };
+
+  // جمع كل أسماء التلاميذ من الأستاذ (القائمة المسطحة + الأفواج)
+  const allTeacherNames = new Map(); // normalized name → preferred name
+  (teacher.students || []).forEach(s => {
+    if (s.name) {
+      const key = _norm(s.name);
+      if (!allTeacherNames.has(key)) allTeacherNames.set(key, s.name);
+    }
+  });
+  (teacher.groups || []).forEach(g => {
+    (g.students || []).forEach(sName => {
+      if (sName) {
+        const key = _norm(sName);
+        if (!allTeacherNames.has(key)) allTeacherNames.set(key, sName);
+      }
+    });
+  });
+
+  try {
+    // اقرأ جميع سجلات الحضور للأستاذ
+    const querySnap = await getDocs(query(
+      collection(db, 'sessionAttendance'),
+      where('teacherId', '>=', teacherId + '_g'),
+      where('teacherId', '<=', teacherId + '_g')
+    ));
+
+    let fixed = 0, total = 0;
+    const batchWrites = [];
+    for (const docSnap of querySnap.docs) {
+      const d = docSnap.data();
+      const students = d.students || [];
+      let changed = false;
+      const updatedStudents = students.map(s => {
+        if (!s.name) return s;
+        const sn = _norm(s.name);
+        // هل الاسم موجود بالفعل في قائمة الأستاذ؟
+        if (allTeacherNames.has(sn)) return s;
+        // بحث بمطابقة الـ variants
+        for (const [normKey, preferredName] of allTeacherNames) {
+          if (namesMatch(s.name, preferredName)) {
+            fixed++;
+            changed = true;
+            return { ...s, name: preferredName };
+          }
+        }
+        return s;
+      });
+      if (changed) {
+        total++;
+        batchWrites.push(setDoc(docSnap.ref, { ...d, students: updatedStudents, savedAt: serverTimestamp() }));
+      }
+    }
+
+    if (batchWrites.length) {
+      await Promise.all(batchWrites);
+      showToast(`✅ تم إصلاح ${fixed} اسم في ${total} حصة`);
+    } else {
+      showToast('✅ جميع الأسماء متطابقة — لا داعي للإصلاح');
+    }
+
+    // تنظيف الكاش وإعادة التحميل
+    if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
+    await loadAttendanceSummary();
+  } catch(e) {
+    console.error('normalizeAttendanceNames error:', e);
+    showToast('⚠️ خطأ في إعادة الربط: ' + e.message, true);
+  }
+  if (btn) { btn.textContent = '🔗 إعادة ربط الحضور'; btn.style.opacity = '1'; btn.disabled = false; }
+};
+
 // ─── تبديل حالة الحضور في سجل الحضور اليومي (3 حالات: ✅←❌←⋯←✅) ───
 window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
   const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -6928,7 +7011,17 @@ window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
     if (snap.exists()) {
       data = snap.data();
       let students = data.students || [];
-      const idx = students.findIndex(s => namesMatch(s.name || '', studentName));
+      // 1. Try exact match first
+      let idx = students.findIndex(s => _norm(s.name || '') === _norm(studentName));
+      // 2. Fallback to permissive match (for old data with different name formats)
+      if (idx === -1) {
+        const pidx = students.findIndex(s => namesMatch(s.name || '', studentName));
+        if (pidx !== -1) {
+          // Found via permissive match → normalize stored name to displayed name
+          students[pidx].name = studentName;
+          idx = pidx;
+        }
+      }
       if (idx !== -1) {
         const cur = students[idx].present;
         if (cur === true) {
@@ -6936,7 +7029,8 @@ window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
           students[idx].present = false;
         } else {
           // absent → unset (remove from array)
-          students = students.filter(s => !namesMatch(s.name || '', studentName));
+          const nameNorm = _norm(studentName);
+          students = students.filter(s => _norm(s.name || '') !== nameNorm);
         }
       } else {
         // unset → present
