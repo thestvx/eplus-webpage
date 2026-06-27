@@ -5471,21 +5471,40 @@ window.crossSearchExam = async (rawVal) => {
   container.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text-muted);font-weight:700">⏳ جاري البحث...</div>`;
 
   const matches = [];
+  const _norm = (n) => String(n||'').trim().toLowerCase();
   for (const t of allTeachers) {
-    const allStudents = t.students || [];
     const groups = t.groups || [];
+    const allStudents = t.students || [];
+    const matchedNames = new Set();
+    // ابحث في قائمة التلاميذ المسطحة أولاً
     allStudents.forEach(s => {
       if (!s.name) return;
-      if (!s.name.toLowerCase().includes(val)) return;
+      if (!_norm(s.name).includes(val)) return;
       let groupName = '—';
       let groupIdx = -1;
       groups.forEach((g, gi) => {
-        if ((g.students || []).some(gs => gs.trim().toLowerCase() === s.name.trim().toLowerCase())) {
+        if ((g.students || []).some(gs => _norm(gs) === _norm(s.name))) {
           groupName = g.name;
           groupIdx = gi;
         }
       });
       matches.push({ teacher: t, student: s, groupName, groupIdx });
+      matchedNames.add(_norm(s.name));
+    });
+    // ثم ابحث في التلاميذ داخل الأفواج فقط (غير الموجودين في القائمة المسطحة)
+    groups.forEach((g, gi) => {
+      (g.students || []).forEach(gs => {
+        if (!gs) return;
+        if (!_norm(gs).includes(val)) return;
+        if (matchedNames.has(_norm(gs))) return;
+        matches.push({
+          teacher: t,
+          student: { name: gs, id: '', present: false, marked: false, payStatus: 'unknown' },
+          groupName: g.name,
+          groupIdx: gi
+        });
+        matchedNames.add(_norm(gs));
+      });
     });
   }
 
@@ -5597,24 +5616,42 @@ window.crossSearchStudent = async (rawVal) => {
 
   // ── 1. ابحث في allTeachers عن كل تلميذ يطابق الاسم ──
   const matches = []; // { teacher, student, groupName, groupIdx }
+  const _norm = (n) => String(n||'').trim().toLowerCase();
   for (const t of allTeachers) {
     const allStudents = t.students || [];
     const groups = t.groups || [];
+    const matchedNames = new Set();
 
-    // ابحث بدون أفواج
+    // ابحث في القائمة المسطحة أولاً
     allStudents.forEach(s => {
       if (!s.name) return;
-      if (!s.name.toLowerCase().includes(val)) return;
-      // حدد الفوج
+      if (!_norm(s.name).includes(val)) return;
       let groupName = '—';
       let groupIdx = -1;
       groups.forEach((g, gi) => {
-        if ((g.students || []).some(gs => gs.trim().toLowerCase() === s.name.trim().toLowerCase())) {
+        if ((g.students || []).some(gs => _norm(gs) === _norm(s.name))) {
           groupName = g.name;
           groupIdx = gi;
         }
       });
       matches.push({ teacher: t, student: s, groupName, groupIdx });
+      matchedNames.add(_norm(s.name));
+    });
+
+    // ثم ابحث في التلاميذ داخل الأفواج فقط
+    groups.forEach((g, gi) => {
+      (g.students || []).forEach(gs => {
+        if (!gs) return;
+        if (!_norm(gs).includes(val)) return;
+        if (matchedNames.has(_norm(gs))) return;
+        matches.push({
+          teacher: t,
+          student: { name: gs, id: '', present: false, marked: false, payStatus: 'unknown' },
+          groupName: g.name,
+          groupIdx: gi
+        });
+        matchedNames.add(_norm(gs));
+      });
     });
   }
 
@@ -5809,8 +5846,12 @@ function _nameVariants(name) {
   set.add(n);
   if (parts.length >= 2) {
     set.add([...parts].reverse().join(' '));
-    set.add(parts[0] + ' ' + parts[parts.length-1]);
-    set.add(parts[parts.length-1] + ' ' + parts[0]);
+    // Only generate first+last sub-variants for exactly 2-part names
+    // (for 3+ parts they lose the middle word & cause false matches)
+    if (parts.length === 2) {
+      set.add(parts[0] + ' ' + parts[parts.length-1]);
+      set.add(parts[parts.length-1] + ' ' + parts[0]);
+    }
     // Also try full permutation for 3-part names
     if (parts.length === 3) {
       set.add(parts[0] + ' ' + parts[2] + ' ' + parts[1]);
@@ -6783,7 +6824,7 @@ window.loadAttendanceSummary = async function() {
             cells.push(`<td class="att-cell att-cell-missed att-cell-clickable" title="${t('att_missed_session')}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">⚠️</td>`);
             totalMissed++;
           } else {
-            cells.push(`<td class="att-cell att-cell-future" title="${t('att_future_session')}">⋯</td>`);
+            cells.push(`<td class="att-cell att-cell-future att-cell-clickable" title="${t('att_future_session')}" onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')">⋯</td>`);
           }
           continue;
         }
