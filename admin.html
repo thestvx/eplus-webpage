@@ -2335,6 +2335,8 @@
       <button onclick="toggleAttendanceStudentSearch()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #059669;background:rgba(5,150,105,0.08);color:#059669;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إضافة تلميذ جديد للأستاذ المختار" id="att-add-student-btn">➕ إضافة تلميذ</button>
       <button onclick="refreshAttendanceSessions()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.3s" title="تحديث الحصص وضبطها حسب تاريخ الأستاذ" id="att-refresh-btn">🔄 تحديث</button>
       <button onclick="normalizeAttendanceNames()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #7C3AED;background:rgba(124,58,237,0.08);color:#7C3AED;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إعادة ربط أسماء التلاميذ بسجلات الحضور" id="att-normalize-btn">🔗 إعادة ربط الحضور</button>
+      <button onclick="backupAttendanceData()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.3s" title="حفظ نسخة احتياطية للحضور" id="att-backup-btn">💾 حفظ نسخة</button>
+      <button onclick="syncAttendanceFromBackup()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #DC2626;background:rgba(220,38,38,0.08);color:#DC2626;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="استعادة الحضور من النسخة الاحتياطية" id="att-sync-btn">🔄 مزامنة الحضور</button>
     </div>
     <!-- ─── شريط بحث إضافة التلميذ ─── -->
     <div id="att-student-search-wrap" style="display:none;margin-bottom:16px;padding:14px 16px;background:var(--card-bg);border:1.5px solid var(--border);border-radius:12px;transition:all 0.3s">
@@ -7003,6 +7005,84 @@ window.normalizeAttendanceNames = async () => {
     showToast('⚠️ خطأ في إعادة الربط: ' + e.message, true);
   }
   if (btn) { btn.textContent = '🔗 إعادة ربط الحضور'; btn.style.opacity = '1'; btn.disabled = false; }
+};
+
+// ─── حفظ نسخة احتياطية للحضور ───
+window.backupAttendanceData = async () => {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+  const btn = document.getElementById('att-backup-btn');
+  if (btn) { btn.textContent = '⏳ جاري...'; btn.style.opacity = '0.6'; btn.disabled = true; }
+  try {
+    const q = query(
+      collection(db, 'sessionAttendance'),
+      where('teacherId', '>=', teacherId + '_g'),
+      where('teacherId', '<=', teacherId + '_g')
+    );
+    const snap = await getDocs(q);
+    const sessions = {};
+    snap.forEach(d => { sessions[d.id] = d.data(); });
+    const backup = {
+      teacherId,
+      teacherName: teacher.name,
+      timestamp: Date.now(),
+      dateStr: new Date().toLocaleString('ar-DZ', { timeZone: 'Africa/Algiers' }),
+      totalSessions: Object.keys(sessions).length,
+      sessions
+    };
+    const backupRef = doc(collection(db, 'attendanceBackups'));
+    await setDoc(backupRef, backup);
+    showToast(`✅ تم حفظ نسخة احتياطية لـ ${teacher.name} (${Object.keys(sessions).length} حصة)`);
+  } catch (e) {
+    console.error('backupAttendanceData error:', e);
+    showToast('⚠️ خطأ في حفظ النسخة: ' + e.message, true);
+  }
+  if (btn) { btn.textContent = '💾 حفظ نسخة'; btn.style.opacity = '1'; btn.disabled = false; }
+};
+
+// ─── مزامنة الحضور من النسخة الاحتياطية ───
+window.syncAttendanceFromBackup = async () => {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+  try {
+    const q = query(
+      collection(db, 'attendanceBackups'),
+      where('teacherId', '==', teacherId)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) { showToast('⚠️ لا توجد نسخة احتياطية لهذا الأستاذ', true); return; }
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    docs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    const latest = docs[0];
+    if (!latest || !latest.sessions || !Object.keys(latest.sessions).length) {
+      showToast('⚠️ النسخة الاحتياطية فارغة أو تالفة', true); return;
+    }
+    const backupDate = latest.dateStr || new Date(latest.timestamp).toLocaleString('ar-DZ');
+    const sessionCount = Object.keys(latest.sessions).length;
+    if (!confirm(`⚠️ هل أنت متأكد من مزامنة الحضور لـ ${teacher.name}؟\n\nسيتم استبدال جميع سجلات الحضور الحالية بنسخة ${backupDate} (${sessionCount} حصة).\n\nهذا الإجراء لا يمكن التراجع عنه!`)) return;
+    const btn = document.getElementById('att-sync-btn');
+    if (btn) { btn.textContent = '⏳ جاري...'; btn.style.opacity = '0.6'; btn.disabled = true; }
+    const batch = writeBatch(db);
+    let count = 0;
+    for (const [docId, data] of Object.entries(latest.sessions)) {
+      const ref = doc(db, 'sessionAttendance', docId);
+      batch.set(ref, { ...data, savedAt: serverTimestamp() });
+      count++;
+    }
+    await batch.commit();
+    if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
+    showToast(`✅ تمت مزامنة ${count} حصة من النسخة الاحتياطية`);
+    await loadAttendanceSummary();
+  } catch (e) {
+    console.error('syncAttendanceFromBackup error:', e);
+    showToast('⚠️ خطأ في المزامنة: ' + e.message, true);
+  }
+  const btn = document.getElementById('att-sync-btn');
+  if (btn) { btn.textContent = '🔄 مزامنة الحضور'; btn.style.opacity = '1'; btn.disabled = false; }
 };
 
 // ─── تبديل حالة الحضور في سجل الحضور اليومي (3 حالات: ✅←❌←⋯←✅) ───
