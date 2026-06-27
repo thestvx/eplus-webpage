@@ -6850,7 +6850,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   const diffDays = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
   const curSession = Math.min(12, Math.max(1, Math.floor(diffDays / 7) + 1));
 
-  // Load session attendance from Firestore if not cached
+  // ── Load session attendance from Firestore if not cached ──
   if (!window._attSummaryCache[teacherId]) {
     window._attSummaryCache[teacherId] = {};
     try {
@@ -6870,34 +6870,94 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     } catch (e) { /* fallback */ }
   }
 
+  // ── Real-time listener for sessionAttendance changes ──
+  // نضبط المستمع مرة واحدة فقط لكل أستاذ (نتجنب الحلقة اللانهائية)
+  if (window._attSessionUnsubFor !== teacherId) {
+    if (window._attSessionUnsub) { window._attSessionUnsub(); window._attSessionUnsub = null; }
+    window._attSessionUnsubFor = teacherId;
+    window._attSessionUnsub = onSnapshot(
+      query(
+        collection(db, 'sessionAttendance'),
+        where('teacherId', '>=', teacherId + '_g'),
+        where('teacherId', '<=', teacherId + '_g')
+      ),
+      snap => {
+        if (!window._attSummaryCache[teacherId]) return;
+        const newCache = {};
+        snap.forEach(d => {
+          const data = d.data();
+          if (!data.sessionNum) return;
+          const gStr = String(data.teacherId || '');
+          const gi = parseInt((gStr.match(/_g(\d+)$/) || [0, 0])[1]);
+          if (!newCache[gi]) newCache[gi] = {};
+          newCache[gi][data.sessionNum] = data;
+        });
+        window._attSummaryCache[teacherId] = newCache;
+        // إعادة الرسم باستخدام الكاش (بدون query)
+        loadAttendanceSummary(teacherId);
+      },
+      err => console.warn('sessionAttendance listener error:', err.code)
+    );
+  }
+
   const groupCache = window._attSummaryCache[teacherId] || {};
 
-  // ── تحميل session controls لقفل/فتح الحصص ──
-  let sessionCtrlMap = {}; // { gi: { sessionNum: { status, scheduledDate } } }
-  if (teacher && teacher.groups) {
-    for (let gi = 0; gi < teacher.groups.length; gi++) {
-      try {
-        const ctrlQ = query(
-          collection(db, 'sessionControl'),
-          where('teacherId', '==', teacherId + '_g' + gi)
-        );
-        const ctrlSnap = await getDocs(ctrlQ);
-        sessionCtrlMap[gi] = {};
-        ctrlSnap.forEach(d => {
-          const cd = d.data();
-          if (cd.sessionNum) sessionCtrlMap[gi][cd.sessionNum] = cd;
-        });
-        // فتح تلقائي للحصص إذا انتهى التاريخ المجدول
-        const nowDate = new Date().toISOString().slice(0, 10);
-        for (const sn in sessionCtrlMap[gi]) {
-          const ctrl = sessionCtrlMap[gi][sn];
-          if (ctrl.status === 'scheduled' && ctrl.scheduledDate && ctrl.scheduledDate <= nowDate) {
-            ctrl.status = 'open';
-            const docId = getCtrlDocId(teacherId, gi, parseInt(sn));
-            setDoc(doc(db, 'sessionControl', docId), { status: 'open', updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
+  // ── Load session controls (cached, with real-time listener) ──
+  let sessionCtrlMap = window._ctrlMapCache?.[teacherId];
+  if (!sessionCtrlMap) {
+    if (!window._ctrlMapCache) window._ctrlMapCache = {};
+    sessionCtrlMap = {};
+    if (teacher && teacher.groups) {
+      for (let gi = 0; gi < teacher.groups.length; gi++) {
+        try {
+          const ctrlSnap = await getDocs(query(
+            collection(db, 'sessionControl'),
+            where('teacherId', '==', teacherId + '_g' + gi)
+          ));
+          sessionCtrlMap[gi] = {};
+          ctrlSnap.forEach(d => {
+            const cd = d.data();
+            if (cd.sessionNum) sessionCtrlMap[gi][cd.sessionNum] = cd;
+          });
+          // فتح تلقائي للحصص إذا انتهى التاريخ المجدول
+          const nowDate = new Date().toISOString().slice(0, 10);
+          for (const sn in sessionCtrlMap[gi]) {
+            const ctrl = sessionCtrlMap[gi][sn];
+            if (ctrl.status === 'scheduled' && ctrl.scheduledDate && ctrl.scheduledDate <= nowDate) {
+              ctrl.status = 'open';
+              const docId = getCtrlDocId(teacherId, gi, parseInt(sn));
+              setDoc(doc(db, 'sessionControl', docId), { status: 'open', updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
+            }
           }
-        }
-      } catch (e) { /* fallback */ }
+        } catch (e) { /* fallback */ }
+      }
+    }
+    window._ctrlMapCache[teacherId] = sessionCtrlMap;
+    // ── Real-time listener for sessionControl changes ──
+    if (window._ctrlUnsubFor !== teacherId) {
+      if (window._ctrlUnsub) { window._ctrlUnsub(); window._ctrlUnsub = null; }
+      window._ctrlUnsubFor = teacherId;
+      window._ctrlUnsub = onSnapshot(
+        query(
+          collection(db, 'sessionControl'),
+          where('teacherId', '>=', teacherId + '_g'),
+          where('teacherId', '<=', teacherId + '_g')
+        ),
+        snap => {
+          const newCtrl = {};
+          snap.forEach(d => {
+            const cd = d.data();
+            if (!cd.sessionNum) return;
+            const gStr = String(cd.teacherId || '');
+            const gi = parseInt((gStr.match(/_g(\d+)$/) || [0, 0])[1]);
+            if (!newCtrl[gi]) newCtrl[gi] = {};
+            newCtrl[gi][cd.sessionNum] = cd;
+          });
+          if (window._ctrlMapCache) window._ctrlMapCache[teacherId] = newCtrl;
+          loadAttendanceSummary(teacherId);
+        },
+        err => console.warn('sessionControl listener error:', err.code)
+      );
     }
   }
 
