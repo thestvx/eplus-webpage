@@ -6741,12 +6741,18 @@ window.loadAttendanceSummary = async function() {
   let allStudents = [];
   const matchedNames = new Set();
 
-  // Helper: match names using variants
+  // Helper: match names conservatively (same-order, prefix, or suffix — no arbitrary subset)
   const namesMatchLocal = (a, b) => {
     if (!a || !b) return false;
-    const va = _nameVariants(a).map(normName);
-    const vb = _nameVariants(b).map(normName);
-    return va.some(v => vb.includes(v));
+    const an = normName(a), bn = normName(b);
+    if (an === bn) return true;
+    const ap = an.split(/\s+/).filter(Boolean);
+    const bp = bn.split(/\s+/).filter(Boolean);
+    if (ap.length === bp.length) return [...ap].sort().join(' ') === [...bp].sort().join(' ');
+    const [shorter, longer] = ap.length <= bp.length ? [ap, bp] : [bp, ap];
+    if (shorter.length < 2) return false;
+    const ss = shorter.join(' '), ls = longer.join(' ');
+    return ls.startsWith(ss + ' ') || ls.endsWith(' ' + ss);
   };
 
   groups.forEach((g, gi) => {
@@ -6919,9 +6925,15 @@ window.normalizeAttendanceNames = async () => {
   const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const namesMatch = (a, b) => {
     if (!a || !b) return false;
-    const va = _nameVariants(a).map(_norm);
-    const vb = _nameVariants(b).map(_norm);
-    return va.some(v => vb.includes(v));
+    const an = _norm(a), bn = _norm(b);
+    if (an === bn) return true;
+    const ap = an.split(/\s+/).filter(Boolean);
+    const bp = bn.split(/\s+/).filter(Boolean);
+    if (ap.length === bp.length) return [...ap].sort().join(' ') === [...bp].sort().join(' ');
+    const [shorter, longer] = ap.length <= bp.length ? [ap, bp] : [bp, ap];
+    if (shorter.length < 2) return false;
+    const ss = shorter.join(' '), ls = longer.join(' ');
+    return ls.startsWith(ss + ' ') || ls.endsWith(' ' + ss);
   };
 
   // جمع كل أسماء التلاميذ من الأستاذ (القائمة المسطحة + الأفواج)
@@ -6998,9 +7010,15 @@ window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
   const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const namesMatch = (a, b) => {
     if (!a || !b) return false;
-    const va = _nameVariants(a).map(_norm);
-    const vb = _nameVariants(b).map(_norm);
-    return va.some(v => vb.includes(v));
+    const an = _norm(a), bn = _norm(b);
+    if (an === bn) return true;
+    const ap = an.split(/\s+/).filter(Boolean);
+    const bp = bn.split(/\s+/).filter(Boolean);
+    if (ap.length === bp.length) return [...ap].sort().join(' ') === [...bp].sort().join(' ');
+    const [shorter, longer] = ap.length <= bp.length ? [ap, bp] : [bp, ap];
+    if (shorter.length < 2) return false;
+    const ss = shorter.join(' '), ls = longer.join(' ');
+    return ls.startsWith(ss + ' ') || ls.endsWith(' ' + ss);
   };
   const groupSuffix = `_g${gi}`;
   const sessionKey  = `${teacherId}${groupSuffix}_session_${sessionNum}`;
@@ -7063,9 +7081,15 @@ window.removeStudentFromTeacher = async (teacherId, studentName) => {
   const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const namesMatchDel = (a, b) => {
     if (!a || !b) return false;
-    const va = _nameVariants(a).map(_norm);
-    const vb = _nameVariants(b).map(_norm);
-    return va.some(v => vb.includes(v));
+    const an = _norm(a), bn = _norm(b);
+    if (an === bn) return true;
+    const ap = an.split(/\s+/).filter(Boolean);
+    const bp = bn.split(/\s+/).filter(Boolean);
+    if (ap.length === bp.length) return [...ap].sort().join(' ') === [...bp].sort().join(' ');
+    const [shorter, longer] = ap.length <= bp.length ? [ap, bp] : [bp, ap];
+    if (shorter.length < 2) return false;
+    const ss = shorter.join(' '), ls = longer.join(' ');
+    return ls.startsWith(ss + ' ') || ls.endsWith(' ' + ss);
   };
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
   if (!teacher) { showToast('⚠️ ' + t('teacher_not_found'), true); return; }
@@ -7383,12 +7407,18 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride) => {
   const normName = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const giNum = parseInt(giFilter);
 
-  // Helper: check if two names match using name variants
+  // Helper: match names conservatively
   const namesMatch = (a, b) => {
     if (!a || !b) return false;
-    const va = _nameVariants(a).map(normName);
-    const vb = _nameVariants(b).map(normName);
-    return va.some(v => vb.includes(v));
+    const an = normName(a), bn = normName(b);
+    if (an === bn) return true;
+    const ap = an.split(/\s+/).filter(Boolean);
+    const bp = bn.split(/\s+/).filter(Boolean);
+    if (ap.length === bp.length) return [...ap].sort().join(' ') === [...bp].sort().join(' ');
+    const [shorter, longer] = ap.length <= bp.length ? [ap, bp] : [bp, ap];
+    if (shorter.length < 2) return false;
+    const ss = shorter.join(' '), ls = longer.join(' ');
+    return ls.startsWith(ss + ' ') || ls.endsWith(' ' + ss);
   };
 
   let studentEntries = [];
