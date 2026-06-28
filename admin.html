@@ -7993,10 +7993,6 @@ window.confirmRenameGroup = async () => {
   if (!newName) { showToast('⚠️ الرجاء إدخال اسم صالح', true); return; }
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
-  const teacher = (allTeachers || []).find(t => t.id === teacherId);
-  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
-  const oldName = (teacher.groups || [])[gi]?.name || '';
-  if (newName === oldName) { closeRenameGroupModal(); return; }
   const btn = document.querySelector('#rename-group-modal .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
   try {
@@ -8006,13 +8002,17 @@ window.confirmRenameGroup = async () => {
     const data = snap.data();
     const groupsArr = data.groups || [];
     if (!groupsArr[gi]) { showToast('⚠️ الفوج غير موجود', true); return; }
+    const oldName = groupsArr[gi]?.name || '';
+    if (newName === oldName) { closeRenameGroupModal(); return; }
     if (groupsArr.some((g, i) => i !== gi && g.name === newName)) {
       showToast('⚠️ يوجد فوج بنفس الاسم مسبقاً', true); return;
     }
     groupsArr[gi].name = newName;
     await setDoc(teacherRef, { groups: groupsArr }, { merge: true });
-    if (teacher.groups) teacher.groups = groupsArr;
+    // تحديث الذاكرة المحلية وجلب آخر البيانات من Firestore
     if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
+    if (window._ctrlMapCache) window._ctrlMapCache[teacherId] = null;
+    await loadTeachers();
     showToast('✅ تمت إعادة التسمية إلى "' + newName + '"');
     closeRenameGroupModal();
     await loadAttendanceSummary();
