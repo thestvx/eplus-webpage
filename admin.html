@@ -2372,6 +2372,7 @@
       <button onclick="normalizeAttendanceNames()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #7C3AED;background:rgba(124,58,237,0.08);color:#7C3AED;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إعادة ربط أسماء التلاميذ بسجلات الحضور" id="att-normalize-btn">🔗 إعادة ربط الحضور</button>
       <button onclick="backupAttendanceData()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.3s" title="حفظ نسخة احتياطية للحضور" id="att-backup-btn">💾 حفظ نسخة</button>
       <button onclick="syncAttendanceFromBackup()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #DC2626;background:rgba(220,38,38,0.08);color:#DC2626;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="استعادة الحضور من النسخة الاحتياطية" id="att-sync-btn">🔄 مزامنة الحضور</button>
+      <button onclick="openRestoreAttendanceModal()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #2563EB;background:rgba(37,99,235,0.08);color:#2563EB;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="استرجاع سجل الحضور الكامل للأستاذ" id="att-restore-btn">📦 استرجاع سجل الحضور</button>
       <button onclick="toggleUnassignedStudents()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #7C3AED;background:rgba(124,58,237,0.08);color:#7C3AED;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إدارة التلاميذ غير المنتمين لأي فوج" id="att-unassign-btn">🔀 غير منتمين</button>
     </div>
     <!-- ─── شريط بحث إضافة التلميذ ─── -->
@@ -3183,6 +3184,21 @@
     <div class="sync-confirm-btns">
       <button class="sync-confirm-cancel" onclick="closeSyncConfirmModal()">إلغاء</button>
       <button class="sync-confirm-ok" onclick="confirmSyncAttendance()">✅ تأكيد المزامنة</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== RESTORE ATTENDANCE MODAL ===== -->
+<div class="sync-confirm-bg" id="restore-att-modal" onclick="if(event.target===this)closeRestoreAttendanceModal()">
+  <div class="sync-confirm-box" style="max-width:520px">
+    <div class="sync-confirm-icon">📦</div>
+    <div class="sync-confirm-title">استرجاع سجل الحضور</div>
+    <div id="restore-att-content" style="padding:12px 0">
+      <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px">⏳ جاري فحص مصادر الاسترجاع...</div>
+    </div>
+    <div class="sync-confirm-btns">
+      <button class="sync-confirm-cancel" onclick="closeRestoreAttendanceModal()">إلغاء</button>
+      <button class="sync-confirm-ok" id="restore-att-confirm-btn" onclick="confirmRestoreAttendance()" style="display:none">✅ تأكيد الاسترجاع</button>
     </div>
   </div>
 </div>
@@ -6069,6 +6085,8 @@ function loadTeachers() {
     document.getElementById('t-today-label').textContent = `📅 اليوم: ${todayName} — ${todayCount} أستاذ`;
     renderTeachersGrid(allTeachers);
     renderStudentOverview();
+    // ترحيل: ضمان _gid لكل الأفواج (مرة واحدة فقط)
+    ensureGroupIds();
     // Refresh attendance table if a teacher is currently selected
     const attTeacherSel = document.getElementById('att-sum-teacher');
     if (attTeacherSel && attTeacherSel.value && typeof onTeacherChange === 'function') {
@@ -6937,10 +6955,34 @@ const _cleanGroupName = (name) => {
   if (!s || s === '#NAME?' || s === '#REF!' || s === '#VALUE!' || s === '#N/A' || s === '—') return '';
   return s;
 };
-const _groupDefaultName = (gi) => {
-  const names = ['الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
-  return 'الفوج ' + (names[gi] || (gi + 1));
-};
+
+// ─── الترحيل: ضمان وجود _gid لكل فوج عند تحميل الصفحة ───
+let _ensureGroupIdsDone = false;
+async function ensureGroupIds() {
+  if (_ensureGroupIdsDone) return;
+  _ensureGroupIdsDone = true;
+  if (!allTeachers || !allTeachers.length) return;
+  let changed = false;
+  for (const t of allTeachers) {
+    const groups = t.groups || [];
+    let teacherChanged = false;
+    groups.forEach(g => {
+      if (!g._gid || g._gid === '') {
+        g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+        teacherChanged = true;
+        changed = true;
+      }
+    });
+    if (teacherChanged) {
+      try {
+        await updateDoc(doc(db, 'teachers', t.id), { groups });
+      } catch (e) { console.warn('ensureGroupIds failed for', t.id, e.message); }
+    }
+  }
+  if (changed) {
+    showToast('✅ تم ترحيل جميع الأفواج إلى نظام المعرفات الجديد');
+  }
+}
 
 window._attSummaryCache = {}; // teacherId -> { gi: { sessionNum: data } }
 
@@ -7221,16 +7263,17 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   };
 
   groups.forEach((g, gi) => {
+    const gid = g._gid || '';
     (g.students || []).forEach(sName => {
       let match = students.find(s => namesMatchLocal(s.name, sName));
       const cleanG = _cleanGroupName(g.name) || 'فوج ' + (gi + 1);
       if (match) {
         matchedNames.add(normName(match.name || ''));
         const cacheGi = studentGiFromCache.get(_normGi(match.name || ''));
-        allStudents.push({ id: match.id, name: match.name, receipt: match.receipt, payStatus: match.payStatus, group: cleanG, gi: cacheGi ?? gi, groupGi: gi });
+        allStudents.push({ id: match.id, name: match.name, receipt: match.receipt, payStatus: match.payStatus, group: cleanG, gi: cacheGi ?? gi, groupGi: gi, gid });
       } else {
         const cacheGi = studentGiFromCache.get(_normGi(sName));
-        allStudents.push({ name: sName, group: cleanG, gi: cacheGi ?? gi, groupGi: gi });
+        allStudents.push({ name: sName, group: cleanG, gi: cacheGi ?? gi, groupGi: gi, gid });
       }
     });
   });
@@ -7241,14 +7284,16 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     if (matchedNames.has(key)) return;
     let groupGi = 0;
     let groupName = '';
+    let groupGid = '';
     groups.forEach((g, idx) => {
       if ((g.students || []).some(gs => namesMatchLocal(gs, s.name))) {
         groupGi = idx;
         groupName = _cleanGroupName(g.name) || 'فوج ' + (idx + 1);
+        groupGid = g._gid || '';
       }
     });
     const cacheGi = studentGiFromCache.get(_normGi(s.name || ''));
-    allStudents.push({ id: s.id, name: s.name || '—', receipt: s.receipt, payStatus: s.payStatus, group: groupName || '—', gi: cacheGi ?? groupGi, groupGi });
+    allStudents.push({ id: s.id, name: s.name || '—', receipt: s.receipt, payStatus: s.payStatus, group: groupName || '—', gi: cacheGi ?? groupGi, groupGi, gid: groupGid });
   });
 
   // Build rows grouped by group (فوج), count stats
@@ -7260,7 +7305,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   const grouped = {};
   allStudents.forEach(s => {
     const dk = s.groupGi;
-    if (!grouped[dk]) grouped[dk] = { group: s.group, gi: dk, students: [] };
+    if (!grouped[dk]) grouped[dk] = { group: s.group, gi: dk, gid: s.gid, students: [] };
     grouped[dk].students.push(s);
   });
   let groupKeys = Object.keys(grouped).map(Number).sort((a,b) => a - b);
@@ -7282,7 +7327,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     }
     const isAdmin = !window._isTeacherAttendanceView;
     allRows.push(`<tr class="att-group-header-row">
-      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}${isAdmin ? `<button class="att-group-rename-btn" onclick="renameGroup(${gi})" title="إعادة تسمية الفوج">✏️ إعادة تسمية</button><button class="att-group-del-btn" onclick="deleteGroup(${gi})" title="حذف الفوج">🗑️ حذف</button>` : ''}</td>
+      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}${isAdmin ? `<button class="att-group-rename-btn" onclick="renameGroup('${g.gid}')" title="إعادة تسمية الفوج">✏️ إعادة تسمية</button><button class="att-group-del-btn" onclick="deleteGroup('${g.gid}')" title="حذف الفوج" data-gid="${g.gid}">🗑️ حذف</button>` : ''}</td>
     </tr>`);
 
     let rowNum = 1;
@@ -7602,7 +7647,165 @@ window.confirmSyncAttendance = async () => {
   if (btn) { btn.textContent = '🔄 مزامنة الحضور'; btn.style.opacity = '1'; btn.disabled = false; }
 };
 
-// ─── تبديل حالة الحضور في سجل الحضور اليومي (3 حالات: ✅←❌←⋯←✅) ───
+// ─── استرجاع سجل الحضور الكامل للأستاذ ───
+let _restoreData = null;
+
+window.openRestoreAttendanceModal = async () => {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+  document.getElementById('restore-att-modal').classList.add('open');
+  _restoreData = null;
+  document.getElementById('restore-att-confirm-btn').style.display = 'none';
+  const content = document.getElementById('restore-att-content');
+  content.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px">⏳ جاري فحص مصادر الاسترجاع...</div>';
+
+  try {
+    const teacherName = teacher.name || teacherId;
+    const lines = [];
+    let hasRestorableData = false;
+
+    // 1. فحص النسخة الاحتياطية للأفواج
+    const groupBackupSnap = await getDoc(doc(db, 'settings', 'groupBackup_' + teacherId));
+    let backupGroups = null;
+    if (groupBackupSnap.exists()) {
+      const gbData = groupBackupSnap.data();
+      backupGroups = gbData.groups || [];
+      const savedAt = gbData.savedAt?.toDate?.()?.toLocaleString('ar-DZ') || 'غير معروف';
+      lines.push(`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;background:#EEF2FF;margin-bottom:6px">
+        <span style="font-size:18px">📦</span>
+        <div style="flex:1">
+          <div style="font-weight:800;font-size:13px;color:#1e40af">نسخة احتياطية للأفواج</div>
+          <div style="font-size:11px;color:var(--text-muted)">${backupGroups.length} فوج — محفوظة في ${savedAt}</div>
+          <div style="font-size:11px;color:#6b7280">${backupGroups.map(g => g.name || '—').join('، ')}</div>
+        </div>
+      </div>`);
+      hasRestorableData = true;
+    }
+
+    // 2. فحص نسخة مزامنة الأسماء
+    const nameSyncSnap = await getDoc(doc(db, 'settings', 'nameSyncBackup'));
+    let syncBackupEntry = null;
+    if (nameSyncSnap.exists()) {
+      const changes = nameSyncSnap.data().changes || [];
+      syncBackupEntry = changes.find(c => c.teacherId === teacherId);
+      if (syncBackupEntry) {
+        lines.push(`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;background:#FEF3C7;margin-bottom:6px">
+          <span style="font-size:18px">🔄</span>
+          <div style="flex:1">
+            <div style="font-weight:800;font-size:13px;color:#92400e">نسخة مزامنة الأسماء</div>
+            <div style="font-size:11px;color:var(--text-muted)">${syncBackupEntry.groups?.length || 0} فوج — ${syncBackupEntry.students?.length || 0} تلميذ</div>
+          </div>
+        </div>`);
+        hasRestorableData = true;
+      }
+    }
+
+    // 3. فحص سجلات الحضور (sessionAttendance)
+    const attQuery = query(
+      collection(db, 'sessionAttendance'),
+      where('teacherId', '>=', teacherId + '_g0'),
+      where('teacherId', '<=', teacherId + '_g9999999999')
+    );
+    const attSnap = await getDocs(attQuery);
+    const attSessions = {};
+    let totalAttRecords = 0;
+    attSnap.forEach(d => {
+      attSessions[d.id] = d.data();
+      totalAttRecords += (d.data().students || []).length;
+    });
+    if (Object.keys(attSessions).length > 0) {
+      lines.push(`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;background:#ECFDF5;margin-bottom:6px">
+        <span style="font-size:18px">✅</span>
+        <div style="flex:1">
+          <div style="font-weight:800;font-size:13px;color:#065f46">سجلات الحضور الحالية</div>
+          <div style="font-size:11px;color:var(--text-muted)">${Object.keys(attSessions).length} حصة — ${totalAttRecords} تسجيل حضور</div>
+        </div>
+      </div>`);
+      hasRestorableData = true;
+    }
+
+    if (!hasRestorableData) {
+      content.innerHTML = `<div style="text-align:center;padding:20px">
+        <div style="font-size:40px;opacity:0.4;margin-bottom:12px">📭</div>
+        <div style="font-weight:800;font-size:15px;color:var(--text-muted);margin-bottom:6px">لا توجد بيانات قابلة للاسترجاع</div>
+        <div style="font-size:12px;color:#9CA3AF">لم يتم العثور على نسخة احتياطية للأفواج ولا سجلات حضور<br>للأستاذ <strong>${teacherName}</strong></div>
+      </div>`;
+      return;
+    }
+
+    lines.unshift(`<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;padding:0 4px">تم العثور على البيانات التالية للأستاذ <strong>${teacherName}</strong>:</div>`);
+    lines.push(`<div style="font-size:12px;color:#DC2626;font-weight:800;margin-top:8px;padding:8px 12px;background:#FEF2F2;border-radius:8px">⚠️ سيتم استبدال جميع بيانات الأستاذ الحالية بهذه البيانات. هذا الإجراء لا يمكن التراجع عنه.</div>`);
+
+    content.innerHTML = lines.join('');
+    _restoreData = { teacherId, teacherName, backupGroups, syncBackupEntry, attSessions };
+    document.getElementById('restore-att-confirm-btn').style.display = '';
+  } catch (e) {
+    console.error('openRestoreAttendanceModal error:', e);
+    content.innerHTML = `<div style="text-align:center;padding:20px;color:#DC2626">❌ خطأ في تحميل البيانات: ${e.message}</div>`;
+  }
+};
+
+window.closeRestoreAttendanceModal = () => {
+  document.getElementById('restore-att-modal').classList.remove('open');
+  _restoreData = null;
+};
+
+window.confirmRestoreAttendance = async () => {
+  const data = _restoreData;
+  if (!data) return;
+  _restoreData = null;
+  const btn = document.getElementById('restore-att-confirm-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الاسترجاع...'; }
+  try {
+    let restoredCount = 0;
+
+    // استرجاع الأفواج من النسخة الاحتياطية (الأولوية القصوى)
+    if (data.backupGroups) {
+      await updateDoc(doc(db, 'teachers', data.teacherId), { groups: data.backupGroups });
+      restoredCount++;
+    } else if (data.syncBackupEntry?.groups) {
+      await updateDoc(doc(db, 'teachers', data.teacherId), { groups: data.syncBackupEntry.groups });
+      restoredCount++;
+    }
+
+    // استرجاع التلاميذ من نسخة المزامنة
+    if (data.syncBackupEntry?.students) {
+      await updateDoc(doc(db, 'teachers', data.teacherId), { students: data.syncBackupEntry.students });
+      restoredCount++;
+    }
+
+    // استرجاع سجلات الحضور
+    if (data.attSessions && Object.keys(data.attSessions).length > 0) {
+      const batch = writeBatch(db);
+      let count = 0;
+      for (const [docId, sessionData] of Object.entries(data.attSessions)) {
+        const ref = doc(db, 'sessionAttendance', docId);
+        batch.set(ref, { ...sessionData, savedAt: serverTimestamp() });
+        count++;
+      }
+      await batch.commit();
+      restoredCount += count;
+    }
+
+    // تفريغ الكاش
+    if (window._attSummaryCache) window._attSummaryCache[data.teacherId] = null;
+    if (window._ctrlMapCache) window._ctrlMapCache[data.teacherId] = null;
+
+    // تحديث allTeachers من Firestore
+    _ensureGroupIdsDone = false;
+    loadTeachers();
+
+    showToast(`✅ تم استرجاع بيانات الأستاذ ${data.teacherName} بنجاح`);
+    closeRestoreAttendanceModal();
+  } catch (e) {
+    console.error('confirmRestoreAttendance error:', e);
+    showToast('❌ خطأ في الاسترجاع: ' + e.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الاسترجاع'; }
+  }
+};
 window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
   // منع التعديل للأساتذة إذا كانت الحصة مقفلة صراحةً من الأدمن
   if (window._isTeacherAttendanceView) {
@@ -7872,18 +8075,19 @@ window.addUnassignedToGroup = async () => {
 };
 
 // ─── حذف فوج كامل ───
-let _delGi = -1;
-window.deleteGroup = (gi) => {
+let _delGid = '';
+window.deleteGroup = (gid) => {
+  if (!gid) { showToast('⚠️ معرف الفوج غير صالح', true); return; }
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
   if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
   const groups = teacher.groups || [];
-  const group = groups[gi];
+  const group = groups.find(g => g && g._gid === gid);
   if (!group) { showToast('⚠️ الفوج غير موجود', true); return; }
-  _delGi = gi;
+  _delGid = gid;
   const studentCount = (group.students || []).length;
-  const groupName = group.name || ('فوج ' + (gi + 1));
+  const groupName = group.name || '—';
   document.getElementById('del-group-name-display').textContent = '🏫 ' + groupName;
   document.getElementById('del-group-msg').innerHTML = '⚠️ سيتم <strong>حذف ' + studentCount + ' تلميذ</strong> موجودين داخل هذا الفوج نهائياً.<br>لا يمكن التراجع عن هذا الإجراء.';
   const bg = document.getElementById('del-group-modal');
@@ -7893,21 +8097,21 @@ window.deleteGroup = (gi) => {
 window.closeDelGroupModal = () => {
   const bg = document.getElementById('del-group-modal');
   if (bg) { bg.classList.remove('open'); document.body.style.overflow = ''; }
-  _delGi = -1;
+  _delGid = '';
 };
 
 window.confirmDelGroup = async () => {
-  const gi = _delGi;
+  const gid = _delGid;
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
-  if (!teacherId || gi < 0) return;
+  if (!teacherId || !gid) return;
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
   if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
   const groups = teacher.groups || [];
-  const group = groups[gi];
+  const group = groups.find(g => g && g._gid === gid);
   if (!group) { showToast('⚠️ الفوج غير موجود', true); return; }
-  const groupName = group.name || ('فوج ' + (gi + 1));
+  const groupName = group.name || '—';
   closeDelGroupModal();
-  const btn2 = document.querySelector('[onclick*="deleteGroup(' + gi + ')"]');
+  const btn2 = document.querySelector(`.att-group-del-btn[data-gid="${gid}"]`);
   if (btn2) btn2.textContent = '⏳ جاري الحذف...';
   try {
     const teacherRef = doc(db, 'teachers', teacherId);
@@ -7915,7 +8119,8 @@ window.confirmDelGroup = async () => {
     if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
     const data = snap.data();
     let groupsArr = data.groups || [];
-    if (!groupsArr[gi]) { showToast('⚠️ الفوج غير موجود', true); return; }
+    const gi = groupsArr.findIndex(g => g && g._gid === gid);
+    if (gi < 0) { showToast('⚠️ الفوج غير موجود', true); return; }
     const deletedGroup = groupsArr[gi];
     const deletedStudentNames = new Set((deletedGroup.students || []).map(s => s.trim().toLowerCase()));
 
@@ -7991,72 +8196,61 @@ window.confirmDelGroup = async () => {
     console.error('deleteGroup error:', e);
     showToast('❌ خطأ في حذف الفوج: ' + e.message, true);
   } finally {
-    const btn3 = document.querySelector('[onclick*="deleteGroup(' + gi + ')"]');
+    const btn3 = document.querySelector(`.att-group-del-btn[data-gid="${gid}"]`);
     if (btn3) btn3.textContent = '🗑️ حذف';
   }
 };
 
-// ─── إعادة تسمية فوج ───
-let _renameGi = -1;
+// ─── إعادة تسمية فوج (تعتمد فقط على _gid) ───
 let _renameGid = '';
-window.renameGroup = async (gi) => {
+window.renameGroup = async (gid) => {
+  if (!gid) { showToast('⚠️ معرف الفوج غير صالح', true); return; }
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
-  _renameGi = gi;
+  _renameGid = gid;
   const inp = document.getElementById('rename-group-input');
   const bg = document.getElementById('rename-group-modal');
   if (!bg) return;
-  // اعرض القيمة المخبأة فوراً ثم افتح النافذة
-  const cachedTeacher = (allTeachers || []).find(t => t.id === teacherId);
-  const cachedGroup = (cachedTeacher?.groups || [])[gi];
-  if (inp) { inp.value = cachedGroup?.name ?? ''; inp.focus(); inp.select(); }
   bg.classList.add('open');
   document.body.style.overflow = 'hidden';
-  // جلب الاسم الحقيقي و _gid من Firestore
+  // جلب الاسم من Firestore باستخدام _gid
   try {
     const snap = await getDoc(doc(db, 'teachers', teacherId));
     if (snap.exists()) {
       const data = snap.data();
       const groupsArr = data.groups || [];
-      // ابحث بالـ gi أولاً (الأسرع)
-      let realGroup = groupsArr[gi];
-      let foundIdx = realGroup ? gi : -1;
-      // إن لم يوجد بالـ gi، ابحث بالـ _gid من الكاش (موثوق)
-      if (!realGroup && cachedGroup?._gid) {
-        foundIdx = groupsArr.findIndex(g => g && g._gid === cachedGroup._gid);
-        if (foundIdx >= 0) realGroup = groupsArr[foundIdx];
+      const group = groupsArr.find(g => g && g._gid === gid);
+      if (group) {
+        if (inp) { inp.value = group.name ?? ''; inp.focus(); inp.select(); }
+      } else {
+        // محاولة من الكاش
+        const cachedTeacher = (allTeachers || []).find(t => t.id === teacherId);
+        const cachedGroup = cachedTeacher?.groups?.find(g => g && g._gid === gid);
+        if (inp) { inp.value = cachedGroup?.name ?? ''; inp.focus(); inp.select(); }
+        showToast('⚠️ الفوج غير موجود في قاعدة البيانات، سيتم استخدام البيانات المخبأة', true);
       }
-      // إن لم يوجد، ابحث بالاسم من الكاش
-      if (!realGroup && cachedGroup?.name) {
-        foundIdx = groupsArr.findIndex(g => g && g.name === cachedGroup.name);
-        if (foundIdx >= 0) realGroup = groupsArr[foundIdx];
-      }
-      // إن لم يوجد، ابحث بكل _gid معروف (للتأكد)
-      if (!realGroup && _renameGid) {
-        foundIdx = groupsArr.findIndex(g => g && g._gid === _renameGid);
-        if (foundIdx >= 0) realGroup = groupsArr[foundIdx];
-      }
-      if (realGroup && foundIdx >= 0) {
-        _renameGid = realGroup._gid || '';
-        _renameGi = foundIdx;
-        if (inp) inp.value = realGroup.name ?? '';
-      }
+    } else {
+      const cachedTeacher = (allTeachers || []).find(t => t.id === teacherId);
+      const cachedGroup = cachedTeacher?.groups?.find(g => g && g._gid === gid);
+      if (inp) { inp.value = cachedGroup?.name ?? ''; inp.focus(); inp.select(); }
     }
-  } catch (e) { /* تجاهل الخطأ */ }
+  } catch (e) {
+    const cachedTeacher = (allTeachers || []).find(t => t.id === teacherId);
+    const cachedGroup = cachedTeacher?.groups?.find(g => g && g._gid === gid);
+    if (inp) { inp.value = cachedGroup?.name ?? ''; inp.focus(); inp.select(); }
+  }
 };
 
 window.closeRenameGroupModal = () => {
   const bg = document.getElementById('rename-group-modal');
   if (bg) { bg.classList.remove('open'); document.body.style.overflow = ''; }
-  _renameGi = -1;
   _renameGid = '';
 };
 
 window.confirmRenameGroup = async () => {
-  const gi = _renameGi;
   const gid = _renameGid;
   const inp = document.getElementById('rename-group-input');
-  if (!inp || gi < 0) return;
+  if (!inp || !gid) return;
   const newName = inp.value.trim();
   if (!newName) { showToast('⚠️ الرجاء إدخال اسم صالح', true); return; }
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
@@ -8069,27 +8263,12 @@ window.confirmRenameGroup = async () => {
     if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
     const data = snap.data();
     let groupsArr = data.groups || [];
-    // ابحث عن الفوج بالـ _gid أولاً، ثم بالـ gi
-    let targetIdx = -1;
-    if (gid) {
-      targetIdx = groupsArr.findIndex(g => g && g._gid === gid);
-    }
-    if (targetIdx < 0 && groupsArr[gi]) {
-      targetIdx = gi;
-    }
-    if (targetIdx < 0 || !groupsArr[targetIdx]) {
-      // محاولة أخيرة: ابحث بالاسم القديم
-      const oldTeacher = (allTeachers || []).find(t => t.id === teacherId);
-      const oldName = oldTeacher?.groups?.[gi]?.name || '';
-      if (oldName) {
-        targetIdx = groupsArr.findIndex(g => g && g.name === oldName);
-      }
-    }
+    const targetIdx = groupsArr.findIndex(g => g && g._gid === gid);
     if (targetIdx < 0 || !groupsArr[targetIdx]) {
       showToast('⚠️ الفوج غير موجود', true); return;
     }
     // تأكد من وجود _gid
-    if (!groupsArr[targetIdx]._gid) groupsArr[targetIdx]._gid = gid || 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+    if (!groupsArr[targetIdx]._gid) groupsArr[targetIdx]._gid = gid;
     const oldName = groupsArr[targetIdx]?.name || '';
     if (newName === oldName) { closeRenameGroupModal(); return; }
     if (groupsArr.some((g, i) => i !== targetIdx && g.name === newName)) {
@@ -8097,14 +8276,13 @@ window.confirmRenameGroup = async () => {
     }
     groupsArr[targetIdx].name = newName;
     await setDoc(teacherRef, { groups: groupsArr }, { merge: true });
-    // تحديث الذاكرة المحلية مباشرة (باستخدام _gid إن أمكن)
+    // تحديث الذاكرة المحلية باستخدام _gid
     const teacher = (allTeachers || []).find(t => t.id === teacherId);
     if (teacher && teacher.groups) {
-      const cacheTarget = gid ? teacher.groups.findIndex(g => g && g._gid === gid) : -1;
-      const cacheIdx = cacheTarget >= 0 ? cacheTarget : gi;
-      if (teacher.groups[cacheIdx]) {
+      const cacheIdx = teacher.groups.findIndex(g => g && g._gid === gid);
+      if (cacheIdx >= 0 && teacher.groups[cacheIdx]) {
         teacher.groups[cacheIdx].name = newName;
-        if (!teacher.groups[cacheIdx]._gid) teacher.groups[cacheIdx]._gid = gid || groupsArr[targetIdx]._gid || '';
+        if (!teacher.groups[cacheIdx]._gid) teacher.groups[cacheIdx]._gid = gid;
       }
     }
     if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
@@ -8529,6 +8707,7 @@ window.restoreSyncBackup = async () => {
   await addLog('↩️ استعادة أسماء', `تمت استعادة أسماء ${restored} أستاذ من آخر مزامنة`, '↩️');
   showToast(`✅ تمت استعادة ${restored} أستاذ بنجاح`);
 
+  _ensureGroupIdsDone = false;
   loadTeachers();
   loadTickets();
 };
@@ -8576,11 +8755,11 @@ window.saveTeacherEdit = async () => {
   const teacher = allTeachers.find(t => t.id === id);
   const oldGroups = teacher ? JSON.parse(JSON.stringify(teacher.groups || [])) : [];
 
-  // ── كشف التغييرات في الأفواج ──
-  const oldNames = new Set(oldGroups.map(g => g.name));
-  const newNames = new Set(groups.map(g => g.name));
-  const removed = oldGroups.filter(g => !newNames.has(g.name));
-  const added = groups.filter(g => !oldNames.has(g.name));
+  // ── كشف التغييرات في الأفواج (باستخدام _gid) ──
+  const oldGids = new Set(oldGroups.map(g => g._gid));
+  const newGids = new Set(groups.map(g => g._gid));
+  const removed = oldGroups.filter(g => !newGids.has(g._gid));
+  const added = groups.filter(g => !oldGids.has(g._gid));
   if (removed.length) {
     console.warn('⚠️ أفواج محذوفة:', removed.map(g => g.name).join(', '), 'للاستاذ', name);
   }
@@ -8655,6 +8834,7 @@ window.restoreTeacherGroups = async (teacherId, teacherName) => {
           await updateDoc(doc(db, 'teachers', teacherId), { groups: match.groups });
           await addLog('📦 استعادة أفواج', `تم استعادة أفواج الأستاذ ${teacherName} من نسخة المزامنة`, '📦');
           showToast('✅ تم استعادة الأفواج بنجاح');
+          _ensureGroupIdsDone = false;
           loadTeachers();
           return;
         }
@@ -8669,6 +8849,7 @@ window.restoreTeacherGroups = async (teacherId, teacherName) => {
     await updateDoc(doc(db, 'teachers', teacherId), { groups: backupGroups });
     await addLog('📦 استعادة أفواج', `تم استعادة أفواج الأستاذ ${teacherName}: ${backupGroups.map(g => g.name).join(', ')}`, '📦');
     showToast('✅ تم استعادة الأفواج بنجاح');
+    _ensureGroupIdsDone = false;
     loadTeachers();
   } catch(e) {
     showToast('⚠️ خطأ: ' + e.message, true);
