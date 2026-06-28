@@ -2970,6 +2970,48 @@
   </div>
 </div>
 
+<!-- ===== RENAME GROUP MODAL ===== -->
+<div class="ctrl-modal-bg" id="rename-group-modal" onclick="if(event.target===this)closeRenameGroupModal()">
+  <div class="ctrl-modal" style="max-width:420px">
+    <div class="ctrl-modal-header">
+      <div style="font-size:22px">✏️</div>
+      <div class="ctrl-modal-title">إعادة تسمية الفوج</div>
+      <button class="att-modal-close" onclick="closeRenameGroupModal()">✕</button>
+    </div>
+    <div class="ctrl-modal-body">
+      <div class="ctrl-field">
+        <label>🏷️ الاسم الجديد للفوج</label>
+        <input type="text" id="rename-group-input" class="inp" placeholder="أدخل اسم الفوج الجديد" value="" onkeydown="if(event.key==='Enter')confirmRenameGroup()">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button onclick="closeRenameGroupModal()" style="flex:1;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text-muted);font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">إلغاء</button>
+        <button onclick="confirmRenameGroup()" class="btn-primary" style="flex:2">💾 حفظ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DELETE GROUP MODAL ===== -->
+<div class="ctrl-modal-bg" id="del-group-modal" onclick="if(event.target===this)closeDelGroupModal()">
+  <div class="ctrl-modal" style="max-width:420px">
+    <div class="ctrl-modal-header">
+      <div style="font-size:22px">🗑️</div>
+      <div class="ctrl-modal-title">حذف الفوج</div>
+      <button class="att-modal-close" onclick="closeDelGroupModal()">✕</button>
+    </div>
+    <div class="ctrl-modal-body">
+      <div style="text-align:center;padding:10px 0">
+        <div style="font-size:15px;color:var(--text-2);font-weight:800;margin-bottom:10px" id="del-group-name-display"></div>
+        <div style="font-size:13px;color:var(--text-muted);font-weight:600;line-height:1.8" id="del-group-msg"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button onclick="closeDelGroupModal()" style="flex:1;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text-muted);font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">إلغاء</button>
+        <button onclick="confirmDelGroup()" style="flex:2;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,#EF4444,#B91C1C);color:white;font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;box-shadow:0 4px 14px rgba(239,68,68,0.3)">🗑️ حذف الفوج</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== ENVELOPE MESSAGE MODAL (للأستاذ) ===== -->
 <div class="env-modal-bg" id="env-modal">
   <div class="env-modal">
@@ -7792,6 +7834,7 @@ window.addUnassignedToGroup = async () => {
 };
 
 // ─── حذف فوج كامل ───
+let _delGi = -1;
 window.deleteGroup = (gi) => {
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
@@ -7800,124 +7843,123 @@ window.deleteGroup = (gi) => {
   const groups = teacher.groups || [];
   const group = groups[gi];
   if (!group) { showToast('⚠️ الفوج غير موجود', true); return; }
+  _delGi = gi;
   const studentCount = (group.students || []).length;
   const groupName = group.name || ('فوج ' + (gi + 1));
+  document.getElementById('del-group-name-display').textContent = '🏫 ' + groupName;
+  document.getElementById('del-group-msg').innerHTML = '⚠️ سيتم <strong>حذف ' + studentCount + ' تلميذ</strong> موجودين داخل هذا الفوج نهائياً.<br>لا يمكن التراجع عن هذا الإجراء.';
+  const bg = document.getElementById('del-group-modal');
+  if (bg) { bg.classList.add('open'); document.body.style.overflow = 'hidden'; }
+};
 
-  // Show confirmation modal
-  const overlay = document.createElement('div');
-  overlay.className = 'del-confirm-bg';
-  overlay.innerHTML = `<div class="del-confirm-box">
-    <div class="del-confirm-icon">🗑️</div>
-    <div class="del-confirm-title">حذف الفوج</div>
-    <div class="del-confirm-sub">هل أنت متأكد من حذف الفوج "<strong>${groupName}</strong>"؟<br><br>
-    ⚠️ سيتم <strong>حذف ${studentCount} تلميذ</strong> موجودين داخله نهائياً.<br>
-    لا يمكن التراجع عن هذا الإجراء.</div>
-    <div class="del-confirm-btns">
-      <button class="del-confirm-cancel" id="del-grp-cancel">إلغاء</button>
-      <button class="del-confirm-ok" id="del-grp-confirm">🗑️ حذف الفوج</button>
-    </div>
-  </div>`;
-  document.body.appendChild(overlay);
+window.closeDelGroupModal = () => {
+  const bg = document.getElementById('del-group-modal');
+  if (bg) { bg.classList.remove('open'); document.body.style.overflow = ''; }
+  _delGi = -1;
+};
 
-  const doDelete = async () => {
-    document.body.removeChild(overlay);
-    const btn2 = document.querySelector('[onclick*="deleteGroup(' + gi + ')"]');
-    if (btn2) btn2.textContent = '⏳ جاري الحذف...';
-    try {
-      const teacherRef = doc(db, 'teachers', teacherId);
-      const snap = await getDoc(teacherRef);
-      if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
-      const data = snap.data();
-      let groupsArr = data.groups || [];
-      if (!groupsArr[gi]) { showToast('⚠️ الفوج غير موجود', true); return; }
-      const deletedGroup = groupsArr[gi];
-      const deletedStudentNames = new Set((deletedGroup.students || []).map(s => s.trim().toLowerCase()));
+window.confirmDelGroup = async () => {
+  const gi = _delGi;
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId || gi < 0) return;
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+  const groups = teacher.groups || [];
+  const group = groups[gi];
+  if (!group) { showToast('⚠️ الفوج غير موجود', true); return; }
+  const groupName = group.name || ('فوج ' + (gi + 1));
+  closeDelGroupModal();
+  const btn2 = document.querySelector('[onclick*="deleteGroup(' + gi + ')"]');
+  if (btn2) btn2.textContent = '⏳ جاري الحذف...';
+  try {
+    const teacherRef = doc(db, 'teachers', teacherId);
+    const snap = await getDoc(teacherRef);
+    if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+    const data = snap.data();
+    let groupsArr = data.groups || [];
+    if (!groupsArr[gi]) { showToast('⚠️ الفوج غير موجود', true); return; }
+    const deletedGroup = groupsArr[gi];
+    const deletedStudentNames = new Set((deletedGroup.students || []).map(s => s.trim().toLowerCase()));
 
-      // Remove students that were exclusively in this group
-      const remainingGroups = groupsArr.filter((_, i) => i !== gi);
-      const namesInOtherGroups = new Set();
-      remainingGroups.forEach(g => (g.students || []).forEach(s => namesInOtherGroups.add(s.trim().toLowerCase())));
+    // Remove students that were exclusively in this group
+    const remainingGroups = groupsArr.filter((_, i) => i !== gi);
+    const namesInOtherGroups = new Set();
+    remainingGroups.forEach(g => (g.students || []).forEach(s => namesInOtherGroups.add(s.trim().toLowerCase())));
 
-      const studentsArr = data.students || [];
-      const filteredStudents = studentsArr.filter(s => {
-        const sn = (s.name || '').trim().toLowerCase();
-        return !(deletedStudentNames.has(sn) && !namesInOtherGroups.has(sn));
-      });
-      const actuallyRemoved = studentsArr.length - filteredStudents.length;
+    const studentsArr = data.students || [];
+    const filteredStudents = studentsArr.filter(s => {
+      const sn = (s.name || '').trim().toLowerCase();
+      return !(deletedStudentNames.has(sn) && !namesInOtherGroups.has(sn));
+    });
+    const actuallyRemoved = studentsArr.length - filteredStudents.length;
 
-      // Remove the group from the array
-      groupsArr.splice(gi, 1);
+    // Remove the group from the array
+    groupsArr.splice(gi, 1);
 
-      // Delete/re-index session attendance and control documents
-      const batch = writeBatch(db);
-      const sessQuery = query(
-        collection(db, 'sessionAttendance'),
-        where('teacherId', '>=', teacherId + '_g0'),
-        where('teacherId', '<=', teacherId + '_g9999999999')
-      );
-      const sessSnap = await getDocs(sessQuery);
-      const ctrlQuery = query(
-        collection(db, 'sessionControl'),
-        where('teacherId', '>=', teacherId + '_g0'),
-        where('teacherId', '<=', teacherId + '_g9999999999')
-      );
-      const ctrlSnap = await getDocs(ctrlQuery);
+    // Delete/re-index session attendance and control documents
+    const batch = writeBatch(db);
+    const sessQuery = query(
+      collection(db, 'sessionAttendance'),
+      where('teacherId', '>=', teacherId + '_g0'),
+      where('teacherId', '<=', teacherId + '_g9999999999')
+    );
+    const sessSnap = await getDocs(sessQuery);
+    const ctrlQuery = query(
+      collection(db, 'sessionControl'),
+      where('teacherId', '>=', teacherId + '_g0'),
+      where('teacherId', '<=', teacherId + '_g9999999999')
+    );
+    const ctrlSnap = await getDocs(ctrlQuery);
 
-      sessSnap.forEach(docSnap => {
-        const data2 = docSnap.data();
-        const gStr = String(data2.teacherId || '');
-        const match = gStr.match(/_g(\d+)$/);
-        if (!match) return;
-        const oldGi = parseInt(match[1]);
-        if (oldGi === gi) {
-          batch.delete(docSnap.ref);
-        } else if (oldGi > gi) {
-          const newTeacherId = gStr.replace(/_g\d+$/, '_g' + (oldGi - 1));
-          batch.update(docSnap.ref, { teacherId: newTeacherId });
-        }
-      });
-      ctrlSnap.forEach(docSnap => {
-        const data2 = docSnap.data();
-        const gStr = String(data2.teacherId || '');
-        const match = gStr.match(/_g(\d+)$/);
-        if (!match) return;
-        const oldGi = parseInt(match[1]);
-        if (oldGi === gi) {
-          batch.delete(docSnap.ref);
-        } else if (oldGi > gi) {
-          const newTeacherId = gStr.replace(/_g\d+$/, '_g' + (oldGi - 1));
-          batch.update(docSnap.ref, { teacherId: newTeacherId });
-        }
-      });
+    sessSnap.forEach(docSnap => {
+      const d2 = docSnap.data();
+      const gStr = String(d2.teacherId || '');
+      const match = gStr.match(/_g(\d+)$/);
+      if (!match) return;
+      const oldGi = parseInt(match[1]);
+      if (oldGi === gi) {
+        batch.delete(docSnap.ref);
+      } else if (oldGi > gi) {
+        batch.update(docSnap.ref, { teacherId: gStr.replace(/_g\d+$/, '_g' + (oldGi - 1)) });
+      }
+    });
+    ctrlSnap.forEach(docSnap => {
+      const d2 = docSnap.data();
+      const gStr = String(d2.teacherId || '');
+      const match = gStr.match(/_g(\d+)$/);
+      if (!match) return;
+      const oldGi = parseInt(match[1]);
+      if (oldGi === gi) {
+        batch.delete(docSnap.ref);
+      } else if (oldGi > gi) {
+        batch.update(docSnap.ref, { teacherId: gStr.replace(/_g\d+$/, '_g' + (oldGi - 1)) });
+      }
+    });
 
-      await batch.commit();
+    await batch.commit();
 
-      // Save teacher document
-      await setDoc(teacherRef, { groups: groupsArr, students: filteredStudents }, { merge: true });
+    // Save teacher document
+    await setDoc(teacherRef, { groups: groupsArr, students: filteredStudents }, { merge: true });
 
-      // Update local cache
-      if (teacher.groups) teacher.groups = groupsArr;
-      if (teacher.students) teacher.students = filteredStudents;
-      if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
-      if (window._ctrlMapCache) window._ctrlMapCache[teacherId] = null;
+    // Update local cache
+    if (teacher.groups) teacher.groups = groupsArr;
+    if (teacher.students) teacher.students = filteredStudents;
+    if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
+    if (window._ctrlMapCache) window._ctrlMapCache[teacherId] = null;
 
-      showToast('✅ تم حذف الفوج "' + groupName + '"' + (actuallyRemoved > 0 ? ' و' + actuallyRemoved + ' تلميذ' : ''));
-      await loadAttendanceSummary();
-    } catch (e) {
-      console.error('deleteGroup error:', e);
-      showToast('❌ خطأ في حذف الفوج: ' + e.message, true);
-    } finally {
-      const btn3 = document.querySelector('[onclick*="deleteGroup(' + gi + ')"]');
-      if (btn3) btn3.textContent = '🗑️ حذف';
-    }
-  };
-
-  overlay.querySelector('#del-grp-confirm').onclick = doDelete;
-  overlay.querySelector('#del-grp-cancel').onclick = () => document.body.removeChild(overlay);
-  overlay.onclick = (e) => { if (e.target === overlay) document.body.removeChild(overlay); };
+    showToast('✅ تم حذف الفوج "' + groupName + '"' + (actuallyRemoved > 0 ? ' و' + actuallyRemoved + ' تلميذ' : ''));
+    await loadAttendanceSummary();
+  } catch (e) {
+    console.error('deleteGroup error:', e);
+    showToast('❌ خطأ في حذف الفوج: ' + e.message, true);
+  } finally {
+    const btn3 = document.querySelector('[onclick*="deleteGroup(' + gi + ')"]');
+    if (btn3) btn3.textContent = '🗑️ حذف';
+  }
 };
 
 // ─── إعادة تسمية فوج ───
+let _renameGi = -1;
 window.renameGroup = (gi) => {
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
@@ -7926,34 +7968,60 @@ window.renameGroup = (gi) => {
   const groups = teacher.groups || [];
   const group = groups[gi];
   if (!group) { showToast('⚠️ الفوج غير موجود', true); return; }
-  const oldName = group.name || ('فوج ' + (gi + 1));
-  const newName = prompt('✏️ أدخل الاسم الجديد للفوج:', oldName);
-  if (!newName || newName.trim() === oldName) return;
-  if (!newName.trim()) { showToast('⚠️ الرجاء إدخال اسم صالح', true); return; }
-  const doRename = async () => {
-    try {
-      const teacherRef = doc(db, 'teachers', teacherId);
-      const snap = await getDoc(teacherRef);
-      if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
-      const data = snap.data();
-      const groupsArr = data.groups || [];
-      if (!groupsArr[gi]) { showToast('⚠️ الفوج غير موجود', true); return; }
-      if (groupsArr.some((g, i) => i !== gi && g.name === newName.trim())) {
-        showToast('⚠️ يوجد فوج بنفس الاسم مسبقاً', true); return;
-      }
-      groupsArr[gi].name = newName.trim();
-      await setDoc(teacherRef, { groups: groupsArr }, { merge: true });
-      // Update local cache
-      if (teacher.groups) teacher.groups = groupsArr;
-      if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
-      showToast('✅ تمت إعادة تسمية الفوج إلى "' + newName.trim() + '"');
-      await loadAttendanceSummary();
-    } catch (e) {
-      console.error('renameGroup error:', e);
-      showToast('❌ خطأ في إعادة التسمية: ' + e.message, true);
+  _renameGi = gi;
+  const inp = document.getElementById('rename-group-input');
+  if (inp) {
+    inp.value = group.name || ('فوج ' + (gi + 1));
+    inp.focus();
+    inp.select();
+  }
+  const bg = document.getElementById('rename-group-modal');
+  if (bg) { bg.classList.add('open'); document.body.style.overflow = 'hidden'; }
+};
+
+window.closeRenameGroupModal = () => {
+  const bg = document.getElementById('rename-group-modal');
+  if (bg) { bg.classList.remove('open'); document.body.style.overflow = ''; }
+  _renameGi = -1;
+};
+
+window.confirmRenameGroup = async () => {
+  const gi = _renameGi;
+  const inp = document.getElementById('rename-group-input');
+  if (!inp || gi < 0) return;
+  const newName = inp.value.trim();
+  if (!newName) { showToast('⚠️ الرجاء إدخال اسم صالح', true); return; }
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+  const oldName = (teacher.groups || [])[gi]?.name || '';
+  if (newName === oldName) { closeRenameGroupModal(); return; }
+  const btn = document.querySelector('#rename-group-modal .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
+  try {
+    const teacherRef = doc(db, 'teachers', teacherId);
+    const snap = await getDoc(teacherRef);
+    if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+    const data = snap.data();
+    const groupsArr = data.groups || [];
+    if (!groupsArr[gi]) { showToast('⚠️ الفوج غير موجود', true); return; }
+    if (groupsArr.some((g, i) => i !== gi && g.name === newName)) {
+      showToast('⚠️ يوجد فوج بنفس الاسم مسبقاً', true); return;
     }
-  };
-  doRename();
+    groupsArr[gi].name = newName;
+    await setDoc(teacherRef, { groups: groupsArr }, { merge: true });
+    if (teacher.groups) teacher.groups = groupsArr;
+    if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
+    showToast('✅ تمت إعادة التسمية إلى "' + newName + '"');
+    closeRenameGroupModal();
+    await loadAttendanceSummary();
+  } catch (e) {
+    console.error('renameGroup error:', e);
+    showToast('❌ خطأ: ' + e.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '💾 حفظ'; }
+  }
 };
 
 let _attSelectedSuggestion = null; // { name, receipt, payStatus }
