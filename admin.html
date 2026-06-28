@@ -2963,6 +2963,14 @@
           <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">⏳ جاري تحميل البيانات...</div>
         </div>
       </div>
+      <div class="ctrl-field" style="margin-top:10px">
+        <label>✍️ إضافة تلميذ يدويًا <span style="font-size:11px;color:var(--text-muted);font-weight:400">(إذا لم يكن موجودًا في القوائم أعلاه)</span></label>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="add-group-manual-name" class="inp" placeholder="الاسم الكامل للتلميذ..." style="flex:1" onkeydown="if(event.key==='Enter')addManualGroupStudent()">
+          <button onclick="addManualGroupStudent()" style="padding:8px 16px;border-radius:10px;border:none;background:var(--primary);color:white;font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;white-space:nowrap">➕ إضافة</button>
+        </div>
+        <div id="add-group-manual-list" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;min-height:20px"></div>
+      </div>
       <div style="display:flex;gap:8px;margin-top:10px">
         <button onclick="closeAddGroupModal()" style="flex:1;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text-muted);font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">إلغاء</button>
         <button onclick="saveNewGroup()" class="btn-primary" style="flex:3">➕ إضافة الفوج</button>
@@ -3199,6 +3207,21 @@
     <div class="sync-confirm-btns">
       <button class="sync-confirm-cancel" onclick="closeRestoreAttendanceModal()">إلغاء</button>
       <button class="sync-confirm-ok" id="restore-att-confirm-btn" onclick="confirmRestoreAttendance()" style="display:none">✅ تأكيد الاسترجاع</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MOVE GROUP MODAL ===== -->
+<div class="sync-confirm-bg" id="move-group-modal" onclick="if(event.target===this)closeMoveGroupModal()">
+  <div class="sync-confirm-box" style="max-width:480px">
+    <div class="sync-confirm-icon">📦</div>
+    <div class="sync-confirm-title">نقل فوج</div>
+    <div id="move-group-content" style="padding:12px 0">
+      <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px">⏳ جاري التحميل...</div>
+    </div>
+    <div class="sync-confirm-btns">
+      <button class="sync-confirm-cancel" onclick="closeMoveGroupModal()">إلغاء</button>
+      <button class="sync-confirm-ok" id="move-group-confirm-btn" onclick="confirmMoveGroup()" style="display:none">✅ تأكيد النقل</button>
     </div>
   </div>
 </div>
@@ -6086,7 +6109,7 @@ function loadTeachers() {
     renderTeachersGrid(allTeachers);
     renderStudentOverview();
     // ترحيل: ضمان _gid لكل الأفواج (مرة واحدة فقط)
-    ensureGroupIds();
+    await ensureGroupIds();
     // Refresh attendance table if a teacher is currently selected
     const attTeacherSel = document.getElementById('att-sum-teacher');
     if (attTeacherSel && attTeacherSel.value && typeof onTeacherChange === 'function') {
@@ -6962,7 +6985,8 @@ async function ensureGroupIds() {
   if (_ensureGroupIdsDone) return;
   _ensureGroupIdsDone = true;
   if (!allTeachers || !allTeachers.length) return;
-  let changed = false;
+  // أولاً: تعيين _gid لجميع الأفواج في الذاكرة (متزامن)
+  const batchWrites = [];
   for (const t of allTeachers) {
     const groups = t.groups || [];
     let teacherChanged = false;
@@ -6970,17 +6994,20 @@ async function ensureGroupIds() {
       if (!g._gid || g._gid === '') {
         g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
         teacherChanged = true;
-        changed = true;
       }
     });
     if (teacherChanged) {
-      try {
-        await updateDoc(doc(db, 'teachers', t.id), { groups });
-      } catch (e) { console.warn('ensureGroupIds failed for', t.id, e.message); }
+      batchWrites.push(updateDoc(doc(db, 'teachers', t.id), { groups }));
     }
   }
-  if (changed) {
-    showToast('✅ تم ترحيل جميع الأفواج إلى نظام المعرفات الجديد');
+  // ثانياً: الحفظ في Firestore (غير متزامن)
+  if (batchWrites.length) {
+    try {
+      await Promise.all(batchWrites);
+      showToast('✅ تم ترحيل جميع الأفواج إلى نظام المعرفات الجديد');
+    } catch (e) {
+      console.warn('ensureGroupIds batch failed:', e.message);
+    }
   }
 }
 
@@ -7263,6 +7290,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   };
 
   groups.forEach((g, gi) => {
+    if (!g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
     const gid = g._gid || '';
     (g.students || []).forEach(sName => {
       let match = students.find(s => namesMatchLocal(s.name, sName));
@@ -7270,7 +7298,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       if (match) {
         matchedNames.add(normName(match.name || ''));
         const cacheGi = studentGiFromCache.get(_normGi(match.name || ''));
-        allStudents.push({ id: match.id, name: match.name, receipt: match.receipt, payStatus: match.payStatus, group: cleanG, gi: cacheGi ?? gi, groupGi: gi, gid });
+        allStudents.push({ id: match.id, name: match.name, receipt: match.receipt, payStatus: match.payStatus, joinedAtSession: match.joinedAtSession, group: cleanG, gi: cacheGi ?? gi, groupGi: gi, gid });
       } else {
         const cacheGi = studentGiFromCache.get(_normGi(sName));
         allStudents.push({ name: sName, group: cleanG, gi: cacheGi ?? gi, groupGi: gi, gid });
@@ -7293,7 +7321,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       }
     });
     const cacheGi = studentGiFromCache.get(_normGi(s.name || ''));
-    allStudents.push({ id: s.id, name: s.name || '—', receipt: s.receipt, payStatus: s.payStatus, group: groupName || '—', gi: cacheGi ?? groupGi, groupGi, gid: groupGid });
+    allStudents.push({ id: s.id, name: s.name || '—', receipt: s.receipt, payStatus: s.payStatus, joinedAtSession: s.joinedAtSession, group: groupName || '—', gi: cacheGi ?? groupGi, groupGi, gid: groupGid });
   });
 
   // Build rows grouped by group (فوج), count stats
@@ -7327,7 +7355,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     }
     const isAdmin = !window._isTeacherAttendanceView;
     allRows.push(`<tr class="att-group-header-row">
-      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}${isAdmin ? `<button class="att-group-rename-btn" onclick="renameGroup('${g.gid}')" title="إعادة تسمية الفوج">✏️ إعادة تسمية</button><button class="att-group-del-btn" onclick="deleteGroup('${g.gid}')" title="حذف الفوج" data-gid="${g.gid}">🗑️ حذف</button>` : ''}</td>
+      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}${isAdmin ? `<button class="att-group-rename-btn" onclick="renameGroup('${g.gid}')" title="إعادة تسمية الفوج">✏️ إعادة تسمية</button><button class="att-group-move-btn" onclick="openMoveGroupModal('${g.gid}')" title="نقل التلاميذ إلى فوج آخر" data-gid="${g.gid}">📦 نقل</button><button class="att-group-del-btn" onclick="deleteGroup('${g.gid}')" title="حذف الفوج" data-gid="${g.gid}">🗑️ حذف</button>` : ''}</td>
     </tr>`);
 
     let rowNum = 1;
@@ -7337,6 +7365,11 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       const cells = [];
       for (let idx = 0; idx < sessionRange.length; idx++) {
         const i = sessionRange[idx];
+        // إذا كان التلميذ مضافًا يدويًا، الحصص قبل تاريخ انضمامه تُعتبر غير مسجلة
+        if (s.joinedAtSession && i < s.joinedAtSession) {
+          cells.push(`<td class="att-cell" title="غير مسجل (قبل انضمام التلميذ)" style="background:transparent;color:var(--text-muted);font-size:11px">—</td>`);
+          continue;
+        }
         const rec = groupSessions[i];
         const toggleGi = s.groupGi !== undefined ? s.groupGi : s.gi;
         const sNameVal = s.name;
@@ -7806,6 +7839,167 @@ window.confirmRestoreAttendance = async () => {
     if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد الاسترجاع'; }
   }
 };
+
+// ─── نقل فوج كامل ───
+let _moveFromGid = '';
+let _moveToGid = '';
+
+window.openMoveGroupModal = async (sourceGid) => {
+  if (!sourceGid) { showToast('⚠️ معرف الفوج المصدر غير صالح', true); return; }
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+  const groups = teacher.groups || [];
+  const srcGroup = groups.find(g => g && g._gid === sourceGid);
+  if (!srcGroup) { showToast('⚠️ الفوج المصدر غير موجود', true); return; }
+  _moveFromGid = sourceGid;
+  document.getElementById('move-group-modal').classList.add('open');
+  document.getElementById('move-group-confirm-btn').style.display = 'none';
+  const content = document.getElementById('move-group-content');
+  const studentCount = (srcGroup.students || []).length;
+  const srcName = srcGroup.name || '—';
+
+  // بناء قائمة الأفواج الهدف (باستثناء المصدر)
+  const targets = groups.filter(g => g && g._gid && g._gid !== sourceGid);
+  if (!targets.length) {
+    content.innerHTML = `<div style="text-align:center;padding:20px;color:#DC2626">
+      ⚠️ لا يوجد فوج آخر لنقل التلاميذ إليه</div>`;
+    return;
+  }
+  const targetOpts = targets.map(g =>
+    `<option value="${g._gid}">🏫 ${g.name || '—'} (${(g.students || []).length} تلميذ)</option>`
+  ).join('');
+  content.innerHTML = `
+    <div style="font-size:13px;margin-bottom:12px;padding:0 4px">
+      <div style="font-weight:800;color:var(--text);margin-bottom:4px">📤 المصدر: <span style="color:var(--primary)">${srcName}</span></div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">عدد التلاميذ المراد نقلهم: <strong>${studentCount}</strong></div>
+      <label style="font-weight:800;font-size:12px;color:var(--text);display:block;margin-bottom:4px">📥 الفوج الهدف:</label>
+      <select id="move-target-select" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">${targetOpts}</select>
+      <div style="font-size:11px;color:#DC2626;margin-top:12px;padding:8px 12px;background:#FEF2F2;border-radius:8px;font-weight:700">
+        ⚠️ سيتم نقل ${studentCount} تلميذ مع جميع سجلات الحضور إلى الفوج الهدف
+      </div>
+    </div>`;
+  _moveToGid = '';
+  document.getElementById('move-group-confirm-btn').style.display = '';
+};
+window.closeMoveGroupModal = () => {
+  document.getElementById('move-group-modal').classList.remove('open');
+  _moveFromGid = '';
+  _moveToGid = '';
+};
+window.confirmMoveGroup = async () => {
+  const sourceGid = _moveFromGid;
+  const sel = document.getElementById('move-target-select');
+  const targetGid = sel ? sel.value : '';
+  if (!sourceGid || !targetGid) { showToast('⚠️ الرجاء اختيار الفوج الهدف', true); return; }
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
+  const btn = document.getElementById('move-group-confirm-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري النقل...'; }
+  try {
+    const teacherRef = doc(db, 'teachers', teacherId);
+    const snap = await getDoc(teacherRef);
+    if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+    const data = snap.data();
+    let groupsArr = data.groups || [];
+    const srcIdx = groupsArr.findIndex(g => g && g._gid === sourceGid);
+    const tgtIdx = groupsArr.findIndex(g => g && g._gid === targetGid);
+    if (srcIdx < 0 || tgtIdx < 0) { showToast('⚠️ أحد الأفواج غير موجود', true); return; }
+    const srcGroup = groupsArr[srcIdx];
+    const tgtGroup = groupsArr[tgtIdx];
+    const studentsToMove = srcGroup.students || [];
+    if (!studentsToMove.length) { showToast('⚠️ الفوج المصدر لا يحتوي على تلاميذ', true); return; }
+
+    // 1. نقل أسماء التلاميذ
+    const existingTargetNames = new Set((tgtGroup.students || []).map(s => s.trim().toLowerCase()));
+    const movedStudentNames = studentsToMove.filter(s => {
+      const n = (s || '').trim().toLowerCase();
+      if (!n || existingTargetNames.has(n)) return false;
+      existingTargetNames.add(n);
+      return true;
+    });
+    tgtGroup.students = [...(tgtGroup.students || []), ...movedStudentNames];
+    srcGroup.students = [];
+
+    // 2. نقل سجلات الحضور من sessions المصدر إلى sessions الهدف
+    const batch = writeBatch(db);
+    const sessQuery = query(
+      collection(db, 'sessionAttendance'),
+      where('teacherId', '>=', teacherId + '_g0'),
+      where('teacherId', '<=', teacherId + '_g9999999999')
+    );
+    const sessSnap = await getDocs(sessQuery);
+    const movedNamesLower = new Set(movedStudentNames.map(s => s.trim().toLowerCase()));
+    // تجميع sessions المصدر والهدف
+    const srcSessions = {};  // sessionNum → {docId, data}
+    const tgtSessions = {}; // sessionNum → {docId, data}
+    sessSnap.forEach(d => {
+      const d2 = d.data();
+      const gStr = String(d2.teacherId || '');
+      const match = gStr.match(/_g(\d+)$/);
+      if (!match) return;
+      const gi = parseInt(match[1]);
+      if (gi === srcIdx) {
+        srcSessions[d2.sessionNum] = { docId: d.id, data: d2 };
+      } else if (gi === tgtIdx) {
+        tgtSessions[d2.sessionNum] = { docId: d.id, data: d2 };
+      }
+    });
+    // لكل حصة في المصدر، انقل الطلاب إلى الهدف
+    for (const sn in srcSessions) {
+      const src = srcSessions[sn];
+      const tgt = tgtSessions[sn];
+      const srcStudents = src.data.students || [];
+      const remaining = srcStudents.filter(st => {
+        const key = (st.name || '').trim().toLowerCase();
+        return !movedNamesLower.has(key);
+      });
+      const moved = srcStudents.filter(st => {
+        const key = (st.name || '').trim().toLowerCase();
+        return movedNamesLower.has(key);
+      });
+      // تحديث المصدر (إزالة المنقولين)
+      if (remaining.length !== srcStudents.length) {
+        const srcDocRef = doc(db, 'sessionAttendance', src.docId);
+        if (remaining.length === 0) {
+          batch.delete(srcDocRef);
+        } else {
+          batch.update(srcDocRef, { students: remaining });
+        }
+      }
+      // إضافة المنقولين إلى الهدف
+      if (moved.length) {
+        const tgtDocId = tgt ? tgt.docId : (teacherId + '_g' + tgtIdx + '_session_' + sn);
+        const tgtDocRef = doc(db, 'sessionAttendance', tgtDocId);
+        if (tgt) {
+          batch.update(tgtDocRef, { students: [...(tgt.data.students || []), ...moved] });
+        } else {
+          batch.set(tgtDocRef, { teacherId: teacherId + '_g' + tgtIdx, sessionNum: parseInt(sn), students: moved, savedAt: serverTimestamp() });
+        }
+      }
+    }
+
+    // 3. حفظ الأفواج
+    await setDoc(teacherRef, { groups: groupsArr }, { merge: true });
+    await batch.commit();
+
+    // 4. تحديث الكاش
+    if (teacher.groups) teacher.groups = groupsArr;
+    if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
+    if (window._ctrlMapCache) window._ctrlMapCache[teacherId] = null;
+
+    showToast(`✅ تم نقل ${movedStudentNames.length} تلميذ من "${srcGroup.name || '—'}" إلى "${tgtGroup.name || '—'}"`);
+    closeMoveGroupModal();
+    await loadAttendanceSummary();
+  } catch (e) {
+    console.error('moveGroup error:', e);
+    showToast('❌ خطأ في نقل الفوج: ' + e.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✅ تأكيد النقل'; }
+  }
+};
+
 window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
   // منع التعديل للأساتذة إذا كانت الحصة مقفلة صراحةً من الأدمن
   if (window._isTeacherAttendanceView) {
@@ -10436,6 +10630,10 @@ window.openAddGroupModal = async () => {
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
   document.getElementById('add-group-name').value = '';
   document.getElementById('add-group-search').value = '';
+  const manualInp = document.getElementById('add-group-manual-name');
+  if (manualInp) manualInp.value = '';
+  const manualList = document.getElementById('add-group-manual-list');
+  if (manualList) manualList.innerHTML = '';
   const bg = document.getElementById('add-group-modal');
   if (!bg) return;
   bg.classList.add('open');
@@ -10455,12 +10653,21 @@ window.closeAddGroupModal = () => {
 async function _buildGroupCandidateList(teacherId) {
   const seen = new Set();
   const candidates = [];
+  // دالة مساعدة للتحقق من التكرار باستخدام جميع تركيبات الاسم
+  const _isNameSeen = (name) => {
+    const variants = _nameVariants(name);
+    return variants.some(v => seen.has(_normOv(v)));
+  };
+  const _markNameSeen = (name) => {
+    const variants = _nameVariants(name);
+    variants.forEach(v => seen.add(_normOv(v)));
+  };
   // 1. من تذاكر المخيم الصيفي
   if (window._allTicketsData) {
     window._allTicketsData.forEach(t => {
       const n = String(t.name || '').trim();
-      if (!n || seen.has(n.toLowerCase())) return;
-      seen.add(n.toLowerCase());
+      if (!n || _isNameSeen(n)) return;
+      _markNameSeen(n);
       candidates.push({
         name: n,
         pack: t.pack || '—',
@@ -10475,8 +10682,8 @@ async function _buildGroupCandidateList(teacherId) {
   if (sheetRows && sheetRows.length) {
     sheetRows.forEach(r => {
       const n = String(r.name || '').trim();
-      if (!n || seen.has(n.toLowerCase())) return;
-      seen.add(n.toLowerCase());
+      if (!n || _isNameSeen(n)) return;
+      _markNameSeen(n);
       candidates.push({
         name: n,
         pack: r.pack || '—',
@@ -10493,8 +10700,8 @@ async function _buildGroupCandidateList(teacherId) {
     const students = t.students || [];
     students.forEach(s => {
       const n = String(s.name || '').trim();
-      if (!n || seen.has(n.toLowerCase())) return;
-      seen.add(n.toLowerCase());
+      if (!n || _isNameSeen(n)) return;
+      _markNameSeen(n);
       candidates.push({
         name: n,
         pack: '',
@@ -10538,6 +10745,60 @@ window.toggleGroupCandidate = (name, checked) => {
   else delete window._groupCandidatesSelected[name];
 };
 
+// ─── إضافة تلميذ يدويًا في مودال إضافة الفوج ───
+window.addManualGroupStudent = () => {
+  const inp = document.getElementById('add-group-manual-name');
+  if (!inp) return;
+  const name = inp.value.trim().replace(/\s+/g, ' ');
+  if (!name) { showToast('⚠️ الرجاء إدخال اسم التلميذ', true); return; }
+  if (window._groupCandidatesSelected[name]) {
+    showToast('⚠️ التلميذ مضاف مسبقاً', true); return;
+  }
+  window._groupCandidatesSelected[name] = true;
+  _renderManualStudents();
+  inp.value = '';
+  showToast(`✅ تمت إضافة "${name}" يدويًا`);
+};
+
+window.removeManualGroupStudent = (name) => {
+  delete window._groupCandidatesSelected[name];
+  _renderManualStudents();
+};
+
+function _renderManualStudents() {
+  const container = document.getElementById('add-group-manual-list');
+  if (!container) return;
+  const dataNames = new Set((window._groupCandidatesData || []).map(c => c.name));
+  const manualNames = Object.keys(window._groupCandidatesSelected).filter(n => !dataNames.has(n));
+  if (!manualNames.length) { container.innerHTML = ''; return; }
+  container.innerHTML = manualNames.map(n =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;background:var(--primary-light);color:var(--primary);font-size:12px;font-weight:700">👤 ${n} <span onclick="removeManualGroupStudent('${n.replace(/'/g,"\\'")}')" style="cursor:pointer;font-size:14px;color:#dc2626;margin-right:2px">&times;</span></span>`
+  ).join('');
+}
+
+// ─── دالة مساعدة لحساب رقم الحصة الحالية ───
+async function _getCurrentSessionNum(teacherId) {
+  try {
+    const teacherDoc = await getDoc(doc(db, 'teachers', teacherId));
+    if (teacherDoc.exists()) {
+      const td = teacherDoc.data();
+      let sessionStartDate = '2026-06-01';
+      if (td.startDate) {
+        const sd = td.startDate.toDate ? td.startDate.toDate() : new Date(td.startDate);
+        sessionStartDate = sd.toISOString().slice(0, 10);
+      } else if (td.fromDate) {
+        const sd = td.fromDate.toDate ? td.fromDate.toDate() : new Date(td.fromDate);
+        sessionStartDate = sd.toISOString().slice(0, 10);
+      }
+      const startDate = new Date(sessionStartDate);
+      const now = new Date();
+      const diffDays = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
+      return Math.min(12, Math.max(1, Math.floor(diffDays / 7) + 1));
+    }
+  } catch(e) { /* fallback */ }
+  return 1;
+}
+
 window.saveNewGroup = async () => {
   const teacherId = document.getElementById('att-sum-teacher')?.value;
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
@@ -10558,11 +10819,13 @@ window.saveNewGroup = async () => {
       showToast('⚠️ يوجد فوج بنفس الاسم مسبقاً', true); return;
     }
     const studentsList = data.students || [];
+    // حساب رقم الحصة الحالية لتسجيل تاريخ انضمام التلاميذ الجدد
+    const curSessionNum = await _getCurrentSessionNum(teacherId);
     // إضافة التلاميذ غير الموجودين إلى قائمة التلاميذ
     let addedCount = 0;
     selected.forEach(name => {
       if (!studentsList.some(s => String(s.name || '').trim().toLowerCase() === name.toLowerCase())) {
-        studentsList.push({ id: 'g_' + Date.now() + '_' + addedCount, name, present: false, marked: false });
+        studentsList.push({ id: 'g_' + Date.now() + '_' + addedCount, name, present: false, marked: false, joinedAtSession: curSessionNum });
         addedCount++;
       }
     });
