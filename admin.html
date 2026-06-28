@@ -6069,6 +6069,11 @@ function loadTeachers() {
     document.getElementById('t-today-label').textContent = `📅 اليوم: ${todayName} — ${todayCount} أستاذ`;
     renderTeachersGrid(allTeachers);
     renderStudentOverview();
+    // Refresh attendance table if a teacher is currently selected
+    const attTeacherSel = document.getElementById('att-sum-teacher');
+    if (attTeacherSel && attTeacherSel.value && typeof onTeacherChange === 'function') {
+      onTeacherChange();
+    }
   });
 }
 
@@ -7180,6 +7185,22 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     return null;
   };
 
+  // Build a map: student name → gi from session cache (handles group-index mismatches)
+  const _normGi = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const studentGiFromCache = new Map();
+  for (const cacheGiStr in groupCache) {
+    const cacheGi = parseInt(cacheGiStr);
+    const sessions = groupCache[cacheGi];
+    if (!sessions) continue;
+    for (const sn in sessions) {
+      const session = sessions[sn];
+      (session.students || []).forEach(st => {
+        const key = _normGi(st.name || '');
+        if (!studentGiFromCache.has(key)) studentGiFromCache.set(key, cacheGi);
+      });
+    }
+  }
+
   // Build student list with group assignment
   const groups = teacher.groups || [];
   let allStudents = [];
@@ -7205,10 +7226,11 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       const cleanG = _cleanGroupName(g.name) || 'فوج ' + (gi + 1);
       if (match) {
         matchedNames.add(normName(match.name || ''));
-        allStudents.push({ id: match.id, name: match.name, receipt: match.receipt, payStatus: match.payStatus, group: cleanG, gi });
+        const cacheGi = studentGiFromCache.get(_normGi(match.name || ''));
+        allStudents.push({ id: match.id, name: match.name, receipt: match.receipt, payStatus: match.payStatus, group: cleanG, gi: cacheGi ?? gi, groupGi: gi });
       } else {
-        // Student name in group doesn't match teacher.students — use as-is
-        allStudents.push({ name: sName, group: cleanG, gi });
+        const cacheGi = studentGiFromCache.get(_normGi(sName));
+        allStudents.push({ name: sName, group: cleanG, gi: cacheGi ?? gi, groupGi: gi });
       }
     });
   });
@@ -7217,15 +7239,16 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   students.forEach(s => {
     const key = normName(s.name || '');
     if (matchedNames.has(key)) return;
-    let gi = 0;
+    let groupGi = 0;
     let groupName = '';
     groups.forEach((g, idx) => {
       if ((g.students || []).some(gs => namesMatchLocal(gs, s.name))) {
-        gi = idx;
+        groupGi = idx;
         groupName = _cleanGroupName(g.name) || 'فوج ' + (idx + 1);
       }
     });
-    allStudents.push({ id: s.id, name: s.name || '—', receipt: s.receipt, payStatus: s.payStatus, group: groupName || '—', gi });
+    const cacheGi = studentGiFromCache.get(_normGi(s.name || ''));
+    allStudents.push({ id: s.id, name: s.name || '—', receipt: s.receipt, payStatus: s.payStatus, group: groupName || '—', gi: cacheGi ?? groupGi, groupGi });
   });
 
   // Build rows grouped by group (فوج), count stats
@@ -7233,11 +7256,12 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   const allRows = [];
   const teacherIdVal = teacherId;
 
-  // Group students by gi
+  // Group students by groupGi (display group, not session gi)
   const grouped = {};
   allStudents.forEach(s => {
-    if (!grouped[s.gi]) grouped[s.gi] = { group: s.group, gi: s.gi, students: [] };
-    grouped[s.gi].students.push(s);
+    const dk = s.groupGi;
+    if (!grouped[dk]) grouped[dk] = { group: s.group, gi: dk, students: [] };
+    grouped[dk].students.push(s);
   });
   let groupKeys = Object.keys(grouped).map(Number).sort((a,b) => a - b);
 
@@ -7269,12 +7293,12 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       for (let idx = 0; idx < sessionRange.length; idx++) {
         const i = sessionRange[idx];
         const rec = groupSessions[i];
-        const giVal = s.gi;
+        const toggleGi = s.groupGi !== undefined ? s.groupGi : s.gi;
         const sNameVal = s.name;
         // Check if session is locked for teacher view (only if admin has explicitly set status ≠ open)
         const ctrl = ctrlMap[i];
         const isLocked = window._isTeacherAttendanceView && ctrl && ctrl.status !== 'open';
-        const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}',${giVal},${i},'${sNameVal.replace(/'/g,"\\'")}')"`;
+        const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}',${toggleGi},${i},'${sNameVal.replace(/'/g,"\\'")}')"`;
         const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
         if (!rec) {
           const isPast = i < curSession;
@@ -10344,10 +10368,21 @@ window.saveNewGroup = async () => {
     });
     groups.push({ _gid: 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10), name: groupName, students: selected, days: [] });
     await setDoc(teacherRef, { students: studentsList, groups }, { merge: true });
+    // تحديث allTeachers مباشرة من Firestore بدلاً من انتظار onSnapshot
+    try {
+      const freshSnap = await getDoc(teacherRef);
+      if (freshSnap.exists()) {
+        const idx = allTeachers.findIndex(t => t.id === teacherId);
+        if (idx !== -1) {
+          allTeachers[idx] = { id: teacherId, ...freshSnap.data() };
+          window._allTeachersCache = [...allTeachers];
+        }
+      }
+    } catch(e) { /* fallback */ }
     showToast(`✅ تم إنشاء الفوج "${groupName}" بنجاح مع ${selected.length} تلميذ${addedCount > 0 ? ' (تمت إضافة ' + addedCount + ' تلميذ جدد)' : ''}`);
     closeAddGroupModal();
-    // إعادة تحميل الجدول
-    if (typeof onTeacherChange === 'function') onTeacherChange();
+    // إعادة تحميل الجدول بالبيانات الجديدة
+    await loadAttendanceSummary();
   } catch(e) {
     showToast('❌ خطأ في حفظ الفوج: ' + e.message, true);
   } finally {
