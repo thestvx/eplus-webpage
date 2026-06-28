@@ -939,6 +939,21 @@
     .att-summary-l{font-size:11px;color:var(--text-muted);font-weight:600;margin-top:2px}
     .att-group-header-row td{padding:10px 14px!important;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)}
     .att-group-header-row:hover{background:var(--primary-light)!important}
+    .att-group-card{border:1.5px solid var(--border-2);border-radius:12px;margin:0 4px 12px 4px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+    .att-group-card:first-child{margin-top:0}
+    .att-group-sep-row td{padding:0!important;height:6px;background:transparent;border:none!important}
+    .att-group-del-btn{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:6px;border:1px solid rgba(239,68,68,0.25);background:rgba(239,68,68,0.07);color:#DC2626;font-size:10px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;line-height:1;white-space:nowrap;margin-right:12px}
+    .att-group-del-btn:hover{background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.5)}
+    .att-unassign-bar{display:none;margin-bottom:14px;padding:14px 18px;background:var(--card-bg);border:1.5px solid var(--border-2);border-radius:12px}
+    .att-unassign-bar.open{display:block}
+    .att-unassign-bar .ub-title{font-size:12px;font-weight:800;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+    .att-unassign-bar .ub-list{max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:3px;padding:4px 0}
+    .att-unassign-bar .ub-item{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;transition:background 0.15s;font-size:13px;font-weight:600;color:var(--text-2)}
+    .att-unassign-bar .ub-item:hover{background:var(--bg)}
+    .att-unassign-bar .ub-item label{cursor:pointer;display:flex;align-items:center;gap:8px;flex:1}
+    .att-unassign-bar .ub-empty{padding:16px;text-align:center;color:var(--text-muted);font-size:12px}
+    .att-unassign-bar .ub-actions{display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap}
+    .att-unassign-bar .ub-count{font-size:11px;color:var(--text-muted);font-weight:700}
 
     /* ===== SESSIONS SYSTEM ===== */
     .sessions-header{background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);padding:20px 24px;margin-bottom:16px;box-shadow:var(--shadow)}
@@ -2354,6 +2369,7 @@
       <button onclick="normalizeAttendanceNames()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #7C3AED;background:rgba(124,58,237,0.08);color:#7C3AED;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إعادة ربط أسماء التلاميذ بسجلات الحضور" id="att-normalize-btn">🔗 إعادة ربط الحضور</button>
       <button onclick="backupAttendanceData()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.3s" title="حفظ نسخة احتياطية للحضور" id="att-backup-btn">💾 حفظ نسخة</button>
       <button onclick="syncAttendanceFromBackup()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #DC2626;background:rgba(220,38,38,0.08);color:#DC2626;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="استعادة الحضور من النسخة الاحتياطية" id="att-sync-btn">🔄 مزامنة الحضور</button>
+      <button onclick="toggleUnassignedStudents()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #7C3AED;background:rgba(124,58,237,0.08);color:#7C3AED;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إدارة التلاميذ غير المنتمين لأي فوج" id="att-unassign-btn">🔀 غير منتمين</button>
     </div>
     <!-- ─── شريط بحث إضافة التلميذ ─── -->
     <div id="att-student-search-wrap" style="display:none;margin-bottom:16px;padding:14px 16px;background:var(--card-bg);border:1.5px solid var(--border);border-radius:12px;transition:all 0.3s">
@@ -2366,6 +2382,20 @@
         <button style="padding:10px 14px;border-radius:10px;border:1px solid var(--border-2);background:var(--card);color:var(--text-muted);font-size:14px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;line-height:1" onclick="toggleAttendanceStudentSearch()" title="إغلاق">✕</button>
       </div>
       <div id="att-student-suggestions" style="display:none;margin-top:8px;background:white;border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;max-height:220px;overflow-y:auto;width:100%"></div>
+    </div>
+    <!-- ─── إدارة التلاميذ غير المنتمين لأي فوج ─── -->
+    <div class="att-unassign-bar" id="att-unassign-bar">
+      <div class="ub-title">🔀 التلاميذ غير المنتمين لأي فوج</div>
+      <div class="ub-list" id="att-unassign-list">
+        <div class="ub-empty">اختر أستاذاً لعرض التلاميذ غير المنتمين</div>
+      </div>
+      <div class="ub-actions" id="att-unassign-actions" style="display:none">
+        <span class="ub-count" id="att-unassign-count">0 تلميذ محدد</span>
+        <select id="att-unassign-group-select" style="padding:6px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:12px;flex:1;min-width:120px">
+          <option value="">اختر الفوج...</option>
+        </select>
+        <button onclick="addUnassignedToGroup()" style="padding:6px 12px;border-radius:8px;border:none;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:white;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;white-space:nowrap" id="att-unassign-add-btn">➕ إضافة إلى الفوج</button>
+      </div>
     </div>
             <div class="tbl-wrap">
               <table class="tbl" id="att-sum-tbl">
@@ -6812,6 +6842,8 @@ window.onTeacherChange = function() {
   }
   // تمرير teacherId للأساتذة لتجنب الاعتماد على قيمة select (قد تُعدم)
   loadAttendanceSummary(window._isTeacherAttendanceView ? teacherId : undefined);
+  // تحديث قائمة غير المنتمين
+  setTimeout(() => refreshUnassignedStudents(), 100);
 }
 
 function populateAttSummaryTeachers() {
@@ -7159,8 +7191,13 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
 
   groupKeys.forEach(gi => {
     const g = grouped[gi];
+    // Spacer row before each group (except the first)
+    if (allRows.length > 0) {
+      allRows.push(`<tr class="att-group-sep-row"><td colspan="${colspan}">&nbsp;</td></tr>`);
+    }
+    const isAdmin = !window._isTeacherAttendanceView;
     allRows.push(`<tr class="att-group-header-row">
-      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}</td>
+      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}${isAdmin ? `<button class="att-group-del-btn" onclick="deleteGroup(${gi})" title="حذف الفوج">🗑️ حذف</button>` : ''}</td>
     </tr>`);
 
     let rowNum = 1;
@@ -7256,6 +7293,8 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       <span class="att-stat-item" style="color:var(--text-muted)">${t('att_rate')} ${pct}%</span>
     `;
   }
+  // تحديث قائمة غير المنتمين
+  setTimeout(() => refreshUnassignedStudents(), 50);
 };
 
 // ─── تحديث الحصص وإعادة تحميلها ───
@@ -7614,6 +7653,265 @@ window.removeStudentFromTeacher = async (teacherId, studentName) => {
     console.error('removeStudentFromTeacher error:', e);
     showToast('⚠️ خطأ في حذف التلميذ: ' + e.message, true);
   }
+};
+
+// ─── إدارة التلاميذ غير المنتمين لأي فوج ───
+window.toggleUnassignedStudents = () => {
+  const bar = document.getElementById('att-unassign-bar');
+  if (!bar) return;
+  const isOpen = bar.classList.contains('open');
+  bar.classList.toggle('open');
+  if (!isOpen) refreshUnassignedStudents();
+  const btn = document.getElementById('att-unassign-btn');
+  if (btn) {
+    btn.style.borderColor = isOpen ? '1.5px solid #7C3AED' : '1.5px solid #7C3AED';
+    btn.style.background = isOpen ? 'rgba(124,58,237,0.08)' : 'rgba(124,58,237,0.15)';
+  }
+};
+
+window.refreshUnassignedStudents = () => {
+  const bar = document.getElementById('att-unassign-bar');
+  const list = document.getElementById('att-unassign-list');
+  const actions = document.getElementById('att-unassign-actions');
+  const sel = document.getElementById('att-unassign-group-select');
+  if (!list || !bar) return;
+  if (!bar.classList.contains('open')) return;
+
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) {
+    list.innerHTML = '<div class="ub-empty">⚠️ الرجاء اختيار أستاذ أولاً</div>';
+    if (actions) actions.style.display = 'none';
+    return;
+  }
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) {
+    list.innerHTML = '<div class="ub-empty">⚠️ الأستاذ غير موجود</div>';
+    if (actions) actions.style.display = 'none';
+    return;
+  }
+  const allStudents = teacher.students || [];
+  const groups = teacher.groups || [];
+  const assignedNames = new Set();
+  groups.forEach(g => (g.students || []).forEach(s => assignedNames.add(s.trim().toLowerCase())));
+  const unassigned = allStudents.filter(s => !assignedNames.has((s.name || '').trim().toLowerCase()));
+
+  // Populate group select
+  if (sel) {
+    sel.innerHTML = '<option value="">اختر الفوج...</option>';
+    groups.forEach((g, i) => {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = g.name || ('فوج ' + (i + 1));
+      sel.appendChild(opt);
+    });
+    sel.value = '';
+  }
+
+  if (!unassigned.length) {
+    list.innerHTML = '<div class="ub-empty">✅ جميع التلاميذ منتمون لأفواج</div>';
+    if (actions) actions.style.display = 'none';
+    return;
+  }
+  if (actions) actions.style.display = '';
+  window._unassignedStudents = unassigned;
+  window._unassignedChecked = {};
+  list.innerHTML = unassigned.map(s => {
+    const name = (s.name || '').replace(/'/g, "\\'");
+    return `<div class="ub-item">
+      <label><input type="checkbox" onchange="toggleUnassignedCheck('${name}',this.checked)" style="accent-color:var(--primary)"><span>${s.name}</span></label>
+    </div>`;
+  }).join('');
+  updateUnassignedCount();
+};
+
+window.toggleUnassignedCheck = (name, checked) => {
+  if (!window._unassignedChecked) window._unassignedChecked = {};
+  if (checked) window._unassignedChecked[name] = true;
+  else delete window._unassignedChecked[name];
+  updateUnassignedCount();
+};
+
+function updateUnassignedCount() {
+  const el = document.getElementById('att-unassign-count');
+  if (!el) return;
+  const n = Object.keys(window._unassignedChecked || {}).length;
+  el.textContent = n + ' تلميذ' + (n > 1 ? ' محددون' : n === 1 ? ' محدد' : ' غير محدد');
+}
+
+window.addUnassignedToGroup = async () => {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
+  const gi = parseInt(document.getElementById('att-unassign-group-select')?.value || '');
+  if (isNaN(gi)) { showToast('⚠️ الرجاء اختيار الفوج الهدف', true); return; }
+  const checked = window._unassignedChecked || {};
+  const names = Object.keys(checked);
+  if (!names.length) { showToast('⚠️ الرجاء اختيار تلاميذ لنقلهم', true); return; }
+  const btn = document.getElementById('att-unassign-add-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
+  try {
+    const teacherRef = doc(db, 'teachers', teacherId);
+    const snap = await getDoc(teacherRef);
+    if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+    const data = snap.data();
+    const groups = data.groups || [];
+    if (!groups[gi]) { showToast('⚠️ الفوج الهدف غير موجود', true); return; }
+    const group = groups[gi];
+    let added = 0;
+    names.forEach(name => {
+      if (!(group.students || []).some(s => s.trim().toLowerCase() === name.trim().toLowerCase())) {
+        if (!group.students) group.students = [];
+        group.students.push(name);
+        added++;
+      }
+    });
+    groups[gi] = group;
+    const students = data.students || [];
+    names.forEach(name => {
+      if (!students.some(s => String(s.name || '').trim().toLowerCase() === name.trim().toLowerCase())) {
+        students.push({ id: 'g_' + Date.now() + '_' + added, name, present: false, marked: false });
+      }
+    });
+    await setDoc(teacherRef, { students, groups }, { merge: true });
+    // Update local cache
+    const teacher2 = (allTeachers || []).find(t => t.id === teacherId);
+    if (teacher2) { teacher2.groups = groups; teacher2.students = students; }
+    if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
+    showToast('✅ تم نقل ' + added + ' تلميذ' + (added > 1 ? 'اً' : '') + ' إلى الفوج "' + (group.name || '') + '"');
+    window._unassignedChecked = {};
+    refreshUnassignedStudents();
+    await loadAttendanceSummary();
+  } catch (e) {
+    console.error('addUnassignedToGroup error:', e);
+    showToast('❌ خطأ: ' + e.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '➕ إضافة إلى الفوج'; }
+  }
+};
+
+// ─── حذف فوج كامل ───
+window.deleteGroup = (gi) => {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+  const groups = teacher.groups || [];
+  const group = groups[gi];
+  if (!group) { showToast('⚠️ الفوج غير موجود', true); return; }
+  const studentCount = (group.students || []).length;
+  const groupName = group.name || ('فوج ' + (gi + 1));
+
+  // Show confirmation modal
+  const overlay = document.createElement('div');
+  overlay.className = 'del-confirm-bg';
+  overlay.innerHTML = `<div class="del-confirm-box">
+    <div class="del-confirm-icon">🗑️</div>
+    <div class="del-confirm-title">حذف الفوج</div>
+    <div class="del-confirm-sub">هل أنت متأكد من حذف الفوج "<strong>${groupName}</strong>"؟<br><br>
+    ⚠️ سيتم <strong>حذف ${studentCount} تلميذ</strong> موجودين داخله نهائياً.<br>
+    لا يمكن التراجع عن هذا الإجراء.</div>
+    <div class="del-confirm-btns">
+      <button class="del-confirm-cancel" id="del-grp-cancel">إلغاء</button>
+      <button class="del-confirm-ok" id="del-grp-confirm">🗑️ حذف الفوج</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+
+  const doDelete = async () => {
+    document.body.removeChild(overlay);
+    const btn2 = document.querySelector('[onclick*="deleteGroup(' + gi + ')"]');
+    if (btn2) btn2.textContent = '⏳ جاري الحذف...';
+    try {
+      const teacherRef = doc(db, 'teachers', teacherId);
+      const snap = await getDoc(teacherRef);
+      if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+      const data = snap.data();
+      let groupsArr = data.groups || [];
+      if (!groupsArr[gi]) { showToast('⚠️ الفوج غير موجود', true); return; }
+      const deletedGroup = groupsArr[gi];
+      const deletedStudentNames = new Set((deletedGroup.students || []).map(s => s.trim().toLowerCase()));
+
+      // Remove students that were exclusively in this group
+      const remainingGroups = groupsArr.filter((_, i) => i !== gi);
+      const namesInOtherGroups = new Set();
+      remainingGroups.forEach(g => (g.students || []).forEach(s => namesInOtherGroups.add(s.trim().toLowerCase())));
+
+      const studentsArr = data.students || [];
+      const filteredStudents = studentsArr.filter(s => {
+        const sn = (s.name || '').trim().toLowerCase();
+        return !(deletedStudentNames.has(sn) && !namesInOtherGroups.has(sn));
+      });
+      const actuallyRemoved = studentsArr.length - filteredStudents.length;
+
+      // Remove the group from the array
+      groupsArr.splice(gi, 1);
+
+      // Delete/re-index session attendance and control documents
+      const batch = writeBatch(db);
+      const sessQuery = query(
+        collection(db, 'sessionAttendance'),
+        where('teacherId', '>=', teacherId + '_g0'),
+        where('teacherId', '<=', teacherId + '_g9999999999')
+      );
+      const sessSnap = await getDocs(sessQuery);
+      const ctrlQuery = query(
+        collection(db, 'sessionControl'),
+        where('teacherId', '>=', teacherId + '_g0'),
+        where('teacherId', '<=', teacherId + '_g9999999999')
+      );
+      const ctrlSnap = await getDocs(ctrlQuery);
+
+      sessSnap.forEach(docSnap => {
+        const data2 = docSnap.data();
+        const gStr = String(data2.teacherId || '');
+        const match = gStr.match(/_g(\d+)$/);
+        if (!match) return;
+        const oldGi = parseInt(match[1]);
+        if (oldGi === gi) {
+          batch.delete(docSnap.ref);
+        } else if (oldGi > gi) {
+          const newTeacherId = gStr.replace(/_g\d+$/, '_g' + (oldGi - 1));
+          batch.update(docSnap.ref, { teacherId: newTeacherId });
+        }
+      });
+      ctrlSnap.forEach(docSnap => {
+        const data2 = docSnap.data();
+        const gStr = String(data2.teacherId || '');
+        const match = gStr.match(/_g(\d+)$/);
+        if (!match) return;
+        const oldGi = parseInt(match[1]);
+        if (oldGi === gi) {
+          batch.delete(docSnap.ref);
+        } else if (oldGi > gi) {
+          const newTeacherId = gStr.replace(/_g\d+$/, '_g' + (oldGi - 1));
+          batch.update(docSnap.ref, { teacherId: newTeacherId });
+        }
+      });
+
+      await batch.commit();
+
+      // Save teacher document
+      await setDoc(teacherRef, { groups: groupsArr, students: filteredStudents }, { merge: true });
+
+      // Update local cache
+      if (teacher.groups) teacher.groups = groupsArr;
+      if (teacher.students) teacher.students = filteredStudents;
+      if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
+      if (window._ctrlMapCache) window._ctrlMapCache[teacherId] = null;
+
+      showToast('✅ تم حذف الفوج "' + groupName + '"' + (actuallyRemoved > 0 ? ' و' + actuallyRemoved + ' تلميذ' : ''));
+      await loadAttendanceSummary();
+    } catch (e) {
+      console.error('deleteGroup error:', e);
+      showToast('❌ خطأ في حذف الفوج: ' + e.message, true);
+    } finally {
+      const btn3 = document.querySelector('[onclick*="deleteGroup(' + gi + ')"]');
+      if (btn3) btn3.textContent = '🗑️ حذف';
+    }
+  };
+
+  overlay.querySelector('#del-grp-confirm').onclick = doDelete;
+  overlay.querySelector('#del-grp-cancel').onclick = () => document.body.removeChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) document.body.removeChild(overlay); };
 };
 
 let _attSelectedSuggestion = null; // { name, receipt, payStatus }
