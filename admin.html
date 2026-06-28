@@ -7145,19 +7145,28 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   // Helper to normalize names for comparison
   const normName = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
 
-  // Build Map of normalized ticket name → ticket data (pack, amount, receipt, status)
+  // Build lookup maps for tickets: by receipt (precise) and by name variant (fallback)
+  const ticketByReceipt = new Map();
   const ticketDataMap = new Map();
   if (window._allTicketsData && window._allTicketsData.length) {
     window._allTicketsData.forEach(t => {
+      const r = String(t.receipt || '').trim();
+      if (r) ticketByReceipt.set(r, t);
       const tn = String(t.name || '').trim();
       if (tn) _nameVariants(tn).map(normName).forEach(v => {
         if (!ticketDataMap.has(v)) ticketDataMap.set(v, t);
       });
     });
   }
-  const _getTicketData = (name) => {
+  const _getTicketData = (studentName, studentReceipt) => {
+    // 1. البحث برقم الإيصال (دقيق ولا يعتمد على الاسم)
+    if (studentReceipt) {
+      const r = String(studentReceipt).trim();
+      if (r && ticketByReceipt.has(r)) return ticketByReceipt.get(r);
+    }
+    // 2. البحث بالاسم (fallback)
     if (!ticketDataMap.size) return null;
-    const variants = _nameVariants(name).map(normName);
+    const variants = _nameVariants(studentName).map(normName);
     for (const v of variants) {
       if (ticketDataMap.has(v)) return ticketDataMap.get(v);
     }
@@ -7189,7 +7198,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       const cleanG = _cleanGroupName(g.name) || 'فوج ' + (gi + 1);
       if (match) {
         matchedNames.add(normName(match.name || ''));
-        allStudents.push({ name: match.name, group: cleanG, gi });
+        allStudents.push({ id: match.id, name: match.name, receipt: match.receipt, payStatus: match.payStatus, group: cleanG, gi });
       } else {
         // Student name in group doesn't match teacher.students — use as-is
         allStudents.push({ name: sName, group: cleanG, gi });
@@ -7209,7 +7218,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         groupName = _cleanGroupName(g.name) || 'فوج ' + (idx + 1);
       }
     });
-    allStudents.push({ name: s.name || '—', group: groupName || '—', gi });
+    allStudents.push({ id: s.id, name: s.name || '—', receipt: s.receipt, payStatus: s.payStatus, group: groupName || '—', gi });
   });
 
   // Build rows grouped by group (فوج), count stats
@@ -7289,20 +7298,18 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           totalAbsent++;
         }
       }
-      const ticketData = _getTicketData(s.name);
+      const ticketData = _getTicketData(s.name, s.receipt);
       let ticketBadge;
-      if (ticketData) {
-        const pack = ticketData.pack || '—';
+      if (ticketData && ticketData.pack) {
+        const pack = ticketData.pack;
         const amt = Number(ticketData.amount || ticketData.paid || 0);
+        const paidAmt = isNaN(amt) ? 0 : amt;
         const remaining = Number(ticketData.remainingAmount);
         const isPaid = isNaN(remaining) || remaining <= 0;
-        const receipt = ticketData.receipt || '';
-        const paidAmt = isNaN(amt) ? 0 : amt;
-        const titleParts = [isPaid ? 'مدفوع بالكامل' : 'باقي ' + (isNaN(remaining) ? '?' : remaining) + ' د.ج'];
-        if (receipt) titleParts.push('الوصف: ' + receipt);
-        ticketBadge = `<span style="display:inline-flex;align-items:center;gap:2px;font-size:10px;padding:1px 6px;border-radius:4px;background:#d1fae5;color:#059669;font-weight:800;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis" title="${titleParts.join(' | ')}">✅ ${isPaid ? '' : '⏳'}${pack}</span>`;
+        const lines = [`✅ مشترك`, `📦 ${pack}`, `💰 ${paidAmt.toLocaleString('ar-DZ')} د.ج`];
+        ticketBadge = `<span style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:3px 8px;font-size:11px;padding:3px 10px;border-radius:6px;background:#d1fae5;color:#059669;font-weight:800;width:fit-content;max-width:100%;line-height:1.4" title="${isPaid ? 'مدفوع بالكامل' : 'باقي ' + (isNaN(remaining) ? '?' : remaining) + ' د.ج'}">${lines.join('<span style="color:rgba(5,150,105,0.3);font-size:14px;font-weight:400">|</span>')}</span>`;
       } else {
-        ticketBadge = '<span style="display:inline-flex;align-items:center;gap:2px;font-size:10px;padding:1px 6px;border-radius:4px;background:#f3f4f6;color:#9ca3af;font-weight:800;white-space:nowrap">◻️</span>';
+        ticketBadge = '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 10px;border-radius:6px;background:#fee2e2;color:#dc2626;font-weight:800;width:fit-content;line-height:1.4">❌ غير مشترك</span>';
       }
       allRows.push(`<tr>
         <td style="font-weight:700;color:var(--text-muted);text-align:center;width:32px;font-size:12px">${rowNum++}</td>
