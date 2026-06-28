@@ -942,8 +942,11 @@
     .att-group-card{border:1.5px solid var(--border-2);border-radius:12px;margin:0 4px 12px 4px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
     .att-group-card:first-child{margin-top:0}
     .att-group-sep-row td{padding:0!important;height:6px;background:transparent;border:none!important}
-    .att-group-del-btn{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:6px;border:1px solid rgba(239,68,68,0.25);background:rgba(239,68,68,0.07);color:#DC2626;font-size:10px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;line-height:1;white-space:nowrap;margin-right:12px}
+    .att-group-del-btn,.att-group-rename-btn{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;line-height:1;white-space:nowrap;margin-right:6px}
+    .att-group-del-btn{border:1px solid rgba(239,68,68,0.25);background:rgba(239,68,68,0.07);color:#DC2626}
     .att-group-del-btn:hover{background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.5)}
+    .att-group-rename-btn{border:1px solid rgba(124,58,237,0.25);background:rgba(124,58,237,0.07);color:#7C3AED}
+    .att-group-rename-btn:hover{background:rgba(124,58,237,0.15);border-color:rgba(124,58,237,0.5)}
     .att-unassign-bar{display:none;margin-bottom:14px;padding:14px 18px;background:var(--card-bg);border:1.5px solid var(--border-2);border-radius:12px}
     .att-unassign-bar.open{display:block}
     .att-unassign-bar .ub-title{font-size:12px;font-weight:800;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:6px}
@@ -7197,7 +7200,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     }
     const isAdmin = !window._isTeacherAttendanceView;
     allRows.push(`<tr class="att-group-header-row">
-      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}${isAdmin ? `<button class="att-group-del-btn" onclick="deleteGroup(${gi})" title="حذف الفوج">🗑️ حذف</button>` : ''}</td>
+      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}${isAdmin ? `<button class="att-group-rename-btn" onclick="renameGroup(${gi})" title="إعادة تسمية الفوج">✏️ إعادة تسمية</button><button class="att-group-del-btn" onclick="deleteGroup(${gi})" title="حذف الفوج">🗑️ حذف</button>` : ''}</td>
     </tr>`);
 
     let rowNum = 1;
@@ -7912,6 +7915,45 @@ window.deleteGroup = (gi) => {
   overlay.querySelector('#del-grp-confirm').onclick = doDelete;
   overlay.querySelector('#del-grp-cancel').onclick = () => document.body.removeChild(overlay);
   overlay.onclick = (e) => { if (e.target === overlay) document.body.removeChild(overlay); };
+};
+
+// ─── إعادة تسمية فوج ───
+window.renameGroup = (gi) => {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+  const groups = teacher.groups || [];
+  const group = groups[gi];
+  if (!group) { showToast('⚠️ الفوج غير موجود', true); return; }
+  const oldName = group.name || ('فوج ' + (gi + 1));
+  const newName = prompt('✏️ أدخل الاسم الجديد للفوج:', oldName);
+  if (!newName || newName.trim() === oldName) return;
+  if (!newName.trim()) { showToast('⚠️ الرجاء إدخال اسم صالح', true); return; }
+  const doRename = async () => {
+    try {
+      const teacherRef = doc(db, 'teachers', teacherId);
+      const snap = await getDoc(teacherRef);
+      if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+      const data = snap.data();
+      const groupsArr = data.groups || [];
+      if (!groupsArr[gi]) { showToast('⚠️ الفوج غير موجود', true); return; }
+      if (groupsArr.some((g, i) => i !== gi && g.name === newName.trim())) {
+        showToast('⚠️ يوجد فوج بنفس الاسم مسبقاً', true); return;
+      }
+      groupsArr[gi].name = newName.trim();
+      await setDoc(teacherRef, { groups: groupsArr }, { merge: true });
+      // Update local cache
+      if (teacher.groups) teacher.groups = groupsArr;
+      if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
+      showToast('✅ تمت إعادة تسمية الفوج إلى "' + newName.trim() + '"');
+      await loadAttendanceSummary();
+    } catch (e) {
+      console.error('renameGroup error:', e);
+      showToast('❌ خطأ في إعادة التسمية: ' + e.message, true);
+    }
+  };
+  doRename();
 };
 
 let _attSelectedSuggestion = null; // { name, receipt, payStatus }
