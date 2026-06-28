@@ -5419,17 +5419,19 @@ function genStudentId(teacherId, idx) {
 const GROUP_DAYS = ['السبت','الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة'];
 
 function buildGroupRow(containerId, groupData) {
-  /* groupData = { name, days:[], students:[] } */
+  /* groupData = { name, days:[], students:[], _gid? } */
   const container = document.getElementById(containerId);
   const emptyEl = document.getElementById(containerId.replace('-list','-empty'));
   if (emptyEl) emptyEl.style.display = 'none';
 
   const idx = container.children.length;
   const g = groupData || { name: '', days: [], students: [] };
+  if (!g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
 
   const row = document.createElement('div');
   row.className = 'group-row';
   row.dataset.gidx = idx;
+  row.dataset.gid = g._gid;
 
   // رسم الأيام
   const daysHtml = GROUP_DAYS.map(d =>
@@ -5655,9 +5657,10 @@ function collectGroups(containerId) {
   const groups = [];
   rows.forEach(row => {
     const name = row.querySelector('.group-name-inp').value.trim();
+    const _gid = row.dataset.gid || '';
     const days = [...row.querySelectorAll('.group-day-btn.sel')].map(b => b.dataset.day);
     const students = [...row.querySelectorAll('.group-students-area .group-student-chip span:first-child')].map(s => s.textContent.trim());
-    if (name) groups.push({ name, days, students });
+    groups.push({ _gid, name: name || 'فوج ' + (groups.length + 1), days, students });
   });
   return groups;
 }
@@ -6929,6 +6932,10 @@ const _cleanGroupName = (name) => {
   if (!s || s === '#NAME?' || s === '#REF!' || s === '#VALUE!' || s === '#N/A' || s === '—') return '';
   return s;
 };
+const _groupDefaultName = (gi) => {
+  const names = ['الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'];
+  return 'الفوج ' + (names[gi] || (gi + 1));
+};
 
 window._attSummaryCache = {}; // teacherId -> { gi: { sessionNum: data } }
 
@@ -7967,6 +7974,7 @@ window.confirmDelGroup = async () => {
 
 // ─── إعادة تسمية فوج ───
 let _renameGi = -1;
+let _renameGid = '';
 window.renameGroup = async (gi) => {
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
@@ -7980,25 +7988,48 @@ window.renameGroup = async (gi) => {
   if (inp) { inp.value = cachedGroup?.name ?? ''; inp.focus(); inp.select(); }
   bg.classList.add('open');
   document.body.style.overflow = 'hidden';
-  // جلب الاسم الحقيقي من Firestore بشكل غير متزامن وحدّث إن اختلف
+  // جلب الاسم الحقيقي و _gid من Firestore
   try {
     const snap = await getDoc(doc(db, 'teachers', teacherId));
     if (snap.exists()) {
-      const realGroup = (snap.data().groups || [])[gi];
-      const realName = realGroup?.name ?? '';
-      if (inp && inp.value !== realName) inp.value = realName;
+      const data = snap.data();
+      const groupsArr = data.groups || [];
+      // تحقق من وجود الفوج بالـ gi
+      let realGroup = groupsArr[gi];
+      // إن لم يوجد بالـ gi، ابحث بالـ _gid المخزن سابقاً أو بالاسم
+      if (!realGroup && _renameGid) {
+        const foundIdx = groupsArr.findIndex(g => g._gid === _renameGid);
+        if (foundIdx >= 0) {
+          realGroup = groupsArr[foundIdx];
+          _renameGi = foundIdx;
+        }
+      }
+      // إن لم يوجد، ابحث بالاسم من cache
+      if (!realGroup && cachedGroup?.name) {
+        const foundIdx = groupsArr.findIndex(g => g.name === cachedGroup.name);
+        if (foundIdx >= 0) {
+          realGroup = groupsArr[foundIdx];
+          _renameGi = foundIdx;
+        }
+      }
+      if (realGroup) {
+        _renameGid = realGroup._gid || '';
+        if (inp) inp.value = realGroup.name ?? '';
+      }
     }
-  } catch (e) { /* تجاهل الخطأ، القيمة المخبأة كافية */ }
+  } catch (e) { /* تجاهل الخطأ */ }
 };
 
 window.closeRenameGroupModal = () => {
   const bg = document.getElementById('rename-group-modal');
   if (bg) { bg.classList.remove('open'); document.body.style.overflow = ''; }
   _renameGi = -1;
+  _renameGid = '';
 };
 
 window.confirmRenameGroup = async () => {
   const gi = _renameGi;
+  const gid = _renameGid;
   const inp = document.getElementById('rename-group-input');
   if (!inp || gi < 0) return;
   const newName = inp.value.trim();
@@ -8012,19 +8043,44 @@ window.confirmRenameGroup = async () => {
     const snap = await getDoc(teacherRef);
     if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
     const data = snap.data();
-    const groupsArr = data.groups || [];
-    if (!groupsArr[gi]) { showToast('⚠️ الفوج غير موجود', true); return; }
-    const oldName = groupsArr[gi]?.name || '';
+    let groupsArr = data.groups || [];
+    // ابحث عن الفوج بالـ _gid أولاً، ثم بالـ gi
+    let targetIdx = -1;
+    if (gid) {
+      targetIdx = groupsArr.findIndex(g => g && g._gid === gid);
+    }
+    if (targetIdx < 0 && groupsArr[gi]) {
+      targetIdx = gi;
+    }
+    if (targetIdx < 0 || !groupsArr[targetIdx]) {
+      // محاولة أخيرة: ابحث بالاسم القديم
+      const oldTeacher = (allTeachers || []).find(t => t.id === teacherId);
+      const oldName = oldTeacher?.groups?.[gi]?.name || '';
+      if (oldName) {
+        targetIdx = groupsArr.findIndex(g => g && g.name === oldName);
+      }
+    }
+    if (targetIdx < 0 || !groupsArr[targetIdx]) {
+      showToast('⚠️ الفوج غير موجود', true); return;
+    }
+    // تأكد من وجود _gid
+    if (!groupsArr[targetIdx]._gid) groupsArr[targetIdx]._gid = gid || 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+    const oldName = groupsArr[targetIdx]?.name || '';
     if (newName === oldName) { closeRenameGroupModal(); return; }
-    if (groupsArr.some((g, i) => i !== gi && g.name === newName)) {
+    if (groupsArr.some((g, i) => i !== targetIdx && g.name === newName)) {
       showToast('⚠️ يوجد فوج بنفس الاسم مسبقاً', true); return;
     }
-    groupsArr[gi].name = newName;
+    groupsArr[targetIdx].name = newName;
     await setDoc(teacherRef, { groups: groupsArr }, { merge: true });
-    // تحديث الذاكرة المحلية مباشرة
+    // تحديث الذاكرة المحلية مباشرة (باستخدام _gid إن أمكن)
     const teacher = (allTeachers || []).find(t => t.id === teacherId);
-    if (teacher && teacher.groups && teacher.groups[gi]) {
-      teacher.groups[gi].name = newName;
+    if (teacher && teacher.groups) {
+      const cacheTarget = gid ? teacher.groups.findIndex(g => g && g._gid === gid) : -1;
+      const cacheIdx = cacheTarget >= 0 ? cacheTarget : gi;
+      if (teacher.groups[cacheIdx]) {
+        teacher.groups[cacheIdx].name = newName;
+        if (!teacher.groups[cacheIdx]._gid) teacher.groups[cacheIdx]._gid = gid || groupsArr[targetIdx]._gid || '';
+      }
     }
     if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
     if (window._ctrlMapCache) window._ctrlMapCache[teacherId] = null;
@@ -10286,7 +10342,7 @@ window.saveNewGroup = async () => {
         addedCount++;
       }
     });
-    groups.push({ name: groupName, students: selected, days: [] });
+    groups.push({ _gid: 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10), name: groupName, students: selected, days: [] });
     await setDoc(teacherRef, { students: studentsList, groups }, { merge: true });
     showToast(`✅ تم إنشاء الفوج "${groupName}" بنجاح مع ${selected.length} تلميذ${addedCount > 0 ? ' (تمت إضافة ' + addedCount + ' تلميذ جدد)' : ''}`);
     closeAddGroupModal();
