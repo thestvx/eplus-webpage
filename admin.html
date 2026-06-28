@@ -8018,26 +8018,27 @@ window.renameGroup = async (gi) => {
     if (snap.exists()) {
       const data = snap.data();
       const groupsArr = data.groups || [];
-      // تحقق من وجود الفوج بالـ gi
+      // ابحث بالـ gi أولاً (الأسرع)
       let realGroup = groupsArr[gi];
-      // إن لم يوجد بالـ gi، ابحث بالـ _gid المخزن سابقاً أو بالاسم
-      if (!realGroup && _renameGid) {
-        const foundIdx = groupsArr.findIndex(g => g._gid === _renameGid);
-        if (foundIdx >= 0) {
-          realGroup = groupsArr[foundIdx];
-          _renameGi = foundIdx;
-        }
+      let foundIdx = realGroup ? gi : -1;
+      // إن لم يوجد بالـ gi، ابحث بالـ _gid من الكاش (موثوق)
+      if (!realGroup && cachedGroup?._gid) {
+        foundIdx = groupsArr.findIndex(g => g && g._gid === cachedGroup._gid);
+        if (foundIdx >= 0) realGroup = groupsArr[foundIdx];
       }
-      // إن لم يوجد، ابحث بالاسم من cache
+      // إن لم يوجد، ابحث بالاسم من الكاش
       if (!realGroup && cachedGroup?.name) {
-        const foundIdx = groupsArr.findIndex(g => g.name === cachedGroup.name);
-        if (foundIdx >= 0) {
-          realGroup = groupsArr[foundIdx];
-          _renameGi = foundIdx;
-        }
+        foundIdx = groupsArr.findIndex(g => g && g.name === cachedGroup.name);
+        if (foundIdx >= 0) realGroup = groupsArr[foundIdx];
       }
-      if (realGroup) {
+      // إن لم يوجد، ابحث بكل _gid معروف (للتأكد)
+      if (!realGroup && _renameGid) {
+        foundIdx = groupsArr.findIndex(g => g && g._gid === _renameGid);
+        if (foundIdx >= 0) realGroup = groupsArr[foundIdx];
+      }
+      if (realGroup && foundIdx >= 0) {
         _renameGid = realGroup._gid || '';
+        _renameGi = foundIdx;
         if (inp) inp.value = realGroup.name ?? '';
       }
     }
@@ -10304,6 +10305,24 @@ async function _buildGroupCandidateList(teacherId) {
       });
     });
   }
+  // 3. من قوائم تلاميذ الأساتذة (كل الأساتذة)
+  const allT = window._allTeachersCache || [];
+  allT.forEach(t => {
+    const tName = t.name || t.id || '';
+    const students = t.students || [];
+    students.forEach(s => {
+      const n = String(s.name || '').trim();
+      if (!n || seen.has(n.toLowerCase())) return;
+      seen.add(n.toLowerCase());
+      candidates.push({
+        name: n,
+        pack: '',
+        amount: '',
+        source: '📚 أ. ' + tName,
+        sourceLabel: 'من تلاميذ ' + tName,
+      });
+    });
+  });
   window._groupCandidatesData = candidates;
   _renderGroupCandidates(candidates);
 }
