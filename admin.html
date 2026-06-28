@@ -4029,12 +4029,14 @@ window.searchStudent = async () => {
 
     const q = query.trim().toLowerCase();
 
+    const queryWords = q.split(/\s+/).filter(Boolean);
     const matches = combined.filter(row => {
-      // بحث في الاسم أولاً
       const name = String(row['name'] || row['الاسم'] || '').toLowerCase();
       const lastName = String(row['اللقب'] || '').toLowerCase();
       const fullName = [name, lastName].filter(Boolean).join(' ').trim();
-      if (name.includes(q) || lastName.includes(q) || fullName.includes(q)) return true;
+      const searchText = fullName || name;
+      // بحث بالكلمات — كل كلمة من البحث يجب أن تظهر في الاسم (بغض النظر عن الترتيب)
+      if (queryWords.every(word => searchText.includes(word))) return true;
       return Object.values(row).some(v => String(v).toLowerCase().includes(q));
     });
 
@@ -7025,7 +7027,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       // استخدم الفوج الأول كافتراضي لعناصر التحكم
       const defaultGi = 0;
       controlHtml += '<tr style="background:var(--bg);border-bottom:1px solid var(--border-2)">';
-      controlHtml += '<th colspan="4" style="font-size:10px;font-weight:700;color:var(--text-muted);text-align:right;padding:6px 16px">🔓 التحكم بالحصص</th>';
+      controlHtml += '<th colspan="4" style="font-size:11px;font-weight:700;color:var(--text-muted);text-align:right;padding:6px 16px">🔓 التحكم بالحصص</th>';
       if (teachersGroups.length > 0) {
         for (let i = 1; i <= totalSessions; i++) {
           const sn = i;
@@ -7037,7 +7039,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           const isLockedS = st === 'locked';
           const statusEmoji = isOpen ? '🟢' : isClosed ? '🔴' : isLockedS ? '⚫' : '🟡';
           const statusTitle = isOpen ? t('ctrl_status_open') : isClosed ? t('ctrl_status_closed') : isLockedS ? t('ctrl_status_locked') : t('ctrl_status_scheduled');
-          controlHtml += `<th style="text-align:center;padding:6px 2px;vertical-align:middle;font-size:10px;white-space:nowrap">
+          controlHtml += `<th style="text-align:center;padding:6px 4px;vertical-align:middle;font-size:10px;white-space:nowrap">
             <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
               <span style="font-size:9px;font-weight:900;color:${isOpen ? '#059669' : isClosed ? '#DC2626' : isLockedS ? '#6b7280' : '#d97706'}" title="${statusTitle}">${statusEmoji}</span>
               <div style="display:flex;gap:2px">
@@ -7050,10 +7052,10 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           </th>`;
         }
       } else {
-        controlHtml += '<th colspan="12" style="text-align:center;padding:6px;font-size:10px;color:var(--text-muted)">⚠️ لا توجد أفواج بعد</th>';
+        controlHtml += '<th colspan="12" style="text-align:center;padding:6px 4px;font-size:11px;color:var(--text-muted)">⚠️ لا توجد أفواج بعد</th>';
       }
       controlHtml += `<th style="padding:6px;text-align:center;vertical-align:middle;white-space:nowrap">
-        <button onclick="openAddGroupModal()" style="display:inline-flex;align-items:center;gap:2px;padding:3px 6px;border-radius:5px;border:1px solid var(--primary);background:var(--primary-light);color:var(--primary);font-size:10px;font-weight:800;cursor:pointer;transition:all 0.15s;font-family:'Tajawal',sans-serif;white-space:nowrap;line-height:1" onmouseover="this.style.background='var(--primary)';this.style.color='white'" onmouseout="this.style.background='var(--primary-light)';this.style.color='var(--primary)'">➕</button>
+        <button onclick="openAddGroupModal()" style="display:inline-flex;align-items:center;gap:2px;padding:2px 5px;border-radius:4px;border:1px solid var(--primary);background:var(--primary-light);color:var(--primary);font-size:10px;font-weight:800;cursor:pointer;transition:all 0.15s;font-family:'Tajawal',sans-serif;white-space:nowrap;line-height:1" onmouseover="this.style.background='var(--primary)';this.style.color='white'" onmouseout="this.style.background='var(--primary-light)';this.style.color='var(--primary)'">➕</button>
       </th>`;
       controlHtml += '</tr>';
     }
@@ -8721,11 +8723,15 @@ window.searchStudentSuggestions = async (val) => {
   const qSort = normSort(val);
 
   // ── 1. البحث في التذاكر (Firebase) ──
+  const qWords = q.split(/\s+/).filter(Boolean);
   const ticketMatches = (allTicketsData || []).filter(t => {
     const tn = _normSug(t.name);
     const ts = normSort(t.name);
-    return tn.includes(q) || ts.includes(qSort) || qSort.includes(ts) ||
-           (t.receipt && _normSug(t.receipt).includes(q));
+    if (tn.includes(q) || ts.includes(qSort) || qSort.includes(ts)) return true;
+    if (t.receipt && _normSug(t.receipt).includes(q)) return true;
+    // بحث بالكلمات — كل كلمة تظهر في الاسم بغض النظر عن الترتيب
+    if (qWords.every(w => tn.includes(w))) return true;
+    return false;
   }).slice(0, 8);
 
   // ── 2. إذا لم توجد نتائج في التذاكر — ابحث في Google Sheet ──
@@ -8738,7 +8744,12 @@ window.searchStudentSuggestions = async (val) => {
     try {
       const sheetRows = await loadSheetStudentsCache();
       // sheetRows الآن objects — نبحث في الاسم
-      sheetMatches = sheetRows.filter(s => _normSug(s.name).includes(q) || normSort(s.name).includes(qSort)).slice(0, 8);
+      sheetMatches = sheetRows.filter(s => {
+        const sn = _normSug(s.name);
+        if (sn.includes(q)) return true;
+        if (qWords.every(w => sn.includes(w))) return true;
+        return normSort(s.name).includes(qSort);
+      }).slice(0, 8);
     } catch(e) { console.warn('sheet search error:', e); }
 
     // إذا تغيّر النص أثناء الانتظار — تجاهل
