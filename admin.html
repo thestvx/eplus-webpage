@@ -7018,16 +7018,16 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   }
 
   // Build header showing all sessions
-  const headerRow = document.getElementById('att-sum-header-row');
-  if (headerRow) {
+  const thead = document.getElementById('att-sum-thead');
+  if (thead) {
     // صف التحكم (للأدمين فقط) — أزرار فتح/جدولة/قفل لكل حصة
     const teachersGroups = teacher.groups || [];
-    let controlHtml = '';
+    let fullHtml = '';
     if (!window._isTeacherAttendanceView) {
       // استخدم الفوج الأول كافتراضي لعناصر التحكم
       const defaultGi = 0;
-      controlHtml += '<tr style="background:var(--bg);border-bottom:1px solid var(--border-2)">';
-      controlHtml += '<th colspan="4" style="font-size:11px;font-weight:700;color:var(--text-muted);text-align:right;padding:6px 16px">🔓 التحكم بالحصص</th>';
+      fullHtml += '<tr style="background:var(--bg);border-bottom:1px solid var(--border-2)">';
+      fullHtml += '<th colspan="4" style="font-size:11px;font-weight:700;color:var(--text-muted);text-align:right;padding:6px 16px">🔓 التحكم بالحصص</th>';
       if (teachersGroups.length > 0) {
         for (let i = 1; i <= totalSessions; i++) {
           const sn = i;
@@ -7039,7 +7039,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           const isLockedS = st === 'locked';
           const statusEmoji = isOpen ? '🟢' : isClosed ? '🔴' : isLockedS ? '⚫' : '🟡';
           const statusTitle = isOpen ? t('ctrl_status_open') : isClosed ? t('ctrl_status_closed') : isLockedS ? t('ctrl_status_locked') : t('ctrl_status_scheduled');
-          controlHtml += `<th style="text-align:center;padding:6px 4px;vertical-align:middle;font-size:10px;white-space:nowrap">
+          fullHtml += `<th style="text-align:center;padding:6px 4px;vertical-align:middle;font-size:10px;white-space:nowrap">
             <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
               <span style="font-size:9px;font-weight:900;color:${isOpen ? '#059669' : isClosed ? '#DC2626' : isLockedS ? '#6b7280' : '#d97706'}" title="${statusTitle}">${statusEmoji}</span>
               <div style="display:flex;gap:2px">
@@ -7052,17 +7052,17 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           </th>`;
         }
       } else {
-        controlHtml += '<th colspan="12" style="text-align:center;padding:6px 4px;font-size:11px;color:var(--text-muted)">⚠️ لا توجد أفواج بعد</th>';
+        fullHtml += '<th colspan="12" style="text-align:center;padding:6px 4px;font-size:11px;color:var(--text-muted)">⚠️ لا توجد أفواج بعد</th>';
       }
-      controlHtml += `<th style="padding:6px;text-align:center;vertical-align:middle;white-space:nowrap">
+      fullHtml += `<th style="padding:6px;text-align:center;vertical-align:middle;white-space:nowrap">
         <button onclick="openAddGroupModal()" style="display:inline-flex;align-items:center;gap:2px;padding:2px 5px;border-radius:4px;border:1px solid var(--primary);background:var(--primary-light);color:var(--primary);font-size:10px;font-weight:800;cursor:pointer;transition:all 0.15s;font-family:'Tajawal',sans-serif;white-space:nowrap;line-height:1" onmouseover="this.style.background='var(--primary)';this.style.color='white'" onmouseout="this.style.background='var(--primary-light)';this.style.color='var(--primary)'">➕</button>
       </th>`;
-      controlHtml += '</tr>';
+      fullHtml += '</tr>';
     }
-    let headerHtml = '<th>#</th><th>التلميذ</th><th>الأستاذ</th><th>الفوج</th>';
-    for (let i = 1; i <= totalSessions; i++) headerHtml += `<th>ح${i}</th>`;
-    headerHtml += '<th data-i18n="att_th_action">إجراء</th>';
-    headerRow.innerHTML = controlHtml + headerHtml;
+    fullHtml += '<tr><th>#</th><th>التلميذ</th><th>الأستاذ</th><th>الفوج</th>';
+    for (let i = 1; i <= totalSessions; i++) fullHtml += `<th>ح${i}</th>`;
+    fullHtml += '<th data-i18n="att_th_action">إجراء</th></tr>';
+    thead.innerHTML = fullHtml;
   }
 
   // Helper to normalize names for comparison
