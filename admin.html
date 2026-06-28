@@ -7960,23 +7960,28 @@ window.confirmDelGroup = async () => {
 
 // ─── إعادة تسمية فوج ───
 let _renameGi = -1;
-window.renameGroup = (gi) => {
+window.renameGroup = async (gi) => {
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
-  const teacher = (allTeachers || []).find(t => t.id === teacherId);
-  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
-  const groups = teacher.groups || [];
-  const group = groups[gi];
-  if (!group) { showToast('⚠️ الفوج غير موجود', true); return; }
   _renameGi = gi;
   const inp = document.getElementById('rename-group-input');
-  if (inp) {
-    inp.value = group.name || ('فوج ' + (gi + 1));
-    inp.focus();
-    inp.select();
-  }
   const bg = document.getElementById('rename-group-modal');
-  if (bg) { bg.classList.add('open'); document.body.style.overflow = 'hidden'; }
+  if (!bg) return;
+  // اعرض القيمة المخبأة فوراً ثم افتح النافذة
+  const cachedTeacher = (allTeachers || []).find(t => t.id === teacherId);
+  const cachedGroup = (cachedTeacher?.groups || [])[gi];
+  if (inp) { inp.value = cachedGroup?.name ?? ''; inp.focus(); inp.select(); }
+  bg.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  // جلب الاسم الحقيقي من Firestore بشكل غير متزامن وحدّث إن اختلف
+  try {
+    const snap = await getDoc(doc(db, 'teachers', teacherId));
+    if (snap.exists()) {
+      const realGroup = (snap.data().groups || [])[gi];
+      const realName = realGroup?.name ?? '';
+      if (inp && inp.value !== realName) inp.value = realName;
+    }
+  } catch (e) { /* تجاهل الخطأ، القيمة المخبأة كافية */ }
 };
 
 window.closeRenameGroupModal = () => {
@@ -8009,10 +8014,13 @@ window.confirmRenameGroup = async () => {
     }
     groupsArr[gi].name = newName;
     await setDoc(teacherRef, { groups: groupsArr }, { merge: true });
-    // تحديث الذاكرة المحلية وجلب آخر البيانات من Firestore
+    // تحديث الذاكرة المحلية مباشرة
+    const teacher = (allTeachers || []).find(t => t.id === teacherId);
+    if (teacher && teacher.groups && teacher.groups[gi]) {
+      teacher.groups[gi].name = newName;
+    }
     if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
     if (window._ctrlMapCache) window._ctrlMapCache[teacherId] = null;
-    await loadTeachers();
     showToast('✅ تمت إعادة التسمية إلى "' + newName + '"');
     closeRenameGroupModal();
     await loadAttendanceSummary();
