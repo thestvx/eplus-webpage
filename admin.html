@@ -7333,7 +7333,13 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   const grouped = {};
   allStudents.forEach(s => {
     const dk = s.groupGi;
-    if (!grouped[dk]) grouped[dk] = { group: s.group, gi: dk, gid: s.gid, students: [] };
+    if (!grouped[dk]) {
+      // التأكد من وجود _gid (قد يكون التلميذ غير منتمٍ لأي فوج بعد)
+      let gidVal = s.gid;
+      if (!gidVal && groups[dk] && groups[dk]._gid) gidVal = groups[dk]._gid;
+      if (!gidVal) gidVal = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+      grouped[dk] = { group: s.group, gi: dk, gid: gidVal, students: [] };
+    }
     grouped[dk].students.push(s);
   });
   let groupKeys = Object.keys(grouped).map(Number).sort((a,b) => a - b);
