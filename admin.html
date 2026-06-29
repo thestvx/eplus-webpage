@@ -918,7 +918,11 @@
     .log-content{}
     .log-title{font-size:13px;font-weight:700;color:var(--text)}
     .log-meta{font-size:11px;color:var(--text-muted);margin-top:3px}
-    .att-cell{text-align:center;font-size:14px;padding:8px 6px!important;transition:all 0.15s;cursor:default}
+    .att-sum-tbl{width:100%;border-collapse:collapse;table-layout:auto}
+    .att-sum-tbl th,.att-sum-tbl td{height:48px;padding:6px 8px!important;font-size:13px;vertical-align:middle;white-space:nowrap}
+    .att-sum-tbl th{height:42px;background:var(--bg-2);font-size:12px;font-weight:800;color:var(--text-muted)}
+    .att-sum-tbl tbody tr:hover{background:var(--primary-light);transition:background 0.1s}
+    .att-cell{text-align:center;font-size:14px;padding:4px!important;transition:all 0.15s;cursor:default;width:48px;min-width:40px;height:48px}
     .att-cell.att-cell-clickable{cursor:pointer}
     .att-cell.att-cell-clickable:hover{filter:brightness(1.3);transform:scale(1.15)}
     .att-cell-present{color:#059669}
@@ -2283,8 +2287,8 @@
             <div class="so-stats" id="so-stats" style="margin-top:16px">
               <div class="so-stat"><div class="so-stat-n" id="so-total">0</div><div class="so-stat-l" data-i18n="so_total_label">👥 إجمالي التلاميذ المسجلين</div></div>
               <div class="so-stat"><div class="so-stat-n" id="so-in-group">0</div><div class="so-stat-l" data-i18n="so_in_group_label">🏫 في الأفواج</div></div>
-              <div class="so-stat"><div class="so-stat-n" id="so-in-sheet">0</div><div class="so-stat-l" data-i18n="so_in_sheet_label">📊 في الشيت</div></div>
-              <div class="so-stat"><div class="so-stat-n" id="so-out-sheet">0</div><div class="so-stat-l" data-i18n="so_out_sheet_label">📋 خارج الشيت</div></div>
+              <div class="so-stat"><div class="so-stat-n" id="so-in-sheet">0</div><div class="so-stat-l" data-i18n="so_in_sheet_label">📋 مسجل في الموقع</div></div>
+              <div class="so-stat"><div class="so-stat-n" id="so-out-sheet">0</div><div class="so-stat-l" data-i18n="so_out_sheet_label">📭 غير مسجل في الموقع</div></div>
             </div>
           </div>
           <!-- Charts panel -->
@@ -2306,15 +2310,18 @@
               </select>
               <select id="so-filter-status" onchange="filterStudentOverview()">
                 <option value="">👥 الجميع</option>
+                <option value="paid">✅ المشتركون</option>
+                <option value="unpaid">❌ غير المشتركين</option>
                 <option value="ingroup">🏫 في الأفواج</option>
-                <option value="insheet">📊 في الشيت</option>
-                <option value="notinsheet">📋 خارج الشيت</option>
+                <option value="notingroup">🚫 خارج الأفواج</option>
+                <option value="insheet">📋 مسجلون في الموقع</option>
+                <option value="notinsheet">📭 غير مسجلين في الموقع</option>
               </select>
             </div>
             <div class="so-search-wrap">
               <div style="position:relative;flex:1">
                 <span style="position:absolute;top:50%;right:12px;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
-                <input class="inp" type="text" id="so-search" placeholder="ابحث باسم التلميذ أو رقم الوصل..." style="padding-right:40px;padding-top:10px;padding-bottom:10px;font-size:13px" oninput="debouncedSearch()">
+                <input class="inp" type="text" id="so-search" placeholder="ابحث باسم التلميذ..." style="padding-right:40px;padding-top:10px;padding-bottom:10px;font-size:13px" oninput="debouncedSearch()">
               </div>
               <span style="font-size:12px;font-weight:700;color:var(--text-muted);white-space:nowrap" id="so-filter-count"></span>
               <button class="btn btn-sm" style="font-size:11px;padding:6px 10px;border-radius:8px" onclick="refreshSheetData()" title="تحديث بيانات الشيت">🔃</button>
@@ -2324,23 +2331,15 @@
               <table class="so-tbl" id="so-tbl">
                 <thead>
                   <tr>
-                    <th>#</th>
-                    <th>📛 التلميذ</th>
-                    <th>👨‍🏫 الأستاذ</th>
-                    <th>🏫 الفوج</th>
-                    <th>📦 الباقة</th>
-                    <th>🌍 اللغات</th>
-                    <th>💻 مسار الإعلام الآلي</th>
-                    <th>💰 المبلغ (الشيت)</th>
-                    <th>💳 المدفوع</th>
-                    <th>🆔 رقم الوصل</th>
-                    <th>✅ الحالة</th>
-                    <th>📋 مسجّل في الموقع</th>
-                    <th>👪 ولي الأمر</th>
-                    <th>📞 رقم ولي الأمر</th>
-                    <th>🎂 العمر</th>
-                    <th>📊 مسجّل في الشيت</th>
-                    <th style="width:40px">🔍</th>
+            <th>#</th>
+              <th>📛 التلميذ</th>
+              <th>👨‍🏫 الأستاذ</th>
+              <th>🏫 الفوج</th>
+              <th>📦 الباقة</th>
+              <th>💰 المبلغ</th>
+              <th>✅ الاشتراك</th>
+              <th>📋 مسجّل في الموقع</th>
+              <th style="width:40px">🔍</th>
                   </tr>
                 </thead>
                 <tbody id="so-tbody">
@@ -2365,6 +2364,11 @@
       </select>
       <select id="att-sum-group" onchange="loadAttendanceSummary()" style="display:none;padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">
         <option value="">🏫 جميع الأفواج</option>
+      </select>
+      <select id="att-sub-filter" onchange="loadAttendanceSummary()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:12px;font-weight:700">
+        <option value="">👥 الجميع</option>
+        <option value="subscribed">✅ المشتركون</option>
+        <option value="unsubscribed">❌ غير المشتركين</option>
       </select>
       <button onclick="exportAttendanceCSV()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif" title="تصدير CSV" id="att-csv-btn">📥 CSV</button>
       <button onclick="toggleAttendanceStudentSearch()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #059669;background:rgba(5,150,105,0.08);color:#059669;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إضافة تلميذ جديد للأستاذ المختار" id="att-add-student-btn">➕ إضافة تلميذ</button>
@@ -2402,7 +2406,7 @@
       </div>
     </div>
             <div class="tbl-wrap">
-              <table class="tbl" id="att-sum-tbl">
+              <table class="tbl att-sum-tbl" id="att-sum-tbl">
                 <thead id="att-sum-thead">
                   <tr id="att-sum-header-row">
                     <th>#</th>
@@ -3464,10 +3468,16 @@ onAuthStateChanged(auth, async user => {
           attTeacherSel.style.opacity = '0.7';
           onTeacherChange();
         }
-        ['att-csv-btn','att-normalize-btn','att-backup-btn','att-sync-btn'].forEach(id => {
+        // إخفاء أزرار الإدارة والأستاذ لا يستطيع إضافة تلاميذ
+        ['att-csv-btn','att-normalize-btn','att-backup-btn','att-sync-btn','att-add-student-btn','att-restore-btn'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.style.display = 'none';
         });
+        // إخفاء أزرار إدارة الأفواج (إعادة تسمية، نقل، حذف)
+        const style = document.createElement('style');
+        style.textContent = '.att-group-rename-btn,.att-group-move-btn,.att-group-del-btn{display:none!important}';
+        style.id = 'teacher-group-btn-hide';
+        document.head.appendChild(style);
         // إخفاء عناصر الموقع غير اللازمة للاستاذ
         document.querySelectorAll('.so-filters, .so-search-wrap, .so-page-nav, .so-charts').forEach(el => { if (el) el.style.display = 'none'; });
         const soStats = document.getElementById('so-stats');
@@ -6306,6 +6316,7 @@ window.renderStudentOverview = async () => {
       if (!sheetMatch) sheetMatch = window._sheetNormCache[_normOv(ticket.name)] || null;
     }
 
+    const _simplifyPack = (p) => String(p||'').replace(/[-\/–—].*$/,'').replace(/\s*\(.*?\)\s*/g,'').trim() || p;
     _soData.push({
       studentName: ticket.name,
       teacherName: match ? match.teacherName : '—',
@@ -6313,6 +6324,7 @@ window.renderStudentOverview = async () => {
       status: isPaid ? 'paid' : 'unpaid',
       statusLabel: isPaid ? '✅ مفعّل' : '⏳ غير مدفوع',
       pkg: ticket.pack || '—',
+      pkgSimple: _simplifyPack(ticket.pack) || '—',
       amount: Number(ticket.amount || 0),
       paid: Number(ticket.paid || ticket.amount || 0),
       receipt: ticket.receipt || '—',
@@ -6350,6 +6362,7 @@ window.renderStudentOverview = async () => {
         status: 'noticket',
         statusLabel: '⚠️ لا توجد تذكرة',
         pkg: sheet.pack || '—',
+        pkgSimple: _simplifyPack(sheet.pack) || '—',
         amount: 0,
         paid: 0,
         receipt: '—',
@@ -6388,6 +6401,7 @@ window.renderStudentOverview = async () => {
       status: 'noteacher',
       statusLabel: '📋 من الأفواج فقط',
       pkg: sheetMatch3 ? sheetMatch3.pack : '—',
+      pkgSimple: _simplifyPack(sheetMatch3 ? sheetMatch3.pack : '') || '—',
       amount: 0,
       paid: 0,
       receipt: '—',
@@ -6428,10 +6442,10 @@ window.renderStudentOverview = async () => {
       teachers.map(t => `<option value="${t.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">${t}</option>`).join('');
   }
 
-  // تعبئة فلتر الباقات
+  // تعبئة فلتر الباقات — أسماء مبسطة
   const packSelect = document.getElementById('so-filter-pack');
   if (packSelect) {
-    const packs = [...new Set(_soData.map(r => r.pkg).filter(p => p !== '—'))].sort();
+    const packs = [...new Set(_soData.map(r => r.pkgSimple).filter(p => p !== '—'))].sort();
     packSelect.innerHTML = '<option value="">📦 جميع الباقات</option>' +
       packs.map(p => `<option value="${p.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">📦 ${p}</option>`).join('');
   }
@@ -6561,18 +6575,18 @@ function _renderSoTable(data, searchFilter) {
       _normOv(r.studentName).includes(q) ||
       _normOv(r.teacherName).includes(q) ||
       _normOv(r.pkg).includes(q) ||
-      _normOv(r.groupName).includes(q) ||
-      r.receipt.toLowerCase().includes(q) ||
-      _normOv(r.parentName).includes(q) ||
-      r.parentPhone.includes(q)
+      _normOv(r.groupName).includes(q)
     );
   }
 
   if (teacherFilter) filtered = filtered.filter(r => r.teacherName === teacherFilter);
-  if (packFilter) filtered = filtered.filter(r => r.pkg === packFilter);
+  if (packFilter) filtered = filtered.filter(r => r.pkgSimple === packFilter);
   if (statusFilter === 'ingroup') filtered = filtered.filter(r => r.groupName && r.groupName !== '—');
+  else if (statusFilter === 'notingroup') filtered = filtered.filter(r => !r.groupName || r.groupName === '—');
   else if (statusFilter === 'insheet') filtered = filtered.filter(r => r.inSheet);
   else if (statusFilter === 'notinsheet') filtered = filtered.filter(r => !r.inSheet);
+  else if (statusFilter === 'paid') filtered = filtered.filter(r => r.status === 'paid');
+  else if (statusFilter === 'unpaid') filtered = filtered.filter(r => r.status === 'unpaid' || r.status === 'noticket');
 
   const countEl = document.getElementById('so-filter-count');
   if (countEl) countEl.textContent = filtered.length < data.length
@@ -6581,8 +6595,10 @@ function _renderSoTable(data, searchFilter) {
 
   const pageNavEl = document.getElementById('so-page-nav');
 
+  const colspan = 9;
+
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="17" class="so-empty"><div class="so-empty-icon">🔍</div><div style="font-weight:700;font-size:15px;color:var(--text-muted)">لا توجد نتائج</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px">حاول تغيير كلمة البحث</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${colspan}" class="so-empty"><div class="so-empty-icon">🔍</div><div style="font-weight:700;font-size:15px;color:var(--text-muted)">لا توجد نتائج</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px">حاول تغيير كلمة البحث</div></td></tr>`;
     if (pageNavEl) pageNavEl.innerHTML = '';
     return;
   }
@@ -6590,11 +6606,9 @@ function _renderSoTable(data, searchFilter) {
   tbody.innerHTML = filtered.map((r, i) => {
     const idx = i + 1;
     const badgeClass = r.status === 'paid' ? 'so-badge paid' : r.status === 'unpaid' || r.status === 'noticket' ? 'so-badge unpaid' : 'so-badge noticket';
-    const sheetBadge = r.inSheet
-      ? '<span class="so-badge sheet-yes" title="موجود في جدول التسجيلات">✅ نعم</span>'
-      : '<span class="so-badge sheet-no" title="غير موجود في جدول التسجيلات">❌ لا</span>';
-    const langsHtml = r.langs ? `<span style="font-size:11px;background:rgba(99,102,241,0.1);color:#4f46e5;padding:2px 8px;border-radius:99px;font-weight:700;white-space:nowrap">🌍 ${r.langs}</span>` : '<span style="color:var(--text-muted);font-size:11px">—</span>';
-    const itTrackHtml = r.itTrack ? `<span style="font-size:11px;background:rgba(16,185,129,0.1);color:#059669;padding:2px 8px;border-radius:99px;font-weight:700;white-space:nowrap">💻 ${r.itTrack}</span>` : '<span style="color:var(--text-muted);font-size:11px">—</span>';
+    const siteBadge = r.inSheet
+      ? '<span class="so-badge sheet-yes" title="مسجل من خلال الموقع">✅ نعم</span>'
+      : '<span class="so-badge sheet-no" title="غير مسجل من خلال الموقع">❌ لا</span>';
     const sheetTotalNum = r.sheetTotal ? parseFloat(r.sheetTotal.replace(/[^\d.]/g,'')) : 0;
     return `<tr class="so-row" style="animation:fadeInRow 0.3s ease ${i*0.05}s both">
       <td style="font-weight:700;color:var(--text-muted)">${idx}</td>
@@ -6602,17 +6616,9 @@ function _renderSoTable(data, searchFilter) {
       <td>${r.teacherName}</td>
       <td><span class="so-group-badge">🏫 ${r.groupName}</span></td>
       <td>${r.pkg !== '—' ? `<span class="so-badge pack">📦 ${r.pkg}</span>` : '<span style="color:var(--text-muted);font-size:11px">—</span>'}</td>
-      <td style="text-align:center">${langsHtml}</td>
-      <td style="text-align:center">${itTrackHtml}</td>
       <td class="so-amount-cell">${sheetTotalNum > 0 ? sheetTotalNum.toLocaleString('ar-DZ') + ' دج' : '—'}</td>
-      <td class="so-amount-cell">${Number(r.paid) ? Number(r.paid).toLocaleString('ar-DZ') + ' دج' : '—'}</td>
-      <td><span class="so-receipt-code">${r.receipt !== '—' ? r.receipt : '—'}</span></td>
       <td><span class="${badgeClass}">${r.statusLabel}</span></td>
-      <td style="text-align:center;font-size:16px">${r.hasTicket ? '✅' : '❌'}</td>
-      <td style="font-size:12px;font-weight:600;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.parentName}">${r.parentName !== '—' ? r.parentName : '<span style="color:var(--text-muted)">—</span>'}</td>
-      <td style="font-size:11px;direction:ltr;text-align:left;white-space:nowrap">${r.parentPhone !== '—' ? r.parentPhone : '<span style="color:var(--text-muted)">—</span>'}</td>
-      <td style="text-align:center">${r.age !== '—' ? r.age : '<span style="color:var(--text-muted)">—</span>'}</td>
-      <td style="text-align:center">${sheetBadge}</td>
+      <td style="text-align:center">${siteBadge}</td>
       <td style="text-align:center"><span class="so-detail-btn" onclick="event.stopPropagation();_showStudentDetail('${encodeURIComponent(JSON.stringify(r))}',this)" title="عرض جميع البيانات">🔍</span></td>
     </tr>`;
   }).join('');
@@ -6620,43 +6626,27 @@ function _renderSoTable(data, searchFilter) {
   if (pageNavEl) pageNavEl.innerHTML = '';
 }
 
-// ─── Student detail popup (all sources) ───
+// ─── Student detail popup — مطابقة صارمة بالاسم الكامل فقط ───
 window._showStudentDetail = (json, btn) => {
   try {
     const r = JSON.parse(decodeURIComponent(json));
-
-    // Find ALL raw sheet data by name match in _sheetStudentsCache
     let fullRaw = null;
     const stName = r.studentName || '';
-    const stNorm = _normOv(stName);
     const stVariants = _nameVariants(stName).map(_normOv);
-    const stWords = stNorm.split(/\s+/).filter(Boolean);
-    const allSheet = typeof _sheetStudentsCache !== 'undefined' && _sheetStudentsCache ? _sheetStudentsCache : [];
-    for (const entry of allSheet) {
-      const eName = entry.name || '';
-      const eNorm = _normOv(eName);
-      // Try exact normalized match first, then variant match, then partial word match
-      const exactMatch = eNorm === stNorm;
-      const variantMatch = stVariants.some(v => _nameVariants(eName).map(_normOv).includes(v));
-      const eWords = eNorm.split(/\s+/).filter(Boolean);
-      const partialMatch = stWords.length > 1 && eWords.length > 1 && stWords.some(w => eWords.includes(w)) && eWords.some(w => stWords.includes(w));
-      if (exactMatch || variantMatch || partialMatch) { fullRaw = entry._raw || entry; break; }
-    }
-    // Fallback 2: try window._sheetNormCache with name variants
-    if (!fullRaw && window._sheetNormCache) {
+
+    // البحث بالاسم الكامل فقط (لا مطابقة جزئية)
+    if (window._sheetNormCache) {
       for (const v of stVariants) {
-        if (window._sheetNormCache[v] && window._sheetNormCache[v]._raw) {
-          fullRaw = window._sheetNormCache[v]._raw;
+        if (window._sheetNormCache[v]) {
+          fullRaw = window._sheetNormCache[v]._raw || window._sheetNormCache[v];
           break;
         }
       }
     }
-    // Fallback 3: use _sheetRaw from the row if cached lookup failed
+    // Fallback: use _sheetRaw from the row data
     if (!fullRaw && r._sheetRaw) fullRaw = r._sheetRaw;
 
     const fields = [];
-
-    // ALL raw sheet columns (everything from the sheet row)
     if (fullRaw) {
       try {
         const raw = typeof fullRaw === 'object' ? fullRaw : JSON.parse(fullRaw);
@@ -6669,13 +6659,11 @@ window._showStudentDetail = (json, btn) => {
         }
       } catch(e) {}
     }
-
-    if (!fields.length) return;
+    if (!fields.length) { showToast('⚠️ لا توجد بيانات في الشيت لهذا التلميذ', true); return; }
     const list = fields.map(([k, v]) => {
       if (k.includes('━━━')) return `<div style="font-size:11px;font-weight:800;color:var(--primary);padding:10px 0 4px;text-align:center;letter-spacing:1px">${k}</div>`;
       return `<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="font-weight:700;color:var(--text-muted);white-space:nowrap;flex-shrink:0">${k}</span><span style="color:var(--text);text-align:left;direction:ltr;word-break:break-word">${v}</span></div>`;
     }).join('');
-
     const old = document.getElementById('so-detail-popup');
     if (old) old.remove();
     const popup = document.createElement('div');
@@ -7364,8 +7352,17 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}${isAdmin ? `<button class="att-group-rename-btn" onclick="renameGroup('${g.gid}')" title="إعادة تسمية الفوج">✏️ إعادة تسمية</button><button class="att-group-move-btn" onclick="openMoveGroupModal('${g.gid}')" title="نقل التلاميذ إلى فوج آخر" data-gid="${g.gid}">📦 نقل</button><button class="att-group-del-btn" onclick="deleteGroup('${g.gid}')" title="حذف الفوج" data-gid="${g.gid}">🗑️ حذف</button>` : ''}</td>
     </tr>`);
 
+    // قراءة فلتر الاشتراك
+    const subFilter = document.getElementById('att-sub-filter')?.value || '';
+
     let rowNum = 1;
     g.students.forEach(s => {
+      // التحقق من الاشتراك
+      const ticketData = _getTicketData(s.name, s.receipt);
+      const isSubscribed = !!(ticketData && ticketData.pack);
+      if (subFilter === 'subscribed' && !isSubscribed) return;
+      if (subFilter === 'unsubscribed' && isSubscribed) return;
+
       const groupSessions = groupCache[s.gi] || {};
       const ctrlMap = sessionCtrlMap[s.gi] || {};
       const cells = [];
@@ -7373,7 +7370,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         const i = sessionRange[idx];
         // إذا كان التلميذ مضافًا يدويًا، الحصص قبل تاريخ انضمامه تُعتبر غير مسجلة
         if (s.joinedAtSession && i < s.joinedAtSession) {
-          cells.push(`<td class="att-cell" title="غير مسجل (قبل انضمام التلميذ)" style="background:transparent;color:var(--text-muted);font-size:11px">—</td>`);
+          cells.push(`<td class="att-cell" title="غير مسجل (قبل انضمام التلميذ)" style="background:transparent;color:var(--text-muted);font-size:11px;text-align:center">—</td>`);
           continue;
         }
         const rec = groupSessions[i];
@@ -7388,12 +7385,12 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           const isPast = i < curSession;
           if (window._isTeacherAttendanceView && isLocked) {
             // الأستاذ لا يستطيع إنشاء تسجيل — الحصة مقفلة من الأدمن
-            cells.push(`<td class="att-cell att-cell-locked" title="${t('att_missed_session')}">🔒</td>`);
+            cells.push(`<td class="att-cell att-cell-locked" style="text-align:center" title="${t('att_missed_session')}">🔒</td>`);
           } else if (isPast) {
-            cells.push(`<td class="${cellClass}" title="${t('att_missed_session')}" ${cellClick}>⚠️</td>`);
+            cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_missed_session')}" ${cellClick}>⚠️</td>`);
             totalMissed++;
           } else {
-            cells.push(`<td class="${cellClass}" title="${t('att_future_session')}" ${cellClick}>⋯</td>`);
+            cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_future_session')}" ${cellClick}>⋯</td>`);
           }
           continue;
         }
@@ -7401,21 +7398,20 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           namesMatchLocal(st.name || '', s.name || '')
         );
         if (!studentRec) {
-          cells.push(`<td class="${isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-future att-cell-clickable'}" title="${t('att_not_recorded')}" ${isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}',${toggleGi},${i},'${sNameVal.replace(/'/g,"\\'")}')"`}>⋯</td>`);
+          cells.push(`<td class="${isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-future att-cell-clickable'}" style="text-align:center" title="${t('att_not_recorded')}" ${isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}',${toggleGi},${i},'${sNameVal.replace(/'/g,"\\'")}')"`}>⋯</td>`);
           continue;
         }
         const date = rec.date || '';
         if (studentRec.present) {
-          cells.push(`<td class="${cellClass}" title="${t('att_present_on')}${date}" ${cellClick}>✅</td>`);
+          cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_present_on')}${date}" ${cellClick}>✅</td>`);
           totalPresent++;
         } else {
-          cells.push(`<td class="${cellClass}" title="${t('att_absent_on')}${date}" ${cellClick}>❌</td>`);
+          cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_absent_on')}${date}" ${cellClick}>❌</td>`);
           totalAbsent++;
         }
       }
-      const ticketData = _getTicketData(s.name, s.receipt);
       let ticketBadge;
-      if (ticketData && ticketData.pack) {
+      if (isSubscribed) {
         const pack = ticketData.pack;
         const amt = Number(ticketData.amount || ticketData.paid || 0);
         const paidAmt = isNaN(amt) ? 0 : amt;
@@ -7426,13 +7422,15 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       } else {
         ticketBadge = '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 10px;border-radius:6px;background:#fee2e2;color:#dc2626;font-weight:800;width:fit-content;line-height:1.4">❌ غير مشترك</span>';
       }
+      // إنشاء كائن JSON لزر العدسة
+      const _detailData = { studentName: s.name, _sheetRaw: s._sheetRaw };
       allRows.push(`<tr>
-        <td style="font-weight:700;color:var(--text-muted);text-align:center;width:32px;font-size:12px">${rowNum++}</td>
-        <td style="font-weight:700"><span style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap">${s.name} ${ticketBadge}</span></td>
-        <td>${teacher.name}</td>
-        <td><span class="att-sum-group">${t('group_prefix')}${s.group}</span></td>
+        <td style="font-weight:700;color:var(--text-muted);text-align:center;width:40px;font-size:12px;padding:6px 4px;height:48px">${rowNum++}</td>
+        <td style="font-weight:700;white-space:nowrap;padding:6px 8px;height:48px"><span style="display:inline-flex;align-items:center;gap:4px;flex-wrap:nowrap">${s.name} <span class="so-detail-btn" onclick="event.stopPropagation();_showStudentDetail('${encodeURIComponent(JSON.stringify(_detailData))}',this)" title="عرض بيانات التلميذ" style="font-size:13px;cursor:pointer;opacity:0.5;transition:opacity 0.15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">🔍</span> ${ticketBadge}</span></td>
+        <td style="padding:6px 8px;height:48px;white-space:nowrap;font-size:13px">${teacher.name}</td>
+        <td style="padding:6px 8px;height:48px;white-space:nowrap;font-size:12px"><span class="att-sum-group">${t('group_prefix')}${s.group}</span></td>
         ${cells.join('')}
-        <td style="text-align:center"><button class="tbl-action del" onclick="removeStudentFromTeacher('${teacherIdVal}','${s.name.replace(/'/g,"\\'")}')" title="${t('att_delete_btn')}">🗑️</button></td>
+        <td style="text-align:center;padding:6px 4px;height:48px"><button class="tbl-action del" onclick="removeStudentFromTeacher('${teacherIdVal}','${s.name.replace(/'/g,"\\'")}')" title="${t('att_delete_btn')}">🗑️</button></td>
       </tr>`);
     });
   });
@@ -8098,6 +8096,7 @@ window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
 
 // ─── حذف تلميذ من قائمة الأستاذ ───
 window.removeStudentFromTeacher = async (teacherId, studentName) => {
+  if (window._isTeacherAttendanceView) { showToast('⚠️ هذه الميزة متاحة فقط للإدارة', true); return; }
   const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const namesMatchDel = (a, b) => {
     if (!a || !b) return false;
@@ -8502,6 +8501,7 @@ let _attSelectedSuggestion = null; // { name, receipt, payStatus }
 
 // ─── إظهار/إخفاء شريط بحث إضافة التلميذ ───
 window.toggleAttendanceStudentSearch = () => {
+  if (window._isTeacherAttendanceView) { showToast('⚠️ هذه الميزة متاحة فقط للإدارة', true); return; }
   const wrap = document.getElementById('att-student-search-wrap');
   const inp  = document.getElementById('att-add-student-input');
   if (!wrap) return;
@@ -8608,6 +8608,7 @@ window.selectAttendanceSuggestion = (name, receipt, payStatus) => {
 
 // ─── تأكيد إضافة التلميذ المختار ───
 window.confirmAddAttendanceStudent = async () => {
+  if (window._isTeacherAttendanceView) { showToast('⚠️ هذه الميزة متاحة فقط للإدارة', true); return; }
   const inp = document.getElementById('att-add-student-input');
   const rawName = inp ? inp.value.trim() : '';
   const name = _attSelectedSuggestion?.name || rawName;
@@ -8813,20 +8814,22 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride) => {
     });
   });
 
-  // Add remaining teacher flat-list students
-  (teacher.students || []).forEach(s => {
-    const key = normName(s.name || '');
-    if (csvMatched.has(key)) return;
-    let gi = 0;
-    let groupName = '—';
-    groups.forEach((g, idx) => {
-      if ((g.students || []).some(gs => namesMatch(gs, s.name))) {
-        gi = idx;
-        groupName = _cleanGroupName(g.name) || 'فوج ' + (idx + 1);
-      }
+  // Add remaining teacher flat-list students (only if exporting all groups)
+  if (giFilter === '' || isNaN(giNum)) {
+    (teacher.students || []).forEach(s => {
+      const key = normName(s.name || '');
+      if (csvMatched.has(key)) return;
+      let gi = 0;
+      let groupName = '—';
+      groups.forEach((g, idx) => {
+        if ((g.students || []).some(gs => namesMatch(gs, s.name))) {
+          gi = idx;
+          groupName = _cleanGroupName(g.name) || 'فوج ' + (idx + 1);
+        }
+      });
+      studentEntries.push({ name: s.name || '—', group: _cleanGroupName(groupName) || '—', gi });
     });
-    studentEntries.push({ name: s.name || '—', group: _cleanGroupName(groupName) || '—', gi });
-  });
+  }
 
   studentEntries.forEach(s => {
     const row = [s.name, teacher.name, s.group];
