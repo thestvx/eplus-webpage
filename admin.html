@@ -5554,13 +5554,17 @@ let _sheetStudentsCache = null;
 let _sheetStudentsLoading = false;
 
 function _mapSheetRow(r) {
-  // Try separate first + last name columns first
-  const first = String(r['الاسم'] || r['first_name'] || r['firstName'] || r['First Name'] || r['الاسم الأول'] || r['الاسم الاول'] || r['اسم الطالب'] || r['Student Name'] || r['اسم التلميذ'] || r['name'] || r['Name'] || '').trim();
-  const last  = String(r['اللقب'] || r['last_name'] || r['lastName'] || r['Last Name'] || r['اسم العائلة'] || r['Family Name'] || r['family_name'] || r['familyName'] || '').trim();
-  let fullName = [first, last].filter(Boolean).join(' ');
-  // Fallback: single full-name column
+  // First: full-name column (الاسم الكامل)
+  let fullName = String(r['الاسم الكامل'] || r['Full Name'] || r['full_name'] || r['fullName'] || '').trim();
+  // Second: combine separate first + last name columns
   if (!fullName) {
-    fullName = String(r['الاسم الكامل'] || r['Full Name'] || r['full_name'] || r['fullName'] || r['اسم الطالب'] || r['Student Name'] || r['اسم التلميذ'] || r['name'] || r['Name'] || '').trim();
+    const first = String(r['الاسم'] || r['first_name'] || r['firstName'] || r['First Name'] || r['الاسم الأول'] || r['الاسم الاول'] || r['اسم الطالب'] || r['Student Name'] || r['اسم التلميذ'] || r['Prénom'] || r['prenom'] || r['firstname'] || r['name'] || r['Name'] || '').trim();
+    const last  = String(r['اللقب'] || r['last_name'] || r['lastName'] || r['Last Name'] || r['اسم العائلة'] || r['Family Name'] || r['family_name'] || r['familyName'] || r['Nom'] || r['nom'] || r['lastname'] || '').trim();
+    fullName = [first, last].filter(Boolean).join(' ');
+  }
+  // Third: fallback to any single name column
+  if (!fullName) {
+    fullName = String(r['اسم الطالب'] || r['Student Name'] || r['اسم التلميذ'] || r['name'] || r['Name'] || '').trim();
   }
   if (!fullName) return null;
   return {
@@ -6215,11 +6219,19 @@ function _findStudentGroup(studentName, teacher) {
     .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
     .replace(/[ًٌٍَُِّْٰ]/g,'').replace(/ـ/g,'').replace(/\s+/g,' ');
   const groups = teacher.groups || [];
-  const targets = _nameVariants(studentName).map(_normGroup);
+  const target = _normGroup(studentName);
+  const tParts = target.split(/\s+/).filter(Boolean);
   for (let i = 0; i < groups.length; i++) {
-    if ((groups[i].students||[]).some(s => targets.includes(_normGroup(s)))) {
-      return groups[i].name;
-    }
+    const match = (groups[i].students||[]).some(s => {
+      const sn = _normGroup(s);
+      if (sn === target) return true;
+      const sParts = sn.split(/\s+/).filter(Boolean);
+      if (sParts.length >= 2 && tParts.length >= 2) {
+        return [...sParts].sort().join(' ') === [...tParts].sort().join(' ');
+      }
+      return false;
+    });
+    if (match) return groups[i].name;
   }
   return '—';
 }
@@ -6228,12 +6240,10 @@ let _soData = [];
 window._sheetNormCache = null; // normalized name → sheet data
 
 function _buildSheetNormCache(sheetRows) {
-  const cache = {};
+  const entries = [];
   (sheetRows || []).forEach(r => {
     const fullName = String(r.name || '').trim();
     if (!fullName) return;
-    // Store under all name variants for better matching
-    const variants = _nameVariants(fullName);
     const val = {
       name: fullName,
       parentName: String(r.parent || '').trim(),
@@ -6245,11 +6255,15 @@ function _buildSheetNormCache(sheetRows) {
       totalAmount: String(r.totalAmount || '').trim(),
       _raw: r._raw || null,
     };
-    variants.forEach(v => {
-      const key = _normOv(v);
-      if (!cache[key]) cache[key] = val;
-    });
+    // المفتاح الوحيد هو الاسم الطبيعي (دون تصادم)
+    const uniqueKey = _normOv(fullName);
+    entries.push({ key: uniqueKey, parts: uniqueKey.split(/\s+/).filter(Boolean), val });
   });
+  // cache للتوافق مع الاستدعاءات القديمة التي تستخدم المفتاح الواحد
+  const cache = {};
+  entries.forEach(e => { if (!cache[e.key]) cache[e.key] = e.val; });
+  // نخزن القائمة كاملة للبحث الذكي
+  window._sheetNormEntries = entries;
   return cache;
 }
 
@@ -6258,6 +6272,44 @@ const _normOv = s => String(s||'').trim().toLowerCase()
   .replace(/[ًٌٍَُِّْٰ]/g,'').replace(/ـ/g,'').replace(/\s+/g,' ');
 
 function _simplifyPack(p) { return String(p||'').replace(/[-\/–—].*$/,'').replace(/\s*\(.*?\)\s*/g,'').trim() || p; }
+
+// دالة بحث ذكية في الشيت: تستخدم المطابقة بالاسم الكامل أولاً، ثم المطابقة الفرعية الآمنة
+function _findSheetMatchSmart(name) {
+  if (!window._sheetNormEntries || !name) return null;
+  const entries = window._sheetNormEntries;
+  const targetNorm = _normOv(name);
+  const targetParts = targetNorm.split(/\s+/).filter(Boolean);
+
+  // 1. مطابقة دقيقة (normalized)
+  for (const e of entries) {
+    if (e.key === targetNorm) return e.val;
+  }
+  // 2. جميع كلمات الاسم المطلوب موجودة في اسم الشيت وبالعكس (مجموعة كلمات متطابقة)
+  if (targetParts.length >= 2) {
+    const sortedTarget = [...targetParts].sort().join(' ');
+    for (const e of entries) {
+      const sortedSheet = [...e.parts].sort().join(' ');
+      if (sortedTarget === sortedSheet) return e.val;
+    }
+  }
+  // 3. كل كلمات الاسم المطلوب موجودة في اسم الشيت (بحد أدنى كلمتين)
+  if (targetParts.length >= 2) {
+    for (const e of entries) {
+      if (targetParts.every(w => e.parts.includes(w))) return e.val;
+    }
+  }
+  // 4. البادئة/اللاحقة (مثلاً "Maroua Ben" → "Maroua Ben Salah")
+  if (targetParts.length >= 2) {
+    for (const e of entries) {
+      if (e.parts.length < 2) continue;
+      const short = targetParts.join(' '), long = e.parts.join(' ');
+      if (long.startsWith(short + ' ') || long.endsWith(' ' + short) || long === short) return e.val;
+      const shortRev = [...targetParts].reverse().join(' ');
+      if (long.startsWith(shortRev + ' ') || long.endsWith(' ' + shortRev)) return e.val;
+    }
+  }
+  return null;
+}
 
 window.renderStudentOverview = async () => {
   const tbody = document.getElementById('so-tbody');
@@ -6282,19 +6334,27 @@ window.renderStudentOverview = async () => {
     (t.students||[]).forEach(s => {
       if (!s.name) return;
       const key = _normOv(s.name);
-      if (!teacherMap[key]) {
+      // لا نستبدل إذا كان الاسم مختلفًا (نتجنب الخلط)
+      if (!teacherMap[key] || teacherMap[key].studentName === s.name) {
         teacherMap[key] = { studentName: s.name, teacherName: t.name, groupName: _findStudentGroup(s.name, t) };
       }
     });
   });
 
-  // Track which normalized names already have an entry (with variant matching)
+  // Track which normalized names already have an entry (exact match + sorted words)
   const allKeys = new Set();
   const _isKnown = (name) => {
-    return _nameVariants(name).map(_normOv).some(v => allKeys.has(v));
+    const n = _normOv(name);
+    if (allKeys.has(n)) return true;
+    const parts = n.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2 && allKeys.has(parts.sort().join(' '))) return true;
+    return false;
   };
   const _addKey = (name) => {
-    _nameVariants(name).map(_normOv).forEach(v => allKeys.add(v));
+    const n = _normOv(name);
+    allKeys.add(n);
+    const parts = n.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) allKeys.add(parts.sort().join(' '));
   };
   _soData = [];
 
@@ -6304,22 +6364,25 @@ window.renderStudentOverview = async () => {
     _addKey(ticket.name);
     let match = teacherMap[_normOv(ticket.name)];
     if (!match) {
-      const tVars = _nameVariants(ticket.name).map(_normOv);
-      for (const v of tVars) { if (teacherMap[v]) { match = teacherMap[v]; break; } }
+      // بحث دقيق: نفس مجموعة الكلمات مرتبة أبجديًا
+      const tParts = _normOv(ticket.name).split(/\s+/).filter(Boolean);
+      if (tParts.length >= 2) {
+        const sortedTarget = tParts.sort().join(' ');
+        for (const [k, v] of Object.entries(teacherMap)) {
+          const mParts = k.split(/\s+/).filter(Boolean);
+          if (mParts.length >= 2 && [...mParts].sort().join(' ') === sortedTarget) {
+            match = v; break;
+          }
+        }
+      }
     }
     const isPaid = ticket.status === 'paid';
-    // Try matching with all name variants
-    let sheetMatch = null;
-    if (window._sheetNormCache) {
-      const variants = _nameVariants(ticket.name).map(_normOv);
-      for (const v of variants) {
-        if (window._sheetNormCache[v]) { sheetMatch = window._sheetNormCache[v]; break; }
-      }
-      if (!sheetMatch) sheetMatch = window._sheetNormCache[_normOv(ticket.name)] || null;
-    }
+    const sheetMatch = _findSheetMatchSmart(ticket.name);
+    // استخدام الاسم الكامل من الشيت إذا وُجد
+    const displayName = sheetMatch ? sheetMatch.name : ticket.name;
 
     _soData.push({
-      studentName: ticket.name,
+      studentName: displayName,
       teacherName: match ? match.teacherName : '—',
       groupName: match ? match.groupName : '—',
       status: isPaid ? 'paid' : 'unpaid',
@@ -6348,12 +6411,18 @@ window.renderStudentOverview = async () => {
     Object.entries(window._sheetNormCache).forEach(([normKey, sheet]) => {
       if (_isKnown(sheet.name || normKey)) return;
       _addKey(sheet.name || normKey);
-      // Try finding teacher match with name variants
+      // Try finding teacher match with sorted words
       let match = teacherMap[normKey];
       if (!match) {
-        const sheetVariants = _nameVariants(sheet.name).map(_normOv);
-        for (const v of sheetVariants) {
-          if (teacherMap[v]) { match = teacherMap[v]; break; }
+        const sParts = _normOv(sheet.name || '').split(/\s+/).filter(Boolean);
+        if (sParts.length >= 2) {
+          const sortedSheet = sParts.sort().join(' ');
+          for (const [k, v] of Object.entries(teacherMap)) {
+            const mParts = k.split(/\s+/).filter(Boolean);
+            if (mParts.length >= 2 && [...mParts].sort().join(' ') === sortedSheet) {
+              match = v; break;
+            }
+          }
         }
       }
       _soData.push({
@@ -6386,17 +6455,10 @@ window.renderStudentOverview = async () => {
   Object.entries(teacherMap).forEach(([key, match]) => {
     if (_isKnown(match.studentName || key)) return;
     _addKey(match.studentName || key);
-    // Also try to match against sheet cache with name variants
-    let sheetMatch3 = null;
-    if (window._sheetNormCache) {
-      const tVariants = _nameVariants(match.studentName || key).map(_normOv);
-      for (const v of tVariants) {
-        if (window._sheetNormCache[v]) { sheetMatch3 = window._sheetNormCache[v]; break; }
-      }
-      if (!sheetMatch3) sheetMatch3 = window._sheetNormCache[key] || null;
-    }
+    const sheetMatch3 = _findSheetMatchSmart(match.studentName || key);
+    const displayName3 = sheetMatch3 ? sheetMatch3.name : (match.studentName || key);
     _soData.push({
-      studentName: match.studentName || key,
+      studentName: displayName3,
       teacherName: match.teacherName,
       groupName: match.groupName,
       status: 'noteacher',
@@ -6627,25 +6689,42 @@ function _renderSoTable(data, searchFilter) {
   if (pageNavEl) pageNavEl.innerHTML = '';
 }
 
-// ─── Student detail popup — مطابقة صارمة بالاسم الكامل فقط ───
-window._showStudentDetail = (json, btn) => {
+// ─── Student detail popup — مطابقة ذكية بالاسم الكامل ───
+window._showStudentDetail = async (json, btn) => {
   try {
     const r = JSON.parse(decodeURIComponent(json));
     let fullRaw = null;
     const stName = r.studentName || '';
-    const stVariants = _nameVariants(stName).map(_normOv);
 
-    // البحث بالاسم الكامل فقط (لا مطابقة جزئية)
+    // تحميل ذاكرة الشيت إذا لم تكن محملة
+    if (!window._sheetStudentsCache && !window._sheetStudentsLoading) {
+      window._sheetStudentsLoading = true;
+      try {
+        const rows = await loadSheetStudentsCache();
+        window._sheetStudentsCache = rows || [];
+        window._sheetNormCache = _buildSheetNormCache(window._sheetStudentsCache);
+      } catch(e) { console.warn('Sheet load in detail popup:', e); }
+      window._sheetStudentsLoading = false;
+    }
+
+    // 1. Smart sheet matching
     if (window._sheetNormCache) {
-      for (const v of stVariants) {
-        if (window._sheetNormCache[v]) {
-          fullRaw = window._sheetNormCache[v]._raw || window._sheetNormCache[v];
+      const sheetMatch = _findSheetMatchSmart(stName);
+      if (sheetMatch) fullRaw = sheetMatch._raw || sheetMatch;
+    }
+    // 2. Fallback: _sheetRaw from row data
+    if (!fullRaw && r._sheetRaw) fullRaw = r._sheetRaw;
+    // 3. Fallback: search all raw sheet data by normalized name
+    if (!fullRaw && window._sheetStudentsCache) {
+      const stNorm = _normOv(stName);
+      for (const row of window._sheetStudentsCache) {
+        const rawName = _normOv(row.name || '');
+        if (rawName === stNorm || rawName.includes(stNorm) || stNorm.includes(rawName)) {
+          fullRaw = row._raw || row;
           break;
         }
       }
     }
-    // Fallback: use _sheetRaw from the row data
-    if (!fullRaw && r._sheetRaw) fullRaw = r._sheetRaw;
 
     const fields = [];
     if (fullRaw) {
