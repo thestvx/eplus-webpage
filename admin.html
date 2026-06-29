@@ -6311,9 +6311,9 @@ function _resolveToFullName(name) {
   // 2. Exact match في programsummerschool
   if (window._sheetNormMap2?.has(norm)) return window._sheetNormMap2.get(norm);
 
-  // 3. Safe subset: جميع كلمات الاسم المطلوب موجودة في اسم شيت واحد فقط
+  // 3. Safe subset: جميع كلمات الاسم المطلوب موجودة في اسم شيت واحد فقط (الاتجاه الصحيح)
   const candidates = [];
-  const check = (map) => { if (!map) return; map.forEach((v, k) => { if (k.split(/\s+/).filter(Boolean).every(w => parts.includes(w))) candidates.push(v); }); };
+  const check = (map) => { if (!map) return; map.forEach((v, k) => { const sParts = k.split(/\s+/).filter(Boolean); if (parts.every(w => sParts.includes(w))) candidates.push(v); }); };
   check(window._sheetNormMap1);
   check(window._sheetNormMap2);
   return candidates.length === 1 ? candidates[0] : null;
@@ -6485,6 +6485,15 @@ window.renderStudentOverview = async () => {
   }
 
   _renderSoTable(_soData, document.getElementById('so-search')?.value || '');
+
+  // بناء خريطة دائمة: normalizedName → _raw sheet data
+  window._studentSheetMap = new Map();
+  _soData.forEach(r => {
+    if (r._sheetRaw) {
+      const key = _normalizeNameStrict(r.studentName);
+      if (!window._studentSheetMap.has(key)) window._studentSheetMap.set(key, r._sheetRaw);
+    }
+  });
 
   // تحديث الرسوم البيانية
   _updateStudentCharts(_soData);
@@ -6675,7 +6684,7 @@ function _normalizeNameStrict(name) {
     .replace(/\s+/g, ' ');
 }
 
-// ─── Student detail popup — بحث في SummerPlus أولاً ثم programsummerschool ───
+// ─── Student detail popup — بحث بالخريطة الدائمة أولاً ثم في SummerPlus → programsummerschool ───
 window._showStudentDetail = async (json, btn) => {
   try {
     const r = JSON.parse(decodeURIComponent(json));
@@ -6690,9 +6699,14 @@ window._showStudentDetail = async (json, btn) => {
       window._sheetStudentsLoading = false;
     }
 
-    // بحث: resolve إلى اسم كامل (آمن) ثم strict match
-    let sheetMatch = _resolveToFullName(stName);
-    const fullRaw = sheetMatch ? sheetMatch._raw : null;
+    // 1. البحث في الخريطة الدائمة (التي بُنيت من renderStudentOverview)
+    let fullRaw = window._studentSheetMap?.get(_normalizeNameStrict(stName)) || null;
+
+    // 2. إذا لم يُوجد، استخدم resolve الآمن
+    if (!fullRaw) {
+      const match = _resolveToFullName(stName);
+      fullRaw = match ? match._raw : null;
+    }
 
     const fields = [];
     if (fullRaw) {
@@ -7469,8 +7483,8 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       } else {
         ticketBadge = '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 10px;border-radius:6px;background:#fee2e2;color:#dc2626;font-weight:800;width:fit-content;line-height:1.4">❌ غير مشترك</span>';
       }
-      // إنشاء كائن JSON لزر العدسة
-      const _detailData = { studentName: s.name, _sheetRaw: s._sheetRaw };
+      // إنشاء كائن JSON لزر العدسة (يُحل الاسم لاحقًا في _showStudentDetail)
+      const _detailData = { studentName: s.name };
       allRows.push(`<tr>
         <td style="font-weight:700;color:var(--text-muted);text-align:center;width:40px;font-size:12px;padding:6px 4px;height:48px">${rowNum++}</td>
         <td style="font-weight:700;white-space:nowrap;padding:6px 8px;height:48px"><span style="display:inline-flex;align-items:center;gap:4px;flex-wrap:nowrap">${s.name} <span class="so-detail-btn" onclick="event.stopPropagation();_showStudentDetail('${encodeURIComponent(JSON.stringify(_detailData))}',this)" title="عرض بيانات التلميذ" style="font-size:13px;cursor:pointer;opacity:0.5;transition:opacity 0.15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">🔍</span> ${ticketBadge}</span></td>
