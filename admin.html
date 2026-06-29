@@ -5589,16 +5589,38 @@ async function loadSheetStudentsCache() {
   _sheetStudentsLoading = true;
   try {
     const [rows1, rows2] = await Promise.all([
-      fetchSheetData(SHEET_ID_1, SHEET_NAME_1),
-      fetchSheetData(SHEET_ID_2, SHEET_NAME_2),
+      fetchSheetData(SHEET_ID_1, SHEET_NAME_1),  // SummerPlus
+      fetchSheetData(SHEET_ID_2, SHEET_NAME_2),  // programsummerschool
     ]);
-    const allRows = [...rows1, ...rows2];
-    _sheetStudentsCache = allRows.map(_mapSheetRow).filter(Boolean);
-    console.log('✅ Sheet cache loaded:', _sheetStudentsCache.length, 'students (sheet1:', rows1.length, '+ sheet2:', rows2.length, ')');
+    // SummerPlus
+    const sheet1 = (rows1 || []).map(_mapSheetRow).filter(Boolean);
+    // programsummerschool (مع إزالة التكرار: نفس الاسم الطبيعي = سجل واحد)
+    const raw2 = (rows2 || []).map(_mapSheetRow).filter(Boolean);
+    const seen2 = new Set();
+    const sheet2 = [];
+    raw2.forEach(r => {
+      const k = _normalizeNameStrict(r.name);
+      if (!seen2.has(k)) { seen2.add(k); sheet2.push(r); }
+    });
+    if (raw2.length > sheet2.length) {
+      console.log('📊 تم إزالة', raw2.length - sheet2.length, 'تسجيلات مكررة من programsummerschool');
+    }
+    const allRows = [...sheet1, ...sheet2];
+    _sheetStudentsCache = allRows;
+    window._sheetCache1 = sheet1;
+    window._sheetCache2 = sheet2;
+    window._sheetNormMap1 = _buildSheetNormMap(sheet1);  // SummerPlus
+    window._sheetNormMap2 = _buildSheetNormMap(sheet2);  // programsummerschool (بدون تكرار)
+    window._sheetNormMap = window._sheetNormMap1; // للتوافق
+    console.log('✅ Sheet cache loaded: SummerPlus', sheet1.length, 'programsummerschool', sheet2.length);
     return _sheetStudentsCache;
   } catch(e) {
     console.warn('⚠️ تعذّر تحميل بيانات الشيت:', e.message);
     _sheetStudentsCache = [];
+    window._sheetCache1 = [];
+    window._sheetCache2 = [];
+    window._sheetNormMap1 = new Map();
+    window._sheetNormMap2 = new Map();
     return [];
   } finally {
     _sheetStudentsLoading = false;
@@ -6228,8 +6250,8 @@ function _findStudentGroup(studentName, teacher) {
 let _soData = [];
 window._sheetNormCache = null; // normalized name → sheet data
 
-function _buildSheetNormCache(sheetRows) {
-  // Map: normalizedFullName → row data (أول مطابقة فقط، لا توجد مفاتيح مكررة)
+// ─── بناء خريطة مطابقة: normalizedFullName → data ───
+function _buildSheetNormMap(sheetRows) {
   const map = new Map();
   (sheetRows || []).forEach(r => {
     const fullName = String(r.name || '').trim();
@@ -6249,8 +6271,12 @@ function _buildSheetNormCache(sheetRows) {
       });
     }
   });
-  window._sheetNormMap = map; // للبحث الدقيق
-  // للتوافق مع الكود القديم الذي يبحث في _sheetNormCache
+  return map;
+}
+
+function _buildSheetNormCache(sheetRows) {
+  const map = _buildSheetNormMap(sheetRows);
+  window._sheetNormMap = map;
   const legacyCache = {};
   map.forEach((v, k) => { legacyCache[k] = v; });
   return legacyCache;
@@ -6262,11 +6288,35 @@ const _normOv = s => String(s||'').trim().toLowerCase()
 
 function _simplifyPack(p) { return String(p||'').replace(/[-\/–—].*$/,'').replace(/\s*\(.*?\)\s*/g,'').trim() || p; }
 
-// ─── بحث دقيق 100%: تطابق تام بعد التطبيع ───
-function _findSheetMatchStrict(name) {
-  if (!window._sheetNormMap || !name) return null;
+// ─── البحث في الشيتين (SummerPlus أولاً) ───
+function _findSheetStrict(name) {
+  if (!name) return null;
   const key = _normalizeNameStrict(name);
-  return window._sheetNormMap.get(key) || null;
+  // 1. SummerPlus
+  if (window._sheetNormMap1?.has(key)) return window._sheetNormMap1.get(key);
+  // 2. programsummerschool
+  if (window._sheetNormMap2?.has(key)) return window._sheetNormMap2.get(key);
+  return null;
+}
+
+// ─── حل الاسم الجزئي إلى اسم كامل من الشيت (آمن: فقط إذا كان فريدًا عبر الشيتين) ───
+function _resolveToFullName(name) {
+  if (!name) return null;
+  const norm = _normalizeNameStrict(name);
+  const parts = norm.split(/\s+/).filter(Boolean);
+  if (!parts.length) return null;
+
+  // 1. Exact match في SummerPlus
+  if (window._sheetNormMap1?.has(norm)) return window._sheetNormMap1.get(norm);
+  // 2. Exact match في programsummerschool
+  if (window._sheetNormMap2?.has(norm)) return window._sheetNormMap2.get(norm);
+
+  // 3. Safe subset: جميع كلمات الاسم المطلوب موجودة في اسم شيت واحد فقط
+  const candidates = [];
+  const check = (map) => { if (!map) return; map.forEach((v, k) => { if (k.split(/\s+/).filter(Boolean).every(w => parts.includes(w))) candidates.push(v); }); };
+  check(window._sheetNormMap1);
+  check(window._sheetNormMap2);
+  return candidates.length === 1 ? candidates[0] : null;
 }
 
 window.renderStudentOverview = async () => {
@@ -6311,7 +6361,7 @@ window.renderStudentOverview = async () => {
     _addKey(ticket.name);
     let match = teacherMap[_normalizeNameStrict(ticket.name)];
     const isPaid = ticket.status === 'paid';
-    const sheetMatch = _findSheetMatchStrict(ticket.name);
+    const sheetMatch = _resolveToFullName(ticket.name);
     const displayName = sheetMatch ? sheetMatch.name : ticket.name;
 
     _soData.push({
@@ -6376,7 +6426,7 @@ window.renderStudentOverview = async () => {
   Object.entries(teacherMap).forEach(([key, match]) => {
     if (_isKnown(match.studentName || key)) return;
     _addKey(match.studentName || key);
-    const sheetMatch3 = _findSheetMatchStrict(match.studentName || key);
+    const sheetMatch3 = _resolveToFullName(match.studentName || key);
     const displayName3 = sheetMatch3 ? sheetMatch3.name : (match.studentName || key);
     _soData.push({
       studentName: displayName3,
@@ -6447,6 +6497,8 @@ window.refreshSheetData = async () => {
   // إعادة ضبط الذاكرة المؤقتة
   _sheetStudentsCache = null;
   window._sheetNormCache = null;
+  window._sheetNormMap1 = null;
+  window._sheetNormMap2 = null;
   await loadSheetStudentsCache();
   const rows = _sheetStudentsCache || [];
   window._sheetNormCache = _buildSheetNormCache(rows);
@@ -6623,25 +6675,23 @@ function _normalizeNameStrict(name) {
     .replace(/\s+/g, ' ');
 }
 
-// ─── Student detail popup — مطابقة دقيقة 100% ───
+// ─── Student detail popup — بحث في SummerPlus أولاً ثم programsummerschool ───
 window._showStudentDetail = async (json, btn) => {
   try {
     const r = JSON.parse(decodeURIComponent(json));
     const stName = r.studentName || '';
 
     // تحميل ذاكرة الشيت إذا لم تكن محملة
-    if (!window._sheetStudentsCache && !window._sheetStudentsLoading) {
+    if (!_sheetStudentsCache && !_sheetStudentsLoading) {
       window._sheetStudentsLoading = true;
       try {
-        const rows = await loadSheetStudentsCache();
-        window._sheetStudentsCache = rows || [];
-        window._sheetNormCache = _buildSheetNormCache(window._sheetStudentsCache);
+        await loadSheetStudentsCache();
       } catch(e) { console.warn('Sheet load in detail popup:', e); }
       window._sheetStudentsLoading = false;
     }
 
-    // بحث دقيق 100%: مطابقة تامة بعد التطبيع فقط. لا includes, لا startsWith, لا fuzzy.
-    const sheetMatch = _findSheetMatchStrict(stName);
+    // بحث: resolve إلى اسم كامل (آمن) ثم strict match
+    let sheetMatch = _resolveToFullName(stName);
     const fullRaw = sheetMatch ? sheetMatch._raw : null;
 
     const fields = [];
