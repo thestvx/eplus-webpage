@@ -6215,23 +6215,12 @@ function _nameVariants(name) {
 }
 
 function _findStudentGroup(studentName, teacher) {
-  const _normGroup = s => String(s||'').trim().toLowerCase()
-    .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
-    .replace(/[ًٌٍَُِّْٰ]/g,'').replace(/ـ/g,'').replace(/\s+/g,' ');
   const groups = teacher.groups || [];
-  const target = _normGroup(studentName);
-  const tParts = target.split(/\s+/).filter(Boolean);
+  const target = _normalizeNameStrict(studentName);
   for (let i = 0; i < groups.length; i++) {
-    const match = (groups[i].students||[]).some(s => {
-      const sn = _normGroup(s);
-      if (sn === target) return true;
-      const sParts = sn.split(/\s+/).filter(Boolean);
-      if (sParts.length >= 2 && tParts.length >= 2) {
-        return [...sParts].sort().join(' ') === [...tParts].sort().join(' ');
-      }
-      return false;
-    });
-    if (match) return groups[i].name;
+    if ((groups[i].students||[]).some(s => _normalizeNameStrict(s) === target)) {
+      return groups[i].name;
+    }
   }
   return '—';
 }
@@ -6240,31 +6229,31 @@ let _soData = [];
 window._sheetNormCache = null; // normalized name → sheet data
 
 function _buildSheetNormCache(sheetRows) {
-  const entries = [];
+  // Map: normalizedFullName → row data (أول مطابقة فقط، لا توجد مفاتيح مكررة)
+  const map = new Map();
   (sheetRows || []).forEach(r => {
     const fullName = String(r.name || '').trim();
     if (!fullName) return;
-    const val = {
-      name: fullName,
-      parentName: String(r.parent || '').trim(),
-      parentPhone: String(r.phone || '').trim(),
-      age: String(r.age || '').trim(),
-      pack: String(r.pack || '').trim(),
-      langs: String(r.langs || '').trim(),
-      itTrack: String(r.itTrack || '').trim(),
-      totalAmount: String(r.totalAmount || '').trim(),
-      _raw: r._raw || null,
-    };
-    // المفتاح الوحيد هو الاسم الطبيعي (دون تصادم)
-    const uniqueKey = _normOv(fullName);
-    entries.push({ key: uniqueKey, parts: uniqueKey.split(/\s+/).filter(Boolean), val });
+    const key = _normalizeNameStrict(fullName);
+    if (!map.has(key)) {
+      map.set(key, {
+        name: fullName,
+        parentName: String(r.parent || '').trim(),
+        parentPhone: String(r.phone || '').trim(),
+        age: String(r.age || '').trim(),
+        pack: String(r.pack || '').trim(),
+        langs: String(r.langs || '').trim(),
+        itTrack: String(r.itTrack || '').trim(),
+        totalAmount: String(r.totalAmount || '').trim(),
+        _raw: r._raw || null,
+      });
+    }
   });
-  // cache للتوافق مع الاستدعاءات القديمة التي تستخدم المفتاح الواحد
-  const cache = {};
-  entries.forEach(e => { if (!cache[e.key]) cache[e.key] = e.val; });
-  // نخزن القائمة كاملة للبحث الذكي
-  window._sheetNormEntries = entries;
-  return cache;
+  window._sheetNormMap = map; // للبحث الدقيق
+  // للتوافق مع الكود القديم الذي يبحث في _sheetNormCache
+  const legacyCache = {};
+  map.forEach((v, k) => { legacyCache[k] = v; });
+  return legacyCache;
 }
 
 const _normOv = s => String(s||'').trim().toLowerCase()
@@ -6273,42 +6262,11 @@ const _normOv = s => String(s||'').trim().toLowerCase()
 
 function _simplifyPack(p) { return String(p||'').replace(/[-\/–—].*$/,'').replace(/\s*\(.*?\)\s*/g,'').trim() || p; }
 
-// دالة بحث ذكية في الشيت: تستخدم المطابقة بالاسم الكامل أولاً، ثم المطابقة الفرعية الآمنة
-function _findSheetMatchSmart(name) {
-  if (!window._sheetNormEntries || !name) return null;
-  const entries = window._sheetNormEntries;
-  const targetNorm = _normOv(name);
-  const targetParts = targetNorm.split(/\s+/).filter(Boolean);
-
-  // 1. مطابقة دقيقة (normalized)
-  for (const e of entries) {
-    if (e.key === targetNorm) return e.val;
-  }
-  // 2. جميع كلمات الاسم المطلوب موجودة في اسم الشيت وبالعكس (مجموعة كلمات متطابقة)
-  if (targetParts.length >= 2) {
-    const sortedTarget = [...targetParts].sort().join(' ');
-    for (const e of entries) {
-      const sortedSheet = [...e.parts].sort().join(' ');
-      if (sortedTarget === sortedSheet) return e.val;
-    }
-  }
-  // 3. كل كلمات الاسم المطلوب موجودة في اسم الشيت (بحد أدنى كلمتين)
-  if (targetParts.length >= 2) {
-    for (const e of entries) {
-      if (targetParts.every(w => e.parts.includes(w))) return e.val;
-    }
-  }
-  // 4. البادئة/اللاحقة (مثلاً "Maroua Ben" → "Maroua Ben Salah")
-  if (targetParts.length >= 2) {
-    for (const e of entries) {
-      if (e.parts.length < 2) continue;
-      const short = targetParts.join(' '), long = e.parts.join(' ');
-      if (long.startsWith(short + ' ') || long.endsWith(' ' + short) || long === short) return e.val;
-      const shortRev = [...targetParts].reverse().join(' ');
-      if (long.startsWith(shortRev + ' ') || long.endsWith(' ' + shortRev)) return e.val;
-    }
-  }
-  return null;
+// ─── بحث دقيق 100%: تطابق تام بعد التطبيع ───
+function _findSheetMatchStrict(name) {
+  if (!window._sheetNormMap || !name) return null;
+  const key = _normalizeNameStrict(name);
+  return window._sheetNormMap.get(key) || null;
 }
 
 window.renderStudentOverview = async () => {
@@ -6333,7 +6291,7 @@ window.renderStudentOverview = async () => {
   (allTeachers||[]).forEach(t => {
     (t.students||[]).forEach(s => {
       if (!s.name) return;
-      const key = _normOv(s.name);
+      const key = _normalizeNameStrict(s.name);
       // لا نستبدل إذا كان الاسم مختلفًا (نتجنب الخلط)
       if (!teacherMap[key] || teacherMap[key].studentName === s.name) {
         teacherMap[key] = { studentName: s.name, teacherName: t.name, groupName: _findStudentGroup(s.name, t) };
@@ -6341,44 +6299,19 @@ window.renderStudentOverview = async () => {
     });
   });
 
-  // Track which normalized names already have an entry (exact match + sorted words)
+  // Track which normalized names already have an entry (exact match only)
   const allKeys = new Set();
-  const _isKnown = (name) => {
-    const n = _normOv(name);
-    if (allKeys.has(n)) return true;
-    const parts = n.split(/\s+/).filter(Boolean);
-    if (parts.length >= 2 && allKeys.has(parts.sort().join(' '))) return true;
-    return false;
-  };
-  const _addKey = (name) => {
-    const n = _normOv(name);
-    allKeys.add(n);
-    const parts = n.split(/\s+/).filter(Boolean);
-    if (parts.length >= 2) allKeys.add(parts.sort().join(' '));
-  };
+  const _isKnown = (name) => allKeys.has(_normalizeNameStrict(name));
+  const _addKey = (name) => allKeys.add(_normalizeNameStrict(name));
   _soData = [];
 
   // ── Part 1: Students with tickets ──
   (activeTickets || []).forEach(ticket => {
     if (_isKnown(ticket.name)) return;
     _addKey(ticket.name);
-    let match = teacherMap[_normOv(ticket.name)];
-    if (!match) {
-      // بحث دقيق: نفس مجموعة الكلمات مرتبة أبجديًا
-      const tParts = _normOv(ticket.name).split(/\s+/).filter(Boolean);
-      if (tParts.length >= 2) {
-        const sortedTarget = tParts.sort().join(' ');
-        for (const [k, v] of Object.entries(teacherMap)) {
-          const mParts = k.split(/\s+/).filter(Boolean);
-          if (mParts.length >= 2 && [...mParts].sort().join(' ') === sortedTarget) {
-            match = v; break;
-          }
-        }
-      }
-    }
+    let match = teacherMap[_normalizeNameStrict(ticket.name)];
     const isPaid = ticket.status === 'paid';
-    const sheetMatch = _findSheetMatchSmart(ticket.name);
-    // استخدام الاسم الكامل من الشيت إذا وُجد
+    const sheetMatch = _findSheetMatchStrict(ticket.name);
     const displayName = sheetMatch ? sheetMatch.name : ticket.name;
 
     _soData.push({
@@ -6411,20 +6344,8 @@ window.renderStudentOverview = async () => {
     Object.entries(window._sheetNormCache).forEach(([normKey, sheet]) => {
       if (_isKnown(sheet.name || normKey)) return;
       _addKey(sheet.name || normKey);
-      // Try finding teacher match with sorted words
-      let match = teacherMap[normKey];
-      if (!match) {
-        const sParts = _normOv(sheet.name || '').split(/\s+/).filter(Boolean);
-        if (sParts.length >= 2) {
-          const sortedSheet = sParts.sort().join(' ');
-          for (const [k, v] of Object.entries(teacherMap)) {
-            const mParts = k.split(/\s+/).filter(Boolean);
-            if (mParts.length >= 2 && [...mParts].sort().join(' ') === sortedSheet) {
-              match = v; break;
-            }
-          }
-        }
-      }
+      // Try finding teacher with exact match
+      let match = teacherMap[_normalizeNameStrict(sheet.name || '')];
       _soData.push({
         studentName: sheet.name || normKey,
         teacherName: match ? match.teacherName : '—',
@@ -6455,7 +6376,7 @@ window.renderStudentOverview = async () => {
   Object.entries(teacherMap).forEach(([key, match]) => {
     if (_isKnown(match.studentName || key)) return;
     _addKey(match.studentName || key);
-    const sheetMatch3 = _findSheetMatchSmart(match.studentName || key);
+    const sheetMatch3 = _findSheetMatchStrict(match.studentName || key);
     const displayName3 = sheetMatch3 ? sheetMatch3.name : (match.studentName || key);
     _soData.push({
       studentName: displayName3,
@@ -6633,12 +6554,12 @@ function _renderSoTable(data, searchFilter) {
   let filtered = data;
 
   if (searchFilter && searchFilter.trim().length >= 1) {
-    const q = _normOv(searchFilter);
+    const q = _normalizeNameStrict(searchFilter);
     filtered = filtered.filter(r =>
-      _normOv(r.studentName).includes(q) ||
-      _normOv(r.teacherName).includes(q) ||
-      _normOv(r.pkg).includes(q) ||
-      _normOv(r.groupName).includes(q)
+      _normalizeNameStrict(r.studentName).includes(q) ||
+      _normalizeNameStrict(r.teacherName).includes(q) ||
+      _normalizeNameStrict(r.pkg).includes(q) ||
+      _normalizeNameStrict(r.groupName).includes(q)
     );
   }
 
@@ -6689,11 +6610,23 @@ function _renderSoTable(data, searchFilter) {
   if (pageNavEl) pageNavEl.innerHTML = '';
 }
 
-// ─── Student detail popup — مطابقة ذكية بالاسم الكامل ───
+// ─── تطبيع صارم للاسم: trim + collapse spaces + lowercase ───
+function _normalizeNameStrict(name) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[إأآٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/[ًٌٍَُِّْٰ]/g, '')
+    .replace(/ـ/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+// ─── Student detail popup — مطابقة دقيقة 100% ───
 window._showStudentDetail = async (json, btn) => {
   try {
     const r = JSON.parse(decodeURIComponent(json));
-    let fullRaw = null;
     const stName = r.studentName || '';
 
     // تحميل ذاكرة الشيت إذا لم تكن محملة
@@ -6707,24 +6640,9 @@ window._showStudentDetail = async (json, btn) => {
       window._sheetStudentsLoading = false;
     }
 
-    // 1. Smart sheet matching
-    if (window._sheetNormCache) {
-      const sheetMatch = _findSheetMatchSmart(stName);
-      if (sheetMatch) fullRaw = sheetMatch._raw || sheetMatch;
-    }
-    // 2. Fallback: _sheetRaw from row data
-    if (!fullRaw && r._sheetRaw) fullRaw = r._sheetRaw;
-    // 3. Fallback: search all raw sheet data by normalized name
-    if (!fullRaw && window._sheetStudentsCache) {
-      const stNorm = _normOv(stName);
-      for (const row of window._sheetStudentsCache) {
-        const rawName = _normOv(row.name || '');
-        if (rawName === stNorm || rawName.includes(stNorm) || stNorm.includes(rawName)) {
-          fullRaw = row._raw || row;
-          break;
-        }
-      }
-    }
+    // بحث دقيق 100%: مطابقة تامة بعد التطبيع فقط. لا includes, لا startsWith, لا fuzzy.
+    const sheetMatch = _findSheetMatchStrict(stName);
+    const fullRaw = sheetMatch ? sheetMatch._raw : null;
 
     const fields = [];
     if (fullRaw) {
@@ -6739,7 +6657,7 @@ window._showStudentDetail = async (json, btn) => {
         }
       } catch(e) {}
     }
-    if (!fields.length) { showToast('⚠️ لا توجد بيانات في الشيت لهذا التلميذ', true); return; }
+    if (!fields.length) { showToast('⚠️ لا توجد بيانات مطابقة لهذا التلميذ في Google Sheets', true); return; }
     const list = fields.map(([k, v]) => {
       if (k.includes('━━━')) return `<div style="font-size:11px;font-weight:800;color:var(--primary);padding:10px 0 4px;text-align:center;letter-spacing:1px">${k}</div>`;
       return `<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="font-weight:700;color:var(--text-muted);white-space:nowrap;flex-shrink:0">${k}</span><span style="color:var(--text);text-align:left;direction:ltr;word-break:break-word">${v}</span></div>`;
@@ -6774,10 +6692,9 @@ window._showSheetDetail = window._showStudentDetail;
 function _findDuplicates() {
   const groups = {};
   (_soData || []).forEach((r, idx) => {
-    // Generate the canonical variant group key: sorted normalized parts
-    const parts = _normOv(r.studentName).split(/\s+/).filter(Boolean).sort().join(' ');
-    if (!groups[parts]) groups[parts] = [];
-    groups[parts].push({ idx, name: r.studentName, teacher: r.teacherName, group: r.groupName, status: r.statusLabel });
+    const key = _normalizeNameStrict(r.studentName);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push({ idx, name: r.studentName, teacher: r.teacherName, group: r.groupName, status: r.statusLabel });
   });
   // Return only groups with more than one entry
   return Object.values(groups).filter(g => g.length > 1);
