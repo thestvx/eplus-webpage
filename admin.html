@@ -8299,7 +8299,73 @@ window.confirmMoveGroup = async () => {
     if (srcIdx < 0 || tgtIdx < 0) { showToast('⚠️ أحد الأفواج غير موجود', true); return; }
     const srcGroup = groupsArr[srcIdx];
     const tgtGroup = groupsArr[tgtIdx];
-    const studentsToMove = srcGroup.students || [];
+
+    // Debug: طباعة معلومات الفوج المصدر
+    console.log('[MoveGroup] Teacher ID:', teacherId);
+    console.log('[MoveGroup] Source GID:', sourceGid);
+    console.log('[MoveGroup] Target GID:', targetGid);
+    console.log('[MoveGroup] Source group index:', srcIdx);
+    console.log('[MoveGroup] Source group name:', srcGroup.name);
+    console.log('[MoveGroup] Source group students[]:', (srcGroup.students || []).length);
+
+    let studentsToMove = srcGroup.students || [];
+
+    // إذا كان students[] فارغاً: حاول جلب أسماء التلاميذ من sessionAttendance
+    if (!studentsToMove.length) {
+      console.log('[MoveGroup] students[] is empty, checking session docs...');
+      try {
+        const sessQ = query(
+          collection(db, 'sessionAttendance'),
+          where('gid', '==', sourceGid)
+        );
+        const sessSnap2 = await getDocs(sessQ);
+        const namesFromSessions = new Set();
+        sessSnap2.forEach(d => {
+          const d2 = d.data();
+          (d2.students || []).forEach(st => {
+            const sn = String(st.name || '').trim();
+            if (sn) namesFromSessions.add(sn);
+          });
+        });
+        if (namesFromSessions.size > 0) {
+          studentsToMove = [...namesFromSessions];
+          console.log('[MoveGroup] Found', studentsToMove.length, 'students from session docs by gid');
+        }
+      } catch (e2) {
+        console.warn('[MoveGroup] Session lookup by gid failed, trying legacy...', e2.message);
+      }
+    }
+
+    // Fallback 2: legacy format — extract gi from sourceGid or use srcIdx
+    if (!studentsToMove.length) {
+      try {
+        const sessQ2 = query(
+          collection(db, 'sessionAttendance'),
+          where('teacherId', '==', teacherId + '_g' + srcIdx)
+        );
+        const sessSnap3 = await getDocs(sessQ2);
+        const namesFromSessions2 = new Set();
+        sessSnap3.forEach(d => {
+          const d2 = d.data();
+          (d2.students || []).forEach(st => {
+            const sn = String(st.name || '').trim();
+            if (sn) namesFromSessions2.add(sn);
+          });
+        });
+        if (namesFromSessions2.size > 0) {
+          studentsToMove = [...namesFromSessions2];
+          console.log('[MoveGroup] Found', studentsToMove.length, 'students from session docs by legacy gi');
+        }
+      } catch (e3) {
+        console.warn('[MoveGroup] Session lookup by gi failed', e3.message);
+      }
+    }
+
+    console.log('[MoveGroup] Total students to move:', studentsToMove.length);
+    if (studentsToMove.length) {
+      console.log('[MoveGroup] Student names:', studentsToMove.slice(0, 10).join(', ') + (studentsToMove.length > 10 ? '...' : ''));
+    }
+
     if (!studentsToMove.length) { showToast('⚠️ الفوج المصدر لا يحتوي على تلاميذ', true); return; }
 
     // 1. نقل أسماء التلاميذ
@@ -9167,7 +9233,7 @@ function _asNorm(s) {
     .replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ').trim();
 }
 
-window.openAddStudentModal = () => {
+window.openAddStudentModal = async () => {
   if (window._isTeacherAttendanceView) { showToast('⚠️ هذه الميزة متاحة فقط للإدارة', true); return; }
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
@@ -9189,10 +9255,78 @@ window.openAddStudentModal = () => {
   const teacher = (window.allTeachers || []).find(t => t.id === teacherId);
   const teacherName = teacher?.name || teacherId;
   document.getElementById('as-teacher-name').textContent = teacherName;
-  const groups = teacher?.groups || [];
+  let groups = teacher?.groups || [];
   // Debug: تأكد من أن البيانات صحيحة
   console.log('[AddStudent] Teacher:', teacherId, 'Name:', teacherName, 'Groups:', groups.length,
     groups.map(g => ({ name: g.name, _gid: g._gid })));
+  console.log('[AddStudent] Teacher students:', (teacher?.students || []).length);
+
+  // إذا كانت الأفواج فارغة ولكن الأستاذ لديه تلاميذ، جرب من sessionAttendance
+  if (groups.length === 0 && teacher && (teacher.students || []).length > 0) {
+    console.log('[AddStudent] groups[] empty but students exist, checking session docs...');
+    try {
+      const sessQ = query(
+        collection(db, 'sessionAttendance'),
+        where('teacherId', '>=', teacherId + '_g0'),
+        where('teacherId', '<=', teacherId + '_g\uf8ff')
+      );
+      const sessSnap = await getDocs(sessQ);
+      const gidNamesMap = {};
+      const giNamesMap = {};
+      sessSnap.forEach(d => {
+        const d2 = d.data();
+        const sNames = (d2.students || []).map(st => String(st.name || '').trim()).filter(Boolean);
+        const gid = d2.gid || '';
+        if (gid) {
+          if (!gidNamesMap[gid]) gidNamesMap[gid] = new Set();
+          sNames.forEach(n => gidNamesMap[gid].add(n));
+        }
+        const tidStr = String(d2.teacherId || '');
+        const giM = tidStr.match(/_g(\d+)$/);
+        if (giM) {
+          const gi2 = parseInt(giM[1]);
+          if (!giNamesMap[gi2]) giNamesMap[gi2] = new Set();
+          sNames.forEach(n => giNamesMap[gi2].add(n));
+        }
+      });
+
+      const seenGids = new Set();
+      // من session docs ذات الصيغة الجديدة
+      for (const [gidVal, namesSet] of Object.entries(gidNamesMap)) {
+        if (namesSet.size > 0 && !seenGids.has(gidVal)) {
+          seenGids.add(gidVal);
+          groups.push({
+            _gid: gidVal,
+            name: 'فوج ' + (groups.length + 1),
+            students: [...namesSet]
+          });
+        }
+      }
+      // من session docs ذات الصيغة القديمة
+      for (const [giStr, namesSet] of Object.entries(giNamesMap)) {
+        if (namesSet.size > 0) {
+          const gid2 = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+          if (!seenGids.has(gid2)) {
+            seenGids.add(gid2);
+            groups.push({
+              _gid: gid2,
+              name: 'فوج ' + (groups.length + 1),
+              students: [...namesSet]
+            });
+          }
+        }
+      }
+
+      if (groups.length > 0) {
+        console.log('[AddStudent] Recovered', groups.length, 'groups from session docs');
+        // حفظ مؤقت في الكاش المحلي لكي تستفيد منه العمليات الأخرى
+        if (teacher) teacher.groups = groups;
+      }
+    } catch (e) {
+      console.warn('[AddStudent] Session doc recovery failed:', e.message);
+    }
+  }
+
   // نضمن أن كل فوج لديه _gid (للمسارات التي تحتاجه)
   groups.forEach(g => { if (g && !g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10); });
   const validGroups = groups; // ← لا نفلتر بـ _gid، نستخدم كل الأفواج
