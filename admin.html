@@ -9185,14 +9185,20 @@ window.openAddStudentModal = () => {
   // بناء قائمة المرشحين
   _asBuildCandidates(teacherId);
 
-  // معلومات السياق
+  // معلومات السياق — نستخدم كل الأفواج بدون فلتر _gid (نفس منطق بقية النظام)
   const teacher = (window.allTeachers || []).find(t => t.id === teacherId);
-  document.getElementById('as-teacher-name').textContent = teacher?.name || teacherId;
+  const teacherName = teacher?.name || teacherId;
+  document.getElementById('as-teacher-name').textContent = teacherName;
   const groups = teacher?.groups || [];
-  const validGroups = groups.filter(g => g._gid);
+  // Debug: تأكد من أن البيانات صحيحة
+  console.log('[AddStudent] Teacher:', teacherId, 'Name:', teacherName, 'Groups:', groups.length,
+    groups.map(g => ({ name: g.name, _gid: g._gid })));
+  // نضمن أن كل فوج لديه _gid (للمسارات التي تحتاجه)
+  groups.forEach(g => { if (g && !g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10); });
+  const validGroups = groups; // ← لا نفلتر بـ _gid، نستخدم كل الأفواج
   const groupEl = document.getElementById('as-group-name');
   if (validGroups.length === 1) {
-    _asTargetGi = groups.indexOf(validGroups[0]);
+    _asTargetGi = 0;
     _asTargetGid = validGroups[0]._gid || '';
     groupEl.textContent = _displayGroupName(validGroups[0].name);
   } else if (validGroups.length > 1) {
@@ -9202,7 +9208,7 @@ window.openAddStudentModal = () => {
   }
 
   // تجهيز قائمة الأفواج في step 2
-  _asPopulateGroupSelect(validGroups, groups);
+  _asPopulateGroupSelect(groups);
 
   _asShowStep(1);
 };
@@ -9246,15 +9252,14 @@ function _asBuildCandidates(teacherId) {
   _asCandidates.sort((a,b) => a.name.localeCompare(b.name, 'ar'));
 }
 
-function _asPopulateGroupSelect(validGroups, allGroups) {
+function _asPopulateGroupSelect(groups) {
   const sel = document.getElementById('as-group-select');
   if (!sel) return;
   sel.innerHTML = '<option value="">اختر الفوج...</option>'
-    + validGroups.map((g,i) => `<option value="${i}">${_displayGroupName(g.name)} (${(g.students||[]).length} طالب)</option>`).join('');
+    + groups.map((g,i) => `<option value="${i}">${_displayGroupName(g.name)} (${(g.students||[]).length} طالب)</option>`).join('');
   sel.value = '';
-  // تعيين تلقائي إذا كان فوج واحد فقط
-  if (validGroups.length === 1) {
-    sel.value = String(allGroups.indexOf(validGroups[0]));
+  if (groups.length === 1) sel.value = '0';
+}
   }
 }
 
@@ -9349,8 +9354,8 @@ window._asNext = () => {
   if (_asStep === 1) {
     // التحقق من وجود فوج
     const teacher = (window.allTeachers || []).find(t => t.id === _asTeacherId);
-    const validGroups = (teacher?.groups || []).filter(g => g._gid);
-    if (!validGroups.length) {
+    const groups = teacher?.groups || [];
+    if (!groups.length) {
       showToast('⚠️ هذا الأستاذ لا يملك أي أفواج — لا يمكن إضافة تلاميذ', true);
       return;
     }
@@ -9376,11 +9381,12 @@ window._asNext = () => {
 function _asGetTargetGi() {
   const teacher = (window.allTeachers || []).find(t => t.id === _asTeacherId);
   const groups = teacher?.groups || [];
-  const validGroups = groups.filter(g => g._gid);
-  if (validGroups.length === 1) return groups.indexOf(validGroups[0]);
+  // نضمن _gid (لنظام الحضور)
+  groups.forEach(g => { if (g && !g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10); });
+  if (groups.length === 1) return 0;
   const sel = document.getElementById('as-group-select');
   const val = sel ? parseInt(sel.value) : -1;
-  if (!isNaN(val) && val >= 0 && groups[val] && groups[val]._gid) return val;
+  if (!isNaN(val) && val >= 0 && val < groups.length) return val;
   return -1;
 }
 
