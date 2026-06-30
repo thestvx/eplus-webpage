@@ -2385,6 +2385,7 @@
       <button onclick="syncAttendanceFromBackup()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #DC2626;background:rgba(220,38,38,0.08);color:#DC2626;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="استعادة الحضور من النسخة الاحتياطية" id="att-sync-btn">🔄 مزامنة الحضور</button>
       <button onclick="openRestoreAttendanceModal()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #2563EB;background:rgba(37,99,235,0.08);color:#2563EB;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="استرجاع سجل الحضور الكامل للأستاذ" id="att-restore-btn">📦 استرجاع سجل الحضور</button>
       <button onclick="toggleUnassignedStudents()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #7C3AED;background:rgba(124,58,237,0.08);color:#7C3AED;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إدارة التلاميذ غير المنتمين لأي فوج" id="att-unassign-btn">🔀 غير منتمين</button>
+      <button onclick="repairOldGroups()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #DC2626;background:rgba(220,38,38,0.08);color:#DC2626;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إصلاح الأفواج القديمة التي تعرض تلاميذ لكنها لا تملك بنية بيانات صحيحة" id="att-repair-btn">🛠️ إصلاح الأفواج القديمة</button>
     </div>
     <!-- ─── شريط بحث إضافة التلميذ ─── -->
     <div id="att-student-search-wrap" style="display:none;margin-bottom:16px;padding:14px 16px;background:var(--card-bg);border:1.5px solid var(--border);border-radius:12px;transition:all 0.3s">
@@ -3554,7 +3555,7 @@ onAuthStateChanged(auth, async user => {
           onTeacherChange();
         }
         // إخفاء أزرار الإدارة والأستاذ لا يستطيع إضافة تلاميذ
-        ['att-csv-btn','att-normalize-btn','att-backup-btn','att-sync-btn','att-add-student-btn','att-restore-btn','att-add-group-btn'].forEach(id => {
+        ['att-csv-btn','att-normalize-btn','att-backup-btn','att-sync-btn','att-add-student-btn','att-restore-btn','att-add-group-btn','att-repair-btn'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.style.display = 'none';
         });
@@ -7290,6 +7291,206 @@ async function ensureGroupIds() {
       console.warn('ensureGroupIds batch failed:', e.message);
     }
   }
+}
+
+// ─── إصلاح الأفواج القديمة (زر يدوي) ───
+// يعالج: أفواج تعرض تلاميذ في الجدول لكن لا تملك _gid أو students[] فارغ أو groups[] مفقود
+window.repairOldGroups = async () => {
+  const btn = document.getElementById('att-repair-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الإصلاح...'; }
+
+  const results = { teachersChecked: 0, teachersChanged: 0, groupsFixed: 0, groupsCreated: 0, studentsLinked: 0, errors: [] };
+
+  try {
+    const teachers = (window.allTeachers || []).slice();
+    results.teachersChecked = teachers.length;
+
+    for (const teacher of teachers) {
+      const teacherId = teacher.id;
+      let groups = (teacher.groups || []).map(g => ({ ...g }));
+      const studentsArr = teacher.students || [];
+
+      // تحميل session docs لهذا الأستاذ
+      let sessSnap;
+      try {
+        sessSnap = await getDocs(query(
+          collection(db, 'sessionAttendance'),
+          where('teacherId', '>=', teacherId + '_g0'),
+          where('teacherId', '<=', teacherId + '_g\uf8ff')
+        ));
+      } catch (e) {
+        results.errors.push(`${teacher.name || teacherId}: فشل تحميل session docs (${e.message})`);
+        continue;
+      }
+
+      // بناء خريطة: gid و gi → أسماء تلاميذ من الجلسات
+      const namesByGid = {};
+      const namesByGi = {};
+      sessSnap.forEach(d => {
+        const d2 = d.data();
+        const sNames = (d2.students || []).map(st => String(st.name || '').trim()).filter(Boolean);
+        const gid = d2.gid || '';
+        if (gid) {
+          if (!namesByGid[gid]) namesByGid[gid] = new Set();
+          sNames.forEach(n => namesByGid[gid].add(n));
+        }
+        const tidStr = String(d2.teacherId || '');
+        const giM = tidStr.match(/_g(\d+)$/);
+        if (giM) {
+          const gi2 = parseInt(giM[1]);
+          if (!namesByGi[gi2]) namesByGi[gi2] = new Set();
+          sNames.forEach(n => namesByGi[gi2].add(n));
+        }
+      });
+
+      let changed = false;
+
+      // 1. إصلاح كل فوج موجود: _gid مفقود، students[] فارغ
+      groups.forEach((g, gi) => {
+        if (!g) return;
+
+        if (!g._gid || g._gid === '') {
+          g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+          changed = true;
+          results.groupsFixed++;
+        }
+
+        const currentNames = (g.students || []).map(s => String(s || '').trim()).filter(Boolean);
+        if (currentNames.length === 0) {
+          const fromGid = namesByGid[g._gid] || new Set();
+          const fromGi = namesByGi[gi] || new Set();
+          const merged = new Set([...fromGid, ...fromGi]);
+          if (merged.size > 0) {
+            g.students = [...merged];
+            changed = true;
+            results.groupsFixed++;
+            results.studentsLinked += merged.size;
+          }
+        }
+      });
+
+      // 2. إنشاء أفواج من session docs ليس لها مقابل في groups[]
+      const existingGids = new Set(groups.map(g => g && g._gid).filter(Boolean));
+      let nextGi = groups.length;
+
+      for (const [gidVal, namesSet] of Object.entries(namesByGid)) {
+        if (!existingGids.has(gidVal) && namesSet.size > 0) {
+          groups.push({ _gid: gidVal, name: 'فوج ' + (nextGi + 1), students: [...namesSet] });
+          changed = true;
+          results.groupsCreated++;
+          results.studentsLinked += namesSet.size;
+          nextGi++;
+        }
+      }
+      for (const [giStr, namesSet] of Object.entries(namesByGi)) {
+        const gi2 = parseInt(giStr);
+        if (!groups[gi2] && namesSet.size > 0) {
+          const newGid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+          groups.push({ _gid: newGid, name: 'فوج ' + (nextGi + 1), students: [...namesSet] });
+          changed = true;
+          results.groupsCreated++;
+          results.studentsLinked += namesSet.size;
+          nextGi++;
+        }
+      }
+
+      // 3. إذا الأستاذ لديه تلاميذ ولا توجد أفواج → أنشئ فوجاً واحداً
+      if (groups.length === 0 && studentsArr.length > 0) {
+        const allNames = [...new Set(studentsArr.map(s => String(s.name || '').trim()).filter(Boolean))];
+        if (allNames.length > 0) {
+          groups.push({ _gid: 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10), name: 'الفوج الأول', students: allNames });
+          changed = true;
+          results.groupsCreated++;
+          results.studentsLinked += allNames.length;
+        }
+      }
+
+      // 4. حفظ التغييرات
+      if (changed) {
+        const cleanGroups = groups.map(g => ({
+          _gid: g._gid || '',
+          name: g.name || '',
+          students: (g.students || []).filter(Boolean),
+          days: g.days || []
+        }));
+        try {
+          await setDoc(doc(db, 'teachers', teacherId), { groups: cleanGroups }, { merge: true });
+          // حدّث الكاش المحلي
+          teacher.groups = cleanGroups;
+          results.teachersChanged++;
+        } catch (e) {
+          results.errors.push(`${teacher.name || teacherId}: فشل الحفظ (${e.message})`);
+        }
+      }
+    }
+
+    // أظهر تقرير الإصلاح
+    _showRepairReport(results);
+
+    // جدّد واجهة الحضور
+    if (typeof loadAttendanceSummary === 'function') {
+      if (window._attSummaryCache) window._attSummaryCache = {};
+      if (window._ctrlMapCache) window._ctrlMapCache = {};
+      loadAttendanceSummary();
+    }
+  } catch (e) {
+    console.error('repairOldGroups error:', e);
+    showToast('❌ خطأ في الإصلاح: ' + e.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🛠️ إصلاح الأفواج القديمة'; }
+  }
+};
+
+function _showRepairReport(r) {
+  const existing = document.getElementById('repair-report-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'repair-report-modal';
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:480px;background:var(--card);border-radius:20px;box-shadow:var(--shadow-xl);overflow:hidden;animation:modalIn 0.25s ease">
+      <div style="padding:24px 28px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+          <span style="font-size:28px">🛠️</span>
+          <div>
+            <div style="font-weight:900;font-size:16px;color:var(--text)">تقرير إصلاح الأفواج</div>
+            <div style="font-size:11px;color:var(--text-muted)">${r.errors.length ? '⚠️ تم مع بعض الأخطاء' : '✅ تم بنجاح'}</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          <div style="padding:12px;background:var(--primary-light);border-radius:12px;text-align:center">
+            <div style="font-size:20px;font-weight:900;color:var(--primary)">${r.teachersChecked}</div>
+            <div style="font-size:10px;color:var(--text-muted);font-weight:700">أساتذة تم فحصهم</div>
+          </div>
+          <div style="padding:12px;background:rgba(5,150,105,0.08);border-radius:12px;text-align:center">
+            <div style="font-size:20px;font-weight:900;color:#059669">${r.teachersChanged}</div>
+            <div style="font-size:10px;color:var(--text-muted);font-weight:700">أساتذة تم تعديلهم</div>
+          </div>
+          <div style="padding:12px;background:rgba(245,158,11,0.08);border-radius:12px;text-align:center">
+            <div style="font-size:20px;font-weight:900;color:#f59e0b">${r.groupsFixed}</div>
+            <div style="font-size:10px;color:var(--text-muted);font-weight:700">أفواج تم إصلاحها</div>
+          </div>
+          <div style="padding:12px;background:rgba(124,58,237,0.08);border-radius:12px;text-align:center">
+            <div style="font-size:20px;font-weight:900;color:#7C3AED">${r.groupsCreated}</div>
+            <div style="font-size:10px;color:var(--text-muted);font-weight:700">أفواج تم إنشاؤها</div>
+          </div>
+          <div style="grid-column:1/-1;padding:12px;background:rgba(37,99,235,0.08);border-radius:12px;text-align:center">
+            <div style="font-size:20px;font-weight:900;color:#2563EB">${r.studentsLinked}</div>
+            <div style="font-size:10px;color:var(--text-muted);font-weight:700">طالب تم ربطهم بالأفواج</div>
+          </div>
+        </div>
+        ${r.errors.length ? `<div style="padding:10px 14px;background:#FEF2F2;border-radius:10px;border:1px solid #FECACA;margin-bottom:12px">
+          <div style="font-weight:700;color:#DC2626;font-size:12px;margin-bottom:4px">⚠️ الأخطاء (${r.errors.length})</div>
+          ${r.errors.map(e => `<div style="font-size:11px;color:#991B1B;padding:2px 0">• ${e}</div>`).join('')}
+        </div>` : ''}
+        <button onclick="this.closest('.modal-overlay').remove()" class="btn-primary" style="width:100%;justify-content:center">
+          ✅ تم
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  setTimeout(() => modal.classList.add('open'), 50);
 }
 
 window._attSummaryCache = {}; // teacherId -> { gi: { sessionNum: data } }
