@@ -3049,7 +3049,7 @@
       <div id="add-student-group-wrap" style="display:none;margin-top:10px">
         <div class="ctrl-field">
           <label>🏫 اختر الفوج الهدف</label>
-          <select id="add-student-group-select" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px"></select>
+          <select id="add-student-group-select" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px" onchange="_onAddStudentGroupChange()"></select>
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:14px">
@@ -9033,6 +9033,15 @@ window.openAddStudentModal = () => {
   });
   // رتّب حسب الاسم
   _addStudentCandidates.sort((a,b) => a.name.localeCompare(b.name, 'ar'));
+  // تجهيز قائمة الأفواج
+  const selTeacher = (all || []).find(t => t.id === teacherId);
+  const selGroups = selTeacher?.groups || [];
+  const gs = document.getElementById('add-student-group-select');
+  if (gs) {
+    gs.innerHTML = '<option value="">اختر الفوج...</option>'
+      + selGroups.filter(g => g._gid).map((g,i) => `<option value="${i}">${_displayGroupName(g.name)} (${(g.students||[]).length} طالب)</option>`).join('');
+    gs.value = '';
+  }
   _updateSelectedBar();
   _searchAddStudent('');
 };
@@ -9053,7 +9062,7 @@ function _normAddSearch(s) {
     .replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ').trim();
 }
 
-// تحديث شريط عدد المختارين
+// تحديث شريط عدد المختارين وإظهار/إخفاء اختيار الفوج
 function _updateSelectedBar() {
   const bar = document.getElementById('add-student-selected-bar');
   const cnt = document.getElementById('add-student-count');
@@ -9067,7 +9076,59 @@ function _updateSelectedBar() {
   // تحديث نص الزر
   const btn = document.getElementById('add-student-confirm-btn');
   if (btn) btn.textContent = n > 0 ? `➕ إضافة (${n})` : '➕ إضافة التلاميذ المختارين';
+  // تحديث حالة اختيار الفوج
+  _updateGroupPickerState();
 }
+
+// إظهار/إخفاء قائمة اختيار الفوج حسب عدد الأفواج وعدد التلاميذ المختارين
+function _updateGroupPickerState() {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  const teacher = (window.allTeachers || []).find(t => t.id === teacherId);
+  const groups = teacher?.groups || [];
+  const validGroups = groups.filter(g => g._gid);
+  const gw = document.getElementById('add-student-group-wrap');
+  const gs = document.getElementById('add-student-group-select');
+  const btn = document.getElementById('add-student-confirm-btn');
+  const n = Object.keys(_addStudentSelected).length;
+
+  // ملء القائمة إذا كانت فارغة
+  if (gs && gs.options.length <= 1) {
+    gs.innerHTML = '<option value="">اختر الفوج...</option>'
+      + validGroups.map((g,i) => `<option value="${i}">${_displayGroupName(g.name)} (${(g.students||[]).length} طالب)</option>`).join('');
+  }
+
+  if (!teacher || !validGroups.length) {
+    if (gw) gw.style.display = 'none';
+    if (btn) btn.disabled = !!n; // تعطيل إذا كان هناك مختارون ولا يوجد أفواج
+    return;
+  }
+
+  if (validGroups.length === 1) {
+    // فوج واحد فقط → إخفاء القائمة + تعيين تلقائي
+    if (gw) gw.style.display = 'none';
+    if (gs) gs.value = String(groups.indexOf(validGroups[0]));
+    if (btn) btn.disabled = !n;
+  } else {
+    // أفواج متعددة → إظهار القائمة فقط عند اختيار تلاميذ
+    if (n > 0) {
+      if (gw) gw.style.display = 'block';
+      // تعطيل الزر إذا لم يختر الفوج
+      const selVal = gs ? gs.value : '';
+      if (btn) btn.disabled = !selVal;
+    } else {
+      if (gw) gw.style.display = 'none';
+      if (btn) btn.disabled = true;
+    }
+  }
+}
+
+// عند تغيير اختيار الفوج يدوياً
+window._onAddStudentGroupChange = () => {
+  const gs = document.getElementById('add-student-group-select');
+  const btn = document.getElementById('add-student-confirm-btn');
+  const n = Object.keys(_addStudentSelected).length;
+  if (btn) btn.disabled = !gs?.value || !n;
+};
 
 window._searchAddStudent = (q) => {
   const resultsEl = document.getElementById('add-student-results');
