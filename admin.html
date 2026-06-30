@@ -8064,17 +8064,17 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           const ctrl = ctrlMap[i];
           const ctrlStatus = ctrl && ctrl.status;
           const isLocked = window._isTeacherAttendanceView && (ctrlStatus === 'locked' || ctrlStatus === 'closed');
-          console.log(`[preJoinCell] s=${s.name} session=${i} joinedAtSession=${s.joinedAtSession} isLocked=${isLocked} gid=${s.gid||s.groupGid||''}`);
           const sNameVal = s.name;
           const sIdAttr = sId.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
           const gidVal = s.gid || s.groupGid || '';
           const snAttr = sNameVal.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-          const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}','${gidVal}',${i},this.dataset.studentId,this.dataset.sn)" data-gid="${gidVal}" data-student-id="${sIdAttr}" data-sn="${snAttr}"`;
+          const attDataAttrs = `data-att-cell="1" data-teacher-id="${teacherIdVal}" data-gid="${gidVal}" data-session="${i}" data-student-id="${sIdAttr}" data-sn="${snAttr}"`;
           const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
+          console.log(`[CELL] student="${sNameVal}" session=${i} type=pre-join clickable=${!isLocked} teacherView=${!!window._isTeacherAttendanceView} locked=${isLocked} gid="${gidVal}"`);
           if (isLocked) {
-            cells.push(`<td class="${cellClass}" style="text-align:center" title="غير مسجل (مقفلة)">🔒</td>`);
+            cells.push(`<td class="${cellClass}" style="text-align:center" title="غير مسجل (مقفلة)" ${attDataAttrs}>🔒</td>`);
           } else {
-            cells.push(`<td class="${cellClass}" style="text-align:center;background:transparent;color:var(--text-muted);font-size:11px" title="غير مسجل — اضغط للتسجيل" ${cellClick}>—</td>`);
+            cells.push(`<td class="${cellClass}" style="text-align:center;background:transparent;color:var(--text-muted);font-size:11px" title="غير مسجل — اضغط للتسجيل" ${attDataAttrs}>—</td>`);
           }
           continue;
         }
@@ -8099,17 +8099,20 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         const snAttr = sNameVal.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
         const sIdAttr = sId.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
         const gidVal = s.gid || s.groupGid || '';
-        const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}','${gidVal}',${i},this.dataset.studentId,this.dataset.sn)" data-gid="${gidVal}" data-student-id="${sIdAttr}" data-sn="${snAttr}"`;
+        const attDataAttrs = `data-att-cell="1" data-teacher-id="${teacherIdVal}" data-gid="${gidVal}" data-session="${i}" data-student-id="${sIdAttr}" data-sn="${snAttr}"`;
         const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
         if (!rec && !studentRec) {
           const isPast = i < curSession;
           if (window._isTeacherAttendanceView && isLocked) {
-            cells.push(`<td class="att-cell att-cell-locked" style="text-align:center" title="${t('att_missed_session')}">🔒</td>`);
+            cells.push(`<td class="att-cell att-cell-locked" style="text-align:center" title="${t('att_missed_session')}" ${attDataAttrs}>🔒</td>`);
+            console.log(`[CELL] student="${s.name}" session=${i} type=no-record-locked clickable=false teacherView=${!!window._isTeacherAttendanceView} locked=true`);
           } else if (isPast) {
-            cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_missed_session')}" ${cellClick}>⚠️</td>`);
+            cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_missed_session')}" ${attDataAttrs}>⚠️</td>`);
+            console.log(`[CELL] student="${s.name}" session=${i} type=missed clickable=true`);
             totalMissed++;
           } else {
-            cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_future_session')}" ${cellClick}>⋯</td>`);
+            cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_future_session')}" ${attDataAttrs}>⋯</td>`);
+            console.log(`[CELL] student="${s.name}" session=${i} type=future clickable=true`);
           }
           continue;
         }
@@ -8122,15 +8125,18 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           }
         }
         if (!studentRec) {
-          cells.push(`<td class="${isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-future att-cell-clickable'}" style="text-align:center" title="${t('att_not_recorded')}" ${isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}','${gidVal}',${i},this.dataset.studentId,this.dataset.sn)" data-gid="${gidVal}" data-student-id="${sIdAttr}" data-sn="${snAttr}"`}>⋯</td>`);
+          cells.push(`<td class="${isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-future att-cell-clickable'}" style="text-align:center" title="${t('att_not_recorded')}" ${attDataAttrs}>⋯</td>`);
+          console.log(`[CELL] student="${s.name}" session=${i} type=not-recorded clickable=${!isLocked}`);
           continue;
         }
         const date = (rec && rec.date) || '';
         if (studentRec.present) {
-          cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_present_on')}${date}" ${cellClick}>✅</td>`);
+          cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_present_on')}${date}" ${attDataAttrs}>✅</td>`);
+          console.log(`[CELL] student="${s.name}" session=${i} type=present clickable=${!isLocked}`);
           totalPresent++;
         } else {
-          cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_absent_on')}${date}" ${cellClick}>❌</td>`);
+          cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_absent_on')}${date}" ${attDataAttrs}>❌</td>`);
+          console.log(`[CELL] student="${s.name}" session=${i} type=absent clickable=${!isLocked}`);
           totalAbsent++;
         }
       }
@@ -8176,6 +8182,27 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   tbody.innerHTML = allRows.length
     ? allRows.join('')
     : '<tr><td colspan="' + colspan + '" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('att_no_data') + '</td></tr>';
+
+  // ── Event delegation: all cells with data-att-cell are clickable ──
+  try {
+    if (tbody._attClickHandler) tbody.removeEventListener('click', tbody._attClickHandler);
+    const attClickHandler = (e) => {
+      const cell = e.target.closest('[data-att-cell]');
+      if (!cell) return;
+      const studentName = cell.dataset.sn || '';
+      const studentId = cell.dataset.studentId || '';
+      const session = parseInt(cell.dataset.session, 10);
+      const gid = cell.dataset.gid || '';
+      const tid = cell.dataset.teacherId || '';
+      if (!session || !tid) return;
+      console.log(`[CLICK] teacher=${tid} gid=${gid} session=${session} student="${studentName}" id=${studentId}`);
+      toggleDailyAttCell(tid, gid, session, studentId, studentName);
+    };
+    tbody.addEventListener('click', attClickHandler);
+    tbody._attClickHandler = attClickHandler;
+  } catch (e) {
+    console.warn('Attendance cell delegation setup failed:', e);
+  }
 
   // Show/hide the stat bar (using correctly counted values)
   let statBar = document.getElementById('att-sum-stats');
