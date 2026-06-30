@@ -7435,6 +7435,22 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   });
   let groupKeys = Object.keys(grouped).map(Number).sort((a,b) => a - b);
 
+  // Save full student data for CSV export (before display filters are applied)
+  window._attFullStudents = [];
+  for (const dkStr of Object.keys(grouped)) {
+    const dk = parseInt(dkStr);
+    const g = grouped[dk];
+    (g.students || []).forEach(s => {
+      window._attFullStudents.push({
+        name: s.name,
+        teacher: teacher.name,
+        group: g.group,
+        gi: dk,
+        receipt: s.receipt
+      });
+    });
+  }
+
   // Filter by selected group if non-empty
   const giNum = parseInt(giFilter);
   if (giFilter !== '' && !isNaN(giNum)) {
@@ -7443,6 +7459,35 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
 
   const sessionRange = Array.from({length: totalSessions}, (_, i) => i + 1);
   const colspan = 4 + totalSessions + 1;
+
+  // Build CSV-ready data for ALL groups (before display filters)
+  // Uses the same namesMatchLocal matching as the table rendering below
+  window._attAllStudentsCsvData = [];
+  for (const dkStr2 of Object.keys(grouped)) {
+    const dk2 = parseInt(dkStr2);
+    const g2 = grouped[dk2];
+    (g2.students || []).forEach(s2 => {
+      const grpSessions = groupCache[s2.gi] || {};
+      const csvVals = [];
+      for (let idx2 = 0; idx2 < sessionRange.length; idx2++) {
+        const i2 = sessionRange[idx2];
+        if (s2.joinedAtSession && i2 < s2.joinedAtSession) { csvVals.push('—'); continue; }
+        const rec2 = grpSessions[i2];
+        if (!rec2) { csvVals.push('—'); continue; }
+        const stuRec2 = (rec2.students || []).find(st => namesMatchLocal(st.name || '', s2.name || ''));
+        csvVals.push(stuRec2 ? (stuRec2.present ? 'حاضر' : 'غائب') : '—');
+      }
+      window._attAllStudentsCsvData.push({
+        name: s2.name,
+        teacher: teacher.name,
+        group: g2.group,
+        gi: dk2,
+        sessions: csvVals
+      });
+    });
+  }
+
+  window._attLastRenderStudents = [];
 
   groupKeys.forEach(gi => {
     const g = grouped[gi];
@@ -7514,6 +7559,20 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           totalAbsent++;
         }
       }
+      // Save rendered data for CSV export (before ticket badge)
+      const csvValues = cells.map(cellHtml => {
+        if (cellHtml.includes('✅')) return 'حاضر';
+        if (cellHtml.includes('❌')) return 'غائب';
+        return '—';
+      });
+      if (!window._attLastRenderStudents) window._attLastRenderStudents = [];
+      window._attLastRenderStudents.push({
+        name: s.name,
+        teacher: teacher.name,
+        group: s.group,
+        sessions: csvValues
+      });
+
       let ticketBadge;
       if (isSubscribed) {
         const pack = ticketData.pack;
@@ -8872,17 +8931,15 @@ function _showGroupPicker(teacher, groups, callback) {
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 }
 
-// ─── تصدير سجل الحضور كـ CSV ───
+// ─── تصدير سجل الحضور كـ CSV (من بيانات الجدول المعروضة) ───
 window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) => {
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
   if (!teacher) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
 
   const groups = teacher.groups || [];
-  const giFilter = giFilterOverride !== undefined ? giFilterOverride : '';
-  const groupLabel = groupLabelOverride || '';
 
-  // First call from button (no args or giFilterOverride=undefined): always show picker
+  // First call from button: show picker
   if (giFilterOverride === undefined) {
     if (!groups.length) { showToast('⚠️ الأستاذ لا يملك أفواجاً', true); return; }
     _showGroupPicker(teacher, groups, (gi, label, subFilter) => {
@@ -8891,95 +8948,93 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) 
     return;
   }
 
-  // If specific group selected, verify it exists
-  if (giFilter !== '' && !groups[parseInt(giFilter)]) {
-    showToast('⚠️ الفوج المحدد غير موجود', true); return;
+  // Verify full CSV data exists (built by loadAttendanceSummary)
+  if (!window._attAllStudentsCsvData || !window._attAllStudentsCsvData.length) {
+    showToast('⚠️ لا توجد بيانات متاحة، حمّل الجدول أولاً', true);
+    return;
   }
 
-  const rows = [];
-  const groupCache = window._attSummaryCache[teacherId] || {};
+  console.log(`📊 CSV: ${window._attAllStudentsCsvData.length} total students available`);
 
-  // Always 12 sessions in CSV
-  const csvTotalSessions = 12;
-
-  // رأس CSV
-  const headers = ['التلميذ', 'الأستاذ', 'الفوج'];
-  const sessionRange = Array.from({length: csvTotalSessions}, (_, i) => i + 1);
-  sessionRange.forEach(i => headers.push(`الحصة ${i}`));
-  rows.push(headers);
-
-  // Strict name normalization for CSV matching
-  const _csvNorm = typeof _normalizeNameStrict === 'function'
+  // Build subscription lookup (strict normalization)
+  const _normS = typeof _normalizeNameStrict === 'function'
     ? _normalizeNameStrict
     : (n) => String(n || '').trim().replace(/\s+/g,' ').toLowerCase()
         .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
         .replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ').trim();
-
-  let studentEntries = [];
-  groups.forEach((g, gi) => {
-    if (giFilter !== '' && parseInt(giFilter) !== gi) return;
-    (g.students || []).forEach(sName => {
-      const name = String(sName || '').trim();
-      if (!name) return;
-      studentEntries.push({
-        name,
-        group: _cleanGroupName(g.name) || 'فوج ' + (gi + 1),
-        gi
-      });
-    });
+  const ticketSubMap = new Map();
+  (allTicketsData||[]).forEach(t => {
+    if (t.deleted || t.status !== 'paid') return;
+    ticketSubMap.set(_normS(t.name), true);
   });
 
-  // Check count before export
-  const expectedCount = studentEntries.length;
-  if (!expectedCount) { showToast('⚠️ لا يوجد تلاميذ في الفوج/الأفواج المحددة', true); return; }
-  console.log(`📊 CSV export: ${studentEntries.length} students from groups, filter: ${filterType || 'all'}`);
-
-  // تطبيق فلتر الاشتراك
-  if (filterType && filterType !== 'all') {
-    const _normTk = (n) => String(n||'').trim().replace(/\s+/g,' ').toLowerCase().replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه');
-    const isSubscribed = (name) => (allTicketsData||[]).some(t => !t.deleted && t.status === 'paid' && _normTk(t.name) === _normTk(name));
-    if (filterType === 'subscribed') studentEntries = studentEntries.filter(s => isSubscribed(s.name));
-    else if (filterType === 'unsubscribed') studentEntries = studentEntries.filter(s => !isSubscribed(s.name));
+  // Filter by group (gi from picker)
+  let exportData = window._attAllStudentsCsvData.slice();
+  if (giFilterOverride !== '') {
+    const gi = parseInt(giFilterOverride);
+    const before = exportData.length;
+    exportData = exportData.filter(s => s.gi === gi);
+    console.log(`📊 Group filter (gi=${gi}): ${exportData.length}/${before} students`);
+    if (!exportData.length) {
+      showToast('⚠️ لا يوجد تلاميذ للفوج المحدد', true);
+      return;
+    }
   }
 
-  studentEntries.forEach(s => {
-    const row = [s.name, teacher.name, s.group];
-    const groupSessions = groupCache[s.gi] || {};
-    sessionRange.forEach(i => {
-      const rec = groupSessions[i];
-      if (!rec) {
-        row.push('—');
-        return;
-      }
-      const studentRec = (rec.students || []).find(st => _csvNorm(st.name || '') === _csvNorm(s.name));
-      if (!studentRec) { row.push('—'); return; }
-      row.push(studentRec.present ? 'حاضر' : 'غائب');
+  // Filter by subscription
+  if (filterType && filterType !== 'all') {
+    const before = exportData.length;
+    exportData = exportData.filter(s => {
+      const isSub = ticketSubMap.has(_normS(s.name));
+      return filterType === 'subscribed' ? isSub : !isSub;
     });
-    rows.push(row);
+    console.log(`📊 Subscription filter "${filterType}": ${exportData.length}/${before} students`);
+    if (!exportData.length) {
+      showToast(`⚠️ لا يوجد تلاميذ ${filterType === 'subscribed' ? 'مشتركين' : 'غير مشتركين'}`, true);
+      return;
+    }
+  }
+
+  // Build CSV rows
+  const csvTotalSessions = 12;
+  const sessionRange = Array.from({length: csvTotalSessions}, (_, i) => i + 1);
+  const headers = ['التلميذ', 'الأستاذ', 'الفوج'];
+  sessionRange.forEach(i => headers.push(`الحصة ${i}`));
+  const csvRows = [headers];
+
+  exportData.forEach(s => {
+    const row = [s.name, s.teacher, s.group];
+    for (let i = 0; i < csvTotalSessions; i++) {
+      row.push(i < s.sessions.length ? s.sessions[i] : '—');
+    }
+    csvRows.push(row);
   });
 
-  console.log(`📊 CSV final rows: ${rows.length - 1} students, ${headers.length} columns`);
+  console.log(`📊 CSV ready: ${csvRows.length - 1} students × ${headers.length} columns`);
 
-  if (rows.length < 2) { showToast('⚠️ لا توجد بيانات للتصدير', true); return; }
+  if (csvRows.length < 2) {
+    showToast('⚠️ لا توجد بيانات للتصدير', true);
+    return;
+  }
 
-  // تحويل إلى CSV
-  const csvContent = rows.map(row =>
+  // Generate CSV file
+  const csvContent = csvRows.map(row =>
     row.map(cell => `"${cell.replace(/"/g,'""')}"`).join(',')
   ).join('\r\n');
-
-  // إضافة BOM UTF-8 ليدعم العربية
   const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  const teacherName = teacher.name.replace(/[\\/:*?"<>|]/g, '_');
-  const groupSuffix = (giFilter !== '' && groupLabel) ? `_${groupLabel.replace(/[^a-zA-Z0-9\u0600-\u06FF\s]/g,'').trim().replace(/\s+/g,'_')}` : '';
-  a.download = `حضور_${teacherName}${groupSuffix}_${new Date().toISOString().slice(0,10)}.csv`;
+  const teacherNameClean = teacher.name.replace(/[\\/:*?"<>|]/g, '_');
+  const groupSuffix = (giFilterOverride !== '' && groupLabelOverride)
+    ? `_${groupLabelOverride.replace(/[^a-zA-Z0-9\u0600-\u06FF\s]/g,'').trim().replace(/\s+/g,'_')}`
+    : '';
+  a.download = `حضور_${teacherNameClean}${groupSuffix}_${new Date().toISOString().slice(0,10)}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  showToast(`✅ تم تصدير ملف CSV: ${a.download}`);
+  showToast(`✅ تم تصدير ${csvRows.length - 1} تلميذ — ${a.download}`);
 };
 
 // Populate teacher select when teachers load
