@@ -2372,6 +2372,7 @@
       </select>
       <button onclick="exportAttendanceCSV()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif" title="تصدير CSV" id="att-csv-btn">📥 CSV</button>
       <button onclick="toggleAttendanceStudentSearch()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #059669;background:rgba(5,150,105,0.08);color:#059669;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إضافة تلميذ جديد للأستاذ المختار" id="att-add-student-btn">➕ إضافة تلميذ</button>
+      <button onclick="openAddGroupModal()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #f59e0b;background:rgba(245,158,11,0.08);color:#f59e0b;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إضافة فوج جديد للأستاذ المختار" id="att-add-group-btn">🏫 إضافة فوج</button>
       <button onclick="refreshAttendanceSessions()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.3s" title="تحديث الحصص وضبطها حسب تاريخ الأستاذ" id="att-refresh-btn">🔄 تحديث</button>
       <button onclick="normalizeAttendanceNames()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #7C3AED;background:rgba(124,58,237,0.08);color:#7C3AED;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إعادة ربط أسماء التلاميذ بسجلات الحضور" id="att-normalize-btn">🔗 إعادة ربط الحضور</button>
       <button onclick="backupAttendanceData()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.3s" title="حفظ نسخة احتياطية للحضور" id="att-backup-btn">💾 حفظ نسخة</button>
@@ -2612,6 +2613,7 @@
                 <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer"><input type="checkbox" id="set-show-att-btn" checked onchange="saveBtnSettings()"> 📋 زر الحضور في بطاقة الأستاذ</label>
                 <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer"><input type="checkbox" id="set-show-csv-btn" checked onchange="saveBtnSettings()"> 📥 زر CSV</label>
                 <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer"><input type="checkbox" id="set-show-add-btn" checked onchange="saveBtnSettings()"> ➕ زر إضافة تلميذ</label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer"><input type="checkbox" id="set-show-group-btn" checked onchange="saveBtnSettings()"> 🏫 زر إضافة فوج</label>
                 <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer"><input type="checkbox" id="set-show-refresh-btn" checked onchange="saveBtnSettings()"> 🔄 زر تحديث الحصص</label>
                 <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer"><input type="checkbox" id="set-show-normalize-btn" checked onchange="saveBtnSettings()"> 🔗 زر إعادة ربط الحضور</label>
                 <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer"><input type="checkbox" id="set-show-backup-btn" checked onchange="saveBtnSettings()"> 💾 زر حفظ نسخة</label>
@@ -3469,7 +3471,7 @@ onAuthStateChanged(auth, async user => {
           onTeacherChange();
         }
         // إخفاء أزرار الإدارة والأستاذ لا يستطيع إضافة تلاميذ
-        ['att-csv-btn','att-normalize-btn','att-backup-btn','att-sync-btn','att-add-student-btn','att-restore-btn'].forEach(id => {
+        ['att-csv-btn','att-normalize-btn','att-backup-btn','att-sync-btn','att-add-student-btn','att-restore-btn','att-add-group-btn'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.style.display = 'none';
         });
@@ -3598,7 +3600,7 @@ onAuthStateChanged(auth, async user => {
 
 // ─── إظهار/إخفاء أزرار الحضور (الإعدادات) ───
 window.saveBtnSettings = async () => {
-  const ids = ['set-show-att-btn','set-show-csv-btn','set-show-add-btn','set-show-refresh-btn','set-show-normalize-btn','set-show-backup-btn','set-show-sync-btn'];
+  const ids = ['set-show-att-btn','set-show-csv-btn','set-show-add-btn','set-show-group-btn','set-show-refresh-btn','set-show-normalize-btn','set-show-backup-btn','set-show-sync-btn'];
   const settings = {};
   ids.forEach(id => { settings[id.replace('set-show-','')] = document.getElementById(id)?.checked ?? true; });
   try {
@@ -3613,6 +3615,7 @@ function applyBtnSettings() {
     'att': { sel: '#teachers-grid .teacher-card-footer .btn-sm-icon', idx: 0, key: 'att-btn' },
     'csv': { el: 'att-csv-btn', key: 'csv-btn' },
     'add': { el: 'att-add-student-btn', key: 'add-btn' },
+    'group': { el: 'att-add-group-btn', key: 'group-btn' },
     'refresh': { el: 'att-refresh-btn', key: 'refresh-btn' },
     'normalize': { el: 'att-normalize-btn', key: 'normalize-btn' },
     'backup': { el: 'att-backup-btn', key: 'backup-btn' },
@@ -3639,7 +3642,7 @@ window.loadBtnSettings = async () => {
     if (snap.exists()) {
       window._btnSettings = snap.data();
       // Sync checkboxes (keys match checkbox ID suffix)
-      const keys = ['att-btn','csv-btn','add-btn','refresh-btn','normalize-btn','backup-btn','sync-btn'];
+      const keys = ['att-btn','csv-btn','add-btn','group-btn','refresh-btn','normalize-btn','backup-btn','sync-btn'];
       for (const key of keys) {
         const cb = document.getElementById('set-show-' + key);
         if (cb) cb.checked = window._btnSettings[key] !== false;
@@ -8879,12 +8882,18 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) 
   const giFilter = giFilterOverride !== undefined ? giFilterOverride : '';
   const groupLabel = groupLabelOverride || '';
 
-  // If teacher has multiple groups and no group was selected yet, show picker
-  if (groups.length > 1 && giFilter === '') {
+  // First call from button (no args or giFilterOverride=undefined): always show picker
+  if (giFilterOverride === undefined) {
+    if (!groups.length) { showToast('⚠️ الأستاذ لا يملك أفواجاً', true); return; }
     _showGroupPicker(teacher, groups, (gi, label, subFilter) => {
       window.exportAttendanceCSV(gi, label, subFilter);
     });
     return;
+  }
+
+  // If specific group selected, verify it exists
+  if (giFilter !== '' && !groups[parseInt(giFilter)]) {
+    showToast('⚠️ الفوج المحدد غير موجود', true); return;
   }
 
   const rows = [];
@@ -8899,55 +8908,31 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) 
   sessionRange.forEach(i => headers.push(`الحصة ${i}`));
   rows.push(headers);
 
-  // قراءة البيانات من الـ cache مباشرة
-  const normName = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
-  const giNum = parseInt(giFilter);
-
-  // Helper: match names conservatively
-  const namesMatch = (a, b) => {
-    if (!a || !b) return false;
-    const an = normName(a), bn = normName(b);
-    if (an === bn) return true;
-    const ap = an.split(/\s+/).filter(Boolean);
-    const bp = bn.split(/\s+/).filter(Boolean);
-    if (ap.length === bp.length) return [...ap].sort().join(' ') === [...bp].sort().join(' ');
-    const [shorter, longer] = ap.length <= bp.length ? [ap, bp] : [bp, ap];
-    if (shorter.length < 2) return false;
-    const ss = shorter.join(' '), ls = longer.join(' ');
-    return ls.startsWith(ss + ' ') || ls.endsWith(' ' + ss);
-  };
+  // Strict name normalization for CSV matching
+  const _csvNorm = typeof _normalizeNameStrict === 'function'
+    ? _normalizeNameStrict
+    : (n) => String(n || '').trim().replace(/\s+/g,' ').toLowerCase()
+        .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+        .replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ').trim();
 
   let studentEntries = [];
-  const csvMatched = new Set();
   groups.forEach((g, gi) => {
-    if (giFilter !== '' && !isNaN(giNum) && gi !== giNum) return;
+    if (giFilter !== '' && parseInt(giFilter) !== gi) return;
     (g.students || []).forEach(sName => {
-      let match = (teacher.students || []).find(s => namesMatch(s.name, sName));
-      if (match) {
-        csvMatched.add(normName(match.name || ''));
-        studentEntries.push({ name: match.name, group: _cleanGroupName(g.name) || 'فوج ' + (gi + 1), gi });
-      } else {
-        studentEntries.push({ name: sName, group: _cleanGroupName(g.name) || 'فوج ' + (gi + 1), gi });
-      }
+      const name = String(sName || '').trim();
+      if (!name) return;
+      studentEntries.push({
+        name,
+        group: _cleanGroupName(g.name) || 'فوج ' + (gi + 1),
+        gi
+      });
     });
   });
 
-  // Add remaining teacher flat-list students (only if exporting all groups)
-  if (giFilter === '' || isNaN(giNum)) {
-    (teacher.students || []).forEach(s => {
-      const key = normName(s.name || '');
-      if (csvMatched.has(key)) return;
-      let gi = 0;
-      let groupName = '—';
-      groups.forEach((g, idx) => {
-        if ((g.students || []).some(gs => namesMatch(gs, s.name))) {
-          gi = idx;
-          groupName = _cleanGroupName(g.name) || 'فوج ' + (idx + 1);
-        }
-      });
-      studentEntries.push({ name: s.name || '—', group: _cleanGroupName(groupName) || '—', gi });
-    });
-  }
+  // Check count before export
+  const expectedCount = studentEntries.length;
+  if (!expectedCount) { showToast('⚠️ لا يوجد تلاميذ في الفوج/الأفواج المحددة', true); return; }
+  console.log(`📊 CSV export: ${studentEntries.length} students from groups, filter: ${filterType || 'all'}`);
 
   // تطبيق فلتر الاشتراك
   if (filterType && filterType !== 'all') {
@@ -8966,12 +8951,14 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) 
         row.push('—');
         return;
       }
-      const studentRec = (rec.students || []).find(st => namesMatch(st.name || '', s.name));
+      const studentRec = (rec.students || []).find(st => _csvNorm(st.name || '') === _csvNorm(s.name));
       if (!studentRec) { row.push('—'); return; }
       row.push(studentRec.present ? 'حاضر' : 'غائب');
     });
     rows.push(row);
   });
+
+  console.log(`📊 CSV final rows: ${rows.length - 1} students, ${headers.length} columns`);
 
   if (rows.length < 2) { showToast('⚠️ لا توجد بيانات للتصدير', true); return; }
 
@@ -8986,7 +8973,7 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) 
   const a = document.createElement('a');
   a.href = url;
   const teacherName = teacher.name.replace(/[\\/:*?"<>|]/g, '_');
-  const groupSuffix = (giFilter !== '' && !isNaN(giNum) && groupLabel) ? `_${groupLabel.replace(/[^a-zA-Z0-9\u0600-\u06FF\s]/g,'').trim().replace(/\s+/g,'_')}` : '';
+  const groupSuffix = (giFilter !== '' && groupLabel) ? `_${groupLabel.replace(/[^a-zA-Z0-9\u0600-\u06FF\s]/g,'').trim().replace(/\s+/g,'_')}` : '';
   a.download = `حضور_${teacherName}${groupSuffix}_${new Date().toISOString().slice(0,10)}.csv`;
   document.body.appendChild(a);
   a.click();
