@@ -952,6 +952,8 @@
     .att-group-del-btn:hover{background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.5)}
     .att-group-rename-btn{border:1px solid rgba(124,58,237,0.25);background:rgba(124,58,237,0.07);color:#7C3AED}
     .att-group-rename-btn:hover{background:rgba(124,58,237,0.15);border-color:rgba(124,58,237,0.5)}
+    .att-group-add-student-btn{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;border:1px solid rgba(5,150,105,0.3);background:rgba(5,150,105,0.08);color:#059669;font-size:12px;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;line-height:1;margin-right:6px;vertical-align:middle}
+    .att-group-add-student-btn:hover{background:rgba(5,150,105,0.2);border-color:rgba(5,150,105,0.5);transform:scale(1.1)}
     .att-unassign-bar{display:none;margin-bottom:14px;padding:14px 18px;background:var(--card-bg);border:1.5px solid var(--border-2);border-radius:12px}
     .att-unassign-bar.open{display:block}
     .att-unassign-bar .ub-title{font-size:12px;font-weight:800;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:6px}
@@ -1010,9 +1012,6 @@
     .ctrl-modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0}
     .ctrl-modal-title{font-size:16px;font-weight:900;color:var(--text);flex:1}
     .ctrl-modal-body{padding:20px 24px;overflow-y:auto;flex:1}
-    .as-step-dot{width:28px;height:4px;border-radius:99px;background:var(--border);transition:all 0.3s;flex:1}
-    .as-step-dot.active{background:var(--primary);box-shadow:0 0 6px rgba(99,102,241,0.4)}
-    .as-step-dot.done{background:var(--success);box-shadow:0 0 6px rgba(16,185,129,0.4)}
     .ctrl-status-group{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
     .ctrl-status-btn{padding:10px 16px;border-radius:12px;border:2px solid var(--border);background:var(--card-bg);font-size:13px;font-weight:800;cursor:pointer;transition:all 0.2s;font-family:'Tawajal',sans-serif;flex:1;text-align:center;min-width:80px}
     .ctrl-status-btn:hover{border-color:var(--border-2);transform:translateY(-1px)}
@@ -3034,79 +3033,31 @@
   </div>
 </div>
 
-<!-- ===== ADD STUDENT MODAL (v3 — ويزارد خطوة بخطوة) ===== -->
-<div class="ctrl-modal-bg" id="add-student-modal" onclick="if(event.target===this)_asClose()">
-  <div class="ctrl-modal" style="max-width:560px">
+<!-- ===== ADD STUDENT TO GROUP MODAL (مبسط — لا يحتاج لاختيار الفوج) ===== -->
+<div class="ctrl-modal-bg" id="add-student-to-group-modal" onclick="if(event.target===this)closeAddStudentToGroupModal()">
+  <div class="ctrl-modal" style="max-width:480px">
     <div class="ctrl-modal-header">
       <div style="font-size:22px">➕</div>
-      <div class="ctrl-modal-title">إضافة تلميذ إلى فوج</div>
-      <button class="att-modal-close" onclick="_asClose()">✕</button>
+      <div class="ctrl-modal-title" id="asg-title">إضافة تلميذ إلى الفوج</div>
+      <button class="att-modal-close" onclick="closeAddStudentToGroupModal()">✕</button>
     </div>
     <div class="ctrl-modal-body" style="max-height:70vh;overflow-y:auto">
-      <!-- Step indicator -->
-      <div id="as-step-indicator" style="display:flex;gap:4px;margin-bottom:16px;padding:0 2px">
-        <div class="as-step-dot active" data-step="1"></div>
-        <div class="as-step-dot" data-step="2"></div>
-        <div class="as-step-dot" data-step="3"></div>
-      </div>
+      <div id="asg-context" style="padding:10px 14px;border-radius:12px;background:rgba(99,102,241,0.06);border:1.5px solid rgba(99,102,241,0.12);margin-bottom:14px;font-size:13px;line-height:1.7;font-weight:700;color:var(--text)" dir="auto"></div>
 
-      <!-- Step 1: Context Info (always visible when step ≥ 1) -->
-      <div id="as-step1">
-        <div id="as-context-bar" style="padding:12px 14px;border-radius:12px;background:rgba(99,102,241,0.06);border:1.5px solid rgba(99,102,241,0.12);margin-bottom:14px;font-size:13px;line-height:1.7">
-          <div id="as-context-teacher" style="font-weight:700;color:var(--text)">👨‍🏫 الأستاذ: <span id="as-teacher-name">—</span></div>
-          <div id="as-context-group" style="font-weight:700;color:var(--text);margin-top:2px">🏫 الفوج: <span id="as-group-name">—</span></div>
-        </div>
+      <div class="ctrl-field" style="margin-bottom:8px">
+        <label>🔍 ابحث عن تلميذ موجود</label>
+        <input class="inp" type="text" id="asg-search-inp" placeholder="اكتب الاسم، اللقب، أو الاسم الكامل..." style="width:100%" autocomplete="off" oninput="searchAddStudentToGroup(this.value)">
       </div>
-
-      <!-- Step 2: Search & Select -->
-      <div id="as-step2" style="display:none">
-        <div class="ctrl-field" style="margin-bottom:0">
-          <label>🔍 البحث عن تلميذ موجود</label>
-          <input class="inp" type="text" id="as-search-inp" placeholder="اكتب الاسم، اللقب، أو الاسم الكامل..." style="width:100%" autocomplete="off" oninput="_asSearch(this.value)">
-        </div>
-        <div id="as-results" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:4px;margin-top:8px;display:flex;flex-direction:column;gap:2px">
-          <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">✍️ اكتب اسم التلميذ للبحث</div>
-        </div>
-        <div id="as-selected-bar" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;background:rgba(99,102,241,0.08);border:1.5px solid rgba(99,102,241,0.2);font-size:12px;font-weight:700;color:var(--text)">✅ تم اختيار <span id="as-selected-count">0</span> تلميذ</div>
-        <div id="as-group-picker" style="display:none;margin-top:10px">
-          <div class="ctrl-field" style="margin-bottom:0">
-            <label>🏫 اختر الفوج الهدف</label>
-            <select id="as-group-select" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px" onchange="_asUpdateConfirmBtn()"></select>
-          </div>
-        </div>
+      <div id="asg-results" style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:4px;margin-top:6px;display:flex;flex-direction:column;gap:2px">
+        <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">✍️ اكتب اسم التلميذ للبحث</div>
       </div>
-
-      <!-- Step 3: Summary & Confirm -->
-      <div id="as-step3" style="display:none">
-        <div id="as-summary-box" style="padding:14px;border-radius:12px;background:rgba(99,102,241,0.04);border:1.5px solid var(--border);margin-bottom:12px"></div>
-      </div>
-
-      <!-- Manual Create Sub-View (replaces step 2 when creating new student) -->
-      <div id="as-manual-view" style="display:none">
-        <div style="padding:4px 0">
-          <div style="font-size:14px;font-weight:900;color:var(--text);margin-bottom:12px">➕ إنشاء تلميذ جديد يدويًا</div>
-          <div class="ctrl-field" style="margin-bottom:10px">
-            <label>👤 الاسم الكامل</label>
-            <input class="inp" type="text" id="as-manual-name" style="width:100%" autocomplete="off" placeholder="أدخل اسم التلميذ...">
-          </div>
-          <div id="as-manual-group-wrap" style="display:none">
-            <div class="ctrl-field" style="margin-bottom:10px">
-              <label>🏫 اختر الفوج</label>
-              <select id="as-manual-group-select" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px"></select>
-            </div>
-          </div>
-          <div id="as-manual-note" style="font-size:11px;color:var(--text-muted);padding:8px 10px;border-radius:6px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.2);margin-bottom:12px">🕐 سيتم إنشاء التلميذ كـ <strong>غير مشترك</strong>، وستظهر جميع الحصص السابقة بحالة <strong>غير مسجل</strong></div>
-          <div id="as-manual-preview" style="display:none;padding:10px 12px;border-radius:10px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15);font-size:12px;line-height:1.7;margin-bottom:12px"></div>
+      <div id="asg-create-section" style="display:none;margin-top:10px;padding:14px;border-radius:12px;background:rgba(251,191,36,0.06);border:1.5px dashed rgba(251,191,36,0.25)">
+        <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:8px">➕ إنشاء تلميذ جديد</div>
+        <div style="display:flex;gap:8px">
+          <input class="inp" type="text" id="asg-create-name" placeholder="الاسم الكامل للتلميذ الجديد..." style="flex:1;font-size:13px" oninput="updateCreateBtn()" onkeydown="if(event.key==='Enter')confirmCreateStudentToGroup()">
+          <button class="btn-primary" id="asg-create-btn" onclick="confirmCreateStudentToGroup()" disabled style="white-space:nowrap;padding:10px 16px">➕ إنشاء وإضافة</button>
         </div>
-      </div>
-
-      <!-- Footer buttons -->
-      <div style="display:flex;gap:8px;margin-top:14px">
-        <button id="as-back-btn" onclick="_asBack()" style="display:none;flex:1;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text-muted);font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">🔙 رجوع</button>
-        <button id="as-cancel-btn" onclick="_asClose()" style="flex:1;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text-muted);font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">إلغاء</button>
-        <button id="as-next-btn" onclick="_asNext()" class="btn-primary" style="display:none;flex:2">التالي: مراجعة</button>
-        <button id="as-confirm-btn" onclick="_asConfirm()" class="btn-primary" style="display:none;flex:2">✅ إضافة</button>
-        <button id="as-manual-confirm-btn" onclick="_asManualConfirm()" class="btn-primary" style="display:none;flex:2">➕ إنشاء وإضافة</button>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:6px">🕐 سيتم إنشاء التلميذ كـ <strong>غير مشترك</strong>، الحصص السابقة بحالة <strong>غير مسجل</strong></div>
       </div>
     </div>
   </div>
@@ -3561,7 +3512,7 @@ onAuthStateChanged(auth, async user => {
         });
         // إخفاء أزرار إدارة الأفواج (إعادة تسمية، نقل، حذف)
         const style = document.createElement('style');
-        style.textContent = '.att-group-rename-btn,.att-group-move-btn,.att-group-del-btn{display:none!important}';
+        style.textContent = '.att-group-rename-btn,.att-group-move-btn,.att-group-del-btn,.att-group-add-student-btn{display:none!important}';
         style.id = 'teacher-group-btn-hide';
         document.head.appendChild(style);
         // إخفاء عناصر الموقع غير اللازمة للاستاذ
@@ -7187,29 +7138,35 @@ window.syncStudentNamesWithTickets = async () => {
   loadTickets();
 };
 
-// ─── Daily attendance summary ───
-window.onTeacherChange = function() {
-  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
-  currentAttTeacherId = teacherId || null; window.currentAttTeacherId = currentAttTeacherId;
-
-  // Populate table group filter
+// ─── تعبئة فلتر الأفواج (مع تجاهل الفارغة) ───
+function populateGroupFilter() {
   const sel = document.getElementById('att-sum-group');
+  if (!sel) return;
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   sel.style.display = 'none';
   sel.innerHTML = '<option value="">🏫 ' + t('att_all_groups') + '</option>';
-
   if (teacherId) {
     const teacher = (allTeachers || []).find(t => t.id === teacherId);
     const groups = teacher?.groups || [];
-    if (groups.length > 1) {
-      groups.forEach((g, i) => {
+    // أظهر فقط الأفواج التي لديها تلاميذ أو تم إنشاؤها حديثاً
+    const showGroups = groups.filter(g => g && (g.students || []).length > 0);
+    if (showGroups.length > 1) {
+      showGroups.forEach((g, i) => {
         const opt = document.createElement('option');
-        opt.value = String(i);
-        opt.textContent = '🏫 ' + (g.name || (t('att_group_prefix') + ' ' + (i + 1)));
+        opt.value = String(groups.indexOf(g));
+        opt.textContent = '🏫 ' + (g.name || (t('att_group_prefix') + ' ' + (groups.indexOf(g) + 1)));
         sel.appendChild(opt);
       });
       sel.style.display = '';
     }
   }
+}
+
+// ─── Daily attendance summary ───
+window.onTeacherChange = function() {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  currentAttTeacherId = teacherId || null; window.currentAttTeacherId = currentAttTeacherId;
+  populateGroupFilter();
   // تمرير teacherId للأساتذة لتجنب الاعتماد على قيمة select (قد تُعدم)
   loadAttendanceSummary(window._isTeacherAttendanceView ? teacherId : undefined);
   // تحديث قائمة غير المنتمين
@@ -7838,6 +7795,13 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     }
     grouped[dk].students.push(s);
   });
+  // تأكد من وجود هيدر لكل فوج حتى لو كان فارغاً (لعرض زر ➕ إضافة تلميذ)
+  groups.forEach((g, gi) => {
+    if (g && !grouped[gi]) {
+      let gidVal = g._gid || 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+      grouped[gi] = { group: _displayGroupName(g.name), gi, gid: gidVal, students: [] };
+    }
+  });
   let groupKeys = Object.keys(grouped).map(Number).sort((a,b) => a - b);
 
   // Save full student data for CSV export (before display filters are applied)
@@ -7907,7 +7871,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     }
     const isAdmin = !window._isTeacherAttendanceView;
     allRows.push(`<tr class="att-group-header-row">
-      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}${isAdmin ? `<button class="att-group-rename-btn" onclick="renameGroup('${g.gid}')" title="إعادة تسمية الفوج">✏️ إعادة تسمية</button><button class="att-group-move-btn" onclick="openMoveGroupModal('${g.gid}')" title="نقل التلاميذ إلى فوج آخر" data-gid="${g.gid}">📦 نقل</button><button class="att-group-del-btn" onclick="deleteGroup('${g.gid}')" title="حذف الفوج" data-gid="${g.gid}">🗑️ حذف</button>` : ''}</td>
+      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}${isAdmin ? `<button class="att-group-add-student-btn" onclick="openAddStudentToGroup('${g.gid}')" title="إضافة تلميذ إلى هذا الفوج" data-gid="${g.gid}" style="--btn-clr:#059669">➕</button><button class="att-group-rename-btn" onclick="renameGroup('${g.gid}')" title="إعادة تسمية الفوج">✏️</button><button class="att-group-move-btn" onclick="openMoveGroupModal('${g.gid}')" title="نقل التلاميذ إلى فوج آخر" data-gid="${g.gid}">📦</button><button class="att-group-del-btn" onclick="deleteGroup('${g.gid}')" title="حذف الفوج" data-gid="${g.gid}">🗑️</button>` : ''}</td>
     </tr>`);
 
     // قراءة فلتر الاشتراك
@@ -9419,663 +9383,51 @@ window.addStudentToTeacherAttendance = async (name, receipt, payStatus) => {
   }
 };
 
-// ─── إضافة تلميذ عبر المودال (v3 — ويزارد خطوة بخطوة) ───
-let _asCandidates = [];
-let _asSelected = {};
-let _asStep = 1;
-let _asTeacherId = '';
-let _asTargetGi = -1;
-let _asTargetGid = '';
-let _asState = 'search'; // 'search' | 'manual'
+// ─── إضافة تلميذ إلى فوج محدد (مبسط — الفوج معروف مسبقاً) ───
+let _asgGid = '';
+let _asgTeacherId = '';
 
-function _asNorm(s) {
+function _asgNorm(s) {
   return String(s||'').trim().toLowerCase()
     .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
     .replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ').trim();
 }
 
-window.openAddStudentModal = async () => {
+window.openAddStudentToGroup = (gid) => {
+  if (!gid) { showToast('⚠️ معرف الفوج غير صالح', true); return; }
   if (window._isTeacherAttendanceView) { showToast('⚠️ هذه الميزة متاحة فقط للإدارة', true); return; }
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
-  _asClose();
-  _asTeacherId = teacherId;
-  _asSelected = {};
-  _asStep = 1;
-  _asState = 'search';
-  _asTargetGi = -1;
-  _asTargetGid = '';
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  const groups = teacher?.groups || [];
+  const group = groups.find(g => g && g._gid === gid);
+  if (!group) { showToast('⚠️ الفوج غير موجود', true); return; }
 
-  const modal = document.getElementById('add-student-modal');
-  if (modal) modal.classList.add('open');
-
-  // بناء قائمة المرشحين
-  _asBuildCandidates(teacherId);
-
-  // معلومات السياق — نستخدم كل الأفواج بدون فلتر _gid (نفس منطق بقية النظام)
-  const teacher = (window.allTeachers || []).find(t => t.id === teacherId);
+  _asgGid = gid;
+  _asgTeacherId = teacherId;
   const teacherName = teacher?.name || teacherId;
-  document.getElementById('as-teacher-name').textContent = teacherName;
-  let groups = teacher?.groups || [];
-  // Debug: تأكد من أن البيانات صحيحة
-  console.log('[AddStudent] Teacher:', teacherId, 'Name:', teacherName, 'Groups:', groups.length,
-    groups.map(g => ({ name: g.name, _gid: g._gid })));
-  console.log('[AddStudent] Teacher students:', (teacher?.students || []).length);
+  const groupName = _displayGroupName(group.name);
 
-  // إذا كانت الأفواج فارغة ولكن الأستاذ لديه تلاميذ، جرب من sessionAttendance
-  if (groups.length === 0 && teacher && (teacher.students || []).length > 0) {
-    console.log('[AddStudent] groups[] empty but students exist, checking session docs...');
-    try {
-      const sessQ = query(
-        collection(db, 'sessionAttendance'),
-        where('teacherId', '>=', teacherId + '_g0'),
-        where('teacherId', '<=', teacherId + '_g\uf8ff')
-      );
-      const sessSnap = await getDocs(sessQ);
-      const gidNamesMap = {};
-      const giNamesMap = {};
-      sessSnap.forEach(d => {
-        const d2 = d.data();
-        const sNames = (d2.students || []).map(st => String(st.name || '').trim()).filter(Boolean);
-        const gid = d2.gid || '';
-        if (gid) {
-          if (!gidNamesMap[gid]) gidNamesMap[gid] = new Set();
-          sNames.forEach(n => gidNamesMap[gid].add(n));
-        }
-        const tidStr = String(d2.teacherId || '');
-        const giM = tidStr.match(/_g(\d+)$/);
-        if (giM) {
-          const gi2 = parseInt(giM[1]);
-          if (!giNamesMap[gi2]) giNamesMap[gi2] = new Set();
-          sNames.forEach(n => giNamesMap[gi2].add(n));
-        }
-      });
+  document.getElementById('asg-title').textContent = `➕ إضافة تلميذ إلى "${groupName}"`;
+  document.getElementById('asg-context').textContent = `👨‍🏫 ${teacherName} ← 🏫 ${groupName}`;
+  document.getElementById('asg-search-inp').value = '';
+  document.getElementById('asg-results').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">✍️ اكتب اسم التلميذ للبحث</div>';
+  document.getElementById('asg-create-section').style.display = 'none';
+  document.getElementById('asg-create-name').value = '';
+  document.getElementById('asg-create-btn').disabled = true;
 
-      const seenGids = new Set();
-      // من session docs ذات الصيغة الجديدة
-      for (const [gidVal, namesSet] of Object.entries(gidNamesMap)) {
-        if (namesSet.size > 0 && !seenGids.has(gidVal)) {
-          seenGids.add(gidVal);
-          groups.push({
-            _gid: gidVal,
-            name: 'فوج ' + (groups.length + 1),
-            students: [...namesSet]
-          });
-        }
-      }
-      // من session docs ذات الصيغة القديمة
-      for (const [giStr, namesSet] of Object.entries(giNamesMap)) {
-        if (namesSet.size > 0) {
-          const gid2 = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
-          if (!seenGids.has(gid2)) {
-            seenGids.add(gid2);
-            groups.push({
-              _gid: gid2,
-              name: 'فوج ' + (groups.length + 1),
-              students: [...namesSet]
-            });
-          }
-        }
-      }
-
-      if (groups.length > 0) {
-        console.log('[AddStudent] Recovered', groups.length, 'groups from session docs');
-        // حفظ مؤقت في الكاش المحلي لكي تستفيد منه العمليات الأخرى
-        if (teacher) teacher.groups = groups;
-      }
-    } catch (e) {
-      console.warn('[AddStudent] Session doc recovery failed:', e.message);
-    }
-  }
-
-  // نضمن أن كل فوج لديه _gid (للمسارات التي تحتاجه)
-  groups.forEach(g => { if (g && !g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10); });
-  const validGroups = groups; // ← لا نفلتر بـ _gid، نستخدم كل الأفواج
-  const groupEl = document.getElementById('as-group-name');
-  if (validGroups.length === 1) {
-    _asTargetGi = 0;
-    _asTargetGid = validGroups[0]._gid || '';
-    groupEl.textContent = _displayGroupName(validGroups[0].name);
-  } else if (validGroups.length > 1) {
-    groupEl.textContent = 'اختر الفوج في الخطوة التالية';
-  } else {
-    groupEl.textContent = '— لا يوجد أفواج';
-  }
-
-  // تجهيز قائمة الأفواج في step 2
-  _asPopulateGroupSelect(groups);
-
-  _asShowStep(1);
+  const modal = document.getElementById('add-student-to-group-modal');
+  if (modal) modal.classList.add('open');
+  setTimeout(() => document.getElementById('asg-search-inp')?.focus(), 200);
 };
 
-function _asBuildCandidates(teacherId) {
-  _asCandidates = [];
-  const all = window.allTeachers || [];
-  const tickets = window._allTicketsData || [];
-  const ticketByReceipt = new Map();
-  tickets.forEach(t => { const r = String(t.receipt || '').trim(); if (r) ticketByReceipt.set(r, t); });
-  const ticketByName = new Map();
-  tickets.forEach(t => { const n = String(t.name || '').trim(); if (n) ticketByName.set(n, t); });
-  const seen = new Set();
-  all.forEach(t => {
-    const groups = t.groups || [];
-    (t.students || []).forEach(s => {
-      const n = String(s.name || '').trim();
-      if (!n || seen.has(n)) return;
-      seen.add(n);
-      let isSubscribed = false, pack = '', receipt = s.receipt || '';
-      let ticketData = null;
-      if (receipt && ticketByReceipt.has(receipt)) ticketData = ticketByReceipt.get(receipt);
-      else if (ticketByName.has(n)) ticketData = ticketByName.get(n);
-      if (ticketData) { isSubscribed = !!ticketData.pack; pack = ticketData.pack || ''; receipt = ticketData.receipt || ''; }
-      let groupName = '', groupGid = '';
-      for (let gi = 0; gi < groups.length; gi++) {
-        const g = groups[gi];
-        if (g && g.students && g.students.some(sn => _asNorm(sn) === _asNorm(n))) {
-          groupName = _displayGroupName(g.name);
-          groupGid = g._gid || '';
-          break;
-        }
-      }
-      _asCandidates.push({
-        name: n, id: s.id || '', receipt, pack, isSubscribed,
-        teacherName: t.name || t.id, teacherId: t.id,
-        groupName, groupGid
-      });
-    });
-  });
-  _asCandidates.sort((a,b) => a.name.localeCompare(b.name, 'ar'));
-}
-
-function _asPopulateGroupSelect(groups) {
-  const sel = document.getElementById('as-group-select');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">اختر الفوج...</option>'
-    + groups.map((g,i) => `<option value="${i}">${_displayGroupName(g.name)} (${(g.students||[]).length} طالب)</option>`).join('');
-  sel.value = '';
-  if (groups.length === 1) sel.value = '0';
-}
-
-window._asClose = () => {
-  const modal = document.getElementById('add-student-modal');
+window.closeAddStudentToGroupModal = () => {
+  const modal = document.getElementById('add-student-to-group-modal');
   if (modal) modal.classList.remove('open');
-  _asSelected = {};
-  _asStep = 1;
-  _asState = 'search';
+  _asgGid = '';
+  _asgTeacherId = '';
 };
 
-function _asShowStep(step) {
-  _asStep = step;
-  // Update dots
-  document.querySelectorAll('.as-step-dot').forEach(d => {
-    const s = parseInt(d.dataset.step);
-    d.classList.toggle('active', s === step);
-    d.classList.toggle('done', s < step);
-  });
-  // Show/hide sections
-  document.getElementById('as-step1').style.display = step >= 1 ? 'block' : 'none';
-  document.getElementById('as-step2').style.display = (step === 2 && _asState === 'search') ? 'block' : 'none';
-  document.getElementById('as-step3').style.display = (step === 3 && _asState === 'search') ? 'block' : 'none';
-  document.getElementById('as-manual-view').style.display = (step === 2 && _asState === 'manual') ? 'block' : 'none';
-
-  // Buttons
-  const backBtn = document.getElementById('as-back-btn');
-  const cancelBtn = document.getElementById('as-cancel-btn');
-  const nextBtn = document.getElementById('as-next-btn');
-  const confirmBtn = document.getElementById('as-confirm-btn');
-  const manualConfirmBtn = document.getElementById('as-manual-confirm-btn');
-
-  backBtn.style.display = 'none';
-  nextBtn.style.display = 'none';
-  confirmBtn.style.display = 'none';
-  manualConfirmBtn.style.display = 'none';
-  cancelBtn.style.display = '';
-
-  if (_asState === 'search') {
-    if (step === 1) {
-      nextBtn.textContent = 'التالي: البحث';
-      nextBtn.style.display = '';
-    } else if (step === 2) {
-      backBtn.style.display = '';
-      const n = Object.keys(_asSelected).length;
-      if (n > 0) {
-        nextBtn.textContent = `التالي: مراجعة (${n})`;
-        nextBtn.style.display = '';
-      }
-    } else if (step === 3) {
-      backBtn.style.display = '';
-      confirmBtn.style.display = '';
-      confirmBtn.disabled = true;
-    }
-  } else if (_asState === 'manual') {
-    if (step === 2) {
-      backBtn.style.display = '';
-      cancelBtn.style.display = 'none';
-      manualConfirmBtn.style.display = '';
-    }
-  }
-
-  // Focus
-  setTimeout(() => {
-    if (step === 2 && _asState === 'search') {
-      const inp = document.getElementById('as-search-inp');
-      if (inp) inp.focus();
-    } else if (_asState === 'manual') {
-      const inp = document.getElementById('as-manual-name');
-      if (inp) inp.focus();
-    }
-  }, 100);
-
-  _asUpdateConfirmBtn();
-  _asUpdateManualPreview();
-}
-
-window._asBack = () => {
-  if (_asState === 'manual') {
-    _asState = 'search';
-    _asShowStep(2);
-    const inp = document.getElementById('as-search-inp');
-    if (inp) _asSearch(inp.value);
-  } else if (_asStep === 3) {
-    _asShowStep(2);
-  } else if (_asStep === 2) {
-    _asShowStep(1);
-  }
-};
-
-window._asNext = () => {
-  if (_asStep === 1) {
-    // التحقق من وجود فوج
-    const teacher = (window.allTeachers || []).find(t => t.id === _asTeacherId);
-    const groups = teacher?.groups || [];
-    if (!groups.length) {
-      showToast('⚠️ هذا الأستاذ لا يملك أي أفواج — لا يمكن إضافة تلاميذ', true);
-      return;
-    }
-    _asShowStep(2);
-  } else if (_asStep === 2) {
-    const n = Object.keys(_asSelected).length;
-    if (!n) {
-      showToast('⚠️ لم يتم اختيار أي تلميذ — اختر تلميذًا من القائمة أولاً', true);
-      return;
-    }
-    // التحقق من اختيار الفوج
-    const gi = _asGetTargetGi();
-    if (gi < 0) {
-      showToast('⚠️ لم يتم اختيار الفوج— الرجاء اختيار الفوج الهدف', true);
-      return;
-    }
-    // بناء ملخص
-    _asBuildSummary();
-    _asShowStep(3);
-  }
-};
-
-function _asGetTargetGi() {
-  const teacher = (window.allTeachers || []).find(t => t.id === _asTeacherId);
-  const groups = teacher?.groups || [];
-  // نضمن _gid (لنظام الحضور)
-  groups.forEach(g => { if (g && !g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10); });
-  if (groups.length === 1) return 0;
-  const sel = document.getElementById('as-group-select');
-  const val = sel ? parseInt(sel.value) : -1;
-  if (!isNaN(val) && val >= 0 && val < groups.length) return val;
-  return -1;
-}
-
-window._asSearch = (q) => {
-  if (_asState === 'manual') return;
-  const resultsEl = document.getElementById('as-results');
-  const qNorm = _asNorm(q);
-  if (!qNorm) {
-    const top = _asCandidates.slice(0, 30);
-    resultsEl.innerHTML = top.length
-      ? top.map((c, i) => _asRenderCandidate(i, c)).join('')
-      : '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">📭 لا يوجد تلاميذ في النظام</div>';
-    return;
-  }
-  const matchName = (name) => _asNorm(name).includes(qNorm);
-  const matchParts = (name) => {
-    const p = qNorm.split(/\s+/).filter(Boolean);
-    const np = _asNorm(name);
-    return p.every(part => np.includes(part));
-  };
-  const matched = _asCandidates
-    .map((c,i) => ({c,i}))
-    .filter(({c}) => matchParts(c.name))
-    .slice(0, 50);
-  if (!matched.length) {
-    const fuzzy = _asCandidates
-      .map((c,i) => ({c,i}))
-      .filter(({c}) => matchName(c.name))
-      .slice(0, 50);
-    if (fuzzy.length) {
-      resultsEl.innerHTML = fuzzy.map(({c,i}) => _asRenderCandidate(i, c)).join('');
-    } else {
-      resultsEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">
-        ❌ لم نجد "${q}" في النظام</div>
-        <button onclick="_asOpenManual('${q.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px 14px;margin-top:4px;border-radius:10px;border:2px dashed #8b5cf6;background:rgba(139,92,246,0.06);color:#7c3aed;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;transition:all 0.2s" onmouseover="this.style.background='rgba(139,92,246,0.12)'" onmouseout="this.style.background='rgba(139,92,246,0.06)'">
-        ➕ إنشاء تلميذ جديد يدويًا</button>`;
-    }
-  } else {
-    resultsEl.innerHTML = matched.map(({c,i}) => _asRenderCandidate(i, c)).join('');
-  }
-};
-
-function _asRenderCandidate(idx, c) {
-  const checked = _asSelected[c.name] ? 'checked' : '';
-  const escName = c.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,"&#39;");
-  const escCall = c.name.replace(/'/g,"\\'");
-  const subBadge = c.isSubscribed
-    ? `<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:#d1fae5;color:#059669;font-weight:700">✅ ${c.pack || 'مشترك'}</span>`
-    : `<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:#fee2e2;color:#dc2626;font-weight:700">❌ غير مشترك</span>`;
-  const groupInfo = c.groupName
-    ? `<span style="font-size:10px;color:var(--text-muted)">🏫 ${c.groupName}</span>`
-    : `<span style="font-size:10px;color:var(--text-muted)">📭 خارج الأفواج</span>`;
-  return `<div class="asr-item" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid ${checked ? 'rgba(99,102,241,0.3)' : 'transparent'};background:${checked ? 'rgba(99,102,241,0.06)' : 'transparent'};cursor:pointer;transition:all 0.1s" onclick="_asToggle('${escCall}')">
-    <input type="checkbox" ${checked} style="accent-color:#6366f1;width:16px;height:16px;cursor:pointer;flex-shrink:0" onchange="_asToggle('${escCall}')">
-    <div style="flex:1;min-width:0">
-      <div style="font-size:13px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:6px">${escName} ${subBadge}</div>
-      <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
-        <span style="font-size:10px;color:var(--text-muted)">👤 ${c.teacherName}</span>
-        ${groupInfo}
-      </div>
-    </div>
-  </div>`;
-}
-
-window._asToggle = (name) => {
-  if (_asSelected[name]) {
-    delete _asSelected[name];
-  } else {
-    _asSelected[name] = true;
-  }
-  _asUpdateSelectedBar();
-  const inp = document.getElementById('as-search-inp');
-  _asSearch(inp ? inp.value : '');
-};
-
-function _asUpdateSelectedBar() {
-  const bar = document.getElementById('as-selected-bar');
-  const cnt = document.getElementById('as-selected-count');
-  const n = Object.keys(_asSelected).length;
-  bar.style.display = n > 0 ? 'block' : 'none';
-  if (cnt) cnt.textContent = n;
-  _asUpdateConfirmBtn();
-}
-
-window._asUpdateConfirmBtn = () => {
-  const n = Object.keys(_asSelected).length;
-  const gi = _asGetTargetGi();
-  const confirmBtn = document.getElementById('as-confirm-btn');
-  if (confirmBtn) confirmBtn.disabled = !n || gi < 0;
-  const nextBtn = document.getElementById('as-next-btn');
-  if (nextBtn && _asStep === 2) {
-    if (n > 0) {
-      nextBtn.textContent = `التالي: مراجعة (${n})`;
-      nextBtn.style.display = '';
-    } else {
-      nextBtn.style.display = 'none';
-    }
-  }
-  // إظهار/إخفاء picker الفوج
-  const teacher = (window.allTeachers || []).find(t => t.id === _asTeacherId);
-  const groups = teacher?.groups || [];
-  groups.forEach(g => { if (g && !g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10); });
-  const picker = document.getElementById('as-group-picker');
-  if (picker) {
-    if (groups.length > 1 && n > 0) {
-      picker.style.display = 'block';
-    } else {
-      picker.style.display = 'none';
-    }
-  }
-}
-
-function _asBuildSummary() {
-  const box = document.getElementById('as-summary-box');
-  const names = Object.keys(_asSelected);
-  const teacher = (window.allTeachers || []).find(t => t.id === _asTeacherId);
-  const groups = teacher?.groups || [];
-  const gi = _asGetTargetGi();
-  const group = groups[gi];
-  const groupName = group ? _displayGroupName(group.name) : '—';
-  const teacherName = teacher?.name || _asTeacherId;
-
-  let html = `<div style="font-size:13px;font-weight:900;color:var(--text);margin-bottom:10px">📋 تأكيد الإضافة</div>`;
-  html += `<div style="font-size:12px;line-height:1.8">`;
-  // قائمة التلاميذ
-  if (names.length === 1) {
-    html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:16px">👤</span> <strong>${names[0]}</strong></div>`;
-  } else {
-    html += `<div style="margin-bottom:6px;font-weight:700">👤 التلاميذ (${names.length}):</div>`;
-    html += `<ul style="margin:0 0 8px 0;padding-right:20px">`;
-    names.forEach(n => { html += `<li style="margin-bottom:2px">${n}</li>`; });
-    html += `</ul>`;
-  }
-  html += `<div style="display:flex;align-items:center;gap:6px;margin-top:6px"><span style="font-size:14px">👨‍🏫</span> ${teacherName}</div>`;
-  html += `<div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span style="font-size:14px">🏫</span> ${groupName}</div>`;
-  // فحص المكررين
-  const _normG = (n) => _asNorm(n);
-  const existingNames = new Set((group?.students || []).map(s => {
-    if (typeof s === 'object' && s.name) return _normG(s.name);
-    return _normG(s);
-  }));
-  const alreadyIn = names.filter(n => existingNames.has(_normG(n)));
-  if (alreadyIn.length) {
-    html += `<div style="margin-top:8px;padding:6px 10px;border-radius:6px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.2);font-size:11px;color:#d97706">
-      ⚠️ ${alreadyIn.map(n => `"${n}"`).join('، ')} موجود مسبقاً في هذا الفوج ولن تتم إضافتهم مرة أخرى</div>`;
-  }
-  html += `</div>`;
-  box.innerHTML = html;
-}
-
-// ─── Manual create ───
-window._asOpenManual = (q) => {
-  _asState = 'manual';
-  document.getElementById('as-manual-name').value = q;
-  const teacher = (window.allTeachers || []).find(t => t.id === _asTeacherId);
-  const groups = teacher?.groups || [];
-  groups.forEach(g => { if (g && !g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10); });
-  const wrap = document.getElementById('as-manual-group-wrap');
-  const sel = document.getElementById('as-manual-group-select');
-  if (sel) {
-    sel.innerHTML = groups.map((g,i) =>
-      `<option value="${i}">${_displayGroupName(g.name)} (${(g.students||[]).length} طالب)</option>`
-    ).join('');
-    sel.value = '';
-    if (groups.length === 1) sel.value = '0';
-  }
-  wrap.style.display = groups.length > 1 ? 'block' : 'none';
-  _asShowStep(2);
-  _asUpdateManualPreview();
-};
-
-function _asUpdateManualPreview() {
-  const preview = document.getElementById('as-manual-preview');
-  const nameInp = document.getElementById('as-manual-name');
-  const name = nameInp ? nameInp.value.trim() : '';
-  if (!name) { preview.style.display = 'none'; return; }
-  const teacher = (window.allTeachers || []).find(t => t.id === _asTeacherId);
-  const groups = teacher?.groups || [];
-  groups.forEach(g => { if (g && !g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10); });
-  let gi = -1;
-  if (groups.length === 1) {
-    gi = 0;
-  } else {
-    const sel = document.getElementById('as-manual-group-select');
-    gi = sel ? parseInt(sel.value) : -1;
-  }
-  if (isNaN(gi) || gi < 0 || !groups[gi]) {
-    preview.style.display = 'none';
-    return;
-  }
-  const groupName = _displayGroupName(groups[gi].name);
-  const teacherName = teacher?.name || _asTeacherId;
-  preview.innerHTML = `👤 <strong>${name}</strong> ← 👨‍🏫 ${teacherName} ← 🏫 ${groupName}`;
-  preview.style.display = 'block';
-  // Enable/disable confirm
-  const btn = document.getElementById('as-manual-confirm-btn');
-  if (btn) btn.disabled = false;
-}
-
-// Bind input change to update preview
-document.addEventListener('input', (e) => {
-  if (e.target && e.target.id === 'as-manual-name') _asUpdateManualPreview();
-  if (e.target && e.target.id === 'as-manual-group-select') _asUpdateManualPreview();
-});
-
-window._asManualConfirm = async () => {
-  const nameInp = document.getElementById('as-manual-name');
-  const name = nameInp ? nameInp.value.trim() : '';
-  if (!name) { showToast('⚠️ الرجاء إدخال اسم التلميذ', true); return; }
-
-  const teacher = (window.allTeachers || []).find(t => t.id === _asTeacherId);
-  if (!teacher) { showToast('👨‍🏫 لم يتم العثور على الأستاذ — يرجى إعادة فتح النافذة', true); return; }
-  const groups = teacher.groups || [];
-  groups.forEach(g => { if (g && !g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10); });
-  let targetGi = -1;
-  if (groups.length === 1) {
-    targetGi = 0;
-  } else {
-    targetGi = parseInt(document.getElementById('as-manual-group-select')?.value || '');
-  }
-  if (isNaN(targetGi) || targetGi < 0 || !groups[targetGi]) {
-    showToast('⚠️ لم يتم اختيار الفوج — الرجاء اختيار الفوج الهدف', true);
-    return;
-  }
-
-  // التحقق من عدم التكرار
-  const nKey = _asNorm(name);
-  if ((teacher.students || []).some(s => _asNorm(s.name||'') === nKey)) {
-    showToast(`⚠️ التلميذ "${name}" موجود مسبقاً في قائمة تلاميذ هذا الأستاذ — استخدم البحث بدلاً من الإنشاء اليدوي`, true);
-    return;
-  }
-  const group = groups[targetGi];
-  const _normCheck = (s) => _asNorm(typeof s === 'object' ? (s.name || '') : s);
-  if ((group.students || []).some(s => _normCheck(s) === nKey)) {
-    showToast(`⚠️ التلميذ "${name}" موجود مسبقاً داخل الفوج "${_displayGroupName(group.name)}"`, true);
-    return;
-  }
-
-  // حساب joinedAtSession
-  let curSessionNum = 1;
-  try {
-    const startDate = teacher?.startDate ? new Date(teacher.startDate) : new Date('2026-06-01');
-    const diffDays = Math.floor((new Date() - startDate) / (1000 * 60 * 60 * 24));
-    curSessionNum = Math.min(12, Math.max(1, Math.floor(diffDays / 7) + 1));
-  } catch(e) { curSessionNum = 1; }
-
-  const btn = document.getElementById('as-manual-confirm-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
-  try {
-    const teacherRef = doc(db, 'teachers', _asTeacherId);
-    const snap = await getDoc(teacherRef);
-    if (!snap.exists()) { showToast('👨‍🏫 لم يتم العثور على بيانات الأستاذ في قاعدة البيانات', true); return; }
-    const data = snap.data();
-    const dGroups = data.groups || [];
-    if (!dGroups[targetGi]) { showToast('🏫 الفوج الهدف غير صالح أو محذوف', true); return; }
-    if (!dGroups[targetGi]._gid) dGroups[targetGi]._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10);
-    if (!dGroups[targetGi].students) dGroups[targetGi].students = [];
-    const dStudents = data.students || [];
-
-    const newId = 'manual_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
-    const newStudent = {
-      id: newId, name, present: false, marked: false,
-      payStatus: 'unknown', receipt: null, joinedAtSession: curSessionNum
-    };
-    dStudents.push(newStudent);
-    dGroups[targetGi].students.push(name);
-
-    await setDoc(teacherRef, { students: dStudents, groups: dGroups }, { merge: true });
-    const t2 = (window.allTeachers || []).find(t => t.id === _asTeacherId);
-    if (t2) { t2.groups = dGroups; t2.students = dStudents; }
-    if (window._attSummaryCache) window._attSummaryCache[_asTeacherId] = null;
-    showToast(`✅ تمت إضافة "${name}" إلى "${_displayGroupName(group.name)}" عند الأستاذ "${teacher.name || _asTeacherId}"`);
-    _asClose();
-    await loadAttendanceSummary();
-  } catch(e) {
-    console.error('_asManualConfirm error:', e);
-    showToast('❌ حدث خطأ أثناء حفظ البيانات: ' + e.message, true);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '➕ إنشاء وإضافة'; }
-  }
-};
-
-window._asConfirm = async () => {
-  const names = Object.keys(_asSelected);
-  if (!names.length) { showToast('⚠️ لم يتم اختيار أي تلميذ', true); return; }
-
-  const teacher = (window.allTeachers || []).find(t => t.id === _asTeacherId);
-  if (!teacher) { showToast('👨‍🏫 لم يتم العثور على الأستاذ — يرجى إعادة فتح النافذة', true); return; }
-  const groups = teacher.groups || [];
-  groups.forEach(g => { if (g && !g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10); });
-  const targetGi = _asGetTargetGi();
-  if (targetGi < 0 || !groups[targetGi]) {
-    showToast('⚠️ لم يتم اختيار الفوج — الرجاء اختيار الفوج الهدف', true);
-    return;
-  }
-  const group = groups[targetGi];
-
-  const _normG = _asNorm;
-  const toAdd = [];
-  const existingNames = new Set((group.students || []).map(s => _normG(typeof s === 'object' ? (s.name || '') : s)));
-  names.forEach(n => {
-    if (!existingNames.has(_normG(n))) toAdd.push(n);
-  });
-  if (!toAdd.length) {
-    showToast(`⚠️ جميع التلاميذ المختارين موجودون مسبقاً في "${_displayGroupName(group.name)}"`, true);
-    return;
-  }
-
-  const btn = document.getElementById('as-confirm-btn');
-  if (btn) { btn.disabled = true; btn.textContent = `⏳ جاري حفظ ${toAdd.length}...`; }
-  try {
-    const teacherRef = doc(db, 'teachers', _asTeacherId);
-    const snap = await getDoc(teacherRef);
-    if (!snap.exists()) { showToast('👨‍🏫 لم يتم العثور على بيانات الأستاذ في قاعدة البيانات', true); return; }
-    const data = snap.data();
-    const dGroups = data.groups || [];
-    if (!dGroups[targetGi]) { showToast('🏫 الفوج الهدف غير صالح أو محذوف', true); return; }
-    if (!dGroups[targetGi]._gid) dGroups[targetGi]._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10);
-    if (!dGroups[targetGi].students) dGroups[targetGi].students = [];
-    const dStudents = data.students || [];
-    const dGroupStudents = dGroups[targetGi].students;
-
-    let added = 0;
-    toAdd.forEach(n => {
-      if (dGroupStudents.some(s => _normG(typeof s === 'object' ? (s.name || '') : s) === _normG(n))) return;
-      dGroupStudents.push(n);
-      if (!dStudents.some(s => _normG(s.name || '') === _normG(n))) {
-        const cand = _asCandidates.find(c => _normG(c.name) === _normG(n));
-        const sid = cand?.id || 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
-        const receipt = cand?.receipt || null;
-        const payStatus = cand?.isSubscribed ? 'paid' : 'unknown';
-        dStudents.push({ id: sid, name: n, present: false, marked: false, receipt, payStatus });
-      }
-      added++;
-    });
-    await setDoc(teacherRef, { students: dStudents, groups: dGroups }, { merge: true });
-    const t2 = (window.allTeachers || []).find(t => t.id === _asTeacherId);
-    if (t2) { t2.groups = dGroups; t2.students = dStudents; }
-    if (window._attSummaryCache) window._attSummaryCache[_asTeacherId] = null;
-    const groupName = _displayGroupName(group.name);
-    const teacherName = teacher.name || _asTeacherId;
-    if (added === 1) {
-      showToast(`✅ تمت إضافة "${toAdd[0]}" إلى "${groupName}" عند الأستاذ "${teacherName}"`);
-    } else {
-      showToast(`✅ تمت إضافة ${added} تلاميذ إلى "${groupName}" عند الأستاذ "${teacherName}"`);
-    }
-    _asSelected = {};
-    _asClose();
-    await loadAttendanceSummary();
-  } catch(e) {
-    console.error('_asConfirm error:', e);
-    showToast('❌ حدث خطأ أثناء حفظ البيانات: ' + e.message, true);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '✅ إضافة'; }
-  }
-};
 
 // ─── نافذة اختيار الفوج والفلتر للـ CSV ───
 function _showGroupPicker(teacher, groups, callback) {
