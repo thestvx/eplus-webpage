@@ -9428,6 +9428,116 @@ window.closeAddStudentToGroupModal = () => {
   _asgTeacherId = '';
 };
 
+function _asgNorm2(s) { return String(s||'').trim().toLowerCase().replace(/[إأآا]/g,'ا').replace(/[يى]/g,'ي').replace(/[ؤ]/g,'و').replace(/[ئ]/g,'ي').replace(/[ة]/g,'ه').replace(/\s+/g,' ').trim(); }
+
+window.searchAddStudentToGroup = (q) => {
+  const teacherId = _asgTeacherId;
+  if (!teacherId) return;
+  const teacher = (window.allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) return;
+  const students = teacher.students || [];
+  const groups = teacher.groups || [];
+  const group = groups.find(g => g && g._gid === _asgGid);
+  const existingNames = new Set((group?.students || []).map(s => _asgNorm2(typeof s === 'object' ? (s.name||'') : s)));
+  const available = students.filter(s => !existingNames.has(_asgNorm2(s.name||'')));
+  const qNorm = _asgNorm2(q);
+  const resultsEl = document.getElementById('asg-results');
+  const createSection = document.getElementById('asg-create-section');
+  createSection.style.display = 'none';
+  if (!qNorm) {
+    resultsEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">✍️ اكتب اسم التلميذ للبحث</div>';
+    return;
+  }
+  const matched = available.filter(s => _asgNorm2(s.name||'').includes(qNorm)).slice(0, 50);
+  if (matched.length) {
+    resultsEl.innerHTML = matched.map(s => {
+      const n = (s.name||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,"&#39;");
+      return '<div class="asg-result-item" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:all 0.1s" onclick="confirmAddExistingStudentToGroup(\''+n+'\')" onmouseover="this.style.background=\'var(--hover-bg)\'" onmouseout="this.style.background=\'transparent\'">'
+        + '<span style="font-size:13px;font-weight:800;color:var(--text);flex:1">'+n+'</span>'
+        + '<span style="font-size:11px;color:var(--text-muted)">➕ إضافة</span></div>';
+    }).join('');
+  } else {
+    resultsEl.innerHTML = '<div style="text-align:center;padding:14px;color:var(--text-muted);font-size:12px">🔍 لم نجد "'+q+'" — يمكنك إضافته يدوياً</div>';
+    createSection.style.display = 'block';
+    document.getElementById('asg-create-name').value = q;
+    updateCreateBtn();
+  }
+};
+
+window.updateCreateBtn = () => {
+  const inp = document.getElementById('asg-create-name');
+  const btn = document.getElementById('asg-create-btn');
+  if (inp && btn) btn.disabled = !inp.value.trim();
+};
+
+window.confirmAddExistingStudentToGroup = async (name) => {
+  if (!name || !_asgTeacherId || !_asgGid) { showToast('⚠️ بيانات غير كاملة', true); return; }
+  const teacherRef = doc(db, 'teachers', _asgTeacherId);
+  try {
+    const snap = await getDoc(teacherRef);
+    if (!snap.exists()) { showToast('👨‍🏫 لم يتم العثور على الأستاذ', true); return; }
+    const data = snap.data();
+    const dGroups = data.groups || [];
+    const dStudents = data.students || [];
+    const group = dGroups.find(g => g && g._gid === _asgGid);
+    if (!group) { showToast('🏫 لم يتم العثور على الفوج', true); return; }
+    if (!group.students) group.students = [];
+    if (group.students.some(s => _asgNorm2(typeof s === 'object' ? (s.name||'') : s) === _asgNorm2(name))) {
+      showToast('⚠️ "'+name+'" موجود مسبقاً في هذا الفوج', true); return;
+    }
+    group.students.push(name);
+    await setDoc(teacherRef, { groups: dGroups, students: dStudents }, { merge: true });
+    const t2 = (window.allTeachers || []).find(t => t.id === _asgTeacherId);
+    if (t2) { t2.groups = dGroups; t2.students = dStudents; }
+    if (window._attSummaryCache) window._attSummaryCache[_asgTeacherId] = null;
+    showToast('✅ تمت إضافة "'+name+'" إلى الفوج');
+    closeAddStudentToGroupModal();
+    await loadAttendanceSummary();
+  } catch(e) {
+    console.error('confirmAddExistingStudentToGroup error:', e);
+    showToast('❌ ' + e.message, true);
+  }
+};
+
+window.confirmCreateStudentToGroup = async () => {
+  const inp = document.getElementById('asg-create-name');
+  const name = inp ? inp.value.trim() : '';
+  if (!name) { showToast('⚠️ الرجاء كتابة اسم التلميذ', true); return; }
+  if (!_asgTeacherId || !_asgGid) { showToast('⚠️ بيانات غير كاملة', true); return; }
+  const teacherRef = doc(db, 'teachers', _asgTeacherId);
+  try {
+    const snap = await getDoc(teacherRef);
+    if (!snap.exists()) { showToast('👨‍🏫 لم يتم العثور على الأستاذ', true); return; }
+    const data = snap.data();
+    const dGroups = data.groups || [];
+    const dStudents = data.students || [];
+    const group = dGroups.find(g => g && g._gid === _asgGid);
+    if (!group) { showToast('🏫 لم يتم العثور على الفوج', true); return; }
+    if (!group.students) group.students = [];
+    if (group.students.some(s => _asgNorm2(typeof s === 'object' ? (s.name||'') : s) === _asgNorm2(name))) {
+      showToast('⚠️ "'+name+'" موجود مسبقاً في هذا الفوج', true); return;
+    }
+    if (dStudents.some(s => _asgNorm2(s.name||'') === _asgNorm2(name))) {
+      showToast('⚠️ "'+name+'" موجود مسبقاً عند هذا الأستاذ', true); return;
+    }
+    const newStudent = {
+      id: 'manual_'+Date.now()+'_'+Math.random().toString(36).slice(2,8),
+      name, present: false, marked: false, payStatus: 'unknown', receipt: null
+    };
+    dStudents.push(newStudent);
+    group.students.push(name);
+    await setDoc(teacherRef, { groups: dGroups, students: dStudents }, { merge: true });
+    const t2 = (window.allTeachers || []).find(t => t.id === _asgTeacherId);
+    if (t2) { t2.groups = dGroups; t2.students = dStudents; }
+    if (window._attSummaryCache) window._attSummaryCache[_asgTeacherId] = null;
+    showToast('✅ تمت إضافة "'+name+'" يدوياً إلى الفوج');
+    closeAddStudentToGroupModal();
+    await loadAttendanceSummary();
+  } catch(e) {
+    console.error('confirmCreateStudentToGroup error:', e);
+    showToast('❌ ' + e.message, true);
+  }
+};
 
 // ─── نافذة اختيار الفوج والفلتر للـ CSV ───
 function _showGroupPicker(teacher, groups, callback) {
