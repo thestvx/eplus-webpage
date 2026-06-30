@@ -2328,6 +2328,7 @@
                 <input class="inp" type="text" id="so-search" placeholder="ابحث باسم التلميذ..." style="padding-right:40px;padding-top:10px;padding-bottom:10px;font-size:13px" oninput="debouncedSearch()">
               </div>
               <span style="font-size:12px;font-weight:700;color:var(--text-muted);white-space:nowrap" id="so-filter-count"></span>
+              <button class="btn btn-sm" style="font-size:11px;padding:6px 10px;border-radius:8px" onclick="exportStudentOverviewCSV()" title="📥 تحميل القائمة الحالية (CSV)">📥</button>
               <button class="btn btn-sm" style="font-size:11px;padding:6px 10px;border-radius:8px" onclick="refreshSheetData()" title="تحديث بيانات الشيت">🔃</button>
               <span style="font-size:10px;color:var(--text-muted)" id="so-sheet-ts"></span>
             </div>
@@ -6608,6 +6609,7 @@ window.renderStudentOverview = async () => {
 
   // تحديث الرسوم البيانية
   _updateStudentCharts(_soData);
+  _updateFilterCounts();
 };
 
 // ─── تحديث بيانات الشيت ───
@@ -6756,6 +6758,7 @@ function _renderSoTable(data, searchFilter) {
   if (!filtered.length) {
     tbody.innerHTML = `<tr><td colspan="${colspan}" class="so-empty"><div class="so-empty-icon">🔍</div><div style="font-weight:700;font-size:15px;color:var(--text-muted)">لا توجد نتائج</div><div style="font-size:12px;color:var(--text-muted);margin-top:4px">حاول تغيير كلمة البحث</div></td></tr>`;
     if (pageNavEl) pageNavEl.innerHTML = '';
+    window._soLastFiltered = filtered;
     return;
   }
 
@@ -6780,7 +6783,105 @@ function _renderSoTable(data, searchFilter) {
   }).join('');
 
   if (pageNavEl) pageNavEl.innerHTML = '';
+  window._soLastFiltered = filtered;
 }
+
+// ─── تحديث أعداد الفلاتر ديناميكيًا ───
+function _updateFilterCounts() {
+  const data = window._soData;
+  if (!data) return;
+  const sel = document.getElementById('so-filter-status');
+  if (!sel) return;
+  const teacherFilter = document.getElementById('so-filter-teacher')?.value || '';
+  const packFilter = document.getElementById('so-filter-pack')?.value || '';
+  const searchVal = document.getElementById('so-search')?.value || '';
+  let base = data;
+  if (teacherFilter) base = base.filter(r => r.teacherName === teacherFilter);
+  if (packFilter) base = base.filter(r => r.pkgSimple === packFilter);
+  if (searchVal && searchVal.trim().length >= 1) {
+    const q = _normalizeNameStrict(searchVal);
+    base = base.filter(r =>
+      _normalizeNameStrict(r.studentName).includes(q) ||
+      _normalizeNameStrict(r.teacherName).includes(q) ||
+      _normalizeNameStrict(r.pkg).includes(q) ||
+      _normalizeNameStrict(r.groupName).includes(q)
+    );
+  }
+
+  const counts = {
+    '': base.length,
+    'paid': base.filter(r => r.status === 'paid').length,
+    'unpaid': base.filter(r => r.status === 'unpaid' || r.status === 'noticket').length,
+    'ingroup': base.filter(r => r.groupName && r.groupName !== '—').length,
+    'notingroup': base.filter(r => !r.groupName || r.groupName === '—').length,
+    'insheet': base.filter(r => r.inSheet).length,
+    'notinsheet': base.filter(r => !r.inSheet).length,
+  };
+  const labels = {
+    '': '👥 الجميع',
+    'paid': '✅ المشتركون',
+    'unpaid': '❌ غير المشتركين',
+    'ingroup': '🏫 في الأفواج',
+    'notingroup': '🚫 خارج الأفواج',
+    'insheet': '📋 مسجلون في الموقع',
+    'notinsheet': '📭 غير مسجلين في الموقع',
+  };
+  const currentVal = sel.value;
+  for (let i = 0; i < sel.options.length; i++) {
+    const opt = sel.options[i];
+    const lbl = labels[opt.value];
+    if (lbl) opt.textContent = `${lbl} (${counts[opt.value]})`;
+  }
+  sel.value = currentVal;
+}
+
+// ─── تصدير القائمة الحالية CSV ───
+window.exportStudentOverviewCSV = () => {
+  const data = window._soLastFiltered;
+  if (!data || !data.length) {
+    showToast('⚠️ لا توجد بيانات للتصدير', true);
+    return;
+  }
+  // معرفة اسم الفلتر النشط
+  const statusSel = document.getElementById('so-filter-status');
+  const statusText = statusSel ? statusSel.options[statusSel.selectedIndex]?.textContent || 'الكل' : 'الكل';
+  const teacherSel = document.getElementById('so-filter-teacher');
+  const teacherText = teacherSel && teacherSel.value ? (teacherSel.options[teacherSel.selectedIndex]?.textContent || '') : '';
+  const searchVal = document.getElementById('so-search')?.value || '';
+
+  const headers = ['الاسم الكامل', 'الأستاذ', 'الفوج', 'حالة الاشتراك', 'الباقة', 'المبلغ (دج)', 'مسجل في الموقع'];
+  const rows = data.map(r => [
+    r.studentName,
+    r.teacherName,
+    r.groupName || '—',
+    r.status === 'paid' ? 'مشترك' : (r.status === 'unpaid' ? 'غير مدفوع' : 'لا توجد تذكرة'),
+    r.pkg || '—',
+    r.sheetTotal ? String(r.sheetTotal).replace(/[^\d.]/g,'') : '0',
+    r.inSheet ? 'نعم' : 'لا',
+  ]);
+
+  let csvContent = headers.join(',') + '\n';
+  rows.forEach(row => {
+    csvContent += row.map(cell => {
+      const s = String(cell).replace(/"/g, '""');
+      return s.includes(',') || s.includes('"') ? `"${s}"` : s;
+    }).join(',') + '\n';
+  });
+
+  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const now = new Date().toISOString().slice(0, 10);
+  const suffix = statusText.replace(/[^\w\s]/g, '').trim().slice(0, 20);
+  const teacherPart = teacherText ? '_' + teacherText.replace(/[^\w\s]/g, '').trim().slice(0, 15) : '';
+  a.download = `التلاميذ_${suffix}${teacherPart}_${now}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast(`✅ تم تحميل ${data.length} تلميذ`);
+};
 
 // ─── تطبيع صارم للاسم: trim + collapse spaces + lowercase ───
 function _normalizeNameStrict(name) {
@@ -6989,6 +7090,7 @@ window.debouncedSearch = () => {
 window.filterStudentOverview = () => {
   const searchVal = document.getElementById('so-search')?.value || '';
   _renderSoTable(_soData || [], searchVal);
+  _updateFilterCounts();
 };
 
 // ─── مزامنة أسماء التلاميذ في الأساتذة مع أسمائهم في المخيم الصيفي ───
