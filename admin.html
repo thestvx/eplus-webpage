@@ -7063,11 +7063,17 @@ function populateSessionSelect(curSession) {
   if (cur) cur.innerHTML = `<span class="att-current-badge">▶ ${t('att_current_session')} ${curSession}</span>`;
 }
 
-// ─── تنظيف اسم الفوج من القيم الخاطئة (#NAME? ...) ───
+// ─── تنظيف اسم الفوج — إزالة أخطاء الصيغ فقط — ───
+// ملاحظة: "—" اسم فوج حقيقي (مجموعات قديمة)، لا نحذفه
 const _cleanGroupName = (name) => {
   const s = String(name || '').trim();
-  if (!s || s === '#NAME?' || s === '#REF!' || s === '#VALUE!' || s === '#N/A' || s === '—') return '';
+  if (!s || s === '#NAME?' || s === '#REF!' || s === '#VALUE!' || s === '#N/A') return '';
   return s;
+};
+// ─── عرض اسم الفوج للمستخدم ───
+const _displayGroupName = (name) => {
+  const cleaned = _cleanGroupName(name);
+  return cleaned || 'فوج بدون اسم';
 };
 
 // ─── الترحيل: ضمان وجود _gid لكل فوج عند تحميل الصفحة ───
@@ -7385,7 +7391,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     const gid = g._gid || '';
     (g.students || []).forEach(sName => {
       let match = students.find(s => namesMatchLocal(s.name, sName));
-      const cleanG = _cleanGroupName(g.name) || 'فوج ' + (gi + 1);
+      const cleanG = _displayGroupName(g.name);
       if (match) {
         matchedNames.add(normName(match.name || ''));
         const cacheGi = studentGiFromCache.get(_normGi(match.name || ''));
