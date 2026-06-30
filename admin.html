@@ -8061,7 +8061,20 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       for (let idx = 0; idx < sessionRange.length; idx++) {
         const i = sessionRange[idx];
         if (s.joinedAtSession && i < s.joinedAtSession) {
-          cells.push(`<td class="att-cell" title="غير مسجل (قبل انضمام التلميذ)" style="background:transparent;color:var(--text-muted);font-size:11px;text-align:center">—</td>`);
+          const ctrl = ctrlMap[i];
+          const ctrlStatus = ctrl && ctrl.status;
+          const isLocked = window._isTeacherAttendanceView && (ctrlStatus === 'locked' || ctrlStatus === 'closed');
+          const sNameVal = s.name;
+          const sIdAttr = sId.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+          const gidVal = s.gid || s.groupGid || '';
+          const snAttr = sNameVal.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+          const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}','${gidVal}',${i},this.dataset.studentId,this.dataset.sn)" data-gid="${gidVal}" data-student-id="${sIdAttr}" data-sn="${snAttr}"`;
+          const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
+          if (isLocked) {
+            cells.push(`<td class="${cellClass}" style="text-align:center" title="غير مسجل (مقفلة)">🔒</td>`);
+          } else {
+            cells.push(`<td class="${cellClass}" style="text-align:center;background:transparent;color:var(--text-muted);font-size:11px" title="غير مسجل — اضغط للتسجيل" ${cellClick}>—</td>`);
+          }
           continue;
         }
         // Try student-centric cache first (finds attendance by student ID regardless of group key)
