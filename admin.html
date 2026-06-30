@@ -5555,16 +5555,21 @@ let _sheetStudentsLoading = false;
 
 function _mapSheetRow(r) {
   // First: full-name column (الاسم الكامل)
-  let fullName = String(r['الاسم الكامل'] || r['Full Name'] || r['full_name'] || r['fullName'] || '').trim();
+  let fullName = String(r['الاسم الكامل'] || r['Full Name'] || r['full_name'] || r['fullName'] || r['الاسم واللقب'] || r['Name Surname'] || r['name_surname'] || '').trim();
   // Second: combine separate first + last name columns
   if (!fullName) {
-    const first = String(r['الاسم'] || r['first_name'] || r['firstName'] || r['First Name'] || r['الاسم الأول'] || r['الاسم الاول'] || r['اسم الطالب'] || r['Student Name'] || r['اسم التلميذ'] || r['Prénom'] || r['prenom'] || r['firstname'] || r['name'] || r['Name'] || '').trim();
-    const last  = String(r['اللقب'] || r['last_name'] || r['lastName'] || r['Last Name'] || r['اسم العائلة'] || r['Family Name'] || r['family_name'] || r['familyName'] || r['Nom'] || r['nom'] || r['lastname'] || '').trim();
+    const first = String(r['الاسم'] || r['first_name'] || r['firstName'] || r['First Name'] || r['الاسم الأول'] || r['الاسم الاول'] || r['اسم الطالب'] || r['Student Name'] || r['اسم التلميذ'] || r['Prénom'] || r['prenom'] || r['PRENOM'] || r['Prenom'] || r['firstname'] || r['FIRSTNAME'] || r['GIVEN NAME'] || r['given_name'] || r['givenName'] || r['name'] || r['Name'] || '').trim();
+    const last  = String(r['اللقب'] || r['last_name'] || r['lastName'] || r['Last Name'] || r['اسم العائلة'] || r['Family Name'] || r['family_name'] || r['familyName'] || r['SURNAME'] || r['Surname'] || r['Nom'] || r['nom'] || r['NOM'] || r['lastname'] || r['LASTNAME'] || '').trim();
     fullName = [first, last].filter(Boolean).join(' ');
   }
   // Third: fallback to any single name column
   if (!fullName) {
-    fullName = String(r['اسم الطالب'] || r['Student Name'] || r['اسم التلميذ'] || r['name'] || r['Name'] || '').trim();
+    fullName = String(r['اسم الطالب'] || r['Student Name'] || r['اسم التلميذ'] || r['name'] || r['Name'] || r['NAME'] || r['Full Name'] || r['full_name'] || r['fullName'] || '').trim();
+  }
+  // Fourth: try ALL column names as last resort
+  if (!fullName) {
+    const vals = Object.values(r).filter(v => typeof v === 'string' && v.trim().length > 0);
+    if (vals.length) fullName = vals.sort((a,b) => b.length - a.length)[0].trim();
   }
   if (!fullName) return null;
   return {
@@ -5592,10 +5597,15 @@ async function loadSheetStudentsCache() {
       fetchSheetData(SHEET_ID_1, SHEET_NAME_1),  // SummerPlus
       fetchSheetData(SHEET_ID_2, SHEET_NAME_2),  // programsummerschool
     ]);
+    console.log('📊 SummerPlus raw:', rows1?.length, 'برنامج raw:', rows2?.length);
     // SummerPlus
     const sheet1 = (rows1 || []).map(_mapSheetRow).filter(Boolean);
+    const failed1 = (rows1 || []).length - sheet1.length;
+    if (failed1 > 0) console.warn('⚠️ SummerPlus: فشل في تحويل', failed1, 'صفاً');
     // programsummerschool (مع إزالة التكرار: نفس الاسم الطبيعي = سجل واحد)
     const raw2 = (rows2 || []).map(_mapSheetRow).filter(Boolean);
+    const failed2 = (rows2 || []).length - raw2.length;
+    if (failed2 > 0) console.warn('⚠️ programsummerschool: فشل في تحويل', failed2, 'صفاً');
     const seen2 = new Set();
     const sheet2 = [];
     raw2.forEach(r => {
@@ -6366,6 +6376,7 @@ window.renderStudentOverview = async () => {
 
     _soData.push({
       studentName: displayName,
+      _originalName: ticket.name,
       teacherName: match ? match.teacherName : '—',
       groupName: match ? match.groupName : '—',
       status: isPaid ? 'paid' : 'unpaid',
@@ -6398,6 +6409,7 @@ window.renderStudentOverview = async () => {
       let match = teacherMap[_normalizeNameStrict(sheet.name || '')];
       _soData.push({
         studentName: sheet.name || normKey,
+        _originalName: sheet.name || normKey,
         teacherName: match ? match.teacherName : '—',
         groupName: match ? match.groupName : '—',
         status: 'noticket',
@@ -6430,6 +6442,7 @@ window.renderStudentOverview = async () => {
     const displayName3 = sheetMatch3 ? sheetMatch3.name : (match.studentName || key);
     _soData.push({
       studentName: displayName3,
+      _originalName: match.studentName || key,
       teacherName: match.teacherName,
       groupName: match.groupName,
       status: 'noteacher',
@@ -6486,12 +6499,25 @@ window.renderStudentOverview = async () => {
 
   _renderSoTable(_soData, document.getElementById('so-search')?.value || '');
 
-  // بناء خريطة دائمة: normalizedName → _raw sheet data
+  // بناء خرائط دائمة للبحث السريع
   window._studentSheetMap = new Map();
+  window._nameResolveMap = new Map();
   _soData.forEach(r => {
-    if (r._sheetRaw) {
-      const key = _normalizeNameStrict(r.studentName);
-      if (!window._studentSheetMap.has(key)) window._studentSheetMap.set(key, r._sheetRaw);
+    if (!r._sheetRaw) return;
+    // خريطة الاسم الكامل (displayName → sheetRaw)
+    const resolvedKey = _normalizeNameStrict(r.studentName);
+    if (!window._studentSheetMap.has(resolvedKey)) window._studentSheetMap.set(resolvedKey, r._sheetRaw);
+    // خريطة الاسم الأصلي (originalName → { resolvedName, _raw })
+    // تسمح بالبحث عن التلميذ بأي اسم كان مسجلاً به في التذاكر أو قوائم الأساتذة
+    if (r._originalName) {
+      const origKey = _normalizeNameStrict(r._originalName);
+      if (!window._nameResolveMap.has(origKey)) {
+        window._nameResolveMap.set(origKey, { resolvedName: r.studentName, _raw: r._sheetRaw });
+      }
+    }
+    // أيضاً خريطة الاسم الكامل فيه
+    if (!window._nameResolveMap.has(resolvedKey)) {
+      window._nameResolveMap.set(resolvedKey, { resolvedName: r.studentName, _raw: r._sheetRaw });
     }
   });
 
@@ -6684,7 +6710,7 @@ function _normalizeNameStrict(name) {
     .replace(/\s+/g, ' ');
 }
 
-// ─── Student detail popup — بحث بالخريطة الدائمة أولاً ثم في SummerPlus → programsummerschool ───
+// ─── Student detail popup — 3 مستويات للبحث الآمن ───
 window._showStudentDetail = async (json, btn) => {
   try {
     const r = JSON.parse(decodeURIComponent(json));
@@ -6699,13 +6725,26 @@ window._showStudentDetail = async (json, btn) => {
       window._sheetStudentsLoading = false;
     }
 
-    // 1. البحث في الخريطة الدائمة (التي بُنيت من renderStudentOverview)
-    let fullRaw = window._studentSheetMap?.get(_normalizeNameStrict(stName)) || null;
+    const normInput = _normalizeNameStrict(stName);
+    let fullRaw = null;
 
-    // 2. إذا لم يُوجد، استخدم resolve الآمن
+    // 1. _nameResolveMap: يربط الاسم الأصلي (من التذاكر/الأساتذة) ← بيانات الشيت
+    if (window._nameResolveMap?.has(normInput)) {
+      fullRaw = window._nameResolveMap.get(normInput)._raw;
+    }
+    // 2. _studentSheetMap: الاسم الكامل من الجدول ← بيانات الشيت
+    if (!fullRaw && window._studentSheetMap?.has(normInput)) {
+      fullRaw = window._studentSheetMap.get(normInput);
+    }
+    // 3. _resolveToFullName: حل آمن (exact → unique subset) مع شرط أن يكون الاسم المحلول أطول
     if (!fullRaw) {
       const match = _resolveToFullName(stName);
-      fullRaw = match ? match._raw : null;
+      if (match) {
+        const inputWords = normInput.split(/\s+/).filter(Boolean).length;
+        const matchWords = _normalizeNameStrict(match.name).split(/\s+/).filter(Boolean).length;
+        // نقبل فقط إذا كان الاسم المحلول أطول (أي تمت عملية حل حقيقية)
+        if (matchWords > inputWords) fullRaw = match._raw;
+      }
     }
 
     const fields = [];
@@ -7439,7 +7478,8 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         const sNameVal = s.name;
         // Check if session is locked for teacher view (only if admin has explicitly set status ≠ open)
         const ctrl = ctrlMap[i];
-        const isLocked = window._isTeacherAttendanceView && ctrl && ctrl.status !== 'open';
+        const ctrlStatus = ctrl && ctrl.status;
+        const isLocked = window._isTeacherAttendanceView && (ctrlStatus === 'locked' || ctrlStatus === 'closed');
         const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}',${toggleGi},${i},'${sNameVal.replace(/'/g,"\\'")}')"`;
         const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
         if (!rec) {
@@ -8066,15 +8106,18 @@ window.confirmMoveGroup = async () => {
 };
 
 window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
-  // منع التعديل للأساتذة إذا كانت الحصة مقفلة صراحةً من الأدمن
+  // منع التعديل للأساتذة إذا كانت الحصة مقفلة صراحةً فقط (locked/closed)
   if (window._isTeacherAttendanceView) {
     try {
       const ctrlSnap = await getDoc(doc(db, 'sessionControl', `${teacherId}_g${gi}_session_${sessionNum}`));
-      // إذا كان هناك سجل تحكم والحالة ≠ open → مقفلة
-      // إذا لم يكن هناك سجل → الحصة مفتوحة افتراضياً (يسمح بالتعديل)
-      if (ctrlSnap.exists() && ctrlSnap.data().status !== 'open') {
-        showToast('🔒 هذه الحصة مقفلة — يرجى التواصل مع الإدارة', true);
-        return;
+      // إذا كان سجل التحكم موجوداً والحالة locked أو closed → مقفلة
+      // إذا لم يوجد سجل أو الحالة open/scheduled → يسمح بالتعديل
+      if (ctrlSnap.exists()) {
+        const st = ctrlSnap.data().status;
+        if (st === 'locked' || st === 'closed') {
+          showToast('🔒 هذه الحصة مقفلة — يرجى التواصل مع الإدارة', true);
+          return;
+        }
       }
     } catch(e) {
       showToast('🔒 تعذر التحقق من حالة الحصة', true);
@@ -8752,7 +8795,7 @@ window.addStudentToTeacherAttendance = async (name, receipt, payStatus) => {
   }
 };
 
-// ─── نافذة اختيار الفوج للـ CSV (إبداعية) ───
+// ─── نافذة اختيار الفوج والفلتر للـ CSV ───
 function _showGroupPicker(teacher, groups, callback) {
   const old = document.getElementById('csv-group-picker');
   if (old) old.remove();
@@ -8765,22 +8808,35 @@ function _showGroupPicker(teacher, groups, callback) {
   box.style.cssText = 'background:linear-gradient(145deg,var(--card),rgba(255,255,255,0.02));border-radius:20px;padding:0;max-width:420px;width:92%;box-shadow:0 25px 80px rgba(0,0,0,0.3);overflow:hidden;animation:slideUp 0.3s ease';
 
   // Gradient header
-  box.innerHTML = `<div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:22px 24px 18px;text-align:center">
-    <div style="font-size:36px;margin-bottom:6px">📥</div>
+  box.innerHTML = `<div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:22px 24px 14px;text-align:center">
+    <div style="font-size:36px;margin-bottom:4px">📥</div>
     <div style="font-size:18px;font-weight:900;color:white;letter-spacing:0.3px">${t('att_export_csv_title') || 'تصدير CSV'}</div>
-    <div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:4px">${t('att_export_csv_pick_group') || 'اختر الفوج الذي تريد تصدير حضوره:'}</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:4px">اختر الفوج ونوع التلاميذ</div>
   </div>
-  <div style="padding:18px 20px 20px">
-    <button class="csv-gp-btn" data-gi="" data-label="" style="display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;margin-bottom:8px;border-radius:14px;border:2px dashed var(--border);background:var(--card-bg);color:var(--text);font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:all 0.2s">
-      <span style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(139,92,246,0.1));display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📊</span>
+  <div style="padding:14px 20px 16px">
+    <div style="font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:8px">🔽 الفوج</div>
+    <button class="csv-gp-btn" data-gi="" data-label="" style="display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;margin-bottom:6px;border-radius:12px;border:2px dashed var(--border);background:var(--card-bg);color:var(--text);font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;transition:all 0.2s">
+      <span style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(139,92,246,0.1));display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">📊</span>
       <span style="flex:1;text-align:right">🏫 ${t('att_all_groups') || 'جميع الأفواج'}</span>
-      <span style="font-size:11px;color:var(--text-muted);font-weight:600">${groups.length} ${t('att_group_prefix') || 'فوج'}</span>
+      <span style="font-size:11px;color:var(--text-muted);font-weight:600">${groups.length} فوج</span>
     </button>
-    ${groups.map((g,i) => `<button class="csv-gp-btn" data-gi="${i}" data-label="${(g.name || (t('att_group_prefix') + ' ' + (i+1))).replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 16px;margin-bottom:6px;border-radius:14px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:all 0.2s">
-      <span style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,rgba(251,191,36,0.15),rgba(245,158,11,0.1));display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🏫</span>
+    ${groups.map((g,i) => `<button class="csv-gp-btn" data-gi="${i}" data-label="${(g.name || (t('att_group_prefix') + ' ' + (i+1))).replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;margin-bottom:4px;border-radius:12px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all 0.2s">
+      <span style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,rgba(251,191,36,0.15),rgba(245,158,11,0.1));display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">🏫</span>
       <span style="flex:1;text-align:right">${g.name || (t('att_group_prefix') + ' ' + (i+1))}</span>
       <span style="font-size:11px;color:var(--text-muted);font-weight:600">${(g.students||[]).length} طالب</span>
     </button>`).join('')}
+    <div style="font-size:12px;font-weight:800;color:var(--text-muted);margin:12px 0 8px">🔽 نوع التلاميذ</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <label style="flex:1;min-width:90px;display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--card-bg);cursor:pointer;font-size:12px;font-weight:700;transition:all 0.15s">
+        <input type="radio" name="csv-filter-type" value="all" checked style="accent-color:#6366f1;width:15px;height:15px;cursor:pointer"> 📋 الكل
+      </label>
+      <label style="flex:1;min-width:90px;display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--card-bg);cursor:pointer;font-size:12px;font-weight:700;transition:all 0.15s">
+        <input type="radio" name="csv-filter-type" value="subscribed" style="accent-color:#059669;width:15px;height:15px;cursor:pointer"> ✅ المشتركون
+      </label>
+      <label style="flex:1;min-width:90px;display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--card-bg);cursor:pointer;font-size:12px;font-weight:700;transition:all 0.15s">
+        <input type="radio" name="csv-filter-type" value="unsubscribed" style="accent-color:#dc2626;width:15px;height:15px;cursor:pointer"> ❌ غير المشتركين
+      </label>
+    </div>
   </div>
   <div style="padding:0 20px 16px;text-align:center">
     <button class="csv-gp-cancel" style="padding:10px 24px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.2s">${t('cancel') || 'إلغاء'}</button>
@@ -8804,8 +8860,9 @@ function _showGroupPicker(teacher, groups, callback) {
       btn.style.boxShadow = '';
     });
     btn.addEventListener('click', () => {
+      const selectedFilter = box.querySelector('input[name="csv-filter-type"]:checked')?.value || 'all';
       overlay.remove();
-      callback(btn.dataset.gi, btn.dataset.label);
+      callback(btn.dataset.gi, btn.dataset.label, selectedFilter);
     });
   });
   box.querySelector('.csv-gp-cancel').addEventListener('click', () => overlay.remove());
@@ -8813,7 +8870,7 @@ function _showGroupPicker(teacher, groups, callback) {
 }
 
 // ─── تصدير سجل الحضور كـ CSV ───
-window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride) => {
+window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) => {
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
   if (!teacher) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
@@ -8824,8 +8881,8 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride) => {
 
   // If teacher has multiple groups and no group was selected yet, show picker
   if (groups.length > 1 && giFilter === '') {
-    _showGroupPicker(teacher, groups, (gi, label) => {
-      window.exportAttendanceCSV(gi, label);
+    _showGroupPicker(teacher, groups, (gi, label, subFilter) => {
+      window.exportAttendanceCSV(gi, label, subFilter);
     });
     return;
   }
@@ -8890,6 +8947,14 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride) => {
       });
       studentEntries.push({ name: s.name || '—', group: _cleanGroupName(groupName) || '—', gi });
     });
+  }
+
+  // تطبيق فلتر الاشتراك
+  if (filterType && filterType !== 'all') {
+    const _normTk = (n) => String(n||'').trim().replace(/\s+/g,' ').toLowerCase().replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه');
+    const isSubscribed = (name) => (allTicketsData||[]).some(t => !t.deleted && t.status === 'paid' && _normTk(t.name) === _normTk(name));
+    if (filterType === 'subscribed') studentEntries = studentEntries.filter(s => isSubscribed(s.name));
+    else if (filterType === 'unsubscribed') studentEntries = studentEntries.filter(s => !isSubscribed(s.name));
   }
 
   studentEntries.forEach(s => {
