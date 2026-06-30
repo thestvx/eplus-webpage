@@ -7190,14 +7190,24 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       const sessSnap = await getDocs(query(
         collection(db, 'sessionAttendance'),
         where('teacherId', '>=', teacherId + '_g0'),
-        where('teacherId', '<=', teacherId + '_g9999999999')
+        where('teacherId', '<=', teacherId + '_g\uF8FF')
       ));
       sessSnap.forEach(d => {
         const data = d.data();
         if (!data.sessionNum) return;
-        const gid = extractGidFromDoc(d.id, teacher.groups) || 'unknown';
-        if (!window._attSummaryCache[teacherId][gid]) window._attSummaryCache[teacherId][gid] = {};
-        window._attSummaryCache[teacherId][gid][data.sessionNum] = data;
+        // الصيغة الجديدة: cacheKey = gid
+        // الصيغة القديمة: cacheKey = gi_0, gi_1, ...
+        let gid = data.gid || extractGidFromDoc(d.id);
+        let cacheKey;
+        if (gid) {
+          cacheKey = gid;
+        } else {
+          // صيغة قديمة: نستخرج gi من _g{gi}_session_
+          const giMatch = d.id.match(/_g(\d+)_session_/);
+          cacheKey = 'gi_' + (giMatch ? giMatch[1] : '0');
+        }
+        if (!window._attSummaryCache[teacherId][cacheKey]) window._attSummaryCache[teacherId][cacheKey] = {};
+        window._attSummaryCache[teacherId][cacheKey][data.sessionNum] = data;
       });
     } catch (e) { /* fallback */ }
   }
@@ -7211,18 +7221,24 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       query(
         collection(db, 'sessionAttendance'),
         where('teacherId', '>=', teacherId + '_g0'),
-        where('teacherId', '<=', teacherId + '_g9999999999')
+        where('teacherId', '<=', teacherId + '_g\uF8FF')
       ),
       snap => {
         if (!window._attSummaryCache[teacherId]) return;
         const newCache = {};
-        const tGroups = (allTeachers || []).find(x => x.id === teacherId)?.groups;
         snap.forEach(d => {
           const data = d.data();
           if (!data.sessionNum) return;
-          const gid = extractGidFromDoc(d.id, tGroups) || 'unknown';
-          if (!newCache[gid]) newCache[gid] = {};
-          newCache[gid][data.sessionNum] = data;
+          let gid = data.gid || extractGidFromDoc(d.id);
+          let cacheKey;
+          if (gid) {
+            cacheKey = gid;
+          } else {
+            const giMatch = d.id.match(/_g(\d+)_session_/);
+            cacheKey = 'gi_' + (giMatch ? giMatch[1] : '0');
+          }
+          if (!newCache[cacheKey]) newCache[cacheKey] = {};
+          newCache[cacheKey][data.sessionNum] = data;
         });
         window._attSummaryCache[teacherId] = newCache;
         // إعادة الرسم باستخدام الكاش (بدون query)
@@ -7273,7 +7289,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         query(
           collection(db, 'sessionControl'),
           where('teacherId', '>=', teacherId + '_g0'),
-          where('teacherId', '<=', teacherId + '_g9999999999')
+          where('teacherId', '<=', teacherId + '_g\uF8FF')
         ),
         snap => {
           const newCtrl = {};
@@ -7503,7 +7519,11 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     const dk2 = parseInt(dkStr2);
     const g2 = grouped[dk2];
     (g2.students || []).forEach(s2 => {
-      const grpSessions = groupCache[s2.gid] || {};
+      const grpSessions = Object.assign({},
+        groupCache[s2.gid] || {},
+        groupCache[s2.groupGid] || {},
+        groupCache['gi_' + dk2] || {}
+      );
       const csvVals = [];
       for (let idx2 = 0; idx2 < sessionRange.length; idx2++) {
         const i2 = sessionRange[idx2];
@@ -7555,7 +7575,11 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         if (_isInAnyGroup) return;
       }
 
-      const groupSessions = groupCache[s.gid] || {};
+      const groupSessions = Object.assign({},
+        groupCache[s.gid] || {},
+        groupCache[s.groupGid] || {},
+        groupCache['gi_' + s.groupGi] || {}
+      );
       const ctrlMap = sessionCtrlMap[s.groupGi] || {};
       const cells = [];
       const sId = s.id || '';
@@ -7744,7 +7768,7 @@ window.normalizeAttendanceNames = async () => {
     const querySnap = await getDocs(query(
       collection(db, 'sessionAttendance'),
       where('teacherId', '>=', teacherId + '_g0'),
-      where('teacherId', '<=', teacherId + '_g9999999999')
+      where('teacherId', '<=', teacherId + '_g\uF8FF')
     ));
 
     let fixed = 0, total = 0;
@@ -7803,7 +7827,7 @@ window.backupAttendanceData = async () => {
     const q = query(
       collection(db, 'sessionAttendance'),
       where('teacherId', '>=', teacherId + '_g0'),
-      where('teacherId', '<=', teacherId + '_g9999999999')
+      where('teacherId', '<=', teacherId + '_g\uF8FF')
     );
     const snap = await getDocs(q);
     const sessions = {};
@@ -7954,7 +7978,7 @@ window.openRestoreAttendanceModal = async () => {
     const attQuery = query(
       collection(db, 'sessionAttendance'),
       where('teacherId', '>=', teacherId + '_g0'),
-      where('teacherId', '<=', teacherId + '_g9999999999')
+      where('teacherId', '<=', teacherId + '_g\uF8FF')
     );
     const attSnap = await getDocs(attQuery);
     const attSessions = {};
@@ -8142,7 +8166,7 @@ window.confirmMoveGroup = async () => {
     const sessQuery = query(
       collection(db, 'sessionAttendance'),
       where('teacherId', '>=', teacherId + '_g0'),
-      where('teacherId', '<=', teacherId + '_g9999999999')
+      where('teacherId', '<=', teacherId + '_g\uF8FF')
     );
     const sessSnap = await getDocs(sessQuery);
     const movedNamesLower = new Set(movedStudentNames.map(s => s.trim().toLowerCase()));
@@ -8628,13 +8652,13 @@ window.confirmDelGroup = async () => {
     const sessQuery = query(
       collection(db, 'sessionAttendance'),
       where('teacherId', '>=', teacherId + '_g0'),
-      where('teacherId', '<=', teacherId + '_g9999999999')
+      where('teacherId', '<=', teacherId + '_g\uF8FF')
     );
     const sessSnap = await getDocs(sessQuery);
     const ctrlQuery = query(
       collection(db, 'sessionControl'),
       where('teacherId', '>=', teacherId + '_g0'),
-      where('teacherId', '<=', teacherId + '_g9999999999')
+      where('teacherId', '<=', teacherId + '_g\uF8FF')
     );
     const ctrlSnap = await getDocs(ctrlQuery);
 
@@ -9158,9 +9182,152 @@ window._searchAddStudent = (q) => {
       .slice(0, 50);
     resultsEl.innerHTML = fuzzy.length
       ? fuzzy.map(({c,i}) => _renderCandidate(i, c)).join('')
-      : '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px">❌ لا توجد نتائج</div>';
+      : `<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px">❌ لا توجد نتائج</div>
+         <button onclick="_openManualAddStudent('${q.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;margin-top:4px;border-radius:10px;border:2px dashed #8b5cf6;background:rgba(139,92,246,0.06);color:#7c3aed;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;transition:all 0.2s" onmouseover="this.style.background='rgba(139,92,246,0.12)'" onmouseout="this.style.background='rgba(139,92,246,0.06)'">➕ إضافة تلميذ يدويًا</button>`;
   } else {
     resultsEl.innerHTML = matched.map(({c,i}) => _renderCandidate(i, c)).join('');
+  }
+};
+
+// ─── إضافة تلميذ يدويًا (غير موجود في النظام) ───
+window._openManualAddStudent = (q) => {
+  // إخفاء نتائج البحث وإظهار نموذج الإضافة اليدوية
+  const resultsEl = document.getElementById('add-student-results');
+  const searchInp = document.getElementById('add-student-search-inp');
+  if (searchInp) searchInp.disabled = true;
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  const teacher = (window.allTeachers || []).find(t => t.id === teacherId);
+  const groups = teacher?.groups || [];
+  const validGroups = groups.filter(g => g._gid);
+  const groupOptions = validGroups.map((g,i) =>
+    `<option value="${i}">${_displayGroupName(g.name)} (${(g.students||[]).length} طالب)</option>`
+  ).join('');
+
+  // حساب الحصة الحالية لتحديد joinedAtSession
+  let curSessionNum = 1;
+  try {
+    const startDate = teacher?.startDate ? new Date(teacher.startDate) : new Date('2026-06-01');
+    const diffDays = Math.floor((new Date() - startDate) / (1000 * 60 * 60 * 24));
+    curSessionNum = Math.min(12, Math.max(1, Math.floor(diffDays / 7) + 1));
+  } catch(e) { curSessionNum = 1; }
+
+  resultsEl.innerHTML = `<div style="padding:12px 0">
+    <div style="font-size:14px;font-weight:900;color:var(--text);margin-bottom:10px">➕ إضافة تلميذ يدويًا</div>
+    <div class="ctrl-field">
+      <label>👤 الاسم الكامل</label>
+      <input class="inp" type="text" id="manual-student-name" value="${q}" style="width:100%" autocomplete="off" placeholder="أدخل اسم التلميذ...">
+    </div>
+    ${validGroups.length > 1 ? `<div class="ctrl-field" style="margin-top:8px">
+      <label>🏫 اختر الفوج</label>
+      <select id="manual-student-group-select" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">
+        <option value="">اختر الفوج...</option>
+        ${groupOptions}
+      </select>
+    </div>` : ''}
+    ${validGroups.length === 1 ? `<div style="padding:8px 12px;border-radius:8px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);font-size:12px;color:var(--text-muted);margin-top:8px">🏫 سيُضاف إلى: ${_displayGroupName(validGroups[0].name)}</div>` : ''}
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px;padding:6px 10px;border-radius:6px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.2)">🕐 الحصص السابقة للحصة ${curSessionNum} ستكون بحالة "غير مسجل"</div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button onclick="_cancelManualAddStudent()" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text-muted);font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">رجوع</button>
+      <button onclick="_confirmManualAddStudent()" class="btn-primary" style="flex:2">➕ إضافة</button>
+    </div>
+  </div>`;
+  document.getElementById('add-student-selected-bar').style.display = 'none';
+  document.getElementById('add-student-group-wrap').style.display = 'none';
+  document.getElementById('add-student-confirm-btn').style.display = 'none';
+};
+
+window._cancelManualAddStudent = () => {
+  const searchInp = document.getElementById('add-student-search-inp');
+  if (searchInp) searchInp.disabled = false;
+  document.getElementById('add-student-confirm-btn').style.display = '';
+  _updateGroupPickerState();
+  _updateSelectedBar();
+  _searchAddStudent(searchInp ? searchInp.value : '');
+};
+
+window._confirmManualAddStudent = async () => {
+  const nameInp = document.getElementById('manual-student-name');
+  const name = nameInp ? nameInp.value.trim() : '';
+  if (!name) { showToast('⚠️ الرجاء إدخال اسم التلميذ', true); return; }
+
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
+  const teacher = (window.allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+  const groups = teacher.groups || [];
+  const validGroups = groups.filter(g => g._gid);
+  let targetGi = -1;
+  if (validGroups.length === 1) {
+    targetGi = groups.indexOf(validGroups[0]);
+  } else {
+    targetGi = parseInt(document.getElementById('manual-student-group-select')?.value || '');
+  }
+  if (isNaN(targetGi) || targetGi < 0 || !groups[targetGi] || !groups[targetGi]._gid) {
+    showToast('⚠️ الرجاء اختيار الفوج', true); return;
+  }
+
+  // التحقق من عدم وجود التلميذ مسبقاً
+  const _normM = (n) => String(n||'').trim().toLowerCase()
+    .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+    .replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ').trim();
+  const nKey = _normM(name);
+  // فحص في قائمة التلاميذ العامة
+  if ((teacher.students || []).some(s => _normM(s.name||'') === nKey)) {
+    showToast(`⚠️ التلميذ "${name}" موجود مسبقاً — استخدم البحث بدلاً من الإضافة اليدوية`, true);
+    return;
+  }
+  // فحص في الفوج الهدف
+  const group = groups[targetGi];
+  const _normCheck = (s) => _normM(typeof s === 'object' ? (s.name || '') : s);
+  if ((group.students || []).some(s => _normCheck(s) === nKey)) {
+    showToast(`⚠️ التلميذ "${name}" موجود مسبقاً في هذا الفوج`, true);
+    return;
+  }
+
+  // حساب joinedAtSession
+  let curSessionNum = 1;
+  try {
+    const startDate = teacher?.startDate ? new Date(teacher.startDate) : new Date('2026-06-01');
+    const diffDays = Math.floor((new Date() - startDate) / (1000 * 60 * 60 * 24));
+    curSessionNum = Math.min(12, Math.max(1, Math.floor(diffDays / 7) + 1));
+  } catch(e) { curSessionNum = 1; }
+
+  const btn = document.querySelector('#add-student-modal .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
+  try {
+    const teacherRef = doc(db, 'teachers', teacherId);
+    const snap = await getDoc(teacherRef);
+    if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+    const data = snap.data();
+    const dGroups = data.groups || [];
+    if (!dGroups[targetGi] || !dGroups[targetGi]._gid) { showToast('⚠️ الفوج غير صالح', true); return; }
+    if (!dGroups[targetGi].students) dGroups[targetGi].students = [];
+    const dStudents = data.students || [];
+
+    // إنشاء سجل جديد
+    const newId = 'manual_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+    const newStudent = {
+      id: newId, name, present: false, marked: false,
+      payStatus: 'unknown', receipt: null, joinedAtSession: curSessionNum
+    };
+    dStudents.push(newStudent);
+    dGroups[targetGi].students.push(name);
+
+    await setDoc(teacherRef, { students: dStudents, groups: dGroups }, { merge: true });
+    const t2 = (window.allTeachers || []).find(t => t.id === teacherId);
+    if (t2) { t2.groups = dGroups; t2.students = dStudents; }
+    if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
+    showToast(`✅ تم إنشاء "${name}" وإضافته إلى "${_displayGroupName(group.name)}"`);
+    closeAddStudentModal();
+    await loadAttendanceSummary();
+  } catch(e) {
+    console.error('_confirmManualAddStudent error:', e);
+    showToast('❌ خطأ: ' + e.message, true);
+  } finally {
+    const searchInp = document.getElementById('add-student-search-inp');
+    if (searchInp) searchInp.disabled = false;
+    document.getElementById('add-student-confirm-btn').style.display = '';
+    if (btn) { btn.disabled = false; btn.textContent = '➕ إضافة التلاميذ المختارين'; }
   }
 };
 
@@ -9742,7 +9909,7 @@ window.openAttModal = async (teacherId) => {
     const sessSnap = await getDocs(query(
       collection(db, 'sessionAttendance'),
       where('teacherId', '>=', teacherId + '_g0'),
-      where('teacherId', '<=', teacherId + '_g9999999999')
+      where('teacherId', '<=', teacherId + '_g\uF8FF')
     ));
     sessSnap.forEach(d => {
       const data = d.data();
@@ -9760,7 +9927,7 @@ window.openAttModal = async (teacherId) => {
     const ctrlSnap = await getDocs(query(
       collection(db, 'sessionControl'),
       where('teacherId', '>=', teacherId + '_g0'),
-      where('teacherId', '<=', teacherId + '_g9999999999')
+      where('teacherId', '<=', teacherId + '_g\uF8FF')
     ));
     ctrlSnap.forEach(d => {
       const data = d.data();
@@ -10873,19 +11040,15 @@ function getCtrlDocId(teacherId, gid, sessionNum) {
 function getCtrlDocIdLegacy(teacherId, gi, sessionNum) {
   return `${teacherId}_g${gi}_session_${sessionNum}`;
 }
-// استخراج gid من وثيقة الحضور/التحكم (يدعم الصيغتين القديمة _g{gi} والجديدة _{gid})
-function extractGidFromDoc(docId, groupsArr) {
-  // الصيغة الجديدة: teacherId_gctrl_gid_session_num أو teacherId_gid_session_num
-  let m = docId.match(/_(g_[^_]+_\w+)_session_(\d+)$/);
+// استخراج gid من وثيقة الحضور (يدعم الصيغتين القديمة والجديدة)
+// للصيغة الجديدة teacherId_{gid}_session_N → تُرجع gid
+// للصيغة القديمة teacherId_g{gi}_session_N → تُرجع null (يُستخدم gi مباشرة كمفتاح كاش)
+function extractGidFromDoc(docId) {
+  // الصيغة الجديدة: teacherId_{gid}_session_num
+  // gid تبدأ بـ "g_" وتحتوي على شرطتين سفليتين على الأقل
+  let m = docId.match(/_(g_\d+_\w+)_session_(\d+)$/);
   if (m) return m[1];
-  // الصيغة القديمة: teacherId_g{gi}_session_num — نستخرج gi ونجد gid من المجموعة
-  m = docId.match(/_g(\d+)_session_(\d+)$/);
-  if (m) {
-    const gi = parseInt(m[1]);
-    const group = (groupsArr || [])[gi];
-    return group?._gid || 'legacy_g' + gi;
-  }
-  return null;
+  return null; // صيغة قديمة → سيستخدم المتصل gi_prefix
 }
 
 // حفظ إعدادات التحكم لحصة معينة
@@ -11625,7 +11788,7 @@ async function loadExtraSessions() {
     const snap = await getDocs(query(
       collection(db, 'sessionAttendance'),
       where('teacherId', '>=', teacherId + '_g0'),
-      where('teacherId', '<=', teacherId + '_g9999999999')
+      where('teacherId', '<=', teacherId + '_g\uF8FF')
     ));
 
     const extras = [];
@@ -12589,7 +12752,7 @@ window.resetAttendance = async () => {
     const q = query(
       collection(db, 'sessionAttendance'),
       where('teacherId', '>=', tid + '_g0'),
-      where('teacherId', '<=', tid + '_g9999999999')
+      where('teacherId', '<=', tid + '_g\uF8FF')
     );
     const snap = await getDocs(q);
 
