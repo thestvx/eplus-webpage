@@ -2385,6 +2385,7 @@
       <button onclick="openRestoreAttendanceModal()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #2563EB;background:rgba(37,99,235,0.08);color:#2563EB;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="استرجاع سجل الحضور الكامل للأستاذ" id="att-restore-btn">📦 استرجاع سجل الحضور</button>
       <button onclick="toggleUnassignedStudents()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #7C3AED;background:rgba(124,58,237,0.08);color:#7C3AED;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إدارة التلاميذ غير المنتمين لأي فوج" id="att-unassign-btn">🔀 غير منتمين</button>
       <button onclick="repairOldGroups()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #DC2626;background:rgba(220,38,38,0.08);color:#DC2626;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إصلاح الأفواج القديمة التي تعرض تلاميذ لكنها لا تملك بنية بيانات صحيحة" id="att-repair-btn">🛠️ إصلاح الأفواج القديمة</button>
+      <button onclick="verifyAttendanceIntegrity()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #059669;background:rgba(5,150,105,0.08);color:#059669;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="التحقق من سلامة سجلات الحضور وربطها" id="att-integrity-btn">🔍 فحص سلامة الحضور</button>
     </div>
     <!-- ─── شريط بحث إضافة التلميذ ─── -->
     <div id="att-student-search-wrap" style="display:none;margin-bottom:16px;padding:14px 16px;background:var(--card-bg);border:1.5px solid var(--border);border-radius:12px;transition:all 0.3s">
@@ -3514,7 +3515,7 @@ onAuthStateChanged(auth, async user => {
           onTeacherChange();
         }
         // إخفاء أزرار الإدارة والأستاذ لا يستطيع إضافة تلاميذ
-        ['att-csv-btn','att-normalize-btn','att-backup-btn','att-sync-btn','att-add-student-btn','att-restore-btn','att-add-group-btn','att-repair-btn'].forEach(id => {
+        ['att-csv-btn','att-normalize-btn','att-backup-btn','att-sync-btn','att-add-student-btn','att-restore-btn','att-add-group-btn','att-repair-btn','att-integrity-btn'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.style.display = 'none';
         });
@@ -7458,6 +7459,125 @@ function _showRepairReport(r) {
   setTimeout(() => modal.classList.add('open'), 50);
 }
 
+// ─── التحقق من سلامة سجلات الحضور ───
+window.verifyAttendanceIntegrity = async () => {
+  const results = { teachersChecked: 0, studentsChecked: 0, missingSessions: 0, orphanRecords: 0, fixed: 0, errors: [] };
+  for (const teacher of (window.allTeachers || [])) {
+    const tid = teacher.id;
+    if (!tid) continue;
+    results.teachersChecked++;
+    try {
+      const sessSnap = await getDocs(query(
+        collection(db, 'sessionAttendance'),
+        where('teacherId', '>=', tid + '_g0'),
+        where('teacherId', '<=', tid + '_g\uf8ff')
+      ));
+      const sessionByStudent = {};
+      const sessionDocIds = {};
+      sessSnap.forEach(d => {
+        const d2 = d.data();
+        if (!d2.sessionNum) return;
+        (d2.students || []).forEach(st => {
+          const sid = String(st.id || '').trim();
+          if (!sid) return;
+          if (!sessionByStudent[sid]) sessionByStudent[sid] = {};
+          sessionByStudent[sid][d2.sessionNum] = st;
+          sessionDocIds[sid] = sessionDocIds[sid] || d.id;
+        });
+      });
+      const studentNames = new Map();
+      (teacher.students || []).forEach(s => { if (s.id) studentNames.set(String(s.id), s.name); });
+      for (const [sid, sessions] of Object.entries(sessionByStudent)) {
+        results.studentsChecked++;
+        const name = studentNames.get(sid) || '?';
+        const allSessNums = Object.keys(sessions).map(Number).sort((a,b) => a - b);
+        for (let sn = 1; sn <= 12; sn++) {
+          if (!sessions[sn] && allSessNums.length > 0 && sn < allSessNums[allSessNums.length - 1]) {
+            results.missingSessions++;
+          }
+        }
+      }
+      // التحقق من السجلات اليتيمة: student في session docs ليس في teacher.students
+      for (const sid of Object.keys(sessionByStudent)) {
+        if (!studentNames.has(sid)) {
+          results.orphanRecords++;
+          // إصلاح: نضيف اسم الطالب من session docs
+          const sessions = sessionByStudent[sid];
+          for (const sn of Object.keys(sessions)) {
+            const st = sessions[sn];
+            if (st.name) {
+              const existing = (teacher.students || []).find(s => String(s.id || '') === sid);
+              if (!existing) {
+                teacher.students = teacher.students || [];
+                teacher.students.push({ id: sid, name: st.name, present: false, marked: false, payStatus: 'unknown', receipt: null });
+                results.fixed++;
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      results.errors.push(`${teacher.name || tid}: ${e.message}`);
+    }
+  }
+  if (results.fixed > 0) {
+    try {
+      for (const teacher of (window.allTeachers || [])) {
+        if (teacher.id) await setDoc(doc(db, 'teachers', teacher.id), { students: teacher.students }, { merge: true });
+      }
+    } catch (e) { results.errors.push('فشل حفظ الإصلاحات: ' + e.message); }
+  }
+  const existing = document.getElementById('integrity-report-modal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'integrity-report-modal';
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:480px;background:var(--card);border-radius:20px;box-shadow:var(--shadow-xl);overflow:hidden;animation:modalIn 0.25s ease">
+      <div style="padding:24px 28px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+          <span style="font-size:28px">🔍</span>
+          <div>
+            <div style="font-weight:900;font-size:16px;color:var(--text)">التحقق من سلامة الحضور</div>
+            <div style="font-size:11px;color:var(--text-muted)">${results.errors.length ? '⚠️ تم مع بعض الأخطاء' : '✅ كل شيء سليم'}</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          <div style="padding:12px;background:var(--primary-light);border-radius:12px;text-align:center">
+            <div style="font-size:20px;font-weight:900;color:var(--primary)">${results.teachersChecked}</div>
+            <div style="font-size:10px;color:var(--text-muted);font-weight:700">أساتذة تم فحصهم</div>
+          </div>
+          <div style="padding:12px;background:rgba(37,99,235,0.08);border-radius:12px;text-align:center">
+            <div style="font-size:20px;font-weight:900;color:#2563EB">${results.studentsChecked}</div>
+            <div style="font-size:10px;color:var(--text-muted);font-weight:700">طلاب تم فحص سجلاتهم</div>
+          </div>
+          <div style="padding:12px;background:rgba(245,158,11,0.08);border-radius:12px;text-align:center">
+            <div style="font-size:20px;font-weight:900;color:#f59e0b">${results.missingSessions}</div>
+            <div style="font-size:10px;color:var(--text-muted);font-weight:700">حصص مفقودة</div>
+          </div>
+          <div style="padding:12px;background:rgba(239,68,68,0.08);border-radius:12px;text-align:center">
+            <div style="font-size:20px;font-weight:900;color:#DC2626">${results.orphanRecords}</div>
+            <div style="font-size:10px;color:var(--text-muted);font-weight:700">سجلات يتيمة</div>
+          </div>
+          <div style="grid-column:1/-1;padding:12px;background:rgba(5,150,105,0.08);border-radius:12px;text-align:center">
+            <div style="font-size:20px;font-weight:900;color:#059669">${results.fixed}</div>
+            <div style="font-size:10px;color:var(--text-muted);font-weight:700">تم إصلاحها تلقائياً</div>
+          </div>
+        </div>
+        ${results.errors.length ? `<div style="padding:10px 14px;background:#FEF2F2;border-radius:10px;border:1px solid #FECACA;margin-bottom:12px">
+          <div style="font-weight:700;color:#DC2626;font-size:12px;margin-bottom:4px">⚠️ الأخطاء (${results.errors.length})</div>
+          ${results.errors.map(e => `<div style="font-size:11px;color:#991B1B;padding:2px 0">• ${e}</div>`).join('')}
+        </div>` : ''}
+        <button onclick="this.closest('.modal-overlay').remove()" class="btn-primary" style="width:100%;justify-content:center">
+          ✅ تم
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  setTimeout(() => modal.classList.add('open'), 50);
+};
+
 window._attSummaryCache = {}; // teacherId -> { gi: { sessionNum: data } }
 
 window.loadAttendanceSummary = async function(_teacherOverride) {
@@ -7567,6 +7687,27 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   }
 
   const groupCache = window._attSummaryCache[teacherId] || {};
+
+  // ── Build student-centric attendance cache (by student ID/name, independent of group key) ──
+  const studentAttCache = {}; // studentId → { sessionNum: { present, name } }
+  for (const cacheKey in groupCache) {
+    for (const sn in groupCache[cacheKey]) {
+      const session = groupCache[cacheKey][sn];
+      (session.students || []).forEach(st => {
+        const sid = String(st.id || '').trim();
+        const key = sid || _normGi(st.name || '');
+        if (!key) return;
+        if (!studentAttCache[key]) studentAttCache[key] = {};
+        studentAttCache[key][session.sessionNum] = st;
+        // also index by the other format (name if id exists, id if name exists)
+        if (sid && st.name) {
+          const nk = _normGi(st.name);
+          if (!studentAttCache[nk]) studentAttCache[nk] = {};
+          studentAttCache[nk][session.sessionNum] = st;
+        }
+      });
+    }
+  }
 
   // ── Load session controls (cached, with real-time listener) ──
   let sessionCtrlMap = window._ctrlMapCache?.[teacherId];
@@ -7850,12 +7991,20 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         groupCache['gi_' + dk2] || {}
       );
       const csvVals = [];
+      const csvStudentKey = s2.id || _normGi(s2.name || '');
       for (let idx2 = 0; idx2 < sessionRange.length; idx2++) {
         const i2 = sessionRange[idx2];
         if (s2.joinedAtSession && i2 < s2.joinedAtSession) { csvVals.push('—'); continue; }
-        const rec2 = grpSessions[i2];
-        if (!rec2) { csvVals.push('—'); continue; }
-        const stuRec2 = (rec2.students || []).find(st => namesMatchLocal(st.name || '', s2.name || ''));
+        // Try student-attendance cache first
+        let stuRec2 = studentAttCache[csvStudentKey]?.[i2] || null;
+        if (!stuRec2) {
+          const nameKey = _normGi(s2.name || '');
+          if (nameKey !== csvStudentKey) stuRec2 = studentAttCache[nameKey]?.[i2] || null;
+        }
+        if (!stuRec2) {
+          const rec2 = grpSessions[i2];
+          if (rec2) stuRec2 = (rec2.students || []).find(st => namesMatchLocal(st.name || '', s2.name || ''));
+        }
         csvVals.push(stuRec2 ? (stuRec2.present ? 'حاضر' : 'غائب') : '—');
       }
       window._attAllStudentsCsvData.push({
@@ -7908,13 +8057,27 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       const ctrlMap = sessionCtrlMap[s.groupGi] || {};
       const cells = [];
       const sId = s.id || '';
+      const studentAttKey = sId || _normGi(s.name || '');
       for (let idx = 0; idx < sessionRange.length; idx++) {
         const i = sessionRange[idx];
         if (s.joinedAtSession && i < s.joinedAtSession) {
           cells.push(`<td class="att-cell" title="غير مسجل (قبل انضمام التلميذ)" style="background:transparent;color:var(--text-muted);font-size:11px;text-align:center">—</td>`);
           continue;
         }
-        const rec = groupSessions[i];
+        // Try student-centric cache first (finds attendance by student ID regardless of group key)
+        let studentRec = studentAttCache[studentAttKey]?.[i] || null;
+        if (!studentRec) {
+          const nameKey = _normGi(s.name || '');
+          if (nameKey !== studentAttKey) studentRec = studentAttCache[nameKey]?.[i] || null;
+        }
+        // Fallback: try group-based cache
+        let rec = null;
+        if (studentRec) {
+          rec = groupSessions[i] || groupCache[s.gid]?.[i] || groupCache[s.groupGid]?.[i] || groupCache['gi_' + s.groupGi]?.[i];
+          if (!rec) rec = { students: [studentRec], sessionNum: i };
+        } else {
+          rec = groupSessions[i];
+        }
         const sNameVal = s.name;
         const ctrl = ctrlMap[i];
         const ctrlStatus = ctrl && ctrl.status;
@@ -7924,7 +8087,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         const gidVal = s.gid || s.groupGid || '';
         const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}','${gidVal}',${i},this.dataset.studentId,this.dataset.sn)" data-gid="${gidVal}" data-student-id="${sIdAttr}" data-sn="${snAttr}"`;
         const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
-        if (!rec) {
+        if (!rec && !studentRec) {
           const isPast = i < curSession;
           if (window._isTeacherAttendanceView && isLocked) {
             cells.push(`<td class="att-cell att-cell-locked" style="text-align:center" title="${t('att_missed_session')}">🔒</td>`);
@@ -7936,18 +8099,19 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           }
           continue;
         }
-        let studentRec;
-        if (sId) {
-          studentRec = (rec.students || []).find(st => String(st.id || '') === sId);
-        }
-        if (!studentRec) {
-          studentRec = (rec.students || []).find(st => namesMatchLocal(st.name || '', s.name || ''));
+        if (!studentRec && rec) {
+          if (sId) {
+            studentRec = (rec.students || []).find(st => String(st.id || '') === sId);
+          }
+          if (!studentRec) {
+            studentRec = (rec.students || []).find(st => namesMatchLocal(st.name || '', s.name || ''));
+          }
         }
         if (!studentRec) {
           cells.push(`<td class="${isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-future att-cell-clickable'}" style="text-align:center" title="${t('att_not_recorded')}" ${isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}','${gidVal}',${i},this.dataset.studentId,this.dataset.sn)" data-gid="${gidVal}" data-student-id="${sIdAttr}" data-sn="${snAttr}"`}>⋯</td>`);
           continue;
         }
-        const date = rec.date || '';
+        const date = (rec && rec.date) || '';
         if (studentRec.present) {
           cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_present_on')}${date}" ${cellClick}>✅</td>`);
           totalPresent++;
@@ -8561,34 +8725,40 @@ window.confirmMoveGroup = async () => {
     );
     const sessSnap = await getDocs(sessQuery);
     const movedNamesLower = new Set(movedStudentNames.map(s => s.trim().toLowerCase()));
-    // تجميع sessions المصدر والهدف
+    // تجميع sessions المصدر والهدف (يدعم الصيغتين القديمة والجديدة)
     const srcSessions = {};  // sessionNum → {docId, data}
     const tgtSessions = {}; // sessionNum → {docId, data}
     sessSnap.forEach(d => {
       const d2 = d.data();
+      // الصيغة الجديدة: مطابقة عن طريق gid
+      const docGid = d2.gid || '';
+      if (docGid) {
+        if (docGid === sourceGid) {
+          if (!srcSessions[d2.sessionNum]) srcSessions[d2.sessionNum] = { docId: d.id, data: d2 };
+        } else if (docGid === targetGid) {
+          if (!tgtSessions[d2.sessionNum]) tgtSessions[d2.sessionNum] = { docId: d.id, data: d2 };
+        }
+        return;
+      }
+      // الصيغة القديمة: مطابقة عن طريق gi من teacherId
       const gStr = String(d2.teacherId || '');
       const match = gStr.match(/_g(\d+)$/);
       if (!match) return;
       const gi = parseInt(match[1]);
       if (gi === srcIdx) {
-        srcSessions[d2.sessionNum] = { docId: d.id, data: d2 };
+        if (!srcSessions[d2.sessionNum]) srcSessions[d2.sessionNum] = { docId: d.id, data: d2 };
       } else if (gi === tgtIdx) {
-        tgtSessions[d2.sessionNum] = { docId: d.id, data: d2 };
+        if (!tgtSessions[d2.sessionNum]) tgtSessions[d2.sessionNum] = { docId: d.id, data: d2 };
       }
     });
     // لكل حصة في المصدر، انقل الطلاب إلى الهدف
+    const _moveNorm = (n) => String(n || '').trim().toLowerCase();
     for (const sn in srcSessions) {
       const src = srcSessions[sn];
       const tgt = tgtSessions[sn];
       const srcStudents = src.data.students || [];
-      const remaining = srcStudents.filter(st => {
-        const key = (st.name || '').trim().toLowerCase();
-        return !movedNamesLower.has(key);
-      });
-      const moved = srcStudents.filter(st => {
-        const key = (st.name || '').trim().toLowerCase();
-        return movedNamesLower.has(key);
-      });
+      const remaining = srcStudents.filter(st => !movedNamesLower.has(_moveNorm(st.name)));
+      const moved = srcStudents.filter(st => movedNamesLower.has(_moveNorm(st.name)));
       // تحديث المصدر (إزالة المنقولين)
       if (remaining.length !== srcStudents.length) {
         const srcDocRef = doc(db, 'sessionAttendance', src.docId);
@@ -8598,14 +8768,23 @@ window.confirmMoveGroup = async () => {
           batch.update(srcDocRef, { students: remaining });
         }
       }
-      // إضافة المنقولين إلى الهدف
+      // إضافة المنقولين إلى الهدف — استخدم الصيغة الجديدة (مع gid) للحفاظ على الاتساق
       if (moved.length) {
-        const tgtDocId = tgt ? tgt.docId : (teacherId + '_g' + tgtIdx + '_session_' + sn);
-        const tgtDocRef = doc(db, 'sessionAttendance', tgtDocId);
+        const targetDocId = targetGid
+          ? (teacherId + '_' + targetGid + '_session_' + sn)
+          : (teacherId + '_g' + tgtIdx + '_session_' + sn);
+        const tgtDocRef = doc(db, 'sessionAttendance', targetDocId);
+        const newRecord = {
+          teacherId: targetGid ? (teacherId + '_' + targetGid) : (teacherId + '_g' + tgtIdx),
+          sessionNum: parseInt(sn),
+          gid: targetGid || null,
+          students: moved,
+          savedAt: serverTimestamp()
+        };
         if (tgt) {
           batch.update(tgtDocRef, { students: [...(tgt.data.students || []), ...moved] });
         } else {
-          batch.set(tgtDocRef, { teacherId: teacherId + '_g' + tgtIdx, sessionNum: parseInt(sn), students: moved, savedAt: serverTimestamp() });
+          batch.set(tgtDocRef, newRecord);
         }
       }
     }
