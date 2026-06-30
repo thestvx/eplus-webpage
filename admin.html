@@ -9487,10 +9487,11 @@ window._asUpdateConfirmBtn = () => {
   }
   // إظهار/إخفاء picker الفوج
   const teacher = (window.allTeachers || []).find(t => t.id === _asTeacherId);
-  const validGroups = (teacher?.groups || []).filter(g => g._gid);
+  const groups = teacher?.groups || [];
+  groups.forEach(g => { if (g && !g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10); });
   const picker = document.getElementById('as-group-picker');
   if (picker) {
-    if (validGroups.length > 1 && n > 0) {
+    if (groups.length > 1 && n > 0) {
       picker.style.display = 'block';
     } else {
       picker.style.display = 'none';
@@ -9542,19 +9543,17 @@ window._asOpenManual = (q) => {
   document.getElementById('as-manual-name').value = q;
   const teacher = (window.allTeachers || []).find(t => t.id === _asTeacherId);
   const groups = teacher?.groups || [];
-  const validGroups = groups.filter(g => g._gid);
+  groups.forEach(g => { if (g && !g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10); });
   const wrap = document.getElementById('as-manual-group-wrap');
   const sel = document.getElementById('as-manual-group-select');
   if (sel) {
-    sel.innerHTML = validGroups.map((g,i) =>
+    sel.innerHTML = groups.map((g,i) =>
       `<option value="${i}">${_displayGroupName(g.name)} (${(g.students||[]).length} طالب)</option>`
     ).join('');
     sel.value = '';
-    if (validGroups.length === 1) {
-      sel.value = String(groups.indexOf(validGroups[0]));
-    }
+    if (groups.length === 1) sel.value = '0';
   }
-  wrap.style.display = validGroups.length > 1 ? 'block' : 'none';
+  wrap.style.display = groups.length > 1 ? 'block' : 'none';
   _asShowStep(2);
   _asUpdateManualPreview();
 };
@@ -9566,15 +9565,15 @@ function _asUpdateManualPreview() {
   if (!name) { preview.style.display = 'none'; return; }
   const teacher = (window.allTeachers || []).find(t => t.id === _asTeacherId);
   const groups = teacher?.groups || [];
-  const validGroups = groups.filter(g => g._gid);
+  groups.forEach(g => { if (g && !g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10); });
   let gi = -1;
-  if (validGroups.length === 1) {
-    gi = groups.indexOf(validGroups[0]);
+  if (groups.length === 1) {
+    gi = 0;
   } else {
     const sel = document.getElementById('as-manual-group-select');
     gi = sel ? parseInt(sel.value) : -1;
   }
-  if (isNaN(gi) || gi < 0 || !groups[gi] || !groups[gi]._gid) {
+  if (isNaN(gi) || gi < 0 || !groups[gi]) {
     preview.style.display = 'none';
     return;
   }
@@ -9601,14 +9600,14 @@ window._asManualConfirm = async () => {
   const teacher = (window.allTeachers || []).find(t => t.id === _asTeacherId);
   if (!teacher) { showToast('👨‍🏫 لم يتم العثور على الأستاذ — يرجى إعادة فتح النافذة', true); return; }
   const groups = teacher.groups || [];
-  const validGroups = groups.filter(g => g._gid);
+  groups.forEach(g => { if (g && !g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10); });
   let targetGi = -1;
-  if (validGroups.length === 1) {
-    targetGi = groups.indexOf(validGroups[0]);
+  if (groups.length === 1) {
+    targetGi = 0;
   } else {
     targetGi = parseInt(document.getElementById('as-manual-group-select')?.value || '');
   }
-  if (isNaN(targetGi) || targetGi < 0 || !groups[targetGi] || !groups[targetGi]._gid) {
+  if (isNaN(targetGi) || targetGi < 0 || !groups[targetGi]) {
     showToast('⚠️ لم يتم اختيار الفوج — الرجاء اختيار الفوج الهدف', true);
     return;
   }
@@ -9642,7 +9641,8 @@ window._asManualConfirm = async () => {
     if (!snap.exists()) { showToast('👨‍🏫 لم يتم العثور على بيانات الأستاذ في قاعدة البيانات', true); return; }
     const data = snap.data();
     const dGroups = data.groups || [];
-    if (!dGroups[targetGi] || !dGroups[targetGi]._gid) { showToast('🏫 الفوج الهدف غير صالح أو محذوف', true); return; }
+    if (!dGroups[targetGi]) { showToast('🏫 الفوج الهدف غير صالح أو محذوف', true); return; }
+    if (!dGroups[targetGi]._gid) dGroups[targetGi]._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10);
     if (!dGroups[targetGi].students) dGroups[targetGi].students = [];
     const dStudents = data.students || [];
 
@@ -9676,14 +9676,13 @@ window._asConfirm = async () => {
   const teacher = (window.allTeachers || []).find(t => t.id === _asTeacherId);
   if (!teacher) { showToast('👨‍🏫 لم يتم العثور على الأستاذ — يرجى إعادة فتح النافذة', true); return; }
   const groups = teacher.groups || [];
-  const validGroups = groups.filter(g => g._gid);
+  groups.forEach(g => { if (g && !g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10); });
   const targetGi = _asGetTargetGi();
   if (targetGi < 0 || !groups[targetGi]) {
     showToast('⚠️ لم يتم اختيار الفوج — الرجاء اختيار الفوج الهدف', true);
     return;
   }
   const group = groups[targetGi];
-  if (!group._gid) { showToast('🏫 الفوج المختار غير صالح', true); return; }
 
   const _normG = _asNorm;
   const toAdd = [];
@@ -9704,7 +9703,8 @@ window._asConfirm = async () => {
     if (!snap.exists()) { showToast('👨‍🏫 لم يتم العثور على بيانات الأستاذ في قاعدة البيانات', true); return; }
     const data = snap.data();
     const dGroups = data.groups || [];
-    if (!dGroups[targetGi] || !dGroups[targetGi]._gid) { showToast('🏫 الفوج الهدف غير صالح أو محذوف', true); return; }
+    if (!dGroups[targetGi]) { showToast('🏫 الفوج الهدف غير صالح أو محذوف', true); return; }
+    if (!dGroups[targetGi]._gid) dGroups[targetGi]._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,10);
     if (!dGroups[targetGi].students) dGroups[targetGi].students = [];
     const dStudents = data.students || [];
     const dGroupStudents = dGroups[targetGi].students;
