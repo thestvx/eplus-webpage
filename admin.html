@@ -866,6 +866,7 @@
     .att-modal-title{font-size:16px;font-weight:900;color:var(--text)}
     .att-modal-close{margin-right:auto;width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--card-bg);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0}
     .att-modal-close:hover{background:var(--danger-soft);border-color:rgba(239,68,68,0.3);color:var(--danger)}
+    .asr-item:hover{background:var(--primary-light)}
     .att-modal-body{padding:20px 24px;overflow-y:auto;flex:1}
     @media(max-width:640px){.att-modal-body{padding:14px 16px}}
 
@@ -2371,7 +2372,7 @@
         <option value="unsubscribed">❌ غير المشتركين</option>
       </select>
       <button onclick="exportAttendanceCSV()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif" title="تصدير CSV" id="att-csv-btn">📥 CSV</button>
-      <button onclick="toggleAttendanceStudentSearch()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #059669;background:rgba(5,150,105,0.08);color:#059669;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إضافة تلميذ جديد للأستاذ المختار" id="att-add-student-btn">➕ إضافة تلميذ</button>
+      <button onclick="openAddStudentModal()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #059669;background:rgba(5,150,105,0.08);color:#059669;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إضافة تلميذ جديد للأستاذ المختار" id="att-add-student-btn">➕ إضافة تلميذ</button>
       <button onclick="openAddGroupModal()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #f59e0b;background:rgba(245,158,11,0.08);color:#f59e0b;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إضافة فوج جديد للأستاذ المختار" id="att-add-group-btn">🏫 إضافة فوج</button>
       <button onclick="refreshAttendanceSessions()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.3s" title="تحديث الحصص وضبطها حسب تاريخ الأستاذ" id="att-refresh-btn">🔄 تحديث</button>
       <button onclick="normalizeAttendanceNames()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #7C3AED;background:rgba(124,58,237,0.08);color:#7C3AED;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إعادة ربط أسماء التلاميذ بسجلات الحضور" id="att-normalize-btn">🔗 إعادة ربط الحضور</button>
@@ -3027,6 +3028,38 @@
   </div>
 </div>
 
+<!-- ===== ADD STUDENT MODAL ===== -->
+<div class="ctrl-modal-bg" id="add-student-modal" onclick="if(event.target===this)closeAddStudentModal()">
+  <div class="ctrl-modal" style="max-width:480px">
+    <div class="ctrl-modal-header">
+      <div style="font-size:22px">➕</div>
+      <div class="ctrl-modal-title">إضافة تلميذ إلى الفوج</div>
+      <button class="att-modal-close" onclick="closeAddStudentModal()">✕</button>
+    </div>
+    <div class="ctrl-modal-body">
+      <div class="ctrl-field">
+        <label>🔍 ابحث عن التلميذ</label>
+        <div style="display:flex;gap:8px">
+          <input class="inp" type="text" id="add-student-search-inp" placeholder="اكتب اسم التلميذ..." style="flex:1" autocomplete="off" oninput="_searchAddStudent(this.value)" onkeydown="if(event.key==='Enter')_confirmAddStudent()">
+        </div>
+        <div id="add-student-results" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:4px;margin-top:6px;display:flex;flex-direction:column;gap:2px">
+          <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">✍️ اكتب اسم التلميذ للبحث</div>
+        </div>
+      </div>
+      <div id="add-student-selected" style="display:none;margin-top:8px"></div>
+      <div id="add-student-group-wrap" style="display:none;margin-top:10px">
+        <div class="ctrl-field">
+          <label>🏫 اختر الفوج</label>
+          <select id="add-student-group-select" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px"></select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button onclick="closeAddStudentModal()" style="flex:1;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text-muted);font-size:14px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">إلغاء</button>
+        <button onclick="_confirmAddStudent()" class="btn-primary" style="flex:3">➕ إضافة إلى الفوج</button>
+      </div>
+    </div>
+  </div>
+</div>
 <!-- ===== ENVELOPE MESSAGE MODAL (للأستاذ) ===== -->
 <div class="env-modal-bg" id="env-modal">
   <div class="env-modal">
@@ -7534,7 +7567,8 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         const ctrl = ctrlMap[i];
         const ctrlStatus = ctrl && ctrl.status;
         const isLocked = window._isTeacherAttendanceView && (ctrlStatus === 'locked' || ctrlStatus === 'closed');
-        const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}',${toggleGi},${i},'${sNameVal.replace(/'/g,"\\'")}')"`;
+        const snAttr = sNameVal.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+        const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}',${toggleGi},${i},this.dataset.sn)" data-sn="${snAttr}"`;
         const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
         if (!rec) {
           const isPast = i < curSession;
@@ -7553,7 +7587,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           namesMatchLocal(st.name || '', s.name || '')
         );
         if (!studentRec) {
-          cells.push(`<td class="${isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-future att-cell-clickable'}" style="text-align:center" title="${t('att_not_recorded')}" ${isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}',${toggleGi},${i},'${sNameVal.replace(/'/g,"\\'")}')"`}>⋯</td>`);
+          cells.push(`<td class="${isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-future att-cell-clickable'}" style="text-align:center" title="${t('att_not_recorded')}" ${isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}',${toggleGi},${i},this.dataset.sn)" data-sn="${snAttr}"`}>⋯</td>`);
           continue;
         }
         const date = rec.date || '';
@@ -8178,8 +8212,6 @@ window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
   if (window._isTeacherAttendanceView) {
     try {
       const ctrlSnap = await getDoc(doc(db, 'sessionControl', `${teacherId}_g${gi}_session_${sessionNum}`));
-      // إذا كان سجل التحكم موجوداً والحالة locked أو closed → مقفلة
-      // إذا لم يوجد سجل أو الحالة open/scheduled → يسمح بالتعديل
       if (ctrlSnap.exists()) {
         const st = ctrlSnap.data().status;
         if (st === 'locked' || st === 'closed') {
@@ -8188,8 +8220,7 @@ window.toggleDailyAttCell = async (teacherId, gi, sessionNum, studentName) => {
         }
       }
     } catch(e) {
-      showToast('🔒 تعذر التحقق من حالة الحصة', true);
-      return;
+      console.warn('toggleDailyAttCell: session control check failed, allowing edit:', e);
     }
   }
   const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -8348,17 +8379,24 @@ window.refreshUnassignedStudents = () => {
   }
   const allStudents = teacher.students || [];
   const groups = teacher.groups || [];
+  const _normU = (n) => String(n||'').trim().replace(/\s+/g,' ').toLowerCase()
+    .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+    .replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ').trim();
   const assignedNames = new Set();
-  groups.forEach(g => (g.students || []).forEach(s => assignedNames.add(s.trim().toLowerCase())));
-  const unassigned = allStudents.filter(s => !assignedNames.has((s.name || '').trim().toLowerCase()));
+  groups.forEach(g => {
+    if (!g || !g._gid) return; // فقط الأفواج ذات Group ID صالح
+    (g.students || []).forEach(s => assignedNames.add(_normU(s)));
+  });
+  const unassigned = allStudents.filter(s => !assignedNames.has(_normU(s.name)));
 
   // Populate group select
   if (sel) {
     sel.innerHTML = '<option value="">اختر الفوج...</option>';
     groups.forEach((g, i) => {
+      if (!g || !g._gid) return;
       const opt = document.createElement('option');
       opt.value = String(i);
-      opt.textContent = g.name || ('فوج ' + (i + 1));
+      opt.textContent = _displayGroupName(g.name);
       sel.appendChild(opt);
     });
     sel.value = '';
@@ -8411,11 +8449,15 @@ window.addUnassignedToGroup = async () => {
     if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
     const data = snap.data();
     const groups = data.groups || [];
-    if (!groups[gi]) { showToast('⚠️ الفوج الهدف غير موجود', true); return; }
+    if (!groups[gi] || !groups[gi]._gid) { showToast('⚠️ الفوج الهدف غير صالح أو محذوف', true); return; }
     const group = groups[gi];
+    const _normG = (n) => String(n||'').trim().replace(/\s+/g,' ').toLowerCase()
+      .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+      .replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ').trim();
     let added = 0;
     names.forEach(name => {
-      if (!(group.students || []).some(s => s.trim().toLowerCase() === name.trim().toLowerCase())) {
+      const nKey = _normG(name);
+      if (!(group.students || []).some(s => _normG(s) === nKey)) {
         if (!group.students) group.students = [];
         group.students.push(name);
         added++;
@@ -8424,7 +8466,8 @@ window.addUnassignedToGroup = async () => {
     groups[gi] = group;
     const students = data.students || [];
     names.forEach(name => {
-      if (!students.some(s => String(s.name || '').trim().toLowerCase() === name.trim().toLowerCase())) {
+      const nKey = _normG(name);
+      if (!students.some(s => _normG(s.name || '') === nKey)) {
         students.push({ id: 'g_' + Date.now() + '_' + added, name, present: false, marked: false });
       }
     });
@@ -8433,7 +8476,7 @@ window.addUnassignedToGroup = async () => {
     const teacher2 = (allTeachers || []).find(t => t.id === teacherId);
     if (teacher2) { teacher2.groups = groups; teacher2.students = students; }
     if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
-    showToast('✅ تم نقل ' + added + ' تلميذ' + (added > 1 ? 'اً' : '') + ' إلى الفوج "' + (group.name || '') + '"');
+    showToast('✅ تم نقل ' + added + ' تلميذ' + (added > 1 ? 'اً' : '') + ' إلى الفوج "' + (_displayGroupName(group.name)) + '"');
     window._unassignedChecked = {};
     refreshUnassignedStudents();
     await loadAttendanceSummary();
@@ -8860,6 +8903,158 @@ window.addStudentToTeacherAttendance = async (name, receipt, payStatus) => {
   } catch(e) {
     console.error('addStudentToTeacherAttendance error:', e);
     showToast('⚠️ خطأ في إضافة التلميذ: ' + e.message, true);
+  }
+};
+
+// ─── إضافة تلميذ عبر المودال (نظام جديد) ───
+let _addStudentCandidates = [];
+let _addStudentSelected = null; // { name, receipt, payStatus }
+
+window.openAddStudentModal = () => {
+  if (window._isTeacherAttendanceView) { showToast('⚠️ هذه الميزة متاحة فقط للإدارة', true); return; }
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
+  closeAddStudentModal(); // reset
+  const modal = document.getElementById('add-student-modal');
+  if (modal) modal.classList.add('open');
+  const inp = document.getElementById('add-student-search-inp');
+  if (inp) { inp.value = ''; inp.focus(); }
+  // Build candidate list from allTeachers
+  _addStudentCandidates = [];
+  _addStudentSelected = null;
+  const tId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!tId) return;
+  const all = window.allTeachers || [];
+  // Collect unique student names across all teachers
+  const seen = new Set();
+  all.forEach(t => {
+    (t.students || []).forEach(s => {
+      const n = String(s.name || '').trim();
+      if (n && !seen.has(n)) { seen.add(n); _addStudentCandidates.push({ name: n, teacherId: t.id, teacherName: t.name || t.id }); }
+    });
+  });
+  // Sort alphabetically
+  _addStudentCandidates.sort((a,b) => a.name.localeCompare(b.name, 'ar'));
+  _searchAddStudent('');
+};
+
+window.closeAddStudentModal = () => {
+  const modal = document.getElementById('add-student-modal');
+  if (modal) modal.classList.remove('open');
+  document.getElementById('add-student-results').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">✍️ اكتب اسم التلميذ للبحث</div>';
+  document.getElementById('add-student-selected').style.display = 'none';
+  document.getElementById('add-student-selected').innerHTML = '';
+  document.getElementById('add-student-group-wrap').style.display = 'none';
+  _addStudentSelected = null;
+};
+
+window._searchAddStudent = (q) => {
+  const resultsEl = document.getElementById('add-student-results');
+  const qNorm = q.trim().toLowerCase().replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ');
+  if (!qNorm) {
+    // Show recent/popular
+    const top = _addStudentCandidates.slice(0, 30);
+    resultsEl.innerHTML = top.length
+      ? top.map((c, i) => `<button class="asr-item" data-idx="${i}" style="display:flex;align-items:center;gap:6px;width:100%;padding:8px 10px;border-radius:8px;border:none;background:transparent;color:var(--text);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;text-align:right;transition:all 0.1s" onclick="_selectAddStudent(${i})">👤 ${c.name}</button>`).join('')
+      : '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px">📭 لا يوجد تلاميذ</div>';
+    return;
+  }
+  const matched = _addStudentCandidates
+    .map((c,i) => ({c,i}))
+    .filter(({c}) => {
+      const n = c.name.toLowerCase().replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ').trim();
+      return n.includes(qNorm);
+    })
+    .slice(0, 50);
+  resultsEl.innerHTML = matched.length
+    ? matched.map(({c,i}) => `<button class="asr-item" data-idx="${i}" style="display:flex;align-items:center;gap:6px;width:100%;padding:8px 10px;border-radius:8px;border:none;background:transparent;color:var(--text);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;text-align:right;transition:all 0.1s" onclick="_selectAddStudent(${i})">👤 ${c.name}</button>`).join('')
+    : '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px">❌ لا توجد نتائج</div>';
+};
+
+window._selectAddStudent = (idx) => {
+  const c = _addStudentCandidates[idx];
+  if (!c) return;
+  _addStudentSelected = c;
+  // Show selected
+  const sel = document.getElementById('add-student-selected');
+  sel.style.display = 'block';
+  sel.innerHTML = `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;border:2px solid #10b981;background:rgba(16,185,129,0.06)">
+    <span style="font-size:20px">✅</span>
+    <div style="flex:1"><div style="font-size:14px;font-weight:800">${c.name}</div>
+    <div style="font-size:11px;color:var(--text-muted)">📌 ${c.teacherName}</div></div>
+  </div>`;
+  // Check teacher groups
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  const teacher = (window.allTeachers || []).find(t => t.id === teacherId);
+  const groups = teacher?.groups || [];
+  const validGroups = groups.filter(g => g._gid);
+  const gw = document.getElementById('add-student-group-wrap');
+  const gs = document.getElementById('add-student-group-select');
+  if (validGroups.length <= 1) {
+    gw.style.display = 'none';
+  } else {
+    gs.innerHTML = validGroups.map((g,i) => `<option value="${i}">${_displayGroupName(g.name)} (${(g.students||[]).length} طالب)</option>`).join('');
+    gw.style.display = 'block';
+  }
+  // Clear search results
+  document.getElementById('add-student-results').innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px">✅ تم اختيار تلميذ</div>';
+};
+
+window._confirmAddStudent = async () => {
+  if (!_addStudentSelected) { showToast('⚠️ الرجاء اختيار تلميذ أولاً', true); return; }
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
+  const teacher = (window.allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+  const groups = teacher.groups || [];
+  const validGroups = groups.filter(g => g._gid);
+  let targetGi = -1;
+  if (validGroups.length === 1) {
+    targetGi = groups.indexOf(validGroups[0]);
+  } else {
+    targetGi = parseInt(document.getElementById('add-student-group-select')?.value || '');
+  }
+  if (targetGi < 0 || !groups[targetGi]) { showToast('⚠️ الرجاء اختيار الفوج', true); return; }
+  const group = groups[targetGi];
+  // Check if student already in group
+  const name = _addStudentSelected.name;
+  const _normC = (n) => String(n||'').trim().replace(/\s+/g,' ').toLowerCase()
+    .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+    .replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ').trim();
+  const nKey = _normC(name);
+  if ((group.students || []).some(s => _normC(s) === nKey)) {
+    showToast(`⚠️ التلميذ "${name}" موجود مسبقاً في هذا الفوج`, true); return;
+  }
+  const btn = document.querySelector('#add-student-modal .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
+  try {
+    const teacherRef = doc(db, 'teachers', teacherId);
+    const snap = await getDoc(teacherRef);
+    if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+    const data = snap.data();
+    const dGroups = data.groups || [];
+    if (!dGroups[targetGi]) { showToast('⚠️ الفوج غير موجود', true); return; }
+    if (!dGroups[targetGi]._gid) { showToast('⚠️ الفوج غير صالح', true); return; }
+    if (!dGroups[targetGi].students) dGroups[targetGi].students = [];
+    dGroups[targetGi].students.push(name);
+    // Also add to teacher-level students if not present
+    const dStudents = data.students || [];
+    if (!dStudents.some(s => _normC(s.name || '') === nKey)) {
+      dStudents.push({ id: 'g_' + Date.now(), name, present: false, marked: false });
+    }
+    await setDoc(teacherRef, { students: dStudents, groups: dGroups }, { merge: true });
+    // Update local cache
+    const t2 = (window.allTeachers || []).find(t => t.id === teacherId);
+    if (t2) { t2.groups = dGroups; t2.students = dStudents; }
+    if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
+    showToast(`✅ تم إضافة "${name}" إلى الفوج "${_displayGroupName(group.name)}"`);
+    closeAddStudentModal();
+    await loadAttendanceSummary();
+  } catch(e) {
+    console.error('_confirmAddStudent error:', e);
+    showToast('❌ خطأ: ' + e.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '➕ إضافة إلى الفوج'; }
   }
 };
 
