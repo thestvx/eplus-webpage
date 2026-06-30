@@ -3052,11 +3052,19 @@
         <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">✍️ اكتب اسم التلميذ للبحث</div>
       </div>
       <div id="asg-create-section" style="display:none;margin-top:10px;padding:14px;border-radius:12px;background:rgba(251,191,36,0.06);border:1.5px dashed rgba(251,191,36,0.25)">
-        <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:8px">➕ إنشاء تلميذ جديد</div>
-        <div style="display:flex;gap:8px">
-          <input class="inp" type="text" id="asg-create-name" placeholder="الاسم الكامل للتلميذ الجديد..." style="flex:1;font-size:13px" oninput="updateCreateBtn()" onkeydown="if(event.key==='Enter')confirmCreateStudentToGroup()">
-          <button class="btn-primary" id="asg-create-btn" onclick="confirmCreateStudentToGroup()" disabled style="white-space:nowrap;padding:10px 16px">➕ إنشاء وإضافة</button>
+        <div id="asg-manual-trigger" style="text-align:center">
+          <button onclick="_asgShowManualForm()" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 24px;border-radius:12px;border:2px dashed #8b5cf6;background:rgba(139,92,246,0.06);color:#7c3aed;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;width:100%;transition:all 0.2s" onmouseover="this.style.background='rgba(139,92,246,0.12)'" onmouseout="this.style.background='rgba(139,92,246,0.06)'">➕ إضافة تلميذ يدويًا</button>
         </div>
+        <div id="asg-manual-form" style="display:none">
+          <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:8px">✏️ إضافة تلميذ جديد</div>
+          <div style="display:flex;gap:8px">
+            <input class="inp" type="text" id="asg-create-name" placeholder="الاسم الكامل للتلميذ..." style="flex:1;font-size:13px" oninput="updateCreateBtn()" onkeydown="if(event.key==='Enter')confirmCreateStudentToGroup()">
+            <button class="btn-primary" id="asg-create-btn" onclick="confirmCreateStudentToGroup()" disabled style="white-space:nowrap;padding:10px 16px">إنشاء وإضافة</button>
+          </div>
+          <button onclick="_asgHideManualForm()" style="margin-top:8px;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:11px;cursor:pointer;font-family:inherit">إلغاء</button>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:4px">سيتم اعتبار التلميذ غير مشترك، وتبدأ الحصص من تاريخ الإضافة</div>
+        </div>
+      </div>
         <div style="font-size:10px;color:var(--text-muted);margin-top:6px">🕐 سيتم إنشاء التلميذ كـ <strong>غير مشترك</strong>، الحصص السابقة بحالة <strong>غير مسجل</strong></div>
       </div>
     </div>
@@ -9430,34 +9438,51 @@ window.closeAddStudentToGroupModal = () => {
 
 function _asgNorm2(s) { return String(s||'').trim().toLowerCase().replace(/[إأآا]/g,'ا').replace(/[يى]/g,'ي').replace(/[ؤ]/g,'و').replace(/[ئ]/g,'ي').replace(/[ة]/g,'ه').replace(/\s+/g,' ').trim(); }
 
+window._asgShowManualForm = () => {
+  document.getElementById('asg-manual-trigger').style.display = 'none';
+  document.getElementById('asg-manual-form').style.display = 'block';
+  document.getElementById('asg-create-name')?.focus();
+};
+
+window._asgHideManualForm = () => {
+  document.getElementById('asg-manual-form').style.display = 'none';
+  document.getElementById('asg-manual-trigger').style.display = 'block';
+  document.getElementById('asg-create-name').value = '';
+  updateCreateBtn();
+};
+
 window.searchAddStudentToGroup = (q) => {
-  const teacherId = _asgTeacherId;
-  if (!teacherId) return;
-  const teacher = (window.allTeachers || []).find(t => t.id === teacherId);
-  if (!teacher) return;
-  const students = teacher.students || [];
-  const groups = teacher.groups || [];
-  const group = groups.find(g => g && g._gid === _asgGid);
-  const existingNames = new Set((group?.students || []).map(s => _asgNorm2(typeof s === 'object' ? (s.name||'') : s)));
-  const available = students.filter(s => !existingNames.has(_asgNorm2(s.name||'')));
-  const qNorm = _asgNorm2(q);
   const resultsEl = document.getElementById('asg-results');
   const createSection = document.getElementById('asg-create-section');
   createSection.style.display = 'none';
-  if (!qNorm) {
-    resultsEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">✍️ اكتب اسم التلميذ للبحث</div>';
-    return;
-  }
-  const matched = available.filter(s => _asgNorm2(s.name||'').includes(qNorm)).slice(0, 50);
-  if (matched.length) {
-    resultsEl.innerHTML = matched.map(s => {
-      const n = (s.name||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,"&#39;");
+  document.getElementById('asg-manual-trigger').style.display = 'block';
+  document.getElementById('asg-manual-form').style.display = 'none';
+  if (!q) { resultsEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">✍️ اكتب اسم التلميذ للبحث</div>'; return; }
+  const group = (window.allTeachers||[]).flatMap(t=>(t.groups||[])).find(g=>g&&g._gid===_asgGid);
+  const existingSet = new Set((group?.students||[]).map(s=>_asgNorm2(typeof s==='object'?(s.name||''):s)));
+  const qNorm = _asgNorm2(q);
+  const parts = qNorm.split(/\s+/).filter(Boolean);
+  const results = (window._soData||[]).filter(r => {
+    if (existingSet.has(_asgNorm2(r.studentName))) return false;
+    const n = _asgNorm2(r.studentName);
+    if (n === qNorm) return true;
+    if (n.includes(qNorm)) return true;
+    if (parts.length > 1 && parts.every(p => n.includes(p))) return true;
+    return false;
+  }).slice(0, 50);
+  if (results.length) {
+    resultsEl.innerHTML = results.map(r => {
+      const n = (r.studentName||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,"&#39;");
+      const subBadge = r.status === 'paid' ? '<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:#d1fae5;color:#059669;font-weight:700">✅ '+r.pkg+'</span>' : '<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:#fee2e2;color:#dc2626;font-weight:700">❌ غير مشترك</span>';
+      const teacher = r.teacherName && r.teacherName !== '-' ? '<span style="font-size:10px;color:var(--text-muted)">👨‍🏫 '+r.teacherName+'</span>' : '';
+      const grp = r.groupName && r.groupName !== '-' ? '<span style="font-size:10px;color:var(--text-muted)">🏫 '+r.groupName+'</span>' : '';
       return '<div class="asg-result-item" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:all 0.1s" onclick="confirmAddExistingStudentToGroup(\''+n+'\')" onmouseover="this.style.background=\'var(--hover-bg)\'" onmouseout="this.style.background=\'transparent\'">'
-        + '<span style="font-size:13px;font-weight:800;color:var(--text);flex:1">'+n+'</span>'
-        + '<span style="font-size:11px;color:var(--text-muted)">➕ إضافة</span></div>';
+        + '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:6px">👤 '+n+' '+subBadge+'</div>'
+        + '<div style="display:flex;align-items:center;gap:6px;margin-top:2px">'+teacher+' '+grp+'</div></div>'
+        + '<span style="font-size:11px;color:#6366f1;font-weight:700">➕ إضافة</span></div>';
     }).join('');
   } else {
-    resultsEl.innerHTML = '<div style="text-align:center;padding:14px;color:var(--text-muted);font-size:12px">🔍 لم نجد "'+q+'" — يمكنك إضافته يدوياً</div>';
+    resultsEl.innerHTML = '<div style="text-align:center;padding:14px;color:var(--text-muted);font-size:12px">🔍 لم نجد "'+q+'" في قاعدة البيانات</div>';
     createSection.style.display = 'block';
     document.getElementById('asg-create-name').value = q;
     updateCreateBtn();
@@ -9486,6 +9511,11 @@ window.confirmAddExistingStudentToGroup = async (name) => {
       showToast('⚠️ "'+name+'" موجود مسبقاً في هذا الفوج', true); return;
     }
     group.students.push(name);
+    if (!dStudents.some(s => _asgNorm2(s.name||'') === _asgNorm2(name))) {
+      const soEntry = (window._soData||[]).find(r => _asgNorm2(r.studentName) === _asgNorm2(name));
+      const newId = soEntry ? 'linked_'+Date.now()+'_'+Math.random().toString(36).slice(2,8) : 'manual_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+      dStudents.push({ id: newId, name, present: false, marked: false, payStatus: 'unknown', receipt: null });
+    }
     await setDoc(teacherRef, { groups: dGroups, students: dStudents }, { merge: true });
     const t2 = (window.allTeachers || []).find(t => t.id === _asgTeacherId);
     if (t2) { t2.groups = dGroups; t2.students = dStudents; }
@@ -9504,6 +9534,12 @@ window.confirmCreateStudentToGroup = async () => {
   const name = inp ? inp.value.trim() : '';
   if (!name) { showToast('⚠️ الرجاء كتابة اسم التلميذ', true); return; }
   if (!_asgTeacherId || !_asgGid) { showToast('⚠️ بيانات غير كاملة', true); return; }
+  const existing = (window._soData||[]).find(r => _asgNorm2(r.studentName) === _asgNorm2(name));
+  if (existing) {
+    showToast('ℹ️ التلميذ "'+name+'" موجود بالفعل في قاعدة البيانات - جارٍ إضافته إلى الفوج');
+    await confirmAddExistingStudentToGroup(existing.studentName);
+    return;
+  }
   const teacherRef = doc(db, 'teachers', _asgTeacherId);
   try {
     const snap = await getDoc(teacherRef);
