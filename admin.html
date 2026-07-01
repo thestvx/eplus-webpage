@@ -7237,10 +7237,9 @@ const _displayGroupName = (name) => {
 // ─── الترحيل: ضمان وجود _gid لكل فوج عند تحميل الصفحة ───
 let _ensureGroupIdsDone = false;
 async function ensureGroupIds() {
-  if (_ensureGroupIdsDone) return;
-  _ensureGroupIdsDone = true;
   if (!allTeachers || !allTeachers.length) return;
-  // أولاً: تعيين _gid لجميع الأفواج في الذاكرة (متزامن)
+  // ✅ لا نستخدم flag واحد — نتحقق من كل أستاذ على حدة
+  // حتى الأستاذ الجديد يحصل على _gid
   const batchWrites = [];
   for (const t of allTeachers) {
     const groups = t.groups || [];
@@ -7255,11 +7254,10 @@ async function ensureGroupIds() {
       batchWrites.push(updateDoc(doc(db, 'teachers', t.id), { groups }));
     }
   }
-  // ثانياً: الحفظ في Firestore (غير متزامن)
   if (batchWrites.length) {
     try {
       await Promise.all(batchWrites);
-      showToast('✅ تم ترحيل جميع الأفواج إلى نظام المعرفات الجديد');
+      console.log('[ensureGroupIds] Persisted', batchWrites.length, 'teachers with new _gid');
     } catch (e) {
       console.warn('ensureGroupIds batch failed:', e.message);
     }
@@ -7899,7 +7897,15 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   };
 
   groups.forEach((g, gi) => {
-    if (!g._gid) g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+    if (!g._gid) {
+      g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+      // ✅ حفظ _gid الجديد في Firestore فوراً حتى لا يتغير عند إعادة التحميل
+      const _newGid = g._gid;
+      const _tid = teacherId;
+      updateDoc(doc(db, 'teachers', _tid), { groups: groups.map((gg, i) => i === gi ? { ...gg, _gid: _newGid } : gg) })
+        .then(() => console.log('[ensureGid] Persisted new _gid for group', gi, _newGid))
+        .catch(e => console.warn('[ensureGid] Failed to persist _gid:', e.message));
+    }
     const gid = g._gid || '';
     (g.students || []).forEach(sName => {
       let match = students.find(s => namesMatchLocal(s.name, sName));
