@@ -1409,6 +1409,13 @@
     .sync-confirm-bg.open{opacity:1;visibility:visible}
     .sync-confirm-box{background:var(--card-bg);border-radius:28px;width:100%;max-width:400px;box-shadow:0 40px 80px rgba(220,38,38,0.15);transform:translateY(24px) scale(0.96);transition:all 0.35s cubic-bezier(0.2,0.8,0.2,1);overflow:hidden;text-align:center}
     .sync-confirm-bg.open .sync-confirm-box{transform:translateY(0) scale(1)}
+
+    /* ✅ إصلاح Modal positioning — يفرض position:fixed على جميع الخلفيات */
+    .ctrl-modal-bg, .sync-confirm-bg, .env-modal-bg, .finance-modal-bg, [id$="-modal"].open {
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: 9999 !important;
+    }
     .sync-confirm-icon{font-size:44px;margin-bottom:10px}
     .sync-confirm-title{font-size:17px;font-weight:900;color:var(--text);margin-bottom:4px}
     .sync-confirm-sub{font-size:13px;color:var(--text-muted);font-weight:600;line-height:1.7;margin-bottom:20px}
@@ -8072,7 +8079,6 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           const attDataAttrs = `data-att-cell="1" data-teacher-id="${teacherIdVal}" data-gid="${gidVal}" data-session="${i}" data-student-id="${sIdAttr}" data-sn="${snAttr}"`;
           const allAttrs = `${cellClick} ${attDataAttrs}`;
           const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
-          console.log(`[CELL] student="${sNameVal}" session=${i} type=pre-join clickable=${!!cellClick} teacherView=${!!window._isTeacherAttendanceView} locked=${isLocked} gid="${gidVal}"`);
           if (isLocked) {
             cells.push(`<td class="${cellClass}" style="text-align:center" title="غير مسجل (مقفلة)" ${allAttrs}>🔒</td>`);
           } else {
@@ -8086,11 +8092,6 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           const nameKey = _normGi(s.name || '');
           if (nameKey !== studentAttKey) studentRec = studentAttCache[nameKey]?.[i] || null;
         }
-        // Debug: log cache lookup results
-        const groupKeysDebug = { gid: s.gid, groupGid: s.groupGid, groupGi: s.groupGi, gi_prefix: 'gi_' + s.groupGi };
-        const foundInSCache = !!(studentRec);
-        const gsKeys = Object.keys(groupCache).join(',');
-        console.log(`[CACHE] student="${s.name}" id=${sId} session=${i} studentAttKey="${studentAttKey}" foundInStudentCache=${foundInSCache} groupCacheKeys=[${gsKeys}] s.gid="${s.gid}" s.groupGid="${s.groupGid}" s.groupGi=${s.groupGi}`);
         // Fallback: try group-based cache
         let rec = null;
         if (studentRec) {
@@ -8114,14 +8115,11 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           const isPast = i < curSession;
           if (window._isTeacherAttendanceView && isLocked) {
             cells.push(`<td class="att-cell att-cell-locked" style="text-align:center" title="${t('att_missed_session')}" ${allAttrs}>🔒</td>`);
-            console.log(`[CELL] student="${s.name}" session=${i} type=no-record-locked clickable=false teacherView=${!!window._isTeacherAttendanceView} locked=true`);
           } else if (isPast) {
             cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_missed_session')}" ${allAttrs}>⚠️</td>`);
-            console.log(`[CELL] student="${s.name}" session=${i} type=missed clickable=true`);
             totalMissed++;
           } else {
             cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_future_session')}" ${allAttrs}>⋯</td>`);
-            console.log(`[CELL] student="${s.name}" session=${i} type=future clickable=true`);
           }
           continue;
         }
@@ -8135,17 +8133,14 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         }
         if (!studentRec) {
           cells.push(`<td class="${isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-future att-cell-clickable'}" style="text-align:center" title="${t('att_not_recorded')}" ${allAttrs}>⋯</td>`);
-          console.log(`[CELL] student="${s.name}" session=${i} type=not-recorded clickable=${!isLocked}`);
           continue;
         }
         const date = (rec && rec.date) || '';
         if (studentRec.present) {
           cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_present_on')}${date}" ${allAttrs}>✅</td>`);
-          console.log(`[CELL] student="${s.name}" session=${i} type=present clickable=${!isLocked}`);
           totalPresent++;
         } else {
           cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_absent_on')}${date}" ${allAttrs}>❌</td>`);
-          console.log(`[CELL] student="${s.name}" session=${i} type=absent clickable=${!isLocked}`);
           totalAbsent++;
         }
       }
@@ -8204,7 +8199,6 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       const gid = cell.dataset.gid || '';
       const tid = cell.dataset.teacherId || '';
       if (!session || !tid) return;
-      console.log(`[CLICK] teacher=${tid} gid=${gid} session=${session} student="${studentName}" id=${studentId}`);
       toggleDailyAttCell(tid, gid, session, studentId, studentName);
     };
     tbody.addEventListener('click', attClickHandler);
@@ -8889,9 +8883,9 @@ window.confirmMoveGroup = async () => {
       }
     }
 
-    // 3. حفظ الأفواج
-    await setDoc(teacherRef, { groups: groupsArr }, { merge: true });
+    // 3. حفظ الأفواج — ✅ batch أولاً ثم setDoc (لضمان الاتساق)
     await batch.commit();
+    await setDoc(teacherRef, { groups: groupsArr }, { merge: true });
 
     // 4. تحديث الكاش
     if (teacher.groups) teacher.groups = groupsArr;
@@ -9319,13 +9313,15 @@ window.confirmDelGroup = async () => {
     groupsArr.splice(gi, 1);
 
     // Delete/re-index session attendance and control documents
+    // ✅ البحث بالـ gid (المعرّف الوحيد) بدلاً من regex القديم
     const batch = writeBatch(db);
+    // حذف جميع sessionAttendance لهذا الفوج via gid field
     const sessQuery = query(
       collection(db, 'sessionAttendance'),
-      where('teacherId', '>=', teacherId + '_g0'),
-      where('teacherId', '<=', teacherId + '_g\uF8FF')
+      where('gid', '==', gid)
     );
     const sessSnap = await getDocs(sessQuery);
+    // حذف جميع sessionControl لهذا الفوج
     const ctrlQuery = query(
       collection(db, 'sessionControl'),
       where('teacherId', '>=', teacherId + '_g0'),
@@ -9333,18 +9329,11 @@ window.confirmDelGroup = async () => {
     );
     const ctrlSnap = await getDocs(ctrlQuery);
 
+    // حذف sessions هذا الفوج
     sessSnap.forEach(docSnap => {
-      const d2 = docSnap.data();
-      const gStr = String(d2.teacherId || '');
-      const match = gStr.match(/_g(\d+)$/);
-      if (!match) return;
-      const oldGi = parseInt(match[1]);
-      if (oldGi === gi) {
-        batch.delete(docSnap.ref);
-      } else if (oldGi > gi) {
-        batch.update(docSnap.ref, { teacherId: gStr.replace(/_g\d+$/, '_g' + (oldGi - 1)) });
-      }
+      batch.delete(docSnap.ref);
     });
+    // حذف/إعادة فهرسة sessionControl
     ctrlSnap.forEach(docSnap => {
       const d2 = docSnap.data();
       const gStr = String(d2.teacherId || '');
@@ -10135,9 +10124,16 @@ window.saveTeacherEdit = async () => {
   const groups = collectGroups('edit-groups-list');
   if (!name || !spec || !days.length) { showToast('❌ ملء الاسم والتخصص والأيام مطلوب', true); return; }
 
-  // ── نسخ احتياطي للأفواج قبل الحفظ ──
-  const teacher = allTeachers.find(t => t.id === id);
-  const oldGroups = teacher ? JSON.parse(JSON.stringify(teacher.groups || [])) : [];
+  // ✅ قراءة من Firestore أولاً (مصدر الحقيقة) بدلاً من الكاش في الذاكرة
+  let freshData = null;
+  try {
+    const freshSnap = await getDoc(doc(db, 'teachers', id));
+    if (freshSnap.exists()) freshData = freshSnap.data();
+  } catch (e) { console.warn('Firestore read failed, using cache:', e.message); }
+
+  const teacher = allTeachers.find(t => t.id === id) || (freshData ? { id, ...freshData } : null);
+  const existingStudents = teacher ? [...(teacher.students || [])] : [];
+  const oldGroups = freshData ? JSON.parse(JSON.stringify(freshData.groups || [])) : (teacher ? JSON.parse(JSON.stringify(teacher.groups || [])) : []);
 
   // ── كشف التغييرات في الأفواج (باستخدام _gid) ──
   const oldGids = new Set(oldGroups.map(g => g._gid));
@@ -10165,7 +10161,6 @@ window.saveTeacherEdit = async () => {
   }
 
   // ── مزامنة تلاميذ الأفواج مع قائمة students الرئيسية ──
-  const existingStudents = teacher ? [...(teacher.students || [])] : [];
 
   // جمع كل أسماء التلاميذ من جميع الأفواج
   const allGroupStudentNames = new Set();
@@ -10325,11 +10320,28 @@ window.openAttModal = async (teacherId) => {
     sessSnap.forEach(d => {
       const data = d.data();
       if (!data.sessionNum) return;
-      const gStr = String(data.teacherId || '');
-      const gi = parseInt((gStr.match(/_g(\d+)$/) || [0,0])[1]);
-      if (!_allRecordedSessionsByGroup[gi]) _allRecordedSessionsByGroup[gi] = {};
-      _allRecordedSessionsByGroup[gi][data.sessionNum] = data;
-      if (gi === 0) _allRecordedSessions[data.sessionNum] = data;
+      // ✅ استخدام data.gid كمفتاح رئيسي (المصدر الوحيد)
+      // fallback: استخراج gid من معرّف المستند
+      // fallback أخير: استخراج gi من حقل teacherId القديم
+      let cacheKey = data.gid || extractGidFromDoc(d.id);
+      if (!cacheKey) {
+        const gStr = String(data.teacherId || '');
+        const giMatch = gStr.match(/_g(\d+)$/);
+        cacheKey = 'gi_' + (giMatch ? giMatch[1] : '0');
+      }
+      // حفظGi numeric للتوافق مع المودال (الذي يستخدم فهرس المجموعة)
+      let giIdx = -1;
+      if (typeof cacheKey === 'string' && !cacheKey.startsWith('gi_')) {
+        // ابحث عن الفهرس الذي يتوافق مع هذا gid
+        const groups = window._activeAttGroups || [];
+        giIdx = groups.findIndex(g => g && g._gid === cacheKey);
+      } else if (typeof cacheKey === 'string' && cacheKey.startsWith('gi_')) {
+        giIdx = parseInt(cacheKey.slice(3));
+      }
+      if (giIdx < 0) giIdx = 0; // fallback
+      if (!_allRecordedSessionsByGroup[giIdx]) _allRecordedSessionsByGroup[giIdx] = {};
+      _allRecordedSessionsByGroup[giIdx][data.sessionNum] = { ...data, _cacheKey: cacheKey };
+      if (giIdx === 0) _allRecordedSessions[data.sessionNum] = _allRecordedSessionsByGroup[giIdx][data.sessionNum];
     });
   } catch(e) {}
   // تحميل sessionControl لكل الأفواج
@@ -11176,6 +11188,9 @@ window.saveAttendance = async () => {
   const gi = (typeof window._activeAttGroupIdx === 'number')
     ? window._activeAttGroupIdx
     : (typeof window._currentGroupIdx === 'number' ? window._currentGroupIdx : 0);
+  // ✅ استخدام _gid (المعرّف الوحيد) بدلاً من gi
+  const gid = window._activeAttGroups?.[gi]?._gid || resolveGid(tid, gi);
+  if (!gid) { showToast('⚠️ خطأ: معرّف الفوج غير موجود', true); return; }
   const todayKey = new Date().toISOString().slice(0,10);
   // ✅ إصلاح: حفظ تلاميذ الفوج المحدد فقط (وليس كل التلاميذ)
   let studentsToSave = currentAttStudents;
@@ -11188,9 +11203,8 @@ window.saveAttendance = async () => {
   const existingSessions = _allRecordedSessionsByGroup[gi] || {};
   let sessionNum = 1;
   for (let i = 1; i <= 12; i++) { if (!existingSessions[i]) { sessionNum = i; break; } }
-  const groupSuffix = '_g' + gi;
-  const sessionKey  = tid + groupSuffix + '_session_' + sessionNum;
-  const record = { teacherId: tid + groupSuffix, sessionNum, date: todayKey, savedAt: serverTimestamp(), students };
+  const sessionKey = makeSessionDocKey(tid, gid, sessionNum);
+  const record = { teacherId: tid + '_' + gid, gid, sessionNum, date: todayKey, savedAt: serverTimestamp(), students };
   try {
     await setDoc(doc(db, 'sessionAttendance', sessionKey), record);
     await setDoc(doc(db, 'attendance', tid + '_' + todayKey),
@@ -11460,6 +11474,24 @@ function extractGidFromDoc(docId) {
   let m = docId.match(/_(g_\d+_\w+)_session_(\d+)$/);
   if (m) return m[1];
   return null; // صيغة قديمة → سيستخدم المتصل gi_prefix
+}
+
+// حل helper: تحويل gi (فهرس الفوج) إلى _gid (المعرّف الوحيد)
+// مصدر الحقيقة: allTeachers[teacherId].groups[gi]._gid
+function resolveGid(teacherId, gi) {
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  const groups = teacher?.groups || [];
+  if (groups[gi] && groups[gi]._gid) return groups[gi]._gid;
+  // fallback: ابحث في window._activeAttGroups
+  const activeGroups = window._activeAttGroups || [];
+  if (activeGroups[gi] && activeGroups[gi]._gid) return activeGroups[gi]._gid;
+  return null;
+}
+
+// إنشاء مفتاح وثيقة الحضور (المصدر الوحيد لสร้าง مفاتيح المستندات)
+// يستخدم _gid دائماً. الصيغة: {teacherId}_{gid}_session_{sessionNum}
+function makeSessionDocKey(teacherId, gid, sessionNum) {
+  return `${teacherId}_${gid}_session_${sessionNum}`;
 }
 
 // حفظ إعدادات التحكم لحصة معينة
@@ -12708,9 +12740,16 @@ window.closeEnvModal = async () => {
 
 // ═══════════════════════════════════════════════
 async function loadSessionsDataForGroup(teacherId, teacherData, sessions, gi, groupData) {
-  const groupSuffix = `_g${gi}`;
+  // ✅ استخدام _gid (المعرّف الوحيد) للاستعلام بدلاً من gi (الفهرس)
+  const gid = groupData?._gid || window._activeAttGroups?.[gi]?._gid || resolveGid(teacherId, gi);
+  if (!gid) {
+    console.warn('[loadSessionsDataForGroup] No gid found for gi', gi, '— skipping');
+    return;
+  }
+  // استعلام by gid field (الم字段 الجديد)
+  // مع fallback للصيغة القديمة إذا وُجدت مستندات قديمة
   onSnapshot(
-    query(collection(db, 'sessionAttendance'), where('teacherId', '==', teacherId + groupSuffix)),
+    query(collection(db, 'sessionAttendance'), where('gid', '==', gid)),
     snap => {
       const recordedSessions = {};
       snap.docs.forEach(d => {
@@ -12722,7 +12761,7 @@ async function loadSessionsDataForGroup(teacherId, teacherData, sessions, gi, gr
   );
   // استماع لتغييرات sessionControl لهذا الفوج
   onSnapshot(
-    query(collection(db, 'sessionControl'), where('teacherId', '==', teacherId + groupSuffix)),
+    query(collection(db, 'sessionControl'), where('teacherId', '==', teacherId + '_g' + gi)),
     snap => {
       if (!_sessionControlCache[gi]) _sessionControlCache[gi] = {};
       let changed = false;
@@ -13252,18 +13291,32 @@ window.editSession_g = async (sessionNum, gi) => {
   const tid = currentAttTeacherId;
   if (!tid) return;
 
-  // نفس المفتاح المستخدم في saveSessionAttendance_g
-  const sessionKey = `${tid}_g${gi}_session_${sessionNum}`;
-  const docRef     = doc(db, 'sessionAttendance', sessionKey);
-  const docSnap    = await getDoc(docRef);
+  // ✅ استخدام _gid مع fallback للصيغة القديمة
+  const gid = window._activeAttGroups?.[gi]?._gid || resolveGid(tid, gi);
+  let docRef, docSnap;
 
-  let savedStudents = [];
-  if (docSnap.exists()) {
-    savedStudents = docSnap.data().students || [];
-  } else {
-    showToast('⚠️ لم يُعثر على سجل لهذه الحصة', true);
-    return;
+  // محاولة 1: الصيغة الجديدة (gid-based)
+  if (gid) {
+    const newKey = makeSessionDocKey(tid, gid, sessionNum);
+    docRef = doc(db, 'sessionAttendance', newKey);
+    docSnap = await getDoc(docRef);
   }
+
+  // محاولة 2: الصيغة القديمة (gi-based) — fallback
+  if (!docSnap || !docSnap.exists()) {
+    const legacyKey = `${tid}_g${gi}_session_${sessionNum}`;
+    const legacyRef = doc(db, 'sessionAttendance', legacyKey);
+    const legacySnap = await getDoc(legacyRef);
+    if (legacySnap.exists()) {
+      docRef = legacyRef;
+      docSnap = legacySnap;
+    } else if (!docSnap || !docSnap.exists()) {
+      showToast('⚠️ لم يُعثر على سجل لهذه الحصة', true);
+      return;
+    }
+  }
+
+  const savedStudents = docSnap.data()?.students || [];
 
   // ✅ تحقق من نافذة 24 ساعة للأستاذ فقط
   if (isTeacherMode) {
@@ -13285,6 +13338,7 @@ window.editSession_g = async (sessionNum, gi) => {
   window._currentGroupIdx = gi;
   window._activeAttGroupIdx = gi; // ✅ إصلاح: مزامنة _activeAttGroupIdx لدالة addStudent
   window._editingDocRef    = docRef;
+  window._editingGid       = gid || null; // ✅ حفظ الـ gid لاستخدامه في الحفظ
 
   const teacherGroups = (window.currentTeacherData?.groups) || (allTeachers||[]).find(x => x.id === currentAttTeacherId)?.groups || window._activeAttGroups || [];
   const groupName = teacherGroups[gi]?.name || '';
@@ -13406,8 +13460,11 @@ window.saveEditedSession_g = async (sessionNum, gi) => {
       showToast('⚠️ لا يوجد تلاميذ للحفظ — حاول مرة أخرى', true);
       return;
     }
+    // ✅ استخدام _gid (المعرّف الوحيد) في حقل teacherId
+    const editGid = window._editingGid || resolveGid(currentAttTeacherId, gi) || '';
     await setDoc(docRef, {
-      teacherId: currentAttTeacherId + `_g${gi}`,
+      teacherId: currentAttTeacherId + '_' + editGid,
+      gid: editGid,
       sessionNum,
       students: savedStudents,
       editedAt: serverTimestamp(),
@@ -13487,8 +13544,13 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
     showToast('⚠️ خطأ: لم يتم تحديد الأستاذ، يرجى إعادة تحميل الصفحة', true);
     return;
   }
-  const groupSuffix = `_g${gi}`;
-  const sessionKey  = `${currentAttTeacherId}${groupSuffix}_session_${sessionNum}`;
+  // ✅ استخدام _gid (المعرّف الوحيد) بدلاً من gi (الفهرس)
+  const gid = window._activeAttGroups?.[gi]?._gid || resolveGid(currentAttTeacherId, gi);
+  if (!gid) {
+    showToast('⚠️ خطأ: لم يتم العثور على معرّف الفوج', true);
+    return;
+  }
+  const sessionKey  = makeSessionDocKey(currentAttTeacherId, gid, sessionNum);
   // ✅ إصلاح: استخدام التاريخ من حقل الإدخال (للأدمين) أو تاريخ اليوم
   const dateInput = document.getElementById('session-date-input');
   const todayDateKey = dateInput ? dateInput.value : new Date().toISOString().slice(0, 10);
@@ -13522,7 +13584,8 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
     : currentAttStudents.map(s => ({ id: s.id, name: s.name, present: !!s.present }));
 
   const record = {
-    teacherId: currentAttTeacherId + groupSuffix,
+    teacherId: currentAttTeacherId + '_' + gid,
+    gid: gid,
     sessionNum,
     date: todayDateKey,
     savedAt: serverTimestamp(),
