@@ -8054,7 +8054,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         groupCache[s.groupGid] || {},
         groupCache['gi_' + s.groupGi] || {}
       );
-      const ctrlMap = sessionCtrlMap[s.groupGi] || {};
+        const ctrlMap = sessionCtrlMap[s.groupGi] || {};
       const cells = [];
       const sId = s.id || '';
       const studentAttKey = sId || _normGi(s.name || '');
@@ -8068,13 +8068,15 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           const sIdAttr = sId.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
           const gidVal = s.gid || s.groupGid || '';
           const snAttr = sNameVal.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+          const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}','${gidVal}',${i},this.dataset.studentId,this.dataset.sn)"`;
           const attDataAttrs = `data-att-cell="1" data-teacher-id="${teacherIdVal}" data-gid="${gidVal}" data-session="${i}" data-student-id="${sIdAttr}" data-sn="${snAttr}"`;
+          const allAttrs = `${cellClick} ${attDataAttrs}`;
           const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
-          console.log(`[CELL] student="${sNameVal}" session=${i} type=pre-join clickable=${!isLocked} teacherView=${!!window._isTeacherAttendanceView} locked=${isLocked} gid="${gidVal}"`);
+          console.log(`[CELL] student="${sNameVal}" session=${i} type=pre-join clickable=${!!cellClick} teacherView=${!!window._isTeacherAttendanceView} locked=${isLocked} gid="${gidVal}"`);
           if (isLocked) {
-            cells.push(`<td class="${cellClass}" style="text-align:center" title="غير مسجل (مقفلة)" ${attDataAttrs}>🔒</td>`);
+            cells.push(`<td class="${cellClass}" style="text-align:center" title="غير مسجل (مقفلة)" ${allAttrs}>🔒</td>`);
           } else {
-            cells.push(`<td class="${cellClass}" style="text-align:center;background:transparent;color:var(--text-muted);font-size:11px" title="غير مسجل — اضغط للتسجيل" ${attDataAttrs}>—</td>`);
+            cells.push(`<td class="${cellClass}" style="text-align:center;background:transparent;color:var(--text-muted);font-size:11px" title="غير مسجل — اضغط للتسجيل" ${allAttrs}>—</td>`);
           }
           continue;
         }
@@ -8084,6 +8086,11 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           const nameKey = _normGi(s.name || '');
           if (nameKey !== studentAttKey) studentRec = studentAttCache[nameKey]?.[i] || null;
         }
+        // Debug: log cache lookup results
+        const groupKeysDebug = { gid: s.gid, groupGid: s.groupGid, groupGi: s.groupGi, gi_prefix: 'gi_' + s.groupGi };
+        const foundInSCache = !!(studentRec);
+        const gsKeys = Object.keys(groupCache).join(',');
+        console.log(`[CACHE] student="${s.name}" id=${sId} session=${i} studentAttKey="${studentAttKey}" foundInStudentCache=${foundInSCache} groupCacheKeys=[${gsKeys}] s.gid="${s.gid}" s.groupGid="${s.groupGid}" s.groupGi=${s.groupGi}`);
         // Fallback: try group-based cache
         let rec = null;
         if (studentRec) {
@@ -8099,19 +8106,21 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         const snAttr = sNameVal.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
         const sIdAttr = sId.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
         const gidVal = s.gid || s.groupGid || '';
+        const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}','${gidVal}',${i},this.dataset.studentId,this.dataset.sn)"`;
         const attDataAttrs = `data-att-cell="1" data-teacher-id="${teacherIdVal}" data-gid="${gidVal}" data-session="${i}" data-student-id="${sIdAttr}" data-sn="${snAttr}"`;
+        const allAttrs = cellClick ? `${cellClick} ${attDataAttrs}` : attDataAttrs;
         const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
         if (!rec && !studentRec) {
           const isPast = i < curSession;
           if (window._isTeacherAttendanceView && isLocked) {
-            cells.push(`<td class="att-cell att-cell-locked" style="text-align:center" title="${t('att_missed_session')}" ${attDataAttrs}>🔒</td>`);
+            cells.push(`<td class="att-cell att-cell-locked" style="text-align:center" title="${t('att_missed_session')}" ${allAttrs}>🔒</td>`);
             console.log(`[CELL] student="${s.name}" session=${i} type=no-record-locked clickable=false teacherView=${!!window._isTeacherAttendanceView} locked=true`);
           } else if (isPast) {
-            cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_missed_session')}" ${attDataAttrs}>⚠️</td>`);
+            cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_missed_session')}" ${allAttrs}>⚠️</td>`);
             console.log(`[CELL] student="${s.name}" session=${i} type=missed clickable=true`);
             totalMissed++;
           } else {
-            cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_future_session')}" ${attDataAttrs}>⋯</td>`);
+            cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_future_session')}" ${allAttrs}>⋯</td>`);
             console.log(`[CELL] student="${s.name}" session=${i} type=future clickable=true`);
           }
           continue;
@@ -8125,17 +8134,17 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           }
         }
         if (!studentRec) {
-          cells.push(`<td class="${isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-future att-cell-clickable'}" style="text-align:center" title="${t('att_not_recorded')}" ${attDataAttrs}>⋯</td>`);
+          cells.push(`<td class="${isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-future att-cell-clickable'}" style="text-align:center" title="${t('att_not_recorded')}" ${allAttrs}>⋯</td>`);
           console.log(`[CELL] student="${s.name}" session=${i} type=not-recorded clickable=${!isLocked}`);
           continue;
         }
         const date = (rec && rec.date) || '';
         if (studentRec.present) {
-          cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_present_on')}${date}" ${attDataAttrs}>✅</td>`);
+          cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_present_on')}${date}" ${allAttrs}>✅</td>`);
           console.log(`[CELL] student="${s.name}" session=${i} type=present clickable=${!isLocked}`);
           totalPresent++;
         } else {
-          cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_absent_on')}${date}" ${attDataAttrs}>❌</td>`);
+          cells.push(`<td class="${cellClass}" style="text-align:center" title="${t('att_absent_on')}${date}" ${allAttrs}>❌</td>`);
           console.log(`[CELL] student="${s.name}" session=${i} type=absent clickable=${!isLocked}`);
           totalAbsent++;
         }
@@ -8626,7 +8635,17 @@ window.openMoveGroupModal = async (sourceGid) => {
   document.getElementById('move-group-modal').classList.add('open');
   document.getElementById('move-group-confirm-btn').style.display = 'none';
   const content = document.getElementById('move-group-content');
-  const studentCount = (srcGroup.students || []).length;
+  let studentCount = (srcGroup.students || []).length;
+  // إذا كان count صفراً ابحث عن التلاميذ من session docs
+  if (!studentCount) {
+    try {
+      const srcQ = query(collection(db, 'sessionAttendance'), where('gid', '==', sourceGid));
+      const srcSnap = await getDocs(srcQ);
+      const nameSet = new Set();
+      srcSnap.forEach(d => { (d.data().students || []).forEach(st => { const sn = String(st.name || '').trim(); if (sn) nameSet.add(sn); }); });
+      studentCount = nameSet.size;
+    } catch(_){}
+  }
   const srcName = srcGroup.name || '—';
 
   // بناء قائمة الأفواج الهدف (باستثناء المصدر)
@@ -8736,6 +8755,46 @@ window.confirmMoveGroup = async () => {
         }
       } catch (e3) {
         console.warn('[MoveGroup] Session lookup by gi failed', e3.message);
+      }
+    }
+
+    // Fallback 3: scan ALL session docs for this teacher via range query (catches both old and new formats)
+    if (!studentsToMove.length) {
+      try {
+        const sessRangeQ = query(
+          collection(db, 'sessionAttendance'),
+          where('teacherId', '>=', teacherId + '_g0'),
+          where('teacherId', '<=', teacherId + '_g\uF8FF')
+        );
+        const sessSnapAll = await getDocs(sessRangeQ);
+        const namesFromAll = new Set();
+        sessSnapAll.forEach(d => {
+          const d2 = d.data();
+          let belongsToSource = false;
+          const docGid = d2.gid || '';
+          if (docGid) {
+            if (docGid === sourceGid) belongsToSource = true;
+          } else {
+            const gStr2 = String(d2.teacherId || '');
+            const match2 = gStr2.match(/_g(\d+)$/);
+            if (match2) {
+              const gi2 = parseInt(match2[1]);
+              if (gi2 === srcIdx) belongsToSource = true;
+            }
+          }
+          if (belongsToSource) {
+            (d2.students || []).forEach(st => {
+              const sn = String(st.name || '').trim();
+              if (sn) namesFromAll.add(sn);
+            });
+          }
+        });
+        if (namesFromAll.size > 0) {
+          studentsToMove = [...namesFromAll];
+          console.log('[MoveGroup] Found', studentsToMove.length, 'students via range scan');
+        }
+      } catch (e4) {
+        console.warn('[MoveGroup] Range scan failed', e4.message);
       }
     }
 
