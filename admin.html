@@ -9894,9 +9894,66 @@ window.openAddStudentToGroup = async (gid) => {
   // البحث عن الفوج في جميع المصادر
   const result = await _resolveGroup(gid, teacherId);
   if (!result.group) {
-    console.error('[openAddStudentToGroup] ❌ الفوج غير موجود بعد البحث في جميع المصادر', { gid, teacherId });
-    showToast('⚠️ الفوج غير موجود في قاعدة البيانات بعد التحقق', true);
-    return;
+    // ─── Fallback: إنشاء الفوج تلقائياً من بيانات الواجهة ───
+    console.warn('[openAddStudentToGroup] ⚠️ لم يجد الفوج، بدء الإنشاء التلقائي (Lazy Creation)', { gid, teacherId });
+
+    // استخراج اسم الفوج من DOM (الزر الموجود داخل صف الفوج)
+    let groupName = 'فوج';
+    try {
+      const btn = document.querySelector(`button[data-gid="${gid}"]`);
+      if (btn) {
+        const td = btn.closest('td');
+        if (td) {
+          const txt = td.textContent || '';
+          const m = txt.match(/🏫\s*(.+?)\s*(?:$|[➕✏️📦🗑️])/);
+          if (m) groupName = m[1].trim();
+        }
+      }
+    } catch(_) {}
+
+    // إنشاء كائن فوج مؤقت
+    const fallbackGroup = {
+      _gid: gid,
+      name: groupName,
+      students: [],
+      days: []
+    };
+
+    // محاولة حفظ الفوج الجديد في Firestore
+    try {
+      const teacherRef = doc(db, 'teachers', teacherId);
+      const snap = await getDoc(teacherRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        const groups = data.groups || [];
+        // تأكد من عدم وجود فوج بنفس الـ _gid (تجنب التكرار)
+        if (!groups.some(g => g && g._gid === gid)) {
+          groups.push(fallbackGroup);
+          await setDoc(teacherRef, { groups }, { merge: true });
+        }
+        // تحديث الذاكرة
+        const teacher = (allTeachers || []).find(t => t.id === teacherId);
+        if (teacher) teacher.groups = groups;
+        console.log('[openAddStudentToGroup] ✅ تم إنشاء الفوج تلقائياً:', groupName);
+      }
+    } catch(e) {
+      console.warn('[openAddStudentToGroup] ⚠️ فشل حفظ الفوج في Firestore:', e.message);
+      // حتى لو فشل الحفظ، استمر باستخدام البيانات المحلية
+      const teacher = (allTeachers || []).find(t => t.id === teacherId);
+      if (teacher) {
+        if (!teacher.groups) teacher.groups = [];
+        if (!teacher.groups.some(g => g && g._gid === gid)) {
+          teacher.groups.push(fallbackGroup);
+        }
+      }
+    }
+
+    // تعيين النتيجة من الفوج المُنشأ
+    result.group = fallbackGroup;
+    result.teacher = (allTeachers || []).find(t => t.id === teacherId) || result.teacher;
+    result.groups = result.teacher?.groups || [fallbackGroup];
+    result.source = 'lazy-created';
+    console.log('[openAddStudentToGroup] ✅ متابعة العملية بالفوج المُنشأ:', groupName);
   }
 
   // تخزين المرجع للاستخدام المتزامن
