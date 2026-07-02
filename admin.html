@@ -8007,7 +8007,6 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       const csvStudentKey = s2.id || _normGi(s2.name || '');
       for (let idx2 = 0; idx2 < sessionRange.length; idx2++) {
         const i2 = sessionRange[idx2];
-        if (s2.joinedAtSession && i2 < s2.joinedAtSession) { csvVals.push('—'); continue; }
         // Try student-attendance cache first
         let stuRec2 = studentAttCache[csvStudentKey]?.[i2] || null;
         if (!stuRec2) {
@@ -8073,25 +8072,6 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       const studentAttKey = sId || _normGi(s.name || '');
       for (let idx = 0; idx < sessionRange.length; idx++) {
         const i = sessionRange[idx];
-        if (s.joinedAtSession && i < s.joinedAtSession) {
-          const ctrl = ctrlMap[i];
-          const ctrlStatus = ctrl && ctrl.status;
-          const isLocked = window._isTeacherAttendanceView && (ctrlStatus === 'locked' || ctrlStatus === 'closed');
-          const sNameVal = s.name;
-          const sIdAttr = sId.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-          const gidVal = s.gid || s.groupGid || '';
-          const snAttr = sNameVal.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-          const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}','${gidVal}',${i},this.dataset.studentId,this.dataset.sn)"`;
-          const attDataAttrs = `data-att-cell="1" data-teacher-id="${teacherIdVal}" data-gid="${gidVal}" data-session="${i}" data-student-id="${sIdAttr}" data-sn="${snAttr}"`;
-          const allAttrs = `${cellClick} ${attDataAttrs}`;
-          const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
-          if (isLocked) {
-            cells.push(`<td class="${cellClass}" style="text-align:center" title="غير مسجل (مقفلة)" ${allAttrs}>🔒</td>`);
-          } else {
-            cells.push(`<td class="${cellClass}" style="text-align:center;background:transparent;color:var(--text-muted);font-size:11px" title="غير مسجل — اضغط للتسجيل" ${allAttrs}>—</td>`);
-          }
-          continue;
-        }
         // Try student-centric cache first (finds attendance by student ID regardless of group key)
         let studentRec = studentAttCache[studentAttKey]?.[i] || null;
         if (!studentRec) {
@@ -8117,6 +8097,8 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         const attDataAttrs = `data-att-cell="1" data-teacher-id="${teacherIdVal}" data-gid="${gidVal}" data-session="${i}" data-student-id="${sIdAttr}" data-sn="${snAttr}"`;
         const allAttrs = cellClick ? `${cellClick} ${attDataAttrs}` : attDataAttrs;
         const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
+        // Debug: log every cell
+        console.log(`[CELL] student="${s.name}" id="${sId}" teacher="${teacherId}" gid="${gidVal}" session=${i} clickable=${!isLocked} isPast=${i < curSession} reason=${!isLocked ? 'none' : 'locked_by_control'} cellClass="${cellClass}"`);
         if (!rec && !studentRec) {
           const isPast = i < curSession;
           if (window._isTeacherAttendanceView && isLocked) {
@@ -12071,7 +12053,7 @@ window.saveNewGroup = async () => {
     let addedCount = 0;
     selected.forEach(name => {
       if (!studentsList.some(s => String(s.name || '').trim().toLowerCase() === name.toLowerCase())) {
-        studentsList.push({ id: 'g_' + Date.now() + '_' + addedCount, name, present: false, marked: false, joinedAtSession: curSessionNum });
+        studentsList.push({ id: 'g_' + Date.now() + '_' + addedCount, name, present: false, marked: false });
         addedCount++;
       }
     });
