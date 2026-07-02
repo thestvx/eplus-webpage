@@ -8608,15 +8608,21 @@ window.openMoveGroupModal = async (sourceGid) => {
   if (!sourceGid) { showToast('⚠️ معرف الفوج المصدر غير صالح', true); return; }
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
-  const teacher = (allTeachers || []).find(t => t.id === teacherId);
-  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
-  const groups = teacher.groups || [];
-  const srcGroup = groups.find(g => g && g._gid === sourceGid);
-  if (!srcGroup) { showToast('⚠️ الفوج المصدر غير موجود', true); return; }
+
+  // الباحث العالمي عن الفوج
+  const res = await _resolveGroup(sourceGid, teacherId);
+  if (!res.group) {
+    console.error('[openMoveGroupModal] ❌ الفوج المصدر غير موجود', { sourceGid, teacherId });
+    showToast('⚠️ الفوج المصدر غير موجود بعد التحقق من قاعدة البيانات', true);
+    return;
+  }
+
   _moveFromGid = sourceGid;
   document.getElementById('move-group-modal').classList.add('open');
   document.getElementById('move-group-confirm-btn').style.display = 'none';
   const content = document.getElementById('move-group-content');
+  const srcGroup = res.group;
+  const groups = res.groups || [];
   let studentCount = (srcGroup.students || []).length;
   // إذا كان count صفراً ابحث عن التلاميذ من session docs
   if (!studentCount) {
@@ -8673,9 +8679,36 @@ window.confirmMoveGroup = async () => {
     if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
     const data = snap.data();
     let groupsArr = data.groups || [];
-    const srcIdx = groupsArr.findIndex(g => g && g._gid === sourceGid);
-    const tgtIdx = groupsArr.findIndex(g => g && g._gid === targetGid);
-    if (srcIdx < 0 || tgtIdx < 0) { showToast('⚠️ أحد الأفواج غير موجود', true); return; }
+
+    // البحث عن الفوج المصدر والهدف باستخدام الباحث العالمي
+    const srcRes = await _resolveGroup(sourceGid, teacherId);
+    const tgtRes = await _resolveGroup(targetGid, teacherId);
+    if (!srcRes.group || !tgtRes.group) {
+      const missing = !srcRes.group ? 'المصدر' : 'الهدف';
+      console.error('[confirmMoveGroup] ❌ الفوج ' + missing + ' غير موجود', { sourceGid, targetGid, teacherId });
+      showToast('⚠️ الفوج ' + missing + ' غير موجود بعد التحقق من قاعدة البيانات', true);
+      return;
+    }
+    // استخدام البيانات الطازجة من Firestore
+    let srcIdx = groupsArr.findIndex(g => g && g._gid === sourceGid);
+    let tgtIdx = groupsArr.findIndex(g => g && g._gid === targetGid);
+    if (srcIdx < 0 || tgtIdx < 0) {
+      //尝试 مرة أخرى بالاسم
+      const srcName = srcRes.group.name;
+      const tgtName = tgtRes.group.name;
+      const srcIdx2 = groupsArr.findIndex(g => g && (g._gid === sourceGid || g.name === srcName));
+      const tgtIdx2 = groupsArr.findIndex(g => g && (g._gid === targetGid || g.name === tgtName));
+      if (srcIdx2 < 0 || tgtIdx2 < 0) {
+        console.error('[confirmMoveGroup] ❌ لم يجد الأفواج حتى بالاسم', { srcIdx2, tgtIdx2 });
+        showToast('⚠️ أحد الأفواج غير موجود في قاعدة البيانات', true);
+        return;
+      }
+      // إصلاح الـ _gid
+      if (srcIdx2 >= 0 && !groupsArr[srcIdx2]._gid) groupsArr[srcIdx2]._gid = sourceGid;
+      if (tgtIdx2 >= 0 && !groupsArr[tgtIdx2]._gid) groupsArr[tgtIdx2]._gid = targetGid;
+      srcIdx = srcIdx2;
+      tgtIdx = tgtIdx2;
+    }
     const srcGroup = groupsArr[srcIdx];
     const tgtGroup = groupsArr[tgtIdx];
 
@@ -9143,13 +9176,13 @@ window.refreshUnassignedStudents = (forceDataOnly) => {
     return true;
   });
 
-  // Populate group select
+  // Populate group select (بالـ _gid وليس index)
   if (sel) {
     sel.innerHTML = '<option value="">اختر الفوج...</option>';
     groups.forEach((g, i) => {
       if (!g || !g._gid) return;
       const opt = document.createElement('option');
-      opt.value = String(i);
+      opt.value = g._gid;
       opt.textContent = _displayGroupName(g.name);
       sel.appendChild(opt);
     });
@@ -9203,8 +9236,17 @@ function updateUnassignedCount() {
 window.addUnassignedToGroup = async () => {
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
-  const gi = parseInt(document.getElementById('att-unassign-group-select')?.value || '');
-  if (isNaN(gi)) { showToast('⚠️ الرجاء اختيار الفوج الهدف', true); return; }
+  const targetGid = document.getElementById('att-unassign-group-select')?.value || '';
+  if (!targetGid) { showToast('⚠️ الرجاء اختيار الفوج الهدف', true); return; }
+
+  // الباحث العالمي عن الفوج
+  const res = await _resolveGroup(targetGid, teacherId);
+  if (!res.group) {
+    console.error('[addUnassignedToGroup] ❌ الفوج الهدف غير موجود', { targetGid, teacherId });
+    showToast('⚠️ الفوج الهدف غير موجود بعد التحقق من قاعدة البيانات', true);
+    return;
+  }
+
   const checked = window._unassignedChecked || {};
   const names = Object.keys(checked);
   if (!names.length) { showToast('⚠️ الرجاء اختيار تلاميذ لنقلهم', true); return; }
@@ -9216,8 +9258,14 @@ window.addUnassignedToGroup = async () => {
     if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
     const data = snap.data();
     const groups = data.groups || [];
-    if (!groups[gi] || !groups[gi]._gid) { showToast('⚠️ الفوج الهدف غير صالح أو محذوف', true); return; }
-    const group = groups[gi];
+    // ابحث في البيانات الطازجة بالـ _gid أو بالاسم
+    let group = groups.find(g => g && g._gid === targetGid);
+    if (!group) {
+      const knownName = res.group.name;
+      group = groups.find(g => g && (g._gid === targetGid || g.name === knownName));
+      if (group && !group._gid) group._gid = targetGid;
+    }
+    if (!group) { showToast('⚠️ الفوج الهدف غير صالح أو محذوف', true); return; }
     const _normG = (n) => String(n||'').trim().replace(/\s+/g,' ').toLowerCase()
       .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
       .replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ').trim();
@@ -9230,7 +9278,6 @@ window.addUnassignedToGroup = async () => {
         added++;
       }
     });
-    groups[gi] = group;
     const students = data.students || [];
     names.forEach(name => {
       const nKey = _normG(name);
@@ -9257,16 +9304,20 @@ window.addUnassignedToGroup = async () => {
 
 // ─── حذف فوج كامل ───
 let _delGid = '';
-window.deleteGroup = (gid) => {
+window.deleteGroup = async (gid) => {
   if (!gid) { showToast('⚠️ معرف الفوج غير صالح', true); return; }
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
-  const teacher = (allTeachers || []).find(t => t.id === teacherId);
-  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
-  const groups = teacher.groups || [];
-  const group = groups.find(g => g && g._gid === gid);
-  if (!group) { showToast('⚠️ الفوج غير موجود', true); return; }
+
+  const res = await _resolveGroup(gid, teacherId);
+  if (!res.group) {
+    console.error('[deleteGroup] ❌ الفوج غير موجود', { gid, teacherId });
+    showToast('⚠️ الفوج غير موجود بعد التحقق من قاعدة البيانات', true);
+    return;
+  }
+
   _delGid = gid;
+  const group = res.group;
   const studentCount = (group.students || []).length;
   const groupName = group.name || '—';
   document.getElementById('del-group-name-display').textContent = '🏫 ' + groupName;
@@ -9285,12 +9336,16 @@ window.confirmDelGroup = async () => {
   const gid = _delGid;
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   if (!teacherId || !gid) return;
-  const teacher = (allTeachers || []).find(t => t.id === teacherId);
-  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
-  const groups = teacher.groups || [];
-  const group = groups.find(g => g && g._gid === gid);
-  if (!group) { showToast('⚠️ الفوج غير موجود', true); return; }
-  const groupName = group.name || '—';
+
+  // الباحث العالمي عن الفوج
+  const res = await _resolveGroup(gid, teacherId);
+  if (!res.group) {
+    console.error('[confirmDelGroup] ❌ الفوج غير موجود', { gid, teacherId });
+    showToast('⚠️ الفوج غير موجود بعد التحقق من قاعدة البيانات', true);
+    return;
+  }
+
+  const groupName = res.group.name || '—';
   closeDelGroupModal();
   const btn2 = document.querySelector(`.att-group-del-btn[data-gid="${gid}"]`);
   if (btn2) btn2.textContent = '⏳ جاري الحذف...';
@@ -9300,8 +9355,21 @@ window.confirmDelGroup = async () => {
     if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
     const data = snap.data();
     let groupsArr = data.groups || [];
-    const gi = groupsArr.findIndex(g => g && g._gid === gid);
-    if (gi < 0) { showToast('⚠️ الفوج غير موجود', true); return; }
+    // استخدام الـ _gid أو اسم الفوج للبحث
+    let gi = groupsArr.findIndex(g => g && g._gid === gid);
+    if (gi < 0) {
+      const fallbackName = res.group.name;
+      gi = groupsArr.findIndex(g => g && (g._gid === gid || g.name === fallbackName));
+      if (gi >= 0 && !groupsArr[gi]._gid) {
+        groupsArr[gi]._gid = gid;
+        console.log('[confirmDelGroup] 🔧 أصلح _gid للفوج:', fallbackName);
+      }
+    }
+    if (gi < 0) {
+      console.error('[confirmDelGroup] ❌ لم يجد الفوج في مصفوفة الأفواج', { gid, groupName, groupsCount: groupsArr.length });
+      showToast('⚠️ الفوج غير موجود في قاعدة البيانات', true);
+      return;
+    }
     const deletedGroup = groupsArr[gi];
     const deletedStudentNames = new Set((deletedGroup.students || []).map(s => s.trim().toLowerCase()));
 
@@ -9361,8 +9429,11 @@ window.confirmDelGroup = async () => {
     await setDoc(teacherRef, { groups: groupsArr, students: filteredStudents }, { merge: true });
 
     // Update local cache
-    if (teacher.groups) teacher.groups = groupsArr;
-    if (teacher.students) teacher.students = filteredStudents;
+    const _cacheTeacher = res.teacher || (allTeachers || []).find(t => t.id === teacherId);
+    if (_cacheTeacher) {
+      if (_cacheTeacher.groups) _cacheTeacher.groups = groupsArr;
+      if (_cacheTeacher.students) _cacheTeacher.students = filteredStudents;
+    }
     if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
     if (window._ctrlMapCache) window._ctrlMapCache[teacherId] = null;
 
@@ -9390,32 +9461,23 @@ window.renameGroup = async (gid) => {
   if (!bg) return;
   bg.classList.add('open');
   document.body.style.overflow = 'hidden';
-  // جلب الاسم من Firestore باستخدام _gid
-  try {
-    const snap = await getDoc(doc(db, 'teachers', teacherId));
-    if (snap.exists()) {
-      const data = snap.data();
-      const groupsArr = data.groups || [];
-      const group = groupsArr.find(g => g && g._gid === gid);
-      if (group) {
-        if (inp) { inp.value = group.name ?? ''; inp.focus(); inp.select(); }
-      } else {
-        // محاولة من الكاش
-        const cachedTeacher = (allTeachers || []).find(t => t.id === teacherId);
-        const cachedGroup = cachedTeacher?.groups?.find(g => g && g._gid === gid);
-        if (inp) { inp.value = cachedGroup?.name ?? ''; inp.focus(); inp.select(); }
-        showToast('⚠️ الفوج غير موجود في قاعدة البيانات، سيتم استخدام البيانات المخبأة', true);
-      }
+  // استخدام الباحث العالمي عن الفوج
+  (async () => {
+    const res = await _resolveGroup(gid, teacherId);
+    if (res.group && res.group.name) {
+      if (inp) { inp.value = res.group.name; inp.focus(); inp.select(); }
     } else {
-      const cachedTeacher = (allTeachers || []).find(t => t.id === teacherId);
-      const cachedGroup = cachedTeacher?.groups?.find(g => g && g._gid === gid);
-      if (inp) { inp.value = cachedGroup?.name ?? ''; inp.focus(); inp.select(); }
+      // Fallback: جرب من Firestore مباشرة
+      try {
+        const snap = await getDoc(doc(db, 'teachers', teacherId));
+        if (snap.exists()) {
+          const groupsArr = (snap.data().groups || []);
+          const fbGroup = groupsArr.find(g => g && (g._gid === gid || g.name));
+          if (fbGroup && fbGroup.name && inp) { inp.value = fbGroup.name; inp.focus(); inp.select(); }
+        }
+      } catch(_) {}
     }
-  } catch (e) {
-    const cachedTeacher = (allTeachers || []).find(t => t.id === teacherId);
-    const cachedGroup = cachedTeacher?.groups?.find(g => g && g._gid === gid);
-    if (inp) { inp.value = cachedGroup?.name ?? ''; inp.focus(); inp.select(); }
-  }
+  })();
 };
 
 window.closeRenameGroupModal = () => {
@@ -9435,14 +9497,31 @@ window.confirmRenameGroup = async () => {
   const btn = document.querySelector('#rename-group-modal .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
   try {
+    // الباحث العالمي عن الفوج
+    const res = await _resolveGroup(gid, teacherId);
+    if (!res.group) {
+      console.error('[confirmRenameGroup] ❌ الفوج غير موجود', { gid, teacherId });
+      showToast('⚠️ الفوج غير موجود بعد التحقق من قاعدة البيانات', true);
+      return;
+    }
     const teacherRef = doc(db, 'teachers', teacherId);
     const snap = await getDoc(teacherRef);
     if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
     const data = snap.data();
     let groupsArr = data.groups || [];
-    const targetIdx = groupsArr.findIndex(g => g && g._gid === gid);
+    let targetIdx = groupsArr.findIndex(g => g && g._gid === gid);
+    if (targetIdx < 0) {
+      const fallbackName = res.group.name;
+      targetIdx = groupsArr.findIndex(g => g && (g._gid === gid || g.name === fallbackName));
+      if (targetIdx >= 0 && !groupsArr[targetIdx]._gid) {
+        groupsArr[targetIdx]._gid = gid;
+        console.log('[confirmRenameGroup] 🔧 أصلح _gid للفوج:', fallbackName);
+      }
+    }
     if (targetIdx < 0 || !groupsArr[targetIdx]) {
-      showToast('⚠️ الفوج غير موجود', true); return;
+      console.error('[confirmRenameGroup] ❌ لم يجد الفوج في مصفوفة الأفواج', { gid, groupsArr: groupsArr.map(g=>({_gid:g._gid, name:g.name})) });
+      showToast('⚠️ الفوج غير موجود في قاعدة البيانات', true);
+      return;
     }
     // تأكد من وجود _gid
     if (!groupsArr[targetIdx]._gid) groupsArr[targetIdx]._gid = gid;
@@ -9680,20 +9759,154 @@ function _asgNorm(s) {
     .replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ').trim();
 }
 
-window.openAddStudentToGroup = (gid) => {
+// ─── الباحث العالمي عن الفوج (Cache ← Firestore ← إصلاح) ───
+// يبحث في جميع المصادر، يعيد بناء المرجع، ويصلح البيانات الناقصة تلقائياً
+// يجب أن تستخدمه جميع عمليات الأفواج (إضافة تلميذ، نقل، حذف، إعادة تسمية، إلخ)
+let _asgResolvedGroup = null;
+let _asgResolvedTeacherData = null;
+
+async function _resolveGroup(gid, teacherId) {
+  const debug = {
+    gid, teacherId,
+    foundInCache: false,
+    foundInFirestore: false,
+    foundByFieldMatch: false,
+    repairedOldGroup: false,
+    repairedMissingGid: false,
+    error: null,
+    source: 'not-found'
+  };
+
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  let group = null;
+  let groups = [];
+  let idx = -1;
+
+  // 1. ← البحث في الذاكرة Cache
+  if (teacher?.groups) {
+    groups = teacher.groups;
+    idx = groups.findIndex(g => g && g._gid === gid);
+    if (idx >= 0) {
+      group = groups[idx];
+      debug.foundInCache = true;
+      debug.source = 'cache';
+      console.log('[resolveGroup] ✅ وجد في Cache:', gid, group?.name);
+    }
+  }
+
+  // 2. ← البحث في Firestore
+  if (!group) {
+    try {
+      const snap = await getDoc(doc(db, 'teachers', teacherId));
+      if (snap.exists()) {
+        const data = snap.data();
+        groups = data.groups || [];
+        idx = groups.findIndex(g => g && g._gid === gid);
+
+        // 2a. وجد بالـ _gid
+        if (idx >= 0) {
+          group = groups[idx];
+          debug.foundInFirestore = true;
+          debug.source = 'firestore';
+          console.log('[resolveGroup] ✅ وجد في Firestore بالـ _gid:', gid, group?.name);
+        }
+
+        // 2b. لم يجد بالـ _gid → ابحث بمطابقة أي حقل نصي مع gid
+        if (!group) {
+          idx = groups.findIndex(g => {
+            if (!g) return false;
+            for (const k of Object.keys(g)) {
+              if (typeof g[k] === 'string' && g[k] === gid) return true;
+            }
+            return false;
+          });
+          if (idx >= 0) {
+            group = groups[idx];
+            debug.foundByFieldMatch = true;
+            debug.source = 'firestore-field-match';
+            console.log('[resolveGroup] ✅ وجد بمطابقة الحقول:', gid, group?.name);
+            if (!group._gid) {
+              group._gid = gid;
+              debug.repairedMissingGid = true;
+            }
+          }
+        }
+
+        // 2c. أفواج قديمة بدون _gid → ابحث عن فوج بدون _gid (يأخذ الـ gid الجديد)
+        if (!group) {
+          const candidates = groups.filter(g => g && !g._gid && g.name);
+          if (candidates.length === 1) {
+            group = candidates[0];
+            group._gid = gid;
+            idx = groups.indexOf(group);
+            debug.repairedOldGroup = true;
+            debug.source = 'repaired-old-group';
+            console.log('[resolveGroup] 🔧 أصلح فوجاً قديماً بدون _gid:', gid, group?.name);
+          } else if (candidates.length > 1) {
+            console.warn('[resolveGroup] ⚠️ يوجد', candidates.length, 'أفواج بدون _gid، لا يمكن التحديد');
+          }
+        }
+
+        // أعد بناء الذاكرة إذا وجد الفوج
+        if (group && teacher) {
+          const oldGroups = teacher.groups;
+          teacher.groups = groups;
+          // إذا وجد التعديل، احفظه فوراً
+          if (debug.repairedMissingGid || debug.repairedOldGroup) {
+            try {
+              await setDoc(doc(db, 'teachers', teacherId), { groups }, { merge: true });
+              console.log('[resolveGroup] ✅ حفظ الإصلاح في Firestore:', group.name);
+            } catch (e) {
+              console.warn('[resolveGroup] ⚠️ فشل حفظ الإصلاح:', e.message);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debug.error = e.message;
+      console.warn('[resolveGroup] ⚠️ خطأ في Firestore:', e.message);
+    }
+  }
+
+  // 3. ← لم يجد ← اطبع تقرير Debug كامل
+  if (!group) {
+    console.error('[resolveGroup] ❌ لم يجد الفوج بعد البحث في جميع المصادر', debug);
+    // Try to list all available groups for debugging
+    try {
+      const snap = await getDoc(doc(db, 'teachers', teacherId));
+      if (snap.exists()) {
+        const allGrps = (snap.data().groups || []).map(g => ({ _gid: g._gid, name: g.name, hasStudents: !!(g.students && g.students.length) }));
+        console.error('[resolveGroup] 📋 جميع الأفواج المتاحة:', allGrps);
+      }
+    } catch(_) {}
+  }
+
+  return { group, groups, teacher, teacherId, gid, idx, source: debug.source, debug };
+}
+
+// ─── فتح نافذة إضافة تلميذ إلى فوج ───
+window.openAddStudentToGroup = async (gid) => {
   if (!gid) { showToast('⚠️ معرف الفوج غير صالح', true); return; }
   if (window._isTeacherAttendanceView) { showToast('⚠️ هذه الميزة متاحة فقط للإدارة', true); return; }
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
-  const teacher = (allTeachers || []).find(t => t.id === teacherId);
-  const groups = teacher?.groups || [];
-  const group = groups.find(g => g && g._gid === gid);
-  if (!group) { showToast('⚠️ الفوج غير موجود', true); return; }
 
+  // البحث عن الفوج في جميع المصادر
+  const result = await _resolveGroup(gid, teacherId);
+  if (!result.group) {
+    console.error('[openAddStudentToGroup] ❌ الفوج غير موجود بعد البحث في جميع المصادر', { gid, teacherId });
+    showToast('⚠️ الفوج غير موجود في قاعدة البيانات بعد التحقق', true);
+    return;
+  }
+
+  // تخزين المرجع للاستخدام المتزامن
   _asgGid = gid;
   _asgTeacherId = teacherId;
-  const teacherName = teacher?.name || teacherId;
-  const groupName = _displayGroupName(group.name);
+  _asgResolvedGroup = result.group;
+  _asgResolvedTeacherData = result.teacher;
+
+  const teacherName = result.teacher?.name || teacherId;
+  const groupName = _displayGroupName(result.group.name);
 
   document.getElementById('asg-title').textContent = `➕ إضافة تلميذ إلى "${groupName}"`;
   document.getElementById('asg-context').textContent = `👨‍🏫 ${teacherName} ← 🏫 ${groupName}`;
@@ -9713,6 +9926,8 @@ window.closeAddStudentToGroupModal = () => {
   if (modal) modal.classList.remove('open');
   _asgGid = '';
   _asgTeacherId = '';
+  _asgResolvedGroup = null;
+  _asgResolvedTeacherData = null;
 };
 
 function _asgNorm2(s) { return String(s||'').trim().toLowerCase().replace(/[إأآا]/g,'ا').replace(/[يى]/g,'ي').replace(/[ؤ]/g,'و').replace(/[ئ]/g,'ي').replace(/[ة]/g,'ه').replace(/\s+/g,' ').trim(); }
@@ -9737,7 +9952,8 @@ window.searchAddStudentToGroup = (q) => {
   document.getElementById('asg-manual-trigger').style.display = 'block';
   document.getElementById('asg-manual-form').style.display = 'none';
   if (!q) { resultsEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">✍️ اكتب اسم التلميذ للبحث</div>'; return; }
-  const group = (window.allTeachers||[]).flatMap(t=>(t.groups||[])).find(g=>g&&g._gid===_asgGid);
+  // استخدم المرجع المُخزّن من openAddStudentToGroup بدلاً من البحث في كل مرة
+  const group = _asgResolvedGroup;
   const existingSet = new Set((group?.students||[]).map(s=>_asgNorm2(typeof s==='object'?(s.name||''):s)));
   const qNorm = _asgNorm2(q);
   const parts = qNorm.split(/\s+/).filter(Boolean);
@@ -9776,6 +9992,15 @@ window.updateCreateBtn = () => {
 
 window.confirmAddExistingStudentToGroup = async (name) => {
   if (!name || !_asgTeacherId || !_asgGid) { showToast('⚠️ بيانات غير كاملة', true); return; }
+
+  // البحث عن الفوج باستخدام الباحث العالمي (مع تحديث الذاكرة)
+  const res = await _resolveGroup(_asgGid, _asgTeacherId);
+  if (!res.group) {
+    console.error('[confirmAddExistingStudentToGroup] ❌ الفوج غير موجود بعد البحث', { gid: _asgGid, teacherId: _asgTeacherId });
+    showToast('🏫 لم يتم العثور على الفوج بعد التحقق من قاعدة البيانات', true);
+    return;
+  }
+
   const teacherRef = doc(db, 'teachers', _asgTeacherId);
   try {
     const snap = await getDoc(teacherRef);
@@ -9783,8 +10008,23 @@ window.confirmAddExistingStudentToGroup = async (name) => {
     const data = snap.data();
     const dGroups = data.groups || [];
     const dStudents = data.students || [];
-    const group = dGroups.find(g => g && g._gid === _asgGid);
-    if (!group) { showToast('🏫 لم يتم العثور على الفوج', true); return; }
+    // استخدم _asgGid للبحث (أو اسم الفوج كـ fallback)
+    let group = dGroups.find(g => g && g._gid === _asgGid);
+    if (!group) {
+      // Fallback: ابحث باسم الفوج إذا كان معروفاً
+      const knownName = _asgResolvedGroup?.name;
+      if (knownName) {
+        group = dGroups.find(g => g && g.name === knownName);
+        if (group) {
+          group._gid = _asgGid;
+          console.log('[confirmAddExistingStudentToGroup] 🔧 أصلح _gid للفوج:', knownName);
+        }
+      }
+    }
+    if (!group) {
+      console.error('[confirmAddExistingStudentToGroup] ❌ لم يجد الفوج بعد Firestore', { _asgGid, knownName: _asgResolvedGroup?.name });
+      showToast('🏫 لم يتم العثور على الفوج', true); return;
+    }
     if (!group.students) group.students = [];
     if (group.students.some(s => _asgNorm2(typeof s === 'object' ? (s.name||'') : s) === _asgNorm2(name))) {
       showToast('⚠️ "'+name+'" موجود مسبقاً في هذا الفوج', true); return;
@@ -9820,6 +10060,15 @@ window.confirmCreateStudentToGroup = async () => {
     await confirmAddExistingStudentToGroup(existing.studentName);
     return;
   }
+
+  // البحث عن الفوج باستخدام الباحث العالمي
+  const res = await _resolveGroup(_asgGid, _asgTeacherId);
+  if (!res.group) {
+    console.error('[confirmCreateStudentToGroup] ❌ الفوج غير موجود بعد البحث', { gid: _asgGid, teacherId: _asgTeacherId });
+    showToast('🏫 لم يتم العثور على الفوج بعد التحقق من قاعدة البيانات', true);
+    return;
+  }
+
   const teacherRef = doc(db, 'teachers', _asgTeacherId);
   try {
     const snap = await getDoc(teacherRef);
@@ -9827,8 +10076,21 @@ window.confirmCreateStudentToGroup = async () => {
     const data = snap.data();
     const dGroups = data.groups || [];
     const dStudents = data.students || [];
-    const group = dGroups.find(g => g && g._gid === _asgGid);
-    if (!group) { showToast('🏫 لم يتم العثور على الفوج', true); return; }
+    let group = dGroups.find(g => g && g._gid === _asgGid);
+    if (!group) {
+      const knownName = _asgResolvedGroup?.name;
+      if (knownName) {
+        group = dGroups.find(g => g && g.name === knownName);
+        if (group) {
+          group._gid = _asgGid;
+          console.log('[confirmCreateStudentToGroup] 🔧 أصلح _gid للفوج:', knownName);
+        }
+      }
+    }
+    if (!group) {
+      console.error('[confirmCreateStudentToGroup] ❌ لم يجد الفوج بعد Firestore', { _asgGid, knownName: _asgResolvedGroup?.name });
+      showToast('🏫 لم يتم العثور على الفوج', true); return;
+    }
     if (!group.students) group.students = [];
     if (group.students.some(s => _asgNorm2(typeof s === 'object' ? (s.name||'') : s) === _asgNorm2(name))) {
       showToast('⚠️ "'+name+'" موجود مسبقاً في هذا الفوج', true); return;
