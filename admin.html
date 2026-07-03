@@ -10604,6 +10604,53 @@ window.cleanLeakedStudents = async (gid) => {
   }
 };
 
+// ─── أدوات مساعدة للكونسول (Firebase Functions غير متاحة في الـ Console بسبب module) ───
+window._firestore = { getDoc, setDoc, updateDoc, doc, collection, query, where, getDocs, writeBatch, deleteDoc, serverTimestamp, orderBy };
+window._showGroups = async (teacherId) => {
+  if (!teacherId) teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { console.warn('⚠️ اختَر أستاذاً أولاً'); return; }
+  const snap = await getDoc(doc(db, 'teachers', teacherId));
+  if (!snap.exists()) { console.warn('⚠️ الأستاذ غير موجود'); return; }
+  const data = snap.data();
+  console.table((data.groups||[]).map((g,i)=>({
+    index: i,
+    _gid: g._gid || '❌ مفقود',
+    name: g.name,
+    students: (g.students||[]).length,
+    days: Array.isArray(g.days) ? g.days.join(',') : '—'
+  })));
+  console.log('📋 raw groups:', JSON.stringify(data.groups, null, 2));
+};
+window._fixMissingGids = async (teacherId) => {
+  if (!teacherId) teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { console.warn('⚠️ اختَر أستاذاً أولاً'); return; }
+  const snap = await getDoc(doc(db, 'teachers', teacherId));
+  if (!snap.exists()) { console.warn('⚠️ الأستاذ غير موجود'); return; }
+  const data = snap.data();
+  let groups = data.groups || [];
+  let changed = false;
+  groups.forEach((g, i) => {
+    if (g && !g._gid) {
+      g._gid = 'g_' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2, 8);
+      changed = true;
+      console.log('✅ أضفت _gid للفوج:', g.name, '→', g._gid);
+    }
+  });
+  if (changed) {
+    await setDoc(doc(db, 'teachers', teacherId), { groups }, { merge: true });
+    console.log('✅ تم حفظ التعديلات');
+  } else {
+    console.log('✅ جميع الأفواج لديهم _gid');
+  }
+};
+window._showAllTeachers = async () => {
+  const snap = await getDocs(collection(db, 'teachers'));
+  console.table(snap.docs.map(d => {
+    const dt = d.data();
+    return { id: d.id, name: dt.name || '—', groups: (dt.groups||[]).length, students: (dt.students||[]).length };
+  }));
+};
+
 // ─── فتح نافذة إضافة تلميذ إلى فوج ───
 window.openAddStudentToGroup = async (gid) => {
   if (!gid) { showToast('⚠️ معرف الفوج غير صالح', true); return; }
