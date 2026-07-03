@@ -7896,15 +7896,21 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     return ls.startsWith(ss + ' ') || ls.endsWith(' ' + ss);
   };
 
-  groups.forEach((g, gi) => {
+  for (let gi = 0; gi < groups.length; gi++) {
+    const g = groups[gi];
+    if (!g) continue;
     if (!g._gid) {
       g._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
-      // ✅ حفظ _gid الجديد في Firestore فوراً حتى لا يتغير عند إعادة التحميل
-      const _newGid = g._gid;
-      const _tid = teacherId;
-      updateDoc(doc(db, 'teachers', _tid), { groups: groups.map((gg, i) => i === gi ? { ...gg, _gid: _newGid } : gg) })
-        .then(() => console.log('[ensureGid] Persisted new _gid for group', gi, _newGid))
-        .catch(e => console.warn('[ensureGid] Failed to persist _gid:', e.message));
+      // ✅ حفظ _gid الجديد في Firestore فوراً (بـ await لضمان المزامنة)
+      try {
+        const _newGid = g._gid;
+        const _tid = teacherId;
+        await updateDoc(doc(db, 'teachers', _tid), { groups: groups.map((gg, i) => i === gi ? { ...gg, _gid: _newGid } : gg) });
+        console.log('[ensureGid] ✅ Persisted new _gid for group', gi, g._gid);
+      } catch(e) {
+        console.warn('[ensureGid] ⚠️ Failed to persist _gid:', e.message);
+        // لا نزال نحتفظ بـ _gid في الذاكرة، لكنها لن تكون في Firestore
+      }
     }
     const gid = g._gid || '';
     (g.students || []).forEach(sName => {
@@ -7919,7 +7925,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         allStudents.push({ id: '', name: sName, group: cleanG, gid: cacheGid || gid, groupGi: gi, groupGid: gid });
       }
     });
-  });
+  }
 
   // Add remaining teacher flat-list students not in any group
   students.forEach(s => {
@@ -7949,10 +7955,8 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   allStudents.forEach(s => {
     const dk = s.groupGi;
     if (!grouped[dk]) {
-      // التأكد من وجود _gid (قد يكون التلميذ غير منتمٍ لأي فوج بعد)
-      let gidVal = s.gid;
-      if (!gidVal && groups[dk] && groups[dk]._gid) gidVal = groups[dk]._gid;
-      if (!gidVal) gidVal = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+      // استخدم _gid الحقيقي فقط، ولا تنشئ gid عشوائياً أبداً
+      let gidVal = s.gid || (groups[dk] && groups[dk]._gid) || '';
       grouped[dk] = { group: s.group, gi: dk, gid: gidVal, students: [] };
     }
     grouped[dk].students.push(s);
@@ -7960,7 +7964,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   // تأكد من وجود هيدر لكل فوج حتى لو كان فارغاً (لعرض زر ➕ إضافة تلميذ)
   groups.forEach((g, gi) => {
     if (g && !grouped[gi]) {
-      let gidVal = g._gid || 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+      let gidVal = g._gid || '';
       grouped[gi] = { group: _displayGroupName(g.name), gi, gid: gidVal, students: [] };
     }
   });
@@ -8040,7 +8044,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     }
     const isAdmin = !window._isTeacherAttendanceView;
     allRows.push(`<tr class="att-group-header-row">
-      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}${isAdmin ? `<button class="att-group-add-student-btn" onclick="openAddStudentToGroup('${g.gid}')" title="إضافة تلميذ إلى هذا الفوج" data-gid="${g.gid}" style="--btn-clr:#059669">➕</button><button class="att-group-rename-btn" onclick="renameGroup('${g.gid}')" title="إعادة تسمية الفوج">✏️</button><button class="att-group-move-btn" onclick="openMoveGroupModal('${g.gid}')" title="نقل التلاميذ إلى فوج آخر" data-gid="${g.gid}">📦</button><button class="att-group-del-btn" onclick="deleteGroup('${g.gid}')" title="حذف الفوج" data-gid="${g.gid}">🗑️</button>` : ''}</td>
+      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${g.group}${isAdmin && g.gid ? `<button class="att-group-add-student-btn" onclick="openAddStudentToGroup('${g.gid}')" title="إضافة تلميذ إلى هذا الفوج" data-gid="${g.gid}" style="--btn-clr:#059669">➕</button><button class="att-group-rename-btn" onclick="renameGroup('${g.gid}')" title="إعادة تسمية الفوج">✏️</button><button class="att-group-move-btn" onclick="openMoveGroupModal('${g.gid}')" title="نقل التلاميذ إلى فوج آخر" data-gid="${g.gid}">📦</button><button class="att-group-del-btn" onclick="deleteGroup('${g.gid}')" title="حذف الفوج" data-gid="${g.gid}">🗑️</button>` : ''}</td>
     </tr>`);
 
     // قراءة فلتر الاشتراك
@@ -9881,8 +9885,169 @@ async function _resolveGroup(gid, teacherId) {
     } catch(_) {}
   }
 
+  // 4. ← اكتشاف التكرارات (Groups مكررة بنفس _gid)
+  if (group && groups) {
+    const dups = groups.filter(g => g && g._gid === gid);
+    if (dups.length > 1) {
+      console.error('[resolveGroup] ⛔ اكتشاف تكرار خطير: يوجد', dups.length, 'فوج بنفس _gid:', gid,
+        dups.map(d => ({ name: d.name, studentsCount: (d.students || []).length })));
+      debug.duplicatesFound = dups.length;
+    }
+    // التحقق من أن التلميذ ليس مكرراً داخل نفس الفوج
+    if (group.students) {
+      const seen = new Set();
+      group.students.forEach(s => {
+        const key = typeof s === 'string' ? s.trim().toLowerCase() : (s.name || '').trim().toLowerCase();
+        if (seen.has(key)) console.warn('[resolveGroup] ⚠️ تلميذ مكرر داخل الفوج:', key);
+        seen.add(key);
+      });
+    }
+  }
+
   return { group, groups, teacher, teacherId, gid, idx, source: debug.source, debug };
 }
+
+// ─── فحص سلامة بيانات الأفواج ───
+async function _checkGroupIntegrity(teacherId) {
+  const report = { teacherId, duplicates: [], missingGid: [], ok: true, errors: [] };
+  try {
+    const snap = await getDoc(doc(db, 'teachers', teacherId));
+    if (!snap.exists()) { report.errors.push('الأستاذ غير موجود'); report.ok = false; return report; }
+    const data = snap.data();
+    const groups = data.groups || [];
+
+    // 1. كشف التكرارات (نفس _gid)
+    const gidMap = new Map();
+    groups.forEach((g, i) => {
+      if (!g || !g._gid) return;
+      if (!gidMap.has(g._gid)) gidMap.set(g._gid, []);
+      gidMap.get(g._gid).push({ idx: i, name: g.name, studentsCount: (g.students || []).length });
+    });
+    for (const [gid, entries] of gidMap) {
+      if (entries.length > 1) {
+        report.duplicates.push({ gid, entries });
+        report.ok = false;
+      }
+    }
+
+    // 2. أفواج بدون _gid
+    groups.forEach((g, i) => {
+      if (g && !g._gid) report.missingGid.push({ idx: i, name: g.name, studentsCount: (g.students || []).length });
+    });
+    if (report.missingGid.length) report.ok = false;
+
+    // 3. تلاميذ مكررون داخل نفس الأستاذ
+    const allStudentNames = new Map();
+    groups.forEach((g, gi) => {
+      if (!g || !g.students) return;
+      g.students.forEach(s => {
+        const key = (typeof s === 'string' ? s : (s.name || '')).trim().toLowerCase();
+        if (!key) return;
+        if (!allStudentNames.has(key)) allStudentNames.set(key, []);
+        allStudentNames.get(key).push({ groupIdx: gi, groupName: g.name, groupGid: g._gid });
+      });
+    });
+    for (const [name, locations] of allStudentNames) {
+      if (locations.length > 1) {
+        report.errors.push(`⚠️ تلميذ "${name}" موجود في ${locations.length} أفواج: ${locations.map(l => l.groupName).join(', ')}`);
+      }
+    }
+
+    console.log('[checkGroupIntegrity] 📋 تقرير سلامة الأفواج:', report);
+  } catch (e) {
+    report.errors.push('خطأ: ' + e.message);
+    report.ok = false;
+  }
+  return report;
+}
+
+// ─── أداة إصلاح الأفواج المكررة ───
+window.repairDuplicateGroups = async (teacherId) => {
+  if (!teacherId) {
+    teacherId = document.getElementById('att-sum-teacher')?.value || '';
+    if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
+  }
+  showToast('🔍 جاري فحص سلامة الأفواج...');
+  const report = await _checkGroupIntegrity(teacherId);
+  console.log('[repair] 📋 تقرير الفحص:', report);
+  if (report.ok && !report.missingGid.length) {
+    showToast('✅ لا توجد مشاكل في الأفواج', false);
+    return;
+  }
+
+  try {
+    const teacherRef = doc(db, 'teachers', teacherId);
+    const snap = await getDoc(teacherRef);
+    if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+    const data = snap.data();
+    let groups = data.groups || [];
+    let students = data.students || [];
+    const fixed = [];
+
+    // 1. دمج الأفواج المكررة
+    const gidMap = new Map();
+    groups.forEach((g, i) => {
+      if (!g || !g._gid) return;
+      if (!gidMap.has(g._gid)) gidMap.set(g._gid, { primary: g, primaryIdx: i, duplicates: [] });
+      else gidMap.get(g._gid).duplicates.push({ group: g, idx: i });
+    });
+    for (const [gid, entry] of gidMap) {
+      if (!entry.duplicates.length) continue;
+      console.log('[repair] 🔧 دمج', entry.duplicates.length + 1, 'نسخ من الفوج:', entry.primary.name);
+      // دمج التلاميذ
+      const studentSet = new Set((entry.primary.students || []).map(s => typeof s === 'string' ? s.trim().toLowerCase() : (s.name || '').trim().toLowerCase()));
+      entry.duplicates.forEach(dup => {
+        (dup.group.students || []).forEach(s => {
+          const key = typeof s === 'string' ? s.trim().toLowerCase() : (s.name || '').trim().toLowerCase();
+          if (key && !studentSet.has(key)) {
+            if (!entry.primary.students) entry.primary.students = [];
+            entry.primary.students.push(s);
+            studentSet.add(key);
+          }
+        });
+        fixed.push({ removed: dup.group.name, mergedInto: entry.primary.name });
+      });
+      // إزالة المكررات (من الأعلى للأسفل)
+      const indicesToRemove = entry.duplicates.map(d => d.idx).sort((a, b) => b - a);
+      indicesToRemove.forEach(idx => groups.splice(idx, 1));
+    }
+
+    // 2. إصلاح الأفواج بدون _gid
+    groups.forEach((g, i) => {
+      if (g && !g._gid) {
+        g._gid = 'g_' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2, 8);
+        fixed.push({ repaired: g.name, newGid: g._gid });
+      }
+    });
+
+    // 3. إزالة التلاميذ المكررين داخل كل فوج
+    groups.forEach(g => {
+      if (!g || !g.students) return;
+      const seen = new Set();
+      g.students = g.students.filter(s => {
+        const key = (typeof s === 'string' ? s : (s.name || '')).trim().toLowerCase();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    });
+
+    // 4. حفظ التغييرات
+    await setDoc(teacherRef, { groups, students }, { merge: true });
+
+    // 5. تحديث الذاكرة
+    const teacher = (allTeachers || []).find(t => t.id === teacherId);
+    if (teacher) { teacher.groups = groups; teacher.students = students; }
+    if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
+
+    const msg = fixed.length ? '✅ تم إصلاح ' + fixed.length + ' مشكلة:\n' + fixed.map(f => f.removed ? `🗑️ دمج "${f.removed}" → "${f.mergedInto}"` : `🔧 إصلاح "${f.repaired}"`).join('\n') : '✅ لا توجد مشاكل';
+    showToast(msg, false);
+    await loadAttendanceSummary();
+  } catch (e) {
+    console.error('[repair] ❌', e);
+    showToast('❌ خطأ في الإصلاح: ' + e.message, true);
+  }
+};
 
 // ─── فتح نافذة إضافة تلميذ إلى فوج ───
 window.openAddStudentToGroup = async (gid) => {
@@ -9894,66 +10059,12 @@ window.openAddStudentToGroup = async (gid) => {
   // البحث عن الفوج في جميع المصادر
   const result = await _resolveGroup(gid, teacherId);
   if (!result.group) {
-    // ─── Fallback: إنشاء الفوج تلقائياً من بيانات الواجهة ───
-    console.warn('[openAddStudentToGroup] ⚠️ لم يجد الفوج، بدء الإنشاء التلقائي (Lazy Creation)', { gid, teacherId });
-
-    // استخراج اسم الفوج من DOM (الزر الموجود داخل صف الفوج)
-    let groupName = 'فوج';
-    try {
-      const btn = document.querySelector(`button[data-gid="${gid}"]`);
-      if (btn) {
-        const td = btn.closest('td');
-        if (td) {
-          const txt = td.textContent || '';
-          const m = txt.match(/🏫\s*(.+?)\s*(?:$|[➕✏️📦🗑️])/);
-          if (m) groupName = m[1].trim();
-        }
-      }
-    } catch(_) {}
-
-    // إنشاء كائن فوج مؤقت
-    const fallbackGroup = {
-      _gid: gid,
-      name: groupName,
-      students: [],
-      days: []
-    };
-
-    // محاولة حفظ الفوج الجديد في Firestore
-    try {
-      const teacherRef = doc(db, 'teachers', teacherId);
-      const snap = await getDoc(teacherRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        const groups = data.groups || [];
-        // تأكد من عدم وجود فوج بنفس الـ _gid (تجنب التكرار)
-        if (!groups.some(g => g && g._gid === gid)) {
-          groups.push(fallbackGroup);
-          await setDoc(teacherRef, { groups }, { merge: true });
-        }
-        // تحديث الذاكرة
-        const teacher = (allTeachers || []).find(t => t.id === teacherId);
-        if (teacher) teacher.groups = groups;
-        console.log('[openAddStudentToGroup] ✅ تم إنشاء الفوج تلقائياً:', groupName);
-      }
-    } catch(e) {
-      console.warn('[openAddStudentToGroup] ⚠️ فشل حفظ الفوج في Firestore:', e.message);
-      // حتى لو فشل الحفظ، استمر باستخدام البيانات المحلية
-      const teacher = (allTeachers || []).find(t => t.id === teacherId);
-      if (teacher) {
-        if (!teacher.groups) teacher.groups = [];
-        if (!teacher.groups.some(g => g && g._gid === gid)) {
-          teacher.groups.push(fallbackGroup);
-        }
-      }
-    }
-
-    // تعيين النتيجة من الفوج المُنشأ
-    result.group = fallbackGroup;
-    result.teacher = (allTeachers || []).find(t => t.id === teacherId) || result.teacher;
-    result.groups = result.teacher?.groups || [fallbackGroup];
-    result.source = 'lazy-created';
-    console.log('[openAddStudentToGroup] ✅ متابعة العملية بالفوج المُنشأ:', groupName);
+    console.error('[openAddStudentToGroup] ❌ لم يجد الفوج بعد البحث في جميع المصادر', {
+      gid, teacherId,
+      allGroupsInFirestore: await (async()=>{ try { const snap=await getDoc(doc(db,'teachers',teacherId)); if(snap.exists()) return (snap.data().groups||[]).map(g=>({_gid:g._gid,name:g.name,studentsCount:(g.students||[]).length})); return []; }catch(_){return [];} })()
+    });
+    showToast('⚠️ لم يتم العثور على بيانات الفوج — راجع Console للتقرير الكامل', true);
+    return;
   }
 
   // تخزين المرجع للاستخدام المتزامن
