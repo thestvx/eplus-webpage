@@ -10281,7 +10281,7 @@ window._checkGroupIntegrity = async function _checkGroupIntegrity(teacherId) {
     });
     if (report.missingGid.length) report.ok = false;
 
-    // 3. تلاميذ مكررون داخل نفس الأستاذ
+    // 3. تلاميذ مكررون داخل نفس الأستاذ (عبر الأفواج)
     const allStudentNames = new Map();
     groups.forEach((g, gi) => {
       if (!g || !g.students) return;
@@ -10297,6 +10297,24 @@ window._checkGroupIntegrity = async function _checkGroupIntegrity(teacherId) {
         report.errors.push(`⚠️ تلميذ "${name}" موجود في ${locations.length} أفواج: ${locations.map(l => l.groupName).join(', ')}`);
       }
     }
+
+    // 4. تلاميذ مكررون داخل نفس الفوج
+    groups.forEach((g, gi) => {
+      if (!g || !g.students) return;
+      const seenInGroup = new Map();
+      g.students.forEach((s, si) => {
+        const key = (typeof s === 'string' ? s : (s.name || '')).trim().toLowerCase();
+        if (!key) return;
+        if (!seenInGroup.has(key)) { seenInGroup.set(key, []); }
+        seenInGroup.get(key).push(si);
+      });
+      for (const [name, indices] of seenInGroup) {
+        if (indices.length > 1) {
+          report.errors.push(`🔴 تلميذ "${name}" مكرر داخل الفوج "${g.name}" (المواقع: ${indices.map(i => i + 1).join(', ')})`);
+          report.ok = false;
+        }
+      }
+    });
 
     console.log('[checkGroupIntegrity] 📋 تقرير سلامة الأفواج:', report);
   } catch (e) {
@@ -10391,6 +10409,74 @@ window.repairDuplicateGroups = async (teacherId) => {
   } catch (e) {
     console.error('[repair] ❌', e);
     showToast('❌ خطأ في الإصلاح: ' + e.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🛠️ إصلاح الأفواج'; }
+  }
+};
+
+// ─── تنظيف التلاميذ المتسربين من أفواج أخرى ───
+// يزيل من الفوج أي تلميذ ليس لديه أي سجل حضور في sessionAttendance
+window.cleanLeakedStudents = async (gid) => {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
+  if (!gid) { showToast('⚠️ معرف الفوج غير صالح', true); return; }
+
+  showToast('🔍 جاري فحص الحضور للتلاميذ...');
+  try {
+    const teacherRef = doc(db, 'teachers', teacherId);
+    const snap = await getDoc(teacherRef);
+    if (!snap.exists()) { showToast('⚠️ الأستاذ غير موجود', true); return; }
+    const data = snap.data();
+    const groups = data.groups || [];
+    const group = groups.find(g => g && g._gid === gid);
+    if (!group) { showToast('⚠️ الفوج غير موجود', true); return; }
+    if (!group.students || !group.students.length) { showToast('⚠️ الفوج لا يحتوي على تلاميذ', true); return; }
+
+    // بناء مجموعة من أسماء التلاميذ الذين لديهم حضور مسجل
+    const studentsWithAtt = new Set();
+    for (let sn = 1; sn <= 12; sn++) {
+      const docId = `${teacherId}_${gid}_session_${sn}`;
+      try {
+        const sSnap = await getDoc(doc(db, 'sessionAttendance', docId));
+        if (sSnap.exists()) {
+          (sSnap.data().students || []).forEach(st => {
+            const n = String(st.name || '').trim().toLowerCase();
+            if (n) studentsWithAtt.add(n);
+          });
+        }
+      } catch (_) {}
+    }
+
+    const before = group.students.length;
+    const kept = [];
+    const removed = [];
+    group.students.forEach(s => {
+      const name = (typeof s === 'string' ? s : (s.name || '')).trim();
+      const key = name.toLowerCase();
+      // احتفظ بالتلميذ إذا كان عنده حضور أو إذا اسمه موجود في studentsWithAtt
+      if (studentsWithAtt.has(key)) {
+        kept.push(s);
+      } else {
+        removed.push(name);
+      }
+    });
+    group.students = kept;
+
+    // احفظ
+    await setDoc(teacherRef, { groups }, { merge: true });
+    const teacher = (allTeachers || []).find(t => t.id === teacherId);
+    if (teacher) teacher.groups = groups;
+    if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
+
+    const msg = removed.length
+      ? `✅ تمت إزالة ${removed.length} تلميذ ليس لديهم حضور من "${group.name || gid}"\n📋 المحذوفون:\n` + removed.join('\n')
+      : `✅ جميع التلاميذ (${kept.length}) لديهم سجل حضور — لا يوجد تسرب`;
+    showToast(msg, removed.length > 0);
+    console.log(`[cleanLeakedStudents] الفوج "${group.name}": ${before} → ${kept.length} (أزيل ${removed.length})`, { removed, kept });
+    await loadAttendanceSummary();
+  } catch (e) {
+    console.error('[cleanLeakedStudents] ❌', e);
+    showToast('❌ خطأ في التنظيف: ' + e.message, true);
   }
 };
 
