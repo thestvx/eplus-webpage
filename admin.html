@@ -7956,8 +7956,9 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   allStudents.forEach(s => {
     const dk = s.groupGi;
     if (!grouped[dk]) {
-      // استخدم _gid الحقيقي فقط، ولا تنشئ gid عشوائياً أبداً
-      let gidVal = s.gid || (groups[dk] && groups[dk]._gid) || '';
+      // استخدم _gid الحقيقي للفوج أولاً، وتجنب 'gi_' القديمة
+      let gidVal = (groups[dk] && groups[dk]._gid) || '';
+      if (!gidVal && s.gid && !/^gi_\d+$/.test(s.gid)) gidVal = s.gid;
       grouped[dk] = { group: s.group, gi: dk, gid: gidVal, students: [] };
     }
     grouped[dk].students.push(s);
@@ -10317,6 +10318,25 @@ window._resolveGroup = async function _resolveGroup(gid, teacherId) {
             console.log('[resolveGroup] 🔧 أصلح فوجاً قديماً بدون _gid:', gid, group?.name);
           } else if (candidates.length > 1) {
             console.warn('[resolveGroup] ⚠️ يوجد', candidates.length, 'أفواج بدون _gid، لا يمكن التحديد');
+          }
+        }
+
+        // 2d. البحث بالـ gi القديم (gi_0, gi_1, ...) → ابحث بفهرس المصفوفة
+        if (!group && /^gi_(\d+)$/.test(gid)) {
+          const giMatch = gid.match(/^gi_(\d+)$/);
+          if (giMatch) {
+            const gi = parseInt(giMatch[1]);
+            if (groups[gi]) {
+              group = groups[gi];
+              idx = gi;
+              debug.source = 'legacy-gi-index';
+              console.log('[resolveGroup] ✅ وجد بالـ gi القديم:', gid, '→', group?.name);
+              // أصلح _gid إن لم يكن موجوداً
+              if (!group._gid) {
+                group._gid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+                debug.repairedMissingGid = true;
+              }
+            }
           }
         }
 
