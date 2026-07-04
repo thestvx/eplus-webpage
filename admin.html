@@ -9100,90 +9100,41 @@ async function _getNextCycleNum(teacherId, gid) {
   return snap.size + 1;
 }
 
-// ─── أرشفة دورة حضور كاملة (Snapshot + Batch ذري) ───
-// الخطوات بالترتيب:
-// 1. قراءة بيانات الفوج والتلاميذ من Firestore مباشرة
-// 2. قراءة sessionAttendance بالصيغتين (جديدة وقديمة)
-// 3. قراءة sessionControl بالصيغتين (جديدة وقديمة)
-// 4. إنشاء Snapshot + إحصائيات
-// 5. Batch ذري: حفظ الأرشيف + حذف sessionAttendance + حذف sessionControl
-async function _snapshotAndArchiveCycle(teacherId, gid) {
-  if (!teacherId || !gid) throw new Error('معرف الأستاذ أو الفوج غير صالح');
-
-  // ─── 1. قراءة بيانات الفوج من Firestore مباشرة ───
+// ─── قراءة دورة الحضور الحالية بالكامل وإرجاع Snapshot ───
+async function _readCurrentCycleSnapshot(teacherId, gid) {
   const teacherSnap = await getDoc(doc(db, 'teachers', teacherId));
   if (!teacherSnap.exists()) throw new Error('الأستاذ غير موجود في قاعدة البيانات');
   const teacherData = teacherSnap.data();
   const groupsArr = teacherData.groups || [];
   const group = groupsArr.find(g => g && g._gid === gid);
-  if (!group) throw new Error('الفوج غير موجود في قاعدة البيانات');
-
-  const groupName = group.name || '—';
-  const teacherName = teacherData.name || '';
-  const startDate = new Date().toISOString().slice(0, 10);
-  const cycleNum = await _getNextCycleNum(teacherId, gid);
+  if (!group) throw new Error('الفوج غير موجود');
   const currentGi = groupsArr.findIndex(g => g && g._gid === gid);
 
-  // ─── 2. قراءة sessionAttendance (بالصيغتين: الجديدة والقديمة) ───
   const sessions = {};
-  const sessionDocsToDelete = new Set(); // تتبع الوثائق للحذف
-
-  // 2a. الصيغة الجديدة: teacherId_gid_session_N
   for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
     const docIdNew = `${teacherId}_${gid}_session_${sn}`;
     const snapNew = await getDoc(doc(db, 'sessionAttendance', docIdNew));
-    if (snapNew.exists()) {
-      sessions[sn] = snapNew.data().students || [];
-      sessionDocsToDelete.add(docIdNew);
-    }
-  }
-
-  // 2b. الصيغة القديمة: teacherId_g{gi}_session_N (للتوافق مع السجلات القديمة)
-  if (currentGi >= 0) {
-    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-      if (sessions[sn]) continue; // وجدناها بالصيغة الجديدة
+    if (snapNew.exists()) { sessions[sn] = snapNew.data().students || []; continue; }
+    if (currentGi >= 0) {
       const docIdLegacy = `${teacherId}_g${currentGi}_session_${sn}`;
       const snapLegacy = await getDoc(doc(db, 'sessionAttendance', docIdLegacy));
-      if (snapLegacy.exists()) {
-        sessions[sn] = snapLegacy.data().students || [];
-        sessionDocsToDelete.add(docIdLegacy);
-      }
+      if (snapLegacy.exists()) { sessions[sn] = snapLegacy.data().students || []; continue; }
     }
+    sessions[sn] = [];
   }
 
-  // 2c. ملء الفارغ
-  for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-    if (!sessions[sn]) sessions[sn] = [];
-  }
-
-  // ─── 3. قراءة sessionControl (بالصيغتين: الجديدة والقديمة) ───
   const sessionControls = {};
-  const ctrlDocsToDelete = new Set();
-
-  // 3a. الصيغة الجديدة: teacherId_gctrl_{gid}_session_N
   for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
     const ctrlDocIdNew = getCtrlDocId(teacherId, gid, sn);
     const ctrlSnapNew = await getDoc(doc(db, 'sessionControl', ctrlDocIdNew));
-    if (ctrlSnapNew.exists()) {
-      sessionControls[sn] = ctrlSnapNew.data();
-      ctrlDocsToDelete.add(ctrlDocIdNew);
-    }
-  }
-
-  // 3b. الصيغة القديمة: teacherId_g{gi}_session_N (للتوافق مع السجلات القديمة)
-  if (currentGi >= 0) {
-    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-      if (sessionControls[sn]) continue;
+    if (ctrlSnapNew.exists()) { sessionControls[sn] = ctrlSnapNew.data(); continue; }
+    if (currentGi >= 0) {
       const ctrlDocIdLegacy = getCtrlDocIdLegacy(teacherId, currentGi, sn);
       const ctrlSnapLegacy = await getDoc(doc(db, 'sessionControl', ctrlDocIdLegacy));
-      if (ctrlSnapLegacy.exists()) {
-        sessionControls[sn] = ctrlSnapLegacy.data();
-        ctrlDocsToDelete.add(ctrlDocIdLegacy);
-      }
+      if (ctrlSnapLegacy.exists()) { sessionControls[sn] = ctrlSnapLegacy.data(); }
     }
   }
 
-  // ─── 4. حساب الإحصائيات (باستخدام Student ID فقط) ───
   let totalPresent = 0, totalAbsent = 0;
   const studentIdSet = new Set();
   Object.values(sessions).forEach(studs => {
@@ -9198,67 +9149,89 @@ async function _snapshotAndArchiveCycle(teacherId, gid) {
   const totalCells = totalStudents * CYCLE_SESSION_COUNT;
   const rate = totalCells > 0 ? Math.round((totalPresent / totalCells) * 100) : 0;
 
-  // ─── 5. Snapshot التلاميذ من Firestore مباشرة ───
   const groupStudentsSnap = (group.students || []).map(s => {
     if (typeof s === 'string') return { id: '', name: s };
-    return {
-      id: s.id || '',
-      name: s.name || '',
-      receipt: s.receipt || '',
-      payStatus: s.payStatus || '',
-      joinedAtSession: s.joinedAtSession || 1
-    };
+    return { id: s.id || '', name: s.name || '', receipt: s.receipt || '', payStatus: s.payStatus || '', joinedAtSession: s.joinedAtSession || 1 };
   });
 
-  // ─── 6. إنشاء وثيقة الأرشيف ───
+  return {
+    teacherId, gid,
+    groupName: group.name || '—',
+    teacherName: teacherData.name || '',
+    sessions, sessionControls,
+    students: groupStudentsSnap,
+    stats: { totalStudents, totalPresent, totalAbsent, totalCells, rate }
+  };
+}
+
+// ─── حفظ Snapshot في الأرشيف ───
+async function _saveArchiveSnapshot(snapshot) {
+  const { teacherId, gid } = snapshot;
+  const cycleNum = await _getNextCycleNum(teacherId, gid);
   const archiveId = _getArchiveDocId(teacherId, gid, cycleNum);
   const archiveData = {
-    teacherId,
-    gid,
-    cycleNum,
-    groupName,
-    teacherName,
+    teacherId, gid, cycleNum,
+    groupName: snapshot.groupName,
+    teacherName: snapshot.teacherName,
     archivedAt: serverTimestamp(),
-    archiveDate: startDate,
-    sessions,
-    sessionControls,
-    students: groupStudentsSnap,
-    stats: {
-      totalStudents,
-      totalPresent,
-      totalAbsent,
-      totalCells,
-      rate
-    },
+    archiveDate: new Date().toISOString().slice(0, 10),
+    sessions: snapshot.sessions,
+    sessionControls: snapshot.sessionControls,
+    students: snapshot.students,
+    stats: snapshot.stats,
     readOnly: true
   };
-
-  // ─── 7. Batch ذري: حفظ الأرشيف + حذف sessionAttendance + حذف sessionControl ───
-  const batch = writeBatch(db);
-
-  // حفظ الأرشيف
-  batch.set(doc(db, 'attendanceArchive', archiveId), archiveData);
-
-  // حذف sessionAttendance (جميع الصيغ)
-  sessionDocsToDelete.forEach(id => batch.delete(doc(db, 'sessionAttendance', id)));
-
-  // حذف sessionControl (جميع الصيغ)
-  ctrlDocsToDelete.forEach(id => batch.delete(doc(db, 'sessionControl', id)));
-
-  // تنفيذ الدفعة (كل شيء أو لا شيء)
-  await batch.commit();
-  console.log(`[archive] ✅ الفوج "${groupName}" — الدورة ${cycleNum}: ${totalStudents} تلميذ, ${sessionDocsToDelete.size} حصة, ${ctrlDocsToDelete.size} تحكم`);
-
-  // ─── 8. مسح الكاش لهذا الفوج فقط ───
-  if (window._attSummaryCache && window._attSummaryCache[teacherId]) {
-    delete window._attSummaryCache[teacherId][gid];
-  }
-  if (window._ctrlMapCache && window._ctrlMapCache[teacherId]) {
-    if (currentGi >= 0) delete window._ctrlMapCache[teacherId][currentGi];
-  }
-
-  return { cycleNum, archiveId };
+  await setDoc(doc(db, 'attendanceArchive', archiveId), archiveData);
+  return { archiveId, archiveData };
 }
+
+// ─── التحقق من صحة الأرشيف (عدد التلاميذ والحصص) ───
+async function _verifyArchive(archiveId, expectedSnapshot) {
+  const snap = await getDoc(doc(db, 'attendanceArchive', archiveId));
+  if (!snap.exists()) throw new Error('❌ الأرشيف لم يتم حفظه في قاعدة البيانات');
+  const saved = snap.data();
+  const savedSessions = saved.sessions || {};
+  const savedStudents = saved.students || [];
+
+  const expStudentCount = expectedSnapshot.students.length;
+  if (savedStudents.length !== expStudentCount) {
+    throw new Error(`❌ عدد التلاميذ غير مطابق: المتوقع ${expStudentCount}، المحفوظ ${savedStudents.length}`);
+  }
+  for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+    const expSess = expectedSnapshot.sessions[sn] || [];
+    const savSess = savedSessions[sn] || [];
+    if (savSess.length !== expSess.length) {
+      throw new Error(`❌ الحصة ${sn}: عدد التلاميذ ${savSess.length} ≠ ${expSess.length}`);
+    }
+  }
+  return true;
+}
+
+// ─── حذف دورة مؤرشفة ───
+// يتم حذف الدورة فقط ولا يؤثر على أي بيانات أخرى
+window.deleteArchiveCycle = async (archiveId) => {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
+  if (!archiveId) { showToast('⚠️ معرف الدورة غير صالح', true); return; }
+
+  if (!confirm('هل أنت متأكد من حذف هذه الدورة المؤرشفة؟\n\nسيتم حذف هذه الدورة نهائياً ولا يمكن التراجع عن العملية.')) return;
+
+  try {
+    await deleteDoc(doc(db, 'attendanceArchive', archiveId));
+    showToast('✅ تم حذف الدورة');
+
+    const viewer = document.getElementById('archive-cycle-viewer');
+    if (viewer) viewer.remove();
+    closeGroupArchive();
+
+    // إعادة فتح قائمة الأرشيف للفوج
+    const gid = archiveId.split('_cycle_')[0].split('_').slice(1).join('_');
+    if (gid) openGroupArchive(gid);
+  } catch (e) {
+    console.error('[deleteArchiveCycle] ❌', e);
+    showToast('❌ خطأ في حذف الدورة: ' + e.message, true);
+  }
+};
 
 // ─── استرجاع دورة مؤرشفة (تستبدل الدورة الحالية بالكامل) ───
 window.restoreArchiveCycle = async (archiveId) => {
@@ -9322,9 +9295,8 @@ window.restoreArchiveCycle = async (archiveId) => {
     if (window._attSummaryCache && window._attSummaryCache[teacherId]) {
       delete window._attSummaryCache[teacherId][gid];
     }
-    if (window._ctrlMapCache && window._ctrlMapCache[teacherId]) {
-      const gi = (allTeachers || []).find(t => t.id === teacherId)?.groups?.findIndex(g => g && g._gid === gid);
-      if (gi >= 0) delete window._ctrlMapCache[teacherId][gi];
+    if (window._ctrlMapCache) {
+      delete window._ctrlMapCache[teacherId];
     }
 
     const viewer = document.getElementById('archive-cycle-viewer');
@@ -9359,8 +9331,11 @@ async function _checkAndArchiveGroup(teacherId, gid, sessionNum) {
 
   console.log(`[checkArchive] ✅ الحصة ${sessionNum} اكتملت — بدء الأرشفة`);
   try {
-    const result = await _snapshotAndArchiveCycle(teacherId, gid);
-    showToast(`📦 تم أرشفة الدورة ${result.cycleNum} تلقائياً`);
+    const snapshot = await _readCurrentCycleSnapshot(teacherId, gid);
+    if (!snapshot.students.length) return;
+    const { archiveId } = await _saveArchiveSnapshot(snapshot);
+    await _verifyArchive(archiveId, snapshot);
+    showToast(`📦 تم أرشفة الدورة تلقائياً`);
     loadAttendanceSummary(teacherId);
   } catch (e) {
     console.error('[checkArchive] ❌ فشل الأرشفة:', e);
@@ -9493,7 +9468,8 @@ window.openArchiveCycle = async (archiveId) => {
     });
 
     html += '</tbody></table></div>';
-    html += '<div style="padding:0 20px 14px;text-align:center;background:#FFFFFF;border-radius:0 0 16px 16px;display:flex;gap:10px;justify-content:center">';
+    html += '<div style="padding:0 20px 14px;text-align:center;background:#FFFFFF;border-radius:0 0 16px 16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">';
+    html += `<button onclick="window.deleteArchiveCycle('${archiveId}')" style="padding:8px 24px;border-radius:10px;border:1px solid #DC2626;background:#FEF2F2;color:#991B1B;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🗑️ حذف هذه الدورة</button>`;
     html += `<button onclick="restoreArchiveCycle('${archiveId}')" style="padding:8px 24px;border-radius:10px;border:1px solid #F59E0B;background:#FEF3C7;color:#92400E;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🔄 استرجاع هذه الدورة</button>`;
     html += '<button onclick="closeArchiveCycle()" style="padding:8px 24px;border-radius:10px;border:1px solid #E5E7EB;background:#FFFFFF;color:#6B7280;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">إغلاق</button>';
     html += '</div>';
@@ -9528,12 +9504,6 @@ window.startNewAttendanceCycle = async (gid) => {
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
   if (!gid) { showToast('⚠️ معرف الفوج غير صالح', true); return; }
-
-  const teacher = (allTeachers || []).find(t => t.id === teacherId);
-  if (!teacher) { showToast('⚠️ الأستاذ غير موجود', true); return; }
-  const group = (teacher.groups || []).find(g => g && g._gid === gid);
-  if (!group) { showToast('⚠️ الفوج غير موجود', true); return; }
-  if (!group.students || !group.students.length) { showToast('⚠️ لا يوجد تلاميذ في هذا الفوج للأرشفة', true); return; }
 
   // نافذة تأكيد
   const confirmModal = document.createElement('div');
@@ -9578,24 +9548,80 @@ window.startNewAttendanceCycle = async (gid) => {
 
   if (!confirmed) return;
 
-  // بدء العملية الذرية
+  // ─── تدفق أرشفة آمن (جميع الخطوات متسلسلة) ───
+  // الترتيب: قراءة → حفظ أرشيف → تحقق → فقط بعدها: إنشاء دورة جديدة
+  // إذا فشلت أي خطوة: لا يتغير شيء في السجل الحالي
   _archiveInProgress = true;
-  showToast('📦 جاري أرشفة الدورة الحالية...');
 
   try {
-    const archiveResult = await _snapshotAndArchiveCycle(teacherId, gid);
+    // الخطوة 1: قراءة السجل الحالي بالكامل من Firestore مباشرة
+    showToast('📦 جاري قراءة سجل الحضور...');
+    const snapshot = await _readCurrentCycleSnapshot(teacherId, gid);
+    if (!snapshot.students.length) throw new Error('لا يوجد تلاميذ في هذا الفوج للأرشفة');
 
-    // إنشاء دورة جديدة: مسح الكاش للفوج
-    if (window._attSummaryCache) {
-      if (!window._attSummaryCache[teacherId]) window._attSummaryCache[teacherId] = {};
-      window._attSummaryCache[teacherId][gid] = {};
+    // الخطوة 2: حفظ الأرشيف (separate setDoc — لا يمس السجل الحالي)
+    showToast('📦 جاري حفظ الأرشيف...');
+    const { archiveId } = await _saveArchiveSnapshot(snapshot);
+
+    // الخطوة 3: التحقق من صحة الأرشيف (عدد التلاميذ والحصص)
+    showToast('📦 جاري التحقق من الأرشيف...');
+    await _verifyArchive(archiveId, snapshot);
+
+    // ✅ الخطوة 4: بعد نجاح الأرشفة والتحقق — الآن فقط نبدأ الدورة الجديدة
+    showToast('✅ تم حفظ الأرشيف، جاري تهيئة الدورة الجديدة...');
+
+    const batch = writeBatch(db);
+
+    // حذف sessionAttendance الحالية لهذا الفوج (الصيغة الجديدة فقط)
+    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+      batch.delete(doc(db, 'sessionAttendance', `${teacherId}_${gid}_session_${sn}`));
+    }
+    // حذف sessionControl الحالية لهذا الفوج (الصيغة الجديدة فقط)
+    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+      batch.delete(doc(db, 'sessionControl', getCtrlDocId(teacherId, gid, sn)));
     }
 
-    showToast(`✅ تم أرشفة الدورة ${archiveResult.cycleNum} وبدء دورة جديدة`);
+    // إنشاء sessionAttendance جديدة (فارغة وجاهزة) لجميع الحصص
+    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+      batch.set(doc(db, 'sessionAttendance', `${teacherId}_${gid}_session_${sn}`), {
+        teacherId: teacherId + '_' + gid,
+        gid, sessionNum: sn,
+        date: new Date().toISOString().slice(0, 10),
+        students: snapshot.students.map(s => ({
+          id: s.id || '',
+          name: s.name || '',
+          present: null
+        })),
+        savedAt: serverTimestamp()
+      });
+    }
+    // إنشاء sessionControl جديدة
+    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+      batch.set(doc(db, 'sessionControl', getCtrlDocId(teacherId, gid, sn)), {
+        teacherId: teacherId + '_' + gid,
+        gid, sessionNum: sn,
+        date: new Date().toISOString().slice(0, 10),
+        savedAt: serverTimestamp(),
+        fullData: true
+      });
+    }
+
+    await batch.commit();
+
+    // مسح الكاش
+    if (window._attSummaryCache && window._attSummaryCache[teacherId]) {
+      delete window._attSummaryCache[teacherId][gid];
+    }
+    if (window._ctrlMapCache) {
+      delete window._ctrlMapCache[teacherId];
+    }
+
+    showToast(`✅ تم أرشفة الدورة وبدء دورة جديدة بنجاح`);
     await loadAttendanceSummary(teacherId);
   } catch (e) {
     console.error('[startNewAttendanceCycle] ❌', e);
-    showToast('⚠️ فشلت العملية: ' + e.message, true);
+    showToast('⚠️ ' + e.message + ' — لم يتم تعديل سجل الحضور الحالي', true);
+    // السجل الحالي يبقى كما هو — لم نمس أي شيء
   } finally {
     _archiveInProgress = false;
   }
