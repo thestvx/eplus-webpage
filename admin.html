@@ -954,6 +954,11 @@
     .att-group-rename-btn:hover{background:rgba(124,58,237,0.15);border-color:rgba(124,58,237,0.5)}
     .att-group-add-student-btn{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;border:1px solid rgba(5,150,105,0.3);background:rgba(5,150,105,0.08);color:#059669;font-size:12px;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;line-height:1;margin-right:6px;vertical-align:middle}
     .att-group-add-student-btn:hover{background:rgba(5,150,105,0.2);border-color:rgba(5,150,105,0.5);transform:scale(1.1)}
+    .att-group-move-btn,.att-group-archive-btn{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;line-height:1;white-space:nowrap;margin-right:6px}
+    .att-group-move-btn{border:1px solid rgba(217,119,6,0.25);background:rgba(217,119,6,0.07);color:#D97706}
+    .att-group-move-btn:hover{background:rgba(217,119,6,0.15);border-color:rgba(217,119,6,0.5)}
+    .att-group-archive-btn{border:1px solid rgba(37,99,235,0.25);background:rgba(37,99,235,0.07);color:#2563EB}
+    .att-group-archive-btn:hover{background:rgba(37,99,235,0.15);border-color:rgba(37,99,235,0.5)}
     .att-unassign-bar{display:none;margin-bottom:14px;padding:14px 18px;background:var(--card-bg);border:1.5px solid var(--border-2);border-radius:12px}
     .att-unassign-bar.open{display:block}
     .att-unassign-bar .ub-title{font-size:12px;font-weight:800;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:6px}
@@ -3271,9 +3276,9 @@
 
 <!-- ===== MOVE GROUP MODAL ===== -->
 <div class="sync-confirm-bg" id="move-group-modal" onclick="if(event.target===this)closeMoveGroupModal()">
-  <div class="sync-confirm-box" style="max-width:480px">
+  <div class="sync-confirm-box" style="max-width:520px">
     <div class="sync-confirm-icon">📦</div>
-    <div class="sync-confirm-title">نقل فوج</div>
+    <div class="sync-confirm-title">نقل تلاميذ</div>
     <div id="move-group-content" style="padding:12px 0">
       <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px">⏳ جاري التحميل...</div>
     </div>
@@ -8046,7 +8051,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     }
     const isAdmin = !window._isTeacherAttendanceView;
     allRows.push(`<tr class="att-group-header-row">
-      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${_displayGroupName((groups[gi] && groups[gi].name) || g.group)}${isAdmin && g.gid ? `<button class="att-group-add-student-btn" onclick="openAddStudentToGroup('${g.gid}')" title="إضافة تلميذ إلى هذا الفوج" data-gid="${g.gid}" style="--btn-clr:#059669">➕</button><button class="att-group-rename-btn" onclick="renameGroup('${g.gid}')" title="إعادة تسمية الفوج">✏️</button><button class="att-group-move-btn" onclick="openMoveGroupModal('${g.gid}')" title="نقل التلاميذ إلى فوج آخر" data-gid="${g.gid}">📦</button><button class="att-group-archive-btn" onclick="openGroupArchive('${g.gid}')" title="أرشيف الحضور (الدورات السابقة)" data-gid="${g.gid}">📂</button><button class="att-group-del-btn" onclick="deleteGroup('${g.gid}')" title="حذف الفوج" data-gid="${g.gid}">🗑️</button>` : ''}</td>
+      <td colspan="${colspan}" style="padding:10px 14px;background:var(--primary-light);border-bottom:2px solid var(--border-2);font-weight:800;font-size:14px;color:var(--text)">🏫 ${_displayGroupName((groups[gi] && groups[gi].name) || g.group)}${isAdmin && g.gid ? `<button class="att-group-add-student-btn" onclick="openAddStudentToGroup('${g.gid}')" title="إضافة تلميذ إلى هذا الفوج" data-gid="${g.gid}" style="--btn-clr:#059669">➕</button><button class="att-group-rename-btn" onclick="renameGroup('${g.gid}')" title="إعادة تسمية الفوج">✏️</button><button class="att-group-move-btn" onclick="openMoveGroupModal('${g.gid}')" title="نقل تلاميذ إلى فوج آخر" data-gid="${g.gid}">📦</button><button class="att-group-archive-btn" onclick="openGroupArchive('${g.gid}')" title="أرشيف الحضور (الدورات السابقة)" data-gid="${g.gid}">📂</button><button class="att-group-del-btn" onclick="deleteGroup('${g.gid}')" title="حذف الفوج" data-gid="${g.gid}">🗑️</button>` : ''}</td>
     </tr>`);
 
     // قراءة فلتر الاشتراك
@@ -8697,7 +8702,7 @@ window.confirmRestoreAttendance = async () => {
   }
 };
 
-// ─── نقل فوج كامل ───
+// ─── نقل تلاميذ (يدعم اختيار تلاميذ محددين) ───
 let _moveFromGid = '';
 let _moveToGid = '';
 
@@ -8720,18 +8725,8 @@ window.openMoveGroupModal = async (sourceGid) => {
   const content = document.getElementById('move-group-content');
   const srcGroup = res.group;
   const groups = res.groups || [];
-  let studentCount = (srcGroup.students || []).length;
-  // إذا كان count صفراً ابحث عن التلاميذ من session docs
-  if (!studentCount) {
-    try {
-      const srcQ = query(collection(db, 'sessionAttendance'), where('gid', '==', sourceGid));
-      const srcSnap = await getDocs(srcQ);
-      const nameSet = new Set();
-      srcSnap.forEach(d => { (d.data().students || []).forEach(st => { const sn = String(st.name || '').trim(); if (sn) nameSet.add(sn); }); });
-      studentCount = nameSet.size;
-    } catch(_){}
-  }
   const srcName = srcGroup.name || '—';
+  let students = srcGroup.students || [];
 
   // بناء قائمة الأفواج الهدف (باستثناء المصدر)
   const targets = groups.filter(g => g && g._gid && g._gid !== sourceGid);
@@ -8743,19 +8738,51 @@ window.openMoveGroupModal = async (sourceGid) => {
   const targetOpts = targets.map(g =>
     `<option value="${g._gid}">🏫 ${g.name || '—'} (${(g.students || []).length} تلميذ)</option>`
   ).join('');
+
+  // بناء قائمة التلاميذ مع checkbox
+  const studentCheckboxHtml = students.map((s, idx) => {
+    const sId = (typeof s === 'string' ? '' : s.id) || '';
+    const sName = typeof s === 'string' ? s : (s.name || '—');
+    const safeName = sName.replace(/"/g,'&quot;');
+    return `<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer;transition:background 0.15s;font-size:12px"
+      onmouseover="this.style.background='#F5F3FF'" onmouseout="this.style.background='transparent'">
+      <input type="checkbox" class="move-student-cb" value="${sId || safeName}" data-id="${sId}" data-name="${safeName}" checked style="width:16px;height:16px;cursor:pointer;accent-color:#7C3AED">
+      <span style="flex:1;color:#374151;font-weight:600">${sName}</span>
+    </label>`;
+  }).join('');
+
+  const totalStudents = students.length;
   content.innerHTML = `
-    <div style="font-size:13px;margin-bottom:12px;padding:0 4px">
-      <div style="font-weight:800;color:var(--text);margin-bottom:4px">📤 المصدر: <span style="color:var(--primary)">${srcName}</span></div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">عدد التلاميذ المراد نقلهم: <strong>${studentCount}</strong></div>
+    <div style="font-size:13px;padding:0 4px">
+      <div style="font-weight:800;color:var(--text);margin-bottom:6px">📤 المصدر: <span style="color:var(--primary)">${srcName}</span> (${totalStudents} تلميذ)</div>
+      <div style="margin:6px 0 10px;display:flex;gap:8px;font-size:11px">
+        <button onclick="document.querySelectorAll('.move-student-cb').forEach(c=>c.checked=true);_updateMoveCount()" style="padding:4px 10px;border-radius:6px;border:1px solid #7C3AED;background:#F5F3FF;color:#7C3AED;font-weight:700;cursor:pointer;font-family:inherit">☑️ تحديد الكل</button>
+        <button onclick="document.querySelectorAll('.move-student-cb').forEach(c=>c.checked=false);_updateMoveCount()" style="padding:4px 10px;border-radius:6px;border:1px solid #D1D5DB;background:#F9FAFB;color:#6B7280;font-weight:700;cursor:pointer;font-family:inherit">⬜ إلغاء الكل</button>
+      </div>
+      <div style="max-height:200px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px 6px;margin-bottom:10px">${studentCheckboxHtml}</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px" id="move-selected-count">✅ المحدد: <strong>${totalStudents}</strong> من ${totalStudents}</div>
+
       <label style="font-weight:800;font-size:12px;color:var(--text);display:block;margin-bottom:4px">📥 الفوج الهدف:</label>
       <select id="move-target-select" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:inherit;font-size:13px">${targetOpts}</select>
       <div style="font-size:11px;color:#DC2626;margin-top:12px;padding:8px 12px;background:#FEF2F2;border-radius:8px;font-weight:700">
-        ⚠️ سيتم نقل ${studentCount} تلميذ مع جميع سجلات الحضور إلى الفوج الهدف
+        ⚠️ سيتم نقل التلاميذ المحددين مع جميع سجلات الحضور إلى الفوج الهدف
       </div>
     </div>`;
   _moveToGid = '';
   document.getElementById('move-group-confirm-btn').style.display = '';
 };
+
+window._updateMoveCount = () => {
+  const checked = document.querySelectorAll('.move-student-cb:checked').length;
+  const total = document.querySelectorAll('.move-student-cb').length;
+  const el = document.getElementById('move-selected-count');
+  if (el) el.innerHTML = `✅ المحدد: <strong>${checked}</strong> من ${total}`;
+};
+
+// ربط التغيير ديناميكياً
+document.addEventListener('change', (e) => {
+  if (e.target.matches('.move-student-cb')) _updateMoveCount();
+});
 window.closeMoveGroupModal = () => {
   document.getElementById('move-group-modal').classList.remove('open');
   _moveFromGid = '';
@@ -8917,6 +8944,17 @@ window.confirmMoveGroup = async () => {
 
     if (!studentsToMove.length) { showToast('⚠️ الفوج المصدر لا يحتوي على تلاميذ', true); return; }
 
+    // تطبيق فلتر اختيار التلاميذ (إذا اختار المستخدم تلاميذ محددين)
+    const checkedCbs = document.querySelectorAll('.move-student-cb:checked');
+    if (checkedCbs.length > 0 && checkedCbs.length < document.querySelectorAll('.move-student-cb').length) {
+      const selectedValues = new Set();
+      checkedCbs.forEach(cb => selectedValues.add(cb.value));
+      studentsToMove = studentsToMove.filter(s => {
+        const val = (typeof s === 'string' ? '' : s.id) || (typeof s === 'string' ? s : (s.name || ''));
+        return val && selectedValues.has(val);
+      });
+    }
+
     // 1. نقل التلاميذ مع الاحتفاظ بالـ Student ID
     const existingTargetIds = new Set((tgtGroup.students || []).map(s => s.id ? String(s.id) : ''));
     const existingTargetNames = new Set((tgtGroup.students || []).map(s => (typeof s === 'string' ? s : (s.name || '')).trim().toLowerCase()));
@@ -9041,24 +9079,29 @@ window.confirmMoveGroup = async () => {
 };
 
 // ─── نظام أرشفة الحضور (كل 12 حصة = دورة) ───
-// عند اكتمال الحصة 12، يُؤرشف السجل تلقائياً ويُبدأ دورة جديدة
+// كل فوج يمتلك أرشيفه المستقل. لا يتم خلط بيانات الأفواج مطلقاً.
+// جميع العمليات تستخدم المعرفات (Teacher ID, Group ID, Student ID, Cycle ID) فقط.
 
 const CYCLE_SESSION_COUNT = 12;
 
-// أرشيف معرف الدورة: teacherId_gid_cycleNum
 function _getArchiveDocId(teacherId, gid, cycleNum) {
   return teacherId + '_' + gid + '_cycle_' + cycleNum;
 }
 
-// ─── أرشفة دورة حضور كاملة ───
-async function _archiveGroupCycle(teacherId, gid) {
+// ─── أرشفة دورة حضور كاملة (Snapshot + Batch) ───
+// 1. تأخذ Snapshot كامل للفوج (تلاميذ، حصص، تحكم، إحصائيات)
+// 2. تحفظ الأرشيف (batch)
+// 3. تحذف sessionAttendance + sessionControl لهذا الفوج فقط (batch)
+// العملية ذرية: تنجح بالكامل أو لا شيء
+async function _snapshotAndArchiveCycle(teacherId, gid) {
+  if (!teacherId || !gid) throw new Error('معرف الأستاذ أو الفوج غير صالح');
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
   if (!teacher) throw new Error('الأستاذ غير موجود');
   const group = (teacher.groups || []).find(g => g && g._gid === gid);
   if (!group) throw new Error('الفوج غير موجود');
 
   const groupName = group.name || '—';
-  const now = new Date().toISOString();
+  const startDate = new Date().toISOString().slice(0, 10);
 
   // 1. حساب رقم الدورة التالية
   const archiveQuery = query(
@@ -9069,63 +9112,82 @@ async function _archiveGroupCycle(teacherId, gid) {
   const archiveSnap = await getDocs(archiveQuery);
   const cycleNum = archiveSnap.size + 1;
 
-  // 2. قراءة جميع sessionAttendance للحصص 1-12 (بالصيغتين الجديدة والقديمة)
+  // 2. قراءة sessionAttendance لهذا الفوج (عن طريق حقل gid — لا gi)
   const sessions = {};
-  const giLegacy = (teacher.groups || []).findIndex(g => g && g._gid === gid);
+  const sessionControls = {};
+
+  // 2a. البحث عن sessionAttendance بحقل gid
+  const sessQuery = query(
+    collection(db, 'sessionAttendance'),
+    where('gid', '==', gid)
+  );
+  const sessSnap = await getDocs(sessQuery);
+  sessSnap.forEach(d => {
+    const sn = d.data().sessionNum;
+    if (sn >= 1 && sn <= CYCLE_SESSION_COUNT) {
+      sessions[sn] = d.data().students || [];
+    }
+  });
+
+  // 2b. البحث عن sessionControl بحقل gid
+  const ctrlQuery = query(
+    collection(db, 'sessionControl'),
+    where('gid', '==', gid)
+  );
+  const ctrlSnap = await getDocs(ctrlQuery);
+  ctrlSnap.forEach(d => {
+    const sn = d.data().sessionNum;
+    if (sn >= 1 && sn <= CYCLE_SESSION_COUNT) {
+      sessionControls[sn] = d.data();
+    }
+  });
+
+  // 2c. Fallback: البحث بالصيغة الجديدة (teacherId_gid_session_N) للسجلات التي قد لا تحتوي على حقل gid
   for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-    const docIdNew = `${teacherId}_${gid}_session_${sn}`;
-    const snapNew = await getDoc(doc(db, 'sessionAttendance', docIdNew));
-    if (snapNew.exists()) {
-      sessions[sn] = snapNew.data().students || [];
-    } else if (giLegacy >= 0) {
-      const docIdLegacy = `${teacherId}_g${giLegacy}_session_${sn}`;
-      const snapLegacy = await getDoc(doc(db, 'sessionAttendance', docIdLegacy));
-      if (snapLegacy.exists()) {
-        sessions[sn] = snapLegacy.data().students || [];
+    if (!sessions[sn]) {
+      const docIdNew = `${teacherId}_${gid}_session_${sn}`;
+      const snapNew = await getDoc(doc(db, 'sessionAttendance', docIdNew));
+      if (snapNew.exists()) {
+        sessions[sn] = snapNew.data().students || [];
       } else {
         sessions[sn] = [];
       }
-    } else {
-      sessions[sn] = [];
     }
-  }
-
-  // 3. قراءة sessionControl
-  const sessionControls = {};
-  const teacherObj2 = (allTeachers || []).find(t => t.id === teacherId);
-  const gi2 = (teacherObj2.groups || []).findIndex(g => g && g._gid === gid);
-  for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-    // الصيغة الجديدة (مع gid)
-    const ctrlDocIdNew = getCtrlDocId(teacherId, gid, sn);
-    const snapNew = await getDoc(doc(db, 'sessionControl', ctrlDocIdNew));
-    if (snapNew.exists()) {
-      sessionControls[sn] = snapNew.data();
-    } else if (gi2 >= 0) {
-      // الصيغة القديمة (مع gi index)
-      const ctrlDocIdLegacy2 = getCtrlDocIdLegacy(teacherId, gi2, sn);
-      const snapLegacy = await getDoc(doc(db, 'sessionControl', ctrlDocIdLegacy2));
-      if (snapLegacy.exists()) {
-        sessionControls[sn] = snapLegacy.data();
+    if (!sessionControls[sn]) {
+      const ctrlDocIdNew = getCtrlDocId(teacherId, gid, sn);
+      const ctrlSnapNew = await getDoc(doc(db, 'sessionControl', ctrlDocIdNew));
+      if (ctrlSnapNew.exists()) {
+        sessionControls[sn] = ctrlSnapNew.data();
       }
     }
   }
 
-  // 4. حساب الإحصائيات
-  let totalPresent = 0, totalAbsent = 0, totalStudents = 0;
-  const studentSet = new Set();
+  // 3. حساب الإحصائيات (باستخدام Student ID فقط)
+  let totalPresent = 0, totalAbsent = 0;
+  const studentIdSet = new Set();
   Object.values(sessions).forEach(studs => {
     studs.forEach(s => {
-      if (s.id || s.name) {
-        const key = s.id || s.name;
-        studentSet.add(key);
-      }
+      const idKey = s.id ? String(s.id) : (s.name || '');
+      if (idKey) studentIdSet.add(idKey);
       if (s.present === true) totalPresent++;
       else if (s.present === false) totalAbsent++;
     });
   });
-  totalStudents = studentSet.size;
+  const totalStudents = studentIdSet.size;
   const totalCells = totalStudents * CYCLE_SESSION_COUNT;
   const rate = totalCells > 0 ? Math.round((totalPresent / totalCells) * 100) : 0;
+
+  // 4. Snapshot التلاميذ (من group.students — باستخدام المعرفات)
+  const groupStudentsSnap = (group.students || []).map(s => {
+    if (typeof s === 'string') return { id: '', name: s };
+    return {
+      id: s.id || '',
+      name: s.name || '',
+      receipt: s.receipt || '',
+      payStatus: s.payStatus || '',
+      joinedAtSession: s.joinedAtSession || 1
+    };
+  });
 
   // 5. إنشاء وثيقة الأرشيف
   const archiveId = _getArchiveDocId(teacherId, gid, cycleNum);
@@ -9136,10 +9198,10 @@ async function _archiveGroupCycle(teacherId, gid) {
     groupName,
     teacherName: teacher.name || '',
     archivedAt: serverTimestamp(),
-    archiveDate: now.slice(0, 10),
+    archiveDate: startDate,
     sessions,
     sessionControls,
-    students: (group.students || []).map(s => typeof s === 'string' ? { name: s } : s),
+    students: groupStudentsSnap,
     stats: {
       totalStudents,
       totalPresent,
@@ -9150,55 +9212,49 @@ async function _archiveGroupCycle(teacherId, gid) {
     readOnly: true
   };
 
-  await setDoc(doc(db, 'attendanceArchive', archiveId), archiveData);
-  console.log(`[archiveGroupCycle] ✅ تم أرشفة الدورة ${cycleNum} للفوج "${groupName}"`);
-
-  // 6. حذف sessionAttendance للحصص 1-12 (بالصيغتين الجديدة والقديمة)
+  // 6. Batch ذري: حفظ الأرشيف + حذف sessionAttendance + حذف sessionControl (لهذا الفوج فقط)
   const batch = writeBatch(db);
+
+  // حفظ الأرشيف
+  batch.set(doc(db, 'attendanceArchive', archiveId), archiveData);
+
+  // حذف sessionAttendance: عن طريق استعلام gid + الصيغة الجديدة
+  const allSessToDelete = new Set();
+  sessSnap.forEach(d => allSessToDelete.add(d.id));
   for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
     const docIdNew = `${teacherId}_${gid}_session_${sn}`;
-    batch.delete(doc(db, 'sessionAttendance', docIdNew));
-    if (giLegacy >= 0) {
-      const docIdLegacy = `${teacherId}_g${giLegacy}_session_${sn}`;
-      batch.delete(doc(db, 'sessionAttendance', docIdLegacy));
-    }
+    allSessToDelete.add(docIdNew);
   }
-  // حذف sessionControl لهذا الفوج (بالصيغتين القديمة والجديدة)
-  const teacherObj = (allTeachers || []).find(t => t.id === teacherId);
-  const gi = (teacherObj.groups || []).findIndex(g => g && g._gid === gid);
-  for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-    // الصيغة الجديدة (مع gid)
-    const ctrlNewId = getCtrlDocId(teacherId, gid, sn);
-    batch.delete(doc(db, 'sessionControl', ctrlNewId));
-    // الصيغة القديمة (مع gi index)
-    if (gi >= 0) {
-      const ctrlLegacyId = getCtrlDocIdLegacy(teacherId, gi, sn);
-      batch.delete(doc(db, 'sessionControl', ctrlLegacyId));
-    }
-  }
-  await batch.commit();
+  allSessToDelete.forEach(id => batch.delete(doc(db, 'sessionAttendance', id)));
 
-  // 7. مسح الكاش
+  // حذف sessionControl: عن طريق استعلام gid + الصيغة الجديدة
+  const allCtrlToDelete = new Set();
+  ctrlSnap.forEach(d => allCtrlToDelete.add(d.id));
+  for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+    const ctrlDocIdNew = getCtrlDocId(teacherId, gid, sn);
+    allCtrlToDelete.add(ctrlDocIdNew);
+  }
+  allCtrlToDelete.forEach(id => batch.delete(doc(db, 'sessionControl', id)));
+
+  // تنفيذ الدفعة (كل شيء أو لا شيء)
+  await batch.commit();
+  console.log(`[snapshotAndArchiveCycle] ✅ تم أرشفة الدورة ${cycleNum} للفوج "${groupName}" (${allSessToDelete.size} حصة, ${totalStudents} تلميذ)`);
+
+  // 7. مسح الكاش لهذا الفوج فقط
   if (window._attSummaryCache && window._attSummaryCache[teacherId]) {
     delete window._attSummaryCache[teacherId][gid];
   }
-  if (window._ctrlMapCache) {
-    // مسح session control cache للفوج
+  if (window._ctrlMapCache && window._ctrlMapCache[teacherId]) {
     const gi = (teacher.groups || []).findIndex(g => g && g._gid === gid);
-    if (gi >= 0 && window._ctrlMapCache[teacherId]) {
-      delete window._ctrlMapCache[teacherId][gi];
-    }
+    if (gi >= 0) delete window._ctrlMapCache[teacherId][gi];
   }
 
-  showToast(`📦 تم أرشفة الدورة ${cycleNum} للفوج "${groupName}" — نسبة الحضور: ${rate}%`);
   return { cycleNum, archiveId };
 }
 
-// ─── التحقق مما إذا كانت الحصة 12 اكتملت لجميع التلاميذ ───
+// ─── التحقق مما إذا كانت الحصة 12 اكتملت ───
 async function _checkAndArchiveGroup(teacherId, gid, sessionNum) {
-  if (sessionNum !== CYCLE_SESSION_COUNT) return; // نتحقق فقط عند الحصة 12
-
-  // قراءة session 12 للتأكد من وجود جميع التلاميذ
+  if (sessionNum !== CYCLE_SESSION_COUNT) return;
   const teachers = window.allTeachers || [];
   const teacher = teachers.find(t => t.id === teacherId);
   if (!teacher) return;
@@ -9210,15 +9266,13 @@ async function _checkAndArchiveGroup(teacherId, gid, sessionNum) {
   const docId = `${teacherId}_${gid}_session_${sessionNum}`;
   const snap = await getDoc(doc(db, 'sessionAttendance', docId));
   if (!snap.exists()) return;
-
   const recordedStudents = snap.data().students || [];
-  if (recordedStudents.length < groupStudents.length) return; // لم يكتمل بعد
+  if (recordedStudents.length < groupStudents.length) return;
 
   console.log(`[checkArchive] ✅ الحصة ${sessionNum} اكتملت لجميع تلاميذ الفوج "${group.name}" — بدء الأرشفة`);
-
   try {
-    await _archiveGroupCycle(teacherId, gid);
-    showToast('🔄 يتم تحميل الدورة الجديدة...');
+    const result = await _snapshotAndArchiveCycle(teacherId, gid);
+    showToast(`📦 تم أرشفة الدورة ${result.cycleNum} تلقائياً`);
     loadAttendanceSummary(teacherId);
   } catch (e) {
     console.error('[checkArchive] ❌ فشل الأرشفة:', e);
@@ -9291,17 +9345,7 @@ window.openGroupArchive = async (gid) => {
   }).join('');
 };
 
-window.closeGroupArchive = () => {
-  const modal = document.getElementById('archive-modal');
-  if (modal) modal.style.display = 'none';
-};
-
-window.closeArchiveCycle = () => {
-  const viewer = document.getElementById('archive-cycle-viewer');
-  if (viewer) viewer.remove();
-};
-
-// ─── عرض دورة مؤرشفة (للقراءة فقط) ───
+// ─── عرض دورة مؤرشفة (Snapshot ثابت — للقراءة فقط) ───
 window.openArchiveCycle = async (archiveId) => {
   showToast('🔍 جاري تحميل الدورة المؤرشفة...');
   try {
@@ -9309,20 +9353,9 @@ window.openArchiveCycle = async (archiveId) => {
     if (!snap.exists()) { showToast('⚠️ الدورة غير موجودة', true); return; }
     const data = snap.data();
 
-    // بناء قائمة بجميع التلاميذ
+    // استخدام التلاميذ من الـ Snapshot فقط (وليس من الفوج الحالي)
     const sessions = data.sessions || {};
-    const allStudentsMap = new Map();
-    (data.students || []).forEach(s => {
-      const key = s.id || s.name || '';
-      if (!allStudentsMap.has(key)) allStudentsMap.set(key, s);
-    });
-    Object.values(sessions).forEach(studs => {
-      studs.forEach(s => {
-        const key = s.id || s.name || '';
-        if (key && !allStudentsMap.has(key)) allStudentsMap.set(key, s);
-      });
-    });
-    const allStudentNames = Array.from(allStudentsMap.values());
+    const archivedStudents = data.students || [];
     const stats = data.stats || {};
 
     let html = `<div style="background:linear-gradient(135deg,#7C3AED,#6366f1);padding:16px 20px 12px;text-align:center;position:sticky;top:0;z-index:2">
@@ -9339,7 +9372,6 @@ window.openArchiveCycle = async (archiveId) => {
       </div>
     </div>`;
 
-    // جدول الحضور للقراءة فقط
     html += '<div style="overflow-x:auto;padding:10px 12px 14px;background:#FFFFFF">';
     html += '<table style="width:100%;border-collapse:collapse;font-size:12px;direction:rtl">';
     html += '<thead><tr>';
@@ -9350,18 +9382,18 @@ window.openArchiveCycle = async (archiveId) => {
     }
     html += '</tr></thead><tbody>';
 
-    allStudentNames.forEach((s, idx) => {
+    archivedStudents.forEach((s, idx) => {
       const sName = typeof s === 'string' ? s : (s.name || '—');
+      const sId = typeof s === 'string' ? '' : (s.id || '');
       html += '<tr>';
       html += `<td style="padding:6px 8px;border:1px solid #E5E7EB;text-align:center;font-weight:600;color:#374151">${idx + 1}</td>`;
       html += `<td style="padding:6px 8px;border:1px solid #E5E7EB;font-weight:700;color:#1F2937">${sName}</td>`;
       for (let i = 1; i <= CYCLE_SESSION_COUNT; i++) {
         const sessionStudents = sessions[i] || [];
-        const rec = sessionStudents.find(st => {
-          if (s.id && st.id) return String(st.id) === String(s.id);
-          const sn = typeof s === 'string' ? s : (s.name || '');
-          return st.id ? false : String(st.name || '').trim() === String(sn).trim();
-        });
+        // البحث باستخدام Student ID فقط — لا اسم
+        const rec = sId
+          ? sessionStudents.find(st => st.id && String(st.id) === sId)
+          : sessionStudents.find(st => !st.id && String(st.name || '').trim() === String(sName).trim());
         let cell = '<span style="color:#9CA3AF">⋯</span>';
         if (rec) {
           cell = rec.present === true
@@ -9390,8 +9422,17 @@ window.openArchiveCycle = async (archiveId) => {
   }
 };
 
+window.closeGroupArchive = () => {
+  const modal = document.getElementById('archive-modal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.closeArchiveCycle = () => {
+  const viewer = document.getElementById('archive-cycle-viewer');
+  if (viewer) viewer.remove();
+};
+
 // ─── بدء دورة حضور جديدة (يدوي) ───
-// ينشئ أرشيفاً للدورة الحالية ويبدأ دورة جديدة بنفس التلاميذ
 let _archiveInProgress = false;
 
 window.startNewAttendanceCycle = async (gid) => {
@@ -9441,7 +9482,6 @@ window.startNewAttendanceCycle = async (gid) => {
   cancelBtn.addEventListener('click', closeConfirm);
   confirmModal.addEventListener('click', (e) => { if (e.target === confirmModal) closeConfirm(); });
 
-  // انتظر التأكيد
   const confirmed = await new Promise(resolve => {
     okBtn.addEventListener('click', () => { closeConfirm(); resolve(true); });
     cancelBtn.addEventListener('click', () => resolve(false));
@@ -9450,19 +9490,14 @@ window.startNewAttendanceCycle = async (gid) => {
 
   if (!confirmed) return;
 
-  // بدء العملية مع حماية double-click
+  // بدء العملية الذرية
   _archiveInProgress = true;
   showToast('📦 جاري أرشفة الدورة الحالية...');
 
   try {
-    // 1. أرشفة الدورة الحالية
-    const archiveResult = await _archiveGroupCycle(teacherId, gid);
-    if (!archiveResult) throw new Error('فشلت عملية الأرشفة');
+    const archiveResult = await _snapshotAndArchiveCycle(teacherId, gid);
 
-    showToast('🔄 إنشاء دورة جديدة...');
-
-    // 2. إنشاء دورة جديدة (لا نحتاج لفعل شيء — sessionAttendance محذوفة،
-    // والتلاميذ محتفظ بهم في group.students، loadAttendanceSummary سيعيد عرض الجدول فارغاً)
+    // إنشاء دورة جديدة: مسح الكاش للفوج
     if (window._attSummaryCache) {
       if (!window._attSummaryCache[teacherId]) window._attSummaryCache[teacherId] = {};
       window._attSummaryCache[teacherId][gid] = {};
