@@ -9630,41 +9630,68 @@ window.startNewAttendanceCycle = async (gid) => {
   _archiveInProgress = true;
 
   try {
-    // الحصول على رقم الدورة الحالية (قبل الاستخدام)
-    const currentCycleNum = await _getCurrentCycleNum(teacherId, gid);
+    // ════════════════════ AUTH CHECK ════════════════════
+    const _uid = auth.currentUser?.uid || 'NO_AUTH';
+    const _authed = !!auth.currentUser;
+    const _hasTeacherDoc = _authed && await getDoc(doc(db, 'teachers', _uid)).then(s => s.exists()).catch(() => false);
+    const _isAdmin = _authed && !_hasTeacherDoc;
+    console.log('═══════ بدء حضور جديد ═══════');
+    console.log('[AUTH]   Current UID:', _uid);
+    console.log('[AUTH]   Authenticated:', _authed);
+    console.log('[AUTH]   Has teachers doc:', _hasTeacherDoc);
+    console.log('[AUTH]   Role:', _isAdmin ? 'Admin' : 'Teacher');
+    console.log('[AUTH]   Selected teacherId:', teacherId);
+    console.log('[AUTH]   gid:', gid);
 
-    // الخطوة 1: قراءة السجل الحالي بالكامل من Firestore مباشرة
+    // ════════════════════ STEP 1: GET CURRENT CYCLE ════════════════════
+    const _cycleQuery = 'attendanceCycles(where teacherId==, gid==, status==current)';
+    console.log('[READ]   Collection: attendanceCycles | Operation: query | Filter: teacherId='+teacherId+', gid='+gid+', status=current');
+    const currentCycleNum = await _getCurrentCycleNum(teacherId, gid);
+    console.log('[READ]   ✓ attendanceCycles query result: cycleNum =', currentCycleNum);
+
+    // ════════════════════ STEP 2: READ CURRENT SNAPSHOT ════════════════════
     showToast('📦 جاري قراءة سجل الحضور...');
+    console.log('[READ]   Collection: teachers | Document:', teacherId);
     const snapshot = await _readCurrentCycleSnapshot(teacherId, gid);
     if (!snapshot.students.length) throw new Error('لا يوجد تلاميذ في هذا الفوج للأرشفة');
+    console.log('[READ]   ✓ teachers + sessionAttendance + sessionControl — all read OK');
 
-    // الخطوة 2: حفظ الأرشيف (separate setDoc — لا يمس السجل الحالي)
-    showToast('📦 جاري حفظ الأرشيف...');
-    const { archiveId } = await _saveArchiveSnapshot(snapshot, currentCycleNum).catch(e => { console.error('[step2 archive]', e); throw e; });
+    // ════════════════════ STEP 3: CREATE ARCHIVE ════════════════════
+    const archiveId = _getArchiveDocId(teacherId, gid, currentCycleNum);
+    console.log('[WRITE]  Collection: attendanceArchive | Document:', archiveId, '| Full Path: attendanceArchive/' + archiveId);
+    console.log('[WRITE]  Teacher ID:', teacherId, '| Group ID:', gid, '| Cycle:', currentCycleNum);
+    const { archiveId: savedArchiveId } = await _saveArchiveSnapshot(snapshot, currentCycleNum);
+    console.log('[WRITE]  ✓ attendanceArchive created:', savedArchiveId);
 
-    // الخطوة 3: التحقق من صحة الأرشيف (عدد التلاميذ والحصص)
-    showToast('📦 جاري التحقق من الأرشيف...');
+    // ════════════════════ STEP 4: VERIFY ARCHIVE ════════════════════
+    console.log('[READ]   Collection: attendanceArchive | Document:', archiveId);
     await _verifyArchive(archiveId, snapshot);
+    console.log('[READ]   ✓ attendanceArchive verified');
 
-    // ✅ الخطوة 4: بعد نجاح الأرشفة والتحقق — الآن فقط نبدأ الدورة الجديدة
-    showToast('✅ تم حفظ الأرشيف، جاري تهيئة الدورة الجديدة...');
-
-    const nextCycleNum = currentCycleNum + 1;
-
-    // أرشفة الدورة الحالية (لا نحذف session docs)
+    // ════════════════════ STEP 5: ARCHIVE CURRENT CYCLE ════════════════════
     const currentCycleDocId = getCycleDocId(teacherId, gid, currentCycleNum);
-    await updateDoc(doc(db, 'attendanceCycles', currentCycleDocId), {
+    console.log('[UPDATE] Collection: attendanceCycles | Document:', currentCycleDocId, '| Full Path: attendanceCycles/' + currentCycleDocId);
+    console.log('[UPDATE] Fields: status=archived, endDate=' + new Date().toISOString().slice(0, 10));
+    await setDoc(doc(db, 'attendanceCycles', currentCycleDocId), {
+      teacherId, gid, cycleNum: currentCycleNum,
       status: 'archived',
       endDate: new Date().toISOString().slice(0, 10)
-    }).catch(e => { console.error('[step4 updateCycle]', e, 'docId:', currentCycleDocId); throw e; });
+    }, { merge: true });
+    console.log('[UPDATE] ✓ attendanceCycles archived');
 
-    // إنشاء دورة جديدة كـ current
-    await _ensureCycleDoc(teacherId, gid, nextCycleNum).catch(e => { console.error('[step5 ensureCycle]', e); throw e; });
+    // ════════════════════ STEP 6: CREATE NEW CYCLE ════════════════════
+    const nextCycleNum = currentCycleNum + 1;
+    const newCycleDocId = getCycleDocId(teacherId, gid, nextCycleNum);
+    console.log('[WRITE]  Collection: attendanceCycles | Document:', newCycleDocId, '| Full Path: attendanceCycles/' + newCycleDocId);
+    await _ensureCycleDoc(teacherId, gid, nextCycleNum);
+    console.log('[WRITE]  ✓ attendanceCycles created as current');
 
-    // إنشاء sessionAttendance جديدة بأرقام الدورة الجديدة (فارغة — بدون present:null)
+    // ════════════════════ STEP 7: CREATE EMPTY SESSION DOCS ════════════════════
     const batch = writeBatch(db);
     for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-      batch.set(doc(db, 'sessionAttendance', getSessionDocId(teacherId, gid, sn, nextCycleNum)), {
+      const sessionDocId = getSessionDocId(teacherId, gid, sn, nextCycleNum);
+      console.log('[WRITE]  Collection: sessionAttendance | Document:', sessionDocId, '| Full Path: sessionAttendance/' + sessionDocId);
+      batch.set(doc(db, 'sessionAttendance', sessionDocId), {
         teacherId: teacherId + '_' + gid,
         gid, cycleNum: nextCycleNum, sessionNum: sn,
         date: new Date().toISOString().slice(0, 10),
@@ -9672,14 +9699,12 @@ window.startNewAttendanceCycle = async (gid) => {
         savedAt: serverTimestamp()
       });
     }
+    await batch.commit();
+    console.log('[WRITE]  ✓ All', CYCLE_SESSION_COUNT, 'sessionAttendance docs created');
 
-    await batch.commit().catch(e => { console.error('[step6 batch]', e); throw e; });
-
-    // تحديث كاش رقم الدورة
+    // تحديث الكاش
     const cacheKey = teacherId + '|' + gid;
     _currentCycleCache[cacheKey] = nextCycleNum;
-
-    // مسح كاش الحضور
     if (window._attSummaryCache && window._attSummaryCache[teacherId]) {
       delete window._attSummaryCache[teacherId][gid];
     }
@@ -9687,10 +9712,13 @@ window.startNewAttendanceCycle = async (gid) => {
       delete window._ctrlMapCache[teacherId];
     }
 
+    console.log('═══════ تم بنجاح: أرشفة الدورة ' + currentCycleNum + ' وبدء الدورة ' + nextCycleNum + ' ═══════');
     showToast(`✅ تم أرشفة الدورة ${currentCycleNum} وبدء الدورة ${nextCycleNum} بنجاح`);
     await loadAttendanceSummary(teacherId);
   } catch (e) {
+    console.log('═══════ فشل في الخطوة أعلاه ═══════');
     console.error('[startNewAttendanceCycle] ❌', e);
+    console.error('[FAILURE]  Code:', e.code, '| Message:', e.message);
     showToast('⚠️ ' + e.message + ' — لم يتم تعديل سجل الحضور الحالي', true);
   } finally {
     _archiveInProgress = false;
@@ -9817,6 +9845,7 @@ window.toggleDailyAttCell = async (teacherId, gid, sessionNum, studentId, studen
       data.savedAt = serverTimestamp();
       data.gid = gid;
       data.cycleNum = cycleNum;
+      data.teacherId = teacherId + '_' + gid;
       await setDoc(docRef, data);
     } else {
       data = {
