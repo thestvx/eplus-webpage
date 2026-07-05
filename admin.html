@@ -9185,7 +9185,7 @@ async function _saveArchiveSnapshot(snapshot) {
   return { archiveId, archiveData };
 }
 
-// ─── التحقق من صحة الأرشيف (عدد التلاميذ والحصص) ───
+// ─── التحقق من صحة الأرشيف (عدد التلاميذ والحصص + قيم الحضور) ───
 async function _verifyArchive(archiveId, expectedSnapshot) {
   const snap = await getDoc(doc(db, 'attendanceArchive', archiveId));
   if (!snap.exists()) throw new Error('❌ الأرشيف لم يتم حفظه في قاعدة البيانات');
@@ -9202,6 +9202,23 @@ async function _verifyArchive(archiveId, expectedSnapshot) {
     const savSess = savedSessions[sn] || [];
     if (savSess.length !== expSess.length) {
       throw new Error(`❌ الحصة ${sn}: عدد التلاميذ ${savSess.length} ≠ ${expSess.length}`);
+    }
+    // التحقق من تطابق قيم الحضور لكل تلميذ
+    for (let si = 0; si < expSess.length; si++) {
+      const expSt = expSess[si];
+      const savSt = savSess[si];
+      const expId = String(expSt.id || '');
+      const savId = String(savSt.id || '');
+      const expName = String(expSt.name || '').trim();
+      const savName = String(savSt.name || '').trim();
+      // تحقق من تطابق المعرف إن وُجد
+      if (expId && savId && expId !== savId) {
+        throw new Error(`❌ الحصة ${sn}: اختلاف في معرف التلميذ ${si + 1} (${expId} ≠ ${savId})`);
+      }
+      // تحقق من تطابق حالة الحضور
+      if (expSt.present !== savSt.present) {
+        throw new Error(`❌ الحصة ${sn}: اختلاف في حالة حضور التلميذ "${expSt.name || expSt.id || si}" (${expSt.present} ≠ ${savSt.present})`);
+      }
     }
   }
   return true;
@@ -9452,10 +9469,15 @@ window.openArchiveCycle = async (archiveId) => {
       html += `<td style="padding:6px 8px;border:1px solid #E5E7EB;font-weight:700;color:#1F2937">${sName}</td>`;
       for (let i = 1; i <= CYCLE_SESSION_COUNT; i++) {
         const sessionStudents = sessions[i] || [];
-        // البحث باستخدام Student ID فقط — لا اسم
-        const rec = sId
-          ? sessionStudents.find(st => st.id && String(st.id) === sId)
-          : sessionStudents.find(st => !st.id && String(st.name || '').trim() === String(sName).trim());
+        // البحث: ID أولاً، ثم الاسم (للتوافق مع جميع الحالات)
+        const _normArc = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+        let rec = null;
+        if (sId) {
+          rec = sessionStudents.find(st => st.id && String(st.id) === sId);
+        }
+        if (!rec) {
+          rec = sessionStudents.find(st => _normArc(st.name) === _normArc(sName));
+        }
         let cell = '<span style="color:#9CA3AF">⋯</span>';
         if (rec) {
           cell = rec.present === true
@@ -9581,17 +9603,13 @@ window.startNewAttendanceCycle = async (gid) => {
       batch.delete(doc(db, 'sessionControl', getCtrlDocId(teacherId, gid, sn)));
     }
 
-    // إنشاء sessionAttendance جديدة (فارغة وجاهزة) لجميع الحصص
+    // إنشاء sessionAttendance جديدة (جداول حضور فارغة — بدون present:null)
     for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
       batch.set(doc(db, 'sessionAttendance', `${teacherId}_${gid}_session_${sn}`), {
         teacherId: teacherId + '_' + gid,
         gid, sessionNum: sn,
         date: new Date().toISOString().slice(0, 10),
-        students: snapshot.students.map(s => ({
-          id: s.id || '',
-          name: s.name || '',
-          present: null
-        })),
+        students: [],
         savedAt: serverTimestamp()
       });
     }
