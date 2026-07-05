@@ -9321,7 +9321,6 @@ window.restoreArchiveCycle = async (archiveId) => {
     if (!gid) { showToast('⚠️ معرف الفوج في الدورة غير صالح', true); return; }
 
     const archivedSessions = data.sessions || {};
-    const archivedSessionControls = data.sessionControls || {};
 
     // إنشاء دورة جديدة للبيانات المسترجعة
     const currentCycleNum = await _getCurrentCycleNum(teacherId, gid);
@@ -9354,16 +9353,6 @@ window.restoreArchiveCycle = async (archiveId) => {
         students,
         savedAt: serverTimestamp()
       });
-    }
-
-    // حذف وإنشاء sessionControl
-    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-      const ctrlDocIdNew = getCtrlDocId(teacherId, gid, sn);
-      batch.delete(doc(db, 'sessionControl', ctrlDocIdNew));
-      const ctrlData = archivedSessionControls[sn];
-      if (ctrlData) {
-        batch.set(doc(db, 'sessionControl', ctrlDocIdNew), { ...ctrlData, savedAt: serverTimestamp() });
-      }
     }
 
     await batch.commit();
@@ -9651,7 +9640,7 @@ window.startNewAttendanceCycle = async (gid) => {
 
     // الخطوة 2: حفظ الأرشيف (separate setDoc — لا يمس السجل الحالي)
     showToast('📦 جاري حفظ الأرشيف...');
-    const { archiveId } = await _saveArchiveSnapshot(snapshot, currentCycleNum);
+    const { archiveId } = await _saveArchiveSnapshot(snapshot, currentCycleNum).catch(e => { console.error('[step2 archive]', e); throw e; });
 
     // الخطوة 3: التحقق من صحة الأرشيف (عدد التلاميذ والحصص)
     showToast('📦 جاري التحقق من الأرشيف...');
@@ -9667,10 +9656,10 @@ window.startNewAttendanceCycle = async (gid) => {
     await updateDoc(doc(db, 'attendanceCycles', currentCycleDocId), {
       status: 'archived',
       endDate: new Date().toISOString().slice(0, 10)
-    });
+    }).catch(e => { console.error('[step4 updateCycle]', e, 'docId:', currentCycleDocId); throw e; });
 
     // إنشاء دورة جديدة كـ current
-    await _ensureCycleDoc(teacherId, gid, nextCycleNum);
+    await _ensureCycleDoc(teacherId, gid, nextCycleNum).catch(e => { console.error('[step5 ensureCycle]', e); throw e; });
 
     // إنشاء sessionAttendance جديدة بأرقام الدورة الجديدة (فارغة — بدون present:null)
     const batch = writeBatch(db);
@@ -9683,18 +9672,8 @@ window.startNewAttendanceCycle = async (gid) => {
         savedAt: serverTimestamp()
       });
     }
-    // إنشاء sessionControl جديدة
-    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-      batch.set(doc(db, 'sessionControl', getCtrlDocId(teacherId, gid, sn)), {
-        teacherId: teacherId + '_' + gid,
-        gid, sessionNum: sn,
-        date: new Date().toISOString().slice(0, 10),
-        savedAt: serverTimestamp(),
-        fullData: true
-      });
-    }
 
-    await batch.commit();
+    await batch.commit().catch(e => { console.error('[step6 batch]', e); throw e; });
 
     // تحديث كاش رقم الدورة
     const cacheKey = teacherId + '|' + gid;
