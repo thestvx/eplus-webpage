@@ -6309,67 +6309,60 @@ function _nameVariants(name) {
 // ─── دالة موحدة: هل التلميذ داخل أي فوج عند أي أستاذ؟ ───
 // تبحث بـ Student ID أولاً (أدق)، ثم بالاسم المُطبع (للتوافق)
 // تفحص جميع الأساتذة وجميع أفواجهم
-function _findStudentGroup(studentName, teacher) {
-  // إذا مررنا teacher محدد، نبحث عنده فقط (للتوافق مع الاستدعاءات القديمة)
-  // وإلا نبحث عند جميع الأساتذة
-  const teachers = teacher ? [teacher] : (window.allTeachers || []);
-  const target = _normalizeNameStrict(studentName);
-  
-  // البحث بالاسم أولاً
+// ─── دالة موحدة لتحديد انتماء التلميذ داخل فوج (بـ Student ID فقط) ───
+// تبحث في جميع الأساتذة وجميع أفواجهم
+// تخرج Debug لكل تلميذ إلى Console
+function isStudentInGroup(studentId) {
+  if (!studentId) {
+    console.debug('[isStudentInGroup] ❌ no studentId provided');
+    return false;
+  }
+  const sid = String(studentId);
+  const teachers = allTeachers || [];
+  console.debug(`[isStudentInGroup] 🔍 Searching for Student ID: "${sid}" across ${teachers.length} teachers`);
+
   for (const t of teachers) {
     const groups = t.groups || [];
-    for (let i = 0; i < groups.length; i++) {
-      if ((groups[i].students||[]).some(s => _normalizeNameStrict(typeof s === 'string' ? s : (s.name || '')) === target)) {
-        return groups[i].name;
+    for (const g of groups) {
+      if (!g) continue;
+      const gid = g._gid || '';
+      const groupStudents = g.students || [];
+      for (const gs of groupStudents) {
+        const gsName = typeof gs === 'string' ? gs : (gs.name || '');
+        if (!gsName) continue;
+
+        // ابحث عن هذا الاسم في قائمة التلاميذ عند هذا الأستاذ وتحقق من Student ID
+        const match = (t.students || []).find(ts =>
+          String(ts.id || '') === sid && window._isSameStudentName(ts.name, gsName)
+        );
+        if (match) {
+          console.debug(`[isStudentInGroup] ✅ Found ID "${sid}" → Teacher: "${t.name}", Group: "${g.name || gid}", GroupID: "${gid}"`);
+          return true;
+        }
       }
+    }
+  }
+
+  console.debug(`[isStudentInGroup] ❌ Student ID "${sid}" NOT found in any teacher group`);
+  return false;
+}
+
+// ─── البحث بالاسم داخل أستاذ محدد (للتوافق مع بناء _soData) ───
+function _findStudentGroup(studentName, teacher) {
+  const groups = teacher ? (teacher.groups || []) : [];
+  const target = _normalizeNameStrict(studentName);
+  for (let i = 0; i < groups.length; i++) {
+    if ((groups[i].students||[]).some(s => _normalizeNameStrict(typeof s === 'string' ? s : (s.name || '')) === target)) {
+      return groups[i].name;
     }
   }
   return '—';
 }
 
-// ─── البحث في جميع الأساتذة (لتحديد انتماء التلميذ الحقيقي) ───
+// ─── البحث في جميع الأساتذة (للتوافق مع الاستدعاءات الحالية) ───
 // تعيد { inGroup, teacherName, groupName, groupGid }
 function _isStudentInAnyGroup(studentId, studentName) {
-  const result = { inGroup: false, teacherName: '', groupName: '', groupGid: '' };
-  if (!studentId && !studentName) return result;
-  const teachers = window.allTeachers || [];
-  const sid = studentId ? String(studentId) : '';
-  // تطبيع الاسم للبحث
-  const _normGrp = (n) => String(n || '').trim().replace(/\s+/g, ' ').replace(/[\u064B-\u065F]/g, '').toLowerCase();
-  const targetName = studentName ? _normGrp(studentName) : '';
-
-  for (const t of teachers) {
-    const groups = t.groups || [];
-    for (const g of groups) {
-      if (!g || !g._gid) continue;
-      const groupStudents = g.students || [];
-      for (const gs of groupStudents) {
-        const gsRaw = typeof gs === 'string' ? gs : (gs.name || '');
-        // 1. البحث بـ Student ID (يتطلب مطابقة اسم في teacher.students)
-        if (sid) {
-          const idMatch = (t.students || []).find(ts => 
-            String(ts.id || '') === sid && window._isSameStudentName(ts.name, gsRaw)
-          );
-          if (idMatch) {
-            result.inGroup = true;
-            result.teacherName = t.name || '';
-            result.groupName = g.name || '';
-            result.groupGid = g._gid || '';
-            return result;
-          }
-        }
-        // 2. البحث بالاسم (إذا لم نعثر بـ ID)
-        if (targetName && _normGrp(gsRaw) === targetName) {
-          result.inGroup = true;
-          result.teacherName = t.name || '';
-          result.groupName = g.name || '';
-          result.groupGid = g._gid || '';
-          return result;
-        }
-      }
-    }
-  }
-  return result;
+  return { inGroup: isStudentInGroup(studentId), teacherName: '', groupName: '', groupGid: '' };
 }
 
 let _soData = [];
@@ -6469,8 +6462,7 @@ window.renderStudentOverview = async () => {
       const key = _normalizeNameStrict(s.name);
       // لا نستبدل إذا كان الاسم مختلفًا (نتجنب الخلط)
       if (!teacherMap[key] || teacherMap[key].studentName === s.name) {
-        // نبحث في جميع الأساتذة (وليس فقط t) لمعرفة إذا كان التلميذ في أي فوج
-        teacherMap[key] = { studentName: s.name, teacherName: t.name, groupName: _findStudentGroup(s.name) };
+        teacherMap[key] = { studentName: s.name, studentId: s.id || '', teacherName: t.name, groupName: _findStudentGroup(s.name, t) };
       }
     });
   });
@@ -6495,6 +6487,8 @@ window.renderStudentOverview = async () => {
       _originalName: ticket.name,
       teacherName: match ? match.teacherName : '—',
       groupName: match ? match.groupName : '—',
+      studentId: match ? match.studentId : '',
+      inGroup: match ? isStudentInGroup(match.studentId) : false,
       status: isPaid ? 'paid' : 'unpaid',
       statusLabel: isPaid ? '✅ مفعّل' : '⏳ غير مدفوع',
       pkg: ticket.pack || '—',
@@ -6528,6 +6522,8 @@ window.renderStudentOverview = async () => {
         _originalName: sheet.name || normKey,
         teacherName: match ? match.teacherName : '—',
         groupName: match ? match.groupName : '—',
+        studentId: match ? match.studentId : '',
+        inGroup: match ? isStudentInGroup(match.studentId) : false,
         status: 'noticket',
         statusLabel: '⚠️ لا توجد تذكرة',
         pkg: sheet.pack || '—',
@@ -6561,6 +6557,8 @@ window.renderStudentOverview = async () => {
       _originalName: match.studentName || key,
       teacherName: match.teacherName,
       groupName: match.groupName,
+      studentId: match.studentId || '',
+      inGroup: match.studentId ? isStudentInGroup(match.studentId) : (match.groupName && match.groupName !== '—'),
       status: 'noteacher',
       statusLabel: '📋 من الأفواج فقط',
       pkg: sheetMatch3 ? sheetMatch3.pack : '—',
@@ -6584,7 +6582,7 @@ window.renderStudentOverview = async () => {
 
   // إحصائيات
   const totalAll = _soData.length;
-  const inGroup = _soData.filter(r => r.groupName && r.groupName !== '—').length;
+  const inGroup = _soData.filter(r => r.inGroup).length;
   const inSheet = _soData.filter(r => r.inSheet).length;
   const outSheet = totalAll - inSheet;
 
@@ -6677,10 +6675,10 @@ function _updateStudentCharts(data) {
   chartsEl.style.display = 'flex';
 
   // ── Pie: distribution (4-way: group x sheet) ──
-  const inGroupInSheet = data.filter(r => r.groupName && r.groupName !== '—' && r.inSheet).length;
-  const inGroupOutSheet = data.filter(r => r.groupName && r.groupName !== '—' && !r.inSheet).length;
-  const noGroupInSheet = data.filter(r => (!r.groupName || r.groupName === '—') && r.inSheet).length;
-  const noGroupOutSheet = data.filter(r => (!r.groupName || r.groupName === '—') && !r.inSheet).length;
+  const inGroupInSheet = data.filter(r => r.inGroup && r.inSheet).length;
+  const inGroupOutSheet = data.filter(r => r.inGroup && !r.inSheet).length;
+  const noGroupInSheet = data.filter(r => !r.inGroup && r.inSheet).length;
+  const noGroupOutSheet = data.filter(r => !r.inGroup && !r.inSheet).length;
 
   const pieCtx = document.getElementById('so-pie-chart');
   if (_soPieChart) { _soPieChart.destroy(); _soPieChart = null; }
@@ -6771,8 +6769,8 @@ function _renderSoTable(data, searchFilter) {
 
   if (teacherFilter) filtered = filtered.filter(r => r.teacherName === teacherFilter);
   if (packFilter) filtered = filtered.filter(r => r.pkgSimple === packFilter);
-  if (statusFilter === 'ingroup') filtered = filtered.filter(r => r.groupName && r.groupName !== '—');
-  else if (statusFilter === 'notingroup') filtered = filtered.filter(r => !r.groupName || r.groupName === '—');
+  if (statusFilter === 'ingroup') filtered = filtered.filter(r => r.inGroup);
+  else if (statusFilter === 'notingroup') filtered = filtered.filter(r => !r.inGroup);
   else if (statusFilter === 'insheet') filtered = filtered.filter(r => r.inSheet);
   else if (statusFilter === 'notinsheet') filtered = filtered.filter(r => !r.inSheet);
   else if (statusFilter === 'paid') filtered = filtered.filter(r => r.status === 'paid');
@@ -6844,8 +6842,8 @@ function _updateFilterCounts() {
     '': base.length,
     'paid': base.filter(r => r.status === 'paid').length,
     'unpaid': base.filter(r => r.status === 'unpaid' || r.status === 'noticket').length,
-    'ingroup': base.filter(r => r.groupName && r.groupName !== '—').length,
-    'notingroup': base.filter(r => !r.groupName || r.groupName === '—').length,
+    'ingroup': base.filter(r => r.inGroup).length,
+    'notingroup': base.filter(r => !r.inGroup).length,
     'insheet': base.filter(r => r.inSheet).length,
     'notinsheet': base.filter(r => !r.inSheet).length,
   };
@@ -7592,7 +7590,7 @@ window.verifyAttendanceIntegrity = async () => {
   }
   if (results.fixed > 0) {
     try {
-      for (const teacher of (window.allTeachers || [])) {
+  for (const teacher of (allTeachers || window.allTeachers || [])) {
         if (teacher.id) await setDoc(doc(db, 'teachers', teacher.id), { students: teacher.students }, { merge: true });
       }
     } catch (e) { results.errors.push('فشل حفظ الإصلاحات: ' + e.message); }
@@ -9930,7 +9928,7 @@ let _unassignedAllStudentIds = new Set();
 // ─── بناء مجموعة كل Student IDs الموجودين في أي فوج عند أي أستاذ ───
 function _buildAllGroupStudentIdsSet() {
   const ids = new Set();
-  const teachers = window.allTeachers || [];
+  const teachers = allTeachers || [];
   for (const t of teachers) {
     const groups = t.groups || [];
     for (const g of groups) {
@@ -11181,7 +11179,7 @@ window.confirmAddExistingStudentToGroup = async (name) => {
       dStudents.push({ id: newId, name, present: false, marked: false, payStatus: 'unknown', receipt: null });
     }
     await setDoc(teacherRef, { groups: dGroups, students: dStudents }, { merge: true });
-    const t2 = (window.allTeachers || []).find(t => t.id === _asgTeacherId);
+    const t2 = (allTeachers || window.allTeachers || []).find(t => t.id === _asgTeacherId);
     if (t2) { t2.groups = dGroups; t2.students = dStudents; }
     if (window._attSummaryCache) window._attSummaryCache[_asgTeacherId] = null;
     showToast('✅ تمت إضافة "'+name+'" إلى الفوج');
@@ -11250,7 +11248,7 @@ window.confirmCreateStudentToGroup = async () => {
     dStudents.push(newStudent);
     group.students.push(name);
     await setDoc(teacherRef, { groups: dGroups, students: dStudents }, { merge: true });
-    const t2 = (window.allTeachers || []).find(t => t.id === _asgTeacherId);
+    const t2 = (allTeachers || window.allTeachers || []).find(t => t.id === _asgTeacherId);
     if (t2) { t2.groups = dGroups; t2.students = dStudents; }
     if (window._attSummaryCache) window._attSummaryCache[_asgTeacherId] = null;
     showToast('✅ تمت إضافة "'+name+'" يدوياً إلى الفوج');
@@ -11799,32 +11797,27 @@ window.checkTeachersGroups = () => {
 // ─── فحص تناسق بيانات التلاميذ والأفواج ───
 // يُسمى عند تحميل البيانات للكشف عن أي تناقض بين "إدارة التلاميذ" و"سجل الحضور"
 window._checkConsistency = () => {
-  const teachers = window.allTeachers || [];
+  const teachers = allTeachers || [];
   if (!teachers.length) return;
   const fixes = [];
   teachers.forEach(t => {
-    const groups = t.groups || [];
     (t.students || []).forEach(s => {
       if (!s.name) return;
-      // نتحقق: هل التلميذ في أي فوج (بالدالة الموحدة)؟
-      const membership = _isStudentInAnyGroup(s.id, s.name);
-      if (!membership.inGroup) return; // خارج الأفواج — لا تناقض
-      // التلميذ موجود في فوج (حسب الدالة الموحدة)
-      // لكن هل groupName في _soData يطابق؟
+      const inGroupActual = isStudentInGroup(s.id);
       const normKey = _normalizeNameStrict(s.name);
       const soRecord = window._soData ? window._soData.find(r => _normalizeNameStrict(r.studentName) === normKey) : null;
-      if (soRecord && (!soRecord.groupName || soRecord.groupName === '—')) {
-        // تناقض: التلميذ في فوج فعلياً لكن إدارة التلاميذ تظهره خارج الأفواج
-        fixes.push({ student: s.name, teacherId: t.id, teacherName: t.name, actualGroup: membership.groupName, actualTeacher: membership.teacherName });
-        // إصلاح تلقائي: تحديث groupName في _soData
-        soRecord.groupName = membership.groupName;
-        soRecord.teacherName = membership.teacherName;
+      if (!soRecord) return;
+      if (inGroupActual && !soRecord.inGroup) {
+        fixes.push({ student: s.name, studentId: s.id, teacherName: t.name });
+        soRecord.inGroup = true;
+      } else if (!inGroupActual && soRecord.inGroup) {
+        fixes.push({ student: s.name, studentId: s.id, teacherName: t.name });
+        soRecord.inGroup = false;
       }
     });
   });
   if (fixes.length) {
-    console.warn(`🔧 _checkConsistency: تم إصلاح ${fixes.length} حالة غير متناسقة:`, fixes);
-    // إعادة تطبيق الفلاتر ليظهر التحديث
+    console.warn(`[checkConsistency] 🔧 تم إصلاح ${fixes.length} حالة غير متناسقة:`, fixes);
     if (typeof _updateFilterCounts === 'function') _updateFilterCounts();
     if (typeof _renderSoTable === 'function') _renderSoTable();
   }
