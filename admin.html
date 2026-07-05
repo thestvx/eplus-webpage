@@ -7925,20 +7925,6 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     return null;
   };
 
-  // Build a map: student name → gid from session cache (no longer depends on group index)
-  const studentGidFromCache = new Map();
-  for (const cacheGidStr in groupCache) {
-    const sessions = groupCache[cacheGidStr];
-    if (!sessions) continue;
-    for (const sn in sessions) {
-      const session = sessions[sn];
-      (session.students || []).forEach(st => {
-        const key = st.id || _normGi(st.name || '');
-        if (!studentGidFromCache.has(key)) studentGidFromCache.set(key, cacheGidStr);
-      });
-    }
-  }
-
   // Build student list with group assignment
   const groups = teacher.groups || [];
   let allStudents = [];
@@ -7980,11 +7966,9 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       const cleanG = _displayGroupName(g.name);
       if (match) {
         matchedNames.add(normName(match.name || ''));
-        const cacheGid = match.id ? studentGidFromCache.get(match.id) : studentGidFromCache.get(_normGi(match.name || ''));
-        allStudents.push({ id: match.id, name: match.name, receipt: match.receipt, payStatus: match.payStatus, joinedAtSession: match.joinedAtSession, group: cleanG, gid: cacheGid || gid, groupGi: gi, groupGid: gid });
+        allStudents.push({ id: match.id, name: match.name, receipt: match.receipt, payStatus: match.payStatus, joinedAtSession: match.joinedAtSession, group: cleanG, gid: gid, groupGi: gi, groupGid: gid });
       } else {
-        const cacheGid = studentGidFromCache.get(_normGi(sName));
-        allStudents.push({ id: '', name: sName, group: cleanG, gid: cacheGid || gid, groupGi: gi, groupGid: gid });
+        allStudents.push({ id: '', name: sName, group: cleanG, gid: gid, groupGi: gi, groupGid: gid });
       }
     });
   }
@@ -8003,8 +7987,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         groupGid = g._gid || '';
       }
     });
-    const cacheGid = s.id ? studentGidFromCache.get(s.id) : studentGidFromCache.get(_normGi(s.name || ''));
-    allStudents.push({ id: s.id || '', name: s.name || '—', receipt: s.receipt, payStatus: s.payStatus, joinedAtSession: s.joinedAtSession, group: groupName || '—', gid: cacheGid || groupGid, groupGi, groupGid });
+    allStudents.push({ id: s.id || '', name: s.name || '—', receipt: s.receipt, payStatus: s.payStatus, joinedAtSession: s.joinedAtSession, group: groupName || '—', gid: groupGid, groupGi, groupGid });
   });
 
   // Build rows grouped by group (فوج), count stats
@@ -11040,6 +11023,8 @@ window.openAddStudentToGroup = async (gid) => {
   document.getElementById('asg-create-section').style.display = 'none';
   document.getElementById('asg-create-name').value = '';
   document.getElementById('asg-create-btn').disabled = true;
+  document.getElementById('asg-manual-trigger').style.display = '';
+  document.getElementById('asg-manual-form').style.display = 'none';
 
   const modal = document.getElementById('add-student-to-group-modal');
   if (modal) modal.classList.add('open');
@@ -11106,6 +11091,9 @@ window.searchAddStudentToGroup = (q) => {
     createSection.style.display = 'block';
     document.getElementById('asg-create-name').value = q;
     updateCreateBtn();
+    // Show the manual form directly
+    document.getElementById('asg-manual-trigger').style.display = 'none';
+    document.getElementById('asg-manual-form').style.display = 'block';
   }
 };
 
@@ -11181,9 +11169,13 @@ window.confirmCreateStudentToGroup = async () => {
   if (!_asgTeacherId || !_asgGid) { showToast('⚠️ بيانات غير كاملة', true); return; }
   const existing = (window._soData||[]).find(r => _asgNorm2(r.studentName) === _asgNorm2(name));
   if (existing) {
-    showToast('ℹ️ التلميذ "'+name+'" موجود بالفعل في قاعدة البيانات - جارٍ إضافته إلى الفوج');
-    await confirmAddExistingStudentToGroup(existing.studentName);
-    return;
+    if (!confirm(`⚠️ تم العثور على تلميذ بنفس الاسم "${existing.studentName}" في قاعدة البيانات.\n\nهل تريد استخدام سجله الحالي؟\n\n"موافق" = استخدام التلميذ الموجود\n"إلغاء" = إنشاء تلميذ جديد`)) {
+      // User chose to create a new student — continue below
+    } else {
+      showToast('ℹ️ جاري إضافة التلميذ الموجود "'+name+'" إلى الفوج');
+      await confirmAddExistingStudentToGroup(existing.studentName);
+      return;
+    }
   }
 
   // البحث عن الفوج باستخدام الباحث العالمي
