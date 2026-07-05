@@ -9641,6 +9641,9 @@ window.startNewAttendanceCycle = async (gid) => {
   _archiveInProgress = true;
 
   try {
+    // الحصول على رقم الدورة الحالية (قبل الاستخدام)
+    const currentCycleNum = await _getCurrentCycleNum(teacherId, gid);
+
     // الخطوة 1: قراءة السجل الحالي بالكامل من Firestore مباشرة
     showToast('📦 جاري قراءة سجل الحضور...');
     const snapshot = await _readCurrentCycleSnapshot(teacherId, gid);
@@ -9657,8 +9660,6 @@ window.startNewAttendanceCycle = async (gid) => {
     // ✅ الخطوة 4: بعد نجاح الأرشفة والتحقق — الآن فقط نبدأ الدورة الجديدة
     showToast('✅ تم حفظ الأرشيف، جاري تهيئة الدورة الجديدة...');
 
-    // الحصول على رقم الدورة الحالية وإنشاء الدورة التالية
-    const currentCycleNum = await _getCurrentCycleNum(teacherId, gid);
     const nextCycleNum = currentCycleNum + 1;
 
     // أرشفة الدورة الحالية (لا نحذف session docs)
