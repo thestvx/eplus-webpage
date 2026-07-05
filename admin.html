@@ -7688,6 +7688,17 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   const diffDays = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
   const curSession = Math.min(12, Math.max(1, Math.floor(diffDays / 7) + 1));
 
+  // ── تحميل أرقام الدورات الحالية لجميع أفواج هذا الأستاذ ──
+  let _cycleMap = {};
+  try {
+    const cycleSnap = await getDocs(query(
+      collection(db, 'attendanceCycles'),
+      where('teacherId', '==', teacherId),
+      where('status', '==', 'current')
+    ));
+    cycleSnap.forEach(d => { const c = d.data(); _cycleMap[c.gid] = c.cycleNum || 1; });
+  } catch (e) { /* قد لا يوجد attendanceCycles بعد */ }
+
   // ── Load session attendance from Firestore if not cached ──
   if (!window._attSummaryCache[teacherId]) {
     window._attSummaryCache[teacherId] = {};
@@ -7700,17 +7711,19 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       sessSnap.forEach(d => {
         const data = d.data();
         if (!data.sessionNum) return;
-        // الصيغة الجديدة: cacheKey = gid
-        // الصيغة القديمة: cacheKey = gi_0, gi_1, ...
+        // تصفية حسب الدورة: إذا كان cycleNum موجوداً ولا يطابق الدورة الحالية، نتجاهله
+        const docCycle = data.cycleNum || 1;
         let gid = data.gid || extractGidFromDoc(d.id);
         let cacheKey;
         if (gid) {
           cacheKey = gid;
         } else {
-          // صيغة قديمة: نستخرج gi من _g{gi}_session_
           const giMatch = d.id.match(/_g(\d+)_session_/);
           cacheKey = 'gi_' + (giMatch ? giMatch[1] : '0');
         }
+        // تجاهل سجلات الدورات غير الحالية
+        const expectedCycle = _cycleMap[gid] || 1;
+        if (docCycle !== expectedCycle) return;
         if (!window._attSummaryCache[teacherId][cacheKey]) window._attSummaryCache[teacherId][cacheKey] = {};
         window._attSummaryCache[teacherId][cacheKey][data.sessionNum] = data;
       });
@@ -7734,6 +7747,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         snap.forEach(d => {
           const data = d.data();
           if (!data.sessionNum) return;
+          const docCycle = data.cycleNum || 1;
           let gid = data.gid || extractGidFromDoc(d.id);
           let cacheKey;
           if (gid) {
@@ -7742,6 +7756,9 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
             const giMatch = d.id.match(/_g(\d+)_session_/);
             cacheKey = 'gi_' + (giMatch ? giMatch[1] : '0');
           }
+          // تجاهل سجلات الدورات غير الحالية
+          const expectedCycle = _cycleMap[gid] || 1;
+          if (docCycle !== expectedCycle) return;
           if (!newCache[cacheKey]) newCache[cacheKey] = {};
           newCache[cacheKey][data.sessionNum] = data;
         });
@@ -8526,24 +8543,34 @@ window.openRestoreAttendanceModal = async () => {
     for (const g of groups) {
       if (!g || !g._gid) continue;
       const gid = g._gid;
-      // البحث بالصيغة الجديدة: teacherId_gid_session_N
+      // البحث بالصيغة الجديدة مع الدورة: teacherId_gid_cycle_N_session_M
+      const cycleNum = await _getCurrentCycleNum(teacherId, gid);
       for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-        const docIdNew = `${teacherId}_${gid}_session_${sn}`;
-        const snapNew = await getDoc(doc(db, 'sessionAttendance', docIdNew));
-        if (snapNew.exists()) {
+        const docIdCycle = getSessionDocId(teacherId, gid, sn, cycleNum);
+        const snapCycle = await getDoc(doc(db, 'sessionAttendance', docIdCycle));
+        if (snapCycle.exists()) {
           if (!currentSessions[gid]) currentSessions[gid] = {};
-          currentSessions[gid][sn] = { docId: docIdNew, data: snapNew.data() };
+          currentSessions[gid][sn] = { docId: docIdCycle, data: snapCycle.data() };
           totalSessionRecords++;
         } else {
-          // البحث بالصيغة القديمة
-          const gi = groups.findIndex(gg => gg && gg._gid === gid);
-          if (gi >= 0) {
-            const docIdOld = `${teacherId}_g${gi}_session_${sn}`;
-            const snapOld = await getDoc(doc(db, 'sessionAttendance', docIdOld));
-            if (snapOld.exists()) {
-              if (!currentSessions[gid]) currentSessions[gid] = {};
-              currentSessions[gid][sn] = { docId: docIdOld, data: snapOld.data() };
-              totalSessionRecords++;
+          // البحث بالصيغة الحديثة بدون دورة: teacherId_gid_session_N
+          const docIdNew = `${teacherId}_${gid}_session_${sn}`;
+          const snapNew = await getDoc(doc(db, 'sessionAttendance', docIdNew));
+          if (snapNew.exists()) {
+            if (!currentSessions[gid]) currentSessions[gid] = {};
+            currentSessions[gid][sn] = { docId: docIdNew, data: snapNew.data() };
+            totalSessionRecords++;
+          } else {
+            // البحث بالصيغة القديمة: teacherId_g{gi}_session_N
+            const gi = groups.findIndex(gg => gg && gg._gid === gid);
+            if (gi >= 0) {
+              const docIdOld = `${teacherId}_g${gi}_session_${sn}`;
+              const snapOld = await getDoc(doc(db, 'sessionAttendance', docIdOld));
+              if (snapOld.exists()) {
+                if (!currentSessions[gid]) currentSessions[gid] = {};
+                currentSessions[gid][sn] = { docId: docIdOld, data: snapOld.data() };
+                totalSessionRecords++;
+              }
             }
           }
         }
@@ -9055,16 +9082,18 @@ window.confirmMoveGroup = async () => {
           batch.update(srcDocRef, { students: remaining });
         }
       }
-      // إضافة المنقولين إلى الهدف — استخدم الصيغة الجديدة (مع gid) للحفاظ على الاتساق
+      // إضافة المنقولين إلى الهدف — استخدم الدورة الحالية للفوج الهدف
       if (moved.length) {
+        const targetCycle = await _getCurrentCycleNum(teacherId, targetGid);
         const targetDocId = targetGid
-          ? (teacherId + '_' + targetGid + '_session_' + sn)
+          ? getSessionDocId(teacherId, targetGid, parseInt(sn), targetCycle)
           : (teacherId + '_g' + tgtIdx + '_session_' + sn);
         const tgtDocRef = doc(db, 'sessionAttendance', targetDocId);
         const newRecord = {
           teacherId: targetGid ? (teacherId + '_' + targetGid) : (teacherId + '_g' + tgtIdx),
           sessionNum: parseInt(sn),
           gid: targetGid || null,
+          cycleNum: targetGid ? targetCycle : undefined,
           students: moved,
           savedAt: serverTimestamp()
         };
@@ -9129,16 +9158,21 @@ async function _readCurrentCycleSnapshot(teacherId, gid) {
   const group = groupsArr.find(g => g && g._gid === gid);
   if (!group) throw new Error('الفوج غير موجود');
   const currentGi = groupsArr.findIndex(g => g && g._gid === gid);
+  const cycleNum = await _getCurrentCycleNum(teacherId, gid);
 
   const sessions = {};
   for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-    const docIdNew = `${teacherId}_${gid}_session_${sn}`;
+    const docIdNew = getSessionDocId(teacherId, gid, sn, cycleNum);
     const snapNew = await getDoc(doc(db, 'sessionAttendance', docIdNew));
     if (snapNew.exists()) { sessions[sn] = snapNew.data().students || []; continue; }
+    // الصيغة القديمة بدون cycle (للبيانات قبل الترحيل)
+    const docIdLegacy = `${teacherId}_${gid}_session_${sn}`;
+    const snapLegacy = await getDoc(doc(db, 'sessionAttendance', docIdLegacy));
+    if (snapLegacy.exists() && !snapNew.exists()) { sessions[sn] = snapLegacy.data().students || []; continue; }
     if (currentGi >= 0) {
-      const docIdLegacy = `${teacherId}_g${currentGi}_session_${sn}`;
-      const snapLegacy = await getDoc(doc(db, 'sessionAttendance', docIdLegacy));
-      if (snapLegacy.exists()) { sessions[sn] = snapLegacy.data().students || []; continue; }
+      const docIdOld = `${teacherId}_g${currentGi}_session_${sn}`;
+      const snapOld = await getDoc(doc(db, 'sessionAttendance', docIdOld));
+      if (snapOld.exists()) { sessions[sn] = snapOld.data().students || []; continue; }
     }
     sessions[sn] = [];
   }
@@ -9185,9 +9219,9 @@ async function _readCurrentCycleSnapshot(teacherId, gid) {
 }
 
 // ─── حفظ Snapshot في الأرشيف ───
-async function _saveArchiveSnapshot(snapshot) {
+async function _saveArchiveSnapshot(snapshot, cycleNum) {
   const { teacherId, gid } = snapshot;
-  const cycleNum = await _getNextCycleNum(teacherId, gid);
+  if (!cycleNum) cycleNum = await _getNextCycleNum(teacherId, gid);
   const archiveId = _getArchiveDocId(teacherId, gid, cycleNum);
   const archiveData = {
     teacherId, gid, cycleNum,
@@ -9276,7 +9310,7 @@ window.restoreArchiveCycle = async (archiveId) => {
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
   if (!archiveId) { showToast('⚠️ معرف الدورة غير صالح', true); return; }
 
-  if (!confirm('⚠️ سيتم استبدال سجل الحضور الحالي بالكامل ببيانات الدورة المؤرشفة. هذا الإجراء لا يمكن التراجع عنه.')) return;
+  if (!confirm('⚠️ سيتم استرجاع هذه الدورة كدورة جديدة مع الاحتفاظ بالدورة الحالية.')) return;
 
   showToast('📦 جاري استرجاع الدورة...');
   try {
@@ -9289,46 +9323,56 @@ window.restoreArchiveCycle = async (archiveId) => {
     const archivedSessions = data.sessions || {};
     const archivedSessionControls = data.sessionControls || {};
 
+    // إنشاء دورة جديدة للبيانات المسترجعة
+    const currentCycleNum = await _getCurrentCycleNum(teacherId, gid);
+    const restoreCycleNum = currentCycleNum + 1;
+    const newCycleDocId = getCycleDocId(teacherId, gid, restoreCycleNum);
+    await setDoc(doc(db, 'attendanceCycles', newCycleDocId), {
+      teacherId, gid, cycleNum: restoreCycleNum,
+      status: 'current',
+      startDate: data.archiveDate || new Date().toISOString().slice(0, 10),
+      createdAt: serverTimestamp()
+    });
+
+    // أرشفة الدورة الحالية
+    const currentCycleDocId = getCycleDocId(teacherId, gid, currentCycleNum);
+    await updateDoc(doc(db, 'attendanceCycles', currentCycleDocId), {
+      status: 'archived',
+      endDate: new Date().toISOString().slice(0, 10)
+    });
+
     const batch = writeBatch(db);
 
-    // حذف sessionAttendance الحالية لهذا الفوج (كل الصيغ)
+    // إنشاء sessionAttendance جديدة من بيانات الأرشيف (باستخدام رقم الدورة الجديد)
     for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-      const docIdNew = `${teacherId}_${gid}_session_${sn}`;
-      batch.delete(doc(db, 'sessionAttendance', docIdNew));
-    }
-
-    // إنشاء sessionAttendance جديدة من بيانات الأرشيف
-    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-      const docIdNew = `${teacherId}_${gid}_session_${sn}`;
+      const docIdNew = getSessionDocId(teacherId, gid, sn, restoreCycleNum);
       const students = archivedSessions[sn] || [];
       batch.set(doc(db, 'sessionAttendance', docIdNew), {
         teacherId: teacherId + '_' + gid,
-        gid,
-        sessionNum: sn,
+        gid, cycleNum: restoreCycleNum, sessionNum: sn,
         date: data.archiveDate || new Date().toISOString().slice(0, 10),
         students,
         savedAt: serverTimestamp()
       });
     }
 
-    // حذف sessionControl الحالية (كل الصيغ)
+    // حذف وإنشاء sessionControl
     for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
       const ctrlDocIdNew = getCtrlDocId(teacherId, gid, sn);
       batch.delete(doc(db, 'sessionControl', ctrlDocIdNew));
-    }
-
-    // إنشاء sessionControl جديدة من الأرشيف
-    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
       const ctrlData = archivedSessionControls[sn];
       if (ctrlData) {
-        const ctrlDocIdNew = getCtrlDocId(teacherId, gid, sn);
         batch.set(doc(db, 'sessionControl', ctrlDocIdNew), { ...ctrlData, savedAt: serverTimestamp() });
       }
     }
 
     await batch.commit();
 
-    // مسح الكاش
+    // تحديث كاش رقم الدورة
+    const cacheKey = teacherId + '|' + gid;
+    _currentCycleCache[cacheKey] = restoreCycleNum;
+
+    // مسح كاش الحضور
     if (window._attSummaryCache && window._attSummaryCache[teacherId]) {
       delete window._attSummaryCache[teacherId][gid];
     }
@@ -9341,7 +9385,7 @@ window.restoreArchiveCycle = async (archiveId) => {
     closeGroupArchive();
 
     await loadAttendanceSummary(teacherId);
-    showToast(`✅ تم استرجاع الدورة ${data.cycleNum} للفوج "${data.groupName || gid}" بنجاح`);
+    showToast(`✅ تم استرجاع الدورة ${data.cycleNum || '?'} كدورة ${restoreCycleNum} للفوج "${data.groupName || gid}"`);
   } catch (e) {
     console.error('[restoreArchiveCycle] ❌', e);
     showToast('❌ خطأ في استرجاع الدورة: ' + e.message, true);
@@ -9360,7 +9404,8 @@ async function _checkAndArchiveGroup(teacherId, gid, sessionNum) {
   const groupStudents = group.students || [];
   if (!groupStudents.length) return;
 
-  const docId = `${teacherId}_${gid}_session_${sessionNum}`;
+  const cycleNum = await _getCurrentCycleNum(teacherId, gid);
+  const docId = getSessionDocId(teacherId, gid, sessionNum, cycleNum);
   const snap = await getDoc(doc(db, 'sessionAttendance', docId));
   if (!snap.exists()) return;
   const recordedStudents = snap.data().students || [];
@@ -9370,7 +9415,7 @@ async function _checkAndArchiveGroup(teacherId, gid, sessionNum) {
   try {
     const snapshot = await _readCurrentCycleSnapshot(teacherId, gid);
     if (!snapshot.students.length) return;
-    const { archiveId } = await _saveArchiveSnapshot(snapshot);
+    const { archiveId } = await _saveArchiveSnapshot(snapshot, cycleNum);
     await _verifyArchive(archiveId, snapshot);
     showToast(`📦 تم أرشفة الدورة تلقائياً`);
     loadAttendanceSummary(teacherId);
@@ -9603,7 +9648,7 @@ window.startNewAttendanceCycle = async (gid) => {
 
     // الخطوة 2: حفظ الأرشيف (separate setDoc — لا يمس السجل الحالي)
     showToast('📦 جاري حفظ الأرشيف...');
-    const { archiveId } = await _saveArchiveSnapshot(snapshot);
+    const { archiveId } = await _saveArchiveSnapshot(snapshot, currentCycleNum);
 
     // الخطوة 3: التحقق من صحة الأرشيف (عدد التلاميذ والحصص)
     showToast('📦 جاري التحقق من الأرشيف...');
@@ -9612,22 +9657,26 @@ window.startNewAttendanceCycle = async (gid) => {
     // ✅ الخطوة 4: بعد نجاح الأرشفة والتحقق — الآن فقط نبدأ الدورة الجديدة
     showToast('✅ تم حفظ الأرشيف، جاري تهيئة الدورة الجديدة...');
 
+    // الحصول على رقم الدورة الحالية وإنشاء الدورة التالية
+    const currentCycleNum = await _getCurrentCycleNum(teacherId, gid);
+    const nextCycleNum = currentCycleNum + 1;
+
+    // أرشفة الدورة الحالية (لا نحذف session docs)
+    const currentCycleDocId = getCycleDocId(teacherId, gid, currentCycleNum);
+    await updateDoc(doc(db, 'attendanceCycles', currentCycleDocId), {
+      status: 'archived',
+      endDate: new Date().toISOString().slice(0, 10)
+    });
+
+    // إنشاء دورة جديدة كـ current
+    await _ensureCycleDoc(teacherId, gid, nextCycleNum);
+
+    // إنشاء sessionAttendance جديدة بأرقام الدورة الجديدة (فارغة — بدون present:null)
     const batch = writeBatch(db);
-
-    // حذف sessionAttendance الحالية لهذا الفوج (الصيغة الجديدة فقط)
     for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-      batch.delete(doc(db, 'sessionAttendance', `${teacherId}_${gid}_session_${sn}`));
-    }
-    // حذف sessionControl الحالية لهذا الفوج (الصيغة الجديدة فقط)
-    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-      batch.delete(doc(db, 'sessionControl', getCtrlDocId(teacherId, gid, sn)));
-    }
-
-    // إنشاء sessionAttendance جديدة (جداول حضور فارغة — بدون present:null)
-    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-      batch.set(doc(db, 'sessionAttendance', `${teacherId}_${gid}_session_${sn}`), {
+      batch.set(doc(db, 'sessionAttendance', getSessionDocId(teacherId, gid, sn, nextCycleNum)), {
         teacherId: teacherId + '_' + gid,
-        gid, sessionNum: sn,
+        gid, cycleNum: nextCycleNum, sessionNum: sn,
         date: new Date().toISOString().slice(0, 10),
         students: [],
         savedAt: serverTimestamp()
@@ -9646,7 +9695,11 @@ window.startNewAttendanceCycle = async (gid) => {
 
     await batch.commit();
 
-    // مسح الكاش
+    // تحديث كاش رقم الدورة
+    const cacheKey = teacherId + '|' + gid;
+    _currentCycleCache[cacheKey] = nextCycleNum;
+
+    // مسح كاش الحضور
     if (window._attSummaryCache && window._attSummaryCache[teacherId]) {
       delete window._attSummaryCache[teacherId][gid];
     }
@@ -9654,12 +9707,11 @@ window.startNewAttendanceCycle = async (gid) => {
       delete window._ctrlMapCache[teacherId];
     }
 
-    showToast(`✅ تم أرشفة الدورة وبدء دورة جديدة بنجاح`);
+    showToast(`✅ تم أرشفة الدورة ${currentCycleNum} وبدء الدورة ${nextCycleNum} بنجاح`);
     await loadAttendanceSummary(teacherId);
   } catch (e) {
     console.error('[startNewAttendanceCycle] ❌', e);
     showToast('⚠️ ' + e.message + ' — لم يتم تعديل سجل الحضور الحالي', true);
-    // السجل الحالي يبقى كما هو — لم نمس أي شيء
   } finally {
     _archiveInProgress = false;
   }
@@ -9714,6 +9766,7 @@ window.openNewAttendanceCycleModal = () => {
 
 window.toggleDailyAttCell = async (teacherId, gid, sessionNum, studentId, studentName) => {
   console.log(`[toggleDailyAttCell] called teacherId=${teacherId} gid=${gid} session=${sessionNum} studentId=${studentId} studentName=${studentName}`);
+  const cycleNum = await _getCurrentCycleNum(teacherId, gid);
   // منع التعديل للأساتذة إذا كانت الحصة مقفلة صراحةً فقط (locked/closed)
   if (window._isTeacherAttendanceView) {
     // نبحث في التحكم بالصيغة القديمة (_g{gi}) والجديدة (_gctrl_{gid})
@@ -9749,7 +9802,7 @@ window.toggleDailyAttCell = async (teacherId, gid, sessionNum, studentId, studen
       return;
     }
   }
-  const docRef = doc(db, 'sessionAttendance', getSessionDocId(teacherId, gid, sessionNum));
+  const docRef = doc(db, 'sessionAttendance', getSessionDocId(teacherId, gid, sessionNum, cycleNum));
   try {
     const snap = await getDoc(docRef);
     let data;
@@ -9757,12 +9810,10 @@ window.toggleDailyAttCell = async (teacherId, gid, sessionNum, studentId, studen
     if (snap.exists()) {
       data = snap.data();
       let students = data.students || [];
-      // البحث حصرياً بواسطة Student ID (لا يستخدم الاسم أبداً للمطابقة)
       let idx = -1;
       if (studentId) {
         idx = students.findIndex(s => String(s.id || '') === String(studentId));
       }
-      // إذا لم يُعثر بـ Student ID، نبحث بالاسم التام فقط (للتوافق مع السجلات القديمة الخالية من ID)
       if (idx === -1 && !studentId) {
         const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
         idx = students.findIndex(s => _norm(s.name || '') === _norm(studentName));
@@ -9770,10 +9821,8 @@ window.toggleDailyAttCell = async (teacherId, gid, sessionNum, studentId, studen
       if (idx !== -1) {
         const cur = students[idx].present;
         if (cur === true) {
-          // حاضر → غائب
           students[idx].present = false;
         } else {
-          // غائب أو ⋯ → نزيل السجل
           if (studentId) {
             students = students.filter(s => String(s.id || '') !== String(studentId));
           } else {
@@ -9787,12 +9836,14 @@ window.toggleDailyAttCell = async (teacherId, gid, sessionNum, studentId, studen
       data.students = students;
       data.savedAt = serverTimestamp();
       data.gid = gid;
+      data.cycleNum = cycleNum;
       await setDoc(docRef, data);
     } else {
       data = {
         teacherId: teacherId + '_' + gid,
         sessionNum,
         gid,
+        cycleNum,
         date: new Date().toISOString().slice(0, 10),
         savedAt: serverTimestamp(),
         students: [{ id: studentId || '', name: studentName, present: true }]
@@ -10191,6 +10242,16 @@ window.confirmDelGroup = async () => {
 
     // حذف sessions هذا الفوج
     sessSnap.forEach(docSnap => {
+      batch.delete(docSnap.ref);
+    });
+    // حذف سجلات attendanceCycles لهذا الفوج
+    const cycleQuery = query(
+      collection(db, 'attendanceCycles'),
+      where('gid', '==', gid),
+      where('teacherId', '==', teacherId)
+    );
+    const cycleSnap = await getDocs(cycleQuery);
+    cycleSnap.forEach(docSnap => {
       batch.delete(docSnap.ref);
     });
     // حذف/إعادة فهرسة sessionControl
@@ -10888,10 +10949,15 @@ window.cleanLeakedStudents = async (gid) => {
 
     // بناء مجموعة من أسماء التلاميذ الذين لديهم حضور مسجل
     const studentsWithAtt = new Set();
+    const cycleNum = await _getCurrentCycleNum(teacherId, gid);
     for (let sn = 1; sn <= 12; sn++) {
-      const docId = `${teacherId}_${gid}_session_${sn}`;
-      try {
-        const sSnap = await getDoc(doc(db, 'sessionAttendance', docId));
+      // البحث بالصيغة الجديدة (مع الدورة) ثم القديمة
+      let docId = getSessionDocId(teacherId, gid, sn, cycleNum);
+      let sSnap = await getDoc(doc(db, 'sessionAttendance', docId));
+      if (!sSnap.exists()) {
+        docId = `${teacherId}_${gid}_session_${sn}`;
+        sSnap = await getDoc(doc(db, 'sessionAttendance', docId));
+      }
         if (sSnap.exists()) {
           (sSnap.data().students || []).forEach(st => {
             const n = String(st.name || '').trim().toLowerCase();
@@ -12711,8 +12777,9 @@ window.saveAttendance = async () => {
   const existingSessions = _allRecordedSessionsByGroup[gi] || {};
   let sessionNum = 1;
   for (let i = 1; i <= 12; i++) { if (!existingSessions[i]) { sessionNum = i; break; } }
-  const sessionKey = makeSessionDocKey(tid, gid, sessionNum);
-  const record = { teacherId: tid + '_' + gid, gid, sessionNum, date: todayKey, savedAt: serverTimestamp(), students };
+  const cycleNum = await _getCurrentCycleNum(tid, gid);
+  const sessionKey = makeSessionDocKey(tid, gid, sessionNum, cycleNum);
+  const record = { teacherId: tid + '_' + gid, gid, cycleNum, sessionNum, date: todayKey, savedAt: serverTimestamp(), students };
   try {
     await setDoc(doc(db, 'sessionAttendance', sessionKey), record);
     await setDoc(doc(db, 'attendance', tid + '_' + todayKey),
@@ -12962,7 +13029,8 @@ window.closeSessionModal = () => {
 let _sessionControlCache = {};  // { gi: { sessionNum: {...} } }
 
 // إنشاء ID وثيقة الحضور باستخدام Group ID الثابت (وليس index)
-function getSessionDocId(teacherId, gid, sessionNum) {
+function getSessionDocId(teacherId, gid, sessionNum, cycleNum) {
+  if (cycleNum && cycleNum > 1) return `${teacherId}_${gid}_cycle_${cycleNum}_session_${sessionNum}`;
   return `${teacherId}_${gid}_session_${sessionNum}`;
 }
 // إنشاء ID وثيقة التحكم باستخدام Group ID الثابت
@@ -12974,15 +13042,93 @@ function getCtrlDocIdLegacy(teacherId, gi, sessionNum) {
   return `${teacherId}_g${gi}_session_${sessionNum}`;
 }
 // استخراج gid من وثيقة الحضور (يدعم الصيغتين القديمة والجديدة)
-// للصيغة الجديدة teacherId_{gid}_session_N → تُرجع gid
-// للصيغة القديمة teacherId_g{gi}_session_N → تُرجع null (يُستخدم gi مباشرة كمفتاح كاش)
 function extractGidFromDoc(docId) {
-  // الصيغة الجديدة: teacherId_{gid}_session_num
-  // gid تبدأ بـ "g_" وتحتوي على شرطتين سفليتين على الأقل
-  let m = docId.match(/_(g_\d+_\w+)_session_(\d+)$/);
+  // الصيغة الجديدة مع الـ cycle: teacherId_{gid}_cycle_N_session_M
+  let m = docId.match(/_(g_\d+_\w+)_cycle_\d+_session_\d+$/);
+  if (m) return m[1];
+  // الصيغة الحديثة بدون cycle: teacherId_{gid}_session_N
+  m = docId.match(/_(g_\d+_\w+)_session_(\d+)$/);
   if (m) return m[1];
   return null; // صيغة قديمة → سيستخدم المتصل gi_prefix
 }
+// استخراج رقم الدورة من Doc ID
+function extractCycleFromDoc(docId) {
+  const m = docId.match(/_cycle_(\d+)_session_/);
+  if (m) return parseInt(m[1], 10);
+  return 1; // docs بدون cycle → الدورة الأولى
+}
+// إنشاء Doc ID لسجل الدورة
+function getCycleDocId(teacherId, gid, cycleNum) {
+  return `${teacherId}_${gid}_cycle_${cycleNum}`;
+}
+// الحصول على رقم الدورة الحالية لفوج (مع كاش)
+let _currentCycleCache = {};
+async function _getCurrentCycleNum(teacherId, gid) {
+  const cacheKey = teacherId + '|' + gid;
+  if (_currentCycleCache[cacheKey]) return _currentCycleCache[cacheKey];
+  try {
+    const q = query(
+      collection(db, 'attendanceCycles'),
+      where('teacherId', '==', teacherId),
+      where('gid', '==', gid),
+      where('status', '==', 'current')
+    );
+    const snap = await getDocs(q);
+    if (snap.size > 0) {
+      const cycleNum = snap.docs[0].data().cycleNum || 1;
+      _currentCycleCache[cacheKey] = cycleNum;
+      return cycleNum;
+    }
+  } catch (e) { console.warn('[getCurrentCycleNum] query failed:', e.message); }
+  // التحقق من وجود دورة أولى في Firestore
+  try {
+    const cycleDocId = getCycleDocId(teacherId, gid, 1);
+    const snap = await getDoc(doc(db, 'attendanceCycles', cycleDocId));
+    if (snap.exists()) {
+      _currentCycleCache[cacheKey] = 1;
+      return 1;
+    }
+  } catch (e) { /* ignore */ }
+  return 1; // افتراضي للبيانات القديمة
+}
+// ضمان وجود سجل دورة (إنشاء إذا لم يوجد)
+async function _ensureCycleDoc(teacherId, gid, cycleNum) {
+  const docId = getCycleDocId(teacherId, gid, cycleNum);
+  const snap = await getDoc(doc(db, 'attendanceCycles', docId));
+  if (!snap.exists()) {
+    await setDoc(doc(db, 'attendanceCycles', docId), {
+      teacherId, gid, cycleNum,
+      status: 'current',
+      startDate: new Date().toISOString().slice(0, 10),
+      createdAt: serverTimestamp()
+    });
+  }
+  return docId;
+}
+// ترحيل: إنشاء سجلات attendanceCycles للبيانات القديمة
+window.migrateAttendanceCycles = async () => {
+  const teachers = allTeachers || [];
+  let created = 0;
+  for (const t of teachers) {
+    for (const g of (t.groups || [])) {
+      const gid = g._gid;
+      if (!gid) continue;
+      const docId = getCycleDocId(t.id, gid, 1);
+      const snap = await getDoc(doc(db, 'attendanceCycles', docId));
+      if (!snap.exists()) {
+        await setDoc(doc(db, 'attendanceCycles', docId), {
+          teacherId: t.id, gid, cycleNum: 1,
+          status: 'current',
+          startDate: new Date().toISOString().slice(0, 10),
+          createdAt: serverTimestamp()
+        });
+        created++;
+      }
+    }
+  }
+  showToast(`✅ تم ترحيل ${created} دورة حضور`);
+  _currentCycleCache = {};
+};
 
 // حل helper: تحويل gi (فهرس الفوج) إلى _gid (المعرّف الوحيد)
 // مصدر الحقيقة: allTeachers[teacherId].groups[gi]._gid
@@ -12998,7 +13144,8 @@ function resolveGid(teacherId, gi) {
 
 // إنشاء مفتاح وثيقة الحضور (المصدر الوحيد لสร้าง مفاتيح المستندات)
 // يستخدم _gid دائماً. الصيغة: {teacherId}_{gid}_session_{sessionNum}
-function makeSessionDocKey(teacherId, gid, sessionNum) {
+function makeSessionDocKey(teacherId, gid, sessionNum, cycleNum) {
+  if (cycleNum && cycleNum > 1) return `${teacherId}_${gid}_cycle_${cycleNum}_session_${sessionNum}`;
   return `${teacherId}_${gid}_session_${sessionNum}`;
 }
 
@@ -14804,14 +14951,26 @@ window.editSession_g = async (sessionNum, gi) => {
   const gid = window._activeAttGroups?.[gi]?._gid || resolveGid(tid, gi);
   let docRef, docSnap;
 
-  // محاولة 1: الصيغة الجديدة (gid-based)
+  // محاولة 1: الصيغة الجديدة مع الدورة (cycle-based)
   if (gid) {
-    const newKey = makeSessionDocKey(tid, gid, sessionNum);
+    const cycleNum = await _getCurrentCycleNum(tid, gid);
+    const newKey = makeSessionDocKey(tid, gid, sessionNum, cycleNum);
     docRef = doc(db, 'sessionAttendance', newKey);
     docSnap = await getDoc(docRef);
   }
 
-  // محاولة 2: الصيغة القديمة (gi-based) — fallback
+  // محاولة 2: الصيغة الحديثة بدون دورة (قبل الترحيل)
+  if (gid && (!docSnap || !docSnap.exists())) {
+    const oldKey = makeSessionDocKey(tid, gid, sessionNum);
+    const oldRef = doc(db, 'sessionAttendance', oldKey);
+    const oldSnap = await getDoc(oldRef);
+    if (oldSnap.exists()) {
+      docRef = oldRef;
+      docSnap = oldSnap;
+    }
+  }
+
+  // محاولة 3: الصيغة القديمة (gi-based) — fallback
   if (!docSnap || !docSnap.exists()) {
     const legacyKey = `${tid}_g${gi}_session_${sessionNum}`;
     const legacyRef = doc(db, 'sessionAttendance', legacyKey);
@@ -15059,7 +15218,8 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
     showToast('⚠️ خطأ: لم يتم العثور على معرّف الفوج', true);
     return;
   }
-  const sessionKey  = makeSessionDocKey(currentAttTeacherId, gid, sessionNum);
+  const cycleNum = await _getCurrentCycleNum(currentAttTeacherId, gid);
+  const sessionKey  = makeSessionDocKey(currentAttTeacherId, gid, sessionNum, cycleNum);
   // ✅ إصلاح: استخدام التاريخ من حقل الإدخال (للأدمين) أو تاريخ اليوم
   const dateInput = document.getElementById('session-date-input');
   const todayDateKey = dateInput ? dateInput.value : new Date().toISOString().slice(0, 10);
@@ -15095,6 +15255,7 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
   const record = {
     teacherId: currentAttTeacherId + '_' + gid,
     gid: gid,
+    cycleNum,
     sessionNum,
     date: todayDateKey,
     savedAt: serverTimestamp(),
