@@ -10951,13 +10951,13 @@ window.cleanLeakedStudents = async (gid) => {
     const studentsWithAtt = new Set();
     const cycleNum = await _getCurrentCycleNum(teacherId, gid);
     for (let sn = 1; sn <= 12; sn++) {
-      // البحث بالصيغة الجديدة (مع الدورة) ثم القديمة
-      let docId = getSessionDocId(teacherId, gid, sn, cycleNum);
-      let sSnap = await getDoc(doc(db, 'sessionAttendance', docId));
-      if (!sSnap.exists()) {
-        docId = `${teacherId}_${gid}_session_${sn}`;
-        sSnap = await getDoc(doc(db, 'sessionAttendance', docId));
-      }
+      try {
+        let docId = getSessionDocId(teacherId, gid, sn, cycleNum);
+        let sSnap = await getDoc(doc(db, 'sessionAttendance', docId));
+        if (!sSnap.exists()) {
+          docId = `${teacherId}_${gid}_session_${sn}`;
+          sSnap = await getDoc(doc(db, 'sessionAttendance', docId));
+        }
         if (sSnap.exists()) {
           (sSnap.data().students || []).forEach(st => {
             const n = String(st.name || '').trim().toLowerCase();
