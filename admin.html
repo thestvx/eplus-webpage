@@ -6306,15 +6306,70 @@ function _nameVariants(name) {
   return [...set];
 }
 
+// ─── دالة موحدة: هل التلميذ داخل أي فوج عند أي أستاذ؟ ───
+// تبحث بـ Student ID أولاً (أدق)، ثم بالاسم المُطبع (للتوافق)
+// تفحص جميع الأساتذة وجميع أفواجهم
 function _findStudentGroup(studentName, teacher) {
-  const groups = teacher.groups || [];
+  // إذا مررنا teacher محدد، نبحث عنده فقط (للتوافق مع الاستدعاءات القديمة)
+  // وإلا نبحث عند جميع الأساتذة
+  const teachers = teacher ? [teacher] : (window.allTeachers || []);
   const target = _normalizeNameStrict(studentName);
-  for (let i = 0; i < groups.length; i++) {
-    if ((groups[i].students||[]).some(s => _normalizeNameStrict(s) === target)) {
-      return groups[i].name;
+  
+  // البحث بالاسم أولاً
+  for (const t of teachers) {
+    const groups = t.groups || [];
+    for (let i = 0; i < groups.length; i++) {
+      if ((groups[i].students||[]).some(s => _normalizeNameStrict(typeof s === 'string' ? s : (s.name || '')) === target)) {
+        return groups[i].name;
+      }
     }
   }
   return '—';
+}
+
+// ─── البحث في جميع الأساتذة (لتحديد انتماء التلميذ الحقيقي) ───
+// تعيد { inGroup, teacherName, groupName, groupGid }
+function _isStudentInAnyGroup(studentId, studentName) {
+  const result = { inGroup: false, teacherName: '', groupName: '', groupGid: '' };
+  if (!studentId && !studentName) return result;
+  const teachers = window.allTeachers || [];
+  const sid = studentId ? String(studentId) : '';
+  // تطبيع الاسم للبحث
+  const _normGrp = (n) => String(n || '').trim().replace(/\s+/g, ' ').replace(/[\u064B-\u065F]/g, '').toLowerCase();
+  const targetName = studentName ? _normGrp(studentName) : '';
+
+  for (const t of teachers) {
+    const groups = t.groups || [];
+    for (const g of groups) {
+      if (!g || !g._gid) continue;
+      const groupStudents = g.students || [];
+      for (const gs of groupStudents) {
+        const gsRaw = typeof gs === 'string' ? gs : (gs.name || '');
+        // 1. البحث بـ Student ID (يتطلب مطابقة اسم في teacher.students)
+        if (sid) {
+          const idMatch = (t.students || []).find(ts => 
+            String(ts.id || '') === sid && window._isSameStudentName(ts.name, gsRaw)
+          );
+          if (idMatch) {
+            result.inGroup = true;
+            result.teacherName = t.name || '';
+            result.groupName = g.name || '';
+            result.groupGid = g._gid || '';
+            return result;
+          }
+        }
+        // 2. البحث بالاسم (إذا لم نعثر بـ ID)
+        if (targetName && _normGrp(gsRaw) === targetName) {
+          result.inGroup = true;
+          result.teacherName = t.name || '';
+          result.groupName = g.name || '';
+          result.groupGid = g._gid || '';
+          return result;
+        }
+      }
+    }
+  }
+  return result;
 }
 
 let _soData = [];
@@ -6414,7 +6469,8 @@ window.renderStudentOverview = async () => {
       const key = _normalizeNameStrict(s.name);
       // لا نستبدل إذا كان الاسم مختلفًا (نتجنب الخلط)
       if (!teacherMap[key] || teacherMap[key].studentName === s.name) {
-        teacherMap[key] = { studentName: s.name, teacherName: t.name, groupName: _findStudentGroup(s.name, t) };
+        // نبحث في جميع الأساتذة (وليس فقط t) لمعرفة إذا كان التلميذ في أي فوج
+        teacherMap[key] = { studentName: s.name, teacherName: t.name, groupName: _findStudentGroup(s.name) };
       }
     });
   });
@@ -6584,6 +6640,8 @@ window.renderStudentOverview = async () => {
   // تحديث الرسوم البيانية
   _updateStudentCharts(_soData);
   _updateFilterCounts();
+  // فحص تناسق البيانات (بعد بناء _soData)
+  if (window._checkConsistency) setTimeout(window._checkConsistency, 0);
 };
 
 // ─── تحديث بيانات الشيت ───
@@ -8066,10 +8124,9 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       if (subFilter === 'unsubscribed' && isSubscribed) return;
       if (subFilter === 'subscribed-unassigned') {
         if (!isSubscribed) return;
-        // نبني المجموعة في كل مرة من البيانات الفعلية (وليس Cache)
-        const _currentIdSet = _buildAllGroupStudentIdsSet();
-        const _isInAnyGroup = s.id && _currentIdSet.has(String(s.id));
-        if (_isInAnyGroup) return;
+        // استخدام الدالة الموحدة (تبحث بـ ID أولاً ثم الاسم عبر جميع الأساتذة)
+        const membership = _isStudentInAnyGroup(s.id, s.name);
+        if (membership.inGroup) return;
       }
 
       const groupSessions = Object.assign({},
@@ -9870,22 +9927,29 @@ window._isSameStudentName = (a, b) => {
 // ثم نعرض التلاميذ الذين لا يوجد ID الخاص بهم في أي فوج
 let _unassignedAllStudentIds = new Set();
 
+// ─── بناء مجموعة كل Student IDs الموجودين في أي فوج عند أي أستاذ ───
 function _buildAllGroupStudentIdsSet() {
   const ids = new Set();
-  const all = window.allTeachers || [];
-  all.forEach(t => {
-    (t.groups || []).forEach(g => {
-      if (!g || !g._gid) return;
-      // الأسماء في group.students: نبحث عن ID لكل اسم في teacher.students باستخدام نفس منطق مطابقة جدول الحضور
+  const teachers = window.allTeachers || [];
+  for (const t of teachers) {
+    const groups = t.groups || [];
+    for (const g of groups) {
+      if (!g || !g._gid) continue;
       (g.students || []).forEach(sName => {
+        const gsName = typeof sName === 'string' ? sName : (sName.name || '');
         const match = (t.students || []).find(s => {
-          if (s.id && window._isSameStudentName(s.name, sName)) return true;
+          if (s.id && window._isSameStudentName(s.name, gsName)) return true;
           return false;
         });
         if (match && match.id) ids.add(String(match.id));
+        // أيضاً: إذا كان اسم group.student مطابقاً تماماً لاسم teacher.student دون ID
+        if (!match) {
+          const nameOnlyMatch = (t.students || []).find(s => window._isSameStudentName(s.name, gsName));
+          if (nameOnlyMatch && nameOnlyMatch.id) ids.add(String(nameOnlyMatch.id));
+        }
       });
-    });
-  });
+    }
+  }
   return ids;
 }
 
@@ -9911,24 +9975,23 @@ window.refreshUnassignedStudents = (forceDataOnly) => {
     if (actions) actions.style.display = 'none';
     return;
   }
-  // بناء مجموعة Student IDs من جميع الأفواج عند جميع الأساتذة
   _unassignedAllStudentIds = _buildAllGroupStudentIdsSet();
   const allStudents = teacher.students || [];
   const groups = teacher.groups || [];
 
-  // التلميذ غير منتمي إذا لم يكن Student ID الخاص به موجوداً في أي فوج
-  // أو إذا لم يكن له ID أصلاً (fallback: الاسم غير موجود في أي فوج مع تطبيع)
+  // استخدام الدالة الموحدة لتحديد التلاميذ غير المنتمين
   const _normU = (n) => String(n||'').trim().replace(/\s+/g,' ').toLowerCase()
     .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
     .replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ').trim();
   const assignedNamesFallback = new Set();
   groups.forEach(g => {
     if (!g || !g._gid) return;
-    (g.students || []).forEach(s => assignedNamesFallback.add(_normU(s)));
+    (g.students || []).forEach(s => assignedNamesFallback.add(_normU(typeof s === 'string' ? s : (s.name || ''))));
   });
   const unassigned = allStudents.filter(s => {
-    // المعيار الأساسي: Student ID
-    if (s.id && _unassignedAllStudentIds.has(String(s.id))) return false;
+    // المعيار الأساسي: الدالة الموحدة (تبحث بـ ID أولاً ثم الاسم عبر جميع الأساتذة)
+    const membership = _isStudentInAnyGroup(s.id, s.name);
+    if (membership.inGroup) return false;
     // Fallback: الاسم المُطبع ليس في أي فوج
     if (assignedNamesFallback.has(_normU(s.name || ''))) return false;
     return true;
@@ -11419,13 +11482,12 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) 
   if (filterType && filterType !== 'all') {
     const before = exportData.length;
     if (filterType === 'subscribed-unassigned') {
-      // مشتركون غير موجودين في أي فوج
-      const allIds = _buildAllGroupStudentIdsSet();
+      // مشتركون غير موجودين في أي فوج (باستخدام الدالة الموحدة)
       exportData = exportData.filter(s => {
         const isSub = ticketSubMap.has(_normS(s.name));
         if (!isSub) return false;
-        const match = (teacher.students || []).find(st => _normS(st.name || '') === _normS(s.name));
-        return !match || !match.id || !allIds.has(String(match.id));
+        const membership = _isStudentInAnyGroup(s.id, s.name);
+        return !membership.inGroup;
       });
     } else {
       exportData = exportData.filter(s => {
@@ -11710,11 +11772,12 @@ window.checkTeachersGroups = () => {
       }
     });
 
-    // تلاميذ في قائمة الأستاذ ليسوا في أي فوج
+    // تلاميذ في قائمة الأستاذ ليسوا في أي فوج (باستخدام الدالة الموحدة)
     if (students.length && groups.length) {
-      const allGroupStudentNames = new Set();
-      groups.forEach(g => (g.students||[]).forEach(s => allGroupStudentNames.add(s.trim().toLowerCase())));
-      const notInGroup = students.filter(s => s.name && !allGroupStudentNames.has(s.name.trim().toLowerCase()));
+      const notInGroup = students.filter(s => {
+        if (!s.name) return false;
+        return !_isStudentInAnyGroup(s.id, s.name).inGroup;
+      });
       if (notInGroup.length) {
         issues.push(`👨‍🏫 ${t.name} — ⚠️ ${notInGroup.length} تلميذ غير موزّعين على أفواج`);
       }
@@ -11731,6 +11794,40 @@ window.checkTeachersGroups = () => {
   if (issues.length > 10) alert(`⚠️ يوجد ${issues.length} مشكلة:\n\n${msg}\n\n... و ${issues.length - 10} مشكلة أخرى (انظر الـ Console)`);
   else alert(`⚠️ يوجد ${issues.length} مشكلة:\n\n${msg}`);
   console.warn('🔍 Group issues:', issues);
+};
+
+// ─── فحص تناسق بيانات التلاميذ والأفواج ───
+// يُسمى عند تحميل البيانات للكشف عن أي تناقض بين "إدارة التلاميذ" و"سجل الحضور"
+window._checkConsistency = () => {
+  const teachers = window.allTeachers || [];
+  if (!teachers.length) return;
+  const fixes = [];
+  teachers.forEach(t => {
+    const groups = t.groups || [];
+    (t.students || []).forEach(s => {
+      if (!s.name) return;
+      // نتحقق: هل التلميذ في أي فوج (بالدالة الموحدة)؟
+      const membership = _isStudentInAnyGroup(s.id, s.name);
+      if (!membership.inGroup) return; // خارج الأفواج — لا تناقض
+      // التلميذ موجود في فوج (حسب الدالة الموحدة)
+      // لكن هل groupName في _soData يطابق؟
+      const normKey = _normalizeNameStrict(s.name);
+      const soRecord = window._soData ? window._soData.find(r => _normalizeNameStrict(r.studentName) === normKey) : null;
+      if (soRecord && (!soRecord.groupName || soRecord.groupName === '—')) {
+        // تناقض: التلميذ في فوج فعلياً لكن إدارة التلاميذ تظهره خارج الأفواج
+        fixes.push({ student: s.name, teacherId: t.id, teacherName: t.name, actualGroup: membership.groupName, actualTeacher: membership.teacherName });
+        // إصلاح تلقائي: تحديث groupName في _soData
+        soRecord.groupName = membership.groupName;
+        soRecord.teacherName = membership.teacherName;
+      }
+    });
+  });
+  if (fixes.length) {
+    console.warn(`🔧 _checkConsistency: تم إصلاح ${fixes.length} حالة غير متناسقة:`, fixes);
+    // إعادة تطبيق الفلاتر ليظهر التحديث
+    if (typeof _updateFilterCounts === 'function') _updateFilterCounts();
+    if (typeof _renderSoTable === 'function') _renderSoTable();
+  }
 };
 
 // ─── Attendance modal (admin view) ───
