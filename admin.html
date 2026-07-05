@@ -8064,28 +8064,21 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   for (const dkStr2 of Object.keys(grouped)) {
     const dk2 = parseInt(dkStr2);
     const g2 = grouped[dk2];
-    (g2.students || []).forEach(s2 => {
-      const grpSessions = Object.assign({},
-        groupCache[s2.gid] || {},
-        groupCache[s2.groupGid] || {},
-        groupCache['gi_' + dk2] || {}
-      );
-      const csvVals = [];
-      const csvStudentKey = s2.id || _normGi(s2.name || '');
-      for (let idx2 = 0; idx2 < sessionRange.length; idx2++) {
-        const i2 = sessionRange[idx2];
-        // Try student-attendance cache first
-        let stuRec2 = studentAttCache[csvStudentKey]?.[i2] || null;
-        if (!stuRec2) {
-          const nameKey = _normGi(s2.name || '');
-          if (nameKey !== csvStudentKey) stuRec2 = studentAttCache[nameKey]?.[i2] || null;
-        }
-        if (!stuRec2) {
+      (g2.students || []).forEach(s2 => {
+        const grpSessions = Object.assign({},
+          groupCache[s2.gid] || {},
+          groupCache[s2.groupGid] || {},
+          groupCache['gi_' + dk2] || {}
+        );
+        const csvVals = [];
+        for (let idx2 = 0; idx2 < sessionRange.length; idx2++) {
+          const i2 = sessionRange[idx2];
+          // Group-scoped only — NOT cross-group studentAttCache
+          let stuRec2 = null;
           const rec2 = grpSessions[i2];
           if (rec2) stuRec2 = (rec2.students || []).find(st => namesMatchLocal(st.name || '', s2.name || ''));
+          csvVals.push(stuRec2 ? (stuRec2.present ? 'حاضر' : 'غائب') : '—');
         }
-        csvVals.push(stuRec2 ? (stuRec2.present ? 'حاضر' : 'غائب') : '—');
-      }
       window._attAllStudentsCsvData.push({
         name: s2.name,
         teacher: teacher.name,
@@ -8135,24 +8128,12 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         const ctrlMap = sessionCtrlMap[s.groupGi] || {};
       const cells = [];
       const sId = s.id || '';
-      const studentAttKey = sId || _normGi(s.name || '');
       const sIdAttr = sId.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
       for (let idx = 0; idx < sessionRange.length; idx++) {
         const i = sessionRange[idx];
-        // Try student-centric cache first (finds attendance by student ID regardless of group key)
-        let studentRec = studentAttCache[studentAttKey]?.[i] || null;
-        if (!studentRec) {
-          const nameKey = _normGi(s.name || '');
-          if (nameKey !== studentAttKey) studentRec = studentAttCache[nameKey]?.[i] || null;
-        }
-        // Fallback: try group-based cache
-        let rec = null;
-        if (studentRec) {
-          rec = groupSessions[i] || groupCache[s.gid]?.[i] || groupCache[s.groupGid]?.[i] || groupCache['gi_' + s.groupGi]?.[i];
-          if (!rec) rec = { students: [studentRec], sessionNum: i };
-        } else {
-          rec = groupSessions[i];
-        }
+        // Attendance is scoped by group — use group-based cache only (NOT cross-group studentAttCache)
+        let rec = groupSessions[i] || groupCache[s.gid]?.[i] || groupCache[s.groupGid]?.[i] || groupCache['gi_' + s.groupGi]?.[i];
+        let studentRec = null;
         const sNameVal = s.name;
         const ctrl = ctrlMap[i];
         const ctrlStatus = ctrl && ctrl.status;
@@ -9117,11 +9098,12 @@ window.confirmMoveGroup = async () => {
     await setDoc(teacherRef, { groups: groupsArr }, { merge: true });
 
     // 4. تحديث الكاش
-    if (teacher.groups) teacher.groups = groupsArr;
+    const teacherCache = (allTeachers || []).find(t => t.id === teacherId);
+    if (teacherCache) teacherCache.groups = groupsArr;
     if (window._attSummaryCache) window._attSummaryCache[teacherId] = null;
     if (window._ctrlMapCache) window._ctrlMapCache[teacherId] = null;
 
-    showToast(`✅ تم نقل ${movedStudentNames.length} تلميذ من "${srcGroup.name || '—'}" إلى "${tgtGroup.name || '—'}"`);
+    showToast(`✅ تم نقل ${movedStudents.length} تلميذ من "${srcGroup.name || '—'}" إلى "${tgtGroup.name || '—'}"`);
     closeMoveGroupModal();
     refreshUnassignedStudents(true);
     await loadAttendanceSummary();
