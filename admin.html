@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
@@ -16460,8 +16460,142 @@ window.fixRestoredDocGids = async (teacherId) => {
   return fixedCount;
 };
 
-// ── Show all sessionAttendance docs for a teacher ──
-window.showAllSessionDocs = async (teacherId) => {
+// ── Diagnose why sessions 8-12 don't display ──
+window.diagnoseDisplay = (teacherId) => {
+  const cache = window._attSummaryCache?.[teacherId] || {};
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { console.log('⚠️ no teacher'); return; }
+  const groups = teacher.groups || [];
+
+  console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
+  console.log('🔍 تشخيص العرض');
+  console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
+
+  console.log('\n%c📌 كل مفاتيح الكاش:', 'font-weight:800');
+  for (const ck of Object.keys(cache)) {
+    const sessions = Object.keys(cache[ck]).sort((a,b) => a-b);
+    console.log(`  "${ck}": حصص ${sessions.join(', ')}`);
+  }
+
+  console.log('\n📌 الفئات من teacher.groups:');
+  groups.forEach((g, gi) => {
+    console.log(`  gi=${gi}: name="${g.name}" _gid="${g._gid || ''}" students=${(g.students||[]).length}`);
+  });
+
+  // Simulate render logic for each group
+  const grouped = {};
+  (teacher.students || []).forEach(s => {
+    const dk = s.groupGi;
+    if (!grouped[dk]) {
+      let gidVal = (groups[dk] && groups[dk]._gid) || '';
+      if (!gidVal && s.gid && !/^gi_\d+$/.test(s.gid)) gidVal = s.gid;
+      grouped[dk] = { group: s.group || (groups[dk] && groups[dk].name) || '—', gi: dk, gid: gidVal, students: [] };
+    }
+    grouped[dk].students.push(s);
+  });
+
+  console.log('\n📌 المجموعات المُجمّعة:');
+  for (const dk of Object.keys(grouped)) {
+    const g = grouped[dk];
+    console.log(`  gi=${dk}: gid="${g.gid}" students=${g.students.length}`);
+    // Simulate groupSessions merge
+    const s0 = g.students[0] || {};
+    const groupSessions = Object.assign({},
+      cache[g.gid] || {},
+      cache[s0.gid] || {},
+      cache[s0.groupGid] || {},
+      cache['gi_' + dk] || {}
+    );
+    const sKeys = Object.keys(groupSessions).sort((a,b) => a-b);
+    console.log(`    groupSessions keys: ${sKeys.join(', ')}`);
+    for (let sn = 1; sn <= 12; sn++) {
+      const rec = groupSessions[sn];
+      if (!rec) {
+        console.log(`    حصة ${sn}: ❌ لا يوجد rec`);
+        continue;
+      }
+      const stCount = (rec.students || []).length;
+      const present = (rec.students || []).filter(s => s.present).length;
+      const gid = rec.gid || 'NONE';
+      // Check first student
+      const firstSt = g.students[0];
+      const found = (rec.students || []).find(st => (st.id && st.id === firstSt.id) || (st.name && st.name === firstSt.name));
+      console.log(`    حصة ${sn}: ${present}/${stCount} حاضر gid="${gid}" student0="${firstSt.name}" found=${found ? '✅' : '❌ NOT FOUND'}`);
+    }
+  }
+};
+
+// ── Full migration: move old-format docs to correct format ──
+window.migrateAttendanceDocs = async (teacherId) => {
+  const q = query(collection(db, 'sessionAttendance'), where('__name__', '>=', teacherId), where('__name__', '<', teacherId + '_\ufff0'));
+  const snap = await getDocs(q);
+  
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { console.log('⚠️ الأستاذ غير موجود'); return; }
+  const groups = teacher.groups || [];
+  
+  // Map: gi index → gid
+  const giToGid = {};
+  groups.forEach((g, gi) => {
+    if (g && g._gid) giToGid[gi] = g._gid;
+  });
+  
+  console.log('📋 خريطة الفئات:', giToGid);
+  
+  const allDocs = [];
+  snap.forEach(d => allDocs.push({ ref: d.ref, id: d.id, data: d.data() }));
+  
+  const batch = writeBatch(db);
+  let createdCount = 0, deletedCount = 0;
+  
+  for (const doc of allDocs) {
+    const docId = doc.id;
+    const data = doc.data;
+    
+    // Detect old format: _g0_, _g1_, _g2_, etc.
+    const oldMatch = docId.match(/_g(\d+)_session_(\d+)$/);
+    // Detect double underscore: __session_N
+    const duMatch = docId.match(/__session_(\d+)$/);
+    
+    if (oldMatch) {
+      const gi = parseInt(oldMatch[1]);
+      const sn = parseInt(oldMatch[2]);
+      const gid = giToGid[gi];
+      if (!gid) { console.log(`⚠️ لا يوجد gid لـ gi=${gi}: ${docId}`); continue; }
+      
+      const newDocId = `${teacherId}_${gid}_session_${sn}`;
+      const newData = { ...data, gid, teacherId: teacherId + '_' + gid, sessionNum: sn, cycleNum: 1 };
+      
+      console.log(`✅ ${docId} → ${newDocId} (${(data.students||[]).length} طالب, ${(data.students||[]).filter(s=>s.present).length} حاضر)`);
+      batch.set(doc(db, 'sessionAttendance', newDocId), newData);
+      batch.delete(doc.ref);
+      createdCount++;
+      deletedCount++;
+    } else if (duMatch) {
+      const sn = parseInt(duMatch[1]);
+      const newDocId = `${teacherId}_${giToGid[0] || ''}_session_${sn}`;
+      const gid = giToGid[0] || '';
+      const newData = { ...data, gid, teacherId: teacherId + '_' + gid, sessionNum: sn, cycleNum: 1 };
+      
+      console.log(`✅ ${docId} → ${newDocId} (${(data.students||[]).length} طالب)`);
+      batch.set(doc(db, 'sessionAttendance', newDocId), newData);
+      batch.delete(doc.ref);
+      createdCount++;
+      deletedCount++;
+    } else if (data.gid === 'NONE' || !data.gid) {
+      // Docs with no gid and non-standard format — delete if they're the bad ones
+      console.log(`🗑️ حذف ${docId} (gid=NONE, صيغة غير معروفة)`);
+      batch.delete(doc.ref);
+      deletedCount++;
+    }
+    // Docs with correct gid format keep as-is (g_1782842684891_a0a5ty79_session_N)
+  }
+  
+  await batch.commit();
+  console.log(`\n%c══════════════════════════════════════════`, 'color:#2563EB;font-weight:800');
+  console.log(`✅ تم: ${createdCount} وثيقة جديدة, ${deletedCount} وثيقة محذوفة`);
+  console.log(`📌 اعمل رفرش للصفحة`);
+};
   const q = query(collection(db, 'sessionAttendance'), where('__name__', '>=', teacherId), where('__name__', '<', teacherId + '_\ufff0'));
   const snap = await getDocs(q);
   console.log(`%c══════════════════════════════════════════`, 'color:#2563EB;font-weight:800');
