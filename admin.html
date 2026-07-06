@@ -19390,8 +19390,10 @@ window.verifyAttendanceIntegrity = async () => {
 // ═══════════════════════════════════════════════════════════
 //  COMPREHENSIVE ATTENDANCE DATA REPAIR
 // ═══════════════════════════════════════════════════════════
-// Run from console AFTER deploying: repairAllAttendanceData()
-window.repairAllAttendanceData = async () => {
+// Run from console AFTER deploying:
+//   repairAllAttendanceData()          — فحص جميع الأساتذة
+//   repairAllAttendanceData("TID123")  — فحص أستاذ معين فقط
+window.repairAllAttendanceData = async (teacherIdOnly) => {
   const R = {
     teachersScanned: 0, teachersWithIssues: 0,
     totalSessionsChecked: 0, healthySessions: 0,
@@ -19420,11 +19422,18 @@ window.repairAllAttendanceData = async () => {
     return docIds === groupIds;
   };
 
-  const teachers = allTeachers || [];
+  let teachers = allTeachers || [];
+  if (teacherIdOnly) {
+    const found = teachers.find(t => t.id === teacherIdOnly);
+    if (!found) { console.warn(`⚠️ أستاذ بالمعرف "${teacherIdOnly}" غير موجود`); return R; }
+    teachers = [found];
+    console.log(`%c🔍 فحص الأستاذ فقط: ${found.name} (${teacherIdOnly})`, 'color:#2563EB;font-weight:800');
+  }
   if (!teachers.length) { console.warn('⚠️ allTeachers empty — cannot scan'); return R; }
 
+  const mode = teacherIdOnly ? `TEACHER-SPECIFIC: ${teacherIdOnly}` : 'FULL SCAN';
   console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
-  console.log('%c  ATTENDANCE REPAIR — FULL SCAN STARTING', 'color:#2563EB;font-weight:800');
+  console.log(`%c  ATTENDANCE REPAIR — ${mode} STARTING`, 'color:#2563EB;font-weight:800');
   console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
 
   for (const teacher of teachers) {
@@ -19613,7 +19622,7 @@ window.repairAllAttendanceData = async () => {
 
   // ── Print report ──
   console.log('\n%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
-  console.log('%c  REPAIR COMPLETE — REPORT', 'color:#2563EB;font-weight:800');
+  console.log(`%c  REPAIR COMPLETE — ${teacherIdOnly ? 'TEACHER: ' + teacherIdOnly : 'REPORT'}`, 'color:#2563EB;font-weight:800');
   console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
   console.log(`📊 الأساتذة المفحوصين: ${R.teachersScanned}`);
   if (R.teachersWithIssues > 0) console.log(`⚠️  أساتذة بمشاكل: ${R.teachersWithIssues}`);
