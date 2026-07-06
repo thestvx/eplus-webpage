@@ -16495,6 +16495,27 @@ window.restoreFromRebuilderBackup = async (teacherId) => {
   if (!best || bestMatching === 0) { console.log('⚠️ لا توجد وثائق تطابق الأستاذ'); return 0; }
 
   const backupData = best.data || {};
+  
+  // Log what's in the backup for this teacher
+  console.log('%c📦 محتويات sessionRebuilder_backups:', 'color:#2563EB;font-weight:800');
+  const gidsInBackup = {};
+  Object.entries(backupData).forEach(([docId, docData]) => {
+    if (!docId.includes(teacherId)) return;
+    const gid = docData.gid || extractGidFromDoc(docId) || 'unknown';
+    if (!gidsInBackup[gid]) gidsInBackup[gid] = [];
+    const present = (docData.students || []).filter(s => s.present).length;
+    const total = (docData.students || []).length;
+    gidsInBackup[gid].push({ docId, sn: docData.sessionNum, present, total });
+  });
+  Object.entries(gidsInBackup).forEach(([gid, docs]) => {
+    const totalPresent = docs.reduce((s, d) => s + d.present, 0);
+    const totalStudents = docs.reduce((s, d) => s + d.total, 0);
+    console.log(`  gid=${gid}: ${docs.length} حصص, ${totalPresent}/${totalStudents} حاضر`);
+    docs.sort((a,b) => a.sn - b.sn).forEach(d => {
+      console.log(`    session ${d.sn}: ${d.present}/${d.total} حاضر`);
+    });
+  });
+
   const batch = writeBatch(db);
   let count = 0;
   Object.entries(backupData).forEach(([docId, docData]) => {
