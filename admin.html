@@ -7348,8 +7348,8 @@ window.repairOldGroups = async () => {
       try {
         sessSnap = await getDocs(query(
           collection(db, 'sessionAttendance'),
-          where('teacherId', '>=', teacherId + '_g0'),
-          where('teacherId', '<=', teacherId + '_g\uf8ff')
+          where('teacherId', '>=', teacherId),
+          where('teacherId', '<', teacherId + '_\ufff0')
         ));
       } catch (e) {
         results.errors.push(`${teacher.name || teacherId}: فشل تحميل session docs (${e.message})`);
@@ -7536,8 +7536,8 @@ window.verifyAttendanceIntegrity = async () => {
     try {
       const sessSnap = await getDocs(query(
         collection(db, 'sessionAttendance'),
-        where('teacherId', '>=', tid + '_g0'),
-        where('teacherId', '<=', tid + '_g\uf8ff')
+        where('teacherId', '>=', tid),
+        where('teacherId', '<', tid + '_\ufff0')
       ));
       const sessionByStudent = {};
       const sessionDocIds = {};
@@ -7705,8 +7705,8 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     try {
       const sessSnap = await getDocs(query(
         collection(db, 'sessionAttendance'),
-        where('teacherId', '>=', teacherId + '_g0'),
-        where('teacherId', '<=', teacherId + '_g\uF8FF')
+        where('teacherId', '>=', teacherId),
+        where('teacherId', '<', teacherId + '_\ufff0')
       ));
       sessSnap.forEach(d => {
         const data = d.data();
@@ -7738,8 +7738,8 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     window._attSessionUnsub = onSnapshot(
       query(
         collection(db, 'sessionAttendance'),
-        where('teacherId', '>=', teacherId + '_g0'),
-        where('teacherId', '<=', teacherId + '_g\uF8FF')
+        where('teacherId', '>=', teacherId),
+        where('teacherId', '<', teacherId + '_\ufff0')
       ),
       snap => {
         if (!window._attSummaryCache[teacherId]) return;
@@ -8335,8 +8335,8 @@ window.normalizeAttendanceNames = async () => {
     // اقرأ جميع سجلات الحضور للأستاذ
     const querySnap = await getDocs(query(
       collection(db, 'sessionAttendance'),
-      where('teacherId', '>=', teacherId + '_g0'),
-      where('teacherId', '<=', teacherId + '_g\uF8FF')
+      where('teacherId', '>=', teacherId),
+      where('teacherId', '<', teacherId + '_\ufff0')
     ));
 
     let fixed = 0, total = 0;
@@ -8394,8 +8394,8 @@ window.backupAttendanceData = async () => {
   try {
     const q = query(
       collection(db, 'sessionAttendance'),
-      where('teacherId', '>=', teacherId + '_g0'),
-      where('teacherId', '<=', teacherId + '_g\uF8FF')
+      where('teacherId', '>=', teacherId),
+      where('teacherId', '<', teacherId + '_\ufff0')
     );
     const snap = await getDocs(q);
     const sessions = {};
@@ -8948,8 +8948,8 @@ window.confirmMoveGroup = async () => {
       try {
         const sessRangeQ = query(
           collection(db, 'sessionAttendance'),
-          where('teacherId', '>=', teacherId + '_g0'),
-          where('teacherId', '<=', teacherId + '_g\uF8FF')
+          where('teacherId', '>=', teacherId),
+          where('teacherId', '<', teacherId + '_\ufff0')
         );
         const sessSnapAll = await getDocs(sessRangeQ);
         const namesFromAll = new Map();
@@ -9026,8 +9026,8 @@ window.confirmMoveGroup = async () => {
     const batch = writeBatch(db);
     const sessQuery = query(
       collection(db, 'sessionAttendance'),
-      where('teacherId', '>=', teacherId + '_g0'),
-      where('teacherId', '<=', teacherId + '_g\uF8FF')
+      where('teacherId', '>=', teacherId),
+      where('teacherId', '<', teacherId + '_\ufff0')
     );
     const sessSnap = await getDocs(sessQuery);
     const movedIdsSet = new Set(movedStudents.filter(s => typeof s !== 'string' && s.id).map(s => String(s.id)));
@@ -9775,6 +9775,7 @@ window.openNewAttendanceCycleModal = () => {
 window.toggleDailyAttCell = async (teacherId, gid, sessionNum, studentId, studentName) => {
   console.log(`[toggleDailyAttCell] called teacherId=${teacherId} gid=${gid} session=${sessionNum} studentId=${studentId} studentName=${studentName}`);
   const cycleNum = await _getCurrentCycleNum(teacherId, gid);
+  _validateAttendanceParams('toggleDailyAttCell', { teacherId, gid, sessionNum, cycleNum, studentId, studentName });
   // منع التعديل للأساتذة إذا كانت الحصة مقفلة صراحةً فقط (locked/closed)
   if (window._isTeacherAttendanceView) {
     // نبحث في التحكم بالصيغة القديمة (_g{gi}) والجديدة (_gctrl_{gid})
@@ -11897,8 +11898,8 @@ window.openAttModal = async (teacherId) => {
   try {
     const sessSnap = await getDocs(query(
       collection(db, 'sessionAttendance'),
-      where('teacherId', '>=', teacherId + '_g0'),
-      where('teacherId', '<=', teacherId + '_g\uF8FF')
+      where('teacherId', '>=', teacherId),
+      where('teacherId', '<', teacherId + '_\ufff0')
     ));
     sessSnap.forEach(d => {
       const data = d.data();
@@ -13066,6 +13067,21 @@ function extractCycleFromDoc(docId) {
   if (m) return parseInt(m[1], 10);
   return 1; // docs بدون cycle → الدورة الأولى
 }
+
+// تحقق من صحة البيانات قبل أي كتابة في سجل الحضور
+function _validateAttendanceParams(op, params) {
+  const missing = [];
+  if (!params.teacherId || typeof params.teacherId !== 'string') missing.push('teacherId');
+  if (!params.gid || typeof params.gid !== 'string') missing.push('gid');
+  if (!params.sessionNum || params.sessionNum < 1 || params.sessionNum > 999) missing.push('sessionNum');
+  if (params.cycleNum === undefined || params.cycleNum === null || params.cycleNum < 1) missing.push('cycleNum');
+  if (!params.studentId && !params.studentName) missing.push('studentId/studentName');
+  if (missing.length) {
+    const msg = `[_validateAttendanceParams] ${op}: مفقود/غير صحيح: ${missing.join(', ')}`;
+    console.error(msg, params);
+    throw new Error('بيانات الحضور غير مكتملة: ' + missing.join(', '));
+  }
+}
 // إنشاء Doc ID لسجل الدورة
 function getCycleDocId(teacherId, gid, cycleNum) {
   return `${teacherId}_${gid}_cycle_${cycleNum}`;
@@ -13895,8 +13911,8 @@ async function loadExtraSessions() {
   try {
     const snap = await getDocs(query(
       collection(db, 'sessionAttendance'),
-      where('teacherId', '>=', teacherId + '_g0'),
-      where('teacherId', '<=', teacherId + '_g\uF8FF')
+      where('teacherId', '>=', teacherId),
+      where('teacherId', '<', teacherId + '_\ufff0')
     ));
 
     const extras = [];
@@ -14866,8 +14882,8 @@ window.resetAttendance = async () => {
     // جلب كل docs الخاصة بهذا الأستاذ من sessionAttendance
     const q = query(
       collection(db, 'sessionAttendance'),
-      where('teacherId', '>=', tid + '_g0'),
-      where('teacherId', '<=', tid + '_g\uF8FF')
+      where('teacherId', '>=', tid),
+      where('teacherId', '<', tid + '_\ufff0')
     );
     const snap = await getDocs(q);
 
@@ -15228,6 +15244,7 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
     return;
   }
   const cycleNum = await _getCurrentCycleNum(currentAttTeacherId, gid);
+  _validateAttendanceParams('saveSessionAttendance_g', { teacherId: currentAttTeacherId, gid, sessionNum, cycleNum, studentId: 'batch', studentName: 'batch' });
   const sessionKey  = makeSessionDocKey(currentAttTeacherId, gid, sessionNum, cycleNum);
   // ✅ إصلاح: استخدام التاريخ من حقل الإدخال (للأدمين) أو تاريخ اليوم
   const dateInput = document.getElementById('session-date-input');
