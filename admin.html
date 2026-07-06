@@ -16122,11 +16122,14 @@ window.repairAllAttendanceData = async (teacherIdOnly) => {
         }
         if (existingWithData > 0) {
           // Build a student list from the current group, carrying over attendance majority
+          // gs could be a string (name only) or object {id, name}
           const recoveredStudents = groupStudents.map(gs => {
-            const key = gs.id || _normGi(gs.name || '');
-            const found = attMap[key];
+            const gsName = (typeof gs === 'string') ? gs : (gs.name || '');
+            const gsId = (typeof gs === 'object' && gs !== null) ? (gs.id || '') : '';
+            const key = gsId || _normGi(gsName);
+            const found = attMap[key] || (gsId && attMap[gsName ? _normGi(gsName) : '']);
             const wasPresent = found ? found.present > found.absent : false;
-            return { id: gs.id || '', name: gs.name || '', present: wasPresent };
+            return { id: gsId, name: gsName, present: wasPresent };
           });
           source = { type: 'sessions', data: { students: recoveredStudents } };
           sourceLabel = `📋 مسترجع من ${existingWithData} حصة موجودة (حتى لو تالفة)`;
@@ -16154,6 +16157,25 @@ window.repairAllAttendanceData = async (teacherIdOnly) => {
         if (source.type === 'archive') {
           const arcSession = (source.data.sessions || {})[sn];
           if (arcSession && Array.isArray(arcSession)) sessionStudents = arcSession;
+        } else if (source.type === 'sessions' && existing[sn] && existing[sn].exists) {
+          // استرجاع من وثيقة الحصة نفسها — نقرا الحضور من الوثيقة القديمة لكل طالب
+          try {
+            const oldSnap = await getDoc(existing[sn].ref);
+            if (oldSnap.exists()) {
+              const oldData = oldSnap.data();
+              const oldStudents = oldData.students || [];
+              // ننشئ قائمة جديدة بطلاب الفوج الحالي، وننقل حالة الحضور من القديم
+              sessionStudents = groupStudents.map(gs => {
+                const gsName = (typeof gs === 'string') ? gs : (gs.name || '');
+                const gsId = (typeof gs === 'object' && gs !== null) ? (gs.id || '') : '';
+                const oldMatch = oldStudents.find(st => {
+                  if (gsId && st.id && String(st.id) === String(gsId)) return true;
+                  return _normGi(st.name || '') === _normGi(gsName);
+                });
+                return { id: gsId, name: gsName, present: oldMatch ? !!oldMatch.present : false };
+              });
+            }
+          } catch (e) { /* per-session read failed */ }
         }
         if (sessionStudents.length === 0) {
           sessionStudents = studentList.map(s => ({
