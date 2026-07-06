@@ -15961,8 +15961,20 @@ window.repairAllAttendanceData = async (teacherIdOnly) => {
     totalSessionsChecked: 0, healthySessions: 0,
     missingSessions: 0, corruptedSessions: 0,
     restoredFromArchive: 0, restoredFromBackup: 0, restoredFromSessions: 0,
+    restoredFromPreRepairBackup: 0,
     preservedHealthy: 0, notRestorable: 0, errors: []
   };
+
+  // ── Auto-restore from attendancePreRepairBackup FIRST ──
+  try {
+    const bpSnap = await getDocs(collection(db, 'attendancePreRepairBackup'));
+    if (!bpSnap.empty) {
+      const bpBatch = writeBatch(db);
+      bpSnap.forEach(d => { bpBatch.set(doc(db, 'sessionAttendance', d.id), d.data()); R.restoredFromPreRepairBackup++; });
+      await bpBatch.commit();
+      console.log(`%c🔄 تمت استعادة ${R.restoredFromPreRepairBackup} وثيقة من الباك أب قبل التصليح`, 'color:#f59e0b;font-weight:800');
+    }
+  } catch (e) { console.warn('⚠️ فشل استعادة الباك أب:', e.message); }
 
   // ── Helper: backup a single session doc ──
   const backupDoc = async (ref, docId) => {
@@ -16101,38 +16113,16 @@ window.repairAllAttendanceData = async (teacherIdOnly) => {
         }
       }
 
-      // Source 4: any existing session docs — extract attendance status per student
+      // Source 4: any existing session docs — use each doc's own students AS-IS
       if (!source) {
-        // collect attendance status from ALL existing sessions (even corrupted ones)
-        const attMap = {}; // studentId_or_name → { presentCount, absentCount }
         let existingWithData = 0;
         for (let sn = 1; sn <= maxSn; sn++) {
           if (!existing[sn] || !existing[sn].exists) continue;
-          const exSnap = await getDoc(existing[sn].ref);
-          if (!exSnap.exists()) continue;
           existingWithData++;
-          const exData = exSnap.data();
-          (exData.students || []).forEach(st => {
-            const key = st.id || _normGi(st.name || '');
-            if (!key) return;
-            if (!attMap[key]) attMap[key] = { present: 0, absent: 0, id: st.id || '', name: st.name || '' };
-            if (st.present) attMap[key].present++;
-            else attMap[key].absent++;
-          });
         }
         if (existingWithData > 0) {
-          // Build a student list from the current group, carrying over attendance majority
-          // gs could be a string (name only) or object {id, name}
-          const recoveredStudents = groupStudents.map(gs => {
-            const gsName = (typeof gs === 'string') ? gs : (gs.name || '');
-            const gsId = (typeof gs === 'object' && gs !== null) ? (gs.id || '') : '';
-            const key = gsId || _normGi(gsName);
-            const found = attMap[key] || (gsId && attMap[gsName ? _normGi(gsName) : '']);
-            const wasPresent = found ? found.present > found.absent : false;
-            return { id: gsId, name: gsName, present: wasPresent };
-          });
-          source = { type: 'sessions', data: { students: recoveredStudents } };
-          sourceLabel = `📋 مسترجع من ${existingWithData} حصة موجودة (حتى لو تالفة)`;
+          source = { type: 'existingRaw' };
+          sourceLabel = `📋 استخدام ${existingWithData} حصة موجودة (بنفس بياناتها)`;
         }
       }
 
@@ -16143,7 +16133,7 @@ window.repairAllAttendanceData = async (teacherIdOnly) => {
       }
 
       let restoredCount = 0;
-      const studentList = source.data.students || [];
+      const studentList = source.data ? (source.data.students || []) : [];
 
       const batch = writeBatch(db);
       for (let sn = 1; sn <= maxSn; sn++) {
@@ -16157,30 +16147,29 @@ window.repairAllAttendanceData = async (teacherIdOnly) => {
         if (source.type === 'archive') {
           const arcSession = (source.data.sessions || {})[sn];
           if (arcSession && Array.isArray(arcSession)) sessionStudents = arcSession;
-        } else if (source.type === 'sessions' && existing[sn] && existing[sn].exists) {
-          // استرجاع من وثيقة الحصة نفسها — نقرا الحضور من الوثيقة القديمة لكل طالب
+        } else if (source.type === 'existingRaw' && existing[sn] && existing[sn].exists) {
+          // استرجاع من وثيقة الحصة نفسها — نستخدم قائمة الطلاب كما هي بدون تعديل
           try {
             const oldSnap = await getDoc(existing[sn].ref);
             if (oldSnap.exists()) {
               const oldData = oldSnap.data();
-              const oldStudents = oldData.students || [];
-              // ننشئ قائمة جديدة بطلاب الفوج الحالي، وننقل حالة الحضور من القديم
-              sessionStudents = groupStudents.map(gs => {
-                const gsName = (typeof gs === 'string') ? gs : (gs.name || '');
-                const gsId = (typeof gs === 'object' && gs !== null) ? (gs.id || '') : '';
-                const oldMatch = oldStudents.find(st => {
-                  if (gsId && st.id && String(st.id) === String(gsId)) return true;
-                  return _normGi(st.name || '') === _normGi(gsName);
-                });
-                return { id: gsId, name: gsName, present: oldMatch ? !!oldMatch.present : false };
-              });
+              sessionStudents = oldData.students || [];
             }
           } catch (e) { /* per-session read failed */ }
         }
         if (sessionStudents.length === 0) {
-          sessionStudents = studentList.map(s => ({
-            id: s.id || '', name: s.name || '', present: !!s.present
-          }));
+          if (source.type === 'existingRaw') {
+            // حصص ما عندها وثيقة قديمة — ننشئ قائمة من طلاب الفوج الحالي غائبين
+            sessionStudents = groupStudents.map(gs => {
+              const gsName = (typeof gs === 'string') ? gs : (gs.name || '');
+              const gsId = (typeof gs === 'object' && gs !== null) ? (gs.id || '') : '';
+              return { id: gsId, name: gsName, present: false };
+            });
+          } else {
+            sessionStudents = studentList.map(s => ({
+              id: s.id || '', name: s.name || '', present: !!s.present
+            }));
+          }
         }
 
         const newDocId = getSessionDocId(tid, gid, sn, cycleNum);
@@ -16240,6 +16229,7 @@ window.repairAllAttendanceData = async (teacherIdOnly) => {
   console.log(`📦 مسترجع من Archive: ${R.restoredFromArchive}`);
   console.log(`💾 مسترجع من Backup: ${R.restoredFromBackup}`);
   console.log(`📋 مسترجع من Session Docs: ${R.restoredFromSessions}`);
+  if (R.restoredFromPreRepairBackup > 0) console.log(`🔄 مسترجع من Pre‑Repair Backup: ${R.restoredFromPreRepairBackup}`);
   console.log(`🟢 حصص محفوظة (سليمة أصلاً): ${R.preservedHealthy}`);
   if (R.notRestorable > 0) console.log(`🔴 غير قابل للاسترجاع: ${R.notRestorable}`);
   if (R.errors.length) {
@@ -16259,6 +16249,26 @@ window.repairAllAttendanceData = async (teacherIdOnly) => {
   }
 
   return R;
+};
+
+// ── Restore from attendancePreRepairBackup ──
+window.restoreAttendanceFromBackup = async (teacherId) => {
+  let q = collection(db, 'attendancePreRepairBackup');
+  if (teacherId) {
+    q = query(q, where('__name__', '>=', teacherId), where('__name__', '<', teacherId + '|'));
+  }
+  const snap = await getDocs(q);
+  if (snap.empty) { console.log('⚠️ لا يوجد باك أب'); return 0; }
+  console.log(`✅ وجد ${snap.size} وثيقة في الباك أب`);
+  const batch = writeBatch(db);
+  let count = 0;
+  snap.forEach(d => {
+    batch.set(doc(db, 'sessionAttendance', d.id), d.data());
+    count++;
+  });
+  await batch.commit();
+  console.log(`✅ تمت استعادة ${count} وثيقة. اعمل رفرش`);
+  return count;
 };
 
 </script>
