@@ -19338,7 +19338,7 @@ window.setGreeting = function(name) {
 // ═══════════════════════════════════════════════════════════
 window.verifyAttendanceIntegrity = async () => {
   const results = [];
-  const teachers = window.allTeachers || window._allTeachers || [];
+  const teachers = window._allTeachersCache || window.allTeachers || window._allTeachers || [];
   if (!teachers.length) { console.log('⚠️ لا يوجد أساتذة'); return; }
   for (const t of teachers) {
     const teacherId = t.id;
@@ -19422,15 +19422,17 @@ window.repairAllAttendanceData = async (teacherIdOnly) => {
     return docIds === groupIds;
   };
 
-  const allT = window.allTeachers || window._allTeachers || [];
+  const allT = window._allTeachersCache || window.allTeachers || window._allTeachers || [];
   let teachers = allT;
   if (teacherIdOnly) {
     const found = teachers.find(t => t.id === teacherIdOnly);
-    if (!found) { console.warn(`⚠️ أستاذ بالمعرف "${teacherIdOnly}" غير موجود`); return R; }
+    if (!found) { console.warn(`⚠️ أستاذ بالمعرف "${teacherIdOnly}" غير موجود. تأكد من تحميل الأساتذة أولاً.`);
+      console.log('💡 تلميح: انتظر لحظة بعد تحميل الصفحة ثم اكتب: console.table(window._allTeachersCache)');
+      return R; }
     teachers = [found];
     console.log(`%c🔍 فحص الأستاذ فقط: ${found.name} (${teacherIdOnly})`, 'color:#2563EB;font-weight:800');
   }
-  if (!teachers.length) { console.warn('⚠️ allTeachers empty — cannot scan'); return R; }
+  if (!teachers.length) { console.warn('⚠️ allTeachers فارغ — لم يتم تحميل الأساتذة بعد. انتظر وحاول مجدداً.'); return R; }
 
   const mode = teacherIdOnly ? `TEACHER-SPECIFIC: ${teacherIdOnly}` : 'FULL SCAN';
   console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
