@@ -7723,12 +7723,9 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           const giMatch = d.id.match(/_g(\d+)_session_/);
           cacheKey = 'gi_' + (giMatch ? giMatch[1] : '0');
         }
-        // تجاهل سجلات الدورات غير الحالية
-        const expectedCycle = _cycleMap[gid] || 1;
-        if (docCycle !== expectedCycle) return;
         if (!window._attSummaryCache[teacherId][cacheKey]) window._attSummaryCache[teacherId][cacheKey] = {};
         window._attSummaryCache[teacherId][cacheKey][data.sessionNum] = data;
-        loadedDocs.push({ id: d.id, cacheKey, sn: data.sessionNum, cycle: docCycle, expected: expectedCycle, students: (data.students||[]).length });
+        loadedDocs.push({ id: d.id, cacheKey, sn: data.sessionNum, cycle: docCycle, students: (data.students||[]).length });
       });
       console.log(`[ATT] Loaded ${loadedDocs.length} session docs for ${teacherId}:`, loadedDocs.slice(0, 10));
       if (loadedDocs.length === 0) {
@@ -7775,8 +7772,6 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
             const giMatch = d.id.match(/_g(\d+)_session_/);
             cacheKey = 'gi_' + (giMatch ? giMatch[1] : '0');
           }
-          const expectedCycle = _cycleMap[gid] || 1;
-          if (docCycle !== expectedCycle) return;
           if (!serverData[cacheKey]) serverData[cacheKey] = {};
           serverData[cacheKey][data.sessionNum] = data;
           hasData = true;
@@ -16276,6 +16271,25 @@ window.checkActualAttendanceData = async (teacherId) => {
     console.log('%c🚨 ALL STUDENTS ABSENT IN ALL DOCS — data is corrupted!', 'color:#DC2626;font-weight:800;font-size:16px');
   } else if (totalPresent > 0) {
     console.log('%c✅ Some students have present=true — data has survived', 'color:#10B981;font-weight:800');
+  }
+};
+
+// ── Check old attendance collection ──
+window.checkOldAttendanceCollection = async (teacherId) => {
+  try {
+    const q = query(collection(db, 'attendance'), where('teacherId', '==', teacherId));
+    const snap = await getDocs(q);
+    if (snap.empty) { console.log('⚠️ لا توجد سجلات في attendance collection'); return; }
+    console.log(`✅ وجد ${snap.size} سجل في attendance collection:`);
+    snap.forEach(d => {
+      const data = d.data();
+      const students = data.students || {};
+      const presentCount = Object.values(students).filter(v => v === true).length;
+      const absentCount = Object.values(students).filter(v => v === false).length;
+      console.log(`  ${d.id}: gid=${data.gid} date=${data.date} present=${presentCount} absent=${absentCount}`);
+    });
+  } catch (e) {
+    console.error('❌ فشل فحص attendance collection:', e.message);
   }
 };
 
