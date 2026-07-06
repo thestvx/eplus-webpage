@@ -7647,28 +7647,24 @@ window.verifyAttendanceIntegrity = async () => {
 
 window._attSummaryCache = {}; // teacherId -> { gi: { sessionNum: data } }
 
-let _attLoadingLock = false;
 window.loadAttendanceSummary = async function(_teacherOverride) {
-  if (_attLoadingLock) { console.log('[ATT] Skipping reentrant call'); return; }
-  _attLoadingLock = true;
-  const _release = () => { _attLoadingLock = false; };
   const teacherId = _teacherOverride || document.getElementById('att-sum-teacher')?.value || '';
   const giFilter = document.getElementById('att-sum-group')?.value || '';
   const tbody = document.getElementById('att-sum-tbody');
-  if (!tbody) { _release(); return; }
+  if (!tbody) { return; }
 
   const delRow = document.getElementById('att-sum-del-row');
   if (!teacherId) {
     tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('att_choose_teacher') + '</td></tr>';
     if (delRow) delRow.style.display = 'none';
-    _release(); return;
+    return;
   }
 
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
   if (!teacher) {
     tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('teacher_not_found') + '</td></tr>';
     if (delRow) delRow.style.display = 'none';
-    _release(); return;
+    return;
   }
   if (delRow) delRow.style.display = '';
 
@@ -7789,8 +7785,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         if (hasData) {
           window._attSummaryCache[teacherId] = serverData;
         }
-        // Use setTimeout to avoid reentrancy lock (the current loadAttendanceSummary may still be rendering)
-        setTimeout(() => loadAttendanceSummary(teacherId), 0);
+        loadAttendanceSummary(teacherId);
       },
       err => console.warn('sessionAttendance listener error:', err.code)
     );
@@ -7886,7 +7881,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   const colspanNum = 4 + totalSessions + 1; // # + name + teacher + group + sessions + action
   if (!students.length) {
     tbody.innerHTML = '<tr><td colspan="' + colspanNum + '" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('no_students_for_teacher') + '</td></tr>';
-    _release(); return;
+    return;
   }
 
   // Build header showing all sessions
@@ -8289,7 +8284,6 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   }
   // تحديث قائمة غير المنتمين
   setTimeout(() => refreshUnassignedStudents(), 50);
-  _release();
 };
 
 // ─── تحديث الحصص وإعادة تحميلها ───
