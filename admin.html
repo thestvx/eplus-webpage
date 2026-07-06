@@ -16293,6 +16293,139 @@ window.checkOldAttendanceCollection = async (teacherId) => {
   }
 };
 
+// ── Check ALL backup sources for attendance data ──
+window.checkAllBackups = async (teacherId) => {
+  console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
+  console.log('%c  فحص جميع المصادر الاحتياطية', 'color:#2563EB;font-weight:800');
+  console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
+
+  // 1. attendanceBackups
+  try {
+    const q1 = query(collection(db, 'attendanceBackups'), where('teacherId', '==', teacherId));
+    const snap1 = await getDocs(q1);
+    if (!snap1.empty) {
+      console.log(`%c✅ attendanceBackups: ${snap1.size} نسخة`, 'color:#10B981;font-weight:800');
+      snap1.forEach(d => {
+        const data = d.data();
+        const sessions = data.sessions || {};
+        const sessionCount = Object.keys(sessions).length;
+        let totalPresent = 0, totalStudents = 0;
+        Object.values(sessions).forEach(s => {
+          (s.students || []).forEach(st => {
+            totalStudents++;
+            if (st.present) totalPresent++;
+          });
+        });
+        console.log(`  📦 ${d.id}: ${sessionCount} حصص, ${totalPresent}/${totalStudents} حاضر, timestamp=${data.timestamp}`);
+      });
+    } else {
+      console.log('⚠️ attendanceBackups: فارغ');
+    }
+  } catch (e) { console.error('❌ فشل فحص attendanceBackups:', e.message); }
+
+  // 2. sessionRebuilder_backups
+  try {
+    const snap2 = await getDocs(collection(db, 'sessionRebuilder_backups'));
+    if (!snap2.empty) {
+      console.log(`%c✅ sessionRebuilder_backups: ${snap2.size} نسخة`, 'color:#10B981;font-weight:800');
+      snap2.forEach(d => {
+        const data = d.data();
+        const backupData = data.data || {};
+        const sessionCount = Object.keys(backupData).length;
+        let totalPresent = 0, totalStudents = 0, matchingDocs = 0;
+        Object.entries(backupData).forEach(([docId, docData]) => {
+          if (docId.includes(teacherId)) {
+            matchingDocs++;
+            (docData.students || []).forEach(st => {
+              totalStudents++;
+              if (st.present) totalPresent++;
+            });
+          }
+        });
+        console.log(`  📦 ${d.id}: ${sessionCount} وثيقة إجمالي, ${matchingDocs} تطابق الأستاذ, ${totalPresent}/${totalStudents} حاضر`);
+      });
+    } else {
+      console.log('⚠️ sessionRebuilder_backups: فارغ');
+    }
+  } catch (e) { console.error('❌ فشل فحص sessionRebuilder_backups:', e.message); }
+
+  // 3. attendancePreRepairBackup
+  try {
+    const snap3 = await getDocs(collection(db, 'attendancePreRepairBackup'));
+    if (!snap3.empty) {
+      let matchingDocs = 0, totalPresent = 0, totalStudents = 0;
+      snap3.forEach(d => {
+        if (d.id.includes(teacherId)) {
+          matchingDocs++;
+          (d.data().students || []).forEach(st => {
+            totalStudents++;
+            if (st.present) totalPresent++;
+          });
+        }
+      });
+      console.log(`%c✅ attendancePreRepairBackup: ${matchingDocs} وثيقة تطابق, ${totalPresent}/${totalStudents} حاضر`, 'color:#10B981;font-weight:800');
+    } else {
+      console.log('⚠️ attendancePreRepairBackup: فارغ');
+    }
+  } catch (e) { console.error('❌ فشل فحص attendancePreRepairBackup:', e.message); }
+
+  console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
+};
+
+// ── Restore from attendanceBackups ──
+window.restoreFromAttendanceBackup = async (teacherId) => {
+  const q = query(collection(db, 'attendanceBackups'), where('teacherId', '==', teacherId));
+  const snap = await getDocs(q);
+  if (snap.empty) { console.log('⚠️ لا توجد نسخة احتياطية'); return 0; }
+
+  let best = null;
+  snap.forEach(d => {
+    const data = d.data();
+    if (!best || (data.timestamp || 0) > (best.timestamp || 0)) best = data;
+  });
+  if (!best) return 0;
+
+  const sessions = best.sessions || {};
+  const batch = writeBatch(db);
+  let count = 0;
+  Object.entries(sessions).forEach(([docId, docData]) => {
+    batch.set(doc(db, 'sessionAttendance', docId), docData);
+    count++;
+  });
+  await batch.commit();
+  console.log(`✅ تمت استعادة ${count} وثيقة من attendanceBackups — اعمل رفرش`);
+  return count;
+};
+
+// ── Restore from sessionRebuilder_backups ──
+window.restoreFromRebuilderBackup = async (teacherId) => {
+  const snap = await getDocs(collection(db, 'sessionRebuilder_backups'));
+  if (snap.empty) { console.log('⚠️ لا توجد نسخة rebuilder'); return 0; }
+
+  let best = null, bestMatching = 0;
+  snap.forEach(d => {
+    const data = d.data();
+    const backupData = data.data || {};
+    let matching = 0;
+    Object.keys(backupData).forEach(docId => { if (docId.includes(teacherId)) matching++; });
+    if (!best || matching > bestMatching) { best = data; bestMatching = matching; }
+  });
+  if (!best || bestMatching === 0) { console.log('⚠️ لا توجد وثائق تطابق الأستاذ'); return 0; }
+
+  const backupData = best.data || {};
+  const batch = writeBatch(db);
+  let count = 0;
+  Object.entries(backupData).forEach(([docId, docData]) => {
+    if (docId.includes(teacherId)) {
+      batch.set(doc(db, 'sessionAttendance', docId), docData);
+      count++;
+    }
+  });
+  await batch.commit();
+  console.log(`✅ تمت استعادة ${count} وثيقة من sessionRebuilder_backups — اعمل رفرش`);
+  return count;
+};
+
 // ── Restore from attendancePreRepairBackup ──
 window.restoreAttendanceFromBackup = async (teacherId) => {
   let q = collection(db, 'attendancePreRepairBackup');
