@@ -16251,6 +16251,34 @@ window.repairAllAttendanceData = async (teacherIdOnly) => {
   return R;
 };
 
+// ── Check actual attendance data in Firestore ──
+window.checkActualAttendanceData = async (teacherId) => {
+  const q = query(collection(db, 'sessionAttendance'), where('__name__', '>=', teacherId), where('__name__', '<', teacherId + '_\ufff0'));
+  const snap = await getDocs(q);
+  if (snap.empty) { console.log('⚠️ لا توجد وثائق'); return; }
+  let totalPresent = 0, totalAbsent = 0, totalStudents = 0, docCount = 0;
+  snap.forEach(d => {
+    const students = d.data().students || [];
+    const present = students.filter(s => s.present).length;
+    const absent = students.length - present;
+    totalPresent += present;
+    totalAbsent += absent;
+    totalStudents += students.length;
+    docCount++;
+    if (present === 0 && students.length > 0) {
+      console.log(`%c❌ ALL ABSENT: ${d.id}`, 'color:#EF4444;font-weight:800');
+    } else if (present > 0) {
+      console.log(`✅ ${d.id}: ${present}/${students.length} present`);
+    }
+  });
+  console.log(`\n📊 ${docCount} docs, ${totalPresent} present / ${totalAbsent} absent`);
+  if (totalPresent === 0 && totalStudents > 0) {
+    console.log('%c🚨 ALL STUDENTS ABSENT IN ALL DOCS — data is corrupted!', 'color:#DC2626;font-weight:800;font-size:16px');
+  } else if (totalPresent > 0) {
+    console.log('%c✅ Some students have present=true — data has survived', 'color:#10B981;font-weight:800');
+  }
+};
+
 // ── Restore from attendancePreRepairBackup ──
 window.restoreAttendanceFromBackup = async (teacherId) => {
   let q = collection(db, 'attendancePreRepairBackup');
