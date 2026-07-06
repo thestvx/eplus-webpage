@@ -7647,24 +7647,28 @@ window.verifyAttendanceIntegrity = async () => {
 
 window._attSummaryCache = {}; // teacherId -> { gi: { sessionNum: data } }
 
+let _attLoadingLock = false;
 window.loadAttendanceSummary = async function(_teacherOverride) {
+  if (_attLoadingLock) { console.log('[ATT] Skipping reentrant call'); return; }
+  _attLoadingLock = true;
+  const _release = () => { _attLoadingLock = false; };
   const teacherId = _teacherOverride || document.getElementById('att-sum-teacher')?.value || '';
   const giFilter = document.getElementById('att-sum-group')?.value || '';
   const tbody = document.getElementById('att-sum-tbody');
-  if (!tbody) return;
+  if (!tbody) { _release(); return; }
 
   const delRow = document.getElementById('att-sum-del-row');
   if (!teacherId) {
     tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('att_choose_teacher') + '</td></tr>';
     if (delRow) delRow.style.display = 'none';
-    return;
+    _release(); return;
   }
 
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
   if (!teacher) {
     tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('teacher_not_found') + '</td></tr>';
     if (delRow) delRow.style.display = 'none';
-    return;
+    _release(); return;
   }
   if (delRow) delRow.style.display = '';
 
@@ -7697,7 +7701,8 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       where('status', '==', 'current')
     ));
     cycleSnap.forEach(d => { const c = d.data(); _cycleMap[c.gid] = c.cycleNum || 1; });
-  } catch (e) { /* قد لا يوجد attendanceCycles بعد */ }
+    console.log(`[ATT] _cycleMap for ${teacherId}:`, JSON.stringify(_cycleMap));
+  } catch (e) { console.warn('[ATT] cycleMap query failed:', e.message); }
 
   // ── Load session attendance from Firestore if not cached ──
   if (!window._attSummaryCache[teacherId]) {
@@ -7708,6 +7713,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         where('teacherId', '>=', teacherId),
         where('teacherId', '<', teacherId + '_\ufff0')
       ));
+      const loadedDocs = [];
       sessSnap.forEach(d => {
         const data = d.data();
         if (!data.sessionNum) return;
@@ -7726,8 +7732,23 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         if (docCycle !== expectedCycle) return;
         if (!window._attSummaryCache[teacherId][cacheKey]) window._attSummaryCache[teacherId][cacheKey] = {};
         window._attSummaryCache[teacherId][cacheKey][data.sessionNum] = data;
+        loadedDocs.push({ id: d.id, cacheKey, sn: data.sessionNum, cycle: docCycle, expected: expectedCycle, students: (data.students||[]).length });
       });
-    } catch (e) { /* fallback */ }
+      console.log(`[ATT] Loaded ${loadedDocs.length} session docs for ${teacherId}:`, loadedDocs.slice(0, 10));
+      if (loadedDocs.length === 0) {
+        console.warn('[ATT] ⚠️ Zero session docs loaded — checking raw query...');
+        const rawSnap = await getDocs(query(
+          collection(db, 'sessionAttendance'),
+          where('teacherId', '>=', teacherId),
+          where('teacherId', '<', teacherId + '_\ufff0')
+        ));
+        console.warn(`[ATT] Raw query returned ${rawSnap.size} docs total`);
+        rawSnap.forEach(d => {
+          const raw = d.data();
+          console.warn(`[ATT]   doc=${d.id} teacherId=${raw.teacherId} gid=${raw.gid} cycleNum=${raw.cycleNum} sessionNum=${raw.sessionNum} students=${(raw.students||[]).length}`);
+        });
+      }
+    } catch (e) { console.warn('[ATT] Initial load failed:', e.message); }
   }
 
   // ── Real-time listener for sessionAttendance changes ──
@@ -7743,7 +7764,9 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       ),
       snap => {
         if (!window._attSummaryCache[teacherId]) return;
-        const newCache = {};
+        // دمج التغييرات بدلاً من الاستبدال الكامل — يمنع مسح الكاش إذا عاد Snapshot فارغاً
+        const serverData = {};
+        let hasData = false;
         snap.forEach(d => {
           const data = d.data();
           if (!data.sessionNum) return;
@@ -7756,14 +7779,16 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
             const giMatch = d.id.match(/_g(\d+)_session_/);
             cacheKey = 'gi_' + (giMatch ? giMatch[1] : '0');
           }
-          // تجاهل سجلات الدورات غير الحالية
           const expectedCycle = _cycleMap[gid] || 1;
           if (docCycle !== expectedCycle) return;
-          if (!newCache[cacheKey]) newCache[cacheKey] = {};
-          newCache[cacheKey][data.sessionNum] = data;
+          if (!serverData[cacheKey]) serverData[cacheKey] = {};
+          serverData[cacheKey][data.sessionNum] = data;
+          hasData = true;
         });
-        window._attSummaryCache[teacherId] = newCache;
-        // إعادة الرسم باستخدام الكاش (بدون query)
+        // فقط استبدل الكاش إذا كان Snapshot يحتوي على بيانات — يحمي من المسح غير المقصود
+        if (hasData) {
+          window._attSummaryCache[teacherId] = serverData;
+        }
         loadAttendanceSummary(teacherId);
       },
       err => console.warn('sessionAttendance listener error:', err.code)
@@ -8263,6 +8288,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   }
   // تحديث قائمة غير المنتمين
   setTimeout(() => refreshUnassignedStudents(), 50);
+  _release();
 };
 
 // ─── تحديث الحصص وإعادة تحميلها ───
@@ -19305,6 +19331,60 @@ window.setGreeting = function(name) {
   if (!el) return;
   el.setAttribute('data-name', name);
   el.textContent = t('greeting_prefix') + ' ' + name + ' 👋';
+};
+
+// ═══════════════════════════════════════════════════════════
+//  فحص سلامة بيانات الحضور — أداة تشخيص من Console
+// ═══════════════════════════════════════════════════════════
+window.verifyAttendanceIntegrity = async () => {
+  const results = [];
+  const teachers = allTeachers || [];
+  if (!teachers.length) { console.log('⚠️ لا يوجد أساتذة'); return; }
+  for (const t of teachers) {
+    const teacherId = t.id;
+    // جلب session docs لهذا الأستاذ
+    try {
+      const snap = await getDocs(query(
+        collection(db, 'sessionAttendance'),
+        where('teacherId', '>=', teacherId),
+        where('teacherId', '<', teacherId + '_\ufff0')
+      ));
+      const cycles = {};
+      snap.forEach(d => {
+        const data = d.data();
+        const gid = data.gid || extractGidFromDoc(d.id) || 'unknown';
+        const cycle = data.cycleNum || 1;
+        const sn = data.sessionNum || '?';
+        const students = (data.students || []).length;
+        if (!cycles[gid]) cycles[gid] = { docs: 0, students: 0, sessions: [], teacherIds: new Set() };
+        cycles[gid].docs++;
+        cycles[gid].students += students;
+        cycles[gid].sessions.push(sn);
+        cycles[gid].teacherIds.add(data.teacherId || 'missing');
+      });
+      console.log(`\n📊 ${t.name} (${teacherId}):`);
+      console.log(`   إجمالي ${snap.size} session docs`);
+      for (const [gid, info] of Object.entries(cycles)) {
+        const tids = [...info.teacherIds].join(', ');
+        const sessions = [...new Set(info.sessions)].sort((a,b) => a-b).join(',');
+        console.log(`   📁 فوج ${gid}: ${info.docs} docs, ~${info.students} تلميذ, حصص: ${sessions}`);
+        console.log(`      teacherId values: ${tids}`);
+        // تحقق من تطابق teacherId مع gid
+        info.teacherIds.forEach(tid => {
+          if (!tid.includes(gid) && !tid.includes('_g')) {
+            console.warn(`      ⚠️ teacherId "${tid}" لا يطابق gid "${gid}"`);
+          }
+        });
+      }
+      results.push({ teacher: t.name, id: teacherId, total: snap.size, cycles: Object.keys(cycles).length });
+    } catch (e) {
+      console.warn(`   ❌ ${t.name}: ${e.message}`);
+      results.push({ teacher: t.name, id: teacherId, error: e.message });
+    }
+  }
+  console.log('\n══════ نهاية الفحص ══════');
+  console.table(results);
+  return results;
 };
 
 // ═══════════════════════════════════════════════════════════
