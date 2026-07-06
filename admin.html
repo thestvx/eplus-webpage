@@ -15984,6 +15984,8 @@ window.repairAllAttendanceData = async (teacherIdOnly) => {
     return docIds === groupIds;
   };
 
+  const _normGi = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
   let teachers = allTeachers || [];
   if (teacherIdOnly) {
     const found = teachers.find(t => t.id === teacherIdOnly);
@@ -16099,6 +16101,38 @@ window.repairAllAttendanceData = async (teacherIdOnly) => {
         }
       }
 
+      // Source 4: any existing session docs — extract attendance status per student
+      if (!source) {
+        // collect attendance status from ALL existing sessions (even corrupted ones)
+        const attMap = {}; // studentId_or_name → { presentCount, absentCount }
+        let existingWithData = 0;
+        for (let sn = 1; sn <= maxSn; sn++) {
+          if (!existing[sn] || !existing[sn].exists) continue;
+          const exSnap = await getDoc(existing[sn].ref);
+          if (!exSnap.exists()) continue;
+          existingWithData++;
+          const exData = exSnap.data();
+          (exData.students || []).forEach(st => {
+            const key = st.id || _normGi(st.name || '');
+            if (!key) return;
+            if (!attMap[key]) attMap[key] = { present: 0, absent: 0, id: st.id || '', name: st.name || '' };
+            if (st.present) attMap[key].present++;
+            else attMap[key].absent++;
+          });
+        }
+        if (existingWithData > 0) {
+          // Build a student list from the current group, carrying over attendance majority
+          const recoveredStudents = groupStudents.map(gs => {
+            const key = gs.id || _normGi(gs.name || '');
+            const found = attMap[key];
+            const wasPresent = found ? found.present > found.absent : false;
+            return { id: gs.id || '', name: gs.name || '', present: wasPresent };
+          });
+          source = { type: 'sessions', data: { students: recoveredStudents } };
+          sourceLabel = `📋 مسترجع من ${existingWithData} حصة موجودة (حتى لو تالفة)`;
+        }
+      }
+
       if (!source) {
         R.notRestorable++;
         teacherLog.push(`     ❌ لا يوجد مصدر سليم للاسترجاع`);
@@ -16123,7 +16157,7 @@ window.repairAllAttendanceData = async (teacherIdOnly) => {
         }
         if (sessionStudents.length === 0) {
           sessionStudents = studentList.map(s => ({
-            id: s.id || '', name: s.name || '', status: 'absent'
+            id: s.id || '', name: s.name || '', present: !!s.present
           }));
         }
 
