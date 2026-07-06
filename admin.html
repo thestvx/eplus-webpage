@@ -16466,6 +16466,7 @@ window.diagnoseDisplay = (teacherId) => {
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
   if (!teacher) { console.log('⚠️ no teacher'); return; }
   const groups = teacher.groups || [];
+  const students = teacher.students || [];
 
   console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
   console.log('🔍 تشخيص العرض');
@@ -16477,28 +16478,54 @@ window.diagnoseDisplay = (teacherId) => {
     console.log(`  "${ck}": حصص ${sessions.join(', ')}`);
   }
 
-  console.log('\n📌 الفئات من teacher.groups:');
-  groups.forEach((g, gi) => {
-    console.log(`  gi=${gi}: name="${g.name}" _gid="${g._gid || ''}" students=${(g.students||[]).length}`);
+  // Replicate the EXACT same allStudents building logic as the render code
+  const allStudents = [];
+  const matchedNames = new Set();
+  const normName = n => (n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const namesMatchLocal = (a, b) => {
+    const an = normName(a), bn = normName(b);
+    if (an === bn) return true;
+    const ap = an.split(/\s+/).filter(Boolean), bp = bn.split(/\s+/).filter(Boolean);
+    if (ap.length === bp.length) return [...ap].sort().join(' ') === [...bp].sort().join(' ');
+    const [shorter, longer] = ap.length <= bp.length ? [ap, bp] : [bp, ap];
+    if (shorter.length < 2) return false;
+    return longer.join(' ').startsWith(shorter.join(' ') + ' ');
+  };
+
+  for (let gi = 0; gi < groups.length; gi++) {
+    const g = groups[gi];
+    if (!g) continue;
+    const gid = g._gid || '';
+    (g.students || []).forEach(sName => {
+      let match = students.find(s => namesMatchLocal(s.name, sName));
+      if (match) matchedNames.add(normName(match.name || ''));
+      allStudents.push({ id: match ? match.id : '', name: match ? match.name : sName, group: g.name || '', gid, groupGi: gi, groupGid: gid });
+    });
+  }
+  students.forEach(s => {
+    if (matchedNames.has(normName(s.name || ''))) return;
+    let groupGi = 0, groupGid = '';
+    groups.forEach((g, idx) => {
+      if ((g.students || []).some(gs => namesMatchLocal(gs, s.name))) {
+        groupGi = idx; groupGid = g._gid || '';
+      }
+    });
+    allStudents.push({ id: s.id || '', name: s.name || '—', group: groups[groupGi]?.name || '', gid: groupGid, groupGi, groupGid });
   });
 
-  // Simulate render logic for each group
+  console.log(`\n📌 allStudents مبني بالطريقة الصحيحة: ${allStudents.length} طالب`);
+
+  // Group by groupGi
   const grouped = {};
-  (teacher.students || []).forEach(s => {
+  allStudents.forEach(s => {
     const dk = s.groupGi;
-    if (!grouped[dk]) {
-      let gidVal = (groups[dk] && groups[dk]._gid) || '';
-      if (!gidVal && s.gid && !/^gi_\d+$/.test(s.gid)) gidVal = s.gid;
-      grouped[dk] = { group: s.group || (groups[dk] && groups[dk].name) || '—', gi: dk, gid: gidVal, students: [] };
-    }
+    if (!grouped[dk]) grouped[dk] = { gid: s.gid || '', students: [] };
     grouped[dk].students.push(s);
   });
 
-  console.log('\n📌 المجموعات المُجمّعة:');
   for (const dk of Object.keys(grouped)) {
     const g = grouped[dk];
-    console.log(`  gi=${dk}: gid="${g.gid}" students=${g.students.length}`);
-    // Simulate groupSessions merge
+    console.log(`\n%c📁 gi=${dk}: gid="${g.gid}" students=${g.students.length}`, 'font-weight:800');
     const s0 = g.students[0] || {};
     const groupSessions = Object.assign({},
       cache[g.gid] || {},
@@ -16507,20 +16534,19 @@ window.diagnoseDisplay = (teacherId) => {
       cache['gi_' + dk] || {}
     );
     const sKeys = Object.keys(groupSessions).sort((a,b) => a-b);
-    console.log(`    groupSessions keys: ${sKeys.join(', ')}`);
+    console.log(`    groupSessions keys: [${sKeys.join(', ')}]`);
     for (let sn = 1; sn <= 12; sn++) {
       const rec = groupSessions[sn];
-      if (!rec) {
-        console.log(`    حصة ${sn}: ❌ لا يوجد rec`);
-        continue;
-      }
+      if (!rec) { console.log(`    حصة ${sn}: ❌ لا يوجد rec`); continue; }
       const stCount = (rec.students || []).length;
       const present = (rec.students || []).filter(s => s.present).length;
-      const gid = rec.gid || 'NONE';
-      // Check first student
       const firstSt = g.students[0];
-      const found = (rec.students || []).find(st => (st.id && st.id === firstSt.id) || (st.name && st.name === firstSt.name));
-      console.log(`    حصة ${sn}: ${present}/${stCount} حاضر gid="${gid}" student0="${firstSt.name}" found=${found ? '✅' : '❌ NOT FOUND'}`);
+      if (!firstSt) { console.log(`    حصة ${sn}: ${present}/${stCount} (لا تلاميذ)`); continue; }
+      const sId = firstSt.id || '';
+      let found = null;
+      if (sId) found = (rec.students || []).find(st => String(st.id || '') === sId);
+      if (!found) found = (rec.students || []).find(st => namesMatchLocal(st.name || '', firstSt.name || ''));
+      console.log(`    حصة ${sn}: ${present}/${stCount} حاضر | student0="${firstSt.name}" found=${found ? '✅ present=' + found.present : '❌ NOT FOUND'}`);
     }
   }
 };
