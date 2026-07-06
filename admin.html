@@ -16417,6 +16417,49 @@ window.restoreFromAttendanceBackup = async (teacherId) => {
   return count;
 };
 
+// ── Fix gid for restored docs with unknown gid ──
+window.fixRestoredDocGids = async (teacherId) => {
+  const q = query(collection(db, 'sessionAttendance'), where('__name__', '>=', teacherId), where('__name__', '<', teacherId + '_\ufff0'));
+  const snap = await getDocs(q);
+  
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { console.log('⚠️ الأستاذ غير موجود'); return 0; }
+  const groups = teacher.groups || [];
+  
+  const expectedDocs = {};
+  for (const g of groups) {
+    if (!g || !g._gid) continue;
+    const gid = g._gid;
+    for (let sn = 1; sn <= 12; sn++) {
+      const docId = `${teacherId}_${gid}_session_${sn}`;
+      expectedDocs[docId] = { gid, sn };
+    }
+  }
+  
+  const batch = writeBatch(db);
+  let fixedCount = 0;
+  
+  snap.forEach(d => {
+    const data = d.data();
+    const docId = d.id;
+    const currentGid = data.gid;
+    const match = expectedDocs[docId];
+    if (match && (!currentGid || currentGid === 'unknown' || currentGid !== match.gid)) {
+      console.log(`  ${docId}: gid "${currentGid}" → "${match.gid}" (${(data.students||[]).length} طالب)`);
+      batch.update(d.ref, { gid: match.gid });
+      fixedCount++;
+    }
+  });
+  
+  if (fixedCount > 0) {
+    await batch.commit();
+    console.log(`%c✅ تم إصلاح ${fixedCount} وثيقة gid`, 'color:#10B981;font-weight:800');
+  } else {
+    console.log('✅ كل الوثائق gid صحيح');
+  }
+  return fixedCount;
+};
+
 // ── Compare backup vs current cache ──
 window.compareBackupVsCache = async (teacherId) => {
   console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
