@@ -16596,32 +16596,6 @@ window.migrateAttendanceDocs = async (teacherId) => {
   console.log(`✅ تم: ${createdCount} وثيقة جديدة, ${deletedCount} وثيقة محذوفة`);
   console.log(`📌 اعمل رفرش للصفحة`);
 };
-  const q = query(collection(db, 'sessionAttendance'), where('__name__', '>=', teacherId), where('__name__', '<', teacherId + '_\ufff0'));
-  const snap = await getDocs(q);
-  console.log(`%c══════════════════════════════════════════`, 'color:#2563EB;font-weight:800');
-  console.log(`📋 كل وثائق sessionAttendance: ${snap.size} وثيقة`);
-  console.log(`%c══════════════════════════════════════════`, 'color:#2563EB;font-weight:800');
-  
-  const byGid = {};
-  snap.forEach(d => {
-    const data = d.data();
-    const gid = data.gid || 'NONE';
-    const sn = data.sessionNum || '?';
-    const present = (data.students || []).filter(s => s.present).length;
-    const total = (data.students || []).length;
-    if (!byGid[gid]) byGid[gid] = [];
-    byGid[gid].push({ docId: d.id, sn, present, total, cycleNum: data.cycleNum });
-  });
-  
-  Object.entries(byGid).sort().forEach(([gid, docs]) => {
-    const tp = docs.reduce((s,d) => s + d.present, 0);
-    const tt = docs.reduce((s,d) => s + d.total, 0);
-    console.log(`\n%c📁 gid="${gid}" — ${docs.length} حصص, ${tp}/${tt} حاضر`, 'font-weight:800');
-    docs.sort((a,b) => a.sn - b.sn).forEach(d => {
-      console.log(`  حصة ${d.sn}: ${d.present}/${d.total} حاضر | docId=${d.docId} cycle=${d.cycleNum}`);
-    });
-  });
-};
 
 // ── Compare backup vs current cache ──
 window.compareBackupVsCache = async (teacherId) => {
