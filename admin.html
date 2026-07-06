@@ -16386,15 +16386,97 @@ window.restoreFromAttendanceBackup = async (teacherId) => {
   if (!best) return 0;
 
   const sessions = best.sessions || {};
+  const docIds = Object.keys(sessions);
+  console.log(`%c📦 الباك أب يحتوي ${docIds.length} وثيقة:`, 'color:#2563EB;font-weight:800');
+  
   const batch = writeBatch(db);
   let count = 0;
+  const gidsInBackup = {};
   Object.entries(sessions).forEach(([docId, docData]) => {
+    const gid = docData.gid || 'unknown';
+    if (!gidsInBackup[gid]) gidsInBackup[gid] = [];
+    const present = (docData.students || []).filter(s => s.present).length;
+    const total = (docData.students || []).length;
+    gidsInBackup[gid].push({ docId, sn: docData.sessionNum, present, total });
     batch.set(doc(db, 'sessionAttendance', docId), docData);
     count++;
   });
+  
+  console.log('%c📊 الأفواج في الباك أب:', 'color:#2563EB;font-weight:800');
+  Object.entries(gidsInBackup).forEach(([gid, docs]) => {
+    const totalPresent = docs.reduce((s, d) => s + d.present, 0);
+    const totalStudents = docs.reduce((s, d) => s + d.total, 0);
+    console.log(`  gid=${gid}: ${docs.length} حصص, ${totalPresent}/${totalStudents} حاضر`);
+    docs.sort((a,b) => a.sn - b.sn).forEach(d => {
+      console.log(`    session ${d.sn}: ${d.present}/${d.total} حاضر`);
+    });
+  });
+  
   await batch.commit();
-  console.log(`✅ تمت استعادة ${count} وثيقة من attendanceBackups — اعمل رفرش`);
+  console.log(`✅ تمت استعادة ${count} وثيقة — اعمل رفرش`);
   return count;
+};
+
+// ── Compare backup vs current cache ──
+window.compareBackupVsCache = async (teacherId) => {
+  console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
+  
+  // Get current cache
+  const cache = window._attSummaryCache?.[teacherId] || {};
+  console.log('%c📋 الكاش الحالي:', 'color:#2563EB;font-weight:800');
+  let cachePresent = 0, cacheTotal = 0;
+  Object.entries(cache).forEach(([gid, sessions]) => {
+    let gPresent = 0, gTotal = 0;
+    Object.entries(sessions).forEach(([sn, data]) => {
+      (data.students || []).forEach(s => { gTotal++; if (s.present) gPresent++; });
+    });
+    cachePresent += gPresent;
+    cacheTotal += gTotal;
+    console.log(`  gid=${gid}: ${Object.keys(sessions).length} حصص, ${gPresent}/${gTotal} حاضر`);
+  });
+  console.log(`  الإجمالي: ${cachePresent}/${cacheTotal} حاضر`);
+  
+  // Get best backup
+  const q = query(collection(db, 'attendanceBackups'), where('teacherId', '==', teacherId));
+  const snap = await getDocs(q);
+  if (snap.empty) { console.log('⚠️ لا يوجد باك أب'); return; }
+  
+  let best = null;
+  snap.forEach(d => {
+    const data = d.data();
+    if (!best || (data.timestamp || 0) > (best.timestamp || 0)) best = data;
+  });
+  
+  const sessions = best.sessions || {};
+  console.log('%c📦 الباك أب:', 'color:#F59E0B;font-weight:800');
+  let backupPresent = 0, backupTotal = 0;
+  const backupGids = {};
+  Object.entries(sessions).forEach(([docId, docData]) => {
+    const gid = docData.gid || 'unknown';
+    if (!backupGids[gid]) backupGids[gid] = { present: 0, total: 0, sessions: [] };
+    const present = (docData.students || []).filter(s => s.present).length;
+    const total = (docData.students || []).length;
+    backupGids[gid].present += present;
+    backupGids[gid].total += total;
+    backupGids[gid].sessions.push(docData.sessionNum);
+    backupPresent += present;
+    backupTotal += total;
+  });
+  Object.entries(backupGids).forEach(([gid, d]) => {
+    console.log(`  gid=${gid}: ${d.sessions.length} حصص, ${d.present}/${d.total} حاضر`);
+  });
+  console.log(`  الإجمالي: ${backupPresent}/${backupTotal} حاضر`);
+  
+  console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
+  
+  // Compare
+  if (backupPresent > cachePresent) {
+    console.log(`%c✅ الباك أب يحتوي حضور أكثر: ${backupPresent} vs ${cachePresent}`, 'color:#10B981;font-weight:800');
+  } else if (backupPresent === cachePresent) {
+    console.log(`%c⚠️ الباك أب والمصدر الحالي متساويين: ${backupPresent}`, 'color:#F59E0B;font-weight:800');
+  } else {
+    console.log(`%c❌ المصدر الحالي يحتوي حضور أكثر: ${cachePresent} vs ${backupPresent}`, 'color:#EF4444;font-weight:800');
+  }
 };
 
 // ── Restore from sessionRebuilder_backups ──
