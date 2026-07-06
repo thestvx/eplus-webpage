@@ -15952,6 +15952,262 @@ window.notifLoadHistory = async function() {
   }
 };
 
+// ═══════════════════════════════════════════════════════════
+//  COMPREHENSIVE ATTENDANCE DATA REPAIR
+// ═══════════════════════════════════════════════════════════
+// Run from console AFTER deploying:
+//   repairAllAttendanceData()          — فحص جميع الأساتذة
+//   repairAllAttendanceData("TID123")  — فحص أستاذ معين فقط
+window.repairAllAttendanceData = async (teacherIdOnly) => {
+  const R = {
+    teachersScanned: 0, teachersWithIssues: 0,
+    totalSessionsChecked: 0, healthySessions: 0,
+    missingSessions: 0, corruptedSessions: 0,
+    restoredFromArchive: 0, restoredFromBackup: 0, restoredFromSessions: 0,
+    preservedHealthy: 0, notRestorable: 0, errors: []
+  };
+
+  // ── Helper: backup a single session doc ──
+  const backupDoc = async (ref, docId) => {
+    try {
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      const backupRef = doc(db, 'attendancePreRepairBackup', docId);
+      await setDoc(backupRef, { ...snap.data(), _backupedAt: serverTimestamp() });
+    } catch (e) { /* silent */ }
+  };
+
+  // ── Helper: determine if a session doc is healthy ──
+  const isHealthyDoc = (data, groupStudents) => {
+    if (!data || !data.sessionNum) return false;
+    const students = data.students || [];
+    if (students.length === 0) return false;
+    const docIds = students.map(s => s.id || '').filter(Boolean).sort().join(',');
+    const groupIds = groupStudents.map(s => s.id || '').filter(Boolean).sort().join(',');
+    return docIds === groupIds;
+  };
+
+  let teachers = allTeachers || [];
+  if (teacherIdOnly) {
+    const found = teachers.find(t => t.id === teacherIdOnly);
+    if (!found) { console.warn(`⚠️ أستاذ بالمعرف "${teacherIdOnly}" غير موجود. تأكد من تحميل الأساتذة أولاً.`); return R; }
+    teachers = [found];
+    console.log(`%c🔍 فحص الأستاذ فقط: ${found.name} (${teacherIdOnly})`, 'color:#2563EB;font-weight:800');
+  }
+  if (!teachers.length) { console.warn('⚠️ allTeachers فارغ — لم يتم تحميل الأساتذة بعد. انتظر وحاول مجدداً.'); return R; }
+
+  const mode = teacherIdOnly ? `TEACHER-SPECIFIC: ${teacherIdOnly}` : 'FULL SCAN';
+  console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
+  console.log(`%c  ATTENDANCE REPAIR — ${mode} STARTING`, 'color:#2563EB;font-weight:800');
+  console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
+
+  for (const teacher of teachers) {
+    const tid = teacher.id;
+    if (!tid) continue;
+    R.teachersScanned++;
+    const tName = teacher.name || tid;
+    const groups = teacher.groups || [];
+    let teacherHasIssue = false;
+    const teacherLog = [];
+
+    for (const g of groups) {
+      if (!g || !g._gid) continue;
+      const gid = g._gid;
+      const groupStudents = g.students || [];
+      const maxSn = CYCLE_SESSION_COUNT || 12;
+      let cycleNum;
+
+      try { cycleNum = await _getCurrentCycleNum(tid, gid) || 1; } catch (e) { cycleNum = 1; }
+
+      // ── Scan current sessionAttendance docs ──
+      const existing = {};
+      let healthy = 0, corrupted = 0, missing = 0;
+
+      for (let sn = 1; sn <= maxSn; sn++) {
+        R.totalSessionsChecked++;
+        const docId = getSessionDocId(tid, gid, sn, cycleNum);
+        const ref = doc(db, 'sessionAttendance', docId);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          const data = snap.data();
+          const h = isHealthyDoc(data, groupStudents);
+          existing[sn] = { ref, docId, healthy: h, students: (data.students || []).length, cycle: data.cycleNum || 1 };
+          if (h) { healthy++; R.healthySessions++; } else { corrupted++; R.corruptedSessions++; }
+        } else {
+          existing[sn] = { ref, docId, healthy: false, exists: false };
+          missing++;
+          R.missingSessions++;
+        }
+      }
+
+      if (corrupted === 0 && missing === 0) {
+        R.preservedHealthy += maxSn;
+        continue;
+      }
+
+      teacherHasIssue = true;
+      teacherLog.push(`  📁 ${g.name || gid}: ${healthy} صحية / ${corrupted} تالفة / ${missing} مفقودة`);
+
+      // ── Find clean source ──
+      let source = null;
+      let sourceLabel = '';
+
+      // Source 1: attendanceArchive
+      try {
+        const aSnap = await getDocs(query(
+          collection(db, 'attendanceArchive'),
+          where('teacherId', '==', tid),
+          where('gid', '==', gid)
+        ));
+        if (!aSnap.empty) {
+          let best = null;
+          aSnap.forEach(d => {
+            const ddata = d.data();
+            if (!best || (ddata.cycleNum || 0) > (best.cycleNum || 0)) best = ddata;
+          });
+          const arcStudents = (best.students || []).length;
+          const arcSessions = Object.keys(best.sessions || {}).length;
+          if (arcStudents > 0 && arcSessions > 0) {
+            source = { type: 'archive', data: best };
+            sourceLabel = `📦 attendanceArchive (${arcStudents} تلميذ, ${arcSessions} حصة)`;
+          }
+        }
+      } catch (e) { /* archive query failed */ }
+
+      // Source 2: groupBackup
+      if (!source) {
+        try {
+          const gbSnap = await getDoc(doc(db, 'settings', 'groupBackup_' + tid));
+          if (gbSnap.exists()) {
+            const gb = gbSnap.data();
+            const bg = (gb.groups || []).find(gg => gg && gg._gid === gid);
+            if (bg && (bg.students || []).length > 0) {
+              source = { type: 'backup', data: bg, savedAt: gb.savedAt };
+              sourceLabel = `💾 groupBackup (${(bg.students||[]).length} تلميذ)`;
+            }
+          }
+        } catch (e) { /* backup query failed */ }
+      }
+
+      // Source 3: existing healthy sessions
+      if (!source) {
+        const healthySessions = Object.entries(existing).filter(([sn, e]) => e.healthy).map(([sn]) => parseInt(sn));
+        if (healthySessions.length > 2) {
+          const refSnap = await getDoc(existing[healthySessions[0]].ref);
+          if (refSnap.exists()) {
+            const refData = refSnap.data();
+            source = { type: 'sessions', data: refData, refSession: healthySessions[0] };
+            sourceLabel = `📋 healthy session ${healthySessions[0]} (${(refData.students||[]).length} تلميذ)`;
+          }
+        }
+      }
+
+      if (!source) {
+        R.notRestorable++;
+        teacherLog.push(`     ❌ لا يوجد مصدر سليم للاسترجاع`);
+        continue;
+      }
+
+      let restoredCount = 0;
+      const studentList = source.data.students || [];
+
+      const batch = writeBatch(db);
+      for (let sn = 1; sn <= maxSn; sn++) {
+        if (existing[sn] && existing[sn].healthy) continue;
+
+        if (existing[sn] && existing[sn].exists) {
+          try { await backupDoc(existing[sn].ref, existing[sn].docId); } catch (e) { /* ignore */ }
+        }
+
+        let sessionStudents = [];
+        if (source.type === 'archive') {
+          const arcSession = (source.data.sessions || {})[sn];
+          if (arcSession && Array.isArray(arcSession)) sessionStudents = arcSession;
+        }
+        if (sessionStudents.length === 0) {
+          sessionStudents = studentList.map(s => ({
+            id: s.id || '', name: s.name || '', status: 'absent'
+          }));
+        }
+
+        const newDocId = getSessionDocId(tid, gid, sn, cycleNum);
+        const newRef = doc(db, 'sessionAttendance', newDocId);
+        batch.set(newRef, {
+          teacherId: tid + '_' + gid,
+          gid,
+          sessionNum: sn,
+          cycleNum,
+          date: new Date().toISOString().slice(0, 10),
+          students: sessionStudents,
+          savedAt: serverTimestamp()
+        });
+        restoredCount++;
+      }
+
+      if (source.type === 'archive') {
+        const ctrls = source.data.sessionControls || {};
+        for (let sn = 1; sn <= maxSn; sn++) {
+          const ctrl = ctrls[sn];
+          if (ctrl) {
+            const ctrlDocId = getCtrlDocId(tid, gid, sn);
+            const ctrlRef = doc(db, 'sessionControl', ctrlDocId);
+            batch.set(ctrlRef, { ...ctrl, savedAt: serverTimestamp() });
+          }
+        }
+      }
+
+      try {
+        await batch.commit();
+        if (source.type === 'archive') R.restoredFromArchive += restoredCount;
+        else if (source.type === 'backup') R.restoredFromBackup += restoredCount;
+        else R.restoredFromSessions += restoredCount;
+        teacherLog.push(`     ✅ استرجاع ${restoredCount} حصة من ${sourceLabel}`);
+      } catch (e) {
+        R.errors.push({ tid, gid, error: e.message });
+        teacherLog.push(`     ❌ فشل الاسترجاع: ${e.message}`);
+      }
+    }
+
+    if (teacherHasIssue) {
+      R.teachersWithIssues++;
+      console.log(`\n👤 ${tName} (${tid}):`);
+      teacherLog.forEach(l => console.log(l));
+    }
+  }
+
+  console.log('\n%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
+  console.log(`%c  REPAIR COMPLETE — ${teacherIdOnly ? 'TEACHER: ' + teacherIdOnly : 'REPORT'}`, 'color:#2563EB;font-weight:800');
+  console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
+  console.log(`📊 الأساتذة المفحوصين: ${R.teachersScanned}`);
+  if (R.teachersWithIssues > 0) console.log(`⚠️  أساتذة بمشاكل: ${R.teachersWithIssues}`);
+  console.log(`📋 إجمالي الحصص المفحوصة: ${R.totalSessionsChecked}`);
+  console.log(`✅ حصص سليمة: ${R.healthySessions}`);
+  console.log(`❌ حصص تالفة: ${R.corruptedSessions}`);
+  console.log(`⬜ حصص مفقودة: ${R.missingSessions}`);
+  console.log(`📦 مسترجع من Archive: ${R.restoredFromArchive}`);
+  console.log(`💾 مسترجع من Backup: ${R.restoredFromBackup}`);
+  console.log(`📋 مسترجع من Session Docs: ${R.restoredFromSessions}`);
+  console.log(`🟢 حصص محفوظة (سليمة أصلاً): ${R.preservedHealthy}`);
+  if (R.notRestorable > 0) console.log(`🔴 غير قابل للاسترجاع: ${R.notRestorable}`);
+  if (R.errors.length) {
+    console.log(`\n❌ أخطاء:`);
+    R.errors.forEach(e => console.log(`   ${e.tid}/${e.gid}: ${e.error}`));
+  }
+  console.log(`\n📌 ملخص: تم استرجاع ${R.restoredFromArchive + R.restoredFromBackup + R.restoredFromSessions} حصة` +
+    ` من أصل ${R.corruptedSessions + R.missingSessions} تالفة/مفقودة.` +
+    ` الباقي: ${R.notRestorable} غير قابل للاسترجاع.`);
+
+  if (R.restoredFromArchive + R.restoredFromBackup + R.restoredFromSessions > 0) {
+    console.log('\n⚠️  تم الاسترجاع. للتحقق:');
+    console.log('   1. افتح أي أستاذ/فوج في جدول الحضور');
+    console.log('   2. تحقق من ظهور جميع الحصص');
+    console.log('   3. جرب تعديل خلية وحفظها');
+    console.log('   4. اختبر من حساب الأستاذ أيضاً');
+  }
+
+  return R;
+};
+
 </script>
 <!-- ===== MESSAGING MODAL ===== -->
 <div class="msg-modal-bg" id="msg-modal-bg">
@@ -19385,278 +19641,6 @@ window.verifyAttendanceIntegrity = async () => {
   console.log('\n══════ نهاية الفحص ══════');
   console.table(results);
   return results;
-};
-
-// ═══════════════════════════════════════════════════════════
-//  COMPREHENSIVE ATTENDANCE DATA REPAIR
-// ═══════════════════════════════════════════════════════════
-// Run from console AFTER deploying:
-//   repairAllAttendanceData()          — فحص جميع الأساتذة
-//   repairAllAttendanceData("TID123")  — فحص أستاذ معين فقط
-window.repairAllAttendanceData = async (teacherIdOnly) => {
-  const R = {
-    teachersScanned: 0, teachersWithIssues: 0,
-    totalSessionsChecked: 0, healthySessions: 0,
-    missingSessions: 0, corruptedSessions: 0,
-    restoredFromArchive: 0, restoredFromBackup: 0, restoredFromSessions: 0,
-    preservedHealthy: 0, notRestorable: 0, errors: []
-  };
-
-  // ── Helper: backup a single session doc ──
-  const backupDoc = async (ref, docId) => {
-    try {
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return;
-      const backupRef = doc(db, 'attendancePreRepairBackup', docId);
-      await setDoc(backupRef, { ...snap.data(), _backupedAt: serverTimestamp() });
-    } catch (e) { /* silent */ }
-  };
-
-  const CYCLE_SESSION_COUNT = 12; // constant from another script tag, redefined here for cross-script access
-
-  // ── Helper: determine if a session doc is healthy ──
-  const isHealthyDoc = (data, groupStudents) => {
-    if (!data || !data.sessionNum) return false;
-    const students = data.students || [];
-    if (students.length === 0) return false;
-    const docIds = students.map(s => s.id || '').filter(Boolean).sort().join(',');
-    const groupIds = groupStudents.map(s => s.id || '').filter(Boolean).sort().join(',');
-    return docIds === groupIds;
-  };
-
-  const allT = window._allTeachersCache || window.allTeachers || window._allTeachers || [];
-  let teachers = allT;
-  if (teacherIdOnly) {
-    const found = teachers.find(t => t.id === teacherIdOnly);
-    if (!found) { console.warn(`⚠️ أستاذ بالمعرف "${teacherIdOnly}" غير موجود. تأكد من تحميل الأساتذة أولاً.`);
-      console.log('💡 تلميح: انتظر لحظة بعد تحميل الصفحة ثم اكتب: console.table(window._allTeachersCache)');
-      return R; }
-    teachers = [found];
-    console.log(`%c🔍 فحص الأستاذ فقط: ${found.name} (${teacherIdOnly})`, 'color:#2563EB;font-weight:800');
-  }
-  if (!teachers.length) { console.warn('⚠️ allTeachers فارغ — لم يتم تحميل الأساتذة بعد. انتظر وحاول مجدداً.'); return R; }
-
-  const mode = teacherIdOnly ? `TEACHER-SPECIFIC: ${teacherIdOnly}` : 'FULL SCAN';
-  console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
-  console.log(`%c  ATTENDANCE REPAIR — ${mode} STARTING`, 'color:#2563EB;font-weight:800');
-  console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
-
-  for (const teacher of teachers) {
-    const tid = teacher.id;
-    if (!tid) continue;
-    R.teachersScanned++;
-    const tName = teacher.name || tid;
-    const groups = teacher.groups || [];
-    let teacherHasIssue = false;
-    const teacherLog = [];
-
-    for (const g of groups) {
-      if (!g || !g._gid) continue;
-      const gid = g._gid;
-      const groupStudents = g.students || [];
-      const maxSn = CYCLE_SESSION_COUNT || 12;
-      let cycleNum;
-
-      try { cycleNum = await _getCurrentCycleNum(tid, gid) || 1; } catch (e) { cycleNum = 1; }
-
-      // ── Scan current sessionAttendance docs ──
-      const existing = {};
-      let healthy = 0, corrupted = 0, missing = 0;
-
-      for (let sn = 1; sn <= maxSn; sn++) {
-        R.totalSessionsChecked++;
-        const docId = getSessionDocId(tid, gid, sn, cycleNum);
-        const ref = doc(db, 'sessionAttendance', docId);
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          const data = snap.data();
-          const h = isHealthyDoc(data, groupStudents);
-          existing[sn] = { ref, docId, healthy: h, students: (data.students || []).length, cycle: data.cycleNum || 1 };
-          if (h) { healthy++; R.healthySessions++; } else { corrupted++; R.corruptedSessions++; }
-        } else {
-          existing[sn] = { ref, docId, healthy: false, exists: false };
-          missing++;
-          R.missingSessions++;
-        }
-      }
-
-      if (corrupted === 0 && missing === 0) {
-        R.preservedHealthy += maxSn;
-        continue; // all healthy
-      }
-
-      teacherHasIssue = true;
-      teacherLog.push(`  📁 ${g.name || gid}: ${healthy} صحية / ${corrupted} تالفة / ${missing} مفقودة`);
-
-      // ── Find clean source ──
-      let source = null; // { type: 'archive'|'backup'|'sessions', data: ... }
-      let sourceLabel = '';
-
-      // Source 1: attendanceArchive (most complete)
-      try {
-        const aSnap = await getDocs(query(
-          collection(db, 'attendanceArchive'),
-          where('teacherId', '==', tid),
-          where('gid', '==', gid)
-        ));
-        if (!aSnap.empty) {
-          let best = null;
-          aSnap.forEach(d => {
-            const ddata = d.data();
-            if (!best || (ddata.cycleNum || 0) > (best.cycleNum || 0)) best = ddata;
-          });
-          const arcStudents = (best.students || []).length;
-          const arcSessions = Object.keys(best.sessions || {}).length;
-          if (arcStudents > 0 && arcSessions > 0) {
-            source = { type: 'archive', data: best, archiveId: best.id || 'unknown' };
-            sourceLabel = `📦 attendanceArchive (${arcStudents} تلميذ, ${arcSessions} حصة)`;
-          }
-        }
-      } catch (e) { /* archive query failed */ }
-
-      // Source 2: groupBackup (fallback)
-      if (!source) {
-        try {
-          const gbSnap = await getDoc(doc(db, 'settings', 'groupBackup_' + tid));
-          if (gbSnap.exists()) {
-            const gb = gbSnap.data();
-            const bg = (gb.groups || []).find(gg => gg && gg._gid === gid);
-            if (bg && (bg.students || []).length > 0) {
-              source = { type: 'backup', data: bg, savedAt: gb.savedAt };
-              sourceLabel = `💾 groupBackup (${(bg.students||[]).length} تلميذ)`;
-            }
-          }
-        } catch (e) { /* backup query failed */ }
-      }
-
-      // Source 3: existing healthy sessions (partial repair)
-      if (!source) {
-        const healthySessions = Object.entries(existing).filter(([sn, e]) => e.healthy).map(([sn]) => parseInt(sn));
-        if (healthySessions.length > 2) {
-          // Use a healthy session's student list as reference
-          const refSnap = await getDoc(existing[healthySessions[0]].ref);
-          if (refSnap.exists()) {
-            const refData = refSnap.data();
-            source = { type: 'sessions', data: refData, refSession: healthySessions[0] };
-            sourceLabel = `📋 healthy session ${healthySessions[0]} (${(refData.students||[]).length} تلميذ)`;
-          }
-        }
-      }
-
-      // ── Restore ──
-      if (!source) {
-        R.notRestorable++;
-        teacherLog.push(`     ❌ لا يوجد مصدر سليم للاسترجاع`);
-        continue;
-      }
-
-      let restoredCount = 0;
-      const studentList = source.type === 'backup'
-        ? (source.data.students || [])
-        : source.type === 'archive'
-          ? (source.data.students || [])
-          : (source.data.students || []);
-
-      const batch = writeBatch(db);
-      for (let sn = 1; sn <= maxSn; sn++) {
-        if (existing[sn] && existing[sn].healthy) continue; // keep healthy
-
-        // Backup the current (possibly corrupted) doc before overwriting
-        if (existing[sn] && existing[sn].exists) {
-          try { await backupDoc(existing[sn].ref, existing[sn].docId); } catch (e) { /* ignore */ }
-        }
-
-        let sessionStudents = [];
-        if (source.type === 'archive') {
-          // Get per-session student list from archive
-          const arcSession = (source.data.sessions || {})[sn];
-          if (arcSession && Array.isArray(arcSession)) sessionStudents = arcSession;
-        }
-        // If archive doesn't have per-session data, create from the student list
-        if (sessionStudents.length === 0) {
-          sessionStudents = studentList.map(s => ({
-            id: s.id || '', name: s.name || '', status: 'absent'
-          }));
-        }
-
-        const newDocId = getSessionDocId(tid, gid, sn, cycleNum);
-        const newRef = doc(db, 'sessionAttendance', newDocId);
-        batch.set(newRef, {
-          teacherId: tid + '_' + gid,
-          gid,
-          sessionNum: sn,
-          cycleNum,
-          date: new Date().toISOString().slice(0, 10),
-          students: sessionStudents,
-          savedAt: serverTimestamp()
-        });
-        restoredCount++;
-      }
-
-      // Also restore sessionControl from archive
-      if (source.type === 'archive') {
-        const ctrls = source.data.sessionControls || {};
-        for (let sn = 1; sn <= maxSn; sn++) {
-          const ctrl = ctrls[sn];
-          if (ctrl) {
-            const ctrlDocId = getCtrlDocId(tid, gid, sn);
-            const ctrlRef = doc(db, 'sessionControl', ctrlDocId);
-            batch.set(ctrlRef, { ...ctrl, savedAt: serverTimestamp() });
-          }
-        }
-      }
-
-      try {
-        await batch.commit();
-        if (source.type === 'archive') R.restoredFromArchive += restoredCount;
-        else if (source.type === 'backup') R.restoredFromBackup += restoredCount;
-        else R.restoredFromSessions += restoredCount;
-        teacherLog.push(`     ✅ استرجاع ${restoredCount} حصة من ${sourceLabel}`);
-      } catch (e) {
-        R.errors.push({ tid, gid, error: e.message });
-        teacherLog.push(`     ❌ فشل الاسترجاع: ${e.message}`);
-      }
-    }
-
-    if (teacherHasIssue) {
-      R.teachersWithIssues++;
-      console.log(`\n👤 ${tName} (${tid}):`);
-      teacherLog.forEach(l => console.log(l));
-    }
-  }
-
-  // ── Print report ──
-  console.log('\n%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
-  console.log(`%c  REPAIR COMPLETE — ${teacherIdOnly ? 'TEACHER: ' + teacherIdOnly : 'REPORT'}`, 'color:#2563EB;font-weight:800');
-  console.log('%c══════════════════════════════════════════', 'color:#2563EB;font-weight:800');
-  console.log(`📊 الأساتذة المفحوصين: ${R.teachersScanned}`);
-  if (R.teachersWithIssues > 0) console.log(`⚠️  أساتذة بمشاكل: ${R.teachersWithIssues}`);
-  console.log(`📋 إجمالي الحصص المفحوصة: ${R.totalSessionsChecked}`);
-  console.log(`✅ حصص سليمة: ${R.healthySessions}`);
-  console.log(`❌ حصص تالفة: ${R.corruptedSessions}`);
-  console.log(`⬜ حصص مفقودة: ${R.missingSessions}`);
-  console.log(`📦 مسترجع من Archive: ${R.restoredFromArchive}`);
-  console.log(`💾 مسترجع من Backup: ${R.restoredFromBackup}`);
-  console.log(`📋 مسترجع من Session Docs: ${R.restoredFromSessions}`);
-  console.log(`🟢 حصص محفوظة (سليمة أصلاً): ${R.preservedHealthy}`);
-  if (R.notRestorable > 0) console.log(`🔴 غير قابل للاسترجاع: ${R.notRestorable}`);
-  if (R.errors.length) {
-    console.log(`\n❌ أخطاء:`);
-    R.errors.forEach(e => console.log(`   ${e.tid}/${e.gid}: ${e.error}`));
-  }
-  console.log(`\n📌 ملخص: تم استرجاع ${R.restoredFromArchive + R.restoredFromBackup + R.restoredFromSessions} حصة` +
-    ` من أصل ${R.corruptedSessions + R.missingSessions} تالفة/مفقودة.` +
-    ` الباقي: ${R.notRestorable} غير قابل للاسترجاع.`);
-
-  if (R.restoredFromArchive + R.restoredFromBackup + R.restoredFromSessions > 0) {
-    console.log('\n⚠️  تم الاسترجاع. للتحقق:');
-    console.log('   1. افتح أي أستاذ/فوج في جدول الحضور');
-    console.log('   2. تحقق من ظهور جميع الحصص');
-    console.log('   3. جرب تعديل خلية وحفظها');
-    console.log('   4. اختبر من حساب الأستاذ أيضاً');
-  }
-
-  return R;
 };
 
 // ═══════════════════════════════════════════════════════════
