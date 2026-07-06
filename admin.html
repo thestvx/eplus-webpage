@@ -7789,7 +7789,8 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         if (hasData) {
           window._attSummaryCache[teacherId] = serverData;
         }
-        loadAttendanceSummary(teacherId);
+        // Use setTimeout to avoid reentrancy lock (the current loadAttendanceSummary may still be rendering)
+        setTimeout(() => loadAttendanceSummary(teacherId), 0);
       },
       err => console.warn('sessionAttendance listener error:', err.code)
     );
@@ -7885,7 +7886,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   const colspanNum = 4 + totalSessions + 1; // # + name + teacher + group + sessions + action
   if (!students.length) {
     tbody.innerHTML = '<tr><td colspan="' + colspanNum + '" style="text-align:center;padding:40px;color:var(--text-muted)">' + t('no_students_for_teacher') + '</td></tr>';
-    return;
+    _release(); return;
   }
 
   // Build header showing all sessions
