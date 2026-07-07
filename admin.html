@@ -7757,11 +7757,8 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       ),
       snap => {
         if (!window._attSummaryCache[teacherId]) return;
-        // دمج التغييرات بدلاً من الاستبدال الكامل — يمنع مسح الكاش إذا عاد Snapshot فارغاً
         const existing = window._attSummaryCache[teacherId];
-        // حفظ المفاتيح الحالية
-        const existingKeys = new Set(Object.keys(existing));
-        const seenKeys = new Set();
+        let changed = false;
         snap.forEach(d => {
           const data = d.data();
           if (!data.sessionNum) return;
@@ -7774,12 +7771,18 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
             cacheKey = 'gi_' + (giMatch ? giMatch[1] : '0');
           }
           if (!existing[cacheKey]) existing[cacheKey] = {};
+          const existingDoc = existing[cacheKey][data.sessionNum];
+          const existingTime = existingDoc?._attUpdatedAt || 0;
+          const serverTime = data.savedAt?.toMillis?.() || 0;
+          if (existingTime > serverTime && existingTime > 0) return;
           existing[cacheKey][data.sessionNum] = data;
-          seenKeys.add(cacheKey);
+          changed = true;
         });
-        // لا نحذف المفاتيح التي لم تظهر في Snapshot (قد تكون لفوج آخر)
-        window._attSummaryCache[teacherId] = existing;
-        loadAttendanceSummary(teacherId);
+        if (!changed) return;
+        if (window._attRenderDebounce) clearTimeout(window._attRenderDebounce);
+        window._attRenderDebounce = setTimeout(() => {
+          loadAttendanceSummary(teacherId);
+        }, 150);
       },
       err => console.warn('sessionAttendance listener error:', err.code)
     );
@@ -9909,7 +9912,7 @@ window.toggleDailyAttCell = async (teacherId, gid, sessionNum, studentId, studen
       };
     }
     await setDoc(docRef, data);
-    // تحديث الكاش مباشرة
+    data._attUpdatedAt = Date.now();
     if (window._attSummaryCache?.[teacherId]) {
       if (!window._attSummaryCache[teacherId][gid]) window._attSummaryCache[teacherId][gid] = {};
       window._attSummaryCache[teacherId][gid][sessionNum] = data;
