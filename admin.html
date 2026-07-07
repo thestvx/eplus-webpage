@@ -9190,6 +9190,10 @@ async function _readCurrentCycleSnapshot(teacherId, gid) {
       const docIdOld = `${teacherId}_g${currentGi}_session_${sn}`;
       const snapOld = await getDoc(doc(db, 'sessionAttendance', docIdOld));
       if (snapOld.exists()) { sessions[sn] = snapOld.data().students || []; continue; }
+      // صيغة gi_ (للبيانات الجديدة بدون _gid حقيقي)
+      const docIdGi = `${teacherId}_gi_${currentGi}_session_${sn}`;
+      const snapGi = await getDoc(doc(db, 'sessionAttendance', docIdGi));
+      if (snapGi.exists()) { sessions[sn] = snapGi.data().students || []; continue; }
     }
     sessions[sn] = [];
   }
@@ -9337,7 +9341,26 @@ window.restoreArchiveCycle = async (archiveId) => {
     const gid = data.gid;
     if (!gid) { showToast('⚠️ معرف الفوج في الدورة غير صالح', true); return; }
 
-    const archivedSessions = data.sessions || {};
+    const archivedSessions = JSON.parse(JSON.stringify(data.sessions || {}));
+
+    // محاولة استرجاع البيانات إذا كانت الجلسات فاضية
+    const hasAnyData = Object.values(archivedSessions).some(arr => arr.length > 0);
+    if (!hasAnyData && data.teacherId) {
+      const teacherSnap = await getDoc(doc(db, 'teachers', data.teacherId));
+      if (teacherSnap.exists()) {
+        const groupsArr = teacherSnap.data().groups || [];
+        const gi = groupsArr.findIndex(g => g && g._gid === gid);
+        if (gi >= 0) {
+          for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+            const docIdGi = `${data.teacherId}_gi_${gi}_session_${sn}`;
+            const sSnap = await getDoc(doc(db, 'sessionAttendance', docIdGi));
+            if (sSnap.exists()) {
+              archivedSessions[sn] = sSnap.data().students || [];
+            }
+          }
+        }
+      }
+    }
 
     // إنشاء دورة جديدة للبيانات المسترجعة
     const currentCycleNum = await _getCurrentCycleNum(teacherId, gid);
@@ -9495,7 +9518,7 @@ window.openGroupArchive = async (gid) => {
   }).join('');
 };
 
-// ─── عرض دورة مؤرشفة (Snapshot ثابت — للقراءة فقط) ───
+// ─── عرض دورة مؤرشفة (Snapshot — قابل للتعديل) ───
 window.openArchiveCycle = async (archiveId) => {
   showToast('🔍 جاري تحميل الدورة المؤرشفة...');
   try {
@@ -9506,6 +9529,31 @@ window.openArchiveCycle = async (archiveId) => {
     const sessions = JSON.parse(JSON.stringify(data.sessions || {}));
     const archivedStudents = data.students || [];
     const stats = data.stats || {};
+
+    // محاولة استرجاع البيانات إذا كانت الجلسات فاضية (للأرشيف القديم)
+    const hasAnyData = Object.values(sessions).some(arr => arr.length > 0);
+    if (!hasAnyData && data.teacherId && data.gid) {
+      const teacherSnap = await getDoc(doc(db, 'teachers', data.teacherId));
+      if (teacherSnap.exists()) {
+        const groupsArr = teacherSnap.data().groups || [];
+        const gi = groupsArr.findIndex(g => g && g._gid === data.gid);
+        if (gi >= 0) {
+          let recovered = false;
+          for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+            const docIdGi = `${data.teacherId}_gi_${gi}_session_${sn}`;
+            const sSnap = await getDoc(doc(db, 'sessionAttendance', docIdGi));
+            if (sSnap.exists()) {
+              sessions[sn] = sSnap.data().students || [];
+              recovered = true;
+            }
+          }
+          if (recovered) {
+            await updateDoc(doc(db, 'attendanceArchive', archiveId), { sessions });
+            showToast('✅ تم استرجاع بيانات الحضور من المصدر');
+          }
+        }
+      }
+    }
 
     let html = `<div style="background:linear-gradient(135deg,#7C3AED,#6366f1);padding:16px 20px 12px;text-align:center;position:sticky;top:0;z-index:2">
       <div style="font-size:24px;margin-bottom:2px">📅</div>
