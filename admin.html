@@ -7758,12 +7758,13 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       snap => {
         if (!window._attSummaryCache[teacherId]) return;
         // دمج التغييرات بدلاً من الاستبدال الكامل — يمنع مسح الكاش إذا عاد Snapshot فارغاً
-        const serverData = {};
-        let hasData = false;
+        const existing = window._attSummaryCache[teacherId];
+        // حفظ المفاتيح الحالية
+        const existingKeys = new Set(Object.keys(existing));
+        const seenKeys = new Set();
         snap.forEach(d => {
           const data = d.data();
           if (!data.sessionNum) return;
-          const docCycle = data.cycleNum || 1;
           let gid = data.gid || extractGidFromDoc(d.id);
           let cacheKey;
           if (gid) {
@@ -7772,14 +7773,12 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
             const giMatch = d.id.match(/_g(\d+)_session_/);
             cacheKey = 'gi_' + (giMatch ? giMatch[1] : '0');
           }
-          if (!serverData[cacheKey]) serverData[cacheKey] = {};
-          serverData[cacheKey][data.sessionNum] = data;
-          hasData = true;
+          if (!existing[cacheKey]) existing[cacheKey] = {};
+          existing[cacheKey][data.sessionNum] = data;
+          seenKeys.add(cacheKey);
         });
-        // فقط استبدل الكاش إذا كان Snapshot يحتوي على بيانات — يحمي من المسح غير المقصود
-        if (hasData) {
-          window._attSummaryCache[teacherId] = serverData;
-        }
+        // لا نحذف المفاتيح التي لم تظهر في Snapshot (قد تكون لفوج آخر)
+        window._attSummaryCache[teacherId] = existing;
         loadAttendanceSummary(teacherId);
       },
       err => console.warn('sessionAttendance listener error:', err.code)
@@ -8149,7 +8148,6 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       const sIdAttr = sId.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
       for (let idx = 0; idx < sessionRange.length; idx++) {
         const i = sessionRange[idx];
-        // Attendance is scoped by group — use group-based cache only (NOT cross-group studentAttCache)
         let rec = groupSessions[i] || groupCache[g.gid]?.[i] || groupCache[s.gid]?.[i] || groupCache[s.groupGid]?.[i] || groupCache['gi_' + s.groupGi]?.[i];
         let studentRec = null;
         const sNameVal = s.name;
@@ -8158,12 +8156,9 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         const isLocked = window._isTeacherAttendanceView && (ctrlStatus === 'locked' || ctrlStatus === 'closed');
         const snAttr = sNameVal.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
         const gidVal = g.gid || s.gid || s.groupGid || '';
-        const cellClick = isLocked ? '' : `onclick="toggleDailyAttCell('${teacherIdVal}','${gidVal}',${i},this.dataset.studentId,this.dataset.sn)"`;
         const attDataAttrs = `data-att-cell="1" data-teacher-id="${teacherIdVal}" data-gid="${gidVal}" data-session="${i}" data-student-id="${sIdAttr}" data-sn="${snAttr}"`;
-        const allAttrs = cellClick ? `${cellClick} ${attDataAttrs}` : attDataAttrs;
+        const allAttrs = attDataAttrs;
         const cellClass = isLocked ? 'att-cell att-cell-locked' : 'att-cell att-cell-clickable';
-        // Debug: log every cell
-        console.log(`[CELL] student="${s.name}" id="${sId}" teacher="${teacherId}" gid="${gidVal}" session=${i} clickable=${!isLocked} isPast=${i < curSession} reason=${!isLocked ? 'none' : 'locked_by_control'} cellClass="${cellClass}"`);
         if (!rec && !studentRec) {
           const isPast = i < curSession;
           if (window._isTeacherAttendanceView && isLocked) {
@@ -9504,8 +9499,7 @@ window.openArchiveCycle = async (archiveId) => {
     if (!snap.exists()) { showToast('⚠️ الدورة غير موجودة', true); return; }
     const data = snap.data();
 
-    // استخدام التلاميذ من الـ Snapshot فقط (وليس من الفوج الحالي)
-    const sessions = data.sessions || {};
+    const sessions = JSON.parse(JSON.stringify(data.sessions || {}));
     const archivedStudents = data.students || [];
     const stats = data.stats || {};
 
@@ -9514,17 +9508,12 @@ window.openArchiveCycle = async (archiveId) => {
       <div style="font-size:15px;font-weight:900;color:#FFFFFF">أرشيف: ${data.groupName || '—'} — الدورة ${data.cycleNum}</div>
       <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:2px">
         ${data.archiveDate ? new Date(data.archiveDate).toLocaleDateString('ar-SA') : '—'}
-        ${stats.rate !== undefined ? `&nbsp;|&nbsp; نسبة الحضور: ${stats.rate}%` : ''}
-      </div>
-      <div style="margin-top:4px;display:flex;gap:10px;justify-content:center;font-size:10px;color:rgba(255,255,255,0.65)">
-        <span>✅ حاضر: ${stats.totalPresent || 0}</span>
-        <span>❌ غائب: ${stats.totalAbsent || 0}</span>
-        <span>👥 تلاميذ: ${stats.totalStudents || 0}</span>
+        — <span style="color:#FCD34D;font-weight:700">✏️ قابل للتعديل</span>
       </div>
     </div>`;
 
     html += '<div style="overflow-x:auto;padding:10px 12px 14px;background:#FFFFFF">';
-    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;direction:rtl">';
+    html += `<table id="archive-edit-table" data-archive-id="${archiveId}" data-gid="${data.gid || ''}" data-teacher-id="${data.teacherId || ''}" style="width:100%;border-collapse:collapse;font-size:12px;direction:rtl">`;
     html += '<thead><tr>';
     html += '<th style="padding:6px 8px;border:1px solid #E5E7EB;background:#F5F3FF;font-weight:800;color:#374151">#</th>';
     html += '<th style="padding:6px 8px;border:1px solid #E5E7EB;background:#F5F3FF;font-weight:800;color:#374151">التلميذ</th>';
@@ -9532,6 +9521,8 @@ window.openArchiveCycle = async (archiveId) => {
       html += `<th style="padding:6px 8px;border:1px solid #E5E7EB;background:#F5F3FF;font-weight:800;color:#374151;text-align:center">ح${i}</th>`;
     }
     html += '</tr></thead><tbody>';
+
+    const _normArc = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
 
     archivedStudents.forEach((s, idx) => {
       const sName = typeof s === 'string' ? s : (s.name || '—');
@@ -9541,30 +9532,24 @@ window.openArchiveCycle = async (archiveId) => {
       html += `<td style="padding:6px 8px;border:1px solid #E5E7EB;font-weight:700;color:#1F2937">${sName}</td>`;
       for (let i = 1; i <= CYCLE_SESSION_COUNT; i++) {
         const sessionStudents = sessions[i] || [];
-        // البحث: ID أولاً، ثم الاسم (للتوافق مع جميع الحالات)
-        const _normArc = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
         let rec = null;
-        if (sId) {
-          rec = sessionStudents.find(st => st.id && String(st.id) === sId);
-        }
-        if (!rec) {
-          rec = sessionStudents.find(st => _normArc(st.name) === _normArc(sName));
-        }
-        let cell = '<span style="color:#9CA3AF">⋯</span>';
-        if (rec) {
-          cell = rec.present === true
-            ? '<span style="color:#059669;font-weight:800">✅</span>'
-            : '<span style="color:#DC2626;font-weight:800">❌</span>';
-        }
-        html += `<td style="padding:6px 8px;border:1px solid #E5E7EB;text-align:center">${cell}</td>`;
+        if (sId) rec = sessionStudents.find(st => st.id && String(st.id) === sId);
+        if (!rec) rec = sessionStudents.find(st => _normArc(st.name) === _normArc(sName));
+        let cellContent = '⋯';
+        let cellColor = '#9CA3AF';
+        let cellBg = 'transparent';
+        if (rec && rec.present === true) { cellContent = '✅'; cellColor = '#059669'; }
+        else if (rec && rec.present === false) { cellContent = '❌'; cellColor = '#DC2626'; }
+        html += `<td class="arc-cell" data-si="${idx}" data-sn="${i}" data-sid="${sId}" data-sname="${sName.replace(/"/g,'&quot;')}" onclick="toggleArchiveCell(this)" style="padding:6px 8px;border:1px solid #E5E7EB;text-align:center;cursor:pointer;transition:background 0.15s;color:${cellColor};font-weight:800;background:${cellBg}" onmouseover="this.style.background='#F3F4F6'" onmouseout="this.style.background='${cellBg}'">${cellContent}</td>`;
       }
       html += '</tr>';
     });
 
     html += '</tbody></table></div>';
     html += '<div style="padding:0 20px 14px;text-align:center;background:#FFFFFF;border-radius:0 0 16px 16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">';
-    html += `<button onclick="window.deleteArchiveCycle('${archiveId}')" style="padding:8px 24px;border-radius:10px;border:1px solid #DC2626;background:#FEF2F2;color:#991B1B;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🗑️ حذف هذه الدورة</button>`;
-    html += `<button onclick="restoreArchiveCycle('${archiveId}')" style="padding:8px 24px;border-radius:10px;border:1px solid #F59E0B;background:#FEF3C7;color:#92400E;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🔄 استرجاع هذه الدورة</button>`;
+    html += `<button id="arc-save-btn" onclick="saveArchiveEdits('${archiveId}')" style="padding:8px 24px;border-radius:10px;border:1px solid #059669;background:#ECFDF5;color:#065F46;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">💾 حفظ التعديلات</button>`;
+    html += `<button onclick="window.deleteArchiveCycle('${archiveId}')" style="padding:8px 24px;border-radius:10px;border:1px solid #DC2626;background:#FEF2F2;color:#991B1B;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🗑️ حذف</button>`;
+    html += `<button onclick="restoreArchiveCycle('${archiveId}')" style="padding:8px 24px;border-radius:10px;border:1px solid #F59E0B;background:#FEF3C7;color:#92400E;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🔄 استرجاع</button>`;
     html += '<button onclick="closeArchiveCycle()" style="padding:8px 24px;border-radius:10px;border:1px solid #E5E7EB;background:#FFFFFF;color:#6B7280;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">إغلاق</button>';
     html += '</div>';
 
@@ -9588,6 +9573,78 @@ window.closeGroupArchive = () => {
 window.closeArchiveCycle = () => {
   const viewer = document.getElementById('archive-cycle-viewer');
   if (viewer) viewer.remove();
+};
+
+// ─── Toggle cell in archive editor ───
+window.toggleArchiveCell = (td) => {
+  const cur = td.textContent.trim();
+  if (cur === '✅') {
+    td.textContent = '❌';
+    td.style.color = '#DC2626';
+  } else if (cur === '❌') {
+    td.textContent = '⋯';
+    td.style.color = '#9CA3AF';
+    td.style.fontWeight = '';
+  } else {
+    td.textContent = '✅';
+    td.style.color = '#059669';
+    td.style.fontWeight = '800';
+  }
+};
+
+// ─── Save archive edits to Firestore ───
+window.saveArchiveEdits = async (archiveId) => {
+  const table = document.getElementById('archive-edit-table');
+  if (!table) { showToast('⚠️ لا يوجد جدول للتعديل', true); return; }
+  const gid = table.dataset.gid;
+  const teacherId = table.dataset.teacherId;
+  if (!archiveId || !gid || !teacherId) { showToast('⚠️ بيانات ناقصة', true); return; }
+
+  showToast('💾 جاري حفظ التعديلات...');
+  const sessions = {};
+  for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) sessions[sn] = [];
+
+  const cells = table.querySelectorAll('.arc-cell');
+  cells.forEach(td => {
+    const si = parseInt(td.dataset.si, 10);
+    const sn = parseInt(td.dataset.sn, 10);
+    const sId = td.dataset.sid || '';
+    const sName = td.dataset.sname || '';
+    const val = td.textContent.trim();
+    const student = { id: sId, name: sName };
+    if (val === '✅') student.present = true;
+    else if (val === '❌') student.present = false;
+    else return;
+    if (!sessions[sn]) sessions[sn] = [];
+    sessions[sn].push(student);
+  });
+
+  let totalPresent = 0, totalAbsent = 0, totalStudents = new Set();
+  Object.values(sessions).forEach(studs => {
+    studs.forEach(s => {
+      const key = s.id || s.name;
+      if (key) totalStudents.add(key);
+      if (s.present === true) totalPresent++;
+      else if (s.present === false) totalAbsent++;
+    });
+  });
+  const totalCells = totalStudents.size * CYCLE_SESSION_COUNT;
+  const rate = totalCells > 0 ? Math.round((totalPresent / totalCells) * 100) : 0;
+
+  try {
+    await updateDoc(doc(db, 'attendanceArchive', archiveId), {
+      sessions,
+      stats: { totalStudents: totalStudents.size, totalPresent, totalAbsent, totalCells, rate },
+      lastEditedAt: serverTimestamp(),
+      lastEditDate: new Date().toISOString().slice(0, 10)
+    });
+    showToast('✅ تم حفظ التعديلات');
+    const btn = document.getElementById('arc-save-btn');
+    if (btn) { btn.textContent = '✅ تم الحفظ'; btn.style.background = '#D1FAE5'; btn.style.color = '#065F46'; }
+  } catch (e) {
+    console.error('[saveArchiveEdits] ❌', e);
+    showToast('❌ خطأ في الحفظ: ' + e.message, true);
+  }
 };
 
 // ─── بدء دورة حضور جديدة (يدوي) ───
@@ -9791,71 +9848,48 @@ window.openNewAttendanceCycleModal = () => {
 };
 
 window.toggleDailyAttCell = async (teacherId, gid, sessionNum, studentId, studentName) => {
-  console.log(`[toggleDailyAttCell] called teacherId=${teacherId} gid=${gid} session=${sessionNum} studentId=${studentId} studentName=${studentName}`);
+  if (!teacherId || !gid || !sessionNum) {
+    console.error('[toggleDailyAttCell] Missing params:', { teacherId, gid, sessionNum });
+    return;
+  }
   const cycleNum = await _getCurrentCycleNum(teacherId, gid);
-  _validateAttendanceParams('toggleDailyAttCell', { teacherId, gid, sessionNum, cycleNum, studentId, studentName });
-  // منع التعديل للأساتذة إذا كانت الحصة مقفلة صراحةً فقط (locked/closed)
+  if (!cycleNum && cycleNum !== 1) {
+    console.error('[toggleDailyAttCell] Invalid cycleNum:', cycleNum);
+    return;
+  }
+  // منع التعديل للأساتذة إذا كانت الحصة مقفلة
   if (window._isTeacherAttendanceView) {
-    // نبحث في التحكم بالصيغة القديمة (_g{gi}) والجديدة (_gctrl_{gid})
     const teacherData = (allTeachers || []).find(t => t.id === teacherId);
     const groups = teacherData?.groups || [];
+    let gi = groups.findIndex(g => g && g._gid === gid);
     let foundLocked = false;
-    let gi;
-    for (let i = 0; i < groups.length; i++) {
-      if (groups[i]._gid === gid) { gi = i; break; }
-    }
     try {
-      // الصيغة الجديدة
-      const newCtrlRef = doc(db, 'sessionControl', getCtrlDocId(teacherId, gid, sessionNum));
-      const newSnap = await getDoc(newCtrlRef);
-      if (newSnap.exists()) {
-        const st = newSnap.data().status;
-        if (st === 'locked' || st === 'closed') foundLocked = true;
+      const newSnap = await getDoc(doc(db, 'sessionControl', getCtrlDocId(teacherId, gid, sessionNum)));
+      if (newSnap.exists() && (newSnap.data().status === 'locked' || newSnap.data().status === 'closed')) foundLocked = true;
+      if (!foundLocked && gi >= 0) {
+        const oldSnap = await getDoc(doc(db, 'sessionControl', `${teacherId}_g${gi}_session_${sessionNum}`));
+        if (oldSnap.exists() && (oldSnap.data().status === 'locked' || oldSnap.data().status === 'closed')) foundLocked = true;
       }
-      // الصيغة القديمة (للتوافق)
-      if (!foundLocked && gi !== undefined) {
-        const oldCtrlRef = doc(db, 'sessionControl', `${teacherId}_g${gi}_session_${sessionNum}`);
-        const oldSnap = await getDoc(oldCtrlRef);
-        if (oldSnap.exists()) {
-          const st = oldSnap.data().status;
-          if (st === 'locked' || st === 'closed') foundLocked = true;
-        }
-      }
-    } catch(e) {
-      console.warn('toggleDailyAttCell: session control check failed, allowing edit:', e);
-    }
-    if (foundLocked) {
-      showToast('🔒 هذه الحصة مقفلة — يرجى التواصل مع الإدارة', true);
-      return;
-    }
+    } catch(e) { console.warn('toggleDailyAttCell: control check failed:', e); }
+    if (foundLocked) { showToast('🔒 هذه الحصة مقفلة', true); return; }
   }
   const docRef = doc(db, 'sessionAttendance', getSessionDocId(teacherId, gid, sessionNum, cycleNum));
+  const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
   try {
     const snap = await getDoc(docRef);
     let data;
-    const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
     if (snap.exists()) {
       data = snap.data();
-      let students = data.students || [];
+      let students = [...(data.students || [])];
       let idx = -1;
-      if (studentId) {
-        idx = students.findIndex(s => String(s.id || '') === String(studentId));
-      }
-      if (idx === -1 && !studentId) {
-        const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
-        idx = students.findIndex(s => _norm(s.name || '') === _norm(studentName));
-      }
+      if (studentId) idx = students.findIndex(s => String(s.id || '') === String(studentId));
+      if (idx === -1 && studentName) idx = students.findIndex(s => _norm(s.name || '') === _norm(studentName));
       if (idx !== -1) {
         const cur = students[idx].present;
         if (cur === true) {
           students[idx].present = false;
         } else {
-          if (studentId) {
-            students = students.filter(s => String(s.id || '') !== String(studentId));
-          } else {
-            const _norm = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
-            students = students.filter(s => _norm(s.name || '') !== _norm(studentName));
-          }
+          students.splice(idx, 1);
         }
       } else {
         students.push({ id: studentId || '', name: studentName, present: true });
@@ -9865,28 +9899,43 @@ window.toggleDailyAttCell = async (teacherId, gid, sessionNum, studentId, studen
       data.gid = gid;
       data.cycleNum = cycleNum;
       data.teacherId = teacherId + '_' + gid;
-      await setDoc(docRef, data);
     } else {
       data = {
         teacherId: teacherId + '_' + gid,
-        sessionNum,
-        gid,
-        cycleNum,
+        sessionNum, gid, cycleNum,
         date: new Date().toISOString().slice(0, 10),
         savedAt: serverTimestamp(),
         students: [{ id: studentId || '', name: studentName, present: true }]
       };
-      await setDoc(docRef, data);
     }
+    await setDoc(docRef, data);
     // تحديث الكاش مباشرة
-    if (window._attSummaryCache) {
-      if (!window._attSummaryCache[teacherId]) window._attSummaryCache[teacherId] = {};
-      window._attSummaryCache[teacherId][gid] = window._attSummaryCache[teacherId][gid] || {};
+    if (window._attSummaryCache?.[teacherId]) {
+      if (!window._attSummaryCache[teacherId][gid]) window._attSummaryCache[teacherId][gid] = {};
       window._attSummaryCache[teacherId][gid][sessionNum] = data;
     }
-    await loadAttendanceSummary(teacherId);
+    // تحديث الخلية المحددة مباشرة بدون إعادة رسم الجدول
+    const cell = document.querySelector(`[data-att-cell][data-gid="${gid}"][data-session="${sessionNum}"][data-student-id="${studentId}"], [data-att-cell][data-gid="${gid}"][data-session="${sessionNum}"][data-sn="${_norm(studentName)}"]`);
+    if (cell) {
+      const studentRec = (data.students || []).find(st => (studentId && String(st.id || '') === String(studentId)) || (!studentId && _norm(st.name || '') === _norm(studentName)));
+      if (studentRec) {
+        if (studentRec.present === true) {
+          cell.innerHTML = '✅';
+          cell.style.color = '#059669';
+          cell.style.fontWeight = '800';
+        } else {
+          cell.innerHTML = '❌';
+          cell.style.color = '#DC2626';
+          cell.style.fontWeight = '800';
+        }
+      } else {
+        cell.innerHTML = '⋯';
+        cell.style.color = '';
+        cell.style.fontWeight = '';
+      }
+    }
   } catch(e) {
-    console.error('toggleDailyAttCell error:', e);
+    console.error('[toggleDailyAttCell] error:', e);
     showToast('⚠️ خطأ في تحديث الحضور', true);
   }
 };
