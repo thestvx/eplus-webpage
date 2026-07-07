@@ -7646,6 +7646,7 @@ window.verifyAttendanceIntegrity = async () => {
 };
 
 window._attSummaryCache = {}; // teacherId -> { gi: { sessionNum: data } }
+window._attRecentlyToggled = {}; // teacherId|gid|sessionNum -> timestamp
 
 window.loadAttendanceSummary = async function(_teacherOverride) {
   const teacherId = _teacherOverride || document.getElementById('att-sum-teacher')?.value || '';
@@ -7756,9 +7757,6 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         where('__name__', '>=', teacherId),
         where('__name__', '<', teacherId + '_\ufff0')
       ),
-// ── Track recently toggled cells to prevent onSnapshot overwrite ──
-window._attRecentlyToggled = {};
-
       snap => {
         if (!window._attSummaryCache[teacherId]) return;
         const existing = window._attSummaryCache[teacherId];
