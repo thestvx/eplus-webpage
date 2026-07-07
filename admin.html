@@ -7699,7 +7699,20 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       where('teacherId', '==', teacherId),
       where('status', '==', 'current')
     ));
+    const groupsData = teacher.groups || [];
     cycleSnap.forEach(d => { const c = d.data(); _cycleMap[c.gid] = c.cycleNum || 1; });
+    // ربط gid قديم (gi_N) بـ gid الحقيقي إن وجد
+    cycleSnap.forEach(d => {
+      const c = d.data();
+      const gidStr = c.gid || '';
+      const giMatch = gidStr.match(/^gi_(\d+)$/);
+      if (giMatch) {
+        const group = groupsData[parseInt(giMatch[1])];
+        if (group && group._gid && group._gid !== gidStr) {
+          _cycleMap[group._gid] = c.cycleNum || 1;
+        }
+      }
+    });
     console.log(`[ATT] _cycleMap for ${teacherId}:`, JSON.stringify(_cycleMap));
   } catch (e) { console.warn('[ATT] cycleMap query failed:', e.message); }
 
@@ -9181,19 +9194,29 @@ async function _readCurrentCycleSnapshot(teacherId, gid) {
   for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
     const docIdNew = getSessionDocId(teacherId, gid, sn, cycleNum);
     const snapNew = await getDoc(doc(db, 'sessionAttendance', docIdNew));
-    if (snapNew.exists()) { sessions[sn] = snapNew.data().students || []; continue; }
-    // الصيغة القديمة بدون cycle (للبيانات قبل الترحيل)
+    if (snapNew.exists()) {
+      const students = snapNew.data().students || [];
+      if (students.length > 0) { sessions[sn] = students; continue; }
+    }
     const docIdLegacy = `${teacherId}_${gid}_session_${sn}`;
     const snapLegacy = await getDoc(doc(db, 'sessionAttendance', docIdLegacy));
-    if (snapLegacy.exists() && !snapNew.exists()) { sessions[sn] = snapLegacy.data().students || []; continue; }
+    if (snapLegacy.exists()) {
+      const students = snapLegacy.data().students || [];
+      if (students.length > 0) { sessions[sn] = students; continue; }
+    }
     if (currentGi >= 0) {
-      const docIdOld = `${teacherId}_g${currentGi}_session_${sn}`;
-      const snapOld = await getDoc(doc(db, 'sessionAttendance', docIdOld));
-      if (snapOld.exists()) { sessions[sn] = snapOld.data().students || []; continue; }
-      // صيغة gi_ (للبيانات الجديدة بدون _gid حقيقي)
       const docIdGi = `${teacherId}_gi_${currentGi}_session_${sn}`;
       const snapGi = await getDoc(doc(db, 'sessionAttendance', docIdGi));
-      if (snapGi.exists()) { sessions[sn] = snapGi.data().students || []; continue; }
+      if (snapGi.exists()) {
+        const students = snapGi.data().students || [];
+        if (students.length > 0) { sessions[sn] = students; continue; }
+      }
+      const docIdOld = `${teacherId}_g${currentGi}_session_${sn}`;
+      const snapOld = await getDoc(doc(db, 'sessionAttendance', docIdOld));
+      if (snapOld.exists()) {
+        const students = snapOld.data().students || [];
+        if (students.length > 0) { sessions[sn] = students; continue; }
+      }
     }
     sessions[sn] = [];
   }
@@ -9306,18 +9329,63 @@ window.deleteArchiveCycle = async (archiveId) => {
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
   if (!archiveId) { showToast('⚠️ معرف الدورة غير صالح', true); return; }
 
-  if (!confirm('هل أنت متأكد من حذف هذه الدورة المؤرشفة؟\n\nسيتم حذف هذه الدورة نهائياً ولا يمكن التراجع عن العملية.')) return;
+  // قراءة الدورة قبل الحذف لاستخراج gid
+  const archiveSnap = await getDoc(doc(db, 'attendanceArchive', archiveId));
+  if (!archiveSnap.exists()) { showToast('⚠️ الدورة غير موجودة', true); return; }
+  const archiveData = archiveSnap.data();
+  const gid = archiveData.gid || '';
+
+  if (!confirm('هل أنت متأكد من حذف هذه الدورة المؤرشفة؟\n\nسيتم حذف هذه الدورة نهائياً وسيتم إعادة ترقيم الدورات المتبقية.')) return;
 
   try {
     await deleteDoc(doc(db, 'attendanceArchive', archiveId));
     showToast('✅ تم حذف الدورة');
 
+    // إعادة ترقيم الدورات المتبقية
+    if (teacherId && gid) {
+      try {
+        const archivesQuery = query(
+          collection(db, 'attendanceArchive'),
+          where('teacherId', '==', teacherId),
+          where('gid', '==', gid)
+        );
+        const snap = await getDocs(archivesQuery);
+        const remaining = [];
+        snap.forEach(d => remaining.push({ id: d.id, data: d.data() }));
+        remaining.sort((a, b) => (a.data.cycleNum || 0) - (b.data.cycleNum || 0));
+
+        // إعادة ترقيم من 1
+        for (let i = 0; i < remaining.length; i++) {
+          const newCycleNum = i + 1;
+          if (remaining[i].data.cycleNum !== newCycleNum) {
+            await updateDoc(doc(db, 'attendanceArchive', remaining[i].id), { cycleNum: newCycleNum });
+            // تحديث attendanceCycles
+            const oldCycleDocId = getCycleDocId(teacherId, gid, remaining[i].data.cycleNum);
+            const newCycleDocId = getCycleDocId(teacherId, gid, newCycleNum);
+            const oldSnap = await getDoc(doc(db, 'attendanceCycles', oldCycleDocId));
+            if (oldSnap.exists()) {
+              await setDoc(doc(db, 'attendanceCycles', newCycleDocId), { ...oldSnap.data(), cycleNum: newCycleNum });
+              await deleteDoc(doc(db, 'attendanceCycles', oldCycleDocId));
+            }
+          }
+        }
+
+        // تحديث رقم الدورة الحالية
+        const currentCycleNum = remaining.length + 1;
+        const cacheKey = teacherId + '|' + gid;
+        _currentCycleCache[cacheKey] = currentCycleNum;
+        if (window._attSummaryCache) delete window._attSummaryCache[teacherId];
+        if (window._ctrlMapCache) delete window._ctrlMapCache[teacherId];
+        await loadAttendanceSummary(teacherId);
+      } catch (e) {
+        console.warn('[deleteArchiveCycle] renumbering error:', e);
+      }
+    }
+
     const viewer = document.getElementById('archive-cycle-viewer');
     if (viewer) viewer.remove();
     closeGroupArchive();
 
-    // إعادة فتح قائمة الأرشيف للفوج
-    const gid = archiveId.split('_cycle_')[0].split('_').slice(1).join('_');
     if (gid) openGroupArchive(gid);
   } catch (e) {
     console.error('[deleteArchiveCycle] ❌', e);
@@ -9350,12 +9418,17 @@ window.restoreArchiveCycle = async (archiveId) => {
       if (teacherSnap.exists()) {
         const groupsArr = teacherSnap.data().groups || [];
         const gi = groupsArr.findIndex(g => g && g._gid === gid);
-        if (gi >= 0) {
-          for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+        for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+          const docIdGid = `${data.teacherId}_${gid}_session_${sn}`;
+          const sSnapGid = await getDoc(doc(db, 'sessionAttendance', docIdGid));
+          if (sSnapGid.exists() && (sSnapGid.data().students || []).length > 0) {
+            archivedSessions[sn] = sSnapGid.data().students || []; continue;
+          }
+          if (gi >= 0) {
             const docIdGi = `${data.teacherId}_gi_${gi}_session_${sn}`;
-            const sSnap = await getDoc(doc(db, 'sessionAttendance', docIdGi));
-            if (sSnap.exists()) {
-              archivedSessions[sn] = sSnap.data().students || [];
+            const sSnapGi = await getDoc(doc(db, 'sessionAttendance', docIdGi));
+            if (sSnapGi.exists() && (sSnapGi.data().students || []).length > 0) {
+              archivedSessions[sn] = sSnapGi.data().students || [];
             }
           }
         }
@@ -9537,20 +9610,26 @@ window.openArchiveCycle = async (archiveId) => {
       if (teacherSnap.exists()) {
         const groupsArr = teacherSnap.data().groups || [];
         const gi = groupsArr.findIndex(g => g && g._gid === data.gid);
-        if (gi >= 0) {
-          let recovered = false;
-          for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+        let recovered = false;
+        for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+          const docIdGid = `${data.teacherId}_${data.gid}_session_${sn}`;
+          const sSnapGid = await getDoc(doc(db, 'sessionAttendance', docIdGid));
+          if (sSnapGid.exists() && (sSnapGid.data().students || []).length > 0) {
+            sessions[sn] = sSnapGid.data().students || [];
+            recovered = true; continue;
+          }
+          if (gi >= 0) {
             const docIdGi = `${data.teacherId}_gi_${gi}_session_${sn}`;
-            const sSnap = await getDoc(doc(db, 'sessionAttendance', docIdGi));
-            if (sSnap.exists()) {
-              sessions[sn] = sSnap.data().students || [];
+            const sSnapGi = await getDoc(doc(db, 'sessionAttendance', docIdGi));
+            if (sSnapGi.exists() && (sSnapGi.data().students || []).length > 0) {
+              sessions[sn] = sSnapGi.data().students || [];
               recovered = true;
             }
           }
-          if (recovered) {
-            await updateDoc(doc(db, 'attendanceArchive', archiveId), { sessions });
-            showToast('✅ تم استرجاع بيانات الحضور من المصدر');
-          }
+        }
+        if (recovered) {
+          await updateDoc(doc(db, 'attendanceArchive', archiveId), { sessions });
+          showToast('✅ تم استرجاع بيانات الحضور من المصدر');
         }
       }
     }
@@ -13297,6 +13376,29 @@ async function _getCurrentCycleNum(teacherId, gid) {
       return cycleNum;
     }
   } catch (e) { console.warn('[getCurrentCycleNum] query failed:', e.message); }
+  // إذا لم نجد بالـ gid الحقيقي، نبحث بصيغة gi_ القديمة
+  try {
+    const teacherSnap = await getDoc(doc(db, 'teachers', teacherId));
+    if (teacherSnap.exists()) {
+      const groupsArr = teacherSnap.data().groups || [];
+      const gi = groupsArr.findIndex(g => g && g._gid === gid);
+      if (gi >= 0) {
+        const giGid = 'gi_' + gi;
+        const q2 = query(
+          collection(db, 'attendanceCycles'),
+          where('teacherId', '==', teacherId),
+          where('gid', '==', giGid),
+          where('status', '==', 'current')
+        );
+        const snap2 = await getDocs(q2);
+        if (snap2.size > 0) {
+          const cycleNum = snap2.docs[0].data().cycleNum || 1;
+          _currentCycleCache[cacheKey] = cycleNum;
+          return cycleNum;
+        }
+      }
+    }
+  } catch (e) { console.warn('[getCurrentCycleNum] gi_fallback failed:', e.message); }
   // التحقق من وجود دورة أولى في Firestore
   try {
     const cycleDocId = getCycleDocId(teacherId, gid, 1);
