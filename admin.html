@@ -9986,10 +9986,31 @@ const updateAttSyncStatus = (gid) => {
 };
 window.updateAttSyncStatus = updateAttSyncStatus;
 
-window.saveGroupAttendance = (gid) => {
+window.saveGroupAttendance = async (gid) => {
   if (!gid) return;
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ اختر أستاذ أولاً', true); return; }
+  const cycleNum = await _getCurrentCycleNum(teacherId, gid);
+  if (!cycleNum && cycleNum !== 1) { showToast('⚠️ لا توجد دورة حالية', true); return; }
+  let saved = 0, failed = 0;
+  const groupData = window._attSummaryCache?.[teacherId]?.[gid];
+  if (!groupData) { showToast('⚠️ لا توجد بيانات لحفظها'); return; }
+  const entries = Object.entries(groupData);
+  if (entries.length === 0) { showToast('⚠️ لا توجد بيانات لحفظها'); return; }
+  for (const [sn, sessionData] of entries) {
+    const docRef = doc(db, 'sessionAttendance', getSessionDocId(teacherId, gid, parseInt(sn), cycleNum));
+    try {
+      await setDoc(docRef, { ...sessionData, savedAt: serverTimestamp() });
+      saved++;
+    } catch (e) {
+      console.error(`[saveGroupAttendance] Session ${sn}:`, e);
+      failed++;
+    }
+  }
   updateAttSyncStatus(gid);
-  showToast('✅ تم حفظ حضور الفوج');
+  showToast(failed === 0
+    ? `✅ تم حفظ ${saved} حصة للفوج`
+    : `⚠️ حفظ ${saved} حصة، فشل ${failed}`);
 };
 
 // ─── حذف تلميذ من قائمة الأستاذ ───
