@@ -7687,6 +7687,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   const now = new Date();
   const diffDays = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
   const curSession = Math.min(12, Math.max(1, Math.floor(diffDays / 7) + 1));
+  window._attCurSession = curSession;
 
   // ── تحميل أرقام الدورات الحالية لجميع أفواج هذا الأستاذ ──
   let _cycleMap = {};
@@ -7761,7 +7762,6 @@ window._attRecentlyToggled = {};
       snap => {
         if (!window._attSummaryCache[teacherId]) return;
         const existing = window._attSummaryCache[teacherId];
-        let changed = false;
         snap.forEach(d => {
           const data = d.data();
           if (!data.sessionNum) return;
@@ -7773,21 +7773,42 @@ window._attRecentlyToggled = {};
             const giMatch = d.id.match(/_g(\d+)_session_/);
             cacheKey = 'gi_' + (giMatch ? giMatch[1] : '0');
           }
-          const toggleKey = `${teacherId}|${cacheKey}|${data.sessionNum}`;
+          if (!existing[cacheKey]) existing[cacheKey] = {};
+          existing[cacheKey][data.sessionNum] = data;
+        });
+        window._attSummaryCache[teacherId] = existing;
+        const tbody = document.getElementById('att-sum-tbody');
+        if (!tbody) return;
+        const cells = tbody.querySelectorAll('[data-att-cell]');
+        cells.forEach(cell => {
+          const cellGid = cell.dataset.gid;
+          const cellSession = parseInt(cell.dataset.session, 10);
+          const cellStudentId = cell.dataset.studentId || '';
+          const cellSn = cell.dataset.sn || '';
+          const toggleKey = `${teacherId}|${cellGid}|${cellSession}`;
           if (window._attRecentlyToggled[toggleKey]) {
             const elapsed = Date.now() - window._attRecentlyToggled[toggleKey];
             if (elapsed < 3000) return;
             delete window._attRecentlyToggled[toggleKey];
           }
-          if (!existing[cacheKey]) existing[cacheKey] = {};
-          existing[cacheKey][data.sessionNum] = data;
-          changed = true;
+          const sessionData = existing[cellGid]?.[cellSession];
+          if (!sessionData) return;
+          const _norm2 = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+          let studentRec = null;
+          if (cellStudentId) studentRec = (sessionData.students || []).find(st => String(st.id || '') === cellStudentId);
+          if (!studentRec) studentRec = (sessionData.students || []).find(st => _norm2(st.name || '') === _norm2(cellSn));
+          if (studentRec) {
+            if (studentRec.present === true) {
+              if (cell.textContent.trim() !== '✅') { cell.textContent = '✅'; cell.style.color = '#059669'; cell.style.fontWeight = '800'; }
+            } else {
+              if (cell.textContent.trim() !== '❌') { cell.textContent = '❌'; cell.style.color = '#DC2626'; cell.style.fontWeight = '800'; }
+            }
+          } else {
+            const isPast = cellSession < (window._attCurSession || 1);
+            const newVal = isPast ? '⚠️' : '⋯';
+            if (cell.textContent.trim() !== newVal) { cell.textContent = newVal; cell.style.color = isPast ? '' : '#9CA3AF'; cell.style.fontWeight = ''; }
+          }
         });
-        if (!changed) return;
-        if (window._attRenderDebounce) clearTimeout(window._attRenderDebounce);
-        window._attRenderDebounce = setTimeout(() => {
-          loadAttendanceSummary(teacherId);
-        }, 200);
       },
       err => console.warn('sessionAttendance listener error:', err.code)
     );
