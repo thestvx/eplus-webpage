@@ -7780,6 +7780,11 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         snap.forEach(d => {
           const data = d.data();
           if (!data.sessionNum) return;
+          // تجاهل الوثائق التي لا تنتمي للدورة الحالية
+          const docCycle = data.cycleNum || 1;
+          const gidCheck = data.gid || extractGidFromDoc(d.id);
+          const currentCycleForGid = window._cycleMap?.[gidCheck] || 1;
+          if (docCycle !== currentCycleForGid) return;
           let gid = data.gid || extractGidFromDoc(d.id);
           let cacheKey;
           if (gid) {
@@ -9474,9 +9479,10 @@ window.restoreArchiveCycle = async (archiveId) => {
     const cacheKey = teacherId + '|' + gid;
     _currentCycleCache[cacheKey] = restoreCycleNum;
 
-    // مسح كاش الحضور
-    if (window._attSummaryCache && window._attSummaryCache[teacherId]) {
-      delete window._attSummaryCache[teacherId][gid];
+    // مسح كاش الحضور بالكامل وإعادة ضبط المستمع لإجبار تحميل كامل من Firestore
+    if (window._attSessionUnsub) { window._attSessionUnsub(); window._attSessionUnsub = null; window._attSessionUnsubFor = null; }
+    if (window._attSummaryCache) {
+      delete window._attSummaryCache[teacherId];
     }
     if (window._ctrlMapCache) {
       delete window._ctrlMapCache[teacherId];
@@ -9911,7 +9917,8 @@ window.startNewAttendanceCycle = async (gid) => {
     // تحديث الكاش
     const cacheKey = teacherId + '|' + gid;
     _currentCycleCache[cacheKey] = nextCycleNum;
-    // حذف كامل ذاكرة الحضور لهذا الأستاذ لإجبار إعادة تحميل كاملة من Firestore
+    // حذف كامل ذاكرة الحضور وإعادة ضبط المستمع لإجبار إعادة تحميل كاملة من Firestore
+    if (window._attSessionUnsub) { window._attSessionUnsub(); window._attSessionUnsub = null; window._attSessionUnsubFor = null; }
     if (window._attSummaryCache) {
       delete window._attSummaryCache[teacherId];
     }
