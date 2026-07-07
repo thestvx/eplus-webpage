@@ -7755,6 +7755,9 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         where('__name__', '>=', teacherId),
         where('__name__', '<', teacherId + '_\ufff0')
       ),
+// ── Track recently toggled cells to prevent onSnapshot overwrite ──
+window._attRecentlyToggled = {};
+
       snap => {
         if (!window._attSummaryCache[teacherId]) return;
         const existing = window._attSummaryCache[teacherId];
@@ -7770,11 +7773,13 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
             const giMatch = d.id.match(/_g(\d+)_session_/);
             cacheKey = 'gi_' + (giMatch ? giMatch[1] : '0');
           }
+          const toggleKey = `${teacherId}|${cacheKey}|${data.sessionNum}`;
+          if (window._attRecentlyToggled[toggleKey]) {
+            const elapsed = Date.now() - window._attRecentlyToggled[toggleKey];
+            if (elapsed < 3000) return;
+            delete window._attRecentlyToggled[toggleKey];
+          }
           if (!existing[cacheKey]) existing[cacheKey] = {};
-          const existingDoc = existing[cacheKey][data.sessionNum];
-          const existingTime = existingDoc?._attUpdatedAt || 0;
-          const serverTime = data.savedAt?.toMillis?.() || 0;
-          if (existingTime > serverTime && existingTime > 0) return;
           existing[cacheKey][data.sessionNum] = data;
           changed = true;
         });
@@ -7782,7 +7787,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         if (window._attRenderDebounce) clearTimeout(window._attRenderDebounce);
         window._attRenderDebounce = setTimeout(() => {
           loadAttendanceSummary(teacherId);
-        }, 150);
+        }, 200);
       },
       err => console.warn('sessionAttendance listener error:', err.code)
     );
@@ -9913,6 +9918,8 @@ window.toggleDailyAttCell = async (teacherId, gid, sessionNum, studentId, studen
     }
     await setDoc(docRef, data);
     data._attUpdatedAt = Date.now();
+    const _toggleKey = `${teacherId}|${gid}|${sessionNum}`;
+    window._attRecentlyToggled[_toggleKey] = Date.now();
     if (window._attSummaryCache?.[teacherId]) {
       if (!window._attSummaryCache[teacherId][gid]) window._attSummaryCache[teacherId][gid] = {};
       window._attSummaryCache[teacherId][gid][sessionNum] = data;
