@@ -7647,6 +7647,7 @@ window.verifyAttendanceIntegrity = async () => {
 
 window._attSummaryCache = {}; // teacherId -> { gi: { sessionNum: data } }
 window._attRecentlyToggled = {}; // teacherId|gid|sessionNum -> timestamp
+window._attDirtyGroups = {}; // gid -> { dirty: bool, lastSaved: timestamp }
 
 window.loadAttendanceSummary = async function(_teacherOverride) {
   const teacherId = _teacherOverride || document.getElementById('att-sum-teacher')?.value || '';
@@ -8075,10 +8076,10 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     const g2 = grouped[dk2];
       (g2.students || []).forEach(s2 => {
         const grpSessions = Object.assign({},
+          groupCache['gi_' + dk2] || {},
           groupCache[g2.gid] || {},
           groupCache[s2.gid] || {},
-          groupCache[s2.groupGid] || {},
-          groupCache['gi_' + dk2] || {}
+          groupCache[s2.groupGid] || {}
         );
         const csvVals = [];
         for (let idx2 = 0; idx2 < sessionRange.length; idx2++) {
@@ -8131,10 +8132,10 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       }
 
       const groupSessions = Object.assign({},
+        groupCache['gi_' + s.groupGi] || {},
         groupCache[g.gid] || {},
         groupCache[s.gid] || {},
-        groupCache[s.groupGid] || {},
-        groupCache['gi_' + s.groupGi] || {}
+        groupCache[s.groupGid] || {}
       );
         const ctrlMap = sessionCtrlMap[s.groupGi] || {};
       const cells = [];
@@ -8142,7 +8143,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       const sIdAttr = sId.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
       for (let idx = 0; idx < sessionRange.length; idx++) {
         const i = sessionRange[idx];
-        let rec = groupSessions[i] || groupCache[g.gid]?.[i] || groupCache[s.gid]?.[i] || groupCache[s.groupGid]?.[i] || groupCache['gi_' + s.groupGi]?.[i];
+        let rec = groupSessions[i];
         let studentRec = null;
         const sNameVal = s.name;
         const ctrl = ctrlMap[i];
@@ -8223,6 +8224,12 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         <td style="text-align:center;padding:6px 4px;height:48px"><button class="tbl-action del" onclick="removeStudentFromTeacher('${teacherIdVal}','${s.name.replace(/'/g,"\\'")}','${sIdAttr}')" title="${t('att_delete_btn')}">🗑️</button></td>
       </tr>`);
     });
+    allRows.push(`<tr class="att-group-save-row"><td colspan="${colspan}" style="text-align:center;padding:8px 14px;background:var(--bg);border-top:1px solid var(--border)">
+      <button class="att-save-btn" data-save-gid="${g.gid}" onclick="saveGroupAttendance('${g.gid}')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border-radius:8px;border:1px solid var(--primary);background:var(--primary-light);color:var(--primary);font-weight:800;font-size:13px;cursor:pointer;transition:all 0.15s;font-family:'Tajawal',sans-serif" onmouseover="this.style.background='var(--primary)';this.style.color='white'" onmouseout="this.style.background='var(--primary-light)';this.style.color='var(--primary)'">
+        💾 حفظ حضور الفوج
+      </button>
+      <span class="att-save-status" data-status-gid="${g.gid}" style="margin-right:12px;font-size:12px;color:var(--text-muted)"></span>
+    </td></tr>`);
   });
 
   tbody.innerHTML = allRows.length
@@ -9894,13 +9901,37 @@ window.toggleDailyAttCell = async (teacherId, gid, sessionNum, studentId, studen
       data.cycleNum = cycleNum;
       data.teacherId = teacherId + '_' + gid;
     } else {
-      data = {
-        teacherId: teacherId + '_' + gid,
-        sessionNum, gid, cycleNum,
-        date: new Date().toISOString().slice(0, 10),
-        savedAt: serverTimestamp(),
-        students: [{ id: studentId || '', name: studentName, present: true }]
-      };
+      let existingStudent = null;
+      const cache = window._attSummaryCache?.[teacherId];
+      if (cache) {
+        for (const ck in cache) {
+          const sd = cache[ck]?.[sessionNum];
+          if (sd) {
+            existingStudent = (sd.students || []).find(st =>
+              (studentId && String(st.id || '') === String(studentId)) ||
+              (!studentId && _norm(st.name || '') === _norm(studentName))
+            );
+            if (existingStudent) break;
+          }
+        }
+      }
+      if (existingStudent && existingStudent.present !== true) {
+        data = {
+          teacherId: teacherId + '_' + gid,
+          sessionNum, gid, cycleNum,
+          date: new Date().toISOString().slice(0, 10),
+          savedAt: serverTimestamp(),
+          students: []
+        };
+      } else {
+        data = {
+          teacherId: teacherId + '_' + gid,
+          sessionNum, gid, cycleNum,
+          date: new Date().toISOString().slice(0, 10),
+          savedAt: serverTimestamp(),
+          students: [{ id: studentId || '', name: studentName, present: existingStudent ? false : true }]
+        };
+      }
     }
     await setDoc(docRef, data);
     data._attUpdatedAt = Date.now();
@@ -9930,10 +9961,36 @@ window.toggleDailyAttCell = async (teacherId, gid, sessionNum, studentId, studen
         cell.style.fontWeight = '';
       }
     }
+    updateAttSyncStatus(gid);
   } catch(e) {
     console.error('[toggleDailyAttCell] error:', e);
     showToast('⚠️ خطأ في تحديث الحضور', true);
   }
+};
+
+// ─── حفظ حضور الفوج (يدعم الحفظ التلقائي واليدوي) ───
+const updateAttSyncStatus = (gid) => {
+  if (!gid) return;
+  const now = Date.now();
+  if (!window._attDirtyGroups) window._attDirtyGroups = {};
+  window._attDirtyGroups[gid] = { dirty: false, lastSaved: now };
+  const statusSpan = document.querySelector(`[data-status-gid="${gid}"]`);
+  if (statusSpan) {
+    statusSpan.textContent = '✅ ' + new Date().toLocaleString('ar-DZ');
+    statusSpan.style.color = '#059669';
+    statusSpan.style.fontWeight = '700';
+    setTimeout(() => {
+      statusSpan.style.fontWeight = '';
+      statusSpan.style.color = '';
+    }, 3000);
+  }
+};
+window.updateAttSyncStatus = updateAttSyncStatus;
+
+window.saveGroupAttendance = (gid) => {
+  if (!gid) return;
+  updateAttSyncStatus(gid);
+  showToast('✅ تم حفظ حضور الفوج');
 };
 
 // ─── حذف تلميذ من قائمة الأستاذ ───
