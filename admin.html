@@ -7716,8 +7716,11 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       sessSnap.forEach(d => {
         const data = d.data();
         if (!data.sessionNum) return;
-        // تصفية حسب الدورة: إذا كان cycleNum موجوداً ولا يطابق الدورة الحالية، نتجاهله
         const docCycle = data.cycleNum || 1;
+        // تجاهل الوثائق التي لا تنتمي للدورة الحالية
+        const gidRaw = data.gid || extractGidFromDoc(d.id);
+        const currentCycleForGid = _cycleMap[gidRaw] || 1;
+        if (docCycle !== currentCycleForGid) return;
         let gid = data.gid || extractGidFromDoc(d.id);
         let cacheKey;
         if (gid) {
