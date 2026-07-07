@@ -7774,39 +7774,6 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           if (!existing[cacheKey]) existing[cacheKey] = {};
           existing[cacheKey][data.sessionNum] = data;
         });
-        window._attSummaryCache[teacherId] = existing;
-        const tbody = document.getElementById('att-sum-tbody');
-        if (!tbody) return;
-        const cells = tbody.querySelectorAll('[data-att-cell]');
-        cells.forEach(cell => {
-          const cellGid = cell.dataset.gid;
-          const cellSession = parseInt(cell.dataset.session, 10);
-          const cellStudentId = cell.dataset.studentId || '';
-          const cellSn = cell.dataset.sn || '';
-          const toggleKey = `${teacherId}|${cellGid}|${cellSession}`;
-          if (window._attRecentlyToggled[toggleKey]) {
-            const elapsed = Date.now() - window._attRecentlyToggled[toggleKey];
-            if (elapsed < 3000) return;
-            delete window._attRecentlyToggled[toggleKey];
-          }
-          const sessionData = existing[cellGid]?.[cellSession];
-          if (!sessionData) return;
-          const _norm2 = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
-          let studentRec = null;
-          if (cellStudentId) studentRec = (sessionData.students || []).find(st => String(st.id || '') === cellStudentId);
-          if (!studentRec) studentRec = (sessionData.students || []).find(st => _norm2(st.name || '') === _norm2(cellSn));
-          if (studentRec) {
-            if (studentRec.present === true) {
-              if (cell.textContent.trim() !== '✅') { cell.textContent = '✅'; cell.style.color = '#059669'; cell.style.fontWeight = '800'; }
-            } else {
-              if (cell.textContent.trim() !== '❌') { cell.textContent = '❌'; cell.style.color = '#DC2626'; cell.style.fontWeight = '800'; }
-            }
-          } else {
-            const isPast = cellSession < (window._attCurSession || 1);
-            const newVal = isPast ? '⚠️' : '⋯';
-            if (cell.textContent.trim() !== newVal) { cell.textContent = newVal; cell.style.color = isPast ? '' : '#9CA3AF'; cell.style.fontWeight = ''; }
-          }
-        });
       },
       err => console.warn('sessionAttendance listener error:', err.code)
     );
