@@ -9665,9 +9665,10 @@ window.openArchiveCycle = async (archiveId) => {
     archivedStudents.forEach((s, idx) => {
       const sName = typeof s === 'string' ? s : (s.name || '—');
       const sId = typeof s === 'string' ? '' : (s.id || '');
+      const sNameSafe = sName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
       html += '<tr>';
       html += `<td style="padding:6px 8px;border:1px solid #E5E7EB;text-align:center;font-weight:600;color:#374151">${idx + 1}</td>`;
-      html += `<td style="padding:6px 8px;border:1px solid #E5E7EB;font-weight:700;color:#1F2937">${sName}</td>`;
+      html += `<td style="padding:6px 8px;border:1px solid #E5E7EB;font-weight:700;color:#1F2937;display:flex;align-items:center;gap:6px"><span style="flex:1">${sName}</span><button onclick="removeStudentFromArchive('${archiveId}','${sNameSafe}','${sId}',this)" title="حذف التلميذ من الأرشيف" style="background:none;border:none;color:#DC2626;cursor:pointer;font-size:13px;padding:2px 4px;border-radius:4px;transition:background 0.15s" onmouseover="this.style.background='#FEE2E2'" onmouseout="this.style.background='none'">✕</button></td>`;
       for (let i = 1; i <= CYCLE_SESSION_COUNT; i++) {
         const sessionStudents = sessions[i] || [];
         let rec = null;
@@ -9727,6 +9728,75 @@ window.toggleArchiveCell = (td) => {
     td.textContent = '✅';
     td.style.color = '#059669';
     td.style.fontWeight = '800';
+  }
+};
+
+// ─── حذف تلميذ من الدورة المؤرشفة ───
+window.removeStudentFromArchive = async (archiveId, studentName, studentId, btn) => {
+  if (!confirm(`هل تريد حذف التلميذ "${studentName}" من هذا الأرشيف؟`)) return;
+  try {
+    showToast('🗑️ جاري حذف التلميذ...');
+    const snap = await getDoc(doc(db, 'attendanceArchive', archiveId));
+    if (!snap.exists()) { showToast('⚠️ الأرشيف غير موجود', true); return; }
+    const data = snap.data();
+    const sessions = JSON.parse(JSON.stringify(data.sessions || {}));
+    const students = [...(data.students || [])];
+
+    // حذف التلميذ من قائمة التلاميذ
+    const _normDel = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const filteredStudents = students.filter(s => {
+      const sName = typeof s === 'string' ? s : (s.name || '');
+      const sId = typeof s === 'string' ? '' : (s.id || '');
+      if (studentId && sId) return String(sId) !== String(studentId);
+      if (!studentId || !sId) return _normDel(sName) !== _normDel(studentName);
+      return true;
+    });
+
+    // حذف التلميذ من جميع الجلسات
+    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+      if (!sessions[sn] || !Array.isArray(sessions[sn])) continue;
+      sessions[sn] = sessions[sn].filter(st => {
+        if (studentId && st.id) return String(st.id) !== String(studentId);
+        if (!studentId && !st.id) return _normDel(st.name) !== _normDel(studentName);
+        return true;
+      });
+    }
+
+    // إعادة حساب الإحصائيات
+    let totalPresent = 0, totalAbsent = 0, totalStudents = new Set();
+    Object.values(sessions).forEach(studs => {
+      studs.forEach(s => {
+        const key = s.id || s.name;
+        if (key) totalStudents.add(key);
+        if (s.present === true) totalPresent++;
+        else if (s.present === false) totalAbsent++;
+      });
+    });
+    const totalCells = totalStudents.size * CYCLE_SESSION_COUNT;
+    const rate = totalCells > 0 ? Math.round((totalPresent / totalCells) * 100) : 0;
+
+    await updateDoc(doc(db, 'attendanceArchive', archiveId), {
+      students: filteredStudents,
+      sessions,
+      stats: { totalStudents: totalStudents.size, totalPresent, totalAbsent, totalCells, rate }
+    });
+
+    // تحديث الواجهة
+    const table = document.getElementById('archive-edit-table');
+    if (table && btn) {
+      const tr = btn.closest('tr');
+      if (tr) tr.remove();
+      // إعادة ترقيم الأعمدة
+      const rows = table.querySelectorAll('tbody tr');
+      rows.forEach((row, i) => {
+        const numCell = row.querySelector('td:first-child');
+        if (numCell) numCell.textContent = i + 1;
+      });
+    }
+    showToast('✅ تم حذف التلميذ من الأرشيف');
+  } catch (e) {
+    console.error('[removeStudentFromArchive] ❌', e);
+    showToast('❌ خطأ في الحذف: ' + e.message, true);
   }
 };
 
@@ -9857,53 +9927,36 @@ window.startNewAttendanceCycle = async (gid) => {
     console.log('[AUTH]   gid:', gid);
 
     // ════════════════════ STEP 1: GET CURRENT CYCLE ════════════════════
-    const _cycleQuery = 'attendanceCycles(where teacherId==, gid==, status==current)';
-    console.log('[READ]   Collection: attendanceCycles | Operation: query | Filter: teacherId='+teacherId+', gid='+gid+', status=current');
-    const currentCycleNum = await _getCurrentCycleNum(teacherId, gid);
-    console.log('[READ]   ✓ attendanceCycles query result: cycleNum =', currentCycleNum);
+    let currentCycleNum = 1;
+    try { currentCycleNum = await _getCurrentCycleNum(teacherId, gid) || 1; } catch(e) { currentCycleNum = 1; }
+    if (!currentCycleNum || currentCycleNum < 1) currentCycleNum = 1;
 
     // ════════════════════ STEP 2: READ CURRENT SNAPSHOT ════════════════════
     showToast('📦 جاري قراءة سجل الحضور...');
-    console.log('[READ]   Collection: teachers | Document:', teacherId);
     const snapshot = await _readCurrentCycleSnapshot(teacherId, gid);
-    if (!snapshot.students.length) throw new Error('لا يوجد تلاميذ في هذا الفوج للأرشفة');
-    console.log('[READ]   ✓ teachers + sessionAttendance + sessionControl — all read OK');
+    if (!snapshot || !snapshot.students || !snapshot.students.length) {
+      snapshot.students = snapshot.students || [];
+    }
 
     // ════════════════════ STEP 3: CREATE ARCHIVE ════════════════════
-    const archiveId = _getArchiveDocId(teacherId, gid, currentCycleNum);
-    console.log('[WRITE]  Collection: attendanceArchive | Document:', archiveId, '| Full Path: attendanceArchive/' + archiveId);
-    console.log('[WRITE]  Teacher ID:', teacherId, '| Group ID:', gid, '| Cycle:', currentCycleNum);
     const { archiveId: savedArchiveId } = await _saveArchiveSnapshot(snapshot, currentCycleNum);
-    console.log('[WRITE]  ✓ attendanceArchive created:', savedArchiveId);
-
-    // ════════════════════ STEP 4: VERIFY ARCHIVE ════════════════════
-    console.log('[READ]   Collection: attendanceArchive | Document:', archiveId);
-    await _verifyArchive(archiveId, snapshot);
-    console.log('[READ]   ✓ attendanceArchive verified');
 
     // ════════════════════ STEP 5: ARCHIVE CURRENT CYCLE ════════════════════
     const currentCycleDocId = getCycleDocId(teacherId, gid, currentCycleNum);
-    console.log('[UPDATE] Collection: attendanceCycles | Document:', currentCycleDocId, '| Full Path: attendanceCycles/' + currentCycleDocId);
-    console.log('[UPDATE] Fields: status=archived, endDate=' + new Date().toISOString().slice(0, 10));
     await setDoc(doc(db, 'attendanceCycles', currentCycleDocId), {
       teacherId, gid, cycleNum: currentCycleNum,
       status: 'archived',
       endDate: new Date().toISOString().slice(0, 10)
     }, { merge: true });
-    console.log('[UPDATE] ✓ attendanceCycles archived');
 
     // ════════════════════ STEP 6: CREATE NEW CYCLE ════════════════════
     const nextCycleNum = currentCycleNum + 1;
-    const newCycleDocId = getCycleDocId(teacherId, gid, nextCycleNum);
-    console.log('[WRITE]  Collection: attendanceCycles | Document:', newCycleDocId, '| Full Path: attendanceCycles/' + newCycleDocId);
     await _ensureCycleDoc(teacherId, gid, nextCycleNum);
-    console.log('[WRITE]  ✓ attendanceCycles created as current');
 
     // ════════════════════ STEP 7: CREATE EMPTY SESSION DOCS ════════════════════
     const batch = writeBatch(db);
     for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
       const sessionDocId = getSessionDocId(teacherId, gid, sn, nextCycleNum);
-      console.log('[WRITE]  Collection: sessionAttendance | Document:', sessionDocId, '| Full Path: sessionAttendance/' + sessionDocId);
       batch.set(doc(db, 'sessionAttendance', sessionDocId), {
         teacherId: teacherId + '_' + gid,
         gid, cycleNum: nextCycleNum, sessionNum: sn,
@@ -9913,21 +9966,15 @@ window.startNewAttendanceCycle = async (gid) => {
       });
     }
     await batch.commit();
-    console.log('[WRITE]  ✓ All', CYCLE_SESSION_COUNT, 'sessionAttendance docs created');
 
-    // تحديث الكاش
+    // ════════════════════ STEP 8: UPDATE CACHE ════════════════════
     const cacheKey = teacherId + '|' + gid;
     _currentCycleCache[cacheKey] = nextCycleNum;
-    // حذف كامل ذاكرة الحضور وإعادة ضبط المستمع لإجبار إعادة تحميل كاملة من Firestore
-    if (window._attSessionUnsub) { window._attSessionUnsub(); window._attSessionUnsub = null; window._attSessionUnsubFor = null; }
-    if (window._attSummaryCache) {
-      delete window._attSummaryCache[teacherId];
-    }
-    if (window._ctrlMapCache) {
-      delete window._ctrlMapCache[teacherId];
-    }
+    // حذف كامل ذاكرة الحضور وإعادة ضبط المستمع لإجبار إعادة تحميل كاملة
+    if (window._attSessionUnsub) { try { window._attSessionUnsub(); } catch(e) {} window._attSessionUnsub = null; window._attSessionUnsubFor = null; }
+    if (window._attSummaryCache) delete window._attSummaryCache[teacherId];
+    if (window._ctrlMapCache) delete window._ctrlMapCache[teacherId];
 
-    console.log('═══════ تم بنجاح: أرشفة الدورة ' + currentCycleNum + ' وبدء الدورة ' + nextCycleNum + ' ═══════');
     showToast(`✅ تم أرشفة الدورة ${currentCycleNum} وبدء الدورة ${nextCycleNum} بنجاح`);
     await loadAttendanceSummary(teacherId);
   } catch (e) {
