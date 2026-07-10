@@ -7713,6 +7713,20 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         }
       }
     });
+    // ربط العكس: لكل gid حقيقي، أضف also gi_N المقابلة
+    // هذا يحل مشكلة الوثائق القديمة التي تحمل data.gid = 'gi_N'
+    groupsData.forEach((g, idx) => {
+      if (g && g._gid && _cycleMap[g._gid] && !_cycleMap['gi_' + idx]) {
+        _cycleMap['gi_' + idx] = _cycleMap[g._gid];
+      }
+    });
+    // ربط أسماء الفئات (s.groupGid) بـ cycleNum
+    const _attAllStudents = [];
+    groupsData.forEach(g => {
+      (g.students || []).forEach(sName => {
+        _attAllStudents.push({ name: typeof sName === 'string' ? sName : sName.name, gid: g._gid });
+      });
+    });
     console.log(`[ATT] _cycleMap for ${teacherId}:`, JSON.stringify(_cycleMap));
     window._cycleMap = _cycleMap;
   } catch (e) { console.warn('[ATT] cycleMap query failed:', e.message); }
@@ -9297,24 +9311,9 @@ async function _readCurrentCycleSnapshot(teacherId, gid) {
   const totalCells = totalStudents * CYCLE_SESSION_COUNT;
   const rate = totalCells > 0 ? Math.round((totalPresent / totalCells) * 100) : 0;
 
-  // جمع كل التلاميذ من جميع مصادر الفوج (group.students + flat list + session data)
   const groupStudentsSnap = (group.students || []).map(s => {
     if (typeof s === 'string') return { id: '', name: s };
     return { id: s.id || '', name: s.name || '', receipt: s.receipt || '', payStatus: s.payStatus || '', joinedAtSession: s.joinedAtSession || 1 };
-  });
-  // إضافة التلاميذ الموجودين في بيانات الجلسات لكن غير موجودين في group.students
-  const existingNames = new Set(groupStudentsSnap.map(s => (s.name || '').trim().toLowerCase()));
-  const existingIds = new Set(groupStudentsSnap.map(s => String(s.id || '')).filter(Boolean));
-  Object.values(sessions).forEach(studs => {
-    studs.forEach(s => {
-      const nameKey = (s.name || '').trim().toLowerCase();
-      const idKey = String(s.id || '');
-      if ((nameKey && !existingNames.has(nameKey)) || (idKey && !existingIds.has(idKey))) {
-        groupStudentsSnap.push({ id: idKey, name: s.name || '', receipt: s.receipt || '', payStatus: s.payStatus || '', joinedAtSession: s.joinedAtSession || 1 });
-        if (nameKey) existingNames.add(nameKey);
-        if (idKey) existingIds.add(idKey);
-      }
-    });
   });
 
   console.log(`[readSnapshot] Result: ${Object.keys(sessions).filter(k => sessions[k].length > 0).length}/${CYCLE_SESSION_COUNT} sessions with data, ${groupStudentsSnap.length} students`);
