@@ -9209,10 +9209,11 @@ async function _readCurrentCycleSnapshot(teacherId, gid) {
   if (!group) throw new Error('الفوج غير موجود');
   const currentGi = groupsArr.findIndex(g => g && g._gid === gid);
   const cycleNum = await _getCurrentCycleNum(teacherId, gid);
-  console.log(`[readSnapshot] teacher=${teacherId} gid=${gid} cycle=${cycleNum} gi=${currentGi}`);
 
-  // ── الخطوة 1: جلب كل وثائق الحضور لهذا الأستاذ عبر query ──
-  // بدلاً من дог guess لـ doc IDs، نجلب الكل ونفلتر
+  console.log(`[readSnapshot] teacher=${teacherId} gid=${gid} cycle=${cycleNum} gi=${currentGi} groupStudents=${group.students?.length || 0}`);
+
+  // ── الخطوة 1: جلب كل وثائق الحضور لهذا الأستاذ عبر query واحد ──
+  // ثم فلترة في الكود: cycleNum + gid + sessionNum
   let allSessionDocs = [];
   try {
     const sessSnap = await getDocs(query(
@@ -9223,68 +9224,43 @@ async function _readCurrentCycleSnapshot(teacherId, gid) {
     sessSnap.forEach(d => {
       const data = d.data();
       if (!data.sessionNum) return;
-      allSessionDocs.push({ id: d.id, data });
+      // فلترة: الدورة الحالية + هذا الفوج + جلسة صالحة
+      const docCycle = data.cycleNum || 1;
+      const docGid = data.gid || extractGidFromDoc(d.id) || '';
+      if (docCycle !== cycleNum) return;
+      if (docGid !== gid && docGid !== ('gi_' + currentGi) && docGid !== ('g' + currentGi)) return;
+      allSessionDocs.push({ id: d.id, data, docGid, docCycle });
     });
   } catch (e) {
-    console.warn('[readSnapshot] query failed, falling back to doc IDs:', e.message);
+    console.warn('[readSnapshot] query failed:', e.message);
   }
-  console.log(`[readSnapshot] Found ${allSessionDocs.length} total session docs via query`);
+  console.log(`[readSnapshot] Found ${allSessionDocs.length} session docs for cycle ${cycleNum}, gid ${gid}`);
 
-  // ── الخطوة 2: تجميع البيانات حسب الجلسة ──
+  // ── الخطوة 2: تجميع الطلاب لكل جلسة (1-12) ──
   const sessions = {};
-  const candidateGids = [gid];
-  if (currentGi >= 0) {
-    candidateGids.push('gi_' + currentGi);
-    candidateGids.push('g' + currentGi);
-  }
   for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-    let found = false;
-    // أولوية: البحث في كل الوثائق المجلوبة حسب gid المناسب
-    for (const doc of allSessionDocs) {
-      const d = doc.data;
-      if (d.sessionNum !== sn) continue;
-      const docGid = d.gid || extractGidFromDoc(doc.id) || '';
-      if (!candidateGids.includes(docGid)) continue;
-      const students = d.students || [];
-      if (students.length > 0) {
-        sessions[sn] = students;
-        found = true;
-        console.log(`[readSnapshot] Session ${sn}: found ${students.length} students from doc ${doc.id} (gid=${docGid})`);
-        break;
+    const relevantDocs = allSessionDocs.filter(d => d.data.sessionNum === sn);
+    if (relevantDocs.length > 0) {
+      // دمج الطلاب من جميع الوثائق ذات الصلة (مع إزالة التكرار)
+      const mergedStudents = [];
+      const seen = new Set();
+      for (const doc of relevantDocs) {
+        for (const s of (doc.data.students || [])) {
+          const key = s.id ? `id:${s.id}` : `name:${(s.name || '').trim().toLowerCase()}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            mergedStudents.push(s);
+          }
+        }
       }
+      sessions[sn] = mergedStudents;
+      console.log(`[readSnapshot] Session ${sn}: ${mergedStudents.length} students (from ${relevantDocs.length} doc(s))`);
+    } else {
+      sessions[sn] = [];
     }
-    if (found) continue;
-
-    // فallback: جلب الوثيقة مباشرة بالـ doc ID (للتوافق مع الصيغ القديمة)
-    const docIdNew = getSessionDocId(teacherId, gid, sn, cycleNum);
-    const snapNew = await getDoc(doc(db, 'sessionAttendance', docIdNew));
-    if (snapNew.exists()) {
-      const students = snapNew.data().students || [];
-      if (students.length > 0) { sessions[sn] = students; console.log(`[readSnapshot] Session ${sn}: fallback found ${students.length} from ${docIdNew}`); continue; }
-    }
-    const docIdLegacy = `${teacherId}_${gid}_session_${sn}`;
-    const snapLegacy = await getDoc(doc(db, 'sessionAttendance', docIdLegacy));
-    if (snapLegacy.exists()) {
-      const students = snapLegacy.data().students || [];
-      if (students.length > 0) { sessions[sn] = students; console.log(`[readSnapshot] Session ${sn}: legacy found ${students.length} from ${docIdLegacy}`); continue; }
-    }
-    if (currentGi >= 0) {
-      const docIdGi = `${teacherId}_gi_${currentGi}_session_${sn}`;
-      const snapGi = await getDoc(doc(db, 'sessionAttendance', docIdGi));
-      if (snapGi.exists()) {
-        const students = snapGi.data().students || [];
-        if (students.length > 0) { sessions[sn] = students; console.log(`[readSnapshot] Session ${sn}: gi found ${students.length} from ${docIdGi}`); continue; }
-      }
-      const docIdOld = `${teacherId}_g${currentGi}_session_${sn}`;
-      const snapOld = await getDoc(doc(db, 'sessionAttendance', docIdOld));
-      if (snapOld.exists()) {
-        const students = snapOld.data().students || [];
-        if (students.length > 0) { sessions[sn] = students; console.log(`[readSnapshot] Session ${sn}: old found ${students.length} from ${docIdOld}`); continue; }
-      }
-    }
-    sessions[sn] = [];
   }
 
+  // ── الخطوة 3: جلسة التحكم (control) ──
   const sessionControls = {};
   for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
     const ctrlDocIdNew = getCtrlDocId(teacherId, gid, sn);
@@ -9297,6 +9273,7 @@ async function _readCurrentCycleSnapshot(teacherId, gid) {
     }
   }
 
+  // ── الخطوة 4: الإحصائيات ──
   let totalPresent = 0, totalAbsent = 0;
   const studentIdSet = new Set();
   Object.values(sessions).forEach(studs => {
@@ -9311,12 +9288,13 @@ async function _readCurrentCycleSnapshot(teacherId, gid) {
   const totalCells = totalStudents * CYCLE_SESSION_COUNT;
   const rate = totalCells > 0 ? Math.round((totalPresent / totalCells) * 100) : 0;
 
+  // ── الخطوة 5: قائمة التلاميذ من group.students فقط ──
   const groupStudentsSnap = (group.students || []).map(s => {
     if (typeof s === 'string') return { id: '', name: s };
     return { id: s.id || '', name: s.name || '', receipt: s.receipt || '', payStatus: s.payStatus || '', joinedAtSession: s.joinedAtSession || 1 };
   });
 
-  console.log(`[readSnapshot] Result: ${Object.keys(sessions).filter(k => sessions[k].length > 0).length}/${CYCLE_SESSION_COUNT} sessions with data, ${groupStudentsSnap.length} students`);
+  console.log(`[readSnapshot] DONE: ${Object.keys(sessions).filter(k => sessions[k].length > 0).length}/${CYCLE_SESSION_COUNT} sessions with data, ${groupStudentsSnap.length} students`);
 
   return {
     teacherId, gid,
