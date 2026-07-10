@@ -7747,7 +7747,15 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         const docCycle = data.cycleNum || 1;
         // تجاهل الوثائق التي لا تنتمي للدورة الحالية
         const gidRaw = data.gid || extractGidFromDoc(d.id);
-        const currentCycleForGid = _cycleMap[gidRaw] || 1;
+        let currentCycleForGid = _cycleMap[gidRaw];
+        if (currentCycleForGid === undefined) {
+          // fallback: إذا كان gidRaw بصيغة gi_N، جرب العثور على gid الحقيقي
+          const giMatch = gidRaw.match(/^gi_(\d+)$/);
+          if (giMatch && groupsData[parseInt(giMatch[1])]?._gid) {
+            currentCycleForGid = _cycleMap[groupsData[parseInt(giMatch[1])]._gid];
+          }
+        }
+        if (currentCycleForGid === undefined) currentCycleForGid = 1;
         if (docCycle !== currentCycleForGid) return;
         let gid = data.gid || extractGidFromDoc(d.id);
         let cacheKey;
@@ -7798,7 +7806,15 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           // تجاهل الوثائق التي لا تنتمي للدورة الحالية
           const docCycle = data.cycleNum || 1;
           const gidCheck = data.gid || extractGidFromDoc(d.id);
-          const currentCycleForGid = window._cycleMap?.[gidCheck] || 1;
+          let currentCycleForGid = window._cycleMap?.[gidCheck];
+          if (currentCycleForGid === undefined) {
+            // fallback: إذا كان gidCheck بصيغة gi_N، جرب العثور على gid الحقيقي
+            const giMatch = gidCheck.match(/^gi_(\d+)$/);
+            if (giMatch && groupsData?.[parseInt(giMatch[1])]?._gid) {
+              currentCycleForGid = window._cycleMap?.[groupsData[parseInt(giMatch[1])]._gid];
+            }
+          }
+          if (currentCycleForGid === undefined) currentCycleForGid = 1;
           if (docCycle !== currentCycleForGid) return;
           let gid = data.gid || extractGidFromDoc(d.id);
           let cacheKey;
@@ -9984,22 +10000,14 @@ window.startNewAttendanceCycle = async (gid) => {
     }
 
     // ════════════════════ STEP 3: CREATE ARCHIVE ════════════════════
+    showToast('💾 جاري حفظ الأرشيف...');
     const { archiveId: savedArchiveId } = await _saveArchiveSnapshot(snapshot, currentCycleNum);
-    console.log('[STEP3] Archive saved:', savedArchiveId, 'students:', snapshot.students.length);
+    console.log('[STEP 3] Archive saved:', savedArchiveId, 'students:', snapshot.students.length);
 
-    // ════════════════════ STEP 3.5: VERIFY ARCHIVE ════════════════════
-    const _verifySnap = await getDoc(doc(db, 'attendanceArchive', savedArchiveId));
-    if (!_verifySnap.exists()) throw new Error('فشل التحقق من الأرشيف — الوثيقة غير موجودة بعد الحفظ');
-    const _verifyData = _verifySnap.data();
-    console.log('[STEP3.5] Verified: students=', (_verifyData.students || []).length, 'sessions keys=', Object.keys(_verifyData.sessions || {}).length);
-    if ((!_verifyData.students || _verifyData.students.length === 0) && snapshot.students.length > 0) {
-      console.warn('[STEP3.5] ⚠️ Archive has 0 students but snapshot had', snapshot.students.length, '— forcing save');
-      await updateDoc(doc(db, 'attendanceArchive', savedArchiveId), {
-        students: snapshot.students,
-        sessions: snapshot.sessions,
-        stats: snapshot.stats
-      });
-    }
+    // ════════════════════ STEP 4: FULL VERIFY ARCHIVE (EXACT MATCH) ════════════════════
+    showToast('🔍 جاري التحقق الكامل من الأرشيف...');
+    await _verifyArchive(savedArchiveId, snapshot);
+    console.log('[STEP 4] ✅ Archive VERIFIED — exact match with snapshot');
 
     // ════════════════════ STEP 5: ARCHIVE CURRENT CYCLE ════════════════════
     const currentCycleDocId = getCycleDocId(teacherId, gid, currentCycleNum);
@@ -10008,14 +10016,15 @@ window.startNewAttendanceCycle = async (gid) => {
       status: 'archived',
       endDate: new Date().toISOString().slice(0, 10)
     }, { merge: true });
-    console.log('[STEP5] Cycle archived:', currentCycleDocId);
+    console.log('[STEP 5] Cycle archived:', currentCycleDocId);
 
     // ════════════════════ STEP 6: CREATE NEW CYCLE ════════════════════
     const nextCycleNum = currentCycleNum + 1;
     await _ensureCycleDoc(teacherId, gid, nextCycleNum);
-    console.log('[STEP6] New cycle created:', nextCycleNum);
+    console.log('[STEP 6] New cycle created:', nextCycleNum);
 
-    // ════════════════════ STEP 7: CREATE EMPTY SESSION DOCS ════════════════════
+    // ════════════════════ STEP 7: CREATE EMPTY SESSION DOCS (ALL ⋯) ════════════════════
+    showToast('🆕 جاري إنشاء سجل الحضور الجديد...');
     const batch = writeBatch(db);
     for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
       const sessionDocId = getSessionDocId(teacherId, gid, sn, nextCycleNum);
@@ -10028,9 +10037,9 @@ window.startNewAttendanceCycle = async (gid) => {
       });
     }
     await batch.commit();
-    console.log('[STEP7] Empty session docs created for cycle', nextCycleNum);
+    console.log('[STEP 7] Empty session docs created for cycle', nextCycleNum);
 
-    // ════════════════════ STEP 8: UPDATE CACHE ════════════════════
+    // ════════════════════ STEP 8: UPDATE CACHE & RELOAD ════════════════════
     const cacheKey = teacherId + '|' + gid;
     _currentCycleCache[cacheKey] = nextCycleNum;
     // حذف كامل ذاكرة الحضور وإعادة ضبط المستمع لإجبار إعادة تحميل كاملة
@@ -10038,10 +10047,12 @@ window.startNewAttendanceCycle = async (gid) => {
     if (window._attSummaryCache) delete window._attSummaryCache[teacherId];
     if (window._ctrlMapCache) delete window._ctrlMapCache[teacherId];
 
-    console.log('[STEP8] Cache cleared, reloading...');
+    console.log('[STEP 8] Cache cleared, reloading...');
     showToast(`✅ تم أرشفة الدورة ${currentCycleNum} وبدء الدورة ${nextCycleNum} بنجاح`);
     await loadAttendanceSummary(teacherId);
-    console.log('═══════ انتهت الأرشفة بنجاح ═══════');
+    console.log('═══════════════════════════════════════');
+    console.log('✅ انتهت الأرشفة بنجاح');
+    console.log('═══════════════════════════════════════');
   } catch (e) {
     console.log('═══════ فشل في الخطوة أعلاه ═══════');
     console.error('[startNewAttendanceCycle] ❌', e);
