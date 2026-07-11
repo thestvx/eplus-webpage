@@ -1488,6 +1488,21 @@
     .finance-modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
     .finance-modal-title{font-size:16px;font-weight:900;color:var(--text);flex:1}
     .finance-modal-body{padding:22px 24px}
+
+    /* ── Supabase Migration Modal ── */
+    .migrate-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:none;align-items:center;justify-content:center}
+    .migrate-overlay.open{display:flex}
+    .migrate-modal{background:var(--card-bg);border-radius:16px;width:90%;max-width:640px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+    .migrate-header{padding:16px 20px;border-bottom:1px solid var(--border);font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px}
+    .migrate-body{padding:16px 20px;overflow-y:auto;flex:1}
+    .migrate-log{background:#1e293b;color:#e2e8f0;font-family:Consolas,monospace;font-size:12px;padding:12px;border-radius:8px;max-height:300px;overflow-y:auto;white-space:pre-wrap;direction:ltr;text-align:left;margin-top:12px}
+    .migrate-log .ok{color:#34d399}
+    .migrate-log .err{color:#f87171}
+    .migrate-log .info{color:#60a5fa}
+    .migrate-log .warn{color:#fbbf24}
+    .migrate-progress{height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;margin:8px 0}
+    .migrate-progress .fill{height:100%;background:#10b981;border-radius:3px;transition:width .3s;width:0}
+    .migrate-stat{display:inline-block;background:var(--card-bg);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;margin:2px}
 </style>
 </head>
 <body>
@@ -1658,6 +1673,7 @@
         </div>
       </div>
         <a href="index.html" class="topbar-btn"><span data-i18n="main_site">🏠 الموقع الرئيسي</span></a>
+        <button class="topbar-btn" id="migrateBtn" onclick="migrateToSupabase()" style="border-color:rgba(16,185,129,0.25);color:#059669;background:var(--success-soft)"><span data-i18n="migrate">🚀 ترحيل → Supabase</span></button>
         <button class="topbar-btn" onclick="doLogout()" style="border-color:rgba(239,68,68,0.25);color:#DC2626;background:var(--danger-soft)"><span data-i18n="logout_short">🚪 خروج</span></button>
       </div>
     </div>
@@ -3270,6 +3286,33 @@
     <div class="sync-confirm-btns">
       <button class="sync-confirm-cancel" onclick="closeRestoreAttendanceModal()">إلغاء</button>
       <button class="sync-confirm-ok" id="restore-att-confirm-btn" onclick="confirmRestoreAttendance()" style="display:none">✅ تأكيد الاسترجاع</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SUPABASE MIGRATION MODAL ===== -->
+<div class="migrate-overlay" id="migrateModal" onclick="if(event.target===this)closeMigrateModal()">
+  <div class="migrate-modal">
+    <div class="migrate-header">
+      <span>🚀</span> ترحيل إلى Supabase
+      <span style="flex:1"></span>
+      <button onclick="closeMigrateModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text)">✕</button>
+    </div>
+    <div class="migrate-body">
+      <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;font-size:13px;margin-bottom:12px">
+        ⚠️ الترحيل يقرأ من Firebase Firestore ويكتب إلى Supabase. بيانات Firebase تبقى سليمة.
+      </div>
+      <div style="margin:8px 0">
+        <label style="font-weight:600;font-size:13px">Supabase Service Role Key</label>
+        <input id="supabaseKey" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:13px;margin-top:4px" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzc1MjY3MywiZXhwIjoyMDk5MzI4NjczfQ.fsG8Y7mK2fpODGQ3SMibDDrgAAnW6e424-aSdoMcaMw">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="startMigration()" id="migrateStartBtn" style="flex:1;padding:10px;background:#10b981;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px">🚀 بدء الترحيل</button>
+        <button onclick="closeMigrateModal()" style="padding:10px 20px;background:#e2e8f0;color:#333;border:none;border-radius:8px;cursor:pointer;font-size:14px">إلغاء</button>
+      </div>
+      <div class="migrate-progress" id="migrateProgress" style="display:none"><div class="fill" id="migrateFill"></div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0" id="migrateStats"></div>
+      <div class="migrate-log" id="migrateLog">🔵 أنقر "بدء الترحيل" للبدء...</div>
     </div>
   </div>
 </div>
@@ -21372,6 +21415,272 @@ window.verifyAttendanceIntegrity = async () => {
   console.table(results);
   return results;
 };
+
+// ═══════════════════════════════════════════════════════════
+//  SUPABASE MIGRATION
+// ═══════════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
+
+window.migrateToSupabase = function() {
+  document.getElementById('migrateModal').classList.add('open');
+  document.getElementById('migrateLog').textContent = '🔵 أدخل Service Role Key ثم اضغط "بدء الترحيل"';
+};
+
+window.closeMigrateModal = function() {
+  document.getElementById('migrateModal').classList.remove('open');
+};
+
+function mLog(level, msg) {
+  const el = document.getElementById('migrateLog');
+  el.innerHTML += `\n[${new Date().toLocaleTimeString()}] <span class="${level}">${msg}</span>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function mProg(pct) {
+  document.getElementById('migrateFill').style.width = pct + '%';
+}
+
+function mStat(label, count) {
+  document.getElementById('migrateStats').innerHTML += `<span class="migrate-stat">${label}: ${count}</span>`;
+}
+
+async function mFetch(table, rows) {
+  if (rows.length === 0) return;
+  const key = document.getElementById('supabaseKey').value.trim();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': key,
+      'Authorization': `Bearer ${key}`,
+      'Prefer': 'resolution=merge-duplicates'
+    },
+    body: JSON.stringify(rows)
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
+  }
+}
+
+async function startMigration() {
+  const key = document.getElementById('supabaseKey').value.trim();
+  if (!key) { alert('الرجاء إدخال Service Role Key'); return; }
+
+  document.getElementById('migrateStartBtn').disabled = true;
+  document.getElementById('migrateStartBtn').textContent = '⏳ جاري الترحيل...';
+  document.getElementById('migrateProgress').style.display = 'block';
+  document.getElementById('migrateStats').innerHTML = '';
+  document.getElementById('migrateLog').innerHTML = '';
+  mProg(0);
+
+  try {
+    mLog('info', '══════════════════════════');
+    mLog('info', '🚀 بدء ترحيل البيانات إلى Supabase...');
+
+    // ── 1. Read teachers ──
+    mLog('info', '📥 جلب الأساتذة من Firebase...');
+    const tSnap = await getDocs(collection(db, 'teachers'));
+    mLog('ok', `   → ${tSnap.size} أستاذ`);
+
+    // ── 2. Write teachers ──
+    mLog('info', '📤 كتابة الأساتذة...');
+    const teacherRows = [];
+    for (const doc of tSnap.docs) {
+      const d = doc.data();
+      teacherRows.push({
+        id: doc.id,
+        name: d.name || '',
+        email: d.email || '',
+        phone: d.phone || '',
+        firebase_uid: doc.id,
+        specialty: d.spec || '',
+        levels: d.levels || '',
+        days: d.days || [],
+        teacher_id: d.teacherId || '',
+        photo: d.photo || '',
+        created_at: d.createdAt ? new Date(d.createdAt.toMillis()).toISOString() : new Date().toISOString()
+      });
+      if (teacherRows.length >= 50) { await mFetch('teachers', teacherRows.splice(0)); }
+    }
+    if (teacherRows.length) await mFetch('teachers', teacherRows);
+    mLog('ok', `   ✅ ${tSnap.size} أستاذ`);
+    mStat('👨‍🏫 أساتذة', tSnap.size);
+    mProg(16);
+
+    // ── 3. Write groups ──
+    mLog('info', '📤 كتابة الأفواج...');
+    let gCount = 0;
+    const groupRows = [];
+    for (const doc of tSnap.docs) {
+      const d = doc.data();
+      if (!d.groups || !Array.isArray(d.groups)) continue;
+      for (const g of d.groups) {
+        groupRows.push({
+          id: g._gid || `g_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          teacher_id: doc.id,
+          name: g.name || '',
+          days: g.days || [],
+          max_students: 30,
+          created_at: new Date().toISOString()
+        });
+        gCount++;
+        if (groupRows.length >= 50) { await mFetch('groups', groupRows.splice(0)); }
+      }
+    }
+    if (groupRows.length) await mFetch('groups', groupRows);
+    mLog('ok', `   ✅ ${gCount} فوج`);
+    mStat('📚 أفواج', gCount);
+    mProg(33);
+
+    // ── 4. Build teacherId → uid map for later ──
+    const tidMap = {};
+    for (const doc of tSnap.docs) {
+      const d = doc.data();
+      if (d.teacherId) tidMap[d.teacherId] = doc.id;
+    }
+
+    // ── 5. Write students ──
+    mLog('info', '📤 كتابة التلاميذ...');
+    let stCount = 0;
+    const studentRows = [];
+    for (const doc of tSnap.docs) {
+      const d = doc.data();
+      if (!d.students || !Array.isArray(d.students)) continue;
+      // Map group student names to group ids
+      const grpNameMap = {};
+      if (d.groups && Array.isArray(d.groups)) {
+        for (const g of d.groups) {
+          const gid = g._gid || '';
+          if (g.students && Array.isArray(g.students)) {
+            g.students.forEach(sn => {
+              const nm = typeof sn === 'string' ? sn : (sn.name || '');
+              if (nm) grpNameMap[nm] = gid;
+            });
+          }
+        }
+      }
+      for (const s of d.students) {
+        const sname = typeof s.name === 'string' ? s.name : String(s.name || '');
+        studentRows.push({
+          id: s.id || `stu_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          group_id: grpNameMap[sname] || null,
+          teacher_id: doc.id,
+          name: sname,
+          subscription_status: s.payStatus === 'paid' ? 'active' : (s.payStatus === 'unpaid' ? 'inactive' : 'non_member'),
+          pay_status: s.payStatus || 'unknown',
+          receipt: s.receipt || '',
+          joined_at_session: s.joinedAtSession || null,
+          created_at: new Date().toISOString()
+        });
+        stCount++;
+        if (studentRows.length >= 50) { await mFetch('students', studentRows.splice(0)); }
+      }
+    }
+    if (studentRows.length) await mFetch('students', studentRows);
+    mLog('ok', `   ✅ ${stCount} تلميذ`);
+    mStat('🧑‍🎓 تلاميذ', stCount);
+    mProg(50);
+
+    // ── 6. Read and write attendance records ──
+    mLog('info', '📥 جلب سجلات الحضور...');
+    const aSnap = await getDocs(collection(db, 'sessionAttendance'));
+    mLog('info', `   → ${aSnap.size} وثيقة`);
+    mLog('info', '📤 كتابة الحضور...');
+    let attCount = 0, attSkip = 0;
+    const attRows = [];
+    for (const doc of aSnap.docs) {
+      const d = doc.data();
+      const studs = d.students;
+      if (!studs || !Array.isArray(studs) || studs.length === 0) { attSkip++; continue; }
+      const teacherUid = tidMap[d.teacherId] || null;
+      const sessNum = d.sessionNum;
+      const gid = d.gid || '';
+      if (!teacherUid || !sessNum || !gid) { attSkip++; continue; }
+      for (const s of studs) {
+        const sname = typeof s.name === 'string' ? s.name : String(s.name || '');
+        if (!sname) continue;
+        attRows.push({
+          id: `att_${teacherUid}_${gid}_${sessNum}_${s.id || sname}`,
+          student_id: s.id || sname,
+          group_id: gid,
+          teacher_id: teacherUid,
+          session_num: sessNum,
+          present: s.present === true,
+          date: d.date || '',
+          created_at: d.savedAt ? new Date(d.savedAt.toMillis()).toISOString() : new Date().toISOString()
+        });
+        attCount++;
+        if (attRows.length >= 100) { await mFetch('attendance_records', attRows.splice(0)); }
+      }
+    }
+    if (attRows.length) await mFetch('attendance_records', attRows);
+    mLog('ok', `   ✅ ${attCount} سجل حضور (تخطى ${attSkip} وثيقة فارغة)`);
+    mStat('📋 حضور', attCount);
+    mProg(66);
+
+    // ── 7. Archives ──
+    mLog('info', '📤 كتابة الأرشيف...');
+    const arSnap = await getDocs(collection(db, 'attendanceArchive'));
+    let arCount = 0;
+    const arRows = [];
+    for (const doc of arSnap.docs) {
+      const d = doc.data();
+      arRows.push({
+        id: doc.id,
+        group_id: d.gid || '',
+        teacher_id: tidMap[d.teacherId] || d.teacherId || '',
+        cycle_number: d.cycleNum || 1,
+        group_name: d.groupName || '',
+        teacher_name: d.teacherName || '',
+        snapshot: { students: d.students || [], sessions: d.sessions || {}, stats: d.stats || {} },
+        archived_at: d.archivedAt ? new Date(d.archivedAt.toMillis()).toISOString() : new Date().toISOString()
+      });
+      arCount++;
+      if (arRows.length >= 50) { await mFetch('attendance_archives', arRows.splice(0)); }
+    }
+    if (arRows.length) await mFetch('attendance_archives', arRows);
+    mLog('ok', `   ✅ ${arCount} أرشيف`);
+    mStat('🗂️ أرشيف', arCount);
+    mProg(83);
+
+    // ── 8. Cycles ──
+    mLog('info', '📤 كتابة دورات الحضور...');
+    const cSnap = await getDocs(collection(db, 'attendanceCycles'));
+    let cCount = 0;
+    const cRows = [];
+    for (const doc of cSnap.docs) {
+      const d = doc.data();
+      cRows.push({
+        id: doc.id,
+        teacher_id: tidMap[d.teacherId] || d.teacherId || '',
+        group_id: d.gid || '',
+        cycle_number: d.cycleNum || 1,
+        status: d.status || 'current',
+        start_date: d.startDate || '',
+        end_date: d.endDate || '',
+        created_at: d.createdAt ? new Date(d.createdAt.toMillis()).toISOString() : new Date().toISOString()
+      });
+      cCount++;
+      if (cRows.length >= 50) { await mFetch('attendance_cycles', cRows.splice(0)); }
+    }
+    if (cRows.length) await mFetch('attendance_cycles', cRows);
+    mLog('ok', `   ✅ ${cCount} دورة`);
+    mStat('🔄 دورات', cCount);
+    mProg(100);
+
+    mLog('info', '══════════════════════════');
+    mLog('ok', '🎉 تم الترحيل بنجاح إلى Supabase!');
+    mLog('info', '🔐 يمكنك الآن إزالة Service Role Key من الحقل');
+
+  } catch (e) {
+    mLog('err', `❌ خطأ: ${e.message}`);
+    console.error(e);
+  } finally {
+    document.getElementById('migrateStartBtn').disabled = false;
+    document.getElementById('migrateStartBtn').textContent = '🚀 بدء الترحيل';
+  }
+}
 
 // ═══════════════════════════════════════════════════════════
 //  INIT on page load

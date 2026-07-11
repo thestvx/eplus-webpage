@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔄 ترحيل البيانات → Supabase</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f5f5f5; padding: 20px; }
+  .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  h1 { text-align: center; margin-bottom: 24px; color: #1a1a2e; }
+  h2 { margin: 16px 0 8px; color: #333; font-size: 16px; }
+  label { display: block; margin: 8px 0 4px; font-weight: 600; font-size: 14px; }
+  input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; direction: ltr; text-align: left; }
+  .btn { 
+    padding: 12px 32px; border: none; border-radius: 8px; font-size: 16px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s; width: 100%; margin-top: 16px;
+  }
+  .btn-primary { background: #10b981; color: white; }
+  .btn-primary:hover { background: #059669; }
+  .btn-primary:disabled { background: #a7f3d0; cursor: not-allowed; }
+  .btn-danger { background: #ef4444; color: white; }
+  .btn-danger:hover { background: #dc2626; }
+  .log { 
+    background: #1e293b; color: #e2e8f0; font-family: 'Consolas', monospace; 
+    padding: 16px; border-radius: 8px; margin-top: 16px; max-height: 400px; overflow-y: auto;
+    font-size: 13px; direction: ltr; text-align: left; white-space: pre-wrap;
+  }
+  .log .info { color: #60a5fa; }
+  .log .success { color: #34d399; }
+  .log .error { color: #f87171; }
+  .log .warn { color: #fbbf24; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0; }
+  .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: center; }
+  .stat-card .num { font-size: 28px; font-weight: 800; color: #0f172a; }
+  .stat-card .label { font-size: 12px; color: #64748b; margin-top: 4px; }
+  .status-bar { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+  .status-bar .bar { flex: 1; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+  .status-bar .fill { height: 100%; background: #10b981; border-radius: 4px; transition: width 0.3s; width: 0%; }
+  .status-bar .pct { font-size: 14px; font-weight: 700; min-width: 40px; }
+  .step-check { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+  .step-check .dot { width: 12px; height: 12px; border-radius: 50%; background: #e2e8f0; flex-shrink: 0; }
+  .step-check .dot.done { background: #10b981; }
+  .step-check .dot.fail { background: #ef4444; }
+  .step-check .dot.pending { background: #fbbf24; }
+  .step-check .step-label { font-size: 14px; }
+  .section { margin: 20px 0; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🔄 ترحيل البيانات إلى Supabase</h1>
+  <p style="text-align:center;color:#64748b;margin-bottom:16px;">يقرأ من Firebase Firestore ← يكتب إلى Supabase PostgreSQL</p>
+
+  <div class="section">
+    <h2>🔌 إعداد الاتصال بـ Supabase</h2>
+    <label>Supabase URL</label>
+    <input id="supabaseUrl" placeholder="https://xxxxx.supabase.co" value="https://jftfvpultaqufhsekdle.supabase.co">
+    <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;margin:8px 0;font-size:13px;">
+      ⚠️ استخدم <strong>Service Role Key</strong> للترحيل (من Dashboard → Settings → API).
+      <br>هذا المفتاح يُستخدم لمرة واحدة فقط — لا تشاركه مع أي أحد.
+    </div>
+    <label>Supabase Service Role Key</label>
+    <input id="supabaseKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." value="">
+  </div>
+
+  <div class="section">
+    <h2>📊 إحصائيات Firebase الحالية</h2>
+    <button class="btn btn-primary" id="btnCount" onclick="countFirestore()">🔍 احصاء Firebase</button>
+    <div id="statsArea" class="stats" style="display:none"></div>
+  </div>
+
+  <div class="section">
+    <h2>▶️ بدء الترحيل</h2>
+    <div id="progressSteps">
+      <div class="step-check"><span class="dot" id="dotTeachers"></span><span class="step-label">الأساتذة</span></div>
+      <div class="step-check"><span class="dot" id="dotGroups"></span><span class="step-label">الأفواج</span></div>
+      <div class="step-check"><span class="dot" id="dotStudents"></span><span class="step-label">التلاميذ</span></div>
+      <div class="step-check"><span class="dot" id="dotAttendance"></span><span class="step-label">الحضور (sessionAttendance)</span></div>
+      <div class="step-check"><span class="dot" id="dotArchives"></span><span class="step-label">الأرشيف (attendanceArchive)</span></div>
+      <div class="step-check"><span class="dot" id="dotCycles"></span><span class="step-label">الدورات (attendanceCycles)</span></div>
+    </div>
+    <div class="status-bar" id="progressBar">
+      <div class="bar"><div class="fill" id="progressFill"></div></div>
+      <span class="pct" id="progressPct">0%</span>
+    </div>
+    <button class="btn btn-primary" id="btnMigrate" onclick="startMigration()">🚀 بدء الترحيل</button>
+    <button class="btn btn-danger" id="btnReset" onclick="resetMigration()" style="margin-top:8px;">🗑️ مسح بيانات Supabase</button>
+  </div>
+
+  <div class="section">
+    <h2>📋 سجل الترحيل</h2>
+    <div class="log" id="logArea">🔵 أنقر "بدء الترحيل" للبدء...</div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+const { createClient } = supabase;
+
+// ── Firebase Config ──
+const firebaseConfig = {
+  apiKey: "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
+  authDomain: "eplus-center-39.firebaseapp.com",
+  projectId: "eplus-center-39",
+  storageBucket: "eplus-center-39.firebasestorage.app",
+  messagingSenderId: "191532732034",
+  appId: "1:191532732034:web:b11449a2f0595db5d02e9b",
+  databaseURL: "https://eplus-center-39-default-rtdb.europe-west1.firebasedatabase.app"
+};
+
+firebase.initializeApp(firebaseConfig);
+const fb = firebase.firestore();
+
+// ── State ──
+let _supabase = null;
+let _stats = { teachers: 0, groups: 0, students: 0, attendance: 0, archives: 0, cycles: 0 };
+
+// ── Logging ──
+const log = document.getElementById('logArea');
+function appendLog(level, msg) {
+  const t = new Date().toLocaleTimeString();
+  log.innerHTML += `\n[${t}] <span class="${level}">${msg}</span>`;
+  log.scrollTop = log.scrollHeight;
+}
+
+function getClient() {
+  if (_supabase) return _supabase;
+  const url = document.getElementById('supabaseUrl').value.trim();
+  const key = document.getElementById('supabaseKey').value.trim();
+  if (!url || !key) { alert('الرجاء إدخال Supabase URL و Anon Key'); return null; }
+  _supabase = createClient(url, key);
+  return _supabase;
+}
+
+// ── Count Firestore ──
+async function countFirestore() {
+  const btn = document.getElementById('btnCount');
+  btn.disabled = true; btn.textContent = '⏳ جاري الإحصاء...';
+  try {
+    const t1 = performance.now();
+
+    // Teachers
+    const tSnap = await fb.collection('teachers').get();
+    _stats.teachers = tSnap.size;
+
+    // attendance docs
+    const aSnap = await fb.collection('sessionAttendance').get();
+    _stats.attendance = aSnap.size;
+
+    // archives
+    const arSnap = await fb.collection('attendanceArchive').get();
+    _stats.archives = arSnap.size;
+
+    // cycles
+    const cSnap = await fb.collection('attendanceCycles').get();
+    _stats.cycles = cSnap.size;
+
+    // Count groups & students from teacher docs
+    let groups = 0, students = 0;
+    tSnap.forEach(d => {
+      const d2 = d.data();
+      if (d2.groups) groups += d2.groups.length;
+      if (d2.students) students += d2.students.length;
+    });
+    _stats.groups = groups;
+    _stats.students = students;
+
+    const elapsed = ((performance.now() - t1) / 1000).toFixed(1);
+
+    const area = document.getElementById('statsArea');
+    area.style.display = 'grid';
+    area.innerHTML = `
+      <div class="stat-card"><div class="num">${_stats.teachers}</div><div class="label">👨‍🏫 أساتذة</div></div>
+      <div class="stat-card"><div class="num">${_stats.groups}</div><div class="label">📚 أفواج</div></div>
+      <div class="stat-card"><div class="num">${_stats.students}</div><div class="label">🧑‍🎓 تلاميذ</div></div>
+      <div class="stat-card"><div class="num">${_stats.attendance}</div><div class="label">📋 سجلات حضور</div></div>
+      <div class="stat-card"><div class="num">${_stats.archives}</div><div class="label">🗂️ أرشيف</div></div>
+      <div class="stat-card"><div class="num">${_stats.cycles}</div><div class="label">🔄 دورات</div></div>
+      <div class="stat-card" style="grid-column:1/-1;background:#e0f2fe;"><div class="num">${elapsed}s</div><div class="label">⏱️ وقت الإحصاء</div></div>
+    `;
+    appendLog('success', `✅ الإحصاء: ${_stats.teachers} أساتذة, ${_stats.groups} فوج, ${_stats.students} تلميذ, ${_stats.attendance} حضور, ${_stats.archives} أرشيف, ${_stats.cycles} دورة (${elapsed}s)`);
+  } catch (e) {
+    appendLog('error', `❌ فشل الإحصاء: ${e.message}`);
+  } finally {
+    btn.disabled = false; btn.textContent = '🔍 احصاء Firebase';
+  }
+}
+
+// ── Migration ──
+function setProgress(pct) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = Math.round(pct) + '%';
+}
+
+function setDot(id, state) {
+  const dot = document.getElementById(id);
+  dot.className = 'dot ' + state;
+}
+
+async function withRetry(fn, label, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i === maxRetries - 1) throw e;
+      appendLog('warn', `⚠️ ${label}: إعادة محاولة ${i+1}/${maxRetries} — ${e.message}`);
+      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
+}
+
+async function startMigration() {
+  const client = getClient();
+  if (!client) return;
+
+  const btn = document.getElementById('btnMigrate');
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري الترحيل...';
+  appendLog('info', '═══════════════════════════════════════');
+  appendLog('info', '🚀 بدء الترحيل إلى Supabase...');
+
+  log.innerHTML = ''; // clear
+  setProgress(0);
+  ['dotTeachers','dotGroups','dotStudents','dotAttendance','dotArchives','dotCycles'].forEach(id => setDot(id, 'pending'));
+
+  let totals = { teachers: 0, groups: 0, students: 0, attendance: 0, archives: 0, cycles: 0 };
+
+  try {
+    // ── Phase 1: Teachers ──
+    appendLog('info', '📥 جلب الأساتذة من Firebase...');
+    const tSnap = await fb.collection('teachers').get();
+    appendLog('info', `   → ${tSnap.size} أستاذ`);
+    
+    setDot('dotTeachers', 'pending');
+    appendLog('info', '📤 كتابة الأساتذة إلى Supabase...');
+    let tCount = 0;
+    for (const doc of tSnap.docs) {
+      const d = doc.data();
+      const teacherRow = {
+        id: doc.id,
+        name: d.name || '',
+        email: d.email || '',
+        phone: d.phone || null,
+        firebase_uid: doc.id,
+        specialty: d.spec || '',
+        levels: d.levels || '',
+        days: d.days || [],
+        teacher_id: d.teacherId || '',
+        photo: d.photo || null,
+        created_at: d.createdAt ? new Date(d.createdAt.toMillis()).toISOString() : new Date().toISOString()
+      };
+      await withRetry(() => client.from('teachers').upsert(teacherRow, { onConflict: 'id' }), `teacher ${doc.id}`);
+      tCount++;
+    }
+    totals.teachers = tCount;
+    setDot('dotTeachers', 'done');
+    appendLog('success', `✅ ${tCount} أستاذ تم ترحيلهم`);
+    setProgress(16);
+
+    // ── Phase 2: Groups ──
+    setDot('dotGroups', 'pending');
+    appendLog('info', '📤 ترحيل الأفواج...');
+    let gCount = 0;
+    for (const doc of tSnap.docs) {
+      const d = doc.data();
+      if (!d.groups || !Array.isArray(d.groups)) continue;
+      for (const g of d.groups) {
+        const gid = g._gid || `g_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const groupRow = {
+          id: gid,
+          teacher_id: doc.id,
+          name: g.name || '',
+          days: g.days || [],
+          max_students: 30,
+          created_at: new Date().toISOString()
+        };
+        await withRetry(() => client.from('groups').upsert(groupRow, { onConflict: 'id' }), `group ${gid}`);
+        gCount++;
+      }
+    }
+    totals.groups = gCount;
+    setDot('dotGroups', 'done');
+    appendLog('success', `✅ ${gCount} فوج تم ترحيلهم`);
+    setProgress(33);
+
+    // ── Phase 3: Students ──
+    setDot('dotStudents', 'pending');
+    appendLog('info', '📤 ترحيل التلاميذ...');
+    let sCount = 0;
+    for (const doc of tSnap.docs) {
+      const d = doc.data();
+      if (!d.students || !Array.isArray(d.students)) continue;
+      
+      // Build group→student name mapping for this teacher
+      const groupStudentNames = new Map();
+      if (d.groups && Array.isArray(d.groups)) {
+        for (const g of d.groups) {
+          const gid = g._gid || '';
+          if (g.students && Array.isArray(g.students)) {
+            g.students.forEach(sname => {
+              const name = typeof sname === 'string' ? sname : (sname.name || '');
+              if (!groupStudentNames.has(name)) groupStudentNames.set(name, gid);
+            });
+          }
+        }
+      }
+
+      for (const s of d.students) {
+        const sid = s.id || `stu_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const sname = typeof s.name === 'string' ? s.name : String(s.name || '');
+        const matchedGid = groupStudentNames.get(sname) || null;
+        
+        const studentRow = {
+          id: sid,
+          group_id: matchedGid,
+          teacher_id: doc.id,
+          name: sname,
+          subscription_status: s.payStatus === 'paid' ? 'active' : (s.payStatus === 'unpaid' ? 'inactive' : 'non_member'),
+          pay_status: s.payStatus || 'unknown',
+          receipt: s.receipt || null,
+          joined_at_session: s.joinedAtSession || null,
+          created_at: new Date().toISOString()
+        };
+        await withRetry(() => client.from('students').upsert(studentRow, { onConflict: 'id' }), `student ${sid}`);
+        sCount++;
+      }
+    }
+    totals.students = sCount;
+    setDot('dotStudents', 'done');
+    appendLog('success', `✅ ${sCount} تلميذ تم ترحيلهم`);
+    setProgress(50);
+
+    // ── Phase 4: Attendance Records ──
+    setDot('dotAttendance', 'pending');
+    appendLog('info', '📥 جلب سجلات الحضور من Firebase...');
+    const aSnap = await fb.collection('sessionAttendance').get();
+    appendLog('info', `   → ${aSnap.size} وثيقة حضور`);
+
+    // Build a teacher_id → uid map from the teacher docs
+    const teacherIdMap = new Map();
+    for (const doc of tSnap.docs) {
+      const d = doc.data();
+      if (d.teacherId) teacherIdMap.set(d.teacherId, doc.id);
+    }
+
+    appendLog('info', '📤 كتابة الحضور إلى Supabase...');
+    let aCount = 0;
+    let aSkipped = 0;
+    for (const doc of aSnap.docs) {
+      const d = doc.data();
+      const students = d.students;
+      if (!students || !Array.isArray(students) || students.length === 0) {
+        aSkipped++;
+        continue;
+      }
+      
+      // Extract teacher uid from teacherId field or doc ID
+      let teacherUid = null;
+      const teacherIdField = d.teacherId || '';
+      if (teacherIdMap.has(teacherIdField)) {
+        teacherUid = teacherIdMap.get(teacherIdField);
+      }
+
+      const sessionNum = d.sessionNum;
+      const gid = d.gid || '';
+      if (!teacherUid || !sessionNum || !gid) {
+        aSkipped++;
+        continue;
+      }
+
+      for (const s of students) {
+        const sname = typeof s.name === 'string' ? s.name : String(s.name || '');
+        if (!sname) continue;
+        const studentId = s.id || sname;
+        
+        const attRow = {
+          id: `att_${teacherUid}_${gid}_${sessionNum}_${studentId}`,
+          student_id: studentId,
+          group_id: gid,
+          teacher_id: teacherUid,
+          session_num: sessionNum,
+          present: s.present === true,
+          date: d.date || new Date().toISOString().split('T')[0],
+          created_at: d.savedAt ? new Date(d.savedAt.toMillis()).toISOString() : new Date().toISOString()
+        };
+        await withRetry(() => client.from('attendance_records').upsert(attRow, { onConflict: 'id' }), `att ${teacherUid} s${sessionNum}`);
+        aCount++;
+      }
+    }
+    totals.attendance = aCount;
+    appendLog('info', `   ⏭️ ${aSkipped} وثيقة تخطيت (بدون طلاب أو بيانات ناقصة)`);
+    setDot('dotAttendance', 'done');
+    appendLog('success', `✅ ${aCount} سجل حضور تم ترحيلهم`);
+    setProgress(66);
+
+    // ── Phase 5: Archives ──
+    setDot('dotArchives', 'pending');
+    appendLog('info', '📤 ترحيل الأرشيف...');
+    const arSnap = await fb.collection('attendanceArchive').get();
+    appendLog('info', `   → ${arSnap.size} وثيقة أرشيف`);
+    let arCount = 0;
+    for (const doc of arSnap.docs) {
+      const d = doc.data();
+      const tUid = teacherIdMap.get(d.teacherId) || d.teacherId || '';
+      const archiveRow = {
+        id: doc.id,
+        group_id: d.gid || '',
+        teacher_id: tUid,
+        cycle_number: d.cycleNum || 1,
+        group_name: d.groupName || '',
+        teacher_name: d.teacherName || '',
+        snapshot: { students: d.students || [], sessions: d.sessions || {}, stats: d.stats || {} },
+        archived_at: d.archivedAt ? new Date(d.archivedAt.toMillis()).toISOString() : new Date().toISOString()
+      };
+      await withRetry(() => client.from('attendance_archives').upsert(archiveRow, { onConflict: 'id' }), `archive ${doc.id}`);
+      arCount++;
+    }
+    totals.archives = arCount;
+    setDot('dotArchives', 'done');
+    appendLog('success', `✅ ${arCount} أرشيف تم ترحيلهم`);
+    setProgress(83);
+
+    // ── Phase 6: Cycles ──
+    setDot('dotCycles', 'pending');
+    appendLog('info', '📤 ترحيل دورات الحضور...');
+    const cSnap = await fb.collection('attendanceCycles').get();
+    appendLog('info', `   → ${cSnap.size} وثيقة دورة`);
+    let cCount = 0;
+    for (const doc of cSnap.docs) {
+      const d = doc.data();
+      const tUid = teacherIdMap.get(d.teacherId) || d.teacherId || '';
+      const cycleRow = {
+        id: doc.id,
+        teacher_id: tUid,
+        group_id: d.gid || '',
+        cycle_number: d.cycleNum || 1,
+        status: d.status || 'current',
+        start_date: d.startDate || null,
+        end_date: d.endDate || null,
+        created_at: d.createdAt ? new Date(d.createdAt.toMillis()).toISOString() : new Date().toISOString()
+      };
+      await withRetry(() => client.from('attendance_cycles').upsert(cycleRow, { onConflict: 'id' }), `cycle ${doc.id}`);
+      cCount++;
+    }
+    totals.cycles = cCount;
+    setDot('dotCycles', 'done');
+    appendLog('success', `✅ ${cCount} دورة تم ترحيلهم`);
+    setProgress(100);
+
+    // ── Done ──
+    appendLog('success', '═══════════════════════════════════════');
+    appendLog('success', `🎉 الترحيل اكتمل بنجاح!`);
+    appendLog('info', `   📊 ${totals.teachers} أساتذة | ${totals.groups} فوج | ${totals.students} تلميذ | ${totals.attendance} حضور | ${totals.archives} أرشيف | ${totals.cycles} دورة`);
+
+  } catch (e) {
+    appendLog('error', `❌ فشل الترحيل: ${e.message}`);
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🚀 بدء الترحيل';
+  }
+}
+
+// ── Reset (delete all Supabase data) ──
+async function resetMigration() {
+  const client = getClient();
+  if (!client) return;
+  if (!confirm('⚠️ هل أنت متأكد؟ سيتم مسح جميع البيانات في Supabase!\n(البيانات في Firebase تبقى آمنة)')) return;
+  if (!confirm('⚠️⚠️ تأكيد نهائي؟ هذا لا يمكن التراجع عنه.')) return;
+
+  const btn = document.getElementById('btnReset');
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري المسح...';
+  appendLog('warn', '🧹 بدء مسح بيانات Supabase...');
+
+  const tables = ['attendance_records', 'attendance_archives', 'attendance_cycles', 'students', 'groups', 'teachers'];
+  for (const table of tables) {
+    try {
+      const { error } = await client.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error && error.code !== 'PGRST116') throw error;
+      appendLog('success', `   ✅ تم مسح ${table}`);
+    } catch (e) {
+      appendLog('warn', `   ⚠️ ${table}: ${e.message}`);
+    }
+  }
+  appendLog('success', '🧹 تم مسح جميع جداول Supabase');
+  btn.disabled = false;
+  btn.textContent = '🗑️ مسح بيانات Supabase';
+}
+</script>
+</body>
+</html>
