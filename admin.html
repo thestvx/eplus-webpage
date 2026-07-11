@@ -14225,6 +14225,75 @@ window.verifyCurrentTeacherAttendance = async () => {
   return { totalStudents: totalStudentsInTeacherDoc, totalSessions: totalSessionsWithData, totalRecords: totalAttendanceRecords, totalErrors };
 };
 
+// ─── تشخيص شامل لكل وثائق sessionAttendance في Firestore ───
+// يقرأ Firestore مباشرة بدون أي فلتر ويعرض كل وثيقة كاملة
+// شغّل في Console: await window.dumpAllSessionDocs()
+window.dumpAllSessionDocs = async () => {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { console.error('⚠️ اختر أستاذ أولاً'); return; }
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { console.error('⚠️ الأستاذ غير موجود'); return; }
+  const groups = teacher.groups || [];
+
+  console.log('%c═══════════════════════════════════════════════════════════════', 'font-weight:bold');
+  console.log('%c  📦 تفريغ كامل لجميع وثائق sessionAttendance', 'font-size:14px;font-weight:bold');
+  console.log(`  الأستاذ: ${teacher.name} (${teacherId})`);
+  console.log(`  الأفواج: ${groups.map((g,i) => `${i}:${g.name||'—'}(${g._gid||'بدون'})`).join(', ')}`);
+  console.log('%c═══════════════════════════════════════════════════════════════', 'font-weight:bold');
+
+  const allSnap = await getDocs(query(
+    collection(db, 'sessionAttendance'),
+    where('__name__', '>=', teacherId),
+    where('__name__', '<', teacherId + '_\ufff0')
+  ));
+  console.log(`\nإجمالي الوثائق: ${allSnap.size}`);
+  console.log('');
+
+  // ترتيب تنازلي: الأحدث أولاً (حسب doc ID)
+  const allDocs = [];
+  allSnap.forEach(d => {
+    const data = d.data();
+    const rawGid = extractGidFromDoc(d.id);
+    const resolvedGid = _resolveRealGid(rawGid, groups);
+    allDocs.push({
+      id: d.id,
+      dataGid: data.gid || '—',
+      cycleNum: data.cycleNum || '—',
+      sessionNum: data.sessionNum || '—',
+      studentsCount: (data.students || []).length,
+      students: (data.students || []).map(s => ({ id: s.id || '', name: s.name || '', present: s.present })),
+      rawGid: rawGid || 'null',
+      resolvedGid: resolvedGid || 'null',
+      teacherIdField: data.teacherId || '—'
+    });
+  });
+  allDocs.sort((a, b) => a.id.localeCompare(b.id));
+
+  for (let i = 0; i < allDocs.length; i++) {
+    const d = allDocs[i];
+    const hasStudents = d.studentsCount > 0;
+    console.log(`[${i + 1}/${allDocs.length}] ${hasStudents ? '✅' : '❌'}`);
+    console.log(`    ID: ${d.id}`);
+    console.log(`    data.gid: ${d.dataGid} | cycleNum: ${d.cycleNum} | sessionNum: ${d.sessionNum}`);
+    console.log(`    extractGidFromDoc: ${d.rawGid} | _resolveRealGid: ${d.resolvedGid}`);
+    console.log(`    teacherId-field: ${d.teacherIdField} | students: ${d.studentsCount}`);
+
+    if (hasStudents) {
+      console.log('    قائمة التلاميذ:');
+      d.students.forEach(s => {
+        const p = s.present === true ? '✅' : s.present === false ? '❌' : '⋯';
+        console.log(`      ${p} ${s.name} (id: ${s.id || '—'})`);
+      });
+    }
+    console.log('');
+  }
+
+  console.log('%c═══════════════════════════════════════════════════════════════', 'font-weight:bold');
+  console.log('%c  ✅ انتهى', 'font-size:14px;font-weight:bold');
+  console.log('%c═══════════════════════════════════════════════════════════════', 'font-weight:bold');
+  return allDocs;
+};
+
 // ─── اختبار جميع الأساتذة: يحاكي مرحلة القراءة لـ startNewAttendanceCycle ───
 // شغّل في Console: await window.testAllTeachersArchive();
 window.testAllTeachersArchive = async () => {
