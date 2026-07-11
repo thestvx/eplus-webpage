@@ -8032,14 +8032,17 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       }
     }
     const gid = g._gid || '';
-    (g.students || []).forEach(sName => {
-      let match = students.find(s => namesMatchLocal(s.name, sName));
+    (g.students || []).forEach(sRaw => {
+      const sIsObj = typeof sRaw === 'object' && sRaw !== null;
+      const sNameStr = sIsObj ? String(sRaw.name || '') : String(sRaw || '');
+      const sNameId = sIsObj ? String(sRaw.id || '') : '';
+      let match = students.find(s => namesMatchLocal(s.name, sNameStr));
       const cleanG = _displayGroupName(g.name);
       if (match) {
         matchedNames.add(normName(match.name || ''));
         allStudents.push({ id: match.id, name: match.name, receipt: match.receipt, payStatus: match.payStatus, joinedAtSession: match.joinedAtSession, group: cleanG, gid: gid, groupGi: gi, groupGid: gid });
       } else {
-        allStudents.push({ id: '', name: sName, group: cleanG, gid: gid, groupGi: gi, groupGid: gid });
+        allStudents.push({ id: sNameId, name: sNameStr, group: cleanG, gid: gid, groupGi: gi, groupGid: gid });
       }
     });
   }
@@ -8052,7 +8055,11 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
     let groupName = '';
     let groupGid = '';
     groups.forEach((g, idx) => {
-      if ((g.students || []).some(gs => namesMatchLocal(gs, s.name))) {
+      if ((g.students || []).some(gs => {
+        const gsIsObj = typeof gs === 'object' && gs !== null;
+        const gsStr = gsIsObj ? String(gs.name || '') : String(gs || '');
+        return namesMatchLocal(gsStr, s.name);
+      })) {
         groupGi = idx;
         groupName = _cleanGroupName(g.name) || 'فوج ' + (idx + 1);
         groupGid = g._gid || '';
@@ -8784,6 +8791,19 @@ window.confirmRestoreAttendance = async () => {
     if (!restoreSources.archivesByGid && restoreSources.backupGroups) {
       const teacherRef = doc(db, 'teachers', teacherId);
       batch.update(teacherRef, { groups: restoreSources.backupGroups });
+    }
+
+    // Integrity Check قبل الاسترجاع
+    if (restoreSources.archivesByGid) {
+      for (const [gid, archives] of Object.entries(restoreSources.archivesByGid)) {
+        const latest = archives[0];
+        const arc = latest.data;
+        const arcStudents = arc.students || [];
+        if (arcStudents.length > 0) {
+          const icArch = window._integrityCheck({ students: arcStudents }, `confirmRestoreArchive ${gid}`);
+          if (!icArch.valid) { throw new Error(`فشل التحقق من أرشيف ${gid}: ${icArch.errors[0]}`); }
+        }
+      }
     }
 
     await batch.commit();
@@ -10068,10 +10088,14 @@ window.startNewAttendanceCycle = async (gid) => {
     console.log(`  1-F: ${sessionsWithDataCnt}/${CYCLE_SESSION_COUNT} حصة بها بيانات، ${sessionStudentMap.size} تلميذاً من session docs`);
 
     // ── 1-G: قائمة التلاميذ النهائية (group.students + session docs, بدون تكرار) ──
+    // نحتفظ بجميع خصائص التلميذ: id, name, receipt, payStatus, joinedAtSession
     const allStudents = [];
     const allSeen = new Set();
     (group.students || []).forEach(s => {
-      const obj = typeof s === 'string' ? { id: '', name: s } : { id: s.id || '', name: s.name || '' };
+      const sIsObj = typeof s === 'object' && s !== null;
+      const obj = sIsObj
+        ? { id: s.id || '', name: s.name || '', receipt: s.receipt || '', payStatus: s.payStatus || '', joinedAtSession: s.joinedAtSession || 1 }
+        : { id: '', name: String(s || ''), receipt: '', payStatus: '', joinedAtSession: 1 };
       const key = obj.id ? `id:${obj.id}` : `name:${(obj.name || '').trim().toLowerCase()}`;
       if (key && key !== 'name:' && !allSeen.has(key)) { allSeen.add(key); allStudents.push(obj); }
     });
@@ -10079,7 +10103,11 @@ window.startNewAttendanceCycle = async (gid) => {
       const key = s.id ? `id:${s.id}` : `name:${(s.name || '').trim().toLowerCase()}`;
       if (key && key !== 'name:' && !allSeen.has(key)) {
         allSeen.add(key);
-        allStudents.push({ id: s.id || '', name: s.name || '' });
+        allStudents.push({
+          id: s.id || '', name: s.name || '',
+          receipt: s.receipt || '', payStatus: s.payStatus || '',
+          joinedAtSession: s.joinedAtSession || 1
+        });
       }
     }
     if (allStudents.length === 0 && sessionsWithDataCnt === 0) {
@@ -10138,6 +10166,11 @@ window.startNewAttendanceCycle = async (gid) => {
     // ╚═══════════════════════════════════════════════╝
     console.log('[المرحلة 3] حفظ الأرشيف...');
     showToast('💾 جاري حفظ الأرشيف...');
+    // Integrity Check قبل الأرشفة
+    const icStudents = window._integrityCheck({ students: allStudents }, 'startNewAttendanceCycle allStudents');
+    if (!icStudents.valid) { throw new Error(`فشل التحقق من التلاميذ: ${icStudents.errors[0]}`); }
+    const icSessions = window._integrityCheck({ sessions: sessionsData }, 'startNewAttendanceCycle sessions');
+    if (!icSessions.valid) { throw new Error(`فشل التحقق من الحصص: ${icSessions.errors[0]}`); }
     const archiveDocId = _getArchiveDocId(teacherId, gid, actualCycle);
     await setDoc(doc(db, 'attendanceArchive', archiveDocId), {
       teacherId, gid, cycleNum: actualCycle,
@@ -10404,6 +10437,9 @@ window.toggleDailyAttCell = async (teacherId, gid, sessionNum, studentId, studen
         };
       }
     }
+    // Integrity Check قبل الحفظ
+    const icToggle = window._integrityCheck(data, `toggleDailyAttCell حصة ${sessionNum}`);
+    if (!icToggle.valid) { throw new Error(`فشل التحقق من بيانات التبديل: ${icToggle.errors[0]}`); }
     await setDoc(docRef, data);
     data._attUpdatedAt = Date.now();
     const _toggleKey = `${teacherId}|${gid}|${sessionNum}`;
@@ -10457,6 +10493,59 @@ const updateAttSyncStatus = (gid) => {
 };
 window.updateAttSyncStatus = updateAttSyncStatus;
 
+// ─── التحقق من سلامة بيانات الحضور قبل الكتابة ───
+// يُستخدم في كل دالة كتابة (حفظ، أرشفة، استرجاع) لضمان عدم كتابة بيانات تالفة
+window._integrityCheck = (data, context) => {
+  const errors = [];
+  const warnings = [];
+  if (!data || typeof data !== 'object') {
+    errors.push(`${context}: data فارغ أو غير صالح`);
+    return { valid: false, errors, warnings };
+  }
+  if (data.students) {
+    if (!Array.isArray(data.students)) {
+      errors.push(`${context}: students ليس مصفوفة`);
+    } else {
+      data.students.forEach((s, i) => {
+        if (typeof s !== 'object' || s === null) {
+          errors.push(`${context}: التلميذ ${i} ليس كائنًا صالحًا`);
+          return;
+        }
+        const nameVal = s.name;
+        if (nameVal === undefined || nameVal === null) {
+          errors.push(`${context}: التلميذ ${i} ليس له اسم`);
+        } else if (typeof nameVal === 'object') {
+          errors.push(`${context}: اسم التلميذ ${i} هو كائن وليس نصًا — ${JSON.stringify(nameVal)}`);
+        } else if (typeof nameVal !== 'string') {
+          errors.push(`${context}: اسم التلميذ ${i} ليس نصًا — النوع: ${typeof nameVal}`);
+        } else if (nameVal.trim() === '') {
+          warnings.push(`${context}: التلميذ ${i} اسمه فارغ`);
+        }
+      });
+    }
+  }
+  if (data.sessions) {
+    for (const [sn, sessionStudents] of Object.entries(data.sessions)) {
+      if (Array.isArray(sessionStudents)) {
+        sessionStudents.forEach((s, i) => {
+          if (s.present !== undefined && typeof s.present !== 'boolean') {
+            errors.push(`${context}: الحصة ${sn} تلميذ ${i}: present ليس boolean`);
+          }
+        });
+      }
+    }
+  }
+  if (errors.length > 0) {
+    console.error(`[IntegrityCheck] ❌ ${errors.length} خطأ — ${context}:`, errors);
+    if (warnings.length > 0) console.warn(`[IntegrityCheck] ⚠️ ${warnings.length} تحذير:`, warnings);
+    return { valid: false, errors, warnings };
+  }
+  if (warnings.length > 0) {
+    console.warn(`[IntegrityCheck] ⚠️ ${warnings.length} تحذير — ${context}:`, warnings);
+  }
+  return { valid: true, errors, warnings };
+};
+
 window.saveGroupAttendance = async (gid) => {
   if (!gid) return;
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
@@ -10468,6 +10557,14 @@ window.saveGroupAttendance = async (gid) => {
   if (!groupData) { showToast('⚠️ لا توجد بيانات لحفظها'); return; }
   const entries = Object.entries(groupData);
   if (entries.length === 0) { showToast('⚠️ لا توجد بيانات لحفظها'); return; }
+  // Integrity Check قبل الحفظ
+  for (const [sn, sessionData] of entries) {
+    const ic = window._integrityCheck(sessionData, `saveGroupAttendance حصة ${sn}`);
+    if (!ic.valid) {
+      showToast(`⚠️ فشل التحقق من سلامة الحصة ${sn}: ${ic.errors[0]}`, true);
+      return;
+    }
+  }
   for (const [sn, sessionData] of entries) {
     const docRef = doc(db, 'sessionAttendance', getSessionDocId(teacherId, gid, parseInt(sn), cycleNum));
     try {
