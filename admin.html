@@ -7692,6 +7692,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   window._attCurSession = curSession;
 
   // ── تحميل أرقام الدورات الحالية لجميع أفواج هذا الأستاذ ──
+  // ── بناء _cycleMap: ربط كل صيغ gid برقم الدورة الحالية ──
   let _cycleMap = {};
   try {
     const cycleSnap = await getDocs(query(
@@ -7700,32 +7701,36 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       where('status', '==', 'current')
     ));
     const groupsData = teacher.groups || [];
+    // الخطوة 1: لكل cycle doc، سجل cycleNum لـ gid الموجود في الوثيقة
     cycleSnap.forEach(d => { const c = d.data(); _cycleMap[c.gid] = c.cycleNum || 1; });
-    // ربط gid قديم (gi_N) بـ gid الحقيقي إن وجد
-    cycleSnap.forEach(d => {
-      const c = d.data();
-      const gidStr = c.gid || '';
-      const giMatch = gidStr.match(/^gi_(\d+)$/);
-      if (giMatch) {
-        const group = groupsData[parseInt(giMatch[1])];
-        if (group && group._gid && group._gid !== gidStr) {
-          _cycleMap[group._gid] = c.cycleNum || 1;
+    // الخطوة 2: لكل فوج، اجعل جميع صيغ gid الخاصة به تشير لنفس cycleNum
+    // تفحص كل فوج وكل cycle doc لتحديد رقم الدورة الصحيح بأي صيغة كانت
+    groupsData.forEach((g, idx) => {
+      // إذا كان للفوج _gid حقيقي وكان مسجلاً في _cycleMap، استخدمه
+      let foundCycle = _cycleMap[g?._gid] || null;
+      // إن لم يوجد، ابحث في cycle docs عن gi_N أو gN
+      if (!foundCycle) {
+        for (const key in _cycleMap) {
+          if (key === `gi_${idx}` || key === `g${idx}`) {
+            foundCycle = _cycleMap[key];
+            break;
+          }
         }
       }
-    });
-    // ربط العكس: لكل gid حقيقي، أضف also gi_N المقابلة
-    // هذا يحل مشكلة الوثائق القديمة التي تحمل data.gid = 'gi_N'
-    groupsData.forEach((g, idx) => {
-      if (g && g._gid && _cycleMap[g._gid] && !_cycleMap['gi_' + idx]) {
-        _cycleMap['gi_' + idx] = _cycleMap[g._gid];
+      // إن لم يوجد بعد، ابحث في cycle docs عن كل صيغ هذا الفوج
+      if (!foundCycle) {
+        const variants = [g?._gid, `gi_${idx}`, `g${idx}`].filter(Boolean);
+        for (const v of variants) {
+          if (_cycleMap[v]) { foundCycle = _cycleMap[v]; break; }
+        }
       }
-    });
-    // ربط أسماء الفئات (s.groupGid) بـ cycleNum
-    const _attAllStudents = [];
-    groupsData.forEach(g => {
-      (g.students || []).forEach(sName => {
-        _attAllStudents.push({ name: typeof sName === 'string' ? sName : sName.name, gid: g._gid });
-      });
+      if (foundCycle) {
+        // سجل جميع الصيغ لهذا الفوج بنفس رقم الدورة
+        const allVariants = [g?._gid, `gi_${idx}`, `g${idx}`].filter(Boolean);
+        for (const v of allVariants) {
+          if (v) _cycleMap[v] = foundCycle;
+        }
+      }
     });
     console.log(`[ATT] _cycleMap for ${teacherId}:`, JSON.stringify(_cycleMap));
     window._cycleMap = _cycleMap;
@@ -7747,24 +7752,14 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         const docCycle = data.cycleNum || 1;
         // تجاهل الوثائق التي لا تنتمي للدورة الحالية
         const gidRaw = data.gid || extractGidFromDoc(d.id);
-        let currentCycleForGid = _cycleMap[gidRaw];
-        if (currentCycleForGid === undefined) {
-          // fallback: إذا كان gidRaw بصيغة gi_N، جرب العثور على gid الحقيقي
-          const giMatch = gidRaw.match(/^gi_(\d+)$/);
-          if (giMatch && groupsData[parseInt(giMatch[1])]?._gid) {
-            currentCycleForGid = _cycleMap[groupsData[parseInt(giMatch[1])]._gid];
-          }
-        }
-        if (currentCycleForGid === undefined) currentCycleForGid = 1;
+        // حوّل gidRaw إلى gid الحقيقي لضمان دقة البحث في _cycleMap
+        const realGid = _resolveRealGid(gidRaw, groupsData);
+        let currentCycleForGid = _cycleMap[realGid];
+        if (currentCycleForGid === undefined) currentCycleForGid = _cycleMap[gidRaw];
+        if (currentCycleForGid === undefined) return; // تخطي — لا يمكن تحديد الدورة
         if (docCycle !== currentCycleForGid) return;
-        let gid = data.gid || extractGidFromDoc(d.id);
-        let cacheKey;
-        if (gid) {
-          cacheKey = gid;
-        } else {
-          const giMatch = d.id.match(/_g(\d+)_session_/);
-          cacheKey = 'gi_' + (giMatch ? giMatch[1] : '0');
-        }
+        // استخدم gid الحقيقي كمفتاح للتخزين المؤقت
+        const cacheKey = realGid || gidRaw || `gi_${groupsData.findIndex(g => g?._gid === gidRaw) >= 0 ? groupsData.findIndex(g => g?._gid === gidRaw) : '0'}`;
         if (!window._attSummaryCache[teacherId][cacheKey]) window._attSummaryCache[teacherId][cacheKey] = {};
         window._attSummaryCache[teacherId][cacheKey][data.sessionNum] = data;
         loadedDocs.push({ id: d.id, cacheKey, sn: data.sessionNum, cycle: docCycle, students: (data.students||[]).length });
@@ -7800,30 +7795,19 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       snap => {
         if (!window._attSummaryCache[teacherId]) return;
         const existing = window._attSummaryCache[teacherId];
+        const gData = teacher.groups || [];
         snap.forEach(d => {
           const data = d.data();
           if (!data.sessionNum) return;
           // تجاهل الوثائق التي لا تنتمي للدورة الحالية
           const docCycle = data.cycleNum || 1;
           const gidCheck = data.gid || extractGidFromDoc(d.id);
-          let currentCycleForGid = window._cycleMap?.[gidCheck];
-          if (currentCycleForGid === undefined) {
-            // fallback: إذا كان gidCheck بصيغة gi_N، جرب العثور على gid الحقيقي
-            const giMatch = gidCheck.match(/^gi_(\d+)$/);
-            if (giMatch && groupsData?.[parseInt(giMatch[1])]?._gid) {
-              currentCycleForGid = window._cycleMap?.[groupsData[parseInt(giMatch[1])]._gid];
-            }
-          }
-          if (currentCycleForGid === undefined) currentCycleForGid = 1;
+          const realGid = _resolveRealGid(gidCheck, gData);
+          let currentCycleForGid = window._cycleMap?.[realGid];
+          if (currentCycleForGid === undefined) currentCycleForGid = window._cycleMap?.[gidCheck];
+          if (currentCycleForGid === undefined) return; // تخطي — لا يمكن تحديد الدورة
           if (docCycle !== currentCycleForGid) return;
-          let gid = data.gid || extractGidFromDoc(d.id);
-          let cacheKey;
-          if (gid) {
-            cacheKey = gid;
-          } else {
-            const giMatch = d.id.match(/_g(\d+)_session_/);
-            cacheKey = 'gi_' + (giMatch ? giMatch[1] : '0');
-          }
+          const cacheKey = realGid || gidCheck || `gi_0`;
           if (!existing[cacheKey]) existing[cacheKey] = {};
           existing[cacheKey][data.sessionNum] = data;
         });
@@ -9228,8 +9212,8 @@ async function _readCurrentCycleSnapshot(teacherId, gid) {
 
   console.log(`[readSnapshot] teacher=${teacherId} gid=${gid} cycle=${cycleNum} gi=${currentGi} groupStudents=${group.students?.length || 0}`);
 
-  // ── الخطوة 1: جلب كل وثائق الحضور لهذا الأستاذ عبر query واحد ──
-  // ثم فلترة في الكود: cycleNum + gid + sessionNum
+  // ── الخطوة 1: جلب جميع وثائق الحضور للفوج الحالي والدورة الحالية ──
+  // نفلتر أولاً بالـ query (حسب teacherId) ثم نفلتر بالكود (حسب gid + cycleNum)
   let allSessionDocs = [];
   try {
     const sessSnap = await getDocs(query(
@@ -9240,43 +9224,69 @@ async function _readCurrentCycleSnapshot(teacherId, gid) {
     sessSnap.forEach(d => {
       const data = d.data();
       if (!data.sessionNum) return;
-      // فلترة: الدورة الحالية + هذا الفوج + جلسة صالحة
       const docCycle = data.cycleNum || 1;
-      const docGid = data.gid || extractGidFromDoc(d.id) || '';
       if (docCycle !== cycleNum) return;
-      if (docGid !== gid && docGid !== ('gi_' + currentGi) && docGid !== ('g' + currentGi)) return;
-      allSessionDocs.push({ id: d.id, data, docGid, docCycle });
+      const docGidRaw = data.gid || extractGidFromDoc(d.id) || '';
+      const docRealGid = _resolveRealGid(docGidRaw, groupsArr) || docGidRaw;
+      if (docRealGid !== gid) return;
+      allSessionDocs.push({ id: d.id, data, docGid: docRealGid, docCycle });
     });
   } catch (e) {
     console.warn('[readSnapshot] query failed:', e.message);
   }
   console.log(`[readSnapshot] Found ${allSessionDocs.length} session docs for cycle ${cycleNum}, gid ${gid}`);
 
-  // ── الخطوة 2: تجميع الطلاب لكل جلسة (1-12) ──
+  // ── الخطوة 2: تجميع الطلاب لكل جلسة (1-12) من جميع الوثائق ──
+  // مع إزالة التكرار حسب id/name
   const sessions = {};
+  const allStudentsFromSessions = new Map(); // id|name → student object (كل التلاميذ عبر جميع الحصص)
   for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
     const relevantDocs = allSessionDocs.filter(d => d.data.sessionNum === sn);
-    if (relevantDocs.length > 0) {
-      // دمج الطلاب من جميع الوثائق ذات الصلة (مع إزالة التكرار)
-      const mergedStudents = [];
-      const seen = new Set();
-      for (const doc of relevantDocs) {
-        for (const s of (doc.data.students || [])) {
-          const key = s.id ? `id:${s.id}` : `name:${(s.name || '').trim().toLowerCase()}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            mergedStudents.push(s);
-          }
+    const mergedStudents = [];
+    const seenInSession = new Set();
+    for (const doc of relevantDocs) {
+      for (const s of (doc.data.students || [])) {
+        const idKey = s.id ? `id:${s.id}` : '';
+        const nameKey = (s.name || '').trim().toLowerCase();
+        const key = idKey || `name:${nameKey}`;
+        if (!key || key === 'name:') continue;
+        if (!seenInSession.has(key)) {
+          seenInSession.add(key);
+          mergedStudents.push(s);
+        }
+        // أضف إلى الخريطة الشاملة (جميع التلاميذ عبر جميع الحصص)
+        if (!allStudentsFromSessions.has(key)) {
+          allStudentsFromSessions.set(key, s);
         }
       }
-      sessions[sn] = mergedStudents;
-      console.log(`[readSnapshot] Session ${sn}: ${mergedStudents.length} students (from ${relevantDocs.length} doc(s))`);
-    } else {
-      sessions[sn] = [];
     }
+    sessions[sn] = mergedStudents;
+    console.log(`[readSnapshot] Session ${sn}: ${mergedStudents.length} students (from ${relevantDocs.length} doc(s))`);
   }
 
-  // ── الخطوة 3: جلسة التحكم (control) ──
+  // ── الخطوة 3: قائمة التلاميذ النهائية = group.students + تلاميذ من session docs ──
+  // نبدأ بـ group.students
+  const finalStudents = [];
+  const seenFinal = new Set();
+  (group.students || []).forEach(s => {
+    const obj = typeof s === 'string' ? { id: '', name: s } : { id: s.id || '', name: s.name || '', receipt: s.receipt || '', payStatus: s.payStatus || '', joinedAtSession: s.joinedAtSession || 1 };
+    const key = obj.id ? `id:${obj.id}` : `name:${(obj.name || '').trim().toLowerCase()}`;
+    if (key && key !== 'name:' && !seenFinal.has(key)) {
+      seenFinal.add(key);
+      finalStudents.push(obj);
+    }
+  });
+  // أضف التلاميذ الموجودين في session docs ولكن ليسوا في group.students
+  for (const [, s] of allStudentsFromSessions) {
+    const key = s.id ? `id:${s.id}` : `name:${(s.name || '').trim().toLowerCase()}`;
+    if (key && key !== 'name:' && !seenFinal.has(key)) {
+      seenFinal.add(key);
+      finalStudents.push({ id: s.id || '', name: s.name || '' });
+    }
+  }
+  console.log(`[readSnapshot] Final students: ${finalStudents.length} (${group.students?.length || 0} from group + ${allStudentsFromSessions.size} from sessions, deduped)`);
+
+  // ── الخطوة 4: جلسة التحكم (control) ──
   const sessionControls = {};
   for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
     const ctrlDocIdNew = getCtrlDocId(teacherId, gid, sn);
@@ -9289,7 +9299,7 @@ async function _readCurrentCycleSnapshot(teacherId, gid) {
     }
   }
 
-  // ── الخطوة 4: الإحصائيات ──
+  // ── الخطوة 5: الإحصائيات ──
   let totalPresent = 0, totalAbsent = 0;
   const studentIdSet = new Set();
   Object.values(sessions).forEach(studs => {
@@ -9304,20 +9314,14 @@ async function _readCurrentCycleSnapshot(teacherId, gid) {
   const totalCells = totalStudents * CYCLE_SESSION_COUNT;
   const rate = totalCells > 0 ? Math.round((totalPresent / totalCells) * 100) : 0;
 
-  // ── الخطوة 5: قائمة التلاميذ من group.students فقط ──
-  const groupStudentsSnap = (group.students || []).map(s => {
-    if (typeof s === 'string') return { id: '', name: s };
-    return { id: s.id || '', name: s.name || '', receipt: s.receipt || '', payStatus: s.payStatus || '', joinedAtSession: s.joinedAtSession || 1 };
-  });
-
-  console.log(`[readSnapshot] DONE: ${Object.keys(sessions).filter(k => sessions[k].length > 0).length}/${CYCLE_SESSION_COUNT} sessions with data, ${groupStudentsSnap.length} students`);
+  console.log(`[readSnapshot] DONE: ${Object.keys(sessions).filter(k => sessions[k].length > 0).length}/${CYCLE_SESSION_COUNT} sessions with data, ${finalStudents.length} students`);
 
   return {
     teacherId, gid,
     groupName: group.name || '—',
     teacherName: teacherData.name || '',
     sessions, sessionControls,
-    students: groupStudentsSnap,
+    students: finalStudents,
     stats: { totalStudents, totalPresent, totalAbsent, totalCells, rate }
   };
 }
@@ -9909,7 +9913,10 @@ window.saveArchiveEdits = async (archiveId) => {
   }
 };
 
-// ─── بدء دورة حضور جديدة (يدوي) ───
+// ─── بدء دورة حضور جديدة (معاد كتابتها بالكامل) ───
+// التصميم: مراحل مستقلة، كل مرحلة تكتمل قبل الانتقال للتالية.
+// لا نعتمد على cache أو واجهة، فقط Firestore مباشرة.
+// المرحلة 4 تستخدم writeBatch واحد لتكون جميع عمليات الكتابة ذرية.
 let _archiveInProgress = false;
 
 window.startNewAttendanceCycle = async (gid) => {
@@ -9918,7 +9925,7 @@ window.startNewAttendanceCycle = async (gid) => {
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
   if (!gid) { showToast('⚠️ معرف الفوج غير صالح', true); return; }
 
-  // نافذة تأكيد
+  // ─── نافذة تأكيد ───
   const confirmModal = document.createElement('div');
   confirmModal.id = 'archive-confirm-modal';
   confirmModal.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease';
@@ -9942,121 +9949,315 @@ window.startNewAttendanceCycle = async (gid) => {
     </div>
   </div>`;
   document.body.appendChild(confirmModal);
-
   const okBtn = document.getElementById('archive-confirm-ok');
   const cancelBtn = document.getElementById('archive-confirm-cancel');
-
-  const closeConfirm = () => {
-    if (confirmModal.parentNode) confirmModal.remove();
-  };
-
+  const closeConfirm = () => { if (confirmModal.parentNode) confirmModal.remove(); };
   cancelBtn.addEventListener('click', closeConfirm);
   confirmModal.addEventListener('click', (e) => { if (e.target === confirmModal) closeConfirm(); });
-
   const confirmed = await new Promise(resolve => {
     okBtn.addEventListener('click', () => { closeConfirm(); resolve(true); });
     cancelBtn.addEventListener('click', () => resolve(false));
     confirmModal.addEventListener('click', (e) => { if (e.target === confirmModal) { closeConfirm(); resolve(false); } });
   });
-
   if (!confirmed) return;
 
-  // ─── تدفق أرشفة آمن (جميع الخطوات متسلسلة) ───
-  // الترتيب: قراءة → حفظ أرشيف → تحقق → فقط بعدها: إنشاء دورة جديدة
-  // إذا فشلت أي خطوة: لا يتغير شيء في السجل الحالي
   _archiveInProgress = true;
+  const startedAt = Date.now();
+  console.log('═══════════════════════════════════════════');
+  console.log('  بدء حضور جديد (إعادة كتابة كاملة)');
+  console.log(`  الأستاذ: ${teacherId}   الفوج: ${gid}`);
+  console.log('═══════════════════════════════════════════');
 
   try {
-    // ════════════════════ AUTH CHECK ════════════════════
-    const _uid = auth.currentUser?.uid || 'NO_AUTH';
-    const _authed = !!auth.currentUser;
-    const _hasTeacherDoc = _authed && await getDoc(doc(db, 'teachers', _uid)).then(s => s.exists()).catch(() => false);
-    const _isAdmin = _authed && !_hasTeacherDoc;
-    console.log('═══════ بدء حضور جديد ═══════');
-    console.log('[AUTH]   Current UID:', _uid);
-    console.log('[AUTH]   Authenticated:', _authed);
-    console.log('[AUTH]   Has teachers doc:', _hasTeacherDoc);
-    console.log('[AUTH]   Role:', _isAdmin ? 'Admin' : 'Teacher');
-    console.log('[AUTH]   Selected teacherId:', teacherId);
-    console.log('[AUTH]   gid:', gid);
+    // ╔═══════════════════════════════════════════════╗
+    // ║  المرحلة 1: قراءة جميع البيانات من Firestore  ║
+    // ╚═══════════════════════════════════════════════╝
+    console.log('[المرحلة 1] قراءة البيانات من Firestore...');
+    showToast('📦 جاري قراءة البيانات...');
 
-    // ════════════════════ STEP 1: GET CURRENT CYCLE ════════════════════
-    let currentCycleNum = 1;
-    try { currentCycleNum = await _getCurrentCycleNum(teacherId, gid) || 1; } catch(e) { currentCycleNum = 1; }
-    if (!currentCycleNum || currentCycleNum < 1) currentCycleNum = 1;
-    console.log('[STEP1] Current cycle:', currentCycleNum);
+    // ── 1-A: الأستاذ والفوج ──
+    const teachSnap = await getDoc(doc(db, 'teachers', teacherId));
+    if (!teachSnap.exists()) throw new Error('الأستاذ غير موجود');
+    const teachData = teachSnap.data();
+    const grps = teachData.groups || [];
+    const group = grps.find(g => g && g._gid === gid);
+    if (!group) throw new Error('الفوج غير موجود');
+    const grpIdx = grps.findIndex(g => g && g._gid === gid);
+    console.log(`  1-A: فوج "${group.name}" (المؤشر=${grpIdx}) — ${group.students?.length || 0} تلميذاً`);
 
-    // ════════════════════ STEP 2: READ CURRENT SNAPSHOT ════════════════════
-    showToast('📦 جاري قراءة سجل الحضور...');
-    const snapshot = await _readCurrentCycleSnapshot(teacherId, gid);
-    if (!snapshot) throw new Error('فشل قراءة بيانات الحضور — لا توجد بيانات');
-    snapshot.students = snapshot.students || [];
-    snapshot.sessions = snapshot.sessions || {};
-    const _snapSessionsWithData = Object.keys(snapshot.sessions).filter(k => (snapshot.sessions[k] || []).length > 0).length;
-    console.log(`[STEP2] Snapshot: ${snapshot.students.length} students, ${_snapSessionsWithData} sessions with data`);
-    // لا نكمل إذا لم تكن هناك بيانات على الإطلاق
-    if (snapshot.students.length === 0 && _snapSessionsWithData === 0) {
-      throw new Error('لا توجد بيانات حضور للاحتفاظ بها — لا يمكن إنشاء أرشيف فارغ');
+    // ── 1-B: رقم الدورة من attendanceCycles ──
+    const cycleFromDoc = await _getCurrentCycleNum(teacherId, gid) || 1;
+    console.log(`  1-B: رقم الدورة حسب وثيقة الـ cycle: ${cycleFromDoc}`);
+
+    // ── 1-C: جميع session docs لهذا الأستاذ ──
+    const allSnap = await getDocs(query(
+      collection(db, 'sessionAttendance'),
+      where('__name__', '>=', teacherId),
+      where('__name__', '<', teacherId + '_\ufff0')
+    ));
+    console.log(`  1-C: مجموع وثائق sessionAttendance: ${allSnap.size}`);
+
+    // ── 1-D: تصنيف الوثائق حسب رقم الدورة (لهذا الفوج فقط) ──
+    const gidVariants = [gid, `gi_${grpIdx}`, `g${grpIdx}`];
+    const docsByCycle = {}; // { cycleNum: [docs] }
+    let totalForGroup = 0;
+    allSnap.forEach(d => {
+      const data = d.data();
+      if (!data.sessionNum || data.sessionNum < 1 || data.sessionNum > CYCLE_SESSION_COUNT) return;
+      const docGidRaw = data.gid || extractGidFromDoc(d.id) || '';
+      const docRealGid = _resolveRealGid(docGidRaw, grps) || docGidRaw;
+      if (docRealGid !== gid) return;
+      const c = data.cycleNum || 1;
+      if (!docsByCycle[c]) docsByCycle[c] = [];
+      docsByCycle[c].push(d);
+      totalForGroup++;
+    });
+    const availableCycles = Object.keys(docsByCycle).map(Number).sort((a, b) => b - a);
+    console.log(`  1-D: ${totalForGroup} وثيقة للفوج موزعة على الدورات: ${JSON.stringify(availableCycles)}`);
+
+    // ── 1-E: اختيار الدورة الفعلية (قد تختلف عن cycleFromDoc إذا كان العداد stale) ──
+    let actualCycle = cycleFromDoc;
+    if (!docsByCycle[actualCycle] || docsByCycle[actualCycle].length === 0) {
+      // العداد stale! ابحث عن أعلى دورة فيها بيانات فعلية
+      if (availableCycles.length > 0) {
+        actualCycle = availableCycles[0]; // أعلى رقم دورة له بيانات
+        console.log(`  1-E: ⚠️ الدورة ${cycleFromDoc} ليس بها بيانات. التبديل إلى الدورة ${actualCycle}`);
+      } else {
+        // لا توجد أي بيانات على الإطلاق → أنشئ الدورة 1 من الصفر
+        actualCycle = 0; // سننشئ الدورة 1
+        console.log('  1-E: لا توجد بيانات حضور سابقة. سيتم إنشاء الدورة الأولى من الصفر.');
+      }
+    } else {
+      console.log(`  1-E: استخدام الدورة ${actualCycle} (تطابق مع وثيقة الـ cycle)`);
     }
 
-    // ════════════════════ STEP 3: CREATE ARCHIVE ════════════════════
+    // ── 1-F: بناء sessions map + جمع التلاميذ من session docs ──
+    const sessionsData = {};
+    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) sessionsData[sn] = [];
+    const sessionStudentMap = new Map(); // key → student object
+
+    if (actualCycle > 0) {
+      const cycleDocs = docsByCycle[actualCycle] || [];
+      for (const d of cycleDocs) {
+        const data = d.data();
+        const sn = data.sessionNum;
+        if (!sessionsData[sn]) sessionsData[sn] = [];
+        const seenInSn = new Set(sessionsData[sn].map(s => String(s.id || '') || (s.name || '').trim().toLowerCase()));
+        for (const s of (data.students || [])) {
+          const key = String(s.id || '') || (s.name || '').trim().toLowerCase();
+          if (key && !seenInSn.has(key)) {
+            seenInSn.add(key);
+            sessionsData[sn].push(s);
+          }
+          const mapKey = s.id ? `id:${s.id}` : `name:${(s.name || '').trim().toLowerCase()}`;
+          if (mapKey && mapKey !== 'name:' && !sessionStudentMap.has(mapKey)) {
+            sessionStudentMap.set(mapKey, s);
+          }
+        }
+      }
+    }
+    const sessionsWithDataCnt = Object.keys(sessionsData).filter(k => sessionsData[k].length > 0).length;
+    console.log(`  1-F: ${sessionsWithDataCnt}/${CYCLE_SESSION_COUNT} حصة بها بيانات، ${sessionStudentMap.size} تلميذاً من session docs`);
+
+    // ── 1-G: قائمة التلاميذ النهائية (group.students + session docs, بدون تكرار) ──
+    const allStudents = [];
+    const allSeen = new Set();
+    (group.students || []).forEach(s => {
+      const obj = typeof s === 'string' ? { id: '', name: s } : { id: s.id || '', name: s.name || '' };
+      const key = obj.id ? `id:${obj.id}` : `name:${(obj.name || '').trim().toLowerCase()}`;
+      if (key && key !== 'name:' && !allSeen.has(key)) { allSeen.add(key); allStudents.push(obj); }
+    });
+    for (const [, s] of sessionStudentMap) {
+      const key = s.id ? `id:${s.id}` : `name:${(s.name || '').trim().toLowerCase()}`;
+      if (key && key !== 'name:' && !allSeen.has(key)) {
+        allSeen.add(key);
+        allStudents.push({ id: s.id || '', name: s.name || '' });
+      }
+    }
+    if (allStudents.length === 0 && sessionsWithDataCnt === 0) {
+      // لا توجد بيانات على الإطلاق — أنشئ الدورة الأولى من الصفر
+      console.log('  1-G: لا توجد بيانات. سيتم إنشاء دورة جديدة بدون أرشيف.');
+      const nextCycleNew = 1;
+      const batchNew = writeBatch(db);
+      batchNew.set(doc(db, 'attendanceCycles', getCycleDocId(teacherId, gid, nextCycleNew)), {
+        teacherId, gid, cycleNum: nextCycleNew, status: 'current', startDate: new Date().toISOString().slice(0, 10), createdAt: serverTimestamp()
+      });
+      for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+        batchNew.set(doc(db, 'sessionAttendance', getSessionDocId(teacherId, gid, sn, nextCycleNew)), {
+          teacherId: teacherId + '_' + gid, gid, cycleNum: nextCycleNew, sessionNum: sn, date: new Date().toISOString().slice(0, 10), students: [], savedAt: serverTimestamp()
+        });
+      }
+      await batchNew.commit();
+      if (window._attSessionUnsub) { try { window._attSessionUnsub(); } catch(e) {} window._attSessionUnsub = null; window._attSessionUnsubFor = null; }
+      if (window._attSummaryCache) delete window._attSummaryCache[teacherId];
+      if (window._ctrlMapCache) delete window._ctrlMapCache[teacherId];
+      showToast(`✅ تم إنشاء دورة جديدة (${nextCycleNew})`);
+      await loadAttendanceSummary(teacherId);
+      return;
+    }
+    console.log(`  1-G: ${allStudents.length} تلميذاً في القائمة النهائية`);
+
+    // ╔═══════════════════════════════════════════════╗
+    // ║  المرحلة 2: بناء Snapshot كامل في الذاكرة    ║
+    // ╚═══════════════════════════════════════════════╝
+    console.log('[المرحلة 2] بناء Snapshot...');
+    let presentCount = 0, absentCount = 0;
+    for (const sn in sessionsData) {
+      for (const s of sessionsData[sn]) {
+        if (s.present === true) presentCount++;
+        else if (s.present === false) absentCount++;
+      }
+    }
+    const snapshot = {
+      teacherId, gid,
+      cycleNum: actualCycle,
+      groupName: group.name || '',
+      teacherName: teachData.name || '',
+      sessions: sessionsData,
+      students: allStudents,
+      stats: {
+        totalStudents: allStudents.length,
+        totalPresent: presentCount,
+        totalAbsent: absentCount,
+        totalCells: allStudents.length * CYCLE_SESSION_COUNT,
+        rate: allStudents.length * CYCLE_SESSION_COUNT > 0 ? Math.round((presentCount / (allStudents.length * CYCLE_SESSION_COUNT)) * 100) : 0
+      }
+    };
+    console.log(`  2: Snapshot: ${allStudents.length} تلميذ، ${sessionsWithDataCnt} حصة، ${presentCount} present, ${absentCount} absent`);
+
+    // ╔═══════════════════════════════════════════════╗
+    // ║  المرحلة 3: حفظ الأرشيف في Firestore + تحقق  ║
+    // ╚═══════════════════════════════════════════════╝
+    console.log('[المرحلة 3] حفظ الأرشيف...');
     showToast('💾 جاري حفظ الأرشيف...');
-    const { archiveId: savedArchiveId } = await _saveArchiveSnapshot(snapshot, currentCycleNum);
-    console.log('[STEP 3] Archive saved:', savedArchiveId, 'students:', snapshot.students.length);
+    const archiveDocId = _getArchiveDocId(teacherId, gid, actualCycle);
+    await setDoc(doc(db, 'attendanceArchive', archiveDocId), {
+      teacherId, gid, cycleNum: actualCycle,
+      groupName: snapshot.groupName,
+      teacherName: snapshot.teacherName,
+      archivedAt: serverTimestamp(),
+      archiveDate: new Date().toISOString().slice(0, 10),
+      sessions: snapshot.sessions,
+      students: snapshot.students,
+      readOnly: true,
+      stats: snapshot.stats
+    });
 
-    // ════════════════════ STEP 4: FULL VERIFY ARCHIVE (EXACT MATCH) ════════════════════
-    showToast('🔍 جاري التحقق الكامل من الأرشيف...');
-    await _verifyArchive(savedArchiveId, snapshot);
-    console.log('[STEP 4] ✅ Archive VERIFIED — exact match with snapshot');
+    // ── قراءة الأرشيف من Firestore والمقارنة ──
+    console.log('  3: جاري التحقق من الأرشيف...');
+    showToast('🔍 جاري التحقق من الأرشيف...');
+    const verifySnap = await getDoc(doc(db, 'attendanceArchive', archiveDocId));
+    if (!verifySnap.exists()) throw new Error('❌ الأرشيف غير موجود بعد الحفظ');
+    const savedArch = verifySnap.data();
+    const savedStuds = savedArch.students || [];
+    const savedSess = savedArch.sessions || {};
 
-    // ════════════════════ STEP 5: ARCHIVE CURRENT CYCLE ════════════════════
-    const currentCycleDocId = getCycleDocId(teacherId, gid, currentCycleNum);
-    await setDoc(doc(db, 'attendanceCycles', currentCycleDocId), {
-      teacherId, gid, cycleNum: currentCycleNum,
-      status: 'archived',
-      endDate: new Date().toISOString().slice(0, 10)
-    }, { merge: true });
-    console.log('[STEP 5] Cycle archived:', currentCycleDocId);
-
-    // ════════════════════ STEP 6: CREATE NEW CYCLE ════════════════════
-    const nextCycleNum = currentCycleNum + 1;
-    await _ensureCycleDoc(teacherId, gid, nextCycleNum);
-    console.log('[STEP 6] New cycle created:', nextCycleNum);
-
-    // ════════════════════ STEP 7: CREATE EMPTY SESSION DOCS (ALL ⋯) ════════════════════
-    showToast('🆕 جاري إنشاء سجل الحضور الجديد...');
-    const batch = writeBatch(db);
+    if (savedStuds.length !== allStudents.length) {
+      throw new Error(`❌ التلاميذ: ${savedStuds.length} ≠ ${allStudents.length}`);
+    }
     for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
-      const sessionDocId = getSessionDocId(teacherId, gid, sn, nextCycleNum);
-      batch.set(doc(db, 'sessionAttendance', sessionDocId), {
+      const expS = sessionsData[sn] || [];
+      const savS = savedSess[sn] || [];
+      if (savS.length !== expS.length) {
+        throw new Error(`❌ الحصة ${sn}: ${savS.length} ≠ ${expS.length} تلميذاً`);
+      }
+      for (let si = 0; si < expS.length; si++) {
+        if ((expS[si].present ?? null) !== (savS[si].present ?? null)) {
+          throw new Error(`❌ الحصة ${sn} تلميذ ${si + 1}: حضور مختلف`);
+        }
+      }
+    }
+    console.log('  3: ✅ الأرشيف متطابق 100%');
+
+    // ╔═════════════════════════════════════════════════════╗
+    // ║  المرحلة 4: إنشاء الدورة الجديدة (writeBatch ذري) ║
+    // ╚═════════════════════════════════════════════════════╝
+    // كل عمليات الكتابة في Batch واحد: أرشفة الدورة القديمة + إنشاء الجديدة + 12 حصة
+    console.log('[المرحلة 4] إنشاء الدورة الجديدة (writeBatch)...');
+    showToast('🆕 جاري إنشاء الدورة الجديدة...');
+
+    const nextCycle = Math.max(cycleFromDoc, actualCycle) + 1;
+    const batch = writeBatch(db);
+
+    // 4-A: أرشفة وثيقة الدورة الحالية (إذا كانت موجودة ولها بيانات)
+    if (actualCycle > 0) {
+      const oldDocId = getCycleDocId(teacherId, gid, actualCycle);
+      batch.set(doc(db, 'attendanceCycles', oldDocId), {
+        teacherId, gid, cycleNum: actualCycle,
+        status: 'archived',
+        endDate: new Date().toISOString().slice(0, 10)
+      }, { merge: true });
+    }
+
+    // 4-B: أرشفة أي وثيقة دورة stale (إذا كان cycleFromDoc مختلفاً عن actualCycle)
+    if (cycleFromDoc !== actualCycle && cycleFromDoc > 0) {
+      const staleDocId = getCycleDocId(teacherId, gid, cycleFromDoc);
+      batch.set(doc(db, 'attendanceCycles', staleDocId), {
+        teacherId, gid, cycleNum: cycleFromDoc,
+        status: 'archived',
+        endDate: new Date().toISOString().slice(0, 10)
+      }, { merge: true });
+    }
+
+    // 4-C: إنشاء وثيقة الدورة الجديدة
+    batch.set(doc(db, 'attendanceCycles', getCycleDocId(teacherId, gid, nextCycle)), {
+      teacherId, gid, cycleNum: nextCycle,
+      status: 'current',
+      startDate: new Date().toISOString().slice(0, 10),
+      createdAt: serverTimestamp()
+    });
+
+    // 4-D: إنشاء 12 وثيقة حصة جديدة (فارغة، بدون تلاميذ، بدون حضور)
+    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+      batch.set(doc(db, 'sessionAttendance', getSessionDocId(teacherId, gid, sn, nextCycle)), {
         teacherId: teacherId + '_' + gid,
-        gid, cycleNum: nextCycleNum, sessionNum: sn,
+        gid, cycleNum: nextCycle, sessionNum: sn,
         date: new Date().toISOString().slice(0, 10),
         students: [],
         savedAt: serverTimestamp()
       });
     }
-    await batch.commit();
-    console.log('[STEP 7] Empty session docs created for cycle', nextCycleNum);
 
-    // ════════════════════ STEP 8: UPDATE CACHE & RELOAD ════════════════════
-    const cacheKey = teacherId + '|' + gid;
-    _currentCycleCache[cacheKey] = nextCycleNum;
-    // حذف كامل ذاكرة الحضور وإعادة ضبط المستمع لإجبار إعادة تحميل كاملة
+    await batch.commit();
+    console.log(`  4: ✅ Batch commit — الدورة ${nextCycle} و ${CYCLE_SESSION_COUNT} حصة`);
+
+    // ╔═══════════════════════════════════════════════╗
+    // ║  المرحلة 5: التحقق من وجود كل حصة في Firestore║
+    // ╚═══════════════════════════════════════════════╝
+    console.log('[المرحلة 5] التحقق من الحصص الجديدة...');
+    showToast('🔍 جاري التحقق من الحصص...');
+    for (let sn = 1; sn <= CYCLE_SESSION_COUNT; sn++) {
+      const docId = getSessionDocId(teacherId, gid, sn, nextCycle);
+      const sSnap = await getDoc(doc(db, 'sessionAttendance', docId));
+      if (!sSnap.exists()) throw new Error(`❌ الحصة ${sn} غير موجودة في Firestore`);
+      const sData = sSnap.data();
+      if (Number(sData.cycleNum) !== nextCycle) throw new Error(`❌ الحصة ${sn}: cycleNum=${sData.cycleNum} ≠ ${nextCycle}`);
+      if (!Array.isArray(sData.students) || sData.students.length !== 0) {
+        throw new Error(`❌ الحصة ${sn}: students غير فارغة (${(sData.students||[]).length})`);
+      }
+      console.log(`  5: ✅ الحصة ${sn}: cycleNum=${sData.cycleNum}, students=[]`);
+    }
+
+    // ╔═══════════════════════════════════════════════╗
+    // ║  المرحلة 6: تنظيف الكاش وإعادة التحميل       ║
+    // ╚═══════════════════════════════════════════════╝
+    console.log('[المرحلة 6] تنظيف الكاش...');
+    _currentCycleCache[teacherId + '|' + gid] = nextCycle;
     if (window._attSessionUnsub) { try { window._attSessionUnsub(); } catch(e) {} window._attSessionUnsub = null; window._attSessionUnsubFor = null; }
     if (window._attSummaryCache) delete window._attSummaryCache[teacherId];
     if (window._ctrlMapCache) delete window._ctrlMapCache[teacherId];
 
-    console.log('[STEP 8] Cache cleared, reloading...');
-    showToast(`✅ تم أرشفة الدورة ${currentCycleNum} وبدء الدورة ${nextCycleNum} بنجاح`);
+    const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+    const summary = `✅ تم أرشفة الدورة ${actualCycle} وبدء الدورة ${nextCycle} — ${allStudents.length} تلميذ، ${elapsed}ث`;
+    console.log(`═══════ ✅ ${summary} ═══════`);
+    showToast(summary);
+    console.log(`[تقرير] الدورة المؤرشفة: ${actualCycle} → الدورة الجديدة: ${nextCycle}`);
+    console.log(`[تقرير] التلاميذ: ${allStudents.length} (${group.students?.length || 0} من group + ${sessionStudentMap.size} من sessions)`);
+    console.log(`[تقرير] الحصص: ${sessionsWithDataCnt}/${CYCLE_SESSION_COUNT}`);
     await loadAttendanceSummary(teacherId);
-    console.log('═══════════════════════════════════════');
-    console.log('✅ انتهت الأرشفة بنجاح');
-    console.log('═══════════════════════════════════════');
   } catch (e) {
-    console.log('═══════ فشل في الخطوة أعلاه ═══════');
+    console.log('═══════ ❌ فشل ═══════');
     console.error('[startNewAttendanceCycle] ❌', e);
-    console.error('[FAILURE]  Code:', e.code, '| Message:', e.message);
     showToast('⚠️ ' + e.message + ' — لم يتم تعديل سجل الحضور الحالي', true);
   } finally {
     _archiveInProgress = false;
@@ -13463,6 +13664,26 @@ function extractGidFromDoc(docId) {
   if (m) return m[1];
   return null; // صيغة قديمة → سيستخدم المتصل gi_prefix
 }
+// تحويل أي صيغة gid إلى gid الحقيقي عن طريق مطابقتها مع جميع الأفواج
+function _resolveRealGid(gidRaw, groupsData) {
+  if (!gidRaw || !groupsData) return gidRaw || null;
+  // مطابقة مباشرة مع _gid
+  const direct = groupsData.find(g => g && g._gid === gidRaw);
+  if (direct) return direct._gid;
+  // محاولة مطابقة الصيغة القديمة gi_N أو gN
+  const idxMatch = gidRaw.match(/^gi?_?(\d+)$/);
+  if (idxMatch) {
+    const idx = parseInt(idxMatch[1], 10);
+    if (groupsData[idx]?._gid) return groupsData[idx]._gid;
+  }
+  // محاولة يائسة: ابحث عن أي فوج تطابق صيغة gidRaw مع أي من صيغه
+  for (let i = 0; i < groupsData.length; i++) {
+    const g = groupsData[i];
+    const variants = [g?._gid, `gi_${i}`, `g${i}`].filter(Boolean);
+    if (variants.includes(gidRaw)) return g._gid || gidRaw;
+  }
+  return gidRaw;
+}
 // استخراج رقم الدورة من Doc ID
 function extractCycleFromDoc(docId) {
   const m = docId.match(/_cycle_(\d+)_session_/);
@@ -13694,6 +13915,101 @@ window.debugAttendanceCycle = async (teacherId, gid) => {
   console.log('\n═══════════════════════════════════════');
   console.log('🏁 انتهى التشخيص');
   console.log('═══════════════════════════════════════');
+};
+
+// ─── اختبار جميع الأساتذة: يحاكي مرحلة القراءة لـ startNewAttendanceCycle ───
+// شغّل في Console: await window.testAllTeachersArchive();
+window.testAllTeachersArchive = async () => {
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('  اختبار شامل: محاكاة أرشفة جميع الأساتذة');
+  console.log('═══════════════════════════════════════════════════════════════');
+  const teacherList = allTeachers || [];
+  let passed = 0, failed = 0;
+  for (const t of teacherList) {
+    const tid = t.id;
+    if (!tid) continue;
+    console.log(`\n📋 الأستاذ: ${t.name || tid} (${tid})`);
+    const groups = t.groups || [];
+    if (groups.length === 0) { console.log('  ⏭️ لا توجد أفواج'); passed++; continue; }
+    for (const g of groups) {
+      const gid = g._gid;
+      if (!gid) { console.log('  ⏭️ فوج بدون _gid'); continue; }
+      const studentCountFromGroup = (g.students || []).length;
+      console.log(`\n  ─── فوج: "${g.name || '—'}" _gid=${gid} — ${studentCountFromGroup} تلميذاً في group.students`);
+
+      try {
+        // 1. قراءة الدورة الحالية
+        const cycleNum = await _getCurrentCycleNum(tid, gid) || 1;
+        // 2. قراءة جميع session docs
+        const snap = await getDocs(query(
+          collection(db, 'sessionAttendance'),
+          where('__name__', '>=', tid),
+          where('__name__', '<', tid + '_\ufff0')
+        ));
+        // 3. تصنيف حسب الدورة
+        const byCycle = {};
+        snap.forEach(d => {
+          const data = d.data();
+          if (!data.sessionNum) return;
+          const docGidRaw = data.gid || extractGidFromDoc(d.id) || '';
+          const docRealGid = _resolveRealGid(docGidRaw, groups) || docGidRaw;
+          if (docRealGid !== gid) return;
+          const c = data.cycleNum || 1;
+          if (!byCycle[c]) byCycle[c] = [];
+          byCycle[c].push(d);
+        });
+        const availCycles = Object.keys(byCycle).map(Number).sort((a,b)=>b-a);
+        const docsInDocCycle = (byCycle[cycleNum] || []).length;
+        console.log(`    cycleFromDoc=${cycleNum} | دورات ببيانات: ${JSON.stringify(availCycles)} | docs في الدورة ${cycleNum}: ${docsInDocCycle}`);
+        // 4. جلب جميع التلاميذ من session docs
+        const sessionStudents = new Map();
+        for (const c in byCycle) {
+          for (const d of byCycle[c]) {
+            for (const s of (d.data().students || [])) {
+              const key = s.id ? `id:${s.id}` : `name:${(s.name||'').trim().toLowerCase()}`;
+              if (key && key !== 'name:' && !sessionStudents.has(key)) sessionStudents.set(key, s);
+            }
+          }
+        }
+        // 5. دمج مع group.students
+        const allStudents = [];
+        const allSeen = new Set();
+        (g.students || []).forEach(s => {
+          const obj = typeof s === 'string' ? { id:'', name:s } : { id:s.id||'', name:s.name||'' };
+          const key = obj.id ? `id:${obj.id}` : `name:${(obj.name||'').trim().toLowerCase()}`;
+          if (key && key !== 'name:' && !allSeen.has(key)) { allSeen.add(key); allStudents.push(obj); }
+        });
+        for (const [, s] of sessionStudents) {
+          const key = s.id ? `id:${s.id}` : `name:${(s.name||'').trim().toLowerCase()}`;
+          if (key && key !== 'name:' && !allSeen.has(key)) { allSeen.add(key); allStudents.push({ id:s.id||'', name:s.name||'' }); }
+        }
+        const totalFromSessions = sessionStudents.size;
+        const totalMerged = allStudents.length;
+        console.log(`    تلاميذ من session docs: ${totalFromSessions} | نهائي (بعد الدمج): ${totalMerged}`);
+        if (totalMerged >= studentCountFromGroup && totalMerged > 0) {
+          console.log(`    ✅ PASS (${totalMerged} تلميذ)`);
+          passed++;
+        } else if (totalMerged === 0 && studentCountFromGroup === 0) {
+          console.log(`    ⚠️ لا توجد بيانات (فارغ)`);
+          passed++;
+        } else {
+          console.log(`    ❌ FAIL: group.students=${studentCountFromGroup} لكن المستخرج=${totalMerged}`);
+          // تفاصيل
+          console.log(`      group.students:`, (g.students||[]).map(s => typeof s === 'string' ? s : s.name));
+          console.log(`      session students:`, [...sessionStudents.values()].map(s => s.name));
+          failed++;
+        }
+      } catch (e) {
+        console.log(`    ❌ ERROR: ${e.message}`);
+        failed++;
+      }
+    }
+  }
+  const total = passed + failed;
+  console.log('\n═══════════════════════════════════════════════════════════════');
+  console.log(`  ✅ النتيجة: ${passed}/${total} نجاح, ${failed}/${total} فشل`);
+  console.log('═══════════════════════════════════════════════════════════════');
+  return { passed, failed, total };
 };
 
 // حل helper: تحويل gi (فهرس الفوج) إلى _gid (المعرّف الوحيد)
