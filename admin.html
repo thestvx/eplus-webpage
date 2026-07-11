@@ -7694,13 +7694,13 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
   // ── تحميل أرقام الدورات الحالية لجميع أفواج هذا الأستاذ ──
   // ── بناء _cycleMap: ربط كل صيغ gid برقم الدورة الحالية ──
   let _cycleMap = {};
+  const groupsData = teacher.groups || [];
   try {
     const cycleSnap = await getDocs(query(
       collection(db, 'attendanceCycles'),
       where('teacherId', '==', teacherId),
       where('status', '==', 'current')
     ));
-    const groupsData = teacher.groups || [];
     // الخطوة 1: لكل cycle doc، سجل cycleNum لـ gid الموجود في الوثيقة
     cycleSnap.forEach(d => { const c = d.data(); _cycleMap[c.gid] = c.cycleNum || 1; });
     // الخطوة 2: لكل فوج، اجعل جميع صيغ gid الخاصة به تشير لنفس cycleNum
@@ -7766,17 +7766,25 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
       });
       console.log(`[ATT] Loaded ${loadedDocs.length} session docs for ${teacherId}:`, loadedDocs.slice(0, 10));
       if (loadedDocs.length === 0) {
-        console.warn('[ATT] ⚠️ Zero session docs loaded — checking raw query...');
-        const rawSnap = await getDocs(query(
-          collection(db, 'sessionAttendance'),
-          where('__name__', '>=', teacherId),
-          where('__name__', '<', teacherId + '_\ufff0')
-        ));
-        console.warn(`[ATT] Raw query returned ${rawSnap.size} docs total`);
-        rawSnap.forEach(d => {
-          const raw = d.data();
-          console.warn(`[ATT]   doc=${d.id} teacherId=${raw.teacherId} gid=${raw.gid} cycleNum=${raw.cycleNum} sessionNum=${raw.sessionNum} students=${(raw.students||[]).length}`);
-        });
+        console.warn('[ATT] ⚠️ Zero session docs loaded — cycle filter (stale counter?) — loading without cycle filter');
+        // عداد الدورة قد يكون stale — أعد التحميل بدون فلتر الدورة
+        try {
+          sessSnap.forEach(d => {
+            const data = d.data();
+            if (!data.sessionNum) return;
+            const gidRaw = data.gid || extractGidFromDoc(d.id);
+            const realGid = _resolveRealGid(gidRaw, groupsData);
+            if (!realGid) return;
+            // تحقق من أن هذا الفوج ينتمي إلى أي فوج لدى الأستاذ
+            const foundGroup = groupsData.find(g => g && g._gid === realGid);
+            if (!foundGroup) return;
+            const cacheKey = realGid;
+            if (!window._attSummaryCache[teacherId][cacheKey]) window._attSummaryCache[teacherId][cacheKey] = {};
+            window._attSummaryCache[teacherId][cacheKey][data.sessionNum] = data;
+            loadedDocs.push({ id: d.id, cacheKey, sn: data.sessionNum, cycle: data.cycleNum||1, students: (data.students||[]).length });
+          });
+          console.log(`[ATT] Fallback loaded ${loadedDocs.length} docs (no cycle filter)`);
+        } catch (e2) { console.warn('[ATT] Fallback also failed:', e2.message); }
       }
     } catch (e) { console.warn('[ATT] Initial load failed:', e.message); }
   }
@@ -8182,10 +8190,11 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         let rec = groupSessions[i];
         let studentRec = null;
         const sNameVal = s.name;
+        const sNameStr = typeof sNameVal === 'string' ? sNameVal : String(sNameVal || '');
         const ctrl = ctrlMap[i];
         const ctrlStatus = ctrl && ctrl.status;
         const isLocked = window._isTeacherAttendanceView && (ctrlStatus === 'locked' || ctrlStatus === 'closed');
-        const snAttr = sNameVal.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+        const snAttr = sNameStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
         const gidVal = g.gid || s.gid || s.groupGid || 'gi_' + s.groupGi;
         const attDataAttrs = `data-att-cell="1" data-teacher-id="${teacherIdVal}" data-gid="${gidVal}" data-session="${i}" data-student-id="${sIdAttr}" data-sn="${snAttr}"`;
         const allAttrs = attDataAttrs;
