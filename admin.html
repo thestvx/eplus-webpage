@@ -7756,7 +7756,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         const realGid = _resolveRealGid(gidRaw, groupsData);
         let currentCycleForGid = _cycleMap[realGid];
         if (currentCycleForGid === undefined) currentCycleForGid = _cycleMap[gidRaw];
-        if (currentCycleForGid === undefined) return; // تخطي — لا يمكن تحديد الدورة
+        if (currentCycleForGid === undefined) currentCycleForGid = 1; // بدون cycle doc → افترض الدورة 1
         if (docCycle !== currentCycleForGid) return;
         // استخدم gid الحقيقي كمفتاح للتخزين المؤقت
         const cacheKey = realGid || gidRaw || `gi_${groupsData.findIndex(g => g?._gid === gidRaw) >= 0 ? groupsData.findIndex(g => g?._gid === gidRaw) : '0'}`;
@@ -8266,7 +8266,7 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         <td style="padding:6px 8px;height:48px;white-space:nowrap;font-size:13px">${teacher.name}</td>
         <td style="padding:6px 8px;height:48px;white-space:nowrap;font-size:12px"><span class="att-sum-group">${t('group_prefix')}${s.group}</span></td>
         ${cells.join('')}
-        <td style="text-align:center;padding:6px 4px;height:48px"><button class="tbl-action del" onclick="removeStudentFromTeacher('${teacherIdVal}','${s.name.replace(/'/g,"\\'")}','${sIdAttr}')" title="${t('att_delete_btn')}">🗑️</button></td>
+        <td style="text-align:center;padding:6px 4px;height:48px"><button class="tbl-action del" onclick="removeStudentFromTeacher('${teacherIdVal}','${(typeof s.name === 'string' ? s.name : String(s.name || '')).replace(/'/g,"\\'")}','${sIdAttr}')" title="${t('att_delete_btn')}">🗑️</button></td>
       </tr>`);
     });
     allRows.push(`<tr class="att-group-save-row"><td colspan="${colspan}" style="text-align:center;padding:8px 14px;background:var(--bg);border-top:1px solid var(--border)">
