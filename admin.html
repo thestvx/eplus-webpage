@@ -14128,6 +14128,23 @@ window.verifyCurrentTeacherAttendance = async () => {
     console.log(`      حصص فريدة: ${uniqueSessions.size > 0 ? [...uniqueSessions].sort((a,b)=>a-b).join(', ') : '—'}`);
     console.log(`   📊 إجمالي سجلات الحضور: ${groupAttendanceCount}`);
 
+    // جدول تفصيلي لكل الحصص 1-12
+    console.log('   ─── تفصيل الحصص لكل فوج ───');
+    for (let sn = 1; sn <= 12; sn++) {
+      const snDocs = groupDocs.filter(d => d.data.sessionNum === sn);
+      const snHasData = snDocs.some(d => (d.data.students || []).length > 0);
+      const snStudents = snDocs.reduce((sum, d) => sum + (d.data.students || []).length, 0);
+      const snIds = snDocs.map(d => {
+        const shortId = d.id.length > 50 ? d.id.slice(0, 45) + '…' : d.id;
+        const studCount = (d.data.students || []).length;
+        return `${shortId} (${studCount})`;
+      });
+      console.log(`      ح${sn}: ${snHasData ? '✅' : '❌'} ${snStudents} تلميذ — [${snIds.join(', ')}]`);
+    }
+
+    // الوثائق غير المتطابقة مع أي فوج
+    const unmatchedIds = [];
+
     // التحقق من سلامة أسماء التلاميذ في session docs
     sessionsWithData.forEach(d => {
       (d.data.students || []).forEach((s, i) => {
@@ -14160,6 +14177,34 @@ window.verifyCurrentTeacherAttendance = async () => {
     if (extraInSessions.length > 0) {
       console.warn(`   ⚠️ تلاميذ في session docs غير موجودين في teacher.groups: [${extraInSessions.join(', ')}]`);
     }
+  }
+
+  // عرض الوثائق غير المتطابقة مع أي فوج
+  const allMatchedIds = new Set();
+  for (const g of groups) {
+    const gid = g._gid;
+    if (!gid) continue;
+    allSnap.forEach(d => {
+      const docGid = d.data().gid || '';
+      if (docGid === gid) { allMatchedIds.add(d.id); return; }
+      const rawGid = extractGidFromDoc(d.id);
+      const resolvedGid = _resolveRealGid(rawGid, groups);
+      if (resolvedGid === gid || rawGid === gid) allMatchedIds.add(d.id);
+    });
+  }
+  const unmatchedDocs = [];
+  allSnap.forEach(d => {
+    if (!allMatchedIds.has(d.id)) {
+      const data = d.data();
+      const rawGid = extractGidFromDoc(d.id);
+      unmatchedDocs.push({ id: d.id, rawGid, sessionNum: data.sessionNum, cycleNum: data.cycleNum, studentsCount: (data.students || []).length });
+    }
+  });
+  if (unmatchedDocs.length > 0) {
+    console.log(`\n⚠️ وثائق غير متطابقة مع أي فوج (${unmatchedDocs.length}):`);
+    unmatchedDocs.forEach(d => {
+      console.log(`   ${d.id} | extractGid="${d.rawGid || 'null'}" | sn=${d.sessionNum} | cycle=${d.cycleNum} | students=${d.studentsCount}`);
+    });
   }
 
   // ── التقرير النهائي ──
