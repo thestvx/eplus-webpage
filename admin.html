@@ -14028,6 +14028,151 @@ window.debugAttendanceCycle = async (teacherId, gid) => {
   console.log('═══════════════════════════════════════');
 };
 
+// ─── التحقق الكامل من حضور الأستاذ الحالي ───
+// يقرأ من Firestore مباشرة ويقارن مع الكاش والجدول
+// شغّل في Console: await window.verifyCurrentTeacherAttendance()
+window.verifyCurrentTeacherAttendance = async () => {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { console.error('⚠️ اختر أستاذ أولاً'); return; }
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  if (!teacher) { console.error('⚠️ الأستاذ غير موجود في allTeachers'); return; }
+  const groups = teacher.groups || [];
+  if (!groups.length) { console.error('⚠️ لا توجد أفواج'); return; }
+
+  console.log('%c═══════════════════════════════════════════════════════════════', 'font-weight:bold');
+  console.log('%c  🔍 التحقق الكامل من الحضور — ' + teacher.name, 'font-size:14px;font-weight:bold');
+  console.log('%c═══════════════════════════════════════════════════════════════', 'font-weight:bold');
+
+  // قراءة جميع session docs من Firestore
+  const allSnap = await getDocs(query(
+    collection(db, 'sessionAttendance'),
+    where('__name__', '>=', teacherId),
+    where('__name__', '<', teacherId + '_\ufff0')
+  ));
+  console.log(`📦 مجموع وثائق sessionAttendance في Firestore: ${allSnap.size}`);
+
+  // قراءة cycle docs
+  const cycleSnap = await getDocs(query(
+    collection(db, 'attendanceCycles'),
+    where('teacherId', '==', teacherId)
+  ));
+  console.log(`📦 مجموع وثائق attendanceCycles: ${cycleSnap.size}`);
+  cycleSnap.forEach(d => {
+    const c = d.data();
+    console.log(`   cycle: gid=${c.gid} num=${c.cycleNum} status=${c.status}`);
+  });
+
+  let totalStudentsInTeacherDoc = 0;
+  let totalSessionsWithData = 0;
+  let totalAttendanceRecords = 0;
+  let totalErrors = 0;
+
+  for (const g of groups) {
+    const gid = g._gid;
+    if (!gid) { console.warn(`⚠️ الفوج "${g.name}" ليس له _gid`); continue; }
+    const groupStudents = g.students || [];
+    const groupStudentCount = groupStudents.length;
+    totalStudentsInTeacherDoc += groupStudentCount;
+
+    // استخراج أسماء التلاميذ من group.students (نصوص أو كائنات)
+    const groupStudentNames = groupStudents.map(s => {
+      if (typeof s === 'object' && s !== null) return String(s.name || '');
+      return String(s || '');
+    }).filter(Boolean);
+
+    // تصفية session docs لهذا الفوج
+    const groupDocs = [];
+    allSnap.forEach(d => {
+      const data = d.data();
+      const docGid = data.gid || '';
+      if (docGid === gid) {
+        groupDocs.push({ id: d.id, data });
+      } else {
+        // استخراج gid من doc ID (للوثائق القديمة)
+        const extractedGid = (() => {
+          const parts = d.id.split('_session_');
+          if (parts.length === 2) {
+            const prefix = parts[0];
+            // prefix format: teacherId_gid or teacherId_gi_N or teacherId_gN
+            if (prefix.startsWith(teacherId + '_')) {
+              const afterTeacher = prefix.slice(teacherId.length + 1);
+              if (afterTeacher === gid) return gid;
+            }
+          }
+          return null;
+        })();
+        if (extractedGid === gid) {
+          groupDocs.push({ id: d.id, data });
+        }
+      }
+    });
+
+    const sessionsWithData = groupDocs.filter(d => (d.data.students || []).length > 0);
+    const uniqueSessions = new Set(sessionsWithData.map(d => d.data.sessionNum));
+    totalSessionsWithData += uniqueSessions.size;
+    const groupAttendanceCount = sessionsWithData.reduce((sum, d) => sum + (d.data.students || []).length, 0);
+    totalAttendanceRecords += groupAttendanceCount;
+
+    console.log(`\n🏫 الفوج: ${g.name || '—'} (_gid: ${gid})`);
+    console.log(`   👥 تلاميذ في teacher.groups: ${groupStudentCount}`);
+    console.log(`      الأسماء: [${groupStudentNames.join(', ')}]`);
+    console.log(`   📋 وثائق sessionAttendance لهذا الفوج: ${groupDocs.length}`);
+    console.log(`      منها بها تلاميذ: ${sessionsWithData.length}`);
+    console.log(`      حصص فريدة: ${uniqueSessions.size > 0 ? [...uniqueSessions].sort((a,b)=>a-b).join(', ') : '—'}`);
+    console.log(`   📊 إجمالي سجلات الحضور: ${groupAttendanceCount}`);
+
+    // التحقق من سلامة أسماء التلاميذ في session docs
+    sessionsWithData.forEach(d => {
+      (d.data.students || []).forEach((s, i) => {
+        const n = s.name;
+        if (n === undefined || n === null) {
+          console.error(`      ❌ التلميذ ${i} في الحصة ${d.data.sessionNum}: name = ${n}`);
+          totalErrors++;
+        } else if (typeof n === 'object') {
+          console.error(`      ❌ التلميذ ${i} في الحصة ${d.data.sessionNum}: name هو كائن — ${JSON.stringify(n)}`);
+          totalErrors++;
+        } else if (typeof n !== 'string') {
+          console.error(`      ❌ التلميذ ${i} في الحصة ${d.data.sessionNum}: name = ${typeof n} (${n})`);
+          totalErrors++;
+        }
+      });
+    });
+
+    // مقارنة أسماء التلاميذ في group مع session docs
+    const namesInSessions = new Set();
+    sessionsWithData.forEach(d => {
+      (d.data.students || []).forEach(s => {
+        if (s.name) namesInSessions.add(s.name);
+      });
+    });
+    const missingInSessions = groupStudentNames.filter(n => n && !namesInSessions.has(n));
+    if (missingInSessions.length > 0) {
+      console.warn(`   ⚠️ تلاميذ في teacher.groups غير موجودين في session docs: [${missingInSessions.join(', ')}]`);
+    }
+    const extraInSessions = [...namesInSessions].filter(n => !groupStudentNames.includes(n));
+    if (extraInSessions.length > 0) {
+      console.warn(`   ⚠️ تلاميذ في session docs غير موجودين في teacher.groups: [${extraInSessions.join(', ')}]`);
+    }
+  }
+
+  // ── التقرير النهائي ──
+  console.log('\n%c═══════════════════════════════════════════════════════════════', 'font-weight:bold');
+  console.log('%c  📊 التقرير النهائي', 'font-size:14px;font-weight:bold');
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log(`  👤 الأستاذ: ${teacher.name} (${teacherId})`);
+  console.log(`  🏫 عدد الأفواج: ${groups.length}`);
+  console.log(`  👥 إجمالي التلاميذ: ${totalStudentsInTeacherDoc}`);
+  console.log(`  📋 إجمالي الحصص ببيانات: ${totalSessionsWithData}`);
+  console.log(`  📊 إجمالي سجلات الحضور: ${totalAttendanceRecords}`);
+  if (totalErrors === 0) {
+    console.log(`%c  ✅ ✅ ✅ جميع البيانات سليمة — لا توجد أخطاء ✅ ✅ ✅`, 'font-size:14px;font-weight:bold;color:green');
+  } else {
+    console.log(`%c  ❌ ❌ ❌ وجد ${totalErrors} خطأ في البيانات ❌ ❌ ❌`, 'font-size:14px;font-weight:bold;color:red');
+  }
+  console.log('═══════════════════════════════════════════════════════════════');
+  return { totalStudents: totalStudentsInTeacherDoc, totalSessions: totalSessionsWithData, totalRecords: totalAttendanceRecord, totalErrors };
+};
+
 // ─── اختبار جميع الأساتذة: يحاكي مرحلة القراءة لـ startNewAttendanceCycle ───
 // شغّل في Console: await window.testAllTeachersArchive();
 window.testAllTeachersArchive = async () => {
