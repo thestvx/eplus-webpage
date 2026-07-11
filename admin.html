@@ -9998,7 +9998,6 @@ window.startNewAttendanceCycle = async (gid) => {
     console.log(`  1-C: مجموع وثائق sessionAttendance: ${allSnap.size}`);
 
     // ── 1-D: تصنيف الوثائق حسب رقم الدورة (لهذا الفوج فقط) ──
-    const gidVariants = [gid, `gi_${grpIdx}`, `g${grpIdx}`];
     const docsByCycle = {}; // { cycleNum: [docs] }
     let totalForGroup = 0;
     allSnap.forEach(d => {
@@ -13654,7 +13653,7 @@ function getCtrlDocId(teacherId, gid, sessionNum) {
 function getCtrlDocIdLegacy(teacherId, gi, sessionNum) {
   return `${teacherId}_g${gi}_session_${sessionNum}`;
 }
-// استخراج gid من وثيقة الحضور (يدعم الصيغتين القديمة والجديدة)
+// استخراج gid من وثيقة الحضور (يدعم جميع الصيغ)
 function extractGidFromDoc(docId) {
   // الصيغة الجديدة مع الـ cycle: teacherId_{gid}_cycle_N_session_M
   let m = docId.match(/_(g_\d+_\w+)_cycle_\d+_session_\d+$/);
@@ -13662,7 +13661,13 @@ function extractGidFromDoc(docId) {
   // الصيغة الحديثة بدون cycle: teacherId_{gid}_session_N
   m = docId.match(/_(g_\d+_\w+)_session_(\d+)$/);
   if (m) return m[1];
-  return null; // صيغة قديمة → سيستخدم المتصل gi_prefix
+  // الصيغة القديمة: teacherId_gi_N_session_M
+  m = docId.match(/_gi_(\d+)_session_\d+$/);
+  if (m) return 'gi_' + m[1];
+  // الصيغة القديمة جداً: teacherId_gN_session_M (N = digits)
+  m = docId.match(/_g(\d+)_session_\d+$/);
+  if (m) return 'g' + m[1];
+  return null;
 }
 // تحويل أي صيغة gid إلى gid الحقيقي عن طريق مطابقتها مع جميع الأفواج
 function _resolveRealGid(gidRaw, groupsData) {
