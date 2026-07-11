@@ -7761,6 +7761,14 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         // استخدم gid الحقيقي كمفتاح للتخزين المؤقت
         const cacheKey = realGid || gidRaw || `gi_${groupsData.findIndex(g => g?._gid === gidRaw) >= 0 ? groupsData.findIndex(g => g?._gid === gidRaw) : '0'}`;
         if (!window._attSummaryCache[teacherId][cacheKey]) window._attSummaryCache[teacherId][cacheKey] = {};
+        // لا تستبدل البيانات الموجودة ببيانات فارغة (يمنع فقدان الحضور عند وجود صيغتين للـ doc ID)
+        const existingData = window._attSummaryCache[teacherId][cacheKey][data.sessionNum];
+        const newHasStudents = (data.students || []).length > 0;
+        const existingHasStudents = existingData && (existingData.students || []).length > 0;
+        if (existingData && existingHasStudents && !newHasStudents) {
+          // الاحتفاظ بالبيانات القديمة الممتلئة — الوثيقة الجديدة فارغة
+          return;
+        }
         window._attSummaryCache[teacherId][cacheKey][data.sessionNum] = data;
         loadedDocs.push({ id: d.id, cacheKey, sn: data.sessionNum, cycle: docCycle, students: (data.students||[]).length });
       });
@@ -7780,6 +7788,10 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
             if (!foundGroup) return;
             const cacheKey = realGid;
             if (!window._attSummaryCache[teacherId][cacheKey]) window._attSummaryCache[teacherId][cacheKey] = {};
+            const existingFallback = window._attSummaryCache[teacherId][cacheKey][data.sessionNum];
+            const newFbHas = (data.students || []).length > 0;
+            const existingFbHas = existingFallback && (existingFallback.students || []).length > 0;
+            if (existingFallback && existingFbHas && !newFbHas) return;
             window._attSummaryCache[teacherId][cacheKey][data.sessionNum] = data;
             loadedDocs.push({ id: d.id, cacheKey, sn: data.sessionNum, cycle: data.cycleNum||1, students: (data.students||[]).length });
           });
@@ -7813,10 +7825,15 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
           const realGid = _resolveRealGid(gidCheck, gData);
           let currentCycleForGid = window._cycleMap?.[realGid];
           if (currentCycleForGid === undefined) currentCycleForGid = window._cycleMap?.[gidCheck];
-          if (currentCycleForGid === undefined) return; // تخطي — لا يمكن تحديد الدورة
+          if (currentCycleForGid === undefined) currentCycleForGid = 1; // بدون cycle doc → الدورة 1
           if (docCycle !== currentCycleForGid) return;
           const cacheKey = realGid || gidCheck || `gi_0`;
           if (!existing[cacheKey]) existing[cacheKey] = {};
+          // لا تستبدل البيانات الموجودة بفارغة
+          const existingSnap = existing[cacheKey][data.sessionNum];
+          const newSnapHas = (data.students || []).length > 0;
+          const existingSnapHas = existingSnap && (existingSnap.students || []).length > 0;
+          if (existingSnap && existingSnapHas && !newSnapHas) return;
           existing[cacheKey][data.sessionNum] = data;
         });
       },
@@ -14088,20 +14105,10 @@ window.verifyCurrentTeacherAttendance = async () => {
       if (docGid === gid) {
         groupDocs.push({ id: d.id, data });
       } else {
-        // استخراج gid من doc ID (للوثائق القديمة)
-        const extractedGid = (() => {
-          const parts = d.id.split('_session_');
-          if (parts.length === 2) {
-            const prefix = parts[0];
-            // prefix format: teacherId_gid or teacherId_gi_N or teacherId_gN
-            if (prefix.startsWith(teacherId + '_')) {
-              const afterTeacher = prefix.slice(teacherId.length + 1);
-              if (afterTeacher === gid) return gid;
-            }
-          }
-          return null;
-        })();
-        if (extractedGid === gid) {
+        // استخدم extractGidFromDoc + _resolveRealGid للتعامل مع جميع صيغ doc ID
+        const rawGid = extractGidFromDoc(d.id);
+        const resolvedGid = _resolveRealGid(rawGid, groups);
+        if (resolvedGid === gid || rawGid === gid) {
           groupDocs.push({ id: d.id, data });
         }
       }
@@ -14170,7 +14177,7 @@ window.verifyCurrentTeacherAttendance = async () => {
     console.log(`%c  ❌ ❌ ❌ وجد ${totalErrors} خطأ في البيانات ❌ ❌ ❌`, 'font-size:14px;font-weight:bold;color:red');
   }
   console.log('═══════════════════════════════════════════════════════════════');
-  return { totalStudents: totalStudentsInTeacherDoc, totalSessions: totalSessionsWithData, totalRecords: totalAttendanceRecord, totalErrors };
+  return { totalStudents: totalStudentsInTeacherDoc, totalSessions: totalSessionsWithData, totalRecords: totalAttendanceRecords, totalErrors };
 };
 
 // ─── اختبار جميع الأساتذة: يحاكي مرحلة القراءة لـ startNewAttendanceCycle ───
