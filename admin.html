@@ -7745,59 +7745,30 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         where('__name__', '>=', teacherId),
         where('__name__', '<', teacherId + '_\ufff0')
       ));
-      const loadedDocs = [];
+      // ── دالة مساعدة: تخزين أفضل وثيقة لكل (فوج + حصة) ──
+      // نختار الوثيقة الأكثر اكتمالاً (أكبر عدد تلاميذ)، وعند التساوي نفضل non-cycle
+      const _storeBestDoc = (cache, cacheKey, sn, newData) => {
+        if (!cache[cacheKey]) cache[cacheKey] = {};
+        const existing = cache[cacheKey][sn];
+        const newCount = (newData.students || []).length;
+        const existingCount = existing ? (existing.students || []).length : -1;
+        if (!existing || newCount > existingCount || (newCount === existingCount && newCount > 0 && !newData.cycleNum && existing.cycleNum)) {
+          cache[cacheKey][sn] = newData;
+        }
+      };
+      const loadedCount = { total: 0 };
       sessSnap.forEach(d => {
         const data = d.data();
         if (!data.sessionNum) return;
-        const docCycle = data.cycleNum || 1;
-        // تجاهل الوثائق التي لا تنتمي للدورة الحالية
         const gidRaw = data.gid || extractGidFromDoc(d.id);
-        // حوّل gidRaw إلى gid الحقيقي لضمان دقة البحث في _cycleMap
-        const realGid = _resolveRealGid(gidRaw, groupsData);
-        let currentCycleForGid = _cycleMap[realGid];
-        if (currentCycleForGid === undefined) currentCycleForGid = _cycleMap[gidRaw];
-        if (currentCycleForGid === undefined) currentCycleForGid = 1; // بدون cycle doc → افترض الدورة 1
-        if (docCycle !== currentCycleForGid) return;
-        // استخدم gid الحقيقي كمفتاح للتخزين المؤقت
-        const cacheKey = realGid || gidRaw || `gi_${groupsData.findIndex(g => g?._gid === gidRaw) >= 0 ? groupsData.findIndex(g => g?._gid === gidRaw) : '0'}`;
-        if (!window._attSummaryCache[teacherId][cacheKey]) window._attSummaryCache[teacherId][cacheKey] = {};
-        // لا تستبدل البيانات الموجودة ببيانات فارغة (يمنع فقدان الحضور عند وجود صيغتين للـ doc ID)
-        const existingData = window._attSummaryCache[teacherId][cacheKey][data.sessionNum];
-        const newHasStudents = (data.students || []).length > 0;
-        const existingHasStudents = existingData && (existingData.students || []).length > 0;
-        if (existingData && existingHasStudents && !newHasStudents) {
-          // الاحتفاظ بالبيانات القديمة الممتلئة — الوثيقة الجديدة فارغة
-          return;
-        }
-        window._attSummaryCache[teacherId][cacheKey][data.sessionNum] = data;
-        loadedDocs.push({ id: d.id, cacheKey, sn: data.sessionNum, cycle: docCycle, students: (data.students||[]).length });
+        if (!gidRaw) return;
+        const realGid = _resolveRealGid(gidRaw, groupsData) || gidRaw;
+        const foundGroup = groupsData.find(g => g && g._gid === realGid);
+        if (!foundGroup) return;
+        _storeBestDoc(window._attSummaryCache[teacherId], realGid, data.sessionNum, data);
+        loadedCount.total++;
       });
-      console.log(`[ATT] Loaded ${loadedDocs.length} session docs for ${teacherId}:`, loadedDocs.slice(0, 10));
-      if (loadedDocs.length === 0) {
-        console.warn('[ATT] ⚠️ Zero session docs loaded — cycle filter (stale counter?) — loading without cycle filter');
-        // عداد الدورة قد يكون stale — أعد التحميل بدون فلتر الدورة
-        try {
-          sessSnap.forEach(d => {
-            const data = d.data();
-            if (!data.sessionNum) return;
-            const gidRaw = data.gid || extractGidFromDoc(d.id);
-            const realGid = _resolveRealGid(gidRaw, groupsData);
-            if (!realGid) return;
-            // تحقق من أن هذا الفوج ينتمي إلى أي فوج لدى الأستاذ
-            const foundGroup = groupsData.find(g => g && g._gid === realGid);
-            if (!foundGroup) return;
-            const cacheKey = realGid;
-            if (!window._attSummaryCache[teacherId][cacheKey]) window._attSummaryCache[teacherId][cacheKey] = {};
-            const existingFallback = window._attSummaryCache[teacherId][cacheKey][data.sessionNum];
-            const newFbHas = (data.students || []).length > 0;
-            const existingFbHas = existingFallback && (existingFallback.students || []).length > 0;
-            if (existingFallback && existingFbHas && !newFbHas) return;
-            window._attSummaryCache[teacherId][cacheKey][data.sessionNum] = data;
-            loadedDocs.push({ id: d.id, cacheKey, sn: data.sessionNum, cycle: data.cycleNum||1, students: (data.students||[]).length });
-          });
-          console.log(`[ATT] Fallback loaded ${loadedDocs.length} docs (no cycle filter)`);
-        } catch (e2) { console.warn('[ATT] Fallback also failed:', e2.message); }
-      }
+      console.log(`[ATT] Loaded ${loadedCount.total} session docs for ${teacherId} (unified, best-doc wins)`);
     } catch (e) { console.warn('[ATT] Initial load failed:', e.message); }
   }
 
@@ -7819,22 +7790,18 @@ window.loadAttendanceSummary = async function(_teacherOverride) {
         snap.forEach(d => {
           const data = d.data();
           if (!data.sessionNum) return;
-          // تجاهل الوثائق التي لا تنتمي للدورة الحالية
-          const docCycle = data.cycleNum || 1;
           const gidCheck = data.gid || extractGidFromDoc(d.id);
-          const realGid = _resolveRealGid(gidCheck, gData);
-          let currentCycleForGid = window._cycleMap?.[realGid];
-          if (currentCycleForGid === undefined) currentCycleForGid = window._cycleMap?.[gidCheck];
-          if (currentCycleForGid === undefined) currentCycleForGid = 1; // بدون cycle doc → الدورة 1
-          if (docCycle !== currentCycleForGid) return;
-          const cacheKey = realGid || gidCheck || `gi_0`;
-          if (!existing[cacheKey]) existing[cacheKey] = {};
-          // لا تستبدل البيانات الموجودة بفارغة
-          const existingSnap = existing[cacheKey][data.sessionNum];
-          const newSnapHas = (data.students || []).length > 0;
-          const existingSnapHas = existingSnap && (existingSnap.students || []).length > 0;
-          if (existingSnap && existingSnapHas && !newSnapHas) return;
-          existing[cacheKey][data.sessionNum] = data;
+          if (!gidCheck) return;
+          const realGid = _resolveRealGid(gidCheck, gData) || gidCheck;
+          const foundGroup = gData.find(g => g && g._gid === realGid);
+          if (!foundGroup) return;
+          if (!existing[realGid]) existing[realGid] = {};
+          const old = existing[realGid][data.sessionNum];
+          const newCnt = (data.students || []).length;
+          const oldCnt = old ? (old.students || []).length : -1;
+          if (!old || newCnt > oldCnt || (newCnt === oldCnt && newCnt > 0 && !data.cycleNum && old.cycleNum)) {
+            existing[realGid][data.sessionNum] = data;
+          }
         });
       },
       err => console.warn('sessionAttendance listener error:', err.code)
