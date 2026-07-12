@@ -3307,7 +3307,7 @@
         <input id="supabaseKey" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:13px;margin-top:4px" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzc1MjY3MywiZXhwIjoyMDk5MzI4NjczfQ.fsG8Y7mK2fpODGQ3SMibDDrgAAnW6e424-aSdoMcaMw">
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button onclick="startMigration()" id="migrateStartBtn" style="flex:1;padding:10px;background:#10b981;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px">🚀 بدء الترحيل</button>
+        <button id="migrateStartBtn" style="flex:1;padding:10px;background:#10b981;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px">🚀 بدء الترحيل</button>
         <button onclick="closeMigrateModal()" style="padding:10px 20px;background:#e2e8f0;color:#333;border:none;border-radius:8px;cursor:pointer;font-size:14px">إلغاء</button>
       </div>
       <div class="migrate-progress" id="migrateProgress" style="display:none"><div class="fill" id="migrateFill"></div></div>
@@ -21463,12 +21463,13 @@ async function mFetch(table, rows) {
   }
 }
 
-window.startMigration = async function() {
+async function startMigration() {
   const key = document.getElementById('supabaseKey').value.trim();
   if (!key) { alert('الرجاء إدخال Service Role Key'); return; }
 
-  document.getElementById('migrateStartBtn').disabled = true;
-  document.getElementById('migrateStartBtn').textContent = '⏳ جاري الترحيل...';
+  const btn = document.getElementById('migrateStartBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري الترحيل...';
   document.getElementById('migrateProgress').style.display = 'block';
   document.getElementById('migrateStats').innerHTML = '';
   document.getElementById('migrateLog').innerHTML = '';
@@ -21683,6 +21684,19 @@ window.startMigration = async function() {
     document.getElementById('migrateStartBtn').textContent = '🚀 بدء الترحيل';
   }
 }
+
+// ── Attach click handlers ──
+document.addEventListener('DOMContentLoaded', function() {
+  const startBtn = document.getElementById('migrateStartBtn');
+  if (startBtn) startBtn.addEventListener('click', startMigration);
+  const migrateBtn = document.getElementById('migrateBtn');
+  if (migrateBtn) migrateBtn.addEventListener('click', function() {
+    document.getElementById('migrateModal').classList.add('open');
+    document.getElementById('migrateLog').textContent = '🔵 أدخل Service Role Key ثم اضغط "بدء الترحيل"';
+  });
+  const closeBtns = document.querySelectorAll('#migrateModal [onclick*="closeMigrateModal"], #migrateModal .close-btn');
+  // close via click on overlay and X button handled by inline onclick
+});
 
 // ═══════════════════════════════════════════════════════════
 //  INIT on page load
