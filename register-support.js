@@ -213,6 +213,16 @@ function msToggle() {
   dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
 }
 
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+  const dd = byId('msDropdown');
+  const trigger = byId('msTrigger');
+  if (!dd || !trigger) return;
+  if (dd.style.display !== 'none' && !dd.contains(e.target) && !trigger.contains(e.target)) {
+    dd.style.display = 'none';
+  }
+});
+
 function msSelect(idx) {
   const i = sSubjects.indexOf(idx);
   if (i === -1) sSubjects.push(idx); else sSubjects.splice(i, 1);
@@ -239,7 +249,6 @@ function msRemove(idx) {
 function updateMsLabel() {
   const lbl = byId('msLabel');
   if (lbl) lbl.textContent = sSubjects.length ? `تم اختيار ${sSubjects.length} مادة` : 'اختر المواد';
-  if (byId('msDropdown')) byId('msDropdown').style.display = 'none';
 }
 
 function updateMsTags() {
