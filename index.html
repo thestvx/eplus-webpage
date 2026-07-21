@@ -79,6 +79,24 @@
     #cefr-hint { display: none; }
     #cefr-hint.show { display: flex !important; }
 
+    /* ── Multi‑select dropdown (support registration) ── */
+    .ms-wrapper { position:relative; width:100%; }
+    .ms-trigger { display:flex; align-items:center; justify-content:space-between; width:100%; padding:10px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:var(--text,#e5e5e5); font-family:'Tajawal',sans-serif; font-size:13px; cursor:pointer; transition:border-color 0.2s; }
+    .ms-trigger:hover { border-color:var(--gold,#c8a84b); }
+    .ms-arrow { font-size:11px; opacity:0.6; }
+    .ms-dropdown { position:absolute; top:100%; left:0; right:0; z-index:50; background:#1a1a2e; border:1px solid rgba(255,255,255,0.12); border-radius:10px; margin-top:2px; max-height:220px; overflow-y:auto; box-shadow:0 8px 30px rgba(0,0,0,0.5); }
+    .ms-opt { padding:9px 14px; cursor:pointer; font-size:13px; color:var(--text,#e5e5e5); transition:background 0.15s; }
+    .ms-opt:hover { background:rgba(200,168,75,0.12); }
+    .ms-opt.selected { background:rgba(200,168,75,0.18); color:var(--gold,#c8a84b); }
+    .ms-opt.selected::before { content:"✓ "; }
+    .ms-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
+    .ms-tag { display:inline-flex; align-items:center; gap:4px; background:rgba(200,168,75,0.12); color:var(--gold,#c8a84b); border-radius:99px; padding:4px 10px; font-size:11px; }
+    .ms-tag-rm { cursor:pointer; opacity:0.5; font-size:14px; line-height:1; }
+    .ms-tag-rm:hover { opacity:1; }
+    html.light-mode .ms-dropdown { background:#fff; border-color:rgba(0,0,0,0.12); }
+    html.light-mode .ms-opt { color:#1a1a2e; }
+    html.light-mode .ms-trigger { background:rgba(0,0,0,0.02); border-color:rgba(0,0,0,0.12); color:#1a1a2e; }
+
   </style>
 </head>
 <body>
@@ -1520,104 +1538,182 @@
   </div>
 
 <!-- ════════════════════════════════════════════════════════
-     Support Registration Modal — صفحة واحدة، نفس تصميم استمارة التسجيل
+     Support Registration — dynamic form modal (step‑by‑step reveal)
      ════════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="support-reg-modal" onclick="closeSupportRegOutside(event)" style="display:none;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;">
   <div class="modal-box" id="support-modal-box" style="margin:auto;">
     <div id="support-form-view">
       <div class="modal-header">
-        <h3 class="modal-title" id="support-modal-title">تسجيل الدعم المدرسي</h3>
+        <h3 class="modal-title">تسجيل الدعم المدرسي</h3>
         <button class="close-btn" onclick="closeSupportReg()" type="button">✕</button>
       </div>
 
-      <form id="support-reg-form" novalidate onsubmit="supportSubmit(event)">
-        <!-- ═══ المعلومات الشخصية ═══ -->
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">الاسم <span>*</span></label>
-            <input class="form-input" id="sFirstName" type="text" required />
+      <form id="support-reg-form" novalidate>
+
+        <!-- ═══ المعلومات الشخصية (تظهر فوراً) ═══ -->
+        <div id="s-personal-group">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">الاسم <span>*</span></label>
+              <input class="form-input" id="sFirstName" type="text" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">اللقب <span>*</span></label>
+              <input class="form-input" id="sLastName" type="text" required />
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">اللقب <span>*</span></label>
-            <input class="form-input" id="sLastName" type="text" required />
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">تاريخ الميلاد <span>*</span></label>
+              <input class="form-input" id="sBirthDate" type="date" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">رقم الهاتف <span>*</span></label>
+              <input class="form-input" id="sPhone" type="tel" placeholder="05XX XX XX XX" required />
+            </div>
           </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">تاريخ الميلاد <span>*</span></label>
-            <input class="form-input" id="sBirthDate" type="date" required />
-          </div>
-          <div class="form-group">
-            <label class="form-label">رقم الهاتف <span>*</span></label>
-            <input class="form-input" id="sPhone" type="tel" placeholder="05XX XX XX XX" required />
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">اسم ولي الأمر <span>*</span></label>
-            <input class="form-input" id="sParentName" type="text" required />
-          </div>
-          <div class="form-group">
-            <label class="form-label">رقم ولي الأمر <span>*</span></label>
-            <input class="form-input" id="sParentPhone" type="tel" placeholder="05XX XX XX XX" required />
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">اسم ولي الأمر <span>*</span></label>
+              <input class="form-input" id="sParentName" type="text" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">رقم ولي الأمر <span>*</span></label>
+              <input class="form-input" id="sParentPhone" type="tel" placeholder="05XX XX XX XX" required />
+            </div>
           </div>
         </div>
 
         <!-- ═══ نوع الطالب ═══ -->
-        <div class="form-group">
+        <div class="form-group" id="s-type-group">
           <label class="form-label">نوع الطالب <span>*</span></label>
           <div class="check-options">
             <label class="check-option">
-              <input name="sStdType" type="radio" value="مدرسي" />
+              <input name="sStdType" type="radio" value="متمدرس" onchange="onStdTypeChange('متمدرس')" />
               <span class="check-box"></span>
-              <span class="check-label">طالب مدرسي</span>
+              <span class="check-label">📘 متمدرس</span>
             </label>
             <label class="check-option">
-              <input name="sStdType" type="radio" value="حُر" />
+              <input name="sStdType" type="radio" value="حر" onchange="onStdTypeChange('حر')" />
               <span class="check-box"></span>
-              <span class="check-label">طالب حُر</span>
+              <span class="check-label">🎓 حُر</span>
             </label>
           </div>
         </div>
 
-        <!-- ═══ المستوى الدراسي ═══ -->
-        <div class="form-group">
+        <!-- ═══ المستوى الدراسي (يظهر فقط للمتمدرس) ═══ -->
+        <div class="form-group" id="s-level-group" style="display:none;">
           <label class="form-label">المستوى الدراسي <span>*</span></label>
-          <div id="s-levels-container" class="check-options" style="flex-wrap:wrap;"></div>
+          <select class="form-input" id="sLevel" onchange="onLevelChange()">
+            <option value="">اختر المستوى الدراسي</option>
+            <optgroup label="📚 المستوى الابتدائي">
+              <option disabled>السنة الأولى ابتدائي 🔒</option>
+              <option disabled>السنة الثانية ابتدائي 🔒</option>
+              <option disabled>السنة الثالثة ابتدائي 🔒</option>
+              <option disabled>السنة الرابعة ابتدائي 🔒</option>
+              <option disabled>السنة الخامسة ابتدائي 🔒</option>
+            </optgroup>
+            <optgroup label="📚 المستوى المتوسط">
+              <option disabled>السنة الأولى متوسط 🔒</option>
+              <option disabled>السنة الثانية متوسط 🔒</option>
+              <option disabled>السنة الثالثة متوسط 🔒</option>
+              <option disabled>السنة الرابعة متوسط 🔒</option>
+            </optgroup>
+            <optgroup label="🎓 المستوى الثانوي">
+              <option disabled>السنة الأولى ثانوي 🔒</option>
+              <option disabled>السنة الثانية ثانوي 🔒</option>
+              <option value="السنة الثالثة ثانوي (بكالوريا)">السنة الثالثة ثانوي (بكالوريا) ✅</option>
+            </optgroup>
+          </select>
         </div>
 
-        <!-- ═══ المؤسسة التعليمية (تظهر فقط للبكالوريا) ═══ -->
+        <!-- ═══ المؤسسة التعليمية ═══ -->
         <div class="form-group" id="s-institution-group" style="display:none;">
           <label class="form-label">المؤسسة التعليمية <span>*</span></label>
-          <input class="form-input" id="sInstitution" type="text" placeholder="اسم المؤسسة التي يدرس بها الطالب" />
+          <select class="form-input" id="sInstitution" onchange="onInstitutionChange()">
+            <option value="">اختر المؤسسة التعليمية</option>
+            <option value="ثانوية هالي عبدالكريم بقمار">ثانوية هالي عبدالكريم بقمار</option>
+            <option value="متقنة عبدالقادر الياجوري بقمار">متقنة عبدالقادر الياجوري بقمار</option>
+            <option value="ثانوية العلامة أبو القاسم سعد الله بقمار">ثانوية العلامة أبو القاسم سعد الله بقمار</option>
+            <option value="أخرى">ثانوية أخرى</option>
+          </select>
         </div>
 
-        <!-- ═══ الشعبة (تظهر فقط للبكالوريا) ═══ -->
+        <!-- ═══ حقل إدخال المؤسسة (يظهر عند اختيار "أخرى") ═══ -->
+        <div class="form-group" id="s-institution-input-group" style="display:none;">
+          <label class="form-label">اسم المؤسسة التعليمية <span>*</span></label>
+          <input class="form-input" id="sInstitutionInput" type="text" placeholder="أدخل اسم مؤسستك التعليمية" oninput="onInstitutionInputChange()" />
+        </div>
+
+        <!-- ═══ الشعبة (Radio Buttons) ═══ -->
         <div class="form-group" id="s-stream-group" style="display:none;">
           <label class="form-label">الشعبة <span>*</span></label>
-          <div id="s-streams-container" class="check-options" style="flex-wrap:wrap;"></div>
+          <div class="check-options" id="s-streams-container" style="flex-wrap:wrap;"></div>
         </div>
 
-        <!-- ═══ المواد والأساتذة (تظهر فقط عند اختيار الشعبة) ═══ -->
+        <!-- ═══ المواد (Multi‑Select Dropdown) ═══ -->
         <div class="form-group" id="s-subjects-group" style="display:none;">
-          <label class="form-label">المواد والأساتذة <span>*</span></label>
-          <div id="s-subjects-container" class="check-options" style="flex-direction:column;max-height:240px;overflow-y:auto;"></div>
+          <label class="form-label">المواد المطلوبة <span>*</span></label>
+          <div class="ms-wrapper">
+            <button type="button" class="ms-trigger" id="msTrigger" onclick="msToggle()">
+              <span id="msLabel">اختر المواد</span>
+              <span class="ms-arrow">▾</span>
+            </button>
+            <div class="ms-dropdown" id="msDropdown" style="display:none;">
+              <div id="ms-options"></div>
+            </div>
+            <div class="ms-tags" id="msTags"></div>
+          </div>
         </div>
 
-        <!-- ═══ القوانين والشروط ═══ -->
-        <div class="form-group">
-          <label class="form-label">القوانين والشروط</label>
-          <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;padding:8px 12px;border-radius:10px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);">⚠️ يرجى قراءة القوانين التالية والموافقة عليها جميعاً لإتمام التسجيل</div>
-          <div id="s-terms-container" class="check-options" style="flex-direction:column;max-height:240px;overflow-y:auto;"></div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:8px;padding:8px 12px;border-radius:10px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15);">✅ بالموافقة على هذه القوانين، أتحمل المسؤولية الكاملة عن صحة المعلومات المقدمة وألتزم بجميع الشروط المذكورة أعلاه.</div>
-        </div>
-
-        <button class="ep-btn-primary submit-btn" type="submit" id="s-submit-btn">إتمام التسجيل ✦</button>
+        <!-- ═══ زر إتمام التسجيل ═══ -->
+        <button class="ep-btn-primary submit-btn" type="button" id="s-submit-btn" style="display:none;" onclick="onSubmitClick()">إتمام التسجيل ✦</button>
       </form>
     </div>
+  </div>
+</div>
 
-    <!-- ═══ Success view (hidden initially) ═══ -->
-    <div id="support-success-view" style="display:none;"></div>
+<!-- ════════════════════════════════════════════════════════
+     Laws Modal — يظهر بعد الضغط على "إتمام التسجيل"
+     ════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="laws-modal" onclick="closeLawsModalOutside(event)" style="display:none;">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      <h3 class="modal-title">قوانين المركز التعليمي</h3>
+    </div>
+    <div id="laws-scroll-area" style="padding:16px 20px 0;max-height:360px;overflow-y:auto;overflow-x:hidden;">
+      <div id="laws-text"></div>
+      <div id="laws-bottom-sentinel" style="height:1px;"></div>
+    </div>
+    <div id="laws-checkbox-area" style="display:none;padding:12px 20px 16px;border-top:1px solid rgba(255,255,255,0.08);">
+      <label class="check-option">
+        <input type="checkbox" id="lawsAgree" onchange="onLawsAgreeChange()" />
+        <span class="check-box"></span>
+        <span class="check-label" style="font-size:12px;">أقر بأنني قرأت جميع قوانين المركز وأوافق عليها، وأتحمل كامل مسؤوليتي داخل المركز التعليمي.</span>
+      </label>
+      <button class="ep-btn-primary submit-btn" id="lawsConfirmBtn" disabled onclick="onLawsConfirm()" style="margin-top:12px;width:100%;">تأكيد التسجيل الأولي</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     Success Modal — بعد تأكيد التسجيل
+     ════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="success-modal" onclick="closeSuccessModalOutside(event)" style="display:none;">
+  <div class="modal-box" style="max-width:440px;text-align:center;">
+    <div class="modal-header" style="border:none;justify-content:center;">
+      <h3 class="modal-title" style="font-size:18px;">✅ تم تأكيد تسجيلك الأولي بنجاح</h3>
+    </div>
+    <div style="padding:0 20px 24px;">
+      <div style="font-size:42px;margin-bottom:8px;">🎉</div>
+      <div class="success-id-card" style="background:linear-gradient(135deg,var(--primary,#c8a84b),var(--accent,#e8c96a));border-radius:16px;padding:20px 24px;margin:12px 0 18px;">
+        <div style="font-size:13px;color:rgba(0,0,0,0.55);margin-bottom:4px;font-weight:700;">رقم التسجيل الخاص بك</div>
+        <div id="success-id-display" style="font-size:44px;font-weight:900;color:#fff;letter-spacing:2px;font-family:monospace;"></div>
+      </div>
+      <p style="font-size:13px;line-height:1.8;color:var(--text-muted);margin:0 0 10px;">يرجى الاحتفاظ بهذا الرقم، لأنه سيستخدم عند مراجعة المركز التعليمي.</p>
+      <p style="font-size:13px;line-height:1.8;color:var(--text-muted);margin:0 0 18px;">يرجى التوجه إلى المركز التعليمي لإتمام عملية التسجيل النهائي ودفع رسوم التسجيل المقدرة بـ <strong style="color:var(--gold,#c8a84b);">500 دج</strong>، وبعدها سيتم تأكيد تسجيلك النهائي وتسليمك بطاقة الطالب.</p>
+      <button class="ep-btn-primary" onclick="closeSuccessModal()" style="min-width:120px;">حسناً</button>
+    </div>
   </div>
 </div>
 

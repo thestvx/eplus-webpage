@@ -1,83 +1,36 @@
 // ═══════════════════════════════════════════════════════════
-//  تسجيل الدعم المدرسي — نموذج صفحة واحدة
+//  تسجيل الدعم المدرسي — Dynamic Form Flow
 // ═══════════════════════════════════════════════════════════
 
 const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.6GzLcHQBFQJukYpLMEbFjHhbZQHWFLCj3wlTLvPN0Dc';
 
-const SUPPORT_STREAMS = {
-  'علوم تجريبية': [
-    { subject: 'العلوم الفيزيائية والتكنولوجيا', teacher: 'نمسي عبد الرحمان' },
-    { subject: 'العلوم الفيزيائية والتكنولوجيا', teacher: 'لكموته لمين' },
-    { subject: 'رياضيات', teacher: 'نعورة عبدالباسط' },
-    { subject: 'رياضيات', teacher: 'ترعة فاطمة' },
-    { subject: 'علوم الطبيعة و الحياة', teacher: 'شكري صحراوي' },
-    { subject: 'عربية', teacher: 'موساوي زبيدة' },
-    { subject: 'فرنسية', teacher: 'كروش شمس الهدى' },
-    { subject: 'انجليزية', teacher: 'كرام الصادق' },
-    { subject: 'علوم اسلامية', teacher: 'هبيته ربيع' },
-    { subject: 'اجتماعيات', teacher: 'ايمن دخان' },
-    { subject: 'فلسفة', teacher: 'دادة نجاح سلام' },
-  ],
-  'رياضيات': [
-    { subject: 'العلوم الفيزيائية', teacher: 'نمسي عبد الرحمان' },
-    { subject: 'العلوم الفيزيائية', teacher: 'لكموته لمين' },
-    { subject: 'رياضيات', teacher: 'نعورة عبد الباسط' },
-    { subject: 'رياضيات', teacher: 'ترعة فاطمة' },
-    { subject: 'عربية', teacher: 'موساوي زبيدة' },
-    { subject: 'فرنسية', teacher: 'كروش شمس الهدى' },
-    { subject: 'انجليزية', teacher: 'كرام الصادق' },
-    { subject: 'علوم اسلامية', teacher: 'هبيته ربيع' },
-    { subject: 'اجتماعيات', teacher: 'ايمن دخان' },
-    { subject: 'فلسفة', teacher: 'دادة نجاح سلام' },
-  ],
-  'تسيير واقتصاد': [
-    { subject: 'عربية', teacher: 'موساوي زبيدة' },
-    { subject: 'فرنسية', teacher: 'كروش شمس الهدى' },
-    { subject: 'انجليزية', teacher: 'كرام الصادق' },
-    { subject: 'محاسبة', teacher: 'عبد الرحمان سرهود' },
-    { subject: 'علوم اسلامية', teacher: 'هبيته ربيع' },
-    { subject: 'اجتماعيات', teacher: 'ايمن دخان' },
-    { subject: 'فلسفة', teacher: 'دادة نجاح سلام' },
-  ],
-  'تقني رياضي': [
-    { subject: 'العلوم الفيزيائية', teacher: 'نمسي عبد الرحمان' },
-    { subject: 'العلوم الفيزيائية', teacher: 'لكموته لمين' },
-    { subject: 'فرنسية', teacher: 'كروش شمس الهدى' },
-    { subject: 'انجليزية', teacher: 'كرام الصادق' },
-    { subject: 'علوم اسلامية', teacher: 'هبيته ربيع' },
-    { subject: 'اجتماعيات', teacher: 'ايمن دخان' },
-    { subject: 'فلسفة', teacher: 'دادة نجاح سلام' },
-  ],
-  'آداب ولغات': [
-    { subject: 'عربية', teacher: 'موساوي زبيدة' },
-    { subject: 'فلسفة', teacher: 'دادة نجاح سلام' },
-    { subject: 'فرنسية', teacher: 'كروش شمس الهدى' },
-    { subject: 'انجليزية', teacher: 'كرام الصادق' },
-    { subject: 'المانية', teacher: 'حمزة علال' },
-    { subject: 'اسبانية', teacher: 'طوالبية ابراهيم' },
-    { subject: 'رياضيات ادبيين', teacher: 'هبيته ربيع' },
-    { subject: 'علوم اسلامية', teacher: 'هبيته ربيع' },
-    { subject: 'اجتماعيات', teacher: 'ايمن دخان' },
-  ],
-};
-
-const SUPPORT_LEVELS = [
-  { label: 'السنة الأولى ابتدائي', disabled: true, icon: '🔒', group: 'المرحلة الابتدائية' },
-  { label: 'السنة الثانية ابتدائي', disabled: true, icon: '🔒', group: 'المرحلة الابتدائية' },
-  { label: 'السنة الثالثة ابتدائي', disabled: true, icon: '🔒', group: 'المرحلة الابتدائية' },
-  { label: 'السنة الرابعة ابتدائي', disabled: true, icon: '🔒', group: 'المرحلة الابتدائية' },
-  { label: 'السنة الخامسة ابتدائي', disabled: true, icon: '🔒', group: 'المرحلة الابتدائية' },
-  { label: 'السنة الأولى متوسط', disabled: true, icon: '🔒', group: 'المرحلة المتوسطة' },
-  { label: 'السنة الثانية متوسط', disabled: true, icon: '🔒', group: 'المرحلة المتوسطة' },
-  { label: 'السنة الثالثة متوسط', disabled: true, icon: '🔒', group: 'المرحلة المتوسطة' },
-  { label: 'السنة الرابعة متوسط', disabled: true, icon: '🔒', group: 'المرحلة المتوسطة' },
-  { label: 'السنة الأولى ثانوي', disabled: true, icon: '🔒', group: 'المرحلة الثانوية' },
-  { label: 'السنة الثانية ثانوي', disabled: true, icon: '🔒', group: 'المرحلة الثانوية' },
-  { label: 'السنة الثالثة ثانوي (بكالوريا)', disabled: false, icon: '📖', group: 'المرحلة الثانوية' },
+// ── Streams ──
+const SUPPORT_STREAMS = [
+  'علوم تجريبية',
+  'رياضيات',
+  'تقني رياضي',
+  'تسيير واقتصاد',
+  'آداب وفلسفة',
+  'لغات أجنبية',
 ];
 
-const SUPPORT_TERMS = [
+// ── Subjects (generic list, same for all streams) ──
+const SUPPORT_SUBJECTS = [
+  'الرياضيات',
+  'الفيزياء',
+  'العلوم الطبيعية والحياة',
+  'اللغة العربية',
+  'اللغة الفرنسية',
+  'اللغة الإنجليزية',
+  'التاريخ والجغرافيا',
+  'الفلسفة',
+  'العلوم الإسلامية',
+  'الإعلام الآلي',
+];
+
+// ── Laws ──
+const SUPPORT_LAWS = [
   'يلتزم الطالب بحضور جميع الحصص في المواعيد المحددة.',
   'التأخر عن الحصة بأكثر من 10 دقائق يعتبر غياباً.',
   'الغياب المتكرر دون عذر مقبول يؤدي إلى الفصل من الدعم.',
@@ -95,21 +48,30 @@ const SUPPORT_TERMS = [
   'أتحمل المسؤولية الكاملة عن صحة المعلومات المقدمة.',
 ];
 
-let supportSelectedSubjects = [];
+// ── State ──
+let sStudentType = null;
+let sLevel = null;
+let sInstitutionVal = null;
+let sStream = null;
+let sSubjects = [];
+let sFormData = null;
 
 function byId(id) { return document.getElementById(id); }
 
-// ── Open / Close ──
+// ── Open / Close main modal ──
 function openSupportReg() {
-  supportSelectedSubjects = [];
-  const form = byId('support-reg-form');
-  if (form) form.reset();
-  // Hide conditional sections
-  byId('s-stream-group').style.display = 'none';
-  byId('s-subjects-group').style.display = 'none';
-  byId('s-institution-group').style.display = 'none';
-  renderSupportLevels();
-  renderSupportTerms();
+  sStudentType = null; sLevel = null; sInstitutionVal = null; sStream = null;
+  sSubjects = []; sFormData = null;
+  const f = byId('support-reg-form');
+  if (f) f.reset();
+  [byId('s-level-group'),byId('s-institution-group'),byId('s-institution-input-group'),
+   byId('s-stream-group'),byId('s-subjects-group'),byId('s-submit-btn')].forEach(el=>{
+    if (el) el.style.display = 'none';
+  });
+  document.querySelectorAll('input[name="sStdType"]').forEach(r=>r.checked=false);
+  byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
+  byId('msTags')&&(byId('msTags').innerHTML='');
+  byId('msDropdown')&&(byId('msDropdown').style.display='none');
   const modal = byId('support-reg-modal');
   if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
 }
@@ -123,147 +85,279 @@ function closeSupportRegOutside(e) {
   if (e.target === byId('support-reg-modal')) closeSupportReg();
 }
 
-// ── Render Levels ──
-function renderSupportLevels() {
-  const container = byId('s-levels-container');
-  if (!container) return;
-  let html = '';
-  let currentGroup = '';
-  SUPPORT_LEVELS.forEach(l => {
-    if (l.group !== currentGroup) {
-      currentGroup = l.group;
-      html += `<div style="width:100%;font-size:12px;font-weight:700;color:var(--gold,#c8a84b);padding:6px 0 2px;border-top:1px solid rgba(255,255,255,0.06);margin-top:4px;">${l.group}</div>`;
-    }
-    html += `<label class="check-option">
-      <input type="radio" name="sLevel" value="${l.label}" ${l.disabled ? 'disabled' : ''} onchange="${l.disabled ? '' : "supportOnLevelChange(this.value)"}" />
-      <span class="check-box"></span>
-      <span class="check-label">${l.icon} ${l.label}${l.disabled ? ' — غير متاح' : ''}</span>
-    </label>`;
+// ── Step 1: Student Type ──
+function onStdTypeChange(type) {
+  sStudentType = type;
+  sLevel = null; sInstitutionVal = null; sStream = null; sSubjects = [];
+  [byId('s-institution-group'),byId('s-institution-input-group'),
+   byId('s-stream-group'),byId('s-subjects-group'),byId('s-submit-btn')].forEach(el=>{
+    if (el) el.style.display = 'none';
   });
-  container.innerHTML = html;
+  byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
+  byId('msTags')&&(byId('msTags').innerHTML='');
+
+  if (type === 'متمدرس') {
+    const lg = byId('s-level-group');
+    if (lg) { lg.style.display = 'block'; }
+    const sel = byId('sLevel');
+    if (sel) sel.value = '';
+  } else {
+    // حر — auto-select bac
+    sLevel = 'السنة الثالثة ثانوي (بكالوريا)';
+    const lg = byId('s-level-group');
+    if (lg) lg.style.display = 'none';
+    showInstitution();
+  }
 }
 
-function supportOnLevelChange(val) {
-  const isBac = val === 'السنة الثالثة ثانوي (بكالوريا)';
-  byId('s-stream-group').style.display = isBac ? 'block' : 'none';
-  byId('s-institution-group').style.display = isBac ? 'block' : 'none';
-  byId('s-subjects-group').style.display = 'none';
-  if (isBac) renderSupportStreams();
+// ── Step 2: Level ──
+function onLevelChange() {
+  const sel = byId('sLevel');
+  sLevel = sel ? sel.value : null;
+  if (sLevel) {
+    showInstitution();
+  } else {
+    [byId('s-institution-group'),byId('s-institution-input-group'),
+     byId('s-stream-group'),byId('s-subjects-group'),byId('s-submit-btn')].forEach(el=>{
+      if (el) el.style.display = 'none';
+    });
+  }
 }
 
-// ── Render Streams ──
-function renderSupportStreams() {
-  const container = byId('s-streams-container');
-  if (!container) return;
-  container.innerHTML = Object.keys(SUPPORT_STREAMS).map(s =>
+// ── Step 3: Institution ──
+function showInstitution() {
+  const ig = byId('s-institution-group');
+  if (ig) { ig.style.display = 'block'; }
+  const sel = byId('sInstitution');
+  if (sel) sel.value = '';
+  byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='none');
+  byId('s-stream-group')&&(byId('s-stream-group').style.display='none');
+  byId('s-subjects-group')&&(byId('s-subjects-group').style.display='none');
+  byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
+}
+
+function onInstitutionChange() {
+  const sel = byId('sInstitution');
+  sInstitutionVal = sel ? sel.value : null;
+  if (!sInstitutionVal) return;
+  sStream = null; sSubjects = [];
+  byId('s-stream-group')&&(byId('s-stream-group').style.display='none');
+  byId('s-subjects-group')&&(byId('s-subjects-group').style.display='none');
+  byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
+  byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
+  byId('msTags')&&(byId('msTags').innerHTML='');
+
+  if (sInstitutionVal === 'أخرى') {
+    byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='block');
+    byId('sInstitutionInput')&&(byId('sInstitutionInput').value='');
+  } else {
+    byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='none');
+    showStream();
+  }
+}
+
+function onInstitutionInputChange() {
+  const inp = byId('sInstitutionInput');
+  if (inp && inp.value.trim().length >= 2) {
+    showStream();
+  } else {
+    byId('s-stream-group')&&(byId('s-stream-group').style.display='none');
+  }
+}
+
+// ── Step 4: Stream ──
+function showStream() {
+  const sg = byId('s-stream-group');
+  if (!sg) return;
+  sg.style.display = 'block';
+  renderStreams();
+}
+
+function renderStreams() {
+  const c = byId('s-streams-container');
+  if (!c) return;
+  c.innerHTML = SUPPORT_STREAMS.map(s =>
     `<label class="check-option">
-      <input type="radio" name="sStream" value="${s}" onchange="supportOnStreamChange('${s}')" />
+      <input type="radio" name="sStream" value="${s}" onchange="onStreamChange('${s}')" />
       <span class="check-box"></span>
       <span class="check-label">${s}</span>
     </label>`
   ).join('');
 }
 
-function supportOnStreamChange(stream) {
-  supportSelectedSubjects = [];
-  renderSupportSubjects(stream);
-  byId('s-subjects-group').style.display = 'block';
+function onStreamChange(stream) {
+  sStream = stream;
+  sSubjects = [];
+  byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
+  byId('msTags')&&(byId('msTags').innerHTML='');
+  byId('msDropdown')&&(byId('msDropdown').style.display='none');
+  const sg = byId('s-subjects-group');
+  if (sg) sg.style.display = 'block';
+  byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
+  renderSubjects();
 }
 
-// ── Render Subjects ──
-function renderSupportSubjects(stream) {
-  const container = byId('s-subjects-container');
-  if (!container) return;
-  const items = SUPPORT_STREAMS[stream] || [];
-  container.innerHTML = items.map((item, i) =>
-    `<label class="check-option">
-      <input type="checkbox" value="${i}" ${supportSelectedSubjects.includes(i) ? 'checked' : ''} onchange="supportToggleSubject(${i},this.checked)" />
-      <span class="check-box"></span>
-      <span class="check-label">${item.subject} — 🎓 ${item.teacher}</span>
-    </label>`
+// ── Step 5: Subjects (Multi-Select Dropdown) ──
+function renderSubjects() {
+  const opts = byId('ms-options');
+  if (!opts) return;
+  opts.innerHTML = SUPPORT_SUBJECTS.map((subj, i) =>
+    `<div class="ms-opt ${sSubjects.includes(i)?'selected':''}" data-idx="${i}" onclick="msSelect(${i})">${subj}</div>`
   ).join('');
+  updateMsLabel();
 }
 
-function supportToggleSubject(idx, checked) {
-  if (checked) {
-    if (!supportSelectedSubjects.includes(idx)) supportSelectedSubjects.push(idx);
+function msToggle() {
+  const dd = byId('msDropdown');
+  if (!dd) return;
+  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
+
+function msSelect(idx) {
+  const i = sSubjects.indexOf(idx);
+  if (i === -1) sSubjects.push(idx); else sSubjects.splice(i, 1);
+  const opts = byId('ms-options');
+  if (opts) {
+    const children = opts.children;
+    for (let c of children) {
+      if (parseInt(c.dataset.idx) === idx) c.classList.toggle('selected');
+    }
+  }
+  updateMsLabel();
+  updateMsTags();
+  if (sSubjects.length > 0) {
+    byId('s-submit-btn')&&(byId('s-submit-btn').style.display='block');
   } else {
-    supportSelectedSubjects = supportSelectedSubjects.filter(i => i !== idx);
+    byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
   }
 }
 
-// ── Render Terms ──
-function renderSupportTerms() {
-  const container = byId('s-terms-container');
-  if (!container) return;
-  container.innerHTML = SUPPORT_TERMS.map(t =>
-    `<label class="check-option">
-      <input type="checkbox" class="s-term-cb" />
-      <span class="check-box"></span>
-      <span class="check-label">${t}</span>
-    </label>`
+function msRemove(idx) {
+  msSelect(idx);
+}
+
+function updateMsLabel() {
+  const lbl = byId('msLabel');
+  if (lbl) lbl.textContent = sSubjects.length ? `تم اختيار ${sSubjects.length} مادة` : 'اختر المواد';
+  if (byId('msDropdown')) byId('msDropdown').style.display = 'none';
+}
+
+function updateMsTags() {
+  const c = byId('msTags');
+  if (!c) return;
+  c.innerHTML = sSubjects.map(i =>
+    `<span class="ms-tag">${SUPPORT_SUBJECTS[i]} <span class="ms-tag-rm" onclick="msRemove(${i})">×</span></span>`
   ).join('');
 }
 
-// ── Submit ──
-async function supportSubmit(e) {
-  e.preventDefault();
-  const btn = byId('s-submit-btn');
+// ── Step 6: Submit (opens laws modal) ──
+function onSubmitClick() {
+  // Validate all fields
+  const firstName = byId('sFirstName')?.value?.trim();
+  const lastName = byId('sLastName')?.value?.trim();
+  const birthDate = byId('sBirthDate')?.value;
+  const phone = byId('sPhone')?.value?.trim();
+  const parentName = byId('sParentName')?.value?.trim();
+  const parentPhone = byId('sParentPhone')?.value?.trim();
+
+  if (!firstName || !lastName || !birthDate || !phone || !parentName || !parentPhone) {
+    alert('⚠️ الرجاء ملء جميع الحقول الإلزامية'); return;
+  }
+  if (!sStudentType) { alert('⚠️ الرجاء اختيار نوع الطالب'); return; }
+  if (sStudentType === 'متمدرس' && !sLevel) { alert('⚠️ الرجاء اختيار المستوى الدراسي'); return; }
+  if (!sInstitutionVal) { alert('⚠️ الرجاء اختيار المؤسسة التعليمية'); return; }
+  if (sInstitutionVal === 'أخرى') {
+    const instInp = byId('sInstitutionInput')?.value?.trim();
+    if (!instInp) { alert('⚠️ الرجاء إدخال اسم المؤسسة التعليمية'); return; }
+  }
+  if (!sStream) { alert('⚠️ الرجاء اختيار الشعبة'); return; }
+  if (sSubjects.length === 0) { alert('⚠️ الرجاء اختيار مادة واحدة على الأقل'); return; }
+
+  // Determine institution value
+  const institution = sInstitutionVal === 'أخرى'
+    ? (byId('sInstitutionInput')?.value?.trim() || '')
+    : sInstitutionVal;
+
+  // Store form data for later submit
+  sFormData = {
+    id: '',
+    first_name: firstName,
+    last_name: lastName,
+    birth_date: birthDate,
+    parent_name: parentName,
+    parent_phone: parentPhone,
+    student_type: sStudentType,
+    level: sLevel,
+    institution,
+    stream: sStream,
+    subjects: sSubjects.map(i => SUPPORT_SUBJECTS[i]),
+    terms_accepted: true,
+    status: 'مسجل مبدئياً',
+    fee_amount: 500,
+  };
+
+  // Generate 3-digit ID now
+  const rand = String(Math.floor(Math.random() * 900) + 100);
+  sFormData.id = rand;
+
+  // Open laws modal
+  openLawsModal();
+}
+
+// ── Laws Modal ──
+function openLawsModal() {
+  const lawsText = byId('laws-text');
+  if (lawsText) {
+    lawsText.innerHTML = SUPPORT_LAWS.map((l, i) =>
+      `<div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:13px;line-height:1.7;">
+        <strong style="color:var(--gold,#c8a84b);">${i + 1}.</strong> ${l}
+      </div>`
+    ).join('');
+  }
+  byId('laws-checkbox-area')&&(byId('laws-checkbox-area').style.display='none');
+  byId('lawsAgree')&&(byId('lawsAgree').checked=false);
+  byId('lawsConfirmBtn')&&(byId('lawsConfirmBtn').disabled=true);
+  closeSupportReg();
+  const modal = byId('laws-modal');
+  if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
+
+  // Reset scroll
+  const area = byId('laws-scroll-area');
+  if (area) { area.scrollTop = 0; }
+
+  // Observe scroll position
+  setTimeout(setupLawsScroll, 100);
+}
+
+function setupLawsScroll() {
+  const area = byId('laws-scroll-area');
+  const sentinel = byId('laws-bottom-sentinel');
+  if (!area || !sentinel) return;
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        byId('laws-checkbox-area')&&(byId('laws-checkbox-area').style.display='block');
+        observer.disconnect();
+      }
+    });
+  }, { root: area, threshold: 1.0 });
+
+  observer.observe(sentinel);
+}
+
+function onLawsAgreeChange() {
+  const cb = byId('lawsAgree');
+  const btn = byId('lawsConfirmBtn');
+  if (btn) btn.disabled = !cb.checked;
+}
+
+async function onLawsConfirm() {
+  if (!sFormData) return;
+  const btn = byId('lawsConfirmBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'جاري التسجيل...'; }
 
   try {
-    // Validate
-    const firstName = byId('sFirstName')?.value?.trim();
-    const lastName = byId('sLastName')?.value?.trim();
-    const birthDate = byId('sBirthDate')?.value;
-    const phone = byId('sPhone')?.value?.trim();
-    const parentName = byId('sParentName')?.value?.trim();
-    const parentPhone = byId('sParentPhone')?.value?.trim();
-    const studentType = document.querySelector('input[name="sStdType"]:checked');
-    const level = document.querySelector('input[name="sLevel"]:checked');
-
-    if (!firstName || !lastName || !birthDate || !phone || !parentName || !parentPhone) {
-      throw new Error('الرجاء ملء جميع الحقول الإلزامية');
-    }
-    if (!studentType) throw new Error('الرجاء اختيار نوع الطالب');
-    if (!level) throw new Error('الرجاء اختيار المستوى الدراسي');
-
-    const levelVal = level.value;
-    const isBac = levelVal === 'السنة الثالثة ثانوي (بكالوريا)';
-    const institution = isBac ? (byId('sInstitution')?.value?.trim() || '') : '';
-    const stream = isBac ? document.querySelector('input[name="sStream"]:checked') : null;
-
-    if (isBac && !institution) throw new Error('الرجاء إدخال اسم المؤسسة التعليمية');
-    if (isBac && !stream) throw new Error('الرجاء اختيار الشعبة');
-    if (isBac && supportSelectedSubjects.length === 0) throw new Error('الرجاء اختيار مادة واحدة على الأقل');
-
-    // Check terms
-    const termCBs = document.querySelectorAll('#s-terms-container .s-term-cb');
-    const termChecked = document.querySelectorAll('#s-terms-container .s-term-cb:checked');
-    if (termChecked.length !== termCBs.length) throw new Error('الرجاء الموافقة على جميع القوانين والشروط');
-
-    const selectedSubjects = isBac ? supportSelectedSubjects.map(i => SUPPORT_STREAMS[stream.value][i]) : [];
-    const year = new Date().getFullYear();
-    const rand = String(Math.floor(Math.random() * 90000) + 10000);
-    const id = 'EP-' + year + '-' + rand;
-
-    const payload = {
-      id,
-      first_name: firstName,
-      last_name: lastName,
-      birth_date: birthDate,
-      parent_name: parentName,
-      parent_phone: parentPhone,
-      student_type: studentType.value,
-      level: levelVal,
-      institution,
-      stream: isBac ? stream.value : '',
-      subjects: selectedSubjects,
-      terms_accepted: true,
-      status: 'مسجل مبدئياً',
-      fee_amount: 500,
-    };
-
     const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations`, {
       method: 'POST',
       headers: {
@@ -272,7 +366,7 @@ async function supportSubmit(e) {
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
         'Prefer': 'return=minimal',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(sFormData),
     });
 
     if (!res.ok) {
@@ -280,43 +374,42 @@ async function supportSubmit(e) {
       throw new Error(txt.slice(0, 200));
     }
 
-    // Success
-    const formView = byId('support-form-view');
-    const successView = byId('support-success-view');
-    if (formView) formView.style.display = 'none';
-    if (successView) {
-      successView.style.display = 'block';
-      successView.innerHTML = `
-        <div class="modal-header">
-          <h3 class="modal-title">✅ تم تأكيد تسجيلك الأولي</h3>
-          <button class="close-btn" onclick="closeSupportReg()" type="button">✕</button>
-        </div>
-        <div style="padding:20px;text-align:center;">
-          <div style="font-size:42px;margin-bottom:8px;">🎉</div>
-          <div style="font-size:17px;font-weight:800;color:#10b981;margin-bottom:12px;">تم تأكيد تسجيلك الأولي بنجاح!</div>
-          <div style="background:rgba(200,168,75,0.07);border:1px solid rgba(200,168,75,0.2);border-radius:10px;padding:12px;margin:10px 0;">
-            <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px;">رقم التلميذ الخاص بك:</div>
-            <div style="font-size:24px;font-weight:900;color:var(--gold,#c8a84b);letter-spacing:1px;direction:ltr;">${id}</div>
-          </div>
-          <div style="font-size:12px;line-height:1.7;color:var(--text-muted);margin:14px 0;text-align:right;">
-            🆔 <strong>هذا الرقم سيرافقك طوال مدة تسجيلك</strong> في المركز التعليمي، احتفظ به جيداً.<br><br>
-            🏫 <strong>لإتمام تسجيلك النهائي:</strong><br>
-            • تفضل بزيارة المركز التعليمي شخصياً.<br>
-            • أحضر معك رقم التسجيل الخاص بك.<br>
-            • قم بدفع حقوق التسجيل المقدرة بـ <strong style="color:var(--gold,#c8a84b);">500 دج</strong>.<br><br>
-            ✨ نتمنى لك مسيرة تعليمية موفقة! 🌟
-          </div>
-          <button class="ep-btn-primary submit-btn" onclick="closeSupportReg()" style="margin-top:8px;">تم</button>
-        </div>
-      `;
-    }
+    // Success — close laws modal, open success modal
+    closeLawsModal();
+    openSuccessModal(sFormData.id);
   } catch (e) {
-    alert(e.message);
-    if (btn) { btn.disabled = false; btn.textContent = 'إتمام التسجيل ✦'; }
+    alert('❌ فشل التسجيل: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'تأكيد التسجيل الأولي'; }
   }
 }
 
-// ── Admin: Load / Confirm ──
+function closeLawsModal() {
+  const modal = byId('laws-modal');
+  if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
+}
+
+function closeLawsModalOutside(e) {
+  if (e.target === byId('laws-modal')) closeLawsModal();
+}
+
+// ── Success Modal ──
+function openSuccessModal(id) {
+  byId('success-id-display')&&(byId('success-id-display').textContent=id);
+  const modal = byId('success-modal');
+  if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
+}
+
+function closeSuccessModal() {
+  const modal = byId('success-modal');
+  if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
+  sFormData = null;
+}
+
+function closeSuccessModalOutside(e) {
+  if (e.target === byId('success-modal')) closeSuccessModal();
+}
+
+// ── Admin helpers (used by admin-support.js) ──
 async function loadRegistrations() {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations?select=*&order=created_at.desc`, {

@@ -12,9 +12,10 @@ const COLUMNS = [
   { key: 'birth_date', label: 'تاريخ الميلاد', sortable: true },
   { key: 'parent_name', label: 'ولي الأمر', sortable: true },
   { key: 'parent_phone', label: 'هاتف ولي الأمر', sortable: false },
+  { key: 'student_type', label: 'نوع الطالب', sortable: true },
   { key: 'level', label: 'المستوى', sortable: true },
-  { key: 'stream', label: 'الشعبة', sortable: true },
   { key: 'institution', label: 'المؤسسة', sortable: false },
+  { key: 'stream', label: 'الشعبة', sortable: true },
   { key: 'subjects', label: 'المواد', sortable: false },
   { key: 'created_at', label: 'تاريخ التسجيل', sortable: true },
   { key: 'status', label: 'الحالة', sortable: true },
@@ -76,14 +77,20 @@ function refreshData() { loadData(); }
 function applyFilters() {
   const search = (byId('search-input')?.value || '').trim().toLowerCase();
   const levelF = byId('level-filter')?.value || '';
+  const streamF = byId('stream-filter')?.value || '';
+  const instF = byId('institution-filter')?.value || '';
+  const typeF = byId('type-filter')?.value || '';
   const statusF = byId('status-filter')?.value || '';
 
   filteredData = allData.filter(r => {
     if (search) {
-      const txt = (r.id + ' ' + r.first_name + ' ' + r.last_name + ' ' + (r.parent_name || '') + ' ' + (r.parent_phone || '')).toLowerCase();
+      const txt = (r.id + ' ' + r.first_name + ' ' + r.last_name + ' ' + (r.parent_name || '') + ' ' + (r.parent_phone || '') + ' ' + (r.student_type || '')).toLowerCase();
       if (!txt.includes(search)) return false;
     }
     if (levelF && r.level !== levelF) return false;
+    if (streamF && r.stream !== streamF) return false;
+    if (instF && r.institution !== instF) return false;
+    if (typeF && r.student_type !== typeF) return false;
     if (statusF && r.status !== statusF) return false;
     return true;
   });
@@ -131,12 +138,20 @@ function renderFilters() {
   `;
 }
 
+function populateFilter(id, key, label, allLabel) {
+  const sel = byId(id);
+  if (!sel) return;
+  const cur = sel.value;
+  const vals = [...new Set(allData.map(r => r[key]).filter(Boolean))];
+  sel.innerHTML = `<option value="">${allLabel}</option>` +
+    vals.map(v => `<option value="${v}" ${v === cur ? 'selected' : ''}>${v}</option>`).join('');
+}
+
 function renderLevelFilter() {
-  const sel = byId('level-filter');
-  const current = sel.value;
-  const levels = [...new Set(allData.map(r => r.level).filter(Boolean))];
-  sel.innerHTML = '<option value="">جميع المستويات</option>' +
-    levels.map(l => `<option value="${l}" ${l === current ? 'selected' : ''}>${l}</option>`).join('');
+  populateFilter('level-filter', 'level', 'المستوى', 'جميع المستويات');
+  populateFilter('stream-filter', 'stream', 'الشعبة', 'جميع الشعب');
+  populateFilter('institution-filter', 'institution', 'المؤسسة', 'جميع المؤسسات');
+  populateFilter('type-filter', 'student_type', 'النوع', 'جميع الأنواع');
 }
 
 // ── Table ──
@@ -165,7 +180,7 @@ function renderTable() {
 
   body.innerHTML = page.map(r => {
     const isPending = r.status === 'مسجل مبدئياً';
-    const subs = Array.isArray(r.subjects) ? r.subjects.map(s => s.subject || s).join('، ') : '';
+    const subs = Array.isArray(r.subjects) ? r.subjects.map(s => typeof s === 'string' ? s : (s.subject || s)).join('، ') : '';
     return `<tr>
       <td style="direction:ltr;font-size:12px;font-weight:600">${r.id || '-'}</td>
       <td>${escHtml(r.first_name)}</td>
@@ -173,9 +188,10 @@ function renderTable() {
       <td>${r.birth_date || '-'}</td>
       <td>${escHtml(r.parent_name || '-')}</td>
       <td dir="ltr">${r.parent_phone || '-'}</td>
+      <td>${escHtml(r.student_type || '-')}</td>
       <td>${r.level || '-'}</td>
-      <td>${r.stream || '-'}</td>
       <td>${escHtml(r.institution || '-')}</td>
+      <td>${r.stream || '-'}</td>
       <td style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(subs)}">${subs || '-'}</td>
       <td style="font-size:11px;direction:ltr;text-align:right">${r.created_at ? formatDate(r.created_at) : '-'}</td>
       <td>${statusBadge(r.status)}</td>
@@ -234,7 +250,7 @@ function viewDetail(id) {
   const r = allData.find(x => x.id === id);
   if (!r) return;
   const subs = Array.isArray(r.subjects) ? r.subjects.map(s =>
-    `<span class="subj-tag">${escHtml(s.subject || s)} — ${escHtml(s.teacher || '')}</span>`
+    `<span class="subj-tag">${escHtml(typeof s === 'string' ? s : (s.subject || s))}</span>`
   ).join('') : '-';
   byId('detail-content').innerHTML = `
     <div class="detail-grid">
