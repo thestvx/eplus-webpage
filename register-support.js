@@ -5,31 +5,63 @@
 const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.6GzLcHQBFQJukYpLMEbFjHhbZQHWFLCj3wlTLvPN0Dc';
 
-// ── Streams ──
-const SUPPORT_STREAMS = [
-  'علوم تجريبية',
-  'رياضيات',
-  'تقني رياضي',
-  'تسيير واقتصاد',
-  'آداب وفلسفة',
-  'لغات أجنبية',
-];
+const SUPPORT_STREAMS = {
+  'علوم تجريبية': [
+    { subject: 'العلوم الفيزيائية والتكنولوجيا', teacher: 'نمسي عبد الرحمان' },
+    { subject: 'العلوم الفيزيائية والتكنولوجيا', teacher: 'لكموته لمين' },
+    { subject: 'الرياضيات', teacher: 'نعورة عبدالباسط' },
+    { subject: 'الرياضيات', teacher: 'ترعة فاطمة' },
+    { subject: 'علوم الطبيعة والحياة', teacher: 'شكري صحراوي' },
+    { subject: 'اللغة العربية', teacher: 'موساوي زبيدة' },
+    { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+    { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
+    { subject: 'العلوم الإسلامية', teacher: 'هبيته ربيع' },
+    { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
+    { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
+  ],
+  'رياضيات': [
+    { subject: 'العلوم الفيزيائية', teacher: 'نمسي عبد الرحمان' },
+    { subject: 'العلوم الفيزيائية', teacher: 'لكموته لمين' },
+    { subject: 'الرياضيات', teacher: 'نعورة عبدالباسط' },
+    { subject: 'الرياضيات', teacher: 'ترعة فاطمة' },
+    { subject: 'اللغة العربية', teacher: 'موساوي زبيدة' },
+    { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+    { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
+    { subject: 'العلوم الإسلامية', teacher: 'هبيته ربيع' },
+    { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
+    { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
+  ],
+  'تسيير واقتصاد': [
+    { subject: 'اللغة العربية', teacher: 'موساوي زبيدة' },
+    { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+    { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
+    { subject: 'المحاسبة', teacher: 'عبد الرحمان سرهود' },
+    { subject: 'العلوم الإسلامية', teacher: 'هبيته ربيع' },
+    { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
+    { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
+  ],
+  'تقني رياضي': [
+    { subject: 'العلوم الفيزيائية', teacher: 'نمسي عبد الرحمان' },
+    { subject: 'العلوم الفيزيائية', teacher: 'لكموته لمين' },
+    { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+    { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
+    { subject: 'العلوم الإسلامية', teacher: 'هبيته ربيع' },
+    { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
+    { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
+  ],
+  'آداب ولغات': [
+    { subject: 'اللغة العربية', teacher: 'موساوي زبيدة' },
+    { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
+    { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+    { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
+    { subject: 'اللغة الألمانية', teacher: 'حمزة علال' },
+    { subject: 'اللغة الإسبانية', teacher: 'طوالبية ابراهيم' },
+    { subject: 'رياضيات (للأدبيين)', teacher: 'هبيته ربيع' },
+    { subject: 'العلوم الإسلامية', teacher: 'هبيته ربيع' },
+    { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
+  ],
+};
 
-// ── Subjects (generic list, same for all streams) ──
-const SUPPORT_SUBJECTS = [
-  'الرياضيات',
-  'الفيزياء',
-  'العلوم الطبيعية والحياة',
-  'اللغة العربية',
-  'اللغة الفرنسية',
-  'اللغة الإنجليزية',
-  'التاريخ والجغرافيا',
-  'الفلسفة',
-  'العلوم الإسلامية',
-  'الإعلام الآلي',
-];
-
-// ── Laws ──
 const SUPPORT_LAWS = [
   'يلتزم الطالب بحضور جميع الحصص في المواعيد المحددة.',
   'التأخر عن الحصة بأكثر من 10 دقائق يعتبر غياباً.',
@@ -72,6 +104,7 @@ function openSupportReg() {
   byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
   byId('msTags')&&(byId('msTags').innerHTML='');
   byId('msDropdown')&&(byId('msDropdown').style.display='none');
+  byId('ms-options')&&(byId('ms-options').innerHTML='');
   const modal = byId('support-reg-modal');
   if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
 }
@@ -95,6 +128,7 @@ function onStdTypeChange(type) {
   });
   byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
   byId('msTags')&&(byId('msTags').innerHTML='');
+  byId('ms-options')&&(byId('ms-options').innerHTML='');
 
   if (type === 'متمدرس') {
     const lg = byId('s-level-group');
@@ -102,7 +136,6 @@ function onStdTypeChange(type) {
     const sel = byId('sLevel');
     if (sel) sel.value = '';
   } else {
-    // حر — auto-select bac
     sLevel = 'السنة الثالثة ثانوي (بكالوريا)';
     const lg = byId('s-level-group');
     if (lg) lg.style.display = 'none';
@@ -146,6 +179,7 @@ function onInstitutionChange() {
   byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
   byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
   byId('msTags')&&(byId('msTags').innerHTML='');
+  byId('ms-options')&&(byId('ms-options').innerHTML='');
 
   if (sInstitutionVal === 'أخرى') {
     byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='block');
@@ -176,7 +210,7 @@ function showStream() {
 function renderStreams() {
   const c = byId('s-streams-container');
   if (!c) return;
-  c.innerHTML = SUPPORT_STREAMS.map(s =>
+  c.innerHTML = Object.keys(SUPPORT_STREAMS).map(s =>
     `<label class="check-option">
       <input type="radio" name="sStream" value="${s}" onchange="onStreamChange('${s}')" />
       <span class="check-box"></span>
@@ -197,12 +231,13 @@ function onStreamChange(stream) {
   renderSubjects();
 }
 
-// ── Step 5: Subjects (Multi-Select Dropdown) ──
+// ── Step 5: Subjects (Multi-Select Dropdown — per stream) ──
 function renderSubjects() {
   const opts = byId('ms-options');
   if (!opts) return;
-  opts.innerHTML = SUPPORT_SUBJECTS.map((subj, i) =>
-    `<div class="ms-opt ${sSubjects.includes(i)?'selected':''}" data-idx="${i}" onclick="msSelect(${i})">${subj}</div>`
+  const items = SUPPORT_STREAMS[sStream] || [];
+  opts.innerHTML = items.map((item, i) =>
+    `<div class="ms-opt ${sSubjects.includes(i)?'selected':''}" data-idx="${i}" onclick="msSelect(${i})">${item.subject} — 🎓 ${item.teacher}</div>`
   ).join('');
   updateMsLabel();
 }
@@ -213,7 +248,6 @@ function msToggle() {
   dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
 }
 
-// Close dropdown when clicking outside
 document.addEventListener('click', (e) => {
   const dd = byId('msDropdown');
   const trigger = byId('msTrigger');
@@ -254,22 +288,21 @@ function updateMsLabel() {
 function updateMsTags() {
   const c = byId('msTags');
   if (!c) return;
+  const items = SUPPORT_STREAMS[sStream] || [];
   c.innerHTML = sSubjects.map(i =>
-    `<span class="ms-tag">${SUPPORT_SUBJECTS[i]} <span class="ms-tag-rm" onclick="msRemove(${i})">×</span></span>`
+    `<span class="ms-tag">${items[i]?.subject || ''} — ${items[i]?.teacher || ''} <span class="ms-tag-rm" onclick="msRemove(${i})">×</span></span>`
   ).join('');
 }
 
 // ── Step 6: Submit (opens laws modal) ──
 function onSubmitClick() {
-  // Validate all fields
   const firstName = byId('sFirstName')?.value?.trim();
   const lastName = byId('sLastName')?.value?.trim();
   const birthDate = byId('sBirthDate')?.value;
-  const phone = byId('sPhone')?.value?.trim();
   const parentName = byId('sParentName')?.value?.trim();
   const parentPhone = byId('sParentPhone')?.value?.trim();
 
-  if (!firstName || !lastName || !birthDate || !phone || !parentName || !parentPhone) {
+  if (!firstName || !lastName || !birthDate || !parentName || !parentPhone) {
     alert('⚠️ الرجاء ملء جميع الحقول الإلزامية'); return;
   }
   if (!sStudentType) { alert('⚠️ الرجاء اختيار نوع الطالب'); return; }
@@ -282,14 +315,19 @@ function onSubmitClick() {
   if (!sStream) { alert('⚠️ الرجاء اختيار الشعبة'); return; }
   if (sSubjects.length === 0) { alert('⚠️ الرجاء اختيار مادة واحدة على الأقل'); return; }
 
-  // Determine institution value
   const institution = sInstitutionVal === 'أخرى'
     ? (byId('sInstitutionInput')?.value?.trim() || '')
     : sInstitutionVal;
 
-  // Store form data for later submit
+  const items = SUPPORT_STREAMS[sStream] || [];
+  const selectedSubjects = sSubjects.map(i => items[i]);
+
+  const year = new Date().getFullYear();
+  const rand = String(Math.floor(Math.random() * 900) + 100);
+  const id = rand;
+
   sFormData = {
-    id: '',
+    id,
     first_name: firstName,
     last_name: lastName,
     birth_date: birthDate,
@@ -299,17 +337,12 @@ function onSubmitClick() {
     level: sLevel,
     institution,
     stream: sStream,
-    subjects: sSubjects.map(i => SUPPORT_SUBJECTS[i]),
+    subjects: selectedSubjects,
     terms_accepted: true,
     status: 'مسجل مبدئياً',
     fee_amount: 500,
   };
 
-  // Generate 3-digit ID now
-  const rand = String(Math.floor(Math.random() * 900) + 100);
-  sFormData.id = rand;
-
-  // Open laws modal
   openLawsModal();
 }
 
@@ -329,12 +362,8 @@ function openLawsModal() {
   closeSupportReg();
   const modal = byId('laws-modal');
   if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
-
-  // Reset scroll
   const area = byId('laws-scroll-area');
   if (area) { area.scrollTop = 0; }
-
-  // Observe scroll position
   setTimeout(setupLawsScroll, 100);
 }
 
@@ -342,7 +371,6 @@ function setupLawsScroll() {
   const area = byId('laws-scroll-area');
   const sentinel = byId('laws-bottom-sentinel');
   if (!area || !sentinel) return;
-
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
@@ -351,7 +379,6 @@ function setupLawsScroll() {
       }
     });
   }, { root: area, threshold: 1.0 });
-
   observer.observe(sentinel);
 }
 
@@ -365,7 +392,6 @@ async function onLawsConfirm() {
   if (!sFormData) return;
   const btn = byId('lawsConfirmBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'جاري التسجيل...'; }
-
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations`, {
       method: 'POST',
@@ -377,13 +403,10 @@ async function onLawsConfirm() {
       },
       body: JSON.stringify(sFormData),
     });
-
     if (!res.ok) {
       const txt = await res.text();
       throw new Error(txt.slice(0, 200));
     }
-
-    // Success — close laws modal, open success modal
     closeLawsModal();
     openSuccessModal(sFormData.id);
   } catch (e) {
@@ -418,7 +441,7 @@ function closeSuccessModalOutside(e) {
   if (e.target === byId('success-modal')) closeSuccessModal();
 }
 
-// ── Admin helpers (used by admin-support.js) ──
+// ── Admin helpers ──
 async function loadRegistrations() {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations?select=*&order=created_at.desc`, {
