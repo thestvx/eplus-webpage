@@ -134,11 +134,13 @@ function onStdTypeChange(type) {
     const lg = byId('s-level-group');
     if (lg) { lg.style.display = 'block'; }
     const sel = byId('sLevel');
-    if (sel) sel.value = '';
-  } else {
+    if (sel) { sel.disabled = false; sel.value = ''; }
+  } else if (type === 'حر') {
     sLevel = 'السنة الثالثة ثانوي (بكالوريا)';
     const lg = byId('s-level-group');
-    if (lg) lg.style.display = 'none';
+    if (lg) { lg.style.display = 'block'; }
+    const sel = byId('sLevel');
+    if (sel) { sel.value = 'السنة الثالثة ثانوي (بكالوريا)'; sel.disabled = true; }
     showInstitution();
   }
 }
@@ -388,10 +390,23 @@ function onLawsAgreeChange() {
   if (btn) btn.disabled = !cb.checked;
 }
 
+// ── Loading Modal ──
+function openLoadingModal() {
+  const modal = byId('loading-modal');
+  if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
+}
+
+function closeLoadingModal() {
+  const modal = byId('loading-modal');
+  if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
+}
+
 async function onLawsConfirm() {
   if (!sFormData) return;
   const btn = byId('lawsConfirmBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'جاري التسجيل...'; }
+  closeLawsModal();
+  openLoadingModal();
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations`, {
       method: 'POST',
@@ -407,11 +422,14 @@ async function onLawsConfirm() {
       const txt = await res.text();
       throw new Error(txt.slice(0, 200));
     }
-    closeLawsModal();
+    closeLoadingModal();
     openSuccessModal(sFormData.id);
   } catch (e) {
-    alert('❌ فشل التسجيل: ' + e.message);
-    if (btn) { btn.disabled = false; btn.textContent = 'تأكيد التسجيل الأولي'; }
+    closeLoadingModal();
+    openLawsModal();
+    if (byId('lawsAgree')) byId('lawsAgree').checked = true;
+    if (byId('lawsConfirmBtn')) { byId('lawsConfirmBtn').disabled = false; byId('lawsConfirmBtn').textContent = 'تأكيد التسجيل الأولي'; }
+    setTimeout(() => alert('❌ فشل التسجيل: ' + e.message), 200);
   }
 }
 
@@ -428,7 +446,22 @@ function closeLawsModalOutside(e) {
 function openSuccessModal(id) {
   byId('success-id-display')&&(byId('success-id-display').textContent=id);
   const modal = byId('success-modal');
-  if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
+  if (modal) { 
+    modal.style.display = 'flex'; 
+    modal.classList.add('active');
+    const box = modal.querySelector('.ep-success-box');
+    if (box) {
+      box.style.animation = 'none';
+      void box.offsetHeight;
+      box.style.animation = '';
+    }
+    const icon = modal.querySelector('.ep-success-icon');
+    if (icon) {
+      icon.style.animation = 'none';
+      void icon.offsetHeight;
+      icon.style.animation = '';
+    }
+  }
 }
 
 function closeSuccessModal() {

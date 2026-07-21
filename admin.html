@@ -1636,6 +1636,12 @@
         <span class="nav-icon">⚙️</span>
         <span class="nav-label" data-i18n="settings">الإعدادات</span>
       </div>
+      <div class="nav-section" data-i18n="support_reg">الدعم المدرسي</div>
+      <div class="nav-item" onclick="switchNavSection('support-registrations')">
+        <span class="nav-icon">📚</span>
+        <span class="nav-label">تسجيلات الدعم المدرسي</span>
+        <span class="nav-badge" id="nav-badge-support">0</span>
+      </div>
       <div class="nav-section" data-i18n="mail_service">خدمات البريد</div>
       <div class="nav-item" onclick="switchNavSection('notifications')">
         <span class="nav-icon">📨</span>
@@ -2741,6 +2747,167 @@
         </div>
       </div>
 
+      <!-- ===== SECTION: SUPPORT REGISTRATIONS ===== -->
+      <div id="section-support-registrations" style="display:none">
+        <div class="section-header">
+          <div class="section-title">
+            <div class="section-icon">📚</div>
+            <span>تسجيلات الدعم المدرسي</span>
+          </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid" style="margin-bottom:24px">
+          <div class="stat-card">
+            <div class="stat-card-glow"></div>
+            <div class="stat-top">
+              <div class="stat-icon-wrap" style="background:var(--primary-light)">📋</div>
+            </div>
+            <div class="stat-num" id="sr-total">0</div>
+            <div class="stat-label">إجمالي التسجيلات</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-glow"></div>
+            <div class="stat-top">
+              <div class="stat-icon-wrap" style="background:var(--accent-soft)">🟡</div>
+            </div>
+            <div class="stat-num" id="sr-initial" style="color:var(--warning)">0</div>
+            <div class="stat-label">مسجل مبدئياً</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-glow"></div>
+            <div class="stat-top">
+              <div class="stat-icon-wrap" style="background:var(--success-soft)">🟢</div>
+            </div>
+            <div class="stat-num" id="sr-confirmed" style="color:var(--success)">0</div>
+            <div class="stat-label">مسجل نهائياً</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-glow"></div>
+            <div class="stat-top">
+              <div class="stat-icon-wrap" style="background:rgba(59,130,246,0.1)">📊</div>
+            </div>
+            <div class="stat-num" id="sr-streams-count">0</div>
+            <div class="stat-label">شعب متاحة</div>
+          </div>
+        </div>
+
+        <!-- Filter & Toolbar -->
+        <div class="panel" style="padding:16px 20px;margin-bottom:16px">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <select class="inp" id="sr-filter-level" style="width:auto;min-width:140px;padding:8px 14px" onchange="srApplyFilters()">
+                <option value="">كل المستويات</option>
+                <option value="السنة الثالثة ثانوي (بكالوريا)">السنة الثالثة ثانوي (بكالوريا)</option>
+              </select>
+              <select class="inp" id="sr-filter-stream" style="width:auto;min-width:140px;padding:8px 14px" onchange="srApplyFilters()">
+                <option value="">كل الشعب</option>
+                <option value="علوم تجريبية">علوم تجريبية</option>
+                <option value="رياضيات">رياضيات</option>
+                <option value="تسيير واقتصاد">تسيير واقتصاد</option>
+                <option value="تقني رياضي">تقني رياضي</option>
+                <option value="آداب ولغات">آداب ولغات</option>
+              </select>
+              <select class="inp" id="sr-filter-type" style="width:auto;min-width:120px;padding:8px 14px" onchange="srApplyFilters()">
+                <option value="">كل الأنواع</option>
+                <option value="متمدرس">متمدرس</option>
+                <option value="حر">حر</option>
+              </select>
+              <select class="inp" id="sr-filter-status" style="width:auto;min-width:150px;padding:8px 14px" onchange="srApplyFilters()">
+                <option value="">كل الحالات</option>
+                <option value="مسجل مبدئياً">🟡 مسجل مبدئياً</option>
+                <option value="مسجل نهائياً">🟢 مسجل نهائياً</option>
+              </select>
+              <select class="inp" id="sr-filter-institution" style="width:auto;min-width:160px;padding:8px 14px" onchange="srApplyFilters()">
+                <option value="">كل المؤسسات</option>
+                <option value="ثانوية هالي عبدالكريم بقمار">ثانوية هالي عبدالكريم بقمار</option>
+                <option value="متقنة عبدالقادر الياجوري بقمار">متقنة عبدالقادر الياجوري بقمار</option>
+                <option value="ثانوية العلامة أبو القاسم سعد الله بقمار">ثانوية العلامة أبو القاسم سعد الله بقمار</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <input class="inp" id="sr-search" type="text" placeholder="🔍 بحث..." style="width:200px;padding:8px 14px" oninput="srApplyFilters()" />
+              <button class="tbl-action" onclick="srExportCSV()" style="font-size:12px">📥 CSV</button>
+              <button class="tbl-action" onclick="srExportExcel()" style="font-size:12px">📊 Excel</button>
+              <button class="tbl-action" onclick="srPrint()" style="font-size:12px">🖨️ طباعة</button>
+              <button class="tbl-action" onclick="srRefresh()" style="font-size:12px;border-color:rgba(245,158,11,0.3);color:#d97706">🔄 تحديث</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="panel" style="padding:0;overflow:hidden">
+          <div class="tbl-wrap" style="border:none">
+            <table class="tbl" id="sr-table">
+              <thead>
+                <tr>
+                  <th onclick="srSort('id')" style="cursor:pointer">ID ↕</th>
+                  <th onclick="srSort('last_name')" style="cursor:pointer">اللقب ↕</th>
+                  <th onclick="srSort('first_name')" style="cursor:pointer">الاسم ↕</th>
+                  <th>تاريخ الميلاد</th>
+                  <th>اسم ولي الأمر</th>
+                  <th>هاتف ولي الأمر</th>
+                  <th>نوع الطالب</th>
+                  <th>المستوى الدراسي</th>
+                  <th>المؤسسة التعليمية</th>
+                  <th>الشعبة</th>
+                  <th>المواد المطلوبة</th>
+                  <th onclick="srSort('created_at')" style="cursor:pointer">تاريخ التسجيل ↕</th>
+                  <th>حالة الطلب</th>
+                  <th>إجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="sr-tbody"></tbody>
+            </table>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px">
+            <div style="font-size:12px;color:var(--text-muted);font-weight:600" id="sr-pagination-info"></div>
+            <div style="display:flex;gap:6px" id="sr-pagination-btns"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ SR Detail Modal ═══ -->
+      <div class="teacher-modal-bg" id="sr-detail-modal">
+        <div class="teacher-modal" style="max-width:700px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:rgba(79,70,229,0.1);border-color:rgba(79,70,229,0.2)">📋</div>
+            <div class="teacher-modal-title">تفاصيل التسجيل</div>
+            <button class="att-modal-close" onclick="document.getElementById('sr-detail-modal').classList.remove('open')">✕</button>
+          </div>
+          <div class="teacher-modal-body" id="sr-detail-body"></div>
+        </div>
+      </div>
+
+      <!-- ═══ SR Edit Modal ═══ -->
+      <div class="teacher-modal-bg" id="sr-edit-modal">
+        <div class="teacher-modal" style="max-width:600px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:var(--accent-soft);border-color:rgba(245,158,11,0.2)">✏️</div>
+            <div class="teacher-modal-title">تعديل التسجيل</div>
+            <button class="att-modal-close" onclick="document.getElementById('sr-edit-modal').classList.remove('open')">✕</button>
+          </div>
+          <div class="teacher-modal-body" id="sr-edit-body"></div>
+        </div>
+      </div>
+
+      <!-- ═══ SR Delete Confirm ═══ -->
+      <div class="teacher-modal-bg" id="sr-delete-modal">
+        <div class="teacher-modal" style="max-width:400px;text-align:center">
+          <div class="teacher-modal-header" style="justify-content:center;border:none">
+            <div style="font-size:48px;margin-bottom:8px">🗑️</div>
+          </div>
+          <div style="padding:0 24px 20px">
+            <div style="font-size:16px;font-weight:900;color:var(--text);margin-bottom:6px">حذف التسجيل</div>
+            <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px">هل أنت متأكد من حذف هذا التسجيل؟ لا يمكن التراجع عن هذا الإجراء.</div>
+            <div style="display:flex;gap:10px;justify-content:center">
+              <button class="btn-sm" onclick="document.getElementById('sr-delete-modal').classList.remove('open')">إلغاء</button>
+              <button class="btn-sm danger" id="sr-delete-confirm-btn">نعم، احذف</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /dashboard-body -->
   </div><!-- /main -->
 </div><!-- /dashboard -->
@@ -3799,12 +3966,12 @@ document.addEventListener('click', (e) => {
 
 // NAV SWITCHING (sidebar-based, not tabs)
 window.switchNavSection = (section) => {
-  ['home','announcements','summer','students','teachers','finance','settings','notifications'].forEach(s => {
+  ['home','announcements','summer','students','teachers','finance','settings','notifications','support-registrations'].forEach(s => {
     const el = document.getElementById('section-' + s);
     if (el) el.style.display = s === section ? 'block' : 'none';
   });
   document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-  const navMap = {home:0, announcements:1, summer:2, students:3, teachers:4, settings:7, notifications:8};
+  const navMap = {home:0, announcements:1, summer:2, students:3, teachers:4, settings:7, notifications:8, 'support-registrations':9};
   const navItems = document.querySelectorAll('.nav-item');
   if (navMap[section] !== undefined) navItems[navMap[section]]?.classList.add('active');
   const finNav = document.getElementById('nav-finance');
@@ -3835,6 +4002,9 @@ window.switchNavSection = (section) => {
   }
   if (section === 'notifications') {
     setTimeout(() => { if (typeof window.notifLoadHistory === 'function') window.notifLoadHistory(); }, 300);
+  }
+  if (section === 'support-registrations') {
+    if (typeof srLoadData === 'function') srLoadData();
   }
 };
 
@@ -21697,6 +21867,360 @@ document.addEventListener('DOMContentLoaded', function() {
   const closeBtns = document.querySelectorAll('#migrateModal [onclick*="closeMigrateModal"], #migrateModal .close-btn');
   // close via click on overlay and X button handled by inline onclick
 });
+
+// ═══════════════════════════════════════════════════════════
+//  SUPPORT REGISTRATIONS (تسجيلات الدعم المدرسي)
+// ═══════════════════════════════════════════════════════════
+const SR_SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
+const SR_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
+
+let srAllData = [];
+let srFilteredData = [];
+let srCurrentPage = 1;
+let srPageSize = 20;
+let srSortField = null;
+let srSortDir = 'asc';
+let srDeleteTarget = null;
+
+async function srFetch(url, options) {
+  return fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SR_ANON_KEY,
+      'Authorization': `Bearer ${SR_ANON_KEY}`,
+      ...(options?.headers || {}),
+    },
+  });
+}
+
+async function srLoadData() {
+  try {
+    const res = await srFetch(`${SR_SUPABASE_URL}/rest/v1/registrations?select=*&order=created_at.desc`);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    srAllData = await res.json();
+    srFilteredData = [...srAllData];
+    srCurrentPage = 1;
+    document.getElementById('nav-badge-support').textContent = srAllData.length;
+    srApplyFilters();
+  } catch (e) {
+    console.error('SR load error:', e);
+    document.getElementById('sr-tbody').innerHTML = '<tr><td colspan="14" style="text-align:center;padding:40px;color:var(--danger)">❌ فشل تحميل البيانات</td></tr>';
+  }
+}
+
+function srGetValue(obj, field) {
+  const v = obj[field];
+  if (v === null || v === undefined) return '';
+  return String(v);
+}
+
+function srApplyFilters() {
+  const level = document.getElementById('sr-filter-level').value;
+  const stream = document.getElementById('sr-filter-stream').value;
+  const type = document.getElementById('sr-filter-type').value;
+  const status = document.getElementById('sr-filter-status').value;
+  const institution = document.getElementById('sr-filter-institution').value;
+  const query = document.getElementById('sr-search').value.toLowerCase().trim();
+
+  srFilteredData = srAllData.filter(r => {
+    if (level && r.level !== level) return false;
+    if (stream && r.stream !== stream) return false;
+    if (type && r.student_type !== type) return false;
+    if (status && r.status !== status) return false;
+    if (institution && r.institution !== institution) return false;
+    if (query) {
+      const searchable = [
+        r.id, r.first_name, r.last_name, r.parent_name,
+        r.parent_phone, r.institution, r.stream, r.level,
+        r.student_type, r.status
+      ].map(srGetValue).join(' ').toLowerCase();
+      if (!searchable.includes(query)) return false;
+    }
+    return true;
+  });
+
+  srCurrentPage = 1;
+  srUpdateStats();
+  srRenderTable();
+}
+
+function srUpdateStats() {
+  const total = srAllData.length;
+  const initial = srAllData.filter(r => r.status === 'مسجل مبدئياً').length;
+  const confirmed = srAllData.filter(r => r.status === 'مسجل نهائياً').length;
+  const streams = new Set(srAllData.filter(r => r.stream).map(r => r.stream));
+  document.getElementById('sr-total').textContent = total;
+  document.getElementById('sr-initial').textContent = initial;
+  document.getElementById('sr-confirmed').textContent = confirmed;
+  document.getElementById('sr-streams-count').textContent = streams.size;
+}
+
+function srSort(field) {
+  if (srSortField === field) {
+    srSortDir = srSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    srSortField = field;
+    srSortDir = 'asc';
+  }
+  srFilteredData.sort((a, b) => {
+    const va = srGetValue(a, field).toLowerCase();
+    const vb = srGetValue(b, field).toLowerCase();
+    if (va < vb) return srSortDir === 'asc' ? -1 : 1;
+    if (va > vb) return srSortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+  srRenderTable();
+}
+
+function srRenderTable() {
+  const tbody = document.getElementById('sr-tbody');
+  const start = (srCurrentPage - 1) * srPageSize;
+  const end = Math.min(start + srPageSize, srFilteredData.length);
+  const page = srFilteredData.slice(start, end);
+
+  if (page.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:40px;color:var(--text-muted)">📭 لا توجد تسجيلات مطابقة</td></tr>';
+    document.getElementById('sr-pagination-info').textContent = '';
+    document.getElementById('sr-pagination-btns').innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = page.map(r => {
+    const subjects = Array.isArray(r.subjects)
+      ? r.subjects.map(s => `${s.subject || ''} - ${s.teacher || ''}`).join('<br>')
+      : '';
+    const statusBadge = r.status === 'مسجل نهائياً'
+      ? '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;background:var(--success-soft);color:#059669;border:1px solid rgba(16,185,129,0.25);font-size:11px;font-weight:800">🟢 مسجل نهائياً</span>'
+      : '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;background:var(--accent-soft);color:#92400E;border:1px solid rgba(245,158,11,0.25);font-size:11px;font-weight:800">🟡 مسجل مبدئياً</span>';
+    const isInitial = r.status === 'مسجل مبدئياً';
+
+    return `<tr>
+      <td style="font-family:monospace;font-weight:800;color:var(--primary)">${r.id}</td>
+      <td>${srGetValue(r, 'last_name')}</td>
+      <td>${srGetValue(r, 'first_name')}</td>
+      <td>${srGetValue(r, 'birth_date')}</td>
+      <td>${srGetValue(r, 'parent_name')}</td>
+      <td style="direction:ltr;text-align:right">${srGetValue(r, 'parent_phone')}</td>
+      <td>${r.student_type === 'حر' ? '🎓 حر' : '📘 متمدرس'}</td>
+      <td>${srGetValue(r, 'level')}</td>
+      <td>${srGetValue(r, 'institution')}</td>
+      <td>${srGetValue(r, 'stream')}</td>
+      <td style="font-size:11px;max-width:200px">${subjects}</td>
+      <td style="font-size:11px;white-space:nowrap">${srFormatDate(r.created_at)}</td>
+      <td>${statusBadge}</td>
+      <td style="white-space:nowrap">
+        <button class="tbl-action view" onclick="srView('${r.id}')" style="font-size:10px">🔍</button>
+        <button class="tbl-action" onclick="srEdit('${r.id}')" style="font-size:10px">✏️</button>
+        ${isInitial ? `<button class="tbl-action" onclick="srConfirm('${r.id}')" style="font-size:10px;border-color:rgba(16,185,129,0.3);color:#059669">✅</button>` : ''}
+        <button class="tbl-action del" onclick="srDelete('${r.id}')" style="font-size:10px">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Pagination
+  const totalPages = Math.ceil(srFilteredData.length / srPageSize);
+  document.getElementById('sr-pagination-info').textContent =
+    `عرض ${start + 1}-${end} من ${srFilteredData.length} تسجيل`;
+
+  let btns = '';
+  if (srCurrentPage > 1) btns += `<button class="tbl-action" onclick="srGoPage(${srCurrentPage - 1})">‹ السابق</button>`;
+  for (let i = Math.max(1, srCurrentPage - 2); i <= Math.min(totalPages, srCurrentPage + 2); i++) {
+    btns += `<button class="tbl-action" onclick="srGoPage(${i})" style="${i === srCurrentPage ? 'background:var(--primary);color:white;border-color:var(--primary)' : ''}">${i}</button>`;
+  }
+  if (srCurrentPage < totalPages) btns += `<button class="tbl-action" onclick="srGoPage(${srCurrentPage + 1})">التالي ›</button>`;
+  document.getElementById('sr-pagination-btns').innerHTML = btns;
+}
+
+function srGoPage(page) {
+  srCurrentPage = page;
+  srRenderTable();
+}
+
+function srFormatDate(d) {
+  if (!d) return '';
+  try { return new Date(d).toLocaleDateString('ar-DZ', { year:'numeric', month:'short', day:'numeric' }); }
+  catch(e) { return d; }
+}
+
+function srView(id) {
+  const r = srAllData.find(x => x.id === id);
+  if (!r) return;
+  const subjects = Array.isArray(r.subjects)
+    ? r.subjects.map(s => `<div style="padding:4px 0;border-bottom:1px solid var(--border)">📚 ${s.subject || ''} — 🎓 ${s.teacher || ''}</div>`).join('')
+    : 'لا توجد مواد';
+  const statusColor = r.status === 'مسجل نهائياً' ? '#059669' : '#d97706';
+
+  document.getElementById('sr-detail-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><strong style="color:var(--text-muted);font-size:11px">رقم التسجيل</strong><div style="font-weight:800;font-family:monospace;color:var(--primary)">${r.id}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">الحالة</strong><div style="font-weight:800;color:${statusColor}">${r.status === 'مسجل نهائياً' ? '🟢 ' : '🟡 '}${r.status}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">الاسم</strong><div>${r.first_name} ${r.last_name}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">تاريخ الميلاد</strong><div>${r.birth_date || '—'}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">ولي الأمر</strong><div>${r.parent_name || '—'}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">هاتف ولي الأمر</strong><div style="direction:ltr">${r.parent_phone || '—'}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">نوع الطالب</strong><div>${r.student_type === 'حر' ? '🎓 حر' : '📘 متمدرس'}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">المستوى</strong><div>${r.level || '—'}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">المؤسسة</strong><div>${r.institution || '—'}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">الشعبة</strong><div>${r.stream || '—'}</div></div>
+      <div style="grid-column:1/-1"><strong style="color:var(--text-muted);font-size:11px">المواد المطلوبة</strong><div style="margin-top:6px">${subjects}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">تاريخ التسجيل</strong><div>${srFormatDate(r.created_at)}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">رسوم التسجيل</strong><div>${r.fee_amount || 500} دج</div></div>
+    </div>`;
+  document.getElementById('sr-detail-modal').classList.add('open');
+}
+
+function srEdit(id) {
+  const r = srAllData.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('sr-edit-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label class="form-label">الاسم</label><input class="inp" id="sr-edit-firstname" value="${r.first_name || ''}"></div>
+      <div class="form-group"><label class="form-label">اللقب</label><input class="inp" id="sr-edit-lastname" value="${r.last_name || ''}"></div>
+      <div class="form-group"><label class="form-label">تاريخ الميلاد</label><input class="inp" id="sr-edit-birth" type="date" value="${r.birth_date || ''}"></div>
+      <div class="form-group"><label class="form-label">ولي الأمر</label><input class="inp" id="sr-edit-parent" value="${r.parent_name || ''}"></div>
+      <div class="form-group"><label class="form-label">الهاتف</label><input class="inp" id="sr-edit-phone" value="${r.parent_phone || ''}" style="direction:ltr"></div>
+      <div class="form-group"><label class="form-label">المؤسسة</label><input class="inp" id="sr-edit-institution" value="${r.institution || ''}"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
+      <button class="btn-sm" onclick="document.getElementById('sr-edit-modal').classList.remove('open')">إلغاء</button>
+      <button class="tbl-action" onclick="srSaveEdit('${id}')" style="border-color:rgba(16,185,129,0.3);color:#059669">💾 حفظ</button>
+    </div>`;
+  document.getElementById('sr-edit-modal').classList.add('open');
+}
+
+async function srSaveEdit(id) {
+  const data = {
+    first_name: document.getElementById('sr-edit-firstname').value,
+    last_name: document.getElementById('sr-edit-lastname').value,
+    birth_date: document.getElementById('sr-edit-birth').value,
+    parent_name: document.getElementById('sr-edit-parent').value,
+    parent_phone: document.getElementById('sr-edit-phone').value,
+    institution: document.getElementById('sr-edit-institution').value,
+  };
+  try {
+    const res = await srFetch(`${SR_SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    document.getElementById('sr-edit-modal').classList.remove('open');
+    srShowToast('تم حفظ التعديلات بنجاح ✅', 'success');
+    srLoadData();
+  } catch (e) {
+    srShowToast('فشل حفظ التعديلات: ' + e.message, 'error');
+  }
+}
+
+function srDelete(id) {
+  srDeleteTarget = id;
+  document.getElementById('sr-delete-modal').classList.add('open');
+  document.getElementById('sr-delete-confirm-btn').onclick = async () => {
+    try {
+      const res = await srFetch(`${SR_SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(srDeleteTarget)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      document.getElementById('sr-delete-modal').classList.remove('open');
+      srShowToast('تم حذف التسجيل بنجاح 🗑️', 'success');
+      srLoadData();
+    } catch (e) {
+      srShowToast('فشل حذف التسجيل: ' + e.message, 'error');
+    }
+  };
+}
+
+async function srConfirm(id) {
+  if (!confirm('هل أنت متأكد من تأكيد تسجيل هذا الطالب نهائياً؟')) return;
+  try {
+    const res = await srFetch(`${SR_SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'مسجل نهائياً' }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    srShowToast('✅ تم تأكيد التسجيل النهائي', 'success');
+    srLoadData();
+  } catch (e) {
+    srShowToast('فشل تأكيد التسجيل: ' + e.message, 'error');
+  }
+}
+
+function srRefresh() {
+  srLoadData();
+  srShowToast('🔄 تم تحديث البيانات', 'success');
+}
+
+function srExportCSV() {
+  const headers = ['ID','الاسم','اللقب','تاريخ الميلاد','ولي الأمر','الهاتف','نوع الطالب','المستوى','المؤسسة','الشعبة','المواد','تاريخ التسجيل','الحالة'];
+  const rows = srFilteredData.map(r => [
+    r.id, r.first_name, r.last_name, r.birth_date,
+    r.parent_name, r.parent_phone, r.student_type, r.level,
+    r.institution, r.stream,
+    Array.isArray(r.subjects) ? r.subjects.map(s => `${s.subject} (${s.teacher})`).join('; ') : '',
+    r.created_at, r.status
+  ]);
+  let csv = '\uFEFF' + headers.join(';') + '\n';
+  csv += rows.map(row => row.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(';')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'support-registrations.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function srExportExcel() {
+  const table = document.getElementById('sr-table').cloneNode(true);
+  // Remove action column
+  const rows = table.querySelectorAll('tr');
+  rows.forEach(row => { if (row.lastElementChild) row.lastElementChild.remove(); });
+  const html = table.outerHTML;
+  const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'support-registrations.xls'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function srPrint() {
+  const win = window.open('', '_blank');
+  const styles = Array.from(document.styleSheets).map(s => {
+    try { return Array.from(s.cssRules || []).map(r => r.cssText).join(''); }
+    catch(e) { return ''; }
+  }).join('');
+  const rows = srFilteredData.map(r => `<tr>
+    <td>${r.id}</td><td>${r.last_name}</td><td>${r.first_name}</td>
+    <td>${r.birth_date || ''}</td><td>${r.parent_name || ''}</td>
+    <td>${r.parent_phone || ''}</td><td>${r.student_type || ''}</td>
+    <td>${r.level || ''}</td><td>${r.institution || ''}</td>
+    <td>${r.stream || ''}</td>
+    <td>${Array.isArray(r.subjects) ? r.subjects.map(s=>s.subject).join(', ') : ''}</td>
+    <td>${srFormatDate(r.created_at)}</td>
+    <td>${r.status}</td>
+  </tr>`).join('');
+  win.document.write(`<html dir="rtl"><head><meta charset="utf-8"><title>تسجيلات الدعم المدرسي</title>
+    <style>body{font-family:Tajawal,sans-serif;padding:20px}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{border:1px solid #ddd;padding:6px 8px;text-align:right}
+    th{background:#f5f3ff;font-weight:800}
+    h2{text-align:center;margin-bottom:20px}</style>
+  </head><body><h2>📚 تسجيلات الدعم المدرسي</h2>
+  <table><thead><tr><th>ID</th><th>اللقب</th><th>الاسم</th><th>تاريخ الميلاد</th><th>ولي الأمر</th><th>الهاتف</th><th>النوع</th><th>المستوى</th><th>المؤسسة</th><th>الشعبة</th><th>المواد</th><th>تاريخ التسجيل</th><th>الحالة</th></tr></thead><tbody>${rows}</tbody></table>
+  <p style="text-align:center;margin-top:20px;color:#999;font-size:11px">تم التصدير من لوحة إدارة E-PLUS</p>
+  </body></html>`);
+  win.document.close();
+  setTimeout(() => { win.print(); }, 300);
+}
+
+function srShowToast(msg, type = 'success') {
+  let t = document.getElementById('sr-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'sr-toast';
+    t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translate(-50%,120px);background:var(--card-bg);color:var(--text);padding:14px 24px;border-radius:16px;font-size:14px;font-weight:800;box-shadow:0 16px 48px rgba(124,58,237,0.2),0 0 0 1px var(--border);transition:transform 0.45s cubic-bezier(0.2,0.8,0.2,1);z-index:99999;display:flex;align-items:center;gap:10px';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.transform = 'translate(-50%, 0)';
+  setTimeout(() => { t.style.transform = 'translate(-50%, 120px)'; }, 3000);
+}
 
 // ═══════════════════════════════════════════════════════════
 //  INIT on page load
