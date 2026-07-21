@@ -75,9 +75,33 @@ CREATE TABLE IF NOT EXISTS attendance_cycles (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- 7. REGISTRATIONS (تسجيلات الدعم المدرسي)
+CREATE TABLE IF NOT EXISTS registrations (
+  id TEXT PRIMARY KEY,
+  first_name TEXT NOT NULL DEFAULT '',
+  last_name TEXT NOT NULL DEFAULT '',
+  birth_date TEXT DEFAULT '',
+  parent_name TEXT DEFAULT '',
+  parent_phone TEXT DEFAULT '',
+  student_type TEXT DEFAULT '', -- 'مدرسي' or 'حُر'
+  level TEXT DEFAULT '', -- 'ثالثة ثانوي (البكالوريا)'
+  stream TEXT DEFAULT '', -- 'علوم تجريبية', 'رياضيات', 'تسيير واقتصاد', 'تقني رياضي', 'آداب ولغات'
+  subjects JSONB DEFAULT '[]',
+  terms_accepted BOOLEAN DEFAULT FALSE,
+  status TEXT DEFAULT 'pending', -- 'pending', 'confirmed', 'paid'
+  fee_amount INTEGER DEFAULT 500,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_attendance_student ON attendance_records(student_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_group_session ON attendance_records(group_id, session_num);
 CREATE INDEX IF NOT EXISTS idx_attendance_teacher ON attendance_records(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_students_group ON students(group_id);
 CREATE INDEX IF NOT EXISTS idx_archives_group ON attendance_archives(group_id, cycle_number);
+CREATE INDEX IF NOT EXISTS idx_registrations_status ON registrations(status);
+
+-- Allow anon key to insert registrations from the public page
+ALTER TABLE registrations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "anon_insert_registrations" ON registrations FOR INSERT TO anon WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "anon_select_registrations" ON registrations FOR SELECT TO anon USING (true);
