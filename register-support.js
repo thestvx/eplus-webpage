@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-//  تسجيل الدعم المدرسي - School Support Registration
+//  تسجيل الدعم المدرسي - School Support Registration v2
 // ═══════════════════════════════════════════════════════════
 
 const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
@@ -11,7 +11,7 @@ const STREAMS = {
     { subject: 'العلوم الفيزيائية والتكنولوجيا', teacher: 'لكموته لمين' },
     { subject: 'رياضيات', teacher: 'نعورة عبدالباسط' },
     { subject: 'رياضيات', teacher: 'ترعة فاطمة' },
-    { subject: 'علوم الطبيعة والحياة', teacher: 'شكري صحراوي' },
+    { subject: 'علوم الطبيعة و الحياة', teacher: 'شكري صحراوي' },
     { subject: 'عربية', teacher: 'موساوي زبيدة' },
     { subject: 'فرنسية', teacher: 'كروش شمس الهدى' },
     { subject: 'انجليزية', teacher: 'كرام الصادق' },
@@ -76,7 +76,14 @@ const TERMS = [
   'يلتزم ولي الأمر بمتابعة مستوى الطالب والتواصل مع الإدارة.',
   'المركز يحتفظ بالحق في تعديل الجدول الزمني حسب الضرورة.',
   'بيانات التسجيل محمية ولا تستخدم إلا للأغراض التعليمية.',
-  'القوانين الداخلية للمركز ملزمة للجميع.الموافقة على القوانين شرط أساسي للتسجيل.',
+  'القوانين الداخلية للمركز ملزمة للجميع. الموافقة على القوانين شرط أساسي للتسجيل.',
+  'أتحمل المسؤولية الكاملة عن صحة المعلومات المقدمة.',
+];
+
+const LEVELS = [
+  { label: 'السنة الأولى ثانوي', disabled: true, icon: '🔒' },
+  { label: 'السنة الثانية ثانوي', disabled: true, icon: '🔒' },
+  { label: 'السنة الثالثة ثانوي (البكالوريا)', disabled: false, icon: '📖' },
 ];
 
 let regStep = 1;
@@ -97,12 +104,16 @@ function renderRegStep() {
   const container = document.getElementById('reg-support-content');
   if (!container) return;
 
-  let html = '';
-  const progress = [1, 2, 3, 4, 5].map(s =>
-    `<span class="reg-step-dot ${s === regStep ? 'active' : (s < regStep ? 'done' : '')}">${s}</span>`
-  ).join(' → ');
+  const totalSteps = 6;
+  const dots = Array.from({ length: totalSteps }, (_, i) => {
+    const s = i + 1;
+    let cls = 'reg-step-dot';
+    if (s === regStep) cls += ' active';
+    else if (s < regStep) cls += ' done';
+    return `<span class="${cls}">${s}</span>`;
+  }).join('');
 
-  html += `<div class="reg-progress">${progress}</div>`;
+  let html = `<div class="reg-progress">${dots}</div>`;
 
   switch (regStep) {
     case 1: html += renderStep1(); break;
@@ -110,6 +121,7 @@ function renderRegStep() {
     case 3: html += renderStep3(); break;
     case 4: html += renderStep4(); break;
     case 5: html += renderStep5(); break;
+    case 6: html += renderStep6(); break;
   }
 
   container.innerHTML = html;
@@ -120,60 +132,56 @@ function renderStep1() {
   return `
     <div class="reg-step-title">📝 المعلومات الشخصية</div>
     <div class="reg-field">
-      <label>الاسم</label>
-      <input id="regFirstName" value="${regData.firstName || ''}" placeholder="الاسم">
+      <label>الاسم <span style="color:var(--gold,#c8a84b)">*</span></label>
+      <input id="rFirstName" value="${esc(regData.firstName || '')}" placeholder="الاسم" dir="auto">
     </div>
     <div class="reg-field">
-      <label>اللقب</label>
-      <input id="regLastName" value="${regData.lastName || ''}" placeholder="اللقب">
+      <label>اللقب <span style="color:var(--gold,#c8a84b)">*</span></label>
+      <input id="rLastName" value="${esc(regData.lastName || '')}" placeholder="اللقب" dir="auto">
     </div>
     <div class="reg-field">
-      <label>تاريخ الميلاد</label>
-      <input id="regBirthDate" type="date" value="${regData.birthDate || ''}">
+      <label>تاريخ الميلاد <span style="color:var(--gold,#c8a84b)">*</span></label>
+      <input id="rBirthDate" type="date" value="${esc(regData.birthDate || '')}">
     </div>
     <div class="reg-field">
-      <label>اسم ولي الأمر</label>
-      <input id="regParentName" value="${regData.parentName || ''}" placeholder="اسم ولي الأمر">
+      <label>اسم ولي الأمر <span style="color:var(--gold,#c8a84b)">*</span></label>
+      <input id="rParentName" value="${esc(regData.parentName || '')}" placeholder="اسم ولي الأمر" dir="auto">
     </div>
     <div class="reg-field">
-      <label>رقم ولي الأمر</label>
-      <input id="regParentPhone" value="${regData.parentPhone || ''}" placeholder="05XX XX XX XX">
+      <label>رقم ولي الأمر <span style="color:var(--gold,#c8a84b)">*</span></label>
+      <input id="rParentPhone" value="${esc(regData.parentPhone || '')}" placeholder="05XX XX XX XX" dir="ltr">
     </div>
-    <button class="reg-btn" onclick="regNextStep()">التالي ←</button>
+    <div class="reg-nav-btns">
+      <button class="reg-btn" onclick="regNextStep()">التالي ←</button>
+    </div>
   `;
 }
 
-// ── Step 2: Student Type & Level ──
+// ── Step 2: Student type + Level ──
 function renderStep2() {
-  const levels = [
-    'التحضيري', 'السنة الأولى', 'السنة الثانية', 'السنة الثالثة',
-    'السنة الرابعة', 'السنة الخامسة', 'السنة الأولى متوسط',
-    'السنة الثانية متوسط', 'السنة الثالثة متوسط', 'السنة الرابعة متوسط',
-    'السنة الأولى ثانوي', 'السنة الثانية ثانوي',
-    'السنة الثالثة ثانوي (البكالوريا)'
-  ];
   const type = regData.studentType || '';
+  const selLevel = regData.level || '';
 
-  let html = `<div class="reg-step-title">🎓 نوع الطالب والمستوى</div>`;
+  let html = `<div class="reg-step-title">🎓 نوع الطالب والمستوى الدراسي</div>`;
 
-  html += `<div class="reg-field"><label>نوع الطالب</label>`;
+  html += `<div class="reg-field"><label>نوع الطالب <span style="color:var(--gold,#c8a84b)">*</span></label>`;
   html += `<div class="reg-radio-group">
-    <label class="reg-radio ${type === 'مدرسي' ? 'selected' : ''}">
-      <input type="radio" name="studentType" value="مدرسي" ${type === 'مدرسي' ? 'checked' : ''} onchange="regData.studentType=this.value"> طالب مدرسي
+    <label class="reg-radio ${type === 'مدرسي' ? 'selected' : ''}" onclick="pickStudentType('مدرسي',this)">
+      <input type="radio" name="rStdType" value="مدرسي" ${type === 'مدرسي' ? 'checked' : ''}> طالب مدرسي
     </label>
-    <label class="reg-radio ${type === 'حُر' ? 'selected' : ''}">
-      <input type="radio" name="studentType" value="حُر" ${type === 'حُر' ? 'checked' : ''} onchange="regData.studentType=this.value"> طالب حُر
+    <label class="reg-radio ${type === 'حُر' ? 'selected' : ''}" onclick="pickStudentType('حُر',this)">
+      <input type="radio" name="rStdType" value="حُر" ${type === 'حُر' ? 'checked' : ''}> طالب حُر
     </label>
   </div></div>`;
 
-  const selectedLevel = regData.level || '';
-  html += `<div class="reg-field"><label>المستوى الدراسي</label><div class="reg-levels-grid">`;
-  levels.forEach(l => {
-    const isBac = l === 'السنة الثالثة ثانوي (البكالوريا)';
-    const active = isBac ? '' : 'disabled';
-    const sel = l === selectedLevel ? 'selected' : '';
-    html += `<div class="reg-level-card ${active} ${sel}" onclick="${isBac ? "selectLevel(this,'" + l + "')" : ""}">
-      ${isBac ? '' : '🔒 '}${l}
+  html += `<div class="reg-field"><label>المستوى الدراسي <span style="color:var(--gold,#c8a84b)">*</span></label><div class="reg-levels-grid">`;
+  LEVELS.forEach(l => {
+    const active = l.disabled ? 'disabled' : '';
+    const sel = l.label === selLevel ? 'selected' : '';
+    html += `<div class="reg-level-card ${active} ${sel}" onclick="${l.disabled ? '' : "pickLevel('" + esc(l.label) + "',this)"}">
+      <div style="font-size:16px;margin-bottom:2px">${l.icon}</div>
+      ${l.label}
+      ${l.disabled ? '<div style="font-size:10px;opacity:0.5;margin-top:4px">غير متاح</div>' : ''}
     </div>`;
   });
   html += `</div></div>`;
@@ -185,38 +193,31 @@ function renderStep2() {
   return html;
 }
 
-function selectLevel(el, level) {
-  document.querySelectorAll('.reg-level-card.selected').forEach(c => c.classList.remove('selected'));
+function pickStudentType(val, el) {
+  document.querySelectorAll('.reg-radio.selected').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
-  regData.level = level;
+  el.querySelector('input').checked = true;
+  regData.studentType = val;
 }
 
-// ── Step 3: Stream & Subjects ──
+function pickLevel(label, el) {
+  document.querySelectorAll('.reg-level-card.selected').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  regData.level = label;
+}
+
+// ── Step 3: Stream ──
 function renderStep3() {
-  const streamNames = Object.keys(STREAMS);
-  const selected = regData.stream || '';
+  const names = Object.keys(STREAMS);
+  const sel = regData.stream || '';
 
-  let html = `<div class="reg-step-title">📚 الشعبة والمواد</div>`;
-
-  html += `<div class="reg-field"><label>اختر شعبتك</label><div class="reg-streams-grid">`;
-  streamNames.forEach(s => {
-    const sel = s === selected ? 'selected' : '';
-    html += `<div class="reg-stream-card ${sel}" onclick="selectStream(this,'${s}')">${s}</div>`;
+  let html = `<div class="reg-step-title">📚 اختر الشعبة</div>`;
+  html += `<div class="reg-field"><label>الشعب المتاحة <span style="color:var(--gold,#c8a84b)">*</span></label><div class="reg-streams-grid">`;
+  names.forEach(s => {
+    const c = s === sel ? 'selected' : '';
+    html += `<div class="reg-stream-card ${c}" onclick="pickStream('${esc(s)}',this)">${s}</div>`;
   });
   html += `</div></div>`;
-
-  if (regData.stream && STREAMS[regData.stream]) {
-    html += `<div class="reg-field"><label>المواد والأساتذة</label><div class="reg-subjects-list">`;
-    STREAMS[regData.stream].forEach((item, i) => {
-      const checked = regData.selectedSubjects ? regData.selectedSubjects.includes(i) : true;
-      html += `<label class="reg-subj-item">
-        <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleSubject(${i},this.checked)">
-        <span class="reg-subj-name">${item.subject}</span>
-        <span class="reg-teacher-name">🎓 ${item.teacher}</span>
-      </label>`;
-    });
-    html += `</div></div>`;
-  }
 
   html += `<div class="reg-nav-btns">
     <button class="reg-btn reg-btn-secondary" onclick="regPrevStep()">→ السابق</button>
@@ -225,76 +226,120 @@ function renderStep3() {
   return html;
 }
 
-function selectStream(el, stream) {
+function pickStream(val, el) {
   document.querySelectorAll('.reg-stream-card.selected').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
-  regData.stream = stream;
-  regData.selectedSubjects = [];
+  regData.stream = val;
+}
+
+// ── Step 4: Subjects ──
+function renderStep4() {
+  const items = STREAMS[regData.stream] || [];
+  if (!regData.selectedSubjects) regData.selectedSubjects = [];
+
+  let html = `<div class="reg-step-title">📖 اختر المواد والأساتذة</div>`;
+  html += `<div style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:10px">الشعبة: <strong style="color:var(--gold,#c8a84b)">${esc(regData.stream)}</strong></div>`;
+
+  if (items.length === 0) {
+    html += `<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.4)">لا توجد مواد متاحة لهذه الشعبة</div>`;
+  } else {
+    html += `<div class="reg-subjects-list">`;
+    items.forEach((item, i) => {
+      const checked = regData.selectedSubjects.includes(i);
+      html += `<label class="reg-subj-item ${checked ? 'checked' : ''}" onclick="toggleSubject(${i})">
+        <input type="checkbox" ${checked ? 'checked' : ''}>
+        <span class="reg-subj-name">${esc(item.subject)}</span>
+        <span class="reg-teacher-name">🎓 ${esc(item.teacher)}</span>
+      </label>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `<div class="reg-nav-btns">
+    <button class="reg-btn reg-btn-secondary" onclick="regPrevStep()">→ السابق</button>
+    <button class="reg-btn" onclick="regNextStep()">إتمام التسجيل ←</button>
+  </div>`;
+  return html;
+}
+
+function toggleSubject(idx) {
+  if (!regData.selectedSubjects) regData.selectedSubjects = [];
+  const pos = regData.selectedSubjects.indexOf(idx);
+  if (pos === -1) regData.selectedSubjects.push(idx);
+  else regData.selectedSubjects.splice(pos, 1);
   renderRegStep();
 }
 
-function toggleSubject(idx, checked) {
-  if (!regData.selectedSubjects) regData.selectedSubjects = [];
-  if (checked) {
-    if (!regData.selectedSubjects.includes(idx)) regData.selectedSubjects.push(idx);
-  } else {
-    regData.selectedSubjects = regData.selectedSubjects.filter(i => i !== idx);
-  }
-}
-
-// ── Step 4: Terms ──
-function renderStep4() {
+// ── Step 5: Terms ──
+function renderStep5() {
   let html = `<div class="reg-step-title">⚖️ القوانين والشروط</div>`;
+  html += `<div style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:12px">يرجى قراءة القوانين التالية والموافقة عليها جميعاً لإتمام التسجيل</div>`;
   html += `<div class="reg-terms-list">`;
   TERMS.forEach((t, i) => {
     html += `<label class="reg-term-item">
-      <input type="checkbox" onchange="checkTerms()" class="reg-term-cb">
-      <span>${t}</span>
+      <input type="checkbox" class="reg-term-cb" data-idx="${i}" onchange="checkTerms()">
+      <span>${esc(t)}</span>
     </label>`;
   });
   html += `</div>`;
+  html += `<div style="font-size:12px;color:rgba(255,255,255,0.4);margin:8px 0;padding:8px;background:rgba(200,168,75,0.08);border-radius:8px;text-align:center">
+    ⚠️ بالموافقة على هذه القوانين، أتحمل المسؤولية الكاملة عن صحة المعلومات المقدمة وألتزم بجميع الشروط المذكورة أعلاه.
+  </div>`;
   html += `<div class="reg-nav-btns">
     <button class="reg-btn reg-btn-secondary" onclick="regPrevStep()">→ السابق</button>
-    <button class="reg-btn" id="regConfirmBtn" onclick="confirmRegistration()" disabled>✅ تأكيد التسجيل</button>
+    <button class="reg-btn" id="rConfirmBtn" onclick="confirmRegistration()" disabled>✅ تأكيد التسجيل الأولي</button>
   </div>`;
   return html;
 }
 
 function checkTerms() {
-  const allChecked = document.querySelectorAll('.reg-term-cb:checked').length === TERMS.length;
-  document.getElementById('regConfirmBtn').disabled = !allChecked;
+  const all = document.querySelectorAll('.reg-term-cb');
+  const checked = document.querySelectorAll('.reg-term-cb:checked');
+  document.getElementById('rConfirmBtn').disabled = checked.length !== all.length;
 }
 
-// ── Step 5: Success ──
-function renderStep5() {
+// ── Step 6: Success ──
+function renderStep6() {
   const id = regData.generatedId || '';
   return `
     <div class="reg-success">
       <div class="reg-success-icon">🎉</div>
-      <div class="reg-success-title">تم تأكيد تسجيلك الأولي بنجاح!</div>
+      <div class="reg-success-title">✅ تم تأكيد تسجيلك الأولي بنجاح!</div>
+      <div class="reg-success-msg" style="font-size:15px;font-weight:600;color:rgba(255,255,255,0.8)">
+        رقم التلميذ الخاص بك هو:
+      </div>
       <div class="reg-success-id">
-        <div>رقم التلميذ الخاص بك:</div>
-        <div class="reg-id-badge">${id}</div>
+        <div class="reg-id-badge" style="direction:ltr;font-size:24px">${id}</div>
       </div>
-      <div class="reg-success-msg">
-        📌 يجب حفظ هذا الرقم جيداً، ستحتاجه لتأكيد تسجيلك النهائي.<br><br>
-        🏫 تفضل بزيارة المركز التعليمي لتأكيد تسجيلك النهائي ودفع حقوق التسجيل المقدرة بـ <strong>500 دج</strong>.
+      <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:12px;padding:14px;margin:14px 0;text-align:right">
+        <div style="font-size:14px;line-height:1.8;color:rgba(255,255,255,0.75)">
+          🆔 <strong>هذا الرقم سيرافقك طوال مدة تسجيلك في المركز التعليمي</strong>، احتفظ به جيداً ولا تشاركه مع أي شخص.<br><br>
+          🏫 <strong>لإتمام تسجيلك النهائي:</strong><br>
+          • تفضل بزيارة المركز التعليمي شخصياً.<br>
+          • أحضر معك رقم التسجيل الخاص بك.<br>
+          • قم بدفع حقوق التسجيل المقدرة بـ <strong style="color:var(--gold,#c8a84b)">500 دج</strong>.<br><br>
+          ✨ نتمنى لك مسيرة تعليمية موفقة ومليئة بالنجاح والتفوق! 🌟
+        </div>
       </div>
-      <button class="reg-btn" onclick="closeSupportReg()">تم</button>
+      <button class="reg-btn" onclick="closeSupportReg()" style="margin-top:8px">تم</button>
     </div>
   `;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
 // ── Navigation ──
 function regNextStep() {
   if (regStep === 1) {
-    regData.firstName = document.getElementById('regFirstName')?.value?.trim();
-    regData.lastName = document.getElementById('regLastName')?.value?.trim();
-    regData.birthDate = document.getElementById('regBirthDate')?.value;
-    regData.parentName = document.getElementById('regParentName')?.value?.trim();
-    regData.parentPhone = document.getElementById('regParentPhone')?.value?.trim();
+    regData.firstName = document.getElementById('rFirstName')?.value?.trim();
+    regData.lastName = document.getElementById('rLastName')?.value?.trim();
+    regData.birthDate = document.getElementById('rBirthDate')?.value;
+    regData.parentName = document.getElementById('rParentName')?.value?.trim();
+    regData.parentPhone = document.getElementById('rParentPhone')?.value?.trim();
     if (!regData.firstName || !regData.lastName || !regData.birthDate || !regData.parentName || !regData.parentPhone) {
-      alert('الرجاء ملء جميع الحقول');
+      alert('الرجاء ملء جميع الحقول الإلزامية');
       return;
     }
   }
@@ -304,7 +349,13 @@ function regNextStep() {
   }
   if (regStep === 3) {
     if (!regData.stream) { alert('الرجاء اختيار الشعبة'); return; }
-    if (!regData.selectedSubjects || regData.selectedSubjects.length === 0) { alert('الرجاء اختيار مادة واحدة على الأقل'); return; }
+  }
+  if (regStep === 4) {
+    if (!regData.selectedSubjects || regData.selectedSubjects.length === 0) {
+      alert('الرجاء اختيار مادة واحدة على الأقل');
+      return;
+    }
+    if (!regData.stream || !STREAMS[regData.stream]) { alert('الرجاء اختيار الشعبة أولاً'); return; }
   }
   regStep++;
   renderRegStep();
@@ -318,15 +369,16 @@ function regPrevStep() {
 // ── Submit to Supabase ──
 async function confirmRegistration() {
   const spinner = document.getElementById('reg-spinner');
-  const btn = document.getElementById('regConfirmBtn');
+  const btn = document.getElementById('rConfirmBtn');
   if (spinner) spinner.style.display = 'flex';
   if (btn) btn.disabled = true;
 
   try {
     const selectedSubjects = (regData.selectedSubjects || []).map(i => STREAMS[regData.stream][i]);
 
-    const id = 'EP-' + new Date().getFullYear() + '-' +
-      String(Math.floor(Math.random() * 90000) + 10000);
+    const year = new Date().getFullYear();
+    const rand = String(Math.floor(Math.random() * 90000) + 10000);
+    const id = 'EP-' + year + '-' + rand;
 
     const payload = {
       id,
@@ -361,7 +413,7 @@ async function confirmRegistration() {
     }
 
     regData.generatedId = id;
-    regStep = 5;
+    regStep = 6;
     renderRegStep();
   } catch (e) {
     alert('حدث خطأ أثناء التسجيل: ' + e.message);
@@ -381,8 +433,7 @@ async function loadRegistrations() {
       },
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    return data;
+    return await res.json();
   } catch (e) {
     console.error('Failed to load registrations:', e);
     return [];
