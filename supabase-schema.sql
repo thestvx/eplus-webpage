@@ -104,5 +104,7 @@ CREATE INDEX IF NOT EXISTS idx_registrations_status ON registrations(status);
 
 -- Allow anon key to insert registrations from the public page
 ALTER TABLE registrations ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "anon_insert_registrations" ON registrations FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "anon_select_registrations" ON registrations FOR SELECT TO anon USING (true);
+DROP POLICY IF EXISTS "anon_insert_registrations" ON registrations;
+CREATE POLICY "anon_insert_registrations" ON registrations FOR INSERT TO anon WITH CHECK (true);
+DROP POLICY IF EXISTS "anon_select_registrations" ON registrations;
+CREATE POLICY "anon_select_registrations" ON registrations FOR SELECT TO anon USING (true);
