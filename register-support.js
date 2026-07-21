@@ -92,12 +92,16 @@ let regData = {};
 async function openSupportReg() {
   regStep = 1;
   regData = {};
-  document.getElementById('reg-support-modal').classList.add('open');
+  const modal = document.getElementById('reg-support-modal');
+  modal.style.display = 'flex';
+  modal.classList.add('active');
   renderRegStep();
 }
 
 function closeSupportReg() {
-  document.getElementById('reg-support-modal').classList.remove('open');
+  const modal = document.getElementById('reg-support-modal');
+  modal.classList.remove('active');
+  modal.style.display = 'none';
 }
 
 function renderRegStep() {
