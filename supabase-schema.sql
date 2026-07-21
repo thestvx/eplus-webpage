@@ -84,11 +84,12 @@ CREATE TABLE IF NOT EXISTS registrations (
   parent_name TEXT DEFAULT '',
   parent_phone TEXT DEFAULT '',
   student_type TEXT DEFAULT '', -- 'مدرسي' or 'حُر'
-  level TEXT DEFAULT '', -- 'ثالثة ثانوي (البكالوريا)'
+  level TEXT DEFAULT '', -- full level name
+  institution TEXT DEFAULT '', -- المؤسسة التعليمية
   stream TEXT DEFAULT '', -- 'علوم تجريبية', 'رياضيات', 'تسيير واقتصاد', 'تقني رياضي', 'آداب ولغات'
   subjects JSONB DEFAULT '[]',
   terms_accepted BOOLEAN DEFAULT FALSE,
-  status TEXT DEFAULT 'pending', -- 'pending', 'confirmed', 'paid'
+  status TEXT DEFAULT 'مسجل مبدئياً', -- 'مسجل مبدئياً' or 'مسجل نهائياً'
   fee_amount INTEGER DEFAULT 500,
   created_at TIMESTAMPTZ DEFAULT now()
 );

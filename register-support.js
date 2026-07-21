@@ -1,6 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-//  تسجيل الدعم المدرسي — Support Registration
-//  يستخدم نفس مكون استمارة التسجيل تماماً، مع تغيير الحقول فقط
+//  تسجيل الدعم المدرسي — نموذج صفحة واحدة
 // ═══════════════════════════════════════════════════════════
 
 const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
@@ -63,6 +62,21 @@ const SUPPORT_STREAMS = {
   ],
 };
 
+const SUPPORT_LEVELS = [
+  { label: 'السنة الأولى ابتدائي', disabled: true, icon: '🔒', group: 'المرحلة الابتدائية' },
+  { label: 'السنة الثانية ابتدائي', disabled: true, icon: '🔒', group: 'المرحلة الابتدائية' },
+  { label: 'السنة الثالثة ابتدائي', disabled: true, icon: '🔒', group: 'المرحلة الابتدائية' },
+  { label: 'السنة الرابعة ابتدائي', disabled: true, icon: '🔒', group: 'المرحلة الابتدائية' },
+  { label: 'السنة الخامسة ابتدائي', disabled: true, icon: '🔒', group: 'المرحلة الابتدائية' },
+  { label: 'السنة الأولى متوسط', disabled: true, icon: '🔒', group: 'المرحلة المتوسطة' },
+  { label: 'السنة الثانية متوسط', disabled: true, icon: '🔒', group: 'المرحلة المتوسطة' },
+  { label: 'السنة الثالثة متوسط', disabled: true, icon: '🔒', group: 'المرحلة المتوسطة' },
+  { label: 'السنة الرابعة متوسط', disabled: true, icon: '🔒', group: 'المرحلة المتوسطة' },
+  { label: 'السنة الأولى ثانوي', disabled: true, icon: '🔒', group: 'المرحلة الثانوية' },
+  { label: 'السنة الثانية ثانوي', disabled: true, icon: '🔒', group: 'المرحلة الثانوية' },
+  { label: 'السنة الثالثة ثانوي (بكالوريا)', disabled: false, icon: '📖', group: 'المرحلة الثانوية' },
+];
+
 const SUPPORT_TERMS = [
   'يلتزم الطالب بحضور جميع الحصص في المواعيد المحددة.',
   'التأخر عن الحصة بأكثر من 10 دقائق يعتبر غياباً.',
@@ -81,23 +95,23 @@ const SUPPORT_TERMS = [
   'أتحمل المسؤولية الكاملة عن صحة المعلومات المقدمة.',
 ];
 
-let supportStep = 1;
-const supportData = { selectedSubjects: [] };
+let supportSelectedSubjects = [];
 
 function byId(id) { return document.getElementById(id); }
 
 // ── Open / Close ──
 function openSupportReg() {
-  supportStep = 1;
-  Object.keys(supportData).forEach(k => {
-    if (Array.isArray(supportData[k])) supportData[k] = [];
-    else supportData[k] = undefined;
-  });
-  supportData.selectedSubjects = [];
+  supportSelectedSubjects = [];
+  const form = byId('support-reg-form');
+  if (form) form.reset();
+  // Hide conditional sections
+  byId('s-stream-group').style.display = 'none';
+  byId('s-subjects-group').style.display = 'none';
+  byId('s-institution-group').style.display = 'none';
+  renderSupportLevels();
+  renderSupportTerms();
   const modal = byId('support-reg-modal');
   if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
-  renderSupportStreams();
-  supportRenderStep();
 }
 
 function closeSupportReg() {
@@ -109,26 +123,61 @@ function closeSupportRegOutside(e) {
   if (e.target === byId('support-reg-modal')) closeSupportReg();
 }
 
-// ── Render dynamic content ──
+// ── Render Levels ──
+function renderSupportLevels() {
+  const container = byId('s-levels-container');
+  if (!container) return;
+  let html = '';
+  let currentGroup = '';
+  SUPPORT_LEVELS.forEach(l => {
+    if (l.group !== currentGroup) {
+      currentGroup = l.group;
+      html += `<div style="width:100%;font-size:12px;font-weight:700;color:var(--gold,#c8a84b);padding:6px 0 2px;border-top:1px solid rgba(255,255,255,0.06);margin-top:4px;">${l.group}</div>`;
+    }
+    html += `<label class="check-option">
+      <input type="radio" name="sLevel" value="${l.label}" ${l.disabled ? 'disabled' : ''} onchange="${l.disabled ? '' : "supportOnLevelChange(this.value)"}" />
+      <span class="check-box"></span>
+      <span class="check-label">${l.icon} ${l.label}${l.disabled ? ' — غير متاح' : ''}</span>
+    </label>`;
+  });
+  container.innerHTML = html;
+}
+
+function supportOnLevelChange(val) {
+  const isBac = val === 'السنة الثالثة ثانوي (بكالوريا)';
+  byId('s-stream-group').style.display = isBac ? 'block' : 'none';
+  byId('s-institution-group').style.display = isBac ? 'block' : 'none';
+  byId('s-subjects-group').style.display = 'none';
+  if (isBac) renderSupportStreams();
+}
+
+// ── Render Streams ──
 function renderSupportStreams() {
   const container = byId('s-streams-container');
   if (!container) return;
   container.innerHTML = Object.keys(SUPPORT_STREAMS).map(s =>
     `<label class="check-option">
-      <input type="radio" name="sStream" value="${s}" onchange="supportData.stream='${s}'" />
+      <input type="radio" name="sStream" value="${s}" onchange="supportOnStreamChange('${s}')" />
       <span class="check-box"></span>
       <span class="check-label">${s}</span>
     </label>`
   ).join('');
 }
 
-function renderSupportSubjects() {
+function supportOnStreamChange(stream) {
+  supportSelectedSubjects = [];
+  renderSupportSubjects(stream);
+  byId('s-subjects-group').style.display = 'block';
+}
+
+// ── Render Subjects ──
+function renderSupportSubjects(stream) {
   const container = byId('s-subjects-container');
-  if (!container || !supportData.stream) return;
-  const items = SUPPORT_STREAMS[supportData.stream] || [];
+  if (!container) return;
+  const items = SUPPORT_STREAMS[stream] || [];
   container.innerHTML = items.map((item, i) =>
     `<label class="check-option">
-      <input type="checkbox" value="${i}" ${supportData.selectedSubjects.includes(i) ? 'checked' : ''} onchange="supportToggleSubject(${i},this.checked)" />
+      <input type="checkbox" value="${i}" ${supportSelectedSubjects.includes(i) ? 'checked' : ''} onchange="supportToggleSubject(${i},this.checked)" />
       <span class="check-box"></span>
       <span class="check-label">${item.subject} — 🎓 ${item.teacher}</span>
     </label>`
@@ -137,116 +186,81 @@ function renderSupportSubjects() {
 
 function supportToggleSubject(idx, checked) {
   if (checked) {
-    if (!supportData.selectedSubjects.includes(idx)) supportData.selectedSubjects.push(idx);
+    if (!supportSelectedSubjects.includes(idx)) supportSelectedSubjects.push(idx);
   } else {
-    supportData.selectedSubjects = supportData.selectedSubjects.filter(i => i !== idx);
+    supportSelectedSubjects = supportSelectedSubjects.filter(i => i !== idx);
   }
 }
 
+// ── Render Terms ──
 function renderSupportTerms() {
   const container = byId('s-terms-container');
   if (!container) return;
-  container.innerHTML = SUPPORT_TERMS.map((t, i) =>
+  container.innerHTML = SUPPORT_TERMS.map(t =>
     `<label class="check-option">
-      <input type="checkbox" class="s-term-cb" onchange="supportCheckTerms()" />
+      <input type="checkbox" class="s-term-cb" />
       <span class="check-box"></span>
       <span class="check-label">${t}</span>
     </label>`
   ).join('');
 }
 
-function supportCheckTerms() {
-  const all = document.querySelectorAll('#s-terms-container .s-term-cb');
-  const checked = document.querySelectorAll('#s-terms-container .s-term-cb:checked');
-  byId('s-btn-confirm').disabled = checked.length !== all.length;
-}
-
-// ── Step rendering ──
-function supportRenderStep() {
-  for (let i = 1; i <= 5; i++) {
-    const el = byId('support-step-' + i);
-    if (el) el.style.display = i === supportStep ? 'block' : 'none';
-  }
-
-  // Dynamic content per step
-  if (supportStep === 4) renderSupportSubjects();
-  if (supportStep === 5) { renderSupportTerms(); supportCheckTerms(); }
-
-  // Buttons
-  byId('s-btn-prev').style.display = supportStep > 1 ? 'block' : 'none';
-  const nextBtn = byId('s-btn-next');
-  const confirmBtn = byId('s-btn-confirm');
-  if (nextBtn) {
-    nextBtn.style.display = supportStep < 5 ? 'block' : 'none';
-    nextBtn.textContent = supportStep === 4 ? 'إتمام التسجيل ←' : 'التالي ←';
-  }
-  if (confirmBtn) confirmBtn.style.display = supportStep === 5 ? 'block' : 'none';
-}
-
-// ── Navigation ──
-function supportNextStep() {
-  if (supportStep === 1) {
-    const fn = byId('sFirstName')?.value?.trim();
-    const ln = byId('sLastName')?.value?.trim();
-    const bd = byId('sBirthDate')?.value;
-    const pn = byId('sParentName')?.value?.trim();
-    const pp = byId('sParentPhone')?.value?.trim();
-    if (!fn || !ln || !bd || !pn || !pp) {
-      alert('الرجاء ملء جميع الحقول الإلزامية');
-      return;
-    }
-    supportData.firstName = fn;
-    supportData.lastName = ln;
-    supportData.birthDate = bd;
-    supportData.parentName = pn;
-    supportData.parentPhone = pp;
-  }
-  if (supportStep === 2) {
-    if (!supportData.studentType) { alert('الرجاء اختيار نوع الطالب'); return; }
-    if (!supportData.level) { alert('الرجاء اختيار المستوى الدراسي'); return; }
-  }
-  if (supportStep === 3) {
-    const checked = document.querySelector('input[name="sStream"]:checked');
-    if (!checked) { alert('الرجاء اختيار الشعبة'); return; }
-    supportData.stream = checked.value;
-  }
-  if (supportStep === 4) {
-    if (!supportData.selectedSubjects || supportData.selectedSubjects.length === 0) {
-      alert('الرجاء اختيار مادة واحدة على الأقل');
-      return;
-    }
-  }
-  if (supportStep < 5) { supportStep++; supportRenderStep(); }
-}
-
-function supportPrevStep() {
-  if (supportStep > 1) { supportStep--; supportRenderStep(); }
-}
-
 // ── Submit ──
-async function supportConfirm() {
-  const btn = byId('s-btn-confirm');
+async function supportSubmit(e) {
+  e.preventDefault();
+  const btn = byId('s-submit-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'جاري التسجيل...'; }
 
   try {
-    const selectedSubjects = (supportData.selectedSubjects || []).map(i => SUPPORT_STREAMS[supportData.stream][i]);
+    // Validate
+    const firstName = byId('sFirstName')?.value?.trim();
+    const lastName = byId('sLastName')?.value?.trim();
+    const birthDate = byId('sBirthDate')?.value;
+    const phone = byId('sPhone')?.value?.trim();
+    const parentName = byId('sParentName')?.value?.trim();
+    const parentPhone = byId('sParentPhone')?.value?.trim();
+    const studentType = document.querySelector('input[name="sStdType"]:checked');
+    const level = document.querySelector('input[name="sLevel"]:checked');
+
+    if (!firstName || !lastName || !birthDate || !phone || !parentName || !parentPhone) {
+      throw new Error('الرجاء ملء جميع الحقول الإلزامية');
+    }
+    if (!studentType) throw new Error('الرجاء اختيار نوع الطالب');
+    if (!level) throw new Error('الرجاء اختيار المستوى الدراسي');
+
+    const levelVal = level.value;
+    const isBac = levelVal === 'السنة الثالثة ثانوي (بكالوريا)';
+    const institution = isBac ? (byId('sInstitution')?.value?.trim() || '') : '';
+    const stream = isBac ? document.querySelector('input[name="sStream"]:checked') : null;
+
+    if (isBac && !institution) throw new Error('الرجاء إدخال اسم المؤسسة التعليمية');
+    if (isBac && !stream) throw new Error('الرجاء اختيار الشعبة');
+    if (isBac && supportSelectedSubjects.length === 0) throw new Error('الرجاء اختيار مادة واحدة على الأقل');
+
+    // Check terms
+    const termCBs = document.querySelectorAll('#s-terms-container .s-term-cb');
+    const termChecked = document.querySelectorAll('#s-terms-container .s-term-cb:checked');
+    if (termChecked.length !== termCBs.length) throw new Error('الرجاء الموافقة على جميع القوانين والشروط');
+
+    const selectedSubjects = isBac ? supportSelectedSubjects.map(i => SUPPORT_STREAMS[stream.value][i]) : [];
     const year = new Date().getFullYear();
     const rand = String(Math.floor(Math.random() * 90000) + 10000);
     const id = 'EP-' + year + '-' + rand;
 
     const payload = {
       id,
-      first_name: supportData.firstName,
-      last_name: supportData.lastName,
-      birth_date: supportData.birthDate,
-      parent_name: supportData.parentName,
-      parent_phone: supportData.parentPhone,
-      student_type: supportData.studentType,
-      level: supportData.level,
-      stream: supportData.stream,
+      first_name: firstName,
+      last_name: lastName,
+      birth_date: birthDate,
+      parent_name: parentName,
+      parent_phone: parentPhone,
+      student_type: studentType.value,
+      level: levelVal,
+      institution,
+      stream: isBac ? stream.value : '',
       subjects: selectedSubjects,
       terms_accepted: true,
-      status: 'pending',
+      status: 'مسجل مبدئياً',
       fee_amount: 500,
     };
 
@@ -266,7 +280,7 @@ async function supportConfirm() {
       throw new Error(txt.slice(0, 200));
     }
 
-    // Show success
+    // Success
     const formView = byId('support-form-view');
     const successView = byId('support-success-view');
     if (formView) formView.style.display = 'none';
@@ -285,24 +299,24 @@ async function supportConfirm() {
             <div style="font-size:24px;font-weight:900;color:var(--gold,#c8a84b);letter-spacing:1px;direction:ltr;">${id}</div>
           </div>
           <div style="font-size:12px;line-height:1.7;color:var(--text-muted);margin:14px 0;text-align:right;">
-            🆔 <strong>هذا الرقم سيرافقك طوال مدة تسجيلك</strong> في المركز التعليمي، احتفظ به جيداً ولا تشاركه مع أي شخص.<br><br>
+            🆔 <strong>هذا الرقم سيرافقك طوال مدة تسجيلك</strong> في المركز التعليمي، احتفظ به جيداً.<br><br>
             🏫 <strong>لإتمام تسجيلك النهائي:</strong><br>
             • تفضل بزيارة المركز التعليمي شخصياً.<br>
             • أحضر معك رقم التسجيل الخاص بك.<br>
             • قم بدفع حقوق التسجيل المقدرة بـ <strong style="color:var(--gold,#c8a84b);">500 دج</strong>.<br><br>
-            ✨ نتمنى لك مسيرة تعليمية موفقة ومليئة بالنجاح والتفوق! 🌟
+            ✨ نتمنى لك مسيرة تعليمية موفقة! 🌟
           </div>
           <button class="ep-btn-primary submit-btn" onclick="closeSupportReg()" style="margin-top:8px;">تم</button>
         </div>
       `;
     }
   } catch (e) {
-    alert('حدث خطأ أثناء التسجيل: ' + e.message);
-    if (btn) { btn.disabled = false; btn.textContent = 'تأكيد التسجيل ✦'; }
+    alert(e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'إتمام التسجيل ✦'; }
   }
 }
 
-// ── Admin: Load registrations ──
+// ── Admin: Load / Confirm ──
 async function loadRegistrations() {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations?select=*&order=created_at.desc`, {
@@ -316,5 +330,62 @@ async function loadRegistrations() {
   } catch (e) {
     console.error('Failed to load registrations:', e);
     return [];
+  }
+}
+
+async function confirmRegistration(id) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({ status: 'مسجل نهائياً' }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return true;
+  } catch (e) {
+    console.error('Failed to confirm registration:', e);
+    return false;
+  }
+}
+
+async function deleteRegistration(id) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return true;
+  } catch (e) {
+    console.error('Failed to delete registration:', e);
+    return false;
+  }
+}
+
+async function updateRegistration(id, data) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return true;
+  } catch (e) {
+    console.error('Failed to update registration:', e);
+    return false;
   }
 }
