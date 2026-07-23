@@ -249,16 +249,21 @@ function renderSubjects() {
 
 function msToggle() {
   const dd = byId('msDropdown');
+  const arrow = document.querySelector('.ms-arrow');
   if (!dd) return;
-  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+  const open = dd.style.display === 'none' || !dd.style.display;
+  dd.style.display = open ? 'block' : 'none';
+  if (arrow) arrow.classList.toggle('open', open);
 }
 
 document.addEventListener('click', (e) => {
   const dd = byId('msDropdown');
   const trigger = byId('msTrigger');
+  const arrow = document.querySelector('.ms-arrow');
   if (!dd || !trigger) return;
   if (dd.style.display !== 'none' && !dd.contains(e.target) && !trigger.contains(e.target)) {
     dd.style.display = 'none';
+    if (arrow) arrow.classList.remove('open');
   }
 });
 
@@ -351,6 +356,26 @@ function onSubmitClick() {
   };
 
   openLawsModal();
+}
+
+// ── Open Laws Modal from Hero (without closing support reg) ──
+function openLawsFromHero() {
+  const lawsText = byId('laws-text');
+  if (lawsText) {
+    lawsText.innerHTML = SUPPORT_LAWS.map((l, i) =>
+      `<div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:13px;line-height:1.7;">
+        <strong style="color:var(--gold,#c8a84b);">${i + 1}.</strong> ${l}
+      </div>`
+    ).join('');
+  }
+  byId('laws-checkbox-area')&&(byId('laws-checkbox-area').style.display='none');
+  byId('lawsAgree')&&(byId('lawsAgree').checked=false);
+  byId('lawsConfirmBtn')&&(byId('lawsConfirmBtn').disabled=true);
+  const modal = byId('laws-modal');
+  if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
+  const area = byId('laws-scroll-area');
+  if (area) { area.scrollTop = 0; }
+  setTimeout(setupLawsScroll, 100);
 }
 
 // ── Laws Modal ──
