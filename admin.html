@@ -2799,6 +2799,7 @@
               <select class="inp" id="sr-filter-level" style="width:auto;min-width:140px;padding:8px 14px" onchange="srApplyFilters()">
                 <option value="">كل المستويات</option>
                 <option value="السنة الثالثة ثانوي (بكالوريا)">السنة الثالثة ثانوي (بكالوريا)</option>
+                <option value="السنة الرابعة متوسط">السنة الرابعة متوسط</option>
               </select>
               <select class="inp" id="sr-filter-stream" style="width:auto;min-width:140px;padding:8px 14px" onchange="srApplyFilters()">
                 <option value="">كل الشعب</option>
@@ -2823,6 +2824,13 @@
                 <option value="ثانوية هالي عبدالكريم بقمار">ثانوية هالي عبدالكريم بقمار</option>
                 <option value="متقنة عبدالقادر الياجوري بقمار">متقنة عبدالقادر الياجوري بقمار</option>
                 <option value="ثانوية العلامة أبو القاسم سعد الله بقمار">ثانوية العلامة أبو القاسم سعد الله بقمار</option>
+                <option value="متوسطة ابن رشد بقمار">متوسطة ابن رشد بقمار</option>
+                <option value="متوسطة عبد الرحمن ميرة بقمار">متوسطة عبد الرحمن ميرة بقمار</option>
+                <option value="متوسطة النصر بقمار">متوسطة النصر بقمار</option>
+                <option value="متوسطة الشهيد أحمد بن بوزيد بقمار">متوسطة الشهيد أحمد بن بوزيد بقمار</option>
+              </select>
+              <select class="inp" id="sr-filter-teacher" style="width:auto;min-width:160px;padding:8px 14px" onchange="srApplyFilters()">
+                <option value="">كل الأساتذة</option>
               </select>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -2841,20 +2849,16 @@
             <table class="tbl" id="sr-table">
               <thead>
                 <tr>
+                  <th style="width:36px">#</th>
+                  <th>الحالة</th>
                   <th onclick="srSort('id')" style="cursor:pointer">ID ↕</th>
                   <th onclick="srSort('last_name')" style="cursor:pointer">اللقب ↕</th>
                   <th onclick="srSort('first_name')" style="cursor:pointer">الاسم ↕</th>
-                  <th>تاريخ الميلاد</th>
-                  <th>اسم ولي الأمر</th>
                   <th>هاتف ولي الأمر</th>
-                  <th>نوع الطالب</th>
-                  <th>المستوى الدراسي</th>
-                  <th>المؤسسة التعليمية</th>
-                  <th>الشعبة</th>
-                  <th>المواد المطلوبة</th>
                   <th onclick="srSort('created_at')" style="cursor:pointer">تاريخ التسجيل ↕</th>
-                  <th>حالة الطلب</th>
-                  <th>إجراءات</th>
+                  <th>المستوى</th>
+                  <th>الشعبة</th>
+                  <th>المؤسسة</th>
                 </tr>
               </thead>
               <tbody id="sr-tbody"></tbody>
@@ -2869,13 +2873,51 @@
 
       <!-- ═══ SR Detail Modal ═══ -->
       <div class="teacher-modal-bg" id="sr-detail-modal">
-        <div class="teacher-modal" style="max-width:700px">
+        <div class="teacher-modal" style="max-width:750px">
           <div class="teacher-modal-header">
             <div class="panel-icon" style="background:rgba(79,70,229,0.1);border-color:rgba(79,70,229,0.2)">📋</div>
             <div class="teacher-modal-title">تفاصيل التسجيل</div>
             <button class="att-modal-close" onclick="document.getElementById('sr-detail-modal').classList.remove('open')">✕</button>
           </div>
           <div class="teacher-modal-body" id="sr-detail-body"></div>
+        </div>
+      </div>
+
+      <!-- ═══ SR Confirm Modal (Final Registration) ═══ -->
+      <div class="teacher-modal-bg" id="sr-confirm-modal">
+        <div class="teacher-modal" style="max-width:500px;text-align:center">
+          <div class="teacher-modal-header" style="justify-content:center;border:none">
+            <div style="font-size:48px;margin-bottom:8px">⚠️</div>
+          </div>
+          <div style="padding:0 24px 24px">
+            <div style="font-size:18px;font-weight:900;color:var(--text);margin-bottom:8px">تأكيد التسجيل النهائي</div>
+            <div style="font-size:13px;color:var(--text-muted);margin-bottom:6px">هل أنت متأكد من تأكيد تسجيل هذا الطالب نهائياً؟</div>
+            <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px">سيتم طباعة بطاقة التسجيل بعد التأكيد.</div>
+            <div style="background:var(--primary-light);border-radius:12px;padding:12px 16px;margin-bottom:20px">
+              <div style="font-size:13px;font-weight:700;color:var(--text)" id="sr-confirm-student-name"></div>
+              <div style="font-size:11px;color:var(--text-muted);font-family:monospace" id="sr-confirm-student-id"></div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:center">
+              <button class="btn-sm" onclick="document.getElementById('sr-confirm-modal').classList.remove('open')">❌ إلغاء</button>
+              <button class="btn-sm" id="sr-confirm-final-btn" style="background:linear-gradient(135deg,#059669,#10b981);color:white;border:none;padding:10px 28px;border-radius:10px;font-weight:800;cursor:pointer">✅ تأكيد وطباعة البطاقة</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ SR Student Card Modal ═══ -->
+      <div class="teacher-modal-bg" id="sr-card-modal">
+        <div class="teacher-modal" style="max-width:480px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.2)">🎓</div>
+            <div class="teacher-modal-title">بطاقة التسجيل</div>
+            <button class="att-modal-close" onclick="document.getElementById('sr-card-modal').classList.remove('open')">✕</button>
+          </div>
+          <div class="teacher-modal-body" id="sr-card-body" style="padding:0;display:flex;justify-content:center"></div>
+          <div style="padding:0 24px 20px;display:flex;gap:10px;justify-content:center">
+            <button class="btn-sm" onclick="document.getElementById('sr-card-modal').classList.remove('open')">إغلاق</button>
+            <button class="tbl-action" onclick="srPrintCard()" style="border-color:rgba(16,185,129,0.3);color:#059669;font-weight:800">🖨️ طباعة البطاقة</button>
+          </div>
         </div>
       </div>
 
@@ -21881,6 +21923,8 @@ let srPageSize = 20;
 let srSortField = null;
 let srSortDir = 'asc';
 let srDeleteTarget = null;
+let srConfirmTarget = null;
+let srCurrentCard = null;
 
 async function srFetch(url, options) {
   return fetch(url, {
@@ -21902,11 +21946,29 @@ async function srLoadData() {
     srFilteredData = [...srAllData];
     srCurrentPage = 1;
     document.getElementById('nav-badge-support').textContent = srAllData.length;
+    srPopulateTeacherFilter();
     srApplyFilters();
   } catch (e) {
     console.error('SR load error:', e);
-    document.getElementById('sr-tbody').innerHTML = '<tr><td colspan="14" style="text-align:center;padding:40px;color:var(--danger)">❌ فشل تحميل البيانات</td></tr>';
+    document.getElementById('sr-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--danger)">❌ فشل تحميل البيانات</td></tr>';
   }
+}
+
+function srPopulateTeacherFilter() {
+  const teacherSet = new Set();
+  srAllData.forEach(r => {
+    if (Array.isArray(r.subjects)) {
+      r.subjects.forEach(s => { if (s.teacher) teacherSet.add(s.teacher); });
+    }
+  });
+  const sel = document.getElementById('sr-filter-teacher');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">كل الأساتذة</option>';
+  [...teacherSet].sort().forEach(name => {
+    sel.innerHTML += `<option value="${name}">${name}</option>`;
+  });
+  sel.value = current;
 }
 
 function srGetValue(obj, field) {
@@ -21921,6 +21983,7 @@ function srApplyFilters() {
   const type = document.getElementById('sr-filter-type').value;
   const status = document.getElementById('sr-filter-status').value;
   const institution = document.getElementById('sr-filter-institution').value;
+  const teacherFilter = document.getElementById('sr-filter-teacher').value;
   const query = document.getElementById('sr-search').value.toLowerCase().trim();
 
   srFilteredData = srAllData.filter(r => {
@@ -21929,6 +21992,10 @@ function srApplyFilters() {
     if (type && r.student_type !== type) return false;
     if (status && r.status !== status) return false;
     if (institution && r.institution !== institution) return false;
+    if (teacherFilter) {
+      const hasTeacher = Array.isArray(r.subjects) && r.subjects.some(s => s.teacher === teacherFilter);
+      if (!hasTeacher) return false;
+    }
     if (query) {
       const searchable = [
         r.id, r.first_name, r.last_name, r.parent_name,
@@ -21980,41 +22047,30 @@ function srRenderTable() {
   const page = srFilteredData.slice(start, end);
 
   if (page.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:40px;color:var(--text-muted)">📭 لا توجد تسجيلات مطابقة</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted)">📭 لا توجد تسجيلات مطابقة</td></tr>';
     document.getElementById('sr-pagination-info').textContent = '';
     document.getElementById('sr-pagination-btns').innerHTML = '';
     return;
   }
 
-  tbody.innerHTML = page.map(r => {
-    const subjects = Array.isArray(r.subjects)
-      ? r.subjects.map(s => `${s.subject || ''} - ${s.teacher || ''}`).join('<br>')
-      : '';
+  tbody.innerHTML = page.map((r, idx) => {
+    const rowNum = start + idx + 1;
     const statusBadge = r.status === 'مسجل نهائياً'
-      ? '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;background:var(--success-soft);color:#059669;border:1px solid rgba(16,185,129,0.25);font-size:11px;font-weight:800">🟢 مسجل نهائياً</span>'
-      : '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;background:var(--accent-soft);color:#92400E;border:1px solid rgba(245,158,11,0.25);font-size:11px;font-weight:800">🟡 مسجل مبدئياً</span>';
-    const isInitial = r.status === 'مسجل مبدئياً';
+      ? '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:99px;background:rgba(16,185,129,0.1);color:#059669;border:1px solid rgba(16,185,129,0.25);font-size:11px;font-weight:800">🟢 مسجل نهائياً</span>'
+      : '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:99px;background:rgba(245,158,11,0.1);color:#92400E;border:1px solid rgba(245,158,11,0.25);font-size:11px;font-weight:800">🟡 مسجل مبدئياً</span>';
+    const streamText = r.stream || '<span style="color:var(--text-muted)">—</span>';
 
-    return `<tr>
-      <td style="font-family:monospace;font-weight:800;color:var(--primary)">${r.id}</td>
-      <td>${srGetValue(r, 'last_name')}</td>
-      <td>${srGetValue(r, 'first_name')}</td>
-      <td>${srGetValue(r, 'birth_date')}</td>
-      <td>${srGetValue(r, 'parent_name')}</td>
-      <td style="direction:ltr;text-align:right">${srGetValue(r, 'parent_phone')}</td>
-      <td>${r.student_type === 'حر' ? '🎓 حر' : '📘 متمدرس'}</td>
-      <td>${srGetValue(r, 'level')}</td>
-      <td>${srGetValue(r, 'institution')}</td>
-      <td>${srGetValue(r, 'stream')}</td>
-      <td style="font-size:11px;max-width:200px">${subjects}</td>
-      <td style="font-size:11px;white-space:nowrap">${srFormatDate(r.created_at)}</td>
+    return `<tr ondblclick="srShowDetail('${r.id}')" style="cursor:pointer" title="انقر مرتين لعرض التفاصيل">
+      <td style="font-size:11px;color:var(--text-muted);font-weight:700">${rowNum}</td>
       <td>${statusBadge}</td>
-      <td style="white-space:nowrap">
-        <button class="tbl-action view" onclick="srView('${r.id}')" style="font-size:10px">🔍</button>
-        <button class="tbl-action" onclick="srEdit('${r.id}')" style="font-size:10px">✏️</button>
-        ${isInitial ? `<button class="tbl-action" onclick="srConfirm('${r.id}')" style="font-size:10px;border-color:rgba(16,185,129,0.3);color:#059669">✅</button>` : ''}
-        <button class="tbl-action del" onclick="srDelete('${r.id}')" style="font-size:10px">🗑️</button>
-      </td>
+      <td style="font-family:monospace;font-weight:800;color:var(--primary)">${r.id}</td>
+      <td style="font-weight:700">${srGetValue(r, 'last_name')}</td>
+      <td style="font-weight:700">${srGetValue(r, 'first_name')}</td>
+      <td style="direction:ltr;text-align:right;font-family:monospace">${srGetValue(r, 'parent_phone')}</td>
+      <td style="font-size:12px;white-space:nowrap">${srFormatDate(r.created_at)}</td>
+      <td style="font-size:12px">${srGetValue(r, 'level')}</td>
+      <td style="font-size:12px">${streamText}</td>
+      <td style="font-size:12px">${srGetValue(r, 'institution')}</td>
     </tr>`;
   }).join('');
 
@@ -22043,36 +22099,176 @@ function srFormatDate(d) {
   catch(e) { return d; }
 }
 
-function srView(id) {
+function srFormatDateTime(d) {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleDateString('ar-DZ', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' }); }
+  catch(e) { return d; }
+}
+
+// ═══ DETAIL MODAL ═══
+function srShowDetail(id) {
   const r = srAllData.find(x => x.id === id);
   if (!r) return;
-  const subjects = Array.isArray(r.subjects)
-    ? r.subjects.map(s => `<div style="padding:4px 0;border-bottom:1px solid var(--border)">📚 ${s.subject || ''} — 🎓 ${s.teacher || ''}</div>`).join('')
-    : 'لا توجد مواد';
+  srCurrentCard = r;
+  const isInitial = r.status === 'مسجل مبدئياً';
   const statusColor = r.status === 'مسجل نهائياً' ? '#059669' : '#d97706';
+  const statusEmoji = r.status === 'مسجل نهائياً' ? '🟢' : '🟡';
+  const subjects = Array.isArray(r.subjects)
+    ? r.subjects.map(s => `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;background:var(--primary-light);font-size:12px"><span>📚 ${s.subject || ''}</span><span style="color:var(--text-muted)">—</span><span>🎓 ${s.teacher || ''}</span></div>`).join('')
+    : '<div style="color:var(--text-muted);font-size:12px">لا توجد مواد</div>';
+
+  let actionsHtml = '';
+  if (isInitial) {
+    actionsHtml += `<button class="tbl-action" onclick="srShowConfirm('${r.id}')" style="border-color:rgba(16,185,129,0.3);color:#059669;font-weight:800;padding:8px 20px;font-size:12px">✅ تأكيد التسجيل النهائي</button>`;
+  } else {
+    actionsHtml += `<button class="tbl-action" onclick="srReprintCard('${r.id}')" style="border-color:rgba(16,185,129,0.3);color:#059669;font-weight:800;padding:8px 20px;font-size:12px">🖨️ إعادة طباعة البطاقة</button>`;
+  }
+  actionsHtml += `<button class="tbl-action" onclick="srEdit('${r.id}')" style="padding:8px 20px;font-size:12px">✏️ تعديل</button>`;
+  actionsHtml += `<button class="tbl-action del" onclick="srDelete('${r.id}')" style="padding:8px 20px;font-size:12px">🗑️ حذف</button>`;
 
   document.getElementById('sr-detail-body').innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div><strong style="color:var(--text-muted);font-size:11px">رقم التسجيل</strong><div style="font-weight:800;font-family:monospace;color:var(--primary)">${r.id}</div></div>
-      <div><strong style="color:var(--text-muted);font-size:11px">الحالة</strong><div style="font-weight:800;color:${statusColor}">${r.status === 'مسجل نهائياً' ? '🟢 ' : '🟡 '}${r.status}</div></div>
-      <div><strong style="color:var(--text-muted);font-size:11px">الاسم</strong><div>${r.first_name} ${r.last_name}</div></div>
-      <div><strong style="color:var(--text-muted);font-size:11px">تاريخ الميلاد</strong><div>${r.birth_date || '—'}</div></div>
-      <div><strong style="color:var(--text-muted);font-size:11px">ولي الأمر</strong><div>${r.parent_name || '—'}</div></div>
-      <div><strong style="color:var(--text-muted);font-size:11px">هاتف ولي الأمر</strong><div style="direction:ltr">${r.parent_phone || '—'}</div></div>
-      <div><strong style="color:var(--text-muted);font-size:11px">نوع الطالب</strong><div>${r.student_type === 'حر' ? '🎓 حر' : '📘 متمدرس'}</div></div>
-      <div><strong style="color:var(--text-muted);font-size:11px">المستوى</strong><div>${r.level || '—'}</div></div>
-      <div><strong style="color:var(--text-muted);font-size:11px">المؤسسة</strong><div>${r.institution || '—'}</div></div>
-      <div><strong style="color:var(--text-muted);font-size:11px">الشعبة</strong><div>${r.stream || '—'}</div></div>
-      <div style="grid-column:1/-1"><strong style="color:var(--text-muted);font-size:11px">المواد المطلوبة</strong><div style="margin-top:6px">${subjects}</div></div>
-      <div><strong style="color:var(--text-muted);font-size:11px">تاريخ التسجيل</strong><div>${srFormatDate(r.created_at)}</div></div>
-      <div><strong style="color:var(--text-muted);font-size:11px">رسوم التسجيل</strong><div>${r.fee_amount || 500} دج</div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div style="background:var(--primary-light);border-radius:10px;padding:12px 14px">
+        <div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">رقم التسجيل</div>
+        <div style="font-weight:900;font-family:monospace;font-size:16px;color:var(--primary)">${r.id}</div>
+      </div>
+      <div style="background:var(--primary-light);border-radius:10px;padding:12px 14px">
+        <div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">الحالة</div>
+        <div style="font-weight:900;font-size:14px;color:${statusColor}">${statusEmoji} ${r.status}</div>
+      </div>
+      <div><strong style="color:var(--text-muted);font-size:11px">الاسم الكامل</strong><div style="font-weight:800;font-size:14px;margin-top:2px">${r.first_name || ''} ${r.last_name || ''}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">تاريخ الميلاد</strong><div style="font-weight:700;margin-top:2px">${r.birth_date || '—'}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">ولي الأمر</strong><div style="font-weight:700;margin-top:2px">${r.parent_name || '—'}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">هاتف ولي الأمر</strong><div style="direction:ltr;font-weight:700;font-family:monospace;margin-top:2px">${r.parent_phone || '—'}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">نوع الطالب</strong><div style="font-weight:700;margin-top:2px">${r.student_type === 'حر' ? '🎓 حر' : '📘 متمدرس'}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">المستوى الدراسي</strong><div style="font-weight:700;margin-top:2px">${r.level || '—'}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">المؤسسة التعليمية</strong><div style="font-weight:700;margin-top:2px">${r.institution || '—'}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">الشعبة</strong><div style="font-weight:700;margin-top:2px">${r.stream || '—'}</div></div>
+      <div style="grid-column:1/-1"><strong style="color:var(--text-muted);font-size:11px">المواد المطلوبة</strong><div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">${subjects}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">تاريخ التسجيل</strong><div style="font-weight:700;margin-top:2px">${srFormatDateTime(r.created_at)}</div></div>
+      <div><strong style="color:var(--text-muted);font-size:11px">رسوم التسجيل</strong><div style="font-weight:700;margin-top:2px">${r.fee_amount || 500} دج</div></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:16px">
+      ${actionsHtml}
     </div>`;
   document.getElementById('sr-detail-modal').classList.add('open');
 }
 
+// ═══ CONFIRM MODAL ═══
+function srShowConfirm(id) {
+  const r = srAllData.find(x => x.id === id);
+  if (!r) return;
+  srConfirmTarget = id;
+  document.getElementById('sr-confirm-student-name').textContent = `${r.first_name} ${r.last_name}`;
+  document.getElementById('sr-confirm-student-id').textContent = `ID: ${r.id}`;
+  document.getElementById('sr-confirm-final-btn').onclick = srDoConfirm;
+  document.getElementById('sr-confirm-modal').classList.add('open');
+}
+
+async function srDoConfirm() {
+  if (!srConfirmTarget) return;
+  const btn = document.getElementById('sr-confirm-final-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري التأكيد...';
+  try {
+    const res = await srFetch(`${SR_SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(srConfirmTarget)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'مسجل نهائياً' }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    document.getElementById('sr-confirm-modal').classList.remove('open');
+    srShowToast('✅ تم تأكيد التسجيل النهائي بنجاح', 'success');
+    srLoadData();
+    const r = srAllData.find(x => x.id === srConfirmTarget) || { id: srConfirmTarget, first_name: '', last_name: '' };
+    srShowCard(r);
+  } catch (e) {
+    srShowToast('فشل تأكيد التسجيل: ' + e.message, 'error');
+  }
+  btn.disabled = false;
+  btn.textContent = '✅ تأكيد وطباعة البطاقة';
+}
+
+// ═══ STUDENT CARD ═══
+function srBuildCardHTML(r) {
+  const today = new Date().toLocaleDateString('ar-DZ', { year:'numeric', month:'long', day:'numeric' });
+  const subjects = Array.isArray(r.subjects)
+    ? r.subjects.map(s => `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px dashed rgba(99,102,241,0.15)"><span style="font-size:10px;font-weight:700">${s.subject}</span><span style="font-size:9px;color:#6366f1;font-weight:600">${s.teacher}</span></div>`).join('')
+    : '';
+  const cardNum = r.id ? r.id.replace(/[^0-9]/g, '').slice(-4) || r.id.slice(-4) : '0000';
+
+  return `<div id="sr-printable-card" style="width:380px;background:white;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.12);font-family:'Tajawal',sans-serif;color:#1e293b;direction:rtl">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:16px 20px;text-align:center;position:relative">
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:4px">
+        <div style="width:40px;height:40px;background:rgba(255,255,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px">🎓</div>
+        <div>
+          <div style="font-size:16px;font-weight:900;color:white;letter-spacing:0.5px">E-PLUS</div>
+          <div style="font-size:9px;color:rgba(255,255,255,0.7);font-weight:600">برنامج الدعم المدرسي</div>
+        </div>
+      </div>
+      <div style="position:absolute;bottom:-1px;left:0;right:0;height:12px;background:white;border-radius:12px 12px 0 0"></div>
+    </div>
+    <!-- Body -->
+    <div style="padding:14px 20px 10px">
+      <!-- Student Name + ID -->
+      <div style="text-align:center;margin-bottom:12px">
+        <div style="font-size:17px;font-weight:900;color:#1e293b">${r.first_name || ''} ${r.last_name || ''}</div>
+        <div style="font-size:10px;color:#6366f1;font-weight:800;font-family:monospace;margin-top:2px">رقم التسجيل: ${r.id || ''}</div>
+      </div>
+      <!-- Info Grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:10px;margin-bottom:10px">
+        <div><span style="color:#94a3b8;font-weight:600">ولي الأمر:</span> <span style="font-weight:800">${r.parent_name || '—'}</span></div>
+        <div><span style="color:#94a3b8;font-weight:600">الهاتف:</span> <span style="font-weight:800;direction:ltr">${r.parent_phone || '—'}</span></div>
+        <div><span style="color:#94a3b8;font-weight:600">المستوى:</span> <span style="font-weight:800">${r.level || '—'}</span></div>
+        <div><span style="color:#94a3b8;font-weight:600">النوع:</span> <span style="font-weight:800">${r.student_type === 'حر' ? '🎓 حر' : '📘 متمدرس'}</span></div>
+      </div>
+      ${r.stream ? `<div style="background:#f0f0ff;border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:11px;font-weight:800;color:#6366f1;text-align:center">الشعبة: ${r.stream}</div>` : ''}
+      ${r.institution ? `<div style="font-size:10px;color:#64748b;margin-bottom:8px;text-align:center">🏫 ${r.institution}</div>` : ''}
+      ${subjects ? `<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:800;color:#475569;margin-bottom:4px">المواد:</div>${subjects}</div>` : ''}
+    </div>
+    <!-- Footer -->
+    <div style="background:#f8fafc;padding:10px 20px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e2e8f0">
+      <div style="font-size:9px;color:#94a3b8">📅 ${today}</div>
+      <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:900">بطاقة #${cardNum}</div>
+    </div>
+  </div>`;
+}
+
+function srShowCard(r) {
+  if (!r) return;
+  srCurrentCard = r;
+  const html = srBuildCardHTML(r);
+  document.getElementById('sr-card-body').innerHTML = `<div style="padding:20px;display:flex;justify-content:center">${html}</div>`;
+  document.getElementById('sr-card-modal').classList.add('open');
+}
+
+function srPrintCard() {
+  const cardEl = document.getElementById('sr-printable-card');
+  if (!cardEl) return;
+  const cardHTML = cardEl.outerHTML;
+  const win = window.open('', '_blank', 'width=420,height=600');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>بطاقة التسجيل - ${srCurrentCard?.first_name || ''} ${srCurrentCard?.last_name || ''}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+      @media print { @page { margin: 10mm; size: auto; } body { margin: 0; padding: 0; } }
+      body { margin: 0; padding: 20px; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; background: #f1f5f9; font-family: 'Tajawal', sans-serif; }
+    </style></head><body>${cardHTML}</body></html>`);
+  win.document.close();
+  setTimeout(() => { win.print(); }, 500);
+}
+
+function srReprintCard(id) {
+  const r = srAllData.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('sr-detail-modal').classList.remove('open');
+  srShowCard(r);
+}
+
+// ═══ EDIT ═══
 function srEdit(id) {
   const r = srAllData.find(x => x.id === id);
   if (!r) return;
+  document.getElementById('sr-detail-modal').classList.remove('open');
   document.getElementById('sr-edit-body').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group"><label class="form-label">الاسم</label><input class="inp" id="sr-edit-firstname" value="${r.first_name || ''}"></div>
@@ -22084,7 +22280,7 @@ function srEdit(id) {
     </div>
     <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
       <button class="btn-sm" onclick="document.getElementById('sr-edit-modal').classList.remove('open')">إلغاء</button>
-      <button class="tbl-action" onclick="srSaveEdit('${id}')" style="border-color:rgba(16,185,129,0.3);color:#059669">💾 حفظ</button>
+      <button class="tbl-action" onclick="srSaveEdit('${id}')" style="border-color:rgba(16,185,129,0.3);color:#059669">💾 حفظ التعديلات</button>
     </div>`;
   document.getElementById('sr-edit-modal').classList.add('open');
 }
@@ -22105,15 +22301,17 @@ async function srSaveEdit(id) {
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     document.getElementById('sr-edit-modal').classList.remove('open');
-    srShowToast('تم حفظ التعديلات بنجاح ✅', 'success');
+    srShowToast('✅ تم حفظ التعديلات بنجاح', 'success');
     srLoadData();
   } catch (e) {
     srShowToast('فشل حفظ التعديلات: ' + e.message, 'error');
   }
 }
 
+// ═══ DELETE ═══
 function srDelete(id) {
   srDeleteTarget = id;
+  document.getElementById('sr-detail-modal').classList.remove('open');
   document.getElementById('sr-delete-modal').classList.add('open');
   document.getElementById('sr-delete-confirm-btn').onclick = async () => {
     try {
@@ -22122,7 +22320,7 @@ function srDelete(id) {
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       document.getElementById('sr-delete-modal').classList.remove('open');
-      srShowToast('تم حذف التسجيل بنجاح 🗑️', 'success');
+      srShowToast('🗑️ تم حذف التسجيل بنجاح', 'success');
       srLoadData();
     } catch (e) {
       srShowToast('فشل حذف التسجيل: ' + e.message, 'error');
@@ -22130,34 +22328,20 @@ function srDelete(id) {
   };
 }
 
-async function srConfirm(id) {
-  if (!confirm('هل أنت متأكد من تأكيد تسجيل هذا الطالب نهائياً؟')) return;
-  try {
-    const res = await srFetch(`${SR_SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'مسجل نهائياً' }),
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    srShowToast('✅ تم تأكيد التسجيل النهائي', 'success');
-    srLoadData();
-  } catch (e) {
-    srShowToast('فشل تأكيد التسجيل: ' + e.message, 'error');
-  }
-}
-
+// ═══ REFRESH ═══
 function srRefresh() {
   srLoadData();
   srShowToast('🔄 تم تحديث البيانات', 'success');
 }
 
+// ═══ EXPORT CSV ═══
 function srExportCSV() {
-  const headers = ['ID','الاسم','اللقب','تاريخ الميلاد','ولي الأمر','الهاتف','نوع الطالب','المستوى','المؤسسة','الشعبة','المواد','تاريخ التسجيل','الحالة'];
+  const headers = ['الحالة','ID','اللقب','الاسم','هاتف ولي الأمر','تاريخ التسجيل','المستوى','الشعبة','المؤسسة','المواد'];
   const rows = srFilteredData.map(r => [
-    r.id, r.first_name, r.last_name, r.birth_date,
-    r.parent_name, r.parent_phone, r.student_type, r.level,
-    r.institution, r.stream,
-    Array.isArray(r.subjects) ? r.subjects.map(s => `${s.subject} (${s.teacher})`).join('; ') : '',
-    r.created_at, r.status
+    r.status, r.id, r.last_name, r.first_name,
+    r.parent_phone,
+    r.created_at, r.level, r.stream, r.institution,
+    Array.isArray(r.subjects) ? r.subjects.map(s => `${s.subject} (${s.teacher})`).join('; ') : ''
   ]);
   let csv = '\uFEFF' + headers.join(';') + '\n';
   csv += rows.map(row => row.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(';')).join('\n');
@@ -22167,11 +22351,9 @@ function srExportCSV() {
   URL.revokeObjectURL(url);
 }
 
+// ═══ EXPORT EXCEL ═══
 function srExportExcel() {
   const table = document.getElementById('sr-table').cloneNode(true);
-  // Remove action column
-  const rows = table.querySelectorAll('tr');
-  rows.forEach(row => { if (row.lastElementChild) row.lastElementChild.remove(); });
   const html = table.outerHTML;
   const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -22179,21 +22361,13 @@ function srExportExcel() {
   URL.revokeObjectURL(url);
 }
 
+// ═══ PRINT ═══
 function srPrint() {
   const win = window.open('', '_blank');
-  const styles = Array.from(document.styleSheets).map(s => {
-    try { return Array.from(s.cssRules || []).map(r => r.cssText).join(''); }
-    catch(e) { return ''; }
-  }).join('');
-  const rows = srFilteredData.map(r => `<tr>
-    <td>${r.id}</td><td>${r.last_name}</td><td>${r.first_name}</td>
-    <td>${r.birth_date || ''}</td><td>${r.parent_name || ''}</td>
-    <td>${r.parent_phone || ''}</td><td>${r.student_type || ''}</td>
-    <td>${r.level || ''}</td><td>${r.institution || ''}</td>
-    <td>${r.stream || ''}</td>
-    <td>${Array.isArray(r.subjects) ? r.subjects.map(s=>s.subject).join(', ') : ''}</td>
-    <td>${srFormatDate(r.created_at)}</td>
-    <td>${r.status}</td>
+  const rows = srFilteredData.map((r, i) => `<tr>
+    <td>${i+1}</td><td>${r.status}</td><td>${r.id}</td><td>${r.last_name}</td><td>${r.first_name}</td>
+    <td>${r.parent_phone || ''}</td>
+    <td>${srFormatDate(r.created_at)}</td><td>${r.level || ''}</td><td>${r.stream || ''}</td><td>${r.institution || ''}</td>
   </tr>`).join('');
   win.document.write(`<html dir="rtl"><head><meta charset="utf-8"><title>تسجيلات الدعم المدرسي</title>
     <style>body{font-family:Tajawal,sans-serif;padding:20px}
@@ -22202,7 +22376,7 @@ function srPrint() {
     th{background:#f5f3ff;font-weight:800}
     h2{text-align:center;margin-bottom:20px}</style>
   </head><body><h2>📚 تسجيلات الدعم المدرسي</h2>
-  <table><thead><tr><th>ID</th><th>اللقب</th><th>الاسم</th><th>تاريخ الميلاد</th><th>ولي الأمر</th><th>الهاتف</th><th>النوع</th><th>المستوى</th><th>المؤسسة</th><th>الشعبة</th><th>المواد</th><th>تاريخ التسجيل</th><th>الحالة</th></tr></thead><tbody>${rows}</tbody></table>
+  <table><thead><tr><th>#</th><th>الحالة</th><th>ID</th><th>اللقب</th><th>الاسم</th><th>الهاتف</th><th>تاريخ التسجيل</th><th>المستوى</th><th>الشعبة</th><th>المؤسسة</th></tr></thead><tbody>${rows}</tbody></table>
   <p style="text-align:center;margin-top:20px;color:#999;font-size:11px">تم التصدير من لوحة إدارة E-PLUS</p>
   </body></html>`);
   win.document.close();
