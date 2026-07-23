@@ -62,6 +62,31 @@ const SUPPORT_STREAMS = {
   ],
 };
 
+const SUPPORT_INSTITUTIONS = {
+  'السنة الثالثة ثانوي (بكالوريا)': [
+    'ثانوية هالي عبدالكريم بقمار',
+    'متقنة عبدالقادر الياجوري بقمار',
+    'ثانوية العلامة أبو القاسم سعد الله بقمار',
+    'أخرى',
+  ],
+  'السنة الرابعة متوسط': [
+    'متوسطة خليفة بن حسن بقمار',
+    'متوسطة أحمد عربية بقمار',
+    'متوسطة البشير الإبراهيمي بقمار',
+    'متوسطة الرويسي بلقاسم بقمار',
+  ],
+};
+
+const SUPPORT_MIDDLE_SCHOOL = [
+  { subject: 'الرياضيات', teacher: 'شامي سهيل' },
+  { subject: 'اللغة الفرنسية', teacher: 'مرغني ريهام' },
+  { subject: 'اللغة الفرنسية', teacher: 'حميدي بلقيس' },
+  { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
+  { subject: 'اللغة الإنجليزية', teacher: 'نصبة فاطمة' },
+  { subject: 'اللغة العربية', teacher: 'سويد هدى' },
+  { subject: 'العلوم الفيزيائية وعلوم الطبيعة والحياة', teacher: 'خنوفة علي' },
+];
+
 const SUPPORT_LAWS = [
   'يلتزم الطالب بحضور جميع الحصص في المواعيد المحددة.',
   'التأخر عن الحصة بأكثر من 10 دقائق يعتبر غياباً.',
@@ -165,7 +190,11 @@ function showInstitution() {
   const ig = byId('s-institution-group');
   if (ig) { ig.style.display = 'block'; }
   const sel = byId('sInstitution');
-  if (sel) sel.value = '';
+  if (sel) {
+    const institutions = SUPPORT_INSTITUTIONS[sLevel] || [];
+    sel.innerHTML = '<option value="">اختر المؤسسة التعليمية</option>' +
+      institutions.map(inst => `<option value="${inst}">${inst}</option>`).join('');
+  }
   byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='none');
   byId('s-stream-group')&&(byId('s-stream-group').style.display='none');
   byId('s-subjects-group')&&(byId('s-subjects-group').style.display='none');
@@ -187,8 +216,13 @@ function onInstitutionChange() {
   if (sInstitutionVal === 'أخرى') {
     byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='block');
     byId('sInstitutionInput')&&(byId('sInstitutionInput').value='');
+    return;
+  }
+  byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='none');
+
+  if (sLevel === 'السنة الرابعة متوسط') {
+    showMiddleSchoolSubjects();
   } else {
-    byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='none');
     showStream();
   }
 }
@@ -196,10 +230,35 @@ function onInstitutionChange() {
 function onInstitutionInputChange() {
   const inp = byId('sInstitutionInput');
   if (inp && inp.value.trim().length >= 2) {
-    showStream();
+    if (sLevel === 'السنة الرابعة متوسط') {
+      showMiddleSchoolSubjects();
+    } else {
+      showStream();
+    }
   } else {
     byId('s-stream-group')&&(byId('s-stream-group').style.display='none');
+    byId('s-subjects-group')&&(byId('s-subjects-group').style.display='none');
   }
+}
+
+function showMiddleSchoolSubjects() {
+  sSubjects = [];
+  byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
+  byId('msTags')&&(byId('msTags').innerHTML='');
+  byId('msDropdown')&&(byId('msDropdown').style.display='none');
+  const sg = byId('s-subjects-group');
+  if (sg) sg.style.display = 'block';
+  byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
+  renderMiddleSchoolSubjects();
+}
+
+function renderMiddleSchoolSubjects() {
+  const opts = byId('ms-options');
+  if (!opts) return;
+  opts.innerHTML = SUPPORT_MIDDLE_SCHOOL.map((item, i) =>
+    `<div class="ms-opt ${sSubjects.includes(i)?'selected':''}" data-idx="${i}" onclick="msSelect(${i})">${item.subject} — 🎓 ${item.teacher}</div>`
+  ).join('');
+  updateMsLabel();
 }
 
 // ── Step 4: Stream ──
@@ -298,7 +357,7 @@ function updateMsLabel() {
 function updateMsTags() {
   const c = byId('msTags');
   if (!c) return;
-  const items = SUPPORT_STREAMS[sStream] || [];
+  const items = sLevel === 'السنة الرابعة متوسط' ? SUPPORT_MIDDLE_SCHOOL : (SUPPORT_STREAMS[sStream] || []);
   c.innerHTML = sSubjects.map(i =>
     `<span class="ms-tag">${items[i]?.subject || ''} — ${items[i]?.teacher || ''} <span class="ms-tag-rm" onclick="msRemove(${i})">×</span></span>`
   ).join('');
@@ -324,14 +383,17 @@ function onSubmitClick() {
       if (!instInp) { alert('⚠️ الرجاء إدخال اسم المؤسسة التعليمية'); return; }
     }
   }
-  if (!sStream) { alert('⚠️ الرجاء اختيار الشعبة'); return; }
+  if (sLevel === 'السنة الثالثة ثانوي (بكالوريا)' && !sStream) {
+    alert('⚠️ الرجاء اختيار الشعبة'); return;
+  }
   if (sSubjects.length === 0) { alert('⚠️ الرجاء اختيار مادة واحدة على الأقل'); return; }
 
   const institution = sInstitutionVal === 'أخرى'
     ? (byId('sInstitutionInput')?.value?.trim() || '')
     : sInstitutionVal;
 
-  const items = SUPPORT_STREAMS[sStream] || [];
+  const isMiddleSchool = sLevel === 'السنة الرابعة متوسط';
+  const items = isMiddleSchool ? SUPPORT_MIDDLE_SCHOOL : (SUPPORT_STREAMS[sStream] || []);
   const selectedSubjects = sSubjects.map(i => items[i]);
 
   const year = new Date().getFullYear();
