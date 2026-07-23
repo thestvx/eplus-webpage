@@ -256,7 +256,7 @@ function renderMiddleSchoolSubjects() {
   const opts = byId('ms-options');
   if (!opts) return;
   opts.innerHTML = SUPPORT_MIDDLE_SCHOOL.map((item, i) =>
-    `<div class="ms-opt ${sSubjects.includes(i)?'selected':''}" data-idx="${i}" onclick="msSelect(${i})">${item.subject} — 🎓 ${item.teacher}</div>`
+    `<div class="ms-opt ${sSubjects.includes(i)?'selected':''}" data-idx="${i}" onclick="msSelect(${i})"><strong>${item.subject}</strong> <span style="opacity:0.6;font-weight:400;">— 🎓 ${item.teacher}</span></div>`
   ).join('');
   updateMsLabel();
 }
@@ -301,7 +301,7 @@ function renderSubjects() {
   if (!opts) return;
   const items = SUPPORT_STREAMS[sStream] || [];
   opts.innerHTML = items.map((item, i) =>
-    `<div class="ms-opt ${sSubjects.includes(i)?'selected':''}" data-idx="${i}" onclick="msSelect(${i})">${item.subject} — 🎓 ${item.teacher}</div>`
+    `<div class="ms-opt ${sSubjects.includes(i)?'selected':''}" data-idx="${i}" onclick="msSelect(${i})"><strong>${item.subject}</strong> <span style="opacity:0.6;font-weight:400;">— 🎓 ${item.teacher}</span></div>`
   ).join('');
   updateMsLabel();
 }
@@ -359,7 +359,7 @@ function updateMsTags() {
   if (!c) return;
   const items = sLevel === 'السنة الرابعة متوسط' ? SUPPORT_MIDDLE_SCHOOL : (SUPPORT_STREAMS[sStream] || []);
   c.innerHTML = sSubjects.map(i =>
-    `<span class="ms-tag">${items[i]?.subject || ''} — ${items[i]?.teacher || ''} <span class="ms-tag-rm" onclick="msRemove(${i})">×</span></span>`
+    `<span class="ms-tag"><strong>${items[i]?.subject || ''}</strong> <span style="opacity:0.7;">${items[i]?.teacher || ''}</span> <span class="ms-tag-rm" onclick="msRemove(${i})">×</span></span>`
   ).join('');
 }
 
