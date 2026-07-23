@@ -2923,7 +2923,7 @@
                 <div id="sr-card-front-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding:16px">
                   <div id="sr-card-front-name" style="font-size:14px;font-weight:900;color:white;text-shadow:0 1px 4px rgba(0,0,0,0.5);margin-bottom:4px"></div>
                   <div id="sr-card-front-id" style="font-size:11px;font-weight:700;color:white;text-shadow:0 1px 3px rgba(0,0,0,0.5);font-family:monospace;margin-bottom:8px"></div>
-                  <canvas id="sr-card-front-barcode" style="max-width:260px;height:50px"></canvas>
+                  <div id="sr-card-front-barcode" style="max-width:260px;min-height:50px;display:flex;justify-content:center"></div>
                 </div>
               </div>
             </div>
@@ -22006,7 +22006,13 @@ function srPopulateTeacherFilter() {
 }
 
 function srGetValue(obj, field) {
+  if (obj === null || obj === undefined) return '';
   const v = obj[field];
+  if (v === null || v === undefined) return '';
+  return String(v);
+}
+
+function srSafeStr(v) {
   if (v === null || v === undefined) return '';
   return String(v);
 }
@@ -22021,13 +22027,14 @@ function srApplyFilters() {
   const query = document.getElementById('sr-search').value.toLowerCase().trim();
 
   srFilteredData = srAllData.filter(r => {
+    if (!r) return false;
     if (level && r.level !== level) return false;
     if (stream && r.stream !== stream) return false;
     if (type && r.student_type !== type) return false;
     if (status && r.status !== status) return false;
     if (institution && r.institution !== institution) return false;
     if (teacherFilter) {
-      const hasTeacher = Array.isArray(r.subjects) && r.subjects.some(s => s.teacher === teacherFilter);
+      const hasTeacher = Array.isArray(r.subjects) && r.subjects.some(s => s && s.teacher === teacherFilter);
       if (!hasTeacher) return false;
     }
     if (query) {
@@ -22035,7 +22042,7 @@ function srApplyFilters() {
         r.id, r.first_name, r.last_name, r.parent_name,
         r.parent_phone, r.institution, r.stream, r.level,
         r.student_type, r.status
-      ].map(srGetValue).join(' ').toLowerCase();
+      ].map(srSafeStr).join(' ').toLowerCase();
       if (!searchable.includes(query)) return false;
     }
     return true;
@@ -22253,25 +22260,34 @@ function srShowCard(r) {
   frontImg.onerror = function() { this.style.background='linear-gradient(135deg,#6366f1,#8b5cf6)'; this.alt='بطاقة التسجيل'; };
   backImg.onerror = function() { this.style.background='linear-gradient(135deg,#e0e7ff,#f0f0ff)'; this.alt='بطاقة التسجيل'; };
 
-  const barcodeCanvas = document.getElementById('sr-card-front-barcode');
-  barcodeCanvas.innerHTML = '';
-  try {
-    JsBarcode(barcodeCanvas, 'EPLUS-' + (r.id || ''), {
-      format: 'CODE128',
-      displayValue: true,
-      lineColor: '#ffffff',
-      background: 'transparent',
-      width: 1.5,
-      height: 30,
-      fontSize: 12,
-      font: 'monospace',
-      textMargin: 2,
-    });
-  } catch(e) { console.error('Barcode error:', e); }
+  const barcodeWrap = document.getElementById('sr-card-front-barcode');
+  barcodeWrap.innerHTML = '';
+  if (typeof JsBarcode !== 'undefined') {
+    try {
+      const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      barcodeWrap.appendChild(svgEl);
+      JsBarcode(svgEl, 'EPLUS-' + (r.id || ''), {
+        format: 'CODE128',
+        displayValue: true,
+        lineColor: '#ffffff',
+        background: 'transparent',
+        width: 1.5,
+        height: 30,
+        fontSize: 12,
+        font: 'monospace',
+        textMargin: 2,
+        xmlDocument: document,
+      });
+      svgEl.style.maxWidth = '100%';
+      svgEl.style.height = 'auto';
+    } catch(e) { console.error('Barcode error:', e); }
+  } else {
+    console.warn('JsBarcode library not loaded');
+  }
 
   const qrContainer = document.getElementById('sr-card-back-qr');
   qrContainer.innerHTML = '';
-  if (token) {
+  if (token && typeof QRCode !== 'undefined') {
     try {
       new QRCode(qrContainer, {
         text: 'https://epluscenter.com/s/' + token,
@@ -22293,7 +22309,7 @@ function srPrintCard() {
   const fullName = `${r.first_name || ''} ${r.last_name || ''}`.trim();
   const today = new Date().toLocaleDateString('ar-DZ', { year:'numeric', month:'long', day:'numeric' });
   const token = r.student_token || '';
-  const barcodeDataUrl = document.getElementById('sr-card-front-barcode')?.toDataURL?.() || '';
+  const barcodeSvg = document.getElementById('sr-card-front-barcode')?.querySelector('svg')?.outerHTML || '';
   const qrImg = document.getElementById('sr-card-back-qr')?.querySelector('img')?.src || '';
 
   const win = window.open('', '_blank', 'width=800,height=600');
@@ -22318,7 +22334,7 @@ function srPrintCard() {
       <div class="overlay front-overlay">
         <div style="font-size:14px;font-weight:900;color:white;text-shadow:0 1px 4px rgba(0,0,0,0.5);margin-bottom:4px">${fullName}</div>
         <div style="font-size:11px;font-weight:700;color:white;text-shadow:0 1px 3px rgba(0,0,0,0.5);font-family:monospace;margin-bottom:8px">EPLUS-${r.id || ''}</div>
-        ${barcodeDataUrl ? `<img src="${barcodeDataUrl}" style="max-width:260px;height:50px">` : ''}
+        <div style="max-width:260px">${barcodeSvg}</div>
       </div>
     </div>
     <div class="card card-page">

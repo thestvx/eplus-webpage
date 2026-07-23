@@ -83,17 +83,25 @@ CREATE TABLE IF NOT EXISTS registrations (
   birth_date TEXT DEFAULT '',
   parent_name TEXT DEFAULT '',
   parent_phone TEXT DEFAULT '',
-  student_type TEXT DEFAULT '', -- 'مدرسي' or 'حُر'
-  level TEXT DEFAULT '', -- full level name
-  institution TEXT DEFAULT '', -- المؤسسة التعليمية
-  stream TEXT DEFAULT '', -- 'علوم تجريبية', 'رياضيات', 'تسيير واقتصاد', 'تقني رياضي', 'آداب ولغات'
+  student_type TEXT DEFAULT '',
+  level TEXT DEFAULT '',
+  institution TEXT DEFAULT '',
+  stream TEXT DEFAULT '',
   subjects JSONB DEFAULT '[]',
   terms_accepted BOOLEAN DEFAULT FALSE,
-  status TEXT DEFAULT 'مسجل مبدئياً', -- 'مسجل مبدئياً' or 'مسجل نهائياً'
+  status TEXT DEFAULT 'مسجل مبدئياً',
   fee_amount INTEGER DEFAULT 500,
-  student_token TEXT UNIQUE DEFAULT '', -- 32-char random token for student portal access
+  student_token TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- ترحيل: إضافة student_token إذا لم يكن موجوداً (للقواعد الموجودة مسبقاً)
+ALTER TABLE registrations ADD COLUMN IF NOT EXISTS student_token TEXT DEFAULT '';
+
+-- ملء التوكنات الفارغة بقيم عشوائية فريدة
+UPDATE registrations
+SET student_token = substr(md5(random()::text || clock_timestamp()::text || id), 1, 32)
+WHERE student_token = '' OR student_token IS NULL;
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_attendance_student ON attendance_records(student_id);
@@ -104,7 +112,7 @@ CREATE INDEX IF NOT EXISTS idx_archives_group ON attendance_archives(group_id, c
 CREATE INDEX IF NOT EXISTS idx_registrations_status ON registrations(status);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_token ON registrations(student_token) WHERE student_token != '';
 
--- Allow anon key to insert registrations from the public page
+-- RLS
 ALTER TABLE registrations ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "anon_insert_registrations" ON registrations;
 CREATE POLICY "anon_insert_registrations" ON registrations FOR INSERT TO anon WITH CHECK (true);
