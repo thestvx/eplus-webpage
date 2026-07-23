@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
@@ -2907,13 +2908,46 @@
 
       <!-- ═══ SR Student Card Modal ═══ -->
       <div class="teacher-modal-bg" id="sr-card-modal">
-        <div class="teacher-modal" style="max-width:480px">
+        <div class="teacher-modal" style="max-width:520px">
           <div class="teacher-modal-header">
             <div class="panel-icon" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.2)">🎓</div>
             <div class="teacher-modal-title">بطاقة التسجيل</div>
             <button class="att-modal-close" onclick="document.getElementById('sr-card-modal').classList.remove('open')">✕</button>
           </div>
-          <div class="teacher-modal-body" id="sr-card-body" style="padding:0;display:flex;justify-content:center"></div>
+          <div class="teacher-modal-body" id="sr-card-body" style="padding:16px;display:flex;flex-direction:column;align-items:center;gap:20px">
+            <!-- Front Card -->
+            <div>
+              <div style="font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:6px;text-align:center">الوجه الأمامي</div>
+              <div id="sr-card-front-wrap" style="position:relative;width:380px;height:228px;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.15)">
+                <img id="sr-card-front-img" src="studentidcard/studentidcardfront.jpg" style="width:100%;height:100%;object-fit:cover;display:block" alt="">
+                <div id="sr-card-front-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding:16px">
+                  <div id="sr-card-front-name" style="font-size:14px;font-weight:900;color:white;text-shadow:0 1px 4px rgba(0,0,0,0.5);margin-bottom:4px"></div>
+                  <div id="sr-card-front-id" style="font-size:11px;font-weight:700;color:white;text-shadow:0 1px 3px rgba(0,0,0,0.5);font-family:monospace;margin-bottom:8px"></div>
+                  <canvas id="sr-card-front-barcode" style="max-width:260px;height:50px"></canvas>
+                </div>
+              </div>
+            </div>
+            <!-- Back Card -->
+            <div>
+              <div style="font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:6px;text-align:center">الوجه الخلفي</div>
+              <div id="sr-card-back-wrap" style="position:relative;width:380px;height:228px;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.15)">
+                <img id="sr-card-back-img" src="studentidcard/studentidcardback.jpg" style="width:100%;height:100%;object-fit:cover;display:block" alt="">
+                <div id="sr-card-back-overlay" style="position:absolute;inset:0;display:flex;padding:20px">
+                  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:4px">
+                    <div style="font-size:10px;color:#64748b;font-weight:600">الاسم الكامل</div>
+                    <div id="sr-card-back-name" style="font-size:13px;font-weight:900;color:#1e293b"></div>
+                    <div style="font-size:10px;color:#64748b;font-weight:600;margin-top:6px">Student ID</div>
+                    <div id="sr-card-back-id" style="font-size:12px;font-weight:800;color:#1e293b;font-family:monospace"></div>
+                    <div style="font-size:10px;color:#64748b;font-weight:600;margin-top:6px">تاريخ التسجيل</div>
+                    <div id="sr-card-back-date" style="font-size:11px;font-weight:700;color:#1e293b"></div>
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:center">
+                    <div id="sr-card-back-qr"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div style="padding:0 24px 20px;display:flex;gap:10px;justify-content:center">
             <button class="btn-sm" onclick="document.getElementById('sr-card-modal').classList.remove('open')">إغلاق</button>
             <button class="tbl-action" onclick="srPrintCard()" style="border-color:rgba(16,185,129,0.3);color:#059669;font-weight:800">🖨️ طباعة البطاقة</button>
@@ -22171,16 +22205,24 @@ async function srDoConfirm() {
   btn.disabled = true;
   btn.textContent = '⏳ جاري التأكيد...';
   try {
+    const r = srAllData.find(x => x.id === srConfirmTarget);
+    const patchData = { status: 'مسجل نهائياً' };
+    if (r && !r.student_token) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let token = '';
+      for (let i = 0; i < 32; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+      patchData.student_token = token;
+    }
     const res = await srFetch(`${SR_SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(srConfirmTarget)}`, {
       method: 'PATCH',
-      body: JSON.stringify({ status: 'مسجل نهائياً' }),
+      body: JSON.stringify(patchData),
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     document.getElementById('sr-confirm-modal').classList.remove('open');
     srShowToast('✅ تم تأكيد التسجيل النهائي بنجاح', 'success');
-    srLoadData();
-    const r = srAllData.find(x => x.id === srConfirmTarget) || { id: srConfirmTarget, first_name: '', last_name: '' };
-    srShowCard(r);
+    await srLoadData();
+    const updated = srAllData.find(x => x.id === srConfirmTarget) || r || { id: srConfirmTarget, first_name: '', last_name: '' };
+    srShowCard(updated);
   } catch (e) {
     srShowToast('فشل تأكيد التسجيل: ' + e.message, 'error');
   }
@@ -22190,71 +22232,112 @@ async function srDoConfirm() {
 
 // ═══ STUDENT CARD ═══
 function srBuildCardHTML(r) {
-  const today = new Date().toLocaleDateString('ar-DZ', { year:'numeric', month:'long', day:'numeric' });
-  const subjects = Array.isArray(r.subjects)
-    ? r.subjects.map(s => `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px dashed rgba(99,102,241,0.15)"><span style="font-size:10px;font-weight:700">${s.subject}</span><span style="font-size:9px;color:#6366f1;font-weight:600">${s.teacher}</span></div>`).join('')
-    : '';
-  const cardNum = r.id ? r.id.replace(/[^0-9]/g, '').slice(-4) || r.id.slice(-4) : '0000';
-
-  return `<div id="sr-printable-card" style="width:380px;background:white;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.12);font-family:'Tajawal',sans-serif;color:#1e293b;direction:rtl">
-    <!-- Header -->
-    <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:16px 20px;text-align:center;position:relative">
-      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:4px">
-        <div style="width:40px;height:40px;background:rgba(255,255,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px">🎓</div>
-        <div>
-          <div style="font-size:16px;font-weight:900;color:white;letter-spacing:0.5px">E-PLUS</div>
-          <div style="font-size:9px;color:rgba(255,255,255,0.7);font-weight:600">برنامج الدعم المدرسي</div>
-        </div>
-      </div>
-      <div style="position:absolute;bottom:-1px;left:0;right:0;height:12px;background:white;border-radius:12px 12px 0 0"></div>
-    </div>
-    <!-- Body -->
-    <div style="padding:14px 20px 10px">
-      <!-- Student Name + ID -->
-      <div style="text-align:center;margin-bottom:12px">
-        <div style="font-size:17px;font-weight:900;color:#1e293b">${r.first_name || ''} ${r.last_name || ''}</div>
-        <div style="font-size:10px;color:#6366f1;font-weight:800;font-family:monospace;margin-top:2px">رقم التسجيل: ${r.id || ''}</div>
-      </div>
-      <!-- Info Grid -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:10px;margin-bottom:10px">
-        <div><span style="color:#94a3b8;font-weight:600">ولي الأمر:</span> <span style="font-weight:800">${r.parent_name || '—'}</span></div>
-        <div><span style="color:#94a3b8;font-weight:600">الهاتف:</span> <span style="font-weight:800;direction:ltr">${r.parent_phone || '—'}</span></div>
-        <div><span style="color:#94a3b8;font-weight:600">المستوى:</span> <span style="font-weight:800">${r.level || '—'}</span></div>
-        <div><span style="color:#94a3b8;font-weight:600">النوع:</span> <span style="font-weight:800">${r.student_type === 'حر' ? '🎓 حر' : '📘 متمدرس'}</span></div>
-      </div>
-      ${r.stream ? `<div style="background:#f0f0ff;border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:11px;font-weight:800;color:#6366f1;text-align:center">الشعبة: ${r.stream}</div>` : ''}
-      ${r.institution ? `<div style="font-size:10px;color:#64748b;margin-bottom:8px;text-align:center">🏫 ${r.institution}</div>` : ''}
-      ${subjects ? `<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:800;color:#475569;margin-bottom:4px">المواد:</div>${subjects}</div>` : ''}
-    </div>
-    <!-- Footer -->
-    <div style="background:#f8fafc;padding:10px 20px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e2e8f0">
-      <div style="font-size:9px;color:#94a3b8">📅 ${today}</div>
-      <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:900">بطاقة #${cardNum}</div>
-    </div>
-  </div>`;
+  return '';
 }
 
 function srShowCard(r) {
   if (!r) return;
   srCurrentCard = r;
-  const html = srBuildCardHTML(r);
-  document.getElementById('sr-card-body').innerHTML = `<div style="padding:20px;display:flex;justify-content:center">${html}</div>`;
+  const fullName = `${r.first_name || ''} ${r.last_name || ''}`.trim();
+  const today = new Date().toLocaleDateString('ar-DZ', { year:'numeric', month:'long', day:'numeric' });
+  const token = r.student_token || '';
+
+  document.getElementById('sr-card-front-name').textContent = fullName;
+  document.getElementById('sr-card-front-id').textContent = 'EPLUS-' + (r.id || '');
+  document.getElementById('sr-card-back-name').textContent = fullName;
+  document.getElementById('sr-card-back-id').textContent = r.id || '';
+  document.getElementById('sr-card-back-date').textContent = today;
+
+  const frontImg = document.getElementById('sr-card-front-img');
+  const backImg = document.getElementById('sr-card-back-img');
+  frontImg.onerror = function() { this.style.background='linear-gradient(135deg,#6366f1,#8b5cf6)'; this.alt='بطاقة التسجيل'; };
+  backImg.onerror = function() { this.style.background='linear-gradient(135deg,#e0e7ff,#f0f0ff)'; this.alt='بطاقة التسجيل'; };
+
+  const barcodeCanvas = document.getElementById('sr-card-front-barcode');
+  barcodeCanvas.innerHTML = '';
+  try {
+    JsBarcode(barcodeCanvas, 'EPLUS-' + (r.id || ''), {
+      format: 'CODE128',
+      displayValue: true,
+      lineColor: '#ffffff',
+      background: 'transparent',
+      width: 1.5,
+      height: 30,
+      fontSize: 12,
+      font: 'monospace',
+      textMargin: 2,
+    });
+  } catch(e) { console.error('Barcode error:', e); }
+
+  const qrContainer = document.getElementById('sr-card-back-qr');
+  qrContainer.innerHTML = '';
+  if (token) {
+    try {
+      new QRCode(qrContainer, {
+        text: 'https://epluscenter.com/s/' + token,
+        width: 100,
+        height: 100,
+        colorDark: '#1e293b',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+    } catch(e) { console.error('QR error:', e); }
+  }
+
   document.getElementById('sr-card-modal').classList.add('open');
 }
 
 function srPrintCard() {
-  const cardEl = document.getElementById('sr-printable-card');
-  if (!cardEl) return;
-  const cardHTML = cardEl.outerHTML;
-  const win = window.open('', '_blank', 'width=420,height=600');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>بطاقة التسجيل - ${srCurrentCard?.first_name || ''} ${srCurrentCard?.last_name || ''}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  const r = srCurrentCard;
+  if (!r) return;
+  const fullName = `${r.first_name || ''} ${r.last_name || ''}`.trim();
+  const today = new Date().toLocaleDateString('ar-DZ', { year:'numeric', month:'long', day:'numeric' });
+  const token = r.student_token || '';
+  const barcodeDataUrl = document.getElementById('sr-card-front-barcode')?.toDataURL?.() || '';
+  const qrImg = document.getElementById('sr-card-back-qr')?.querySelector('img')?.src || '';
+
+  const win = window.open('', '_blank', 'width=800,height=600');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>بطاقة التسجيل - ${fullName}</title>
     <style>
-      @media print { @page { margin: 10mm; size: auto; } body { margin: 0; padding: 0; } }
-      body { margin: 0; padding: 20px; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; background: #f1f5f9; font-family: 'Tajawal', sans-serif; }
-    </style></head><body>${cardHTML}</body></html>`);
+      @media print { @page { margin: 5mm; size: landscape; } body { margin: 0; padding: 0; } .card-page { page-break-after: always; } .card-page:last-child { page-break-after: avoid; } }
+      body { margin: 0; padding: 10px; display: flex; gap: 20px; justify-content: center; align-items: flex-start; background: #f1f5f9; font-family: 'Tajawal', Arial, sans-serif; }
+      .card { width: 380px; height: 228px; position: relative; overflow: hidden; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); flex-shrink: 0; }
+      .card img.bg { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .overlay { position: absolute; inset: 0; }
+      .front-overlay { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 16px; }
+      .back-overlay { display: flex; padding: 20px; }
+      .back-left { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+      .back-right { display: flex; align-items: center; justify-content: center; }
+      .label { font-size: 10px; color: #64748b; font-weight: 600; }
+      .value { font-size: 13px; font-weight: 900; color: #1e293b; }
+      .value.id { font-family: monospace; font-size: 12px; }
+      .value.date { font-size: 11px; font-weight: 700; }
+    </style></head><body>
+    <div class="card card-page">
+      <img class="bg" src="studentidcard/studentidcardfront.jpg" onerror="this.style.background='linear-gradient(135deg,#6366f1,#8b5cf6)'">
+      <div class="overlay front-overlay">
+        <div style="font-size:14px;font-weight:900;color:white;text-shadow:0 1px 4px rgba(0,0,0,0.5);margin-bottom:4px">${fullName}</div>
+        <div style="font-size:11px;font-weight:700;color:white;text-shadow:0 1px 3px rgba(0,0,0,0.5);font-family:monospace;margin-bottom:8px">EPLUS-${r.id || ''}</div>
+        ${barcodeDataUrl ? `<img src="${barcodeDataUrl}" style="max-width:260px;height:50px">` : ''}
+      </div>
+    </div>
+    <div class="card card-page">
+      <img class="bg" src="studentidcard/studentidcardback.jpg" onerror="this.style.background='linear-gradient(135deg,#e0e7ff,#f0f0ff)'">
+      <div class="overlay back-overlay">
+        <div class="back-left">
+          <div class="label">الاسم الكامل</div>
+          <div class="value">${fullName}</div>
+          <div class="label" style="margin-top:6px">Student ID</div>
+          <div class="value id">${r.id || ''}</div>
+          <div class="label" style="margin-top:6px">تاريخ التسجيل</div>
+          <div class="value date">${today}</div>
+        </div>
+        <div class="back-right">${qrImg ? `<img src="${qrImg}" width="100" height="100">` : ''}</div>
+      </div>
+    </div>
+    </body></html>`);
   win.document.close();
-  setTimeout(() => { win.print(); }, 500);
+  setTimeout(() => { win.print(); }, 600);
 }
 
 function srReprintCard(id) {

@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS registrations (
   terms_accepted BOOLEAN DEFAULT FALSE,
   status TEXT DEFAULT 'مسجل مبدئياً', -- 'مسجل مبدئياً' or 'مسجل نهائياً'
   fee_amount INTEGER DEFAULT 500,
+  student_token TEXT UNIQUE DEFAULT '', -- 32-char random token for student portal access
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -101,6 +102,7 @@ CREATE INDEX IF NOT EXISTS idx_attendance_teacher ON attendance_records(teacher_
 CREATE INDEX IF NOT EXISTS idx_students_group ON students(group_id);
 CREATE INDEX IF NOT EXISTS idx_archives_group ON attendance_archives(group_id, cycle_number);
 CREATE INDEX IF NOT EXISTS idx_registrations_status ON registrations(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_token ON registrations(student_token) WHERE student_token != '';
 
 -- Allow anon key to insert registrations from the public page
 ALTER TABLE registrations ENABLE ROW LEVEL SECURITY;
@@ -108,3 +110,5 @@ DROP POLICY IF EXISTS "anon_insert_registrations" ON registrations;
 CREATE POLICY "anon_insert_registrations" ON registrations FOR INSERT TO anon WITH CHECK (true);
 DROP POLICY IF EXISTS "anon_select_registrations" ON registrations;
 CREATE POLICY "anon_select_registrations" ON registrations FOR SELECT TO anon USING (true);
+DROP POLICY IF EXISTS "anon_update_registrations" ON registrations;
+CREATE POLICY "anon_update_registrations" ON registrations FOR UPDATE TO anon USING (true);

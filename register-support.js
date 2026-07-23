@@ -400,6 +400,13 @@ function onSubmitClick() {
   const rand = String(Math.floor(Math.random() * 900) + 100);
   const id = rand;
 
+  function _genToken(len) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let t = '';
+    for (let i = 0; i < len; i++) t += chars.charAt(Math.floor(Math.random() * chars.length));
+    return t;
+  }
+
   sFormData = {
     id,
     first_name: firstName,
@@ -415,6 +422,7 @@ function onSubmitClick() {
     terms_accepted: true,
     status: 'مسجل مبدئياً',
     fee_amount: 500,
+    student_token: _genToken(32),
   };
 
   openLawsModal();
