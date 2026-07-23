@@ -137,11 +137,12 @@ function onStdTypeChange(type) {
     if (sel) { sel.disabled = false; sel.value = ''; }
   } else if (type === 'حر') {
     sLevel = 'السنة الثالثة ثانوي (بكالوريا)';
+    sInstitutionVal = 'غير محدد';
     const lg = byId('s-level-group');
     if (lg) { lg.style.display = 'block'; }
     const sel = byId('sLevel');
     if (sel) { sel.value = 'السنة الثالثة ثانوي (بكالوريا)'; sel.disabled = true; }
-    showInstitution();
+    showStream();
   }
 }
 
@@ -206,6 +207,8 @@ function showStream() {
   const sg = byId('s-stream-group');
   if (!sg) return;
   sg.style.display = 'block';
+  byId('s-institution-group')&&(byId('s-institution-group').style.display='none');
+  byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='none');
   renderStreams();
 }
 
@@ -309,10 +312,12 @@ function onSubmitClick() {
   }
   if (!sStudentType) { alert('⚠️ الرجاء اختيار نوع الطالب'); return; }
   if (sStudentType === 'متمدرس' && !sLevel) { alert('⚠️ الرجاء اختيار المستوى الدراسي'); return; }
-  if (!sInstitutionVal) { alert('⚠️ الرجاء اختيار المؤسسة التعليمية'); return; }
-  if (sInstitutionVal === 'أخرى') {
-    const instInp = byId('sInstitutionInput')?.value?.trim();
-    if (!instInp) { alert('⚠️ الرجاء إدخال اسم المؤسسة التعليمية'); return; }
+  if (sStudentType === 'متمدرس') {
+    if (!sInstitutionVal) { alert('⚠️ الرجاء اختيار المؤسسة التعليمية'); return; }
+    if (sInstitutionVal === 'أخرى') {
+      const instInp = byId('sInstitutionInput')?.value?.trim();
+      if (!instInp) { alert('⚠️ الرجاء إدخال اسم المؤسسة التعليمية'); return; }
+    }
   }
   if (!sStream) { alert('⚠️ الرجاء اختيار الشعبة'); return; }
   if (sSubjects.length === 0) { alert('⚠️ الرجاء اختيار مادة واحدة على الأقل'); return; }
@@ -373,15 +378,37 @@ function setupLawsScroll() {
   const area = byId('laws-scroll-area');
   const sentinel = byId('laws-bottom-sentinel');
   if (!area || !sentinel) return;
+
+  function showCheckbox() {
+    const cbArea = byId('laws-checkbox-area');
+    if (cbArea && cbArea.style.display !== 'block') {
+      cbArea.style.display = 'block';
+      cbArea.style.animation = 'lawsFadeIn 0.4s ease forwards';
+    }
+  }
+
+  // If content doesn't overflow, show immediately
+  if (area.scrollHeight <= area.clientHeight + 5) {
+    showCheckbox();
+    return;
+  }
+
+  // IntersectionObserver approach
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        byId('laws-checkbox-area')&&(byId('laws-checkbox-area').style.display='block');
-        observer.disconnect();
-      }
+      if (entry.isIntersecting) { showCheckbox(); observer.disconnect(); }
     });
-  }, { root: area, threshold: 1.0 });
+  }, { root: area, threshold: 0.8 });
   observer.observe(sentinel);
+
+  // Fallback: manual scroll check
+  area.addEventListener('scroll', function onScroll() {
+    if (area.scrollTop + area.clientHeight >= area.scrollHeight - 10) {
+      showCheckbox();
+      area.removeEventListener('scroll', onScroll);
+      observer.disconnect();
+    }
+  });
 }
 
 function onLawsAgreeChange() {
