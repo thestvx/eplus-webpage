@@ -1,45 +1,38 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>لوحة الأستاذ — E-PLUS</title>
-  <link rel="icon" type="image/x-icon" href="images/eplus-icon.ico">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>لوحة الأستاذ — E-PLUS Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
   <style>
-    *{margin:0;padding:0;box-sizing:border-box}
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
     :root{
-      --primary:#6366f1;--primary-dark:#4f46e5;--primary-darker:#3730a3;--primary-light:rgba(99,102,241,0.08);--primary-medium:rgba(99,102,241,0.15);
-      --gold:#c8a84b;--gold-dark:#b09030;--gold-light:rgba(200,168,75,0.1);
-      --bg:#f0f2f5;--card:#ffffff;--text:#1e293b;--text-secondary:#475569;--text-muted:#94a3b8;
-      --border:#e2e8f0;--border-light:#f1f5f9;
-      --success:#059669;--success-light:rgba(16,185,129,0.1);
-      --danger:#dc2626;--danger-light:rgba(220,38,38,0.08);
-      --blue:#0ea5e9;--blue-light:rgba(14,165,233,0.08);
-      --sidebar-w:260px;--radius:14px;--radius-sm:10px;--radius-xs:8px;
-      --shadow:0 1px 3px rgba(0,0,0,0.04),0 4px 12px rgba(0,0,0,0.04);
-      --shadow-md:0 4px 16px rgba(0,0,0,0.06);--shadow-lg:0 8px 32px rgba(0,0,0,0.08);
-      --transition:0.3s cubic-bezier(0.4,0,0.2,1);
+      --primary:#6366f1;--primary-light:rgba(99,102,241,0.08);--primary-dark:#4f46e5;
+      --gold:#c8a84b;--gold-light:rgba(200,168,75,0.1);
+      --bg:#f4f5fa;--card:#fff;--text:#1e1b4b;--text-muted:#6b7280;--text-secondary:#9ca3af;
+      --border:#e5e7eb;--border-light:#f0f1f5;
+      --radius:16px;--radius-sm:12px;--radius-xs:8px;
+      --shadow:0 2px 12px rgba(0,0,0,0.06);--shadow-lg:0 8px 32px rgba(0,0,0,0.1);
+      --transition:all .25s cubic-bezier(.4,0,.2,1);
+      --sidebar-w:260px;
+      --green:#059669;--green-light:rgba(5,150,105,0.08);
+      --red:#dc2626;--red-light:rgba(220,38,38,0.08);
+      --blue:#2563eb;--blue-light:rgba(37,99,235,0.08);
+      --purple:#7c3aed;--purple-light:rgba(124,58,237,0.08);
     }
-    body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
-    button{font-family:'Tajawal',sans-serif;cursor:pointer;border:none}
-    input,textarea,select{font-family:'Tajawal',sans-serif}
-
+    body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     @keyframes fadeSlideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes scaleIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
-    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    @keyframes bgZoom{from{transform:scale(1.05)}to{transform:scale(1.12)}}
+    @keyframes scaleIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}
     @keyframes slideInDrawer{from{transform:translateX(100%)}to{transform:translateX(0)}}
     @keyframes slideOutDrawer{from{transform:translateX(0)}to{transform:translateX(100%)}}
 
-    /* LOGIN */
+    /* ═══ LOGIN ═══ */
     .login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:#1a1a2e}
     .login-bg{position:absolute;inset:0;z-index:0;overflow:hidden}
     .login-bg video{width:100%;height:100%;object-fit:cover}
@@ -48,137 +41,187 @@
     .login-shape{position:absolute;border-radius:50%;background:rgba(255,255,255,0.04)}
     .login-shape:nth-child(1){width:300px;height:300px;top:-80px;right:-60px;animation:float 6s ease-in-out infinite}
     .login-shape:nth-child(2){width:200px;height:200px;bottom:-40px;left:-40px;animation:float 8s ease-in-out infinite 1s}
-    .login-card{background:rgba(255,255,255,0.12);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.18);border-radius:24px;padding:44px 36px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.3);position:relative;z-index:2;text-align:center;animation:fadeSlideUp 0.7s ease both}
-    .login-logo-img{max-width:200px;height:auto;margin:0 auto 32px;display:block;animation:scaleIn 0.6s ease both 0.1s;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.15))}
-    .login-field{margin-bottom:18px;text-align:right}
-    .login-label{display:block;font-size:13px;font-weight:700;color:rgba(255,255,255,0.8);margin-bottom:8px}
-    .login-input{width:100%;padding:14px 16px 14px 48px;border:1.5px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);font-size:15px;font-weight:700;color:#fff;background:rgba(255,255,255,0.08);transition:var(--transition);direction:ltr;text-align:left}
+    .login-card{background:rgba(255,255,255,0.12);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.18);border-radius:24px;padding:44px 36px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.3);position:relative;z-index:2;text-align:center;animation:fadeSlideUp .7s ease both}
+    .login-logo-img{max-width:200px;height:auto;margin:0 auto 24px;display:block;animation:scaleIn .6s ease both .1s;filter:drop-shadow(0 4px 12px rgba(0,0,0,.15))}
+    .login-role-badge{display:inline-block;padding:6px 18px;border-radius:20px;font-size:13px;font-weight:800;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.9);margin-bottom:24px;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.15)}
+    .login-field{margin-bottom:16px;text-align:right}
+    .login-label{display:block;font-size:13px;font-weight:700;color:rgba(255,255,255,0.8);margin-bottom:6px}
+    .login-input{width:100%;padding:14px 16px 14px 48px;border:1.5px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);font-size:15px;font-weight:700;color:#fff;background:rgba(255,255,255,0.08);transition:var(--transition);font-family:'Tajawal',sans-serif}
     .login-input::placeholder{color:rgba(255,255,255,0.35)}
     .login-input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,75,0.2);background:rgba(255,255,255,0.12)}
     .login-input-wrap{position:relative}
-    .login-input-icon{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:18px;opacity:0.5;pointer-events:none}
-    .login-btn{width:100%;padding:15px;border:none;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--gold),#e2c46a);color:#1a1a2e;font-size:16px;font-weight:900;transition:var(--transition);margin-top:8px;box-shadow:0 4px 16px rgba(200,168,75,0.3)}
-    .login-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(200,168,75,0.4)}
-    .login-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
-    .login-error{background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.3);color:#fca5a5;border-radius:var(--radius-xs);padding:12px 14px;font-size:13px;font-weight:700;margin-top:14px;display:none;backdrop-filter:blur(8px)}
-    .login-footer{margin-top:28px;font-size:12px;color:rgba(255,255,255,0.4);font-weight:600}
-    .login-role-badge{display:inline-block;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(200,168,75,0.2);color:var(--gold);margin-bottom:20px;border:1px solid rgba(200,168,75,0.3)}
+    .login-input-icon{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:18px;opacity:.5;pointer-events:none}
+    .login-btn{width:100%;padding:15px;border:none;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--gold),#e2c46a);color:#1a1a2e;font-size:16px;font-weight:900;transition:var(--transition);margin-top:8px;box-shadow:0 4px 16px rgba(200,168,75,0.3);font-family:'Tajawal',sans-serif;cursor:pointer}
+    .login-btn:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(200,168,75,0.4)}
+    .login-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+    .login-error{display:none;margin-top:12px;padding:10px;border-radius:var(--radius-xs);background:rgba(220,38,38,0.12);color:#fca5a5;font-size:13px;font-weight:600}
+    .login-footer{margin-top:20px;font-size:11px;color:rgba(255,255,255,0.4)}
 
-    /* LAYOUT */
+    /* ═══ SIDEBAR ═══ */
     .portal-layout{display:flex;min-height:100vh}
-    .sidebar{width:var(--sidebar-w);background:linear-gradient(180deg,#1e1b4b 0%,#312e81 50%,#3730a3 100%);color:#fff;position:fixed;top:0;right:0;bottom:0;z-index:100;display:flex;flex-direction:column;overflow-y:auto;transition:var(--transition)}
-    .sidebar::-webkit-scrollbar{width:0}
-    .sidebar-brand{padding:28px 24px 20px;border-bottom:1px solid rgba(255,255,255,0.08)}
-    .sidebar-brand-row{display:flex;align-items:center;gap:14px}
-    .sidebar-logo{width:48px;height:48px;background:linear-gradient(135deg,var(--gold),#e2c46a);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;box-shadow:0 4px 16px rgba(200,168,75,0.3)}
-    .sidebar-brand-text{flex:1;min-width:0}
-    .sidebar-brand-name{font-size:18px;font-weight:900}
-    .sidebar-brand-sub{font-size:11px;color:rgba(255,255,255,0.5);font-weight:600;margin-top:2px}
-    .sidebar-teacher{padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.08)}
-    .sidebar-teacher-avatar{width:56px;height:56px;background:linear-gradient(135deg,rgba(255,255,255,0.15),rgba(255,255,255,0.05));border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;margin:0 auto 12px;border:2px solid rgba(255,255,255,0.1)}
-    .sidebar-teacher-name{text-align:center;font-size:15px;font-weight:800;margin-bottom:4px}
-    .sidebar-teacher-id{text-align:center;font-size:11px;color:rgba(255,255,255,0.5);font-weight:600;font-family:monospace}
-    .sidebar-nav{padding:16px 12px;flex:1}
-    .sidebar-link{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--radius-sm);color:rgba(255,255,255,0.7);font-size:14px;font-weight:600;transition:var(--transition);cursor:pointer;margin-bottom:2px}
+    .sidebar{width:var(--sidebar-w);background:linear-gradient(180deg,#1e1b4b 0%,#312e81 50%,#3730a3 100%);color:#fff;position:fixed;top:0;right:0;bottom:0;z-index:100;display:flex;flex-direction:column;overflow-y:auto}
+    .sidebar-brand{padding:24px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.08)}
+    .sidebar-brand-row{display:flex;align-items:center;gap:12px}
+    .sidebar-logo{width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+    .sidebar-brand-name{font-size:18px;font-weight:900;letter-spacing:1px}
+    .sidebar-brand-sub{font-size:10px;opacity:.5;font-weight:500}
+    .sidebar-teacher{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08);text-align:center}
+    .sidebar-teacher-avatar{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--gold),#e2c46a);color:#1e1b4b;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;margin:0 auto 8px}
+    .sidebar-teacher-name{font-size:14px;font-weight:700}
+    .sidebar-teacher-id{font-size:11px;opacity:.5;margin-top:2px}
+    .sidebar-nav{flex:1;padding:12px 10px}
+    .sidebar-link{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--radius-sm);cursor:pointer;transition:var(--transition);font-size:14px;font-weight:600;color:rgba(255,255,255,0.6);margin-bottom:4px}
     .sidebar-link:hover{background:rgba(255,255,255,0.08);color:#fff}
-    .sidebar-link.active{background:linear-gradient(135deg,rgba(200,168,75,0.2),rgba(200,168,75,0.1));color:var(--gold);font-weight:700}
-    .sidebar-link-icon{width:20px;text-align:center;font-size:16px}
-    .sidebar-footer{padding:16px 24px;border-top:1px solid rgba(255,255,255,0.08)}
-    .sidebar-logout{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;border-radius:var(--radius-sm);background:rgba(220,38,38,0.12);border:1px solid rgba(220,38,38,0.2);color:#fca5a5;font-size:13px;font-weight:700;transition:var(--transition)}
-    .sidebar-logout:hover{background:rgba(220,38,38,0.2);border-color:rgba(220,38,38,0.35)}
-    .main-content{flex:1;margin-right:var(--sidebar-w);min-height:100vh}
+    .sidebar-link.active{background:rgba(255,255,255,0.12);color:#fff;font-weight:700}
+    .sidebar-link-icon{font-size:18px;width:24px;text-align:center}
+    .sidebar-footer{padding:12px 10px;border-top:1px solid rgba(255,255,255,0.08)}
+    .sidebar-logout{width:100%;padding:12px;border:none;border-radius:var(--radius-sm);background:rgba(220,38,38,0.12);color:#fca5a5;font-size:13px;font-weight:700;cursor:pointer;transition:var(--transition);font-family:'Tajawal',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px}
+    .sidebar-logout:hover{background:rgba(220,38,38,0.25)}
+
+    /* ═══ MAIN ═══ */
+    .main-content{flex:1;margin-right:var(--sidebar-w);min-height:100vh;display:flex;flex-direction:column}
     .main-topbar{display:none;padding:12px 20px;background:var(--card);border-bottom:1px solid var(--border);align-items:center;gap:12px;position:sticky;top:0;z-index:90}
-    .topbar-toggle{width:40px;height:40px;border-radius:var(--radius-sm);background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:18px;transition:var(--transition)}
-    .topbar-brand{display:flex;align-items:center;gap:10px;flex:1}
-    .topbar-logo{width:36px;height:36px;background:linear-gradient(135deg,var(--gold),#e2c46a);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+    .topbar-toggle{background:none;border:none;font-size:22px;cursor:pointer;padding:4px}
+    .topbar-brand{display:flex;align-items:center;gap:8px;flex:1}
+    .topbar-logo{font-size:20px}
     .topbar-title{font-size:16px;font-weight:900}
-    .topbar-logout{padding:8px 14px;border-radius:var(--radius-xs);background:var(--danger-light);color:var(--danger);font-size:12px;font-weight:700;transition:var(--transition)}
-    .main-body{padding:32px 28px}
+    .topbar-logout{background:none;border:1.5px solid var(--red);color:var(--red);padding:6px 14px;border-radius:var(--radius-xs);font-size:12px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif}
+    .main-body{flex:1;padding:28px 32px}
 
-    /* HERO */
-    .hero-card{background:linear-gradient(135deg,#4f46e5 0%,#6366f1 40%,#818cf8 100%);border-radius:20px;padding:36px 32px;color:#fff;position:relative;overflow:hidden;margin-bottom:28px;animation:fadeSlideUp 0.5s ease both}
-    .hero-card::before{content:'';position:absolute;top:-50%;left:-20%;width:60%;height:200%;background:radial-gradient(circle,rgba(200,168,75,0.12) 0%,transparent 60%);pointer-events:none}
-    .hero-row{display:flex;align-items:center;gap:20px;position:relative;z-index:1}
-    .hero-avatar{width:68px;height:68px;background:rgba(255,255,255,0.15);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;border:2px solid rgba(255,255,255,0.2)}
-    .hero-info{flex:1}
-    .hero-greeting{font-size:13px;color:rgba(255,255,255,0.6);font-weight:600;margin-bottom:4px}
-    .hero-name{font-size:24px;font-weight:900}
-    .hero-id{font-size:12px;color:rgba(255,255,255,0.5);font-family:monospace;font-weight:600;margin-top:4px}
-    .hero-badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;position:relative;z-index:1}
-    .hero-badge{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;backdrop-filter:blur(8px);background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15)}
+    /* ═══ DASHBOARD ═══ */
+    .hero-card{background:linear-gradient(135deg,#1e1b4b 0%,#312e81 50%,#3730a3 100%);border-radius:var(--radius);padding:28px 32px;color:#fff;display:flex;align-items:center;gap:20px;margin-bottom:24px;box-shadow:var(--shadow-lg);animation:fadeSlideUp .5s ease both}
+    .hero-avatar{width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,var(--gold),#e2c46a);color:#1e1b4b;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;flex-shrink:0}
+    .hero-greeting{font-size:13px;opacity:.7;margin-bottom:2px}
+    .hero-name{font-size:22px;font-weight:900}
+    .hero-id{font-size:11px;opacity:.5;margin-top:2px}
+    .hero-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+    .hero-badge{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(255,255,255,0.12);backdrop-filter:blur(4px)}
+    .stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:28px}
+    .stat-card{background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);transition:var(--transition);animation:fadeSlideUp .5s ease both}
+    .stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+    .stat-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px}
+    .stat-value{font-size:26px;font-weight:900;line-height:1.2}
+    .stat-label{font-size:12px;color:var(--text-muted);font-weight:600;margin-top:2px}
+    .c-purple .stat-icon{background:var(--purple-light);color:var(--purple)}
+    .c-green .stat-icon{background:var(--green-light);color:var(--green)}
+    .c-blue .stat-icon{background:var(--blue-light);color:var(--blue)}
+    .c-gold .stat-icon{background:var(--gold-light);color:var(--gold)}
+    .c-red .stat-icon{background:var(--red-light);color:var(--red)}
+    .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .section-title{font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px}
+    .section-count{font-size:12px;color:var(--text-muted);font-weight:600;background:var(--primary-light);padding:4px 12px;border-radius:20px}
 
-    /* STATS */
-    .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
-    .stat-card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);border:1px solid var(--border-light);transition:var(--transition);position:relative;overflow:hidden}
-    .stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
-    .stat-card::before{content:'';position:absolute;top:0;right:0;width:4px;height:100%;border-radius:0 var(--radius) var(--radius) 0}
-    .stat-card.c-purple::before{background:var(--primary)}
-    .stat-card.c-gold::before{background:var(--gold)}
-    .stat-card.c-green::before{background:var(--success)}
-    .stat-card.c-blue::before{background:var(--blue)}
-    .stat-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:14px}
-    .stat-icon.i-purple{background:var(--primary-light)}
-    .stat-icon.i-gold{background:var(--gold-light)}
-    .stat-icon.i-green{background:var(--success-light)}
-    .stat-icon.i-blue{background:var(--blue-light)}
-    .stat-value{font-size:28px;font-weight:900;color:var(--text);line-height:1}
-    .stat-label{font-size:12px;color:var(--text-muted);font-weight:600;margin-top:4px}
+    /* ═══ TABLE ═══ */
+    .data-table{width:100%;border-collapse:collapse;background:var(--card);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border-light)}
+    .data-table th{padding:14px 16px;text-align:right;font-size:12px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light)}
+    .data-table td{padding:12px 16px;font-size:13px;border-bottom:1px solid var(--border-light);vertical-align:middle}
+    .data-table tr:last-child td{border-bottom:none}
+    .data-table tr:hover td{background:var(--primary-light)}
 
-    /* CONTENT CARDS */
-    .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-    .section-title{font-size:18px;font-weight:900;color:var(--text);display:flex;align-items:center;gap:8px}
-    .section-count{background:var(--primary-light);color:var(--primary);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:800}
-    .content-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-bottom:32px}
-    .content-card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);border:1px solid var(--border-light);transition:var(--transition);animation:fadeSlideUp 0.5s ease both}
-    .content-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md)}
-    .content-card-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
-    .content-card-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
-    .content-card-title{font-size:15px;font-weight:800;color:var(--text)}
-    .content-card-sub{font-size:12px;color:var(--text-muted);font-weight:600;margin-top:2px}
-    .content-card-body{font-size:13px;color:var(--text-secondary);line-height:1.7;margin-bottom:14px}
-    .content-card-footer{display:flex;gap:8px}
-    .content-btn{flex:1;padding:10px;border-radius:var(--radius-xs);border:1.5px solid var(--border);background:var(--card);color:var(--text-secondary);font-size:12px;font-weight:700;cursor:pointer;transition:var(--transition);display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:'Tajawal',sans-serif}
-    .content-btn:hover{border-color:var(--primary);background:var(--primary-light);color:var(--primary)}
-    .content-btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
-    .content-btn.primary:hover{background:var(--primary-dark)}
+    /* ═══ CONTENT CARDS ═══ */
+    .content-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+    .content-card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);overflow:hidden;transition:var(--transition);animation:fadeSlideUp .4s ease both}
+    .content-card:hover{box-shadow:var(--shadow);transform:translateY(-2px)}
+    .content-card-header{padding:16px 20px 12px;display:flex;align-items:flex-start;gap:12px}
+    .content-card-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+    .content-card-icon.lesson{background:var(--blue-light);color:var(--blue)}
+    .content-card-icon.exercise{background:var(--green-light);color:var(--green)}
+    .content-card-icon.homework{background:var(--gold-light);color:var(--gold)}
+    .content-card-icon.announcement{background:var(--purple-light);color:var(--purple)}
+    .content-card-title{font-size:14px;font-weight:800;margin-bottom:4px}
+    .content-card-sub{font-size:11px;color:var(--text-muted)}
+    .content-card-body{padding:0 20px 12px;font-size:12px;color:var(--text-secondary);line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .content-card-footer{padding:12px 20px;border-top:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between}
+    .content-tag{padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700}
+    .content-actions{display:flex;gap:6px}
+    .content-actions button{padding:5px 10px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;transition:var(--transition);font-family:'Tajawal',sans-serif}
+    .btn-edit{background:var(--primary-light);color:var(--primary)}
+    .btn-delete{background:var(--red-light);color:var(--red)}
 
-    .portal-footer{text-align:center;padding:24px;font-size:12px;color:var(--text-muted);font-weight:600}
+    /* ═══ UPLOAD ZONE ═══ */
+    .upload-zone{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:32px 20px;text-align:center;cursor:pointer;transition:var(--transition);background:var(--bg)}
+    .upload-zone:hover,.upload-zone.dragover{border-color:var(--primary);background:var(--primary-light)}
+    .upload-zone-icon{font-size:36px;margin-bottom:8px;opacity:.5}
+    .upload-zone-text{font-size:13px;color:var(--text-muted);font-weight:600}
+    .upload-zone-hint{font-size:11px;color:var(--text-secondary);margin-top:4px}
+    .file-list{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+    .file-item{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--card);border:1px solid var(--border-light);border-radius:var(--radius-xs);font-size:12px}
+    .file-item-icon{font-size:20px}
+    .file-item-info{flex:1;min-width:0}
+    .file-item-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .file-item-size{color:var(--text-muted);font-size:11px}
+    .file-item-remove{background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:4px}
+    .file-progress{height:4px;background:var(--border);border-radius:2px;margin-top:6px;overflow:hidden}
+    .file-progress-bar{height:100%;background:var(--primary);border-radius:2px;transition:width .3s;width:0}
 
-    /* LOADING */
-    .loading-page{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px}
-    .spinner{width:44px;height:44px;border:3.5px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite}
-    .loading-text{font-size:15px;color:var(--text-muted);font-weight:600}
+    /* ═══ FORM ═══ */
+    .form-section{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;background:var(--card)}
+    .form-section-title{font-size:13px;font-weight:800;color:var(--primary);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+    .form-group{margin-bottom:14px}
+    .form-group:last-child{margin-bottom:0}
+    .form-label{display:block;font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px}
+    .form-label .required{color:var(--red)}
+    .form-input{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:14px;font-weight:600;color:var(--text);background:var(--bg);transition:var(--transition);font-family:'Tajawal',sans-serif}
+    .form-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
+    .form-input::placeholder{color:var(--text-secondary)}
+    select.form-input{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:left 12px center;padding-left:32px}
 
-    /* DRAWER */
-    .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;opacity:0;transition:opacity 0.3s ease;backdrop-filter:blur(2px)}
-    .drawer-overlay.open{display:block;opacity:1}
+    /* ═══ BALANCE CARD ═══ */
+    .balance-card{background:linear-gradient(135deg,#059669,#10b981);border-radius:var(--radius);padding:32px;color:#fff;text-align:center;max-width:400px;margin:40px auto;box-shadow:0 8px 32px rgba(5,150,105,0.3)}
+    .balance-label{font-size:14px;opacity:.8;margin-bottom:8px}
+    .balance-amount{font-size:42px;font-weight:900}
+    .balance-currency{font-size:16px;opacity:.7;margin-top:4px}
 
-    /* MODAL */
-    .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
-    .modal-bg.open{display:flex}
-    .modal{background:var(--card);border-radius:20px;width:100%;max-width:600px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);animation:scaleIn 0.3s ease both}
-    .modal-header{display:flex;align-items:center;gap:12px;padding:20px 24px;border-bottom:1px solid var(--border-light)}
-    .modal-title{flex:1;font-size:17px;font-weight:900}
-    .modal-close{width:32px;height:32px;border-radius:8px;background:var(--danger-light);color:var(--danger);display:flex;align-items:center;justify-content:center;font-size:16px;transition:var(--transition)}
-    .modal-close:hover{background:rgba(220,38,38,0.15)}
-    .modal-body{padding:24px}
-    .form-group{margin-bottom:16px}
-    .form-label{display:block;font-size:13px;font-weight:700;color:var(--text-secondary);margin-bottom:6px}
-    .form-input{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:14px;font-weight:600;color:var(--text);background:var(--card);transition:var(--transition)}
-    .form-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
-    textarea.form-input{resize:vertical;min-height:80px}
-    .form-btn{padding:10px 20px;border-radius:var(--radius-xs);font-size:13px;font-weight:700;transition:var(--transition)}
-    .form-btn.primary{background:var(--primary);color:#fff;border:none}
-    .form-btn.primary:hover{background:var(--primary-dark)}
+    /* ═══ MODAL ═══ */
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(4px)}
+    .modal-bg.open{opacity:1;pointer-events:auto}
+    .modal{background:var(--card);border-radius:var(--radius);width:90%;max-width:580px;max-height:85vh;overflow-y:auto;box-shadow:var(--shadow-lg);transform:translateY(20px);transition:transform .25s}
+    .modal-bg.open .modal{transform:translateY(0)}
+    .modal-header{padding:20px 24px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:12px}
+    .modal-title{font-size:16px;font-weight:800;flex:1}
+    .modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);padding:4px}
+    .modal-body{padding:20px 24px}
 
-    /* RESPONSIVE */
-    @media(max-width:1024px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
+    /* ═══ BTN ═══ */
+    .btn-primary{width:100%;padding:12px;border:none;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;font-size:14px;font-weight:800;cursor:pointer;transition:var(--transition);font-family:'Tajawal',sans-serif}
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(99,102,241,0.3)}
+    .btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+    .btn-add{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border:none;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:var(--transition);font-family:'Tajawal',sans-serif}
+    .btn-add:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(99,102,241,0.3)}
+
+    /* ═══ EMPTY ═══ */
+    .empty-state{text-align:center;padding:48px 20px;color:var(--text-muted)}
+    .empty-state-icon{font-size:48px;margin-bottom:12px;opacity:.4}
+    .empty-state-text{font-size:14px;font-weight:600}
+
+    /* ═══ FOOTER ═══ */
+    .portal-footer{text-align:center;padding:20px;font-size:11px;color:var(--text-secondary);margin-top:auto}
+
+    /* ═══ LOADING ═══ */
+    .loading-page{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh}
+    .spinner{width:40px;height:40px;border:4px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .loading-text{margin-top:16px;font-size:14px;color:var(--text-muted);font-weight:600}
+
+    /* ═══ DRAWER ═══ */
+    .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:199;opacity:0;pointer-events:none;transition:opacity .25s}
+    .drawer-overlay.open{opacity:1;pointer-events:auto}
+
+    /* ═══ RESPONSIVE ═══ */
+    @media(max-width:1024px){.stats-grid{grid-template-columns:repeat(3,1fr)}}
     @media(max-width:768px){
-      .sidebar{display:none}.main-content{margin-right:0}.main-topbar{display:flex}.main-body{padding:20px 16px}
-      .hero-card{padding:24px 20px;border-radius:16px}.hero-avatar{width:56px;height:56px;font-size:22px}
-      .hero-name{font-size:20px}.stats-grid{grid-template-columns:repeat(2,1fr);gap:12px}
+      .sidebar{display:none}
+      .main-content{margin-right:0}
+      .main-topbar{display:flex}
+      .stats-grid{grid-template-columns:repeat(2,1fr)}
       .content-grid{grid-template-columns:1fr}
+      .main-body{padding:16px}
+      .hero-card{flex-direction:column;text-align:center;padding:20px}
+      .hero-badges{justify-content:center}
+      .data-table{font-size:12px}
+      .data-table th,.data-table td{padding:10px 8px}
     }
+    @media(max-width:480px){.stats-grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -186,46 +229,336 @@
     <div class="loading-page"><div class="spinner"></div><div class="loading-text">جاري تحميل لوحة الأستاذ...</div></div>
   </div>
   <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
-
-  <!-- CONTENT MODAL -->
-  <div class="modal-bg" id="content-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title" id="content-modal-title">إضافة محتوى</div>
-        <button class="modal-close" onclick="closeContentModal()">✕</button>
-      </div>
-      <div class="modal-body" id="content-modal-body"></div>
-    </div>
-  </div>
+  <div class="modal-bg" id="content-modal"><div class="modal"><div class="modal-header"><div class="modal-title" id="content-modal-title">إضافة محتوى جديد</div><button class="modal-close" onclick="closeContentModal()">✕</button></div><div class="modal-body" id="content-modal-body"></div></div></div>
 
   <script>
-    const firebaseConfig = { apiKey: "AIzaSyDzUxZQ...placeholder", authDomain: "eplus-center-39.firebaseapp.com", projectId: "eplus-center-39", storageBucket: "eplus-center-39.appspot.com", messagingSenderId: "123456789", appId: "1:123456789:web:placeholder" };
+    const firebaseConfig={apiKey:"AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",authDomain:"eplus-center-39.firebaseapp.com",projectId:"eplus-center-39",storageBucket:"eplus-center-39.firebasestorage.app",messagingSenderId:"191532732034",appId:"1:191532732034:web:b11449a2f0595db5d02e9b"};
+    let db,storage;
+    try{firebase.initializeApp(firebaseConfig);db=firebase.firestore();storage=firebase.storage();}catch(e){console.error('Firebase init error:',e);}
 
-    let db, auth;
-    try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); auth = firebase.auth(); } catch(e) { console.error('Firebase init error:', e); }
+    const USERS_COLLECTION='users',SRT_COLLECTION='support_teachers',CONTENT_COLLECTION='teacher_content',REG_COLLECTION='support_registrations',FIN_COLLECTION='teacher_finance';
+    const SESSION_KEY='eplus_teacher_session',SESSION_MAX_AGE=24*60*60*1000;
+    const TYPE_LABELS={lesson:'📚 درس',exercise:'📝 تمارين',homework:'📋 واجبات',announcement:'📢 إعلان'};
+    const TYPE_COLORS={lesson:'blue',exercise:'green',homework:'gold',announcement:'purple'};
+    const ALLOWED_TYPES=['application/pdf','image/jpeg','image/jpg','image/png','image/webp','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.openxmlformats-officedocument.presentationml.presentation','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','video/mp4','application/zip'];
+    const MAX_FILE_SIZE=50*1024*1024;
 
-    const SESSION_KEY = 'eplus_teacher_session';
-    const SESSION_MAX_AGE = 24*60*60*1000;
-    const USERS_COLLECTION = 'users';
-    const SRT_COLLECTION = 'support_teachers';
-    const CONTENT_COLLECTION = 'teacher_content';
+    let currentTeacher=null,currentPage='home',pendingFiles=[];
 
-    let currentTeacher = null;
-    let currentPage = 'home';
-    let teacherSubjects = [];
-
-    async function hashPassword(password, salt) {
-      const enc = new TextEncoder();
-      const data = enc.encode(salt + ':' + password);
-      const buf = await crypto.subtle.digest('SHA-256', data);
-      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-
+    /* ═══ SESSION ═══ */
     function getSession(){try{const s=localStorage.getItem(SESSION_KEY);if(!s)return null;const o=JSON.parse(s);if(Date.now()-o.loginTime>SESSION_MAX_AGE){localStorage.removeItem(SESSION_KEY);return null;}return o;}catch(e){localStorage.removeItem(SESSION_KEY);return null;}}
-    function saveSession(user,teacher){localStorage.setItem(SESSION_KEY,JSON.stringify({userId:user.userId,username:user.username,role:user.role,teacherId:teacher.teacherId,teacherDocId:teacher.id,loginTime:Date.now()}));}
+    function saveSession(u,t){localStorage.setItem(SESSION_KEY,JSON.stringify({userId:u.userId,username:u.username,role:u.role,teacherId:t.teacherId,teacherDocId:t.id,loginTime:Date.now()}));}
     function clearSession(){localStorage.removeItem(SESSION_KEY);}
 
+    /* ═══ HASH ═══ */
+    async function hashPassword(p,s){const e=new TextEncoder(),d=e.encode(s+':'+p),b=await crypto.subtle.digest('SHA-256',d);return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+
+    /* ═══ FORMAT ═══ */
+    function fmtNum(n){return(n||0).toLocaleString('ar-DZ');}
+    function fmtDate(d){if(!d)return'—';const t=d.seconds?new Date(d.seconds*1000):new Date(d);return t.toLocaleDateString('ar-DZ',{year:'numeric',month:'short',day:'numeric'});}
+
+    /* ═══ UI HELPERS ═══ */
     function showLoading(){document.getElementById('app').innerHTML='<div class="loading-page"><div class="spinner"></div><div class="loading-text">جاري تحميل لوحة الأستاذ...</div></div>';}
+    function openDrawer(){document.getElementById('drawer-overlay').classList.add('open');let d=document.getElementById('mobile-drawer-panel');if(!d){d=document.createElement('div');d.id='mobile-drawer-panel';d.style.cssText='display:block;position:fixed;top:0;right:0;bottom:0;width:280px;background:linear-gradient(180deg,#1e1b4b 0%,#312e81 50%,#3730a3 100%);color:#fff;z-index:201;overflow-y:auto;animation:slideInDrawer .3s ease both;box-shadow:-4px 0 24px rgba(0,0,0,0.3)';document.body.appendChild(d);}d.innerHTML=renderSidebar(currentTeacher);d.style.display='block';d.style.animation='slideInDrawer .3s ease both';}
+    function closeDrawer(){document.getElementById('drawer-overlay').classList.remove('open');const d=document.getElementById('mobile-drawer-panel');if(d){d.style.animation='slideOutDrawer .3s ease both';setTimeout(()=>{d.style.display='none';},280);}}
+    function handleLogout(){clearSession();window.location.href='/teacher.html';}
+
+    /* ═══ SIDEBAR ═══ */
+    function renderSidebar(t){
+      const name=t.name||'الأستاذ',initials=name[0]||'م';
+      return `<div class="sidebar-brand"><div class="sidebar-brand-row"><div class="sidebar-logo">🎓</div><div class="sidebar-brand-text"><div class="sidebar-brand-name">E-PLUS</div><div class="sidebar-brand-sub">Teacher Portal</div></div></div></div>
+      <div class="sidebar-teacher"><div class="sidebar-teacher-avatar">${initials}</div><div class="sidebar-teacher-name">${name}</div><div class="sidebar-teacher-id">${t.teacherId||''}</div></div>
+      <div class="sidebar-nav">
+        <div class="sidebar-link ${currentPage==='home'?'active':''}" onclick="navigateTo('home')"><span class="sidebar-link-icon">🏠</span>الرئيسية</div>
+        <div class="sidebar-link ${currentPage==='content'?'active':''}" onclick="navigateTo('content')"><span class="sidebar-link-icon">📚</span>المحتوى التعليمي</div>
+        <div class="sidebar-link ${currentPage==='students'?'active':''}" onclick="navigateTo('students')"><span class="sidebar-link-icon">👥</span>الطلاب</div>
+        <div class="sidebar-link ${currentPage==='finance'?'active':''}" onclick="navigateTo('finance')"><span class="sidebar-link-icon">💰</span>الموارد المالية</div>
+      </div>
+      <div class="sidebar-footer"><button class="sidebar-logout" onclick="handleLogout()">🚪 تسجيل الخروج</button></div>`;
+    }
+    function navigateTo(p){currentPage=p;closeDrawer();renderCurrentPage();}
+    function renderCurrentPage(){if(!currentTeacher)return;if(currentPage==='content')renderContentPage();else if(currentPage==='students')renderStudentsPage();else if(currentPage==='finance')renderFinancePage();else renderDashboard(currentTeacher);}
+    function updateSidebarActive(){document.querySelectorAll('.sidebar-link').forEach(l=>{l.classList.remove('active');if(currentPage==='home'&&l.textContent.includes('الرئيسية'))l.classList.add('active');if(currentPage==='content'&&l.textContent.includes('المحتوى'))l.classList.add('active');if(currentPage==='students'&&l.textContent.includes('الطلاب'))l.classList.add('active');if(currentPage==='finance'&&l.textContent.includes('المالية'))l.classList.add('active');});}
+
+    /* ═══ DASHBOARD ═══ */
+    async function renderDashboard(t){
+      currentTeacher=t;currentPage='home';
+      const teacherId=t.teacherId||t.id;
+      const subjects=Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s):[];
+      const levels=Array.isArray(t.levels)?t.levels:[];
+      const name=t.name||'الأستاذ',initials=name[0]||'م';
+      const content=document.getElementById('app');
+      content.innerHTML=`<div class="portal-layout">${renderSidebar(t)}<div class="main-content">
+        <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">👨‍🏫</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
+        <div class="main-body">
+          <div class="hero-card"><div class="hero-avatar">${initials}</div><div><div class="hero-greeting">مرحباً بك</div><div class="hero-name">${name}</div><div class="hero-id">ID: ${teacherId}</div><div class="hero-badges">${subjects.map(s=>'<span class="hero-badge">'+s+'</span>').join('')}${levels.map(l=>'<span class="hero-badge">'+l+'</span>').join('')}</div></div></div>
+          <div class="stats-grid" id="dash-stats">
+            <div class="stat-card c-green"><div class="stat-icon">👨‍🎓</div><div class="stat-value" id="stat-students">...</div><div class="stat-label">طالب مسجل</div></div>
+            <div class="stat-card c-blue"><div class="stat-icon">📚</div><div class="stat-value" id="stat-lessons">...</div><div class="stat-label">درس</div></div>
+            <div class="stat-card c-purple"><div class="stat-icon">📝</div><div class="stat-value" id="stat-exercises">...</div><div class="stat-label">تمرين / سلسلة</div></div>
+            <div class="stat-card c-gold"><div class="stat-icon">📢</div><div class="stat-value" id="stat-announcements">...</div><div class="stat-label">إعلان</div></div>
+            <div class="stat-card c-red"><div class="stat-icon">💰</div><div class="stat-value" id="stat-balance">...</div><div class="stat-label">الرصيد الحالي (دج)</div></div>
+          </div>
+          <div class="section-header"><div class="section-title">📋 آخر المحتويات المضافة</div></div>
+          <div id="dash-recent-content"></div>
+          <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
+        </div>
+      </div></div>`;
+      updateSidebarActive();
+      loadDashboardStats(teacherId,subjects);
+    }
+
+    async function loadDashboardStats(teacherId,subjects){
+      try{
+        const [contentSnap,regSnap,finSnap]=await Promise.all([
+          db.collection(CONTENT_COLLECTION).where('teacherId','==',teacherId).get().catch(()=>({docs:[]})),
+          db.collection(REG_COLLECTION).where('status','==','مسجل نهائياً').get().catch(()=>({docs:[]})),
+          db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(()=>({docs:[]})),
+        ]);
+        const allContent=contentSnap.docs.map(d=>({id:d.id,...d.data()}));
+        const lessons=allContent.filter(c=>c.type==='lesson').length;
+        const exercises=allContent.filter(c=>c.type==='exercise'||c.type==='homework').length;
+        const announcements=allContent.filter(c=>c.type==='announcement').length;
+        const students=regSnap.docs.filter(d=>{
+          const data=d.data();
+          if(!Array.isArray(data.subjects))return false;
+          return data.subjects.some(s=>{
+            const sn=s.subject||s;
+            return subjects.some(ts=>ts===sn);
+          });
+        }).length;
+        const balance=finSnap.docs.length>0?(finSnap.docs[0].data().balance||0):0;
+        document.getElementById('stat-students').textContent=fmtNum(students);
+        document.getElementById('stat-lessons').textContent=fmtNum(lessons);
+        document.getElementById('stat-exercises').textContent=fmtNum(exercises);
+        document.getElementById('stat-announcements').textContent=fmtNum(announcements);
+        document.getElementById('stat-balance').textContent=fmtNum(balance);
+        const recent=allContent.sort((a,b)=>{const ta=a.createdAt?.seconds||0,tb=b.createdAt?.seconds||0;return tb-ta;}).slice(0,6);
+        const container=document.getElementById('dash-recent-content');
+        if(recent.length===0){container.innerHTML='<div class="empty-state"><div class="empty-state-icon">📄</div><div class="empty-state-text">لا يوجد محتوى بعد</div></div>';return;}
+        container.innerHTML='<div class="content-grid">'+recent.map(c=>{
+          const tc=TYPE_COLORS[c.type]||'blue';
+          const tl=TYPE_LABELS[c.type]||c.type;
+          return `<div class="content-card"><div class="content-card-header"><div class="content-card-icon ${c.type}">${tl.split(' ')[0]}</div><div><div class="content-card-title">${c.title||'بدون عنوان'}</div><div class="content-card-sub">${c.subject||''} ${c.level?'— '+c.level:''}</div></div></div><div class="content-card-footer"><span class="content-tag" style="background:var(--${tc}-light);color:var(--${tc})">${tl}</span><span style="font-size:11px;color:var(--text-muted)">${fmtDate(c.createdAt)}</span></div></div>`;
+        }).join('')+'</div>';
+      }catch(e){console.error('Dashboard stats error:',e);}
+    }
+
+    /* ═══ CONTENT PAGE ═══ */
+    async function renderContentPage(){
+      currentTeacher=currentTeacher||{teacherId:''};
+      const teacherId=currentTeacher.teacherId||currentTeacher.id;
+      const content=document.getElementById('app');
+      content.innerHTML=`<div class="portal-layout">${renderSidebar(currentTeacher)}<div class="main-content">
+        <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">👨‍🏫</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
+        <div class="main-body">
+          <div class="section-header"><div class="section-title">📚 المحتوى التعليمي</div><button class="btn-add" onclick="openAddContent()">+ إضافة محتوى</button></div>
+          <div id="content-list"><div class="loading-page" style="min-height:200px"><div class="spinner"></div></div></div>
+          <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
+        </div>
+      </div></div>`;
+      updateSidebarActive();
+      try{
+        const snap=await db.collection(CONTENT_COLLECTION).where('teacherId','==',teacherId).orderBy('createdAt','desc').get();
+        const items=snap.docs.map(d=>({id:d.id,...d.data()}));
+        const list=document.getElementById('content-list');
+        if(items.length===0){list.innerHTML='<div class="empty-state"><div class="empty-state-icon">📚</div><div class="empty-state-text">لم تضف أي محتوى بعد</div></div>';return;}
+        list.innerHTML='<div class="content-grid">'+items.map(c=>{
+          const tc=TYPE_COLORS[c.type]||'blue';
+          const tl=TYPE_LABELS[c.type]||c.type;
+          const hasFiles=c.attachments&&c.attachments.length>0;
+          const hasUrl=c.url&&c.url.trim();
+          return `<div class="content-card"><div class="content-card-header"><div class="content-card-icon ${c.type}">${tl.split(' ')[0]}</div><div style="flex:1;min-width:0"><div class="content-card-title">${c.title||'بدون عنوان'}</div><div class="content-card-sub">${c.subject||''} ${c.level?'— '+c.level:''}</div></div></div>${c.description?'<div class="content-card-body">'+c.description+'</div>':''}<div class="content-card-footer"><div style="display:flex;gap:4px;flex-wrap:wrap"><span class="content-tag" style="background:var(--${tc}-light);color:var(--${tc})">${tl}</span>${hasFiles?'<span class="content-tag" style="background:var(--green-light);color:var(--green)">📎 '+c.attachments.length+'</span>':''}${hasUrl?'<span class="content-tag" style="background:var(--blue-light);color:var(--blue)">🔗 رابط</span>':''}<span style="font-size:11px;color:var(--text-muted);margin-right:auto">${fmtDate(c.createdAt)}</span></div><div class="content-actions"><button class="btn-delete" onclick="deleteContent('${c.id}')">🗑️</button></div></div></div>`;
+        }).join('')+'</div>';
+      }catch(e){console.error('Content load error:',e);document.getElementById('content-list').innerHTML='<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">حدث خطأ أثناء تحميل المحتوى</div></div>';}
+    }
+
+    function openAddContent(){
+      pendingFiles=[];
+      const t=currentTeacher;
+      const subjects=Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s):[];
+      const levels=Array.isArray(t.levels)?t.levels:[];
+      document.getElementById('content-modal-title').textContent='إضافة محتوى جديد';
+      document.getElementById('content-modal-body').innerHTML=`
+        <div class="form-section">
+          <div class="form-section-title">📝 معلومات المحتوى</div>
+          <div class="form-group"><label class="form-label">نوع المحتوى <span class="required">*</span></label>
+            <select class="form-input" id="cnt-type"><option value="lesson">📚 درس</option><option value="exercise">📝 تمارين</option><option value="homework">📋 واجبات</option><option value="announcement">📢 إعلان</option></select></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group"><label class="form-label">المادة <span class="required">*</span></label>
+              <select class="form-input" id="cnt-subject">${subjects.map(s=>'<option value="'+s+'">'+s+'</option>').join('')}</select></div>
+            <div class="form-group"><label class="form-label">المستوى</label>
+              <select class="form-input" id="cnt-level"><option value="">الكل</option>${levels.map(l=>'<option value="'+l+'">'+l+'</option>').join('')}</select></div>
+          </div>
+          <div class="form-group"><label class="form-label">العنوان <span class="required">*</span></label><input class="form-input" type="text" id="cnt-title" placeholder="عنوان المحتوى"></div>
+          <div class="form-group"><label class="form-label">الوصف</label><textarea class="form-input" id="cnt-desc" rows="3" placeholder="وصف مختصر للمحتوى..." style="resize:vertical"></textarea></div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">📎 المرفقات</div>
+          <div class="upload-zone" id="upload-zone">
+            <div class="upload-zone-icon">📁</div>
+            <div class="upload-zone-text">اسحب الملفات هنا أو اضغط للاختيار</div>
+            <div class="upload-zone-hint">PDF, JPG, PNG, DOCX, PPTX, XLSX, MP4, ZIP — حد أقصى 50MB</div>
+          </div>
+          <input type="file" id="file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.pptx,.xlsx,.mp4,.zip" style="display:none">
+          <div class="file-list" id="file-list"></div>
+          <div class="form-group" style="margin-top:12px"><label class="form-label">رابط إضافي (اختياري)</label><input class="form-input" type="url" id="cnt-url" placeholder="https://..."></div>
+        </div>
+        <button class="btn-primary" id="cnt-save-btn" onclick="saveContent()">💾 حفظ المحتوى</button>`;
+      document.getElementById('content-modal').classList.add('open');
+      setupUploadZone();
+    }
+
+    function setupUploadZone(){
+      const zone=document.getElementById('upload-zone');
+      const input=document.getElementById('file-input');
+      zone.addEventListener('click',()=>input.click());
+      zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('dragover');});
+      zone.addEventListener('dragleave',()=>zone.classList.remove('dragover'));
+      zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('dragover');handleFiles(e.dataTransfer.files);});
+      input.addEventListener('change',e=>handleFiles(e.target.files));
+    }
+
+    function handleFiles(fileList){
+      for(const file of fileList){
+        if(!ALLOWED_TYPES.includes(file.type)){alert('نوع الملف غير مدعوم: '+file.name);continue;}
+        if(file.size>MAX_FILE_SIZE){alert('الملف كبير جداً: '+file.name+' (حد أقصى 50MB)');continue;}
+        if(pendingFiles.length>=10){alert('حد أقصى 10 ملفات');break;}
+        pendingFiles.push({file,name:file.name,size:file.size,type:file.type,progress:0,uploaded:false,url:''});
+      }
+      renderFileList();
+    }
+
+    function renderFileList(){
+      const container=document.getElementById('file-list');
+      if(!container)return;
+      if(pendingFiles.length===0){container.innerHTML='';return;}
+      container.innerHTML=pendingFiles.map((f,i)=>{
+        const icon=f.type.startsWith('image/')?'🖼️':f.type==='application/pdf'?'📄':f.type.includes('video')?'🎬':'📎';
+        const size=f.size>1024*1024?(f.size/(1024*1024)).toFixed(1)+'MB':(f.size/1024).toFixed(0)+'KB';
+        return `<div class="file-item"><span class="file-item-icon">${icon}</span><div class="file-item-info"><div class="file-item-name">${f.name}</div><div class="file-item-size">${size}</div>${f.progress>0&&f.progress<100?'<div class="file-progress"><div class="file-progress-bar" style="width:'+f.progress+'%"></div></div>':''}${f.uploaded?'<div style="color:var(--green);font-size:11px;font-weight:700">✅ تم الرفع</div>':''}</div><button class="file-item-remove" onclick="removeFile(${i})">✕</button></div>`;
+      }).join('');
+    }
+
+    function removeFile(i){pendingFiles.splice(i,1);renderFileList();}
+
+    async function uploadFileToStorage(fileObj,teacherId){
+      const path='support-content/'+teacherId+'/'+Date.now()+'_'+fileObj.name;
+      const ref=storage.ref(path);
+      const task=ref.put(fileObj.file);
+      return new Promise((resolve,reject)=>{
+        task.on('state_changed',snap=>{
+          const pct=Math.round((snap.bytesTransferred/snap.totalBytes)*100);
+          fileObj.progress=pct;renderFileList();
+        },err=>reject(err),async()=>{
+          const url=await task.snapshot.ref.getDownloadURL();
+          fileObj.uploaded=true;fileObj.url=url;fileObj.storagePath=path;fileObj.progress=100;
+          renderFileList();
+          resolve({name:fileObj.name,size:fileObj.size,type:fileObj.type,url,storagePath:path});
+        });
+      });
+    }
+
+    async function saveContent(){
+      const t=currentTeacher;
+      const teacherId=t.teacherId||t.id;
+      const type=document.getElementById('cnt-type').value;
+      const subject=document.getElementById('cnt-subject').value;
+      const level=document.getElementById('cnt-level').value;
+      const title=document.getElementById('cnt-title').value.trim();
+      const description=document.getElementById('cnt-desc').value.trim();
+      const url=document.getElementById('cnt-url').value.trim();
+      if(!title){alert('الرجاء إدخال عنوان');return;}
+      const btn=document.getElementById('cnt-save-btn');
+      btn.disabled=true;btn.textContent='⏳ جاري الحفظ...';
+      try{
+        const attachments=[];
+        for(const f of pendingFiles){
+          if(!f.uploaded){
+            const result=await uploadFileToStorage(f,teacherId);
+            attachments.push(result);
+          }else{
+            attachments.push({name:f.name,size:f.size,type:f.type,url:f.url,storagePath:f.storagePath});
+          }
+        }
+        await db.collection(CONTENT_COLLECTION).add({
+          teacherId,teacherName:t.name||'',type,subject,level,title,description,
+          url:url||'',attachments,
+          createdAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+        closeContentModal();
+        if(currentPage==='content')renderContentPage();
+      }catch(e){console.error('Save content error:',e);alert('حدث خطأ أثناء الحفظ: '+e.message);}
+      btn.disabled=false;btn.textContent='💾 حفظ المحتوى';
+    }
+
+    async function deleteContent(id){
+      if(!confirm('هل أنت متأكد من حذف هذا المحتوى؟'))return;
+      try{await db.collection(CONTENT_COLLECTION).doc(id).delete();if(currentPage==='content')renderContentPage();}catch(e){console.error('Delete error:',e);}
+    }
+
+    function closeContentModal(){document.getElementById('content-modal').classList.remove('open');pendingFiles=[];}
+
+    /* ═══ STUDENTS PAGE ═══ */
+    async function renderStudentsPage(){
+      currentTeacher=currentTeacher||{};
+      const t=currentTeacher;
+      const teacherId=t.teacherId||t.id;
+      const subjects=Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s):[];
+      const content=document.getElementById('app');
+      content.innerHTML=`<div class="portal-layout">${renderSidebar(t)}<div class="main-content">
+        <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">👨‍🏫</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
+        <div class="main-body">
+          <div class="section-header"><div class="section-title">👥 الطلاب المسجلون</div><div class="section-count" id="students-count">...</div></div>
+          <div id="students-table-wrap"><div class="loading-page" style="min-height:200px"><div class="spinner"></div></div></div>
+          <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
+        </div>
+      </div></div>`;
+      updateSidebarActive();
+      try{
+        const snap=await db.collection(REG_COLLECTION).where('status','==','مسجل نهائياً').get();
+        const matched=snap.docs.filter(d=>{
+          const data=d.data();
+          if(!Array.isArray(data.subjects))return false;
+          return data.subjects.some(s=>{const sn=s.subject||s;return subjects.some(ts=>ts===sn);});
+        }).map(d=>{const data=d.data();return{id:d.id,...data,matchedSubjects:(data.subjects||[]).filter(s=>{const sn=s.subject||s;return subjects.includes(sn);}).map(s=>s.subject||s)};});
+        document.getElementById('students-count').textContent=matched.length+' طالب';
+        const wrap=document.getElementById('students-table-wrap');
+        if(matched.length===0){wrap.innerHTML='<div class="empty-state"><div class="empty-state-icon">👨‍🎓</div><div class="empty-state-text">لا يوجد طلاب مسجلون في موادك بعد</div></div>';return;}
+        wrap.innerHTML=`<table class="data-table"><thead><tr><th>الاسم</th><th>Student ID</th><th>المستوى</th><th>المادة</th><th>تاريخ التسجيل</th></tr></thead><tbody>${matched.map(s=>{
+          const name=(s.first_name||'')+' '+(s.last_name||'');
+          return `<tr><td style="font-weight:700">${name}</td><td><code style="font-size:11px;background:var(--primary-light);padding:2px 8px;border-radius:6px;color:var(--primary)">${s.id}</code></td><td>${s.level||'—'}</td><td style="font-size:12px">${s.matchedSubjects.join('، ')}</td><td style="font-size:12px">${fmtDate(s.timestamp||s.createdAt)}</td></tr>`;
+        }).join('')}</tbody></table>`;
+      }catch(e){console.error('Students error:',e);document.getElementById('students-table-wrap').innerHTML='<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">حدث خطأ أثناء تحميل بيانات الطلاب</div></div>';}
+    }
+
+    /* ═══ FINANCE PAGE ═══ */
+    async function renderFinancePage(){
+      currentTeacher=currentTeacher||{};
+      const t=currentTeacher;
+      const teacherId=t.teacherId||t.id;
+      const content=document.getElementById('app');
+      content.innerHTML=`<div class="portal-layout">${renderSidebar(t)}<div class="main-content">
+        <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">👨‍🏫</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
+        <div class="main-body">
+          <div class="section-header"><div class="section-title">💰 الموارد المالية</div></div>
+          <div id="finance-content"><div class="loading-page" style="min-height:200px"><div class="spinner"></div></div></div>
+          <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
+        </div>
+      </div></div>`;
+      updateSidebarActive();
+      try{
+        const snap=await db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get();
+        const balance=snap.docs.length>0?(snap.docs[0].data().balance||0):0;
+        document.getElementById('finance-content').innerHTML=`
+          <div class="balance-card">
+            <div class="balance-label">💰 الرصيد الحالي</div>
+            <div class="balance-amount">${fmtNum(balance)}</div>
+            <div class="balance-currency">دينار جزائري (دج)</div>
+          </div>
+          <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">سيتم تطوير قسم المالية ليشمل سجل العمليات والأرباح والتقارير</div>`;
+      }catch(e){console.error('Finance error:',e);document.getElementById('finance-content').innerHTML='<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">حدث خطأ</div></div>';}
+    }
 
     /* ═══ LOGIN ═══ */
     function showLogin(errorMsg){
@@ -237,20 +570,8 @@
             <img class="login-logo-img" src="images/logostudentportal.png" alt="E-PLUS">
             <div class="login-role-badge">👨‍🏫 لوحة الأستاذ</div>
             <form onsubmit="handleLogin(event)">
-              <div class="login-field">
-                <label class="login-label">اسم المستخدم</label>
-                <div class="login-input-wrap">
-                  <input class="login-input" type="text" id="login-id" placeholder="اسم المستخدم" required autocomplete="off">
-                  <span class="login-input-icon">👤</span>
-                </div>
-              </div>
-              <div class="login-field">
-                <label class="login-label">كلمة المرور</label>
-                <div class="login-input-wrap">
-                  <input class="login-input" type="password" id="login-pass" placeholder="كلمة المرور" required autocomplete="off">
-                  <span class="login-input-icon">🔒</span>
-                </div>
-              </div>
+              <div class="login-field"><label class="login-label">اسم المستخدم</label><div class="login-input-wrap"><input class="login-input" type="text" id="login-id" placeholder="اسم المستخدم" required autocomplete="off"><span class="login-input-icon">👤</span></div></div>
+              <div class="login-field"><label class="login-label">كلمة المرور</label><div class="login-input-wrap"><input class="login-input" type="password" id="login-pass" placeholder="كلمة المرور" required autocomplete="off"><span class="login-input-icon">🔒</span></div></div>
               <button class="login-btn" type="submit" id="login-btn">تسجيل الدخول ✦</button>
               <div class="login-error" id="login-error">${errorMsg||''}</div>
             </form>
@@ -269,291 +590,27 @@
       btn.disabled=true;btn.textContent='جاري التحقق...';errEl.style.display='none';
       try{
         const userSnap=await db.collection(USERS_COLLECTION).where('username','==',username).limit(1).get();
-        if(userSnap.empty){errEl.textContent='اسم المستخدم غير صحيح. الرجاء المحاولة مرة أخرى.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
-        const userDoc=userSnap.docs[0];
-        const userData=userDoc.data();
-        if(userData.role!=='teacher'){errEl.textContent='اسم المستخدم غير صحيح. الرجاء المحاولة مرة أخرى.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
-        if(userData.status!=='active'){errEl.textContent='تم تعطيل حسابك. الرجاء مراجعة الإدارة.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
+        if(userSnap.empty){errEl.textContent='اسم المستخدم غير صحيح.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
+        const userDoc=userSnap.docs[0],userData=userDoc.data();
+        if(userData.role!=='teacher'){errEl.textContent='اسم المستخدم غير صحيح.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
+        if(userData.status!=='active'){errEl.textContent='تم تعطيل حسابك.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
         const computedHash=await hashPassword(pass,userData.passwordSalt);
-        if(computedHash!==userData.passwordHash){errEl.textContent='كلمة المرور غير صحيحة. الرجاء المحاولة مرة أخرى.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
+        if(computedHash!==userData.passwordHash){errEl.textContent='كلمة المرور غير صحيحة.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
         const teacherSnap=await db.collection(SRT_COLLECTION).where('userId','==',userData.userId).limit(1).get();
         if(teacherSnap.empty){errEl.textContent='لا يوجد بروفايل مرتبط بهذا الحساب.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
-        const teacherDoc=teacherSnap.docs[0];
-        const teacherData=teacherDoc.data();
-        if(teacherData.status==='disabled'){errEl.textContent='تم تعطيل حسابك. الرجاء مراجعة الإدارة.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
-        const teacher={id:teacherDoc.id,...teacherData};
-        saveSession(userData,teacher);
+        const teacherDoc=teacherSnap.docs[0],teacherData=teacherDoc.data();
+        if(teacherData.status==='disabled'){errEl.textContent='تم تعطيل حسابك.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
+        saveSession(userData,{id:teacherDoc.id,...teacherData});
         try{await db.collection(USERS_COLLECTION).doc(userDoc.id).update({lastLogin:firebase.firestore.FieldValue.serverTimestamp()});}catch(e){}
-        renderDashboard(teacher);
+        renderDashboard({id:teacherDoc.id,...teacherData});
       }catch(err){console.error('Teacher login error:',err);errEl.textContent='حدث خطأ أثناء التحقق.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';}
     }
 
-    /* ═══ SIDEBAR ═══ */
-    function renderSidebar(t){
-      const initials=t.name?t.name[0]:'م';
-      return `
-        <div class="sidebar-brand"><div class="sidebar-brand-row"><div class="sidebar-logo">🎓</div><div class="sidebar-brand-text"><div class="sidebar-brand-name">E-PLUS</div><div class="sidebar-brand-sub">Teacher Portal</div></div></div></div>
-        <div class="sidebar-teacher"><div class="sidebar-teacher-avatar">${initials}</div><div class="sidebar-teacher-name">${t.name||'الأستاذ'}</div><div class="sidebar-teacher-id">${t.teacherId||t.id}</div></div>
-        <div class="sidebar-nav">
-          <div class="sidebar-link ${currentPage==='home'?'active':''}" onclick="navigateTo('home')"><span class="sidebar-link-icon">🏠</span>الرئيسية</div>
-          <div class="sidebar-link ${currentPage==='content'?'active':''}" onclick="navigateTo('content')"><span class="sidebar-link-icon">📚</span>المحتوى التعليمي</div>
-          <div class="sidebar-link ${currentPage==='students'?'active':''}" onclick="navigateTo('students')"><span class="sidebar-link-icon">👥</span>الطلاب</div>
-          <div class="sidebar-link ${currentPage==='finance'?'active':''}" onclick="navigateTo('finance')"><span class="sidebar-link-icon">💰</span>الموارد المالية</div>
-        </div>
-        <div class="sidebar-footer"><button class="sidebar-logout" onclick="handleLogout()">🚪 تسجيل الخروج</button></div>`;
-    }
-
-    function navigateTo(page){currentPage=page;closeDrawer();renderCurrentPage();}
-    function renderCurrentPage(){if(!currentTeacher)return;if(currentPage==='content')renderContentPage();else if(currentPage==='students')renderStudentsPage();else if(currentPage==='finance')renderFinancePage();else renderDashboard(currentTeacher);}
-
-    function openDrawer(){
-      document.getElementById('drawer-overlay').classList.add('open');
-      let drawer=document.getElementById('mobile-drawer-panel');
-      if(!drawer){drawer=document.createElement('div');drawer.id='mobile-drawer-panel';drawer.style.cssText='display:block;position:fixed;top:0;right:0;bottom:0;width:280px;background:linear-gradient(180deg,#1e1b4b 0%,#312e81 50%,#3730a3 100%);color:#fff;z-index:201;overflow-y:auto;animation:slideInDrawer 0.3s ease both;box-shadow:-4px 0 24px rgba(0,0,0,0.3)';document.body.appendChild(drawer);}
-      drawer.innerHTML=renderSidebar(currentTeacher);drawer.style.display='block';drawer.style.animation='slideInDrawer 0.3s ease both';
-    }
-    function closeDrawer(){
-      document.getElementById('drawer-overlay').classList.remove('open');
-      const d=document.getElementById('mobile-drawer-panel');
-      if(d){d.style.animation='slideOutDrawer 0.3s ease both';setTimeout(()=>{d.style.display='none';},280);}
-    }
-
-    /* ═══ DASHBOARD ═══ */
-    async function renderDashboard(t){
-      currentTeacher=t;currentPage='home';
-      const subjects=Array.isArray(t.subjects)?t.subjects:[];
-      const levels=Array.isArray(t.levels)?t.levels:[];
-      const initials=t.name?t.name[0]:'م';
-
-      let contentCount=0;
-      try{const snap=await db.collection(CONTENT_COLLECTION).where('teacherId','==',t.teacherId||t.id).get();contentCount=snap.size;}catch(e){}
-
-      document.getElementById('app').innerHTML=`
-        <div class="portal-layout">
-          <aside class="sidebar">${renderSidebar(t)}</aside>
-          <div class="main-content">
-            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">👨‍🏫</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
-            <div class="main-body">
-              <div class="hero-card"><div class="hero-row"><div class="hero-avatar">${initials}</div><div class="hero-info"><div class="hero-greeting">مرحباً بك 👋</div><div class="hero-name">${t.name||'الأستاذ'}</div><div class="hero-id">${t.teacherId||t.id}</div></div></div><div class="hero-badges">${subjects.map(s=>`<span class="hero-badge">📚 ${typeof s==='string'?s:(s.subject||'')}</span>`).join('')}${levels.map(l=>`<span class="hero-badge">🎓 ${l}</span>`).join('')}</div></div>
-              <div class="stats-grid">
-                <div class="stat-card c-purple" style="animation:fadeSlideUp 0.5s ease both 0.1s"><div class="stat-icon i-purple">📚</div><div class="stat-value">${subjects.length}</div><div class="stat-label">مادة مُدرَّسة</div></div>
-                <div class="stat-card c-gold" style="animation:fadeSlideUp 0.5s ease both 0.15s"><div class="stat-icon i-gold">📄</div><div class="stat-value">${contentCount}</div><div class="stat-label">محتوى منشور</div></div>
-                <div class="stat-card c-green" style="animation:fadeSlideUp 0.5s ease both 0.2s"><div class="stat-icon i-green">👥</div><div class="stat-value">—</div><div class="stat-label">طالب مسجل</div></div>
-                <div class="stat-card c-blue" style="animation:fadeSlideUp 0.5s ease both 0.25s"><div class="stat-icon i-blue">🕐</div><div class="stat-value" style="font-size:14px;font-weight:700;color:var(--text-muted)">${t.lastLogin?new Date(t.lastLogin.seconds?t.lastLogin.seconds*1000:t.lastLogin).toLocaleDateString('ar-DZ'):'—'}</div><div class="stat-label">آخر دخول</div></div>
-              </div>
-              <div class="section-header"><div class="section-title">⚡ إجراءات سريعة</div></div>
-              <div class="content-grid">
-                <div class="content-card" onclick="navigateTo('content')" style="cursor:pointer"><div class="content-card-header"><div class="content-card-icon" style="background:var(--primary-light)">📚</div><div><div class="content-card-title">إدارة المحتوى</div><div class="content-card-sub">إضافة وتعديل الدروس والتمارين</div></div></div><div class="content-card-body">أضف محتوى تعليمي جديد لطلابك: دروس، تمارين، واجبات، إعلانات.</div><div class="content-card-footer"><button class="content-btn primary">➡️ الذهاب</button></div></div>
-                <div class="content-card" onclick="navigateTo('students')" style="cursor:pointer"><div class="content-card-header"><div class="content-card-icon" style="background:var(--success-light)">👥</div><div><div class="content-card-title">الطلاب المسجلون</div><div class="content-card-sub">عرض قائمة طلابك</div></div></div><div class="content-card-body">اطلع على الطلاب المسجلين في موادك ومستوياتك.</div><div class="content-card-footer"><button class="content-btn primary">➡️ الذهاب</button></div></div>
-              </div>
-              <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
-            </div>
-          </div>
-        </div>`;
-      updateSidebarActive();
-    }
-
-    /* ═══ CONTENT PAGE ═══ */
-    async function renderContentPage(){
-      currentPage='content';
-      const t=currentTeacher;
-      const teacherId=t.teacherId||t.id;
-      let items=[];
-      try{const snap=await db.collection(CONTENT_COLLECTION).where('teacherId','==',teacherId).orderBy('createdAt','desc').get();items=snap.docs.map(d=>({id:d.id,...d.data()}));}catch(e){console.error('Content load error:',e);}
-
-      const lessons=items.filter(i=>i.type==='lesson');
-      const exercises=items.filter(i=>i.type==='exercise');
-      const homework=items.filter(i=>i.type==='homework');
-      const announcements=items.filter(i=>i.type==='announcement');
-
-      function renderContentList(list,typeLabel){
-        if(!list.length)return '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">لا يوجد محتوى بعد</div>';
-        return list.map(c=>`<div class="content-card" style="animation-delay:0.05s">
-          <div class="content-card-header">
-            <div class="content-card-icon" style="background:${c.type==='lesson'?'var(--primary-light)':c.type==='exercise'?'var(--gold-light)':c.type==='homework'?'var(--blue-light)':'var(--success-light)'}">${c.type==='lesson'?'📖':c.type==='exercise'?'📝':c.type==='homework'?'📋':'📢'}</div>
-            <div style="flex:1"><div class="content-card-title">${c.title||'بدون عنوان'}</div><div class="content-card-sub">${c.subject||''} • ${c.createdAt?new Date(c.createdAt.seconds?c.createdAt.seconds*1000:c.createdAt).toLocaleDateString('ar-DZ'):'—'}</div></div>
-          </div>
-          <div class="content-card-body">${c.description||'لا يوجد وصف'}</div>
-          <div class="content-card-footer">
-            <button class="content-btn" onclick="deleteContent('${c.id}')">🗑️ حذف</button>
-          </div>
-        </div>`).join('');
-      }
-
-      document.getElementById('app').innerHTML=`
-        <div class="portal-layout">
-          <aside class="sidebar">${renderSidebar(t)}</aside>
-          <div class="main-content">
-            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">👨‍🏫</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
-            <div class="main-body">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
-                <div class="section-title">📚 المحتوى التعليمي</div>
-                <button onclick="openAddContent()" style="padding:10px 20px;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--primary),#8b5cf6);color:#fff;font-size:13px;font-weight:800">➕ إضافة محتوى</button>
-              </div>
-              <div style="margin-bottom:28px"><div style="font-size:15px;font-weight:800;margin-bottom:12px;color:var(--text)">📖 الدروس (${lessons.length})</div>${renderContentList(lessons,'درس')}</div>
-              <div style="margin-bottom:28px"><div style="font-size:15px;font-weight:800;margin-bottom:12px;color:var(--text)">📝 التمارين (${exercises.length})</div>${renderContentList(exercises,'تمرين')}</div>
-              <div style="margin-bottom:28px"><div style="font-size:15px;font-weight:800;margin-bottom:12px;color:var(--text)">📋 الواجبات (${homework.length})</div>${renderContentList(homework,'واجب')}</div>
-              <div style="margin-bottom:28px"><div style="font-size:15px;font-weight:800;margin-bottom:12px;color:var(--text)">📢 الإعلانات (${announcements.length})</div>${renderContentList(announcements,'إعلان')}</div>
-              <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
-            </div>
-          </div>
-        </div>`;
-      updateSidebarActive();
-    }
-
-    function openAddContent(){
-      const t=currentTeacher;
-      const subjects=Array.isArray(t.subjects)?t.subjects:[];
-      const levels=Array.isArray(t.levels)?t.levels:[];
-      const subjectOptions=subjects.map(s=>{const n=typeof s==='string'?s:(s.subject||'');return `<option value="${n}">${n}</option>`;}).join('');
-      const levelOptions=levels.map(l=>`<option value="${l}">${l}</option>`).join('');
-
-      document.getElementById('content-modal-title').textContent='إضافة محتوى جديد';
-      document.getElementById('content-modal-body').innerHTML=`
-        <div class="form-group"><label class="form-label">نوع المحتوى <span style="color:var(--danger)">*</span></label>
-          <select class="form-input" id="cnt-type"><option value="lesson">📖 درس</option><option value="exercise">📝 تمرين</option><option value="homework">📋 واجب</option><option value="announcement">📢 إعلان</option></select></div>
-        <div class="form-group"><label class="form-label">المادة <span style="color:var(--danger)">*</span></label>
-          <select class="form-input" id="cnt-subject">${subjectOptions||'<option value="">—</option>'}</select></div>
-        <div class="form-group"><label class="form-label">المستوى</label>
-          <select class="form-input" id="cnt-level"><option value="">الكل</option>${levelOptions}</select></div>
-        <div class="form-group"><label class="form-label">العنوان <span style="color:var(--danger)">*</span></label><input class="form-input" type="text" id="cnt-title" placeholder="عنوان المحتوى"></div>
-        <div class="form-group"><label class="form-label">الوصف</label><textarea class="form-input" id="cnt-desc" placeholder="وصف المحتوى..."></textarea></div>
-        <div class="form-group"><label class="form-label">رابط خارجي (اختياري)</label><input class="form-input" type="url" id="cnt-url" placeholder="https://..."></div>
-        <div class="form-group"><label class="form-label">نوع الرابط</label>
-          <select class="form-input" id="cnt-urltype"><option value="">بدون</option><option value="youtube">YouTube</option><option value="gdrive">Google Drive</option><option value="link">رابط آخر</option></select></div>
-        <button class="form-btn primary" onclick="saveContent()" style="width:100%">💾 حفظ المحتوى</button>`;
-      document.getElementById('content-modal').classList.add('open');
-    }
-
-    async function saveContent(){
-      const t=currentTeacher;
-      const type=document.getElementById('cnt-type').value;
-      const subject=document.getElementById('cnt-subject').value;
-      const level=document.getElementById('cnt-level').value;
-      const title=document.getElementById('cnt-title').value.trim();
-      const description=document.getElementById('cnt-desc').value.trim();
-      const url=document.getElementById('cnt-url').value.trim();
-      const urlType=document.getElementById('cnt-urltype').value;
-      if(!title){alert('الرجاء إدخال العنوان');return;}
-      try{
-        await db.collection(CONTENT_COLLECTION).add({
-          teacherId:t.teacherId||t.id,teacherName:t.name||'',type,subject,level,title,description,url,urlType,
-          targetLevels:level?[level]:(Array.isArray(t.levels)?t.levels:[]),
-          targetSubjects:subject?[subject]:(Array.isArray(t.subjects)?t.subjects.map(s=>typeof s==='string'?s:s.subject):[]),
-          createdAt:firebase.firestore.FieldValue.serverTimestamp()
-        });
-        closeContentModal();renderContentPage();
-      }catch(e){console.error('Save content error:',e);alert('حدث خطأ أثناء الحفظ');}
-    }
-
-    async function deleteContent(id){
-      if(!confirm('هل أنت م chắc من حذف هذا المحتوى؟'))return;
-      try{await db.collection(CONTENT_COLLECTION).doc(id).delete();renderContentPage();}catch(e){console.error('Delete content error:',e);}
-    }
-
-    function closeContentModal(){document.getElementById('content-modal').classList.remove('open');}
-
-    /* ═══ STUDENTS PAGE ═══ */
-    async function renderStudentsPage(){
-      currentPage='students';
-      const t=currentTeacher;
-      const subjects=Array.isArray(t.subjects)?t.subjects.map(s=>typeof s==='string'?s:s.subject):[];
-      const levels=Array.isArray(t.levels)?t.levels:[];
-      let students=[];
-      try{
-        const snap=await db.collection('support_registrations').where('status','==','مسجل نهائياً').get();
-        students=snap.docs.map(d=>({id:d.id,...d.data()})).filter(s=>{
-          if(!Array.isArray(s.subjects))return false;
-          const hasSubject=s.subjects.some(sub=>subjects.includes(sub.subject));
-          const hasLevel=levels.length===0||levels.includes(s.level);
-          return hasSubject&&hasLevel;
-        });
-      }catch(e){console.error('Students load error:',e);}
-
-      const rows=students.length?students.map(s=>{
-        const fullName=(s.first_name||'')+' '+(s.last_name||'');
-        const studentSubjects=(Array.isArray(s.subjects)?s.subjects:[]).filter(sub=>subjects.includes(sub.subject)).map(sub=>sub.subject).join('، ');
-        return `<tr><td style="font-weight:700">${fullName}</td><td style="font-family:monospace;font-size:12px">${s.id}</td><td>${s.level||'—'}</td><td style="font-size:12px">${studentSubjects}</td></tr>`;
-      }).join(''):'<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--text-muted)">لا يوجد طلاب مسجلون في موادك بعد</td></tr>';
-
-      document.getElementById('app').innerHTML=`
-        <div class="portal-layout">
-          <aside class="sidebar">${renderSidebar(t)}</aside>
-          <div class="main-content">
-            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">👨‍🏫</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
-            <div class="main-body">
-              <div class="section-title" style="margin-bottom:20px">👥 الطلاب المسجلون في موادك</div>
-              <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);overflow-x:auto">
-                <table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--border-light)"><th style="padding:12px 16px;text-align:right;font-size:12px;font-weight:800;color:var(--text-muted)">الاسم</th><th style="padding:12px 16px;text-align:right;font-size:12px;font-weight:800;color:var(--text-muted)">المعرف</th><th style="padding:12px 16px;text-align:right;font-size:12px;font-weight:800;color:var(--text-muted)">المستوى</th><th style="padding:12px 16px;text-align:right;font-size:12px;font-weight:800;color:var(--text-muted)">المواد</th></tr></thead><tbody>${rows}</tbody></table>
-              </div>
-              <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
-            </div>
-          </div>
-        </div>`;
-      updateSidebarActive();
-    }
-
-    function updateSidebarActive(){
-      document.querySelectorAll('.sidebar-link').forEach(l=>{
-        l.classList.remove('active');
-        if(currentPage==='home'&&l.textContent.includes('الرئيسية'))l.classList.add('active');
-        if(currentPage==='content'&&l.textContent.includes('المحتوى'))l.classList.add('active');
-        if(currentPage==='students'&&l.textContent.includes('الطلاب'))l.classList.add('active');
-        if(currentPage==='finance'&&l.textContent.includes('المالية'))l.classList.add('active');
-      });
-    }
-
-    /* ═══ FINANCE PAGE ═══ */
-    const FIN_COLLECTION = 'teacher_finance';
-    async function renderFinancePage(){
-      currentPage='finance';
-      const t=currentTeacher;
-      const teacherId=t.teacherId||t.id;
-      let financeData={balance:0,totalEarnings:0,totalDues:0,totalPaid:0,lastTransaction:null,transactions:[]};
-      try{
-        const snap=await db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get();
-        if(!snap.empty){const d=snap.docs[0];financeData={id:d.id,...d.data(),transactions:Array.isArray(d.data().transactions)?d.data().transactions:[]};}
-      }catch(e){console.error('Finance load error:',e);}
-
-      const fmt=n=>(n||0).toLocaleString('ar-DZ')+' دج';
-      const txRows=financeData.transactions.length?financeData.transactions.slice(0,10).map(tx=>{
-        const isCredit=tx.type==='credit';
-        return `<tr><td style="padding:10px 14px;border-bottom:1px solid var(--border-light);font-size:13px">${tx.date?new Date(tx.date.seconds?tx.date.seconds*1000:tx.date).toLocaleDateString('ar-DZ'):'—'}</td><td style="padding:10px 14px;border-bottom:1px solid var(--border-light);font-size:13px">${tx.description||'—'}</td><td style="padding:10px 14px;border-bottom:1px solid var(--border-light);font-size:13px;font-weight:700;color:${isCredit?'var(--success)':'var(--danger)'}">${isCredit?'+':'-'} ${fmt(tx.amount)}</td></tr>`;
-      }).join(''):'<tr><td colspan="3" style="text-align:center;padding:32px;color:var(--text-muted);font-size:13px">لا توجد معاملات مالية بعد</td></tr>';
-
-      document.getElementById('app').innerHTML=`
-        <div class="portal-layout">
-          <aside class="sidebar">${renderSidebar(t)}</aside>
-          <div class="main-content">
-            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">👨‍🏫</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
-            <div class="main-body">
-              <div class="section-title" style="margin-bottom:24px">💰 الموارد المالية</div>
-              <div class="stats-grid">
-                <div class="stat-card c-green" style="animation:fadeSlideUp 0.5s ease both 0.1s"><div class="stat-icon i-green">💰</div><div class="stat-value" style="font-size:20px">${fmt(financeData.balance)}</div><div class="stat-label">الرصيد الحالي</div></div>
-                <div class="stat-card c-purple" style="animation:fadeSlideUp 0.5s ease both 0.15s"><div class="stat-icon i-purple">📈</div><div class="stat-value" style="font-size:20px">${fmt(financeData.totalEarnings)}</div><div class="stat-label">إجمالي الأرباح</div></div>
-                <div class="stat-card c-gold" style="animation:fadeSlideUp 0.5s ease both 0.2s"><div class="stat-icon i-gold">📋</div><div class="stat-value" style="font-size:20px">${fmt(financeData.totalDues)}</div><div class="stat-label">إجمالي المستحقات</div></div>
-                <div class="stat-card c-blue" style="animation:fadeSlideUp 0.5s ease both 0.25s"><div class="stat-icon i-blue">✅</div><div class="stat-value" style="font-size:20px">${fmt(financeData.totalPaid)}</div><div class="stat-label">إجمالي المدفوعات</div></div>
-              </div>
-              <div class="section-header" style="margin-top:8px"><div class="section-title">📋 سجل المعاملات</div></div>
-              <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);overflow-x:auto">
-                <table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--border-light)"><th style="padding:10px 14px;text-align:right;font-size:12px;font-weight:800;color:var(--text-muted)">التاريخ</th><th style="padding:10px 14px;text-align:right;font-size:12px;font-weight:800;color:var(--text-muted)">الوصف</th><th style="padding:10px 14px;text-align:right;font-size:12px;font-weight:800;color:var(--text-muted)">المبلغ</th></tr></thead><tbody>${txRows}</tbody></table>
-              </div>
-              <div style="margin-top:24px;padding:20px;background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);text-align:center">
-                <div style="font-size:14px;font-weight:700;color:var(--text-muted)">🔄 سيتم تطوير هذا القسم ليشمل: نسبة الأستاذ من كل طالب، الرواتب، المكافآت، الخصومات، تقارير الأرباح</div>
-              </div>
-              <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
-            </div>
-          </div>
-        </div>`;
-      updateSidebarActive();
-    }
-
-    function handleLogout(){clearSession();window.location.href='/teacher.html';}
-
+    /* ═══ INIT ═══ */
     async function init(){
       const session=getSession();
       if(session){
-        if(session.role && session.role!=='teacher'){clearSession();showLogin('صلاحيات غير كافية.');return;}
+        if(session.role&&session.role!=='teacher'){clearSession();showLogin('صلاحيات غير كافية.');return;}
         showLoading();
         try{
           const doc=await db.collection(SRT_COLLECTION).doc(session.teacherDocId).get();

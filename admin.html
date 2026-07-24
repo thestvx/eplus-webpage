@@ -3002,6 +3002,7 @@
           <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(16,185,129,0.1)">✅</div></div><div class="stat-num" id="srt-active">0</div><div class="stat-label">أساتذة مفعلين</div></div>
           <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(200,168,75,0.1)">📚</div></div><div class="stat-num" id="srt-subjects">0</div><div class="stat-label">مادة مُدرَّسة</div></div>
           <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(220,38,38,0.08)">🚫</div></div><div class="stat-num" id="srt-disabled">0</div><div class="stat-label">معطّل</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(16,185,129,0.1)">💰</div></div><div class="stat-num" id="srt-treasury-total" style="direction:ltr">0 دج</div><div class="stat-label">إجمالي الخزينة</div></div>
         </div>
 
         <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center">
@@ -3026,6 +3027,7 @@
                 <th>المستويات</th>
                 <th>الحالة</th>
                 <th>تاريخ الإنشاء</th>
+                <th>الرصيد</th>
                 <th>إجراءات</th>
               </tr>
             </thead>
@@ -3228,6 +3230,44 @@
     </div>
   </div>
 </div>
+
+<!-- ===== SRT BALANCE MODAL ===== -->
+<div class="teacher-modal-bg" id="srt-balance-modal">
+  <div class="teacher-modal" style="max-width:480px">
+    <div class="teacher-modal-header">
+      <div class="panel-icon" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.2)">💰</div>
+      <div class="teacher-modal-title">إدارة رصيد الأستاذ</div>
+      <button class="att-modal-close" onclick="document.getElementById('srt-balance-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="teacher-modal-body">
+      <input type="hidden" id="srt-balance-teacher-id" value="">
+      <div style="background:var(--primary-light);border-radius:14px;padding:18px 20px;margin-bottom:18px;text-align:center">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">الرصيد الحالي</div>
+        <div id="srt-balance-current" style="font-size:28px;font-weight:900;color:var(--primary);direction:ltr;display:inline-block">0 دج</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">الأستاذ: <strong id="srt-balance-teacher-name"></strong></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">العملية <span class="required">*</span></label>
+        <select class="inp" id="srt-balance-action" style="padding:10px 14px">
+          <option value="add">➕ إضافة رصيد</option>
+          <option value="deduct">➖ خصم رصيد</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">المبلغ (دج) <span class="required">*</span></label>
+        <input class="inp" type="number" id="srt-balance-amount" min="1" step="100" placeholder="أدخل المبلغ" style="padding:10px 14px">
+      </div>
+      <div class="form-group">
+        <label class="form-label">السبب / ملاحظة</label>
+        <input class="inp" type="text" id="srt-balance-note" placeholder="مثال: دفع راتب شهري، خصم..." style="padding:10px 14px">
+      </div>
+      <div id="srt-balance-error" style="display:none;background:rgba(220,38,38,0.08);color:#dc2626;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:600;margin-bottom:10px"></div>
+      <button class="btn-primary" onclick="srtConfirmBalance()" style="width:100%;margin-top:8px;padding:12px;font-weight:800">💾 تأكيد العملية</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SRT SUPPORT TREASURY BALANCE MODAL ===== -->
 
 <!-- ===== ATTENDANCE MODAL ===== -->
 <div class="att-modal-bg" id="att-modal">
@@ -22702,6 +22742,102 @@ async function srtResetUserPassword(userId, newPassword) {
   });
 }
 
+/* ═══ SUPPORT TREASURY ═══ */
+const SRT_TREASURY_COLLECTION = 'support_treasury';
+const SRT_TREASURY_LOG_COLLECTION = 'support_treasury_transactions';
+
+function srtOpenBalanceModal(teacherId) {
+  const teacher = srtAllData.find(t => t.id === teacherId);
+  if (!teacher) return;
+  document.getElementById('srt-balance-teacher-id').value = teacherId;
+  document.getElementById('srt-balance-current').textContent = (teacher.balance || 0).toLocaleString('ar-DZ') + ' دج';
+  document.getElementById('srt-balance-teacher-name').textContent = teacher.name || '—';
+  document.getElementById('srt-balance-action').value = 'add';
+  document.getElementById('srt-balance-amount').value = '';
+  document.getElementById('srt-balance-note').value = '';
+  document.getElementById('srt-balance-error').style.display = 'none';
+  document.getElementById('srt-balance-modal').classList.add('open');
+}
+
+async function srtConfirmBalance() {
+  const teacherId = document.getElementById('srt-balance-teacher-id').value;
+  const action = document.getElementById('srt-balance-action').value;
+  const amount = parseInt(document.getElementById('srt-balance-amount').value);
+  const note = document.getElementById('srt-balance-note').value.trim();
+  const errEl = document.getElementById('srt-balance-error');
+  errEl.style.display = 'none';
+
+  if (!amount || amount <= 0) { errEl.textContent = '⚠️ أدخل مبلغ صحيح'; errEl.style.display = 'block'; return; }
+
+  const teacher = srtAllData.find(t => t.id === teacherId);
+  if (!teacher) { errEl.textContent = '⚠️ الأستاذ غير موجود'; errEl.style.display = 'block'; return; }
+
+  const currentBalance = teacher.balance || 0;
+  if (action === 'deduct' && amount > currentBalance) { errEl.textContent = '⚠️ الرصيد غير كافٍ (الرصيد الحالي: ' + currentBalance.toLocaleString('ar-DZ') + ' دج)'; errEl.style.display = 'block'; return; }
+
+  const {doc:d,updateDoc,getDocs,collection:c,addDoc}=srtFS(),db=srtDB();
+  const newBalance = action === 'add' ? currentBalance + amount : currentBalance - amount;
+
+  try {
+    await updateDoc(d(db, SRT_COLLECTION, teacherId), {
+      balance: newBalance,
+      balanceUpdatedAt: new Date().toISOString()
+    });
+
+    await addDoc(c(db, SRT_TREASURY_LOG_COLLECTION), {
+      teacherId, teacherName: teacher.name || '',
+      action, amount, note: note || (action === 'add' ? 'إضافة رصيد' : 'خصم رصيد'),
+      previousBalance: currentBalance, newBalance,
+      createdAt: new Date().toISOString()
+    });
+
+    if (action === 'add') {
+      try {
+        const treasurySnap = await getDocs(c(db, SRT_TREASURY_COLLECTION));
+        if (treasurySnap.empty) {
+          const {setDoc}=srtFS();
+          await setDoc(d(db, SRT_TREASURY_COLLECTION, 'main'), { balance: amount, updatedAt: new Date().toISOString() });
+        } else {
+          const treasuryDoc = treasurySnap.docs[0];
+          const treasuryBalance = treasuryDoc.data().balance || 0;
+          await updateDoc(d(db, SRT_TREASURY_COLLECTION, treasuryDoc.id), {
+            balance: treasuryBalance - amount,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      } catch (treasuryErr) { console.warn('Treasury log failed (non-critical):', treasuryErr); }
+    }
+
+    teacher.balance = newBalance;
+    document.getElementById('srt-balance-modal').classList.remove('open');
+    srtRenderStats();
+    srtRenderTable(srtAllData.filter(t => {
+      const q = (document.getElementById('srt-search')?.value || '').trim().toLowerCase();
+      const status = document.getElementById('srt-status-filter')?.value || '';
+      if (q && !t.name?.toLowerCase().includes(q) && !(t.teacherId || t.id || '').toLowerCase().includes(q)) return false;
+      if (status && (status === 'disabled' ? t.status !== 'disabled' : t.status === 'disabled')) return false;
+      return true;
+    }));
+    srtShowToast('✅ تم ' + (action === 'add' ? 'إضافة' : 'خصم') + ' ' + amount.toLocaleString('ar-DZ') + ' دج بنجاح', 'success');
+  } catch (e) {
+    console.error('Balance update error:', e);
+    errEl.textContent = '❌ فشل العملية: ' + e.message;
+    errEl.style.display = 'block';
+  }
+}
+
+async function srtLoadTreasuryBalance() {
+  try {
+    const {getDocs,collection:c}=srtFS(),db=srtDB();
+    const snap = await getDocs(c(db, SRT_TREASURY_COLLECTION));
+    if (!snap.empty) {
+      const data = snap.docs[0].data();
+      const el = document.getElementById('srt-treasury-total');
+      if (el) el.textContent = (data.balance || 0).toLocaleString('ar-DZ') + ' دج';
+    }
+  } catch (e) { console.warn('Treasury load failed:', e); }
+}
+
 async function srtLoadData() {
   const {getDocs,collection:c}=srtFS(),db=srtDB();
   try {
@@ -22709,6 +22845,7 @@ async function srtLoadData() {
     srtAllData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     srtRenderStats();
     srtRenderTable(srtAllData);
+    srtLoadTreasuryBalance();
   } catch (e) { console.error('SRT load error:', e); srtAllData = []; srtRenderStats(); srtRenderTable([]); }
 }
 
@@ -22754,8 +22891,10 @@ function srtRenderTable(data) {
       <td style="font-size:12px;max-width:160px">${levels}</td>
       <td>${statusBadge}</td>
       <td style="font-size:12px">${created}</td>
+      <td style="font-weight:700;font-size:13px;direction:ltr;text-align:center">${(t.balance || 0).toLocaleString('ar-DZ')} دج</td>
       <td>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="tbl-action" onclick="srtOpenBalanceModal('${t.id}')" title="إدارة الرصيد" style="padding:4px 8px;font-size:11px;background:rgba(16,185,129,0.08);color:#059669">💰</button>
           <button class="tbl-action" onclick="srtToggleStatus('${t.id}')" title="تبديل الحالة" style="padding:4px 8px;font-size:11px">${isDis ? '✅ تفعيل' : '🚫 تعطيل'}</button>
           <button class="tbl-action" onclick="srtOpenEditModal('${t.id}')" title="تعديل" style="padding:4px 8px;font-size:11px">✏️</button>
           ${t.userId ? '<button class="tbl-action" onclick="srtResetPassword(\'' + t.id + '\')" title="إعادة تعيين كلمة المرور" style="padding:4px 8px;font-size:11px">🔄</button>' : ''}
