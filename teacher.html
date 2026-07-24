@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة الأستاذ — E-PLUS</title>
+  <link rel="icon" type="image/x-icon" href="images/eplus-icon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --primary:#6366f1;--primary-dark:#4f46e5;--primary-darker:#3730a3;--primary-light:rgba(99,102,241,0.08);--primary-medium:rgba(99,102,241,0.15);
+      --gold:#c8a84b;--gold-dark:#b09030;--gold-light:rgba(200,168,75,0.1);
+      --bg:#f0f2f5;--card:#ffffff;--text:#1e293b;--text-secondary:#475569;--text-muted:#94a3b8;
+      --border:#e2e8f0;--border-light:#f1f5f9;
+      --success:#059669;--success-light:rgba(16,185,129,0.1);
+      --danger:#dc2626;--danger-light:rgba(220,38,38,0.08);
+      --blue:#0ea5e9;--blue-light:rgba(14,165,233,0.08);
+      --sidebar-w:260px;--radius:14px;--radius-sm:10px;--radius-xs:8px;
+      --shadow:0 1px 3px rgba(0,0,0,0.04),0 4px 12px rgba(0,0,0,0.04);
+      --shadow-md:0 4px 16px rgba(0,0,0,0.06);--shadow-lg:0 8px 32px rgba(0,0,0,0.08);
+      --transition:0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+    body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+    button{font-family:'Tajawal',sans-serif;cursor:pointer;border:none}
+    input,textarea,select{font-family:'Tajawal',sans-serif}
+
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes fadeSlideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes scaleIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes bgZoom{from{transform:scale(1.05)}to{transform:scale(1.12)}}
+    @keyframes slideInDrawer{from{transform:translateX(100%)}to{transform:translateX(0)}}
+    @keyframes slideOutDrawer{from{transform:translateX(0)}to{transform:translateX(100%)}}
+
+    /* LOGIN */
+    .login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:#1a1a2e}
+    .login-bg{position:absolute;inset:0;background:url('images/studentportalbackground.jpg') center/cover no-repeat;animation:bgZoom 20s ease-in-out infinite alternate;z-index:0}
+    .login-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(79,70,229,0.88),rgba(55,48,163,0.92));z-index:1;backdrop-filter:blur(2px)}
+    .login-shapes{position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none}
+    .login-shape{position:absolute;border-radius:50%;background:rgba(255,255,255,0.04)}
+    .login-shape:nth-child(1){width:300px;height:300px;top:-80px;right:-60px;animation:float 6s ease-in-out infinite}
+    .login-shape:nth-child(2){width:200px;height:200px;bottom:-40px;left:-40px;animation:float 8s ease-in-out infinite 1s}
+    .login-card{background:rgba(255,255,255,0.12);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.18);border-radius:24px;padding:44px 36px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.3);position:relative;z-index:2;text-align:center;animation:fadeSlideUp 0.7s ease both}
+    .login-logo-img{max-width:200px;height:auto;margin:0 auto 32px;display:block;animation:scaleIn 0.6s ease both 0.1s;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.15))}
+    .login-field{margin-bottom:18px;text-align:right}
+    .login-label{display:block;font-size:13px;font-weight:700;color:rgba(255,255,255,0.8);margin-bottom:8px}
+    .login-input{width:100%;padding:14px 16px 14px 48px;border:1.5px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);font-size:15px;font-weight:700;color:#fff;background:rgba(255,255,255,0.08);transition:var(--transition);direction:ltr;text-align:left}
+    .login-input::placeholder{color:rgba(255,255,255,0.35)}
+    .login-input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,75,0.2);background:rgba(255,255,255,0.12)}
+    .login-input-wrap{position:relative}
+    .login-input-icon{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:18px;opacity:0.5;pointer-events:none}
+    .login-btn{width:100%;padding:15px;border:none;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--gold),#e2c46a);color:#1a1a2e;font-size:16px;font-weight:900;transition:var(--transition);margin-top:8px;box-shadow:0 4px 16px rgba(200,168,75,0.3)}
+    .login-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(200,168,75,0.4)}
+    .login-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+    .login-error{background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.3);color:#fca5a5;border-radius:var(--radius-xs);padding:12px 14px;font-size:13px;font-weight:700;margin-top:14px;display:none;backdrop-filter:blur(8px)}
+    .login-footer{margin-top:28px;font-size:12px;color:rgba(255,255,255,0.4);font-weight:600}
+    .login-role-badge{display:inline-block;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(200,168,75,0.2);color:var(--gold);margin-bottom:20px;border:1px solid rgba(200,168,75,0.3)}
+
+    /* LAYOUT */
+    .portal-layout{display:flex;min-height:100vh}
+    .sidebar{width:var(--sidebar-w);background:linear-gradient(180deg,#1e1b4b 0%,#312e81 50%,#3730a3 100%);color:#fff;position:fixed;top:0;right:0;bottom:0;z-index:100;display:flex;flex-direction:column;overflow-y:auto;transition:var(--transition)}
+    .sidebar::-webkit-scrollbar{width:0}
+    .sidebar-brand{padding:28px 24px 20px;border-bottom:1px solid rgba(255,255,255,0.08)}
+    .sidebar-brand-row{display:flex;align-items:center;gap:14px}
+    .sidebar-logo{width:48px;height:48px;background:linear-gradient(135deg,var(--gold),#e2c46a);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;box-shadow:0 4px 16px rgba(200,168,75,0.3)}
+    .sidebar-brand-text{flex:1;min-width:0}
+    .sidebar-brand-name{font-size:18px;font-weight:900}
+    .sidebar-brand-sub{font-size:11px;color:rgba(255,255,255,0.5);font-weight:600;margin-top:2px}
+    .sidebar-teacher{padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.08)}
+    .sidebar-teacher-avatar{width:56px;height:56px;background:linear-gradient(135deg,rgba(255,255,255,0.15),rgba(255,255,255,0.05));border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;margin:0 auto 12px;border:2px solid rgba(255,255,255,0.1)}
+    .sidebar-teacher-name{text-align:center;font-size:15px;font-weight:800;margin-bottom:4px}
+    .sidebar-teacher-id{text-align:center;font-size:11px;color:rgba(255,255,255,0.5);font-weight:600;font-family:monospace}
+    .sidebar-nav{padding:16px 12px;flex:1}
+    .sidebar-link{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--radius-sm);color:rgba(255,255,255,0.7);font-size:14px;font-weight:600;transition:var(--transition);cursor:pointer;margin-bottom:2px}
+    .sidebar-link:hover{background:rgba(255,255,255,0.08);color:#fff}
+    .sidebar-link.active{background:linear-gradient(135deg,rgba(200,168,75,0.2),rgba(200,168,75,0.1));color:var(--gold);font-weight:700}
+    .sidebar-link-icon{width:20px;text-align:center;font-size:16px}
+    .sidebar-footer{padding:16px 24px;border-top:1px solid rgba(255,255,255,0.08)}
+    .sidebar-logout{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;border-radius:var(--radius-sm);background:rgba(220,38,38,0.12);border:1px solid rgba(220,38,38,0.2);color:#fca5a5;font-size:13px;font-weight:700;transition:var(--transition)}
+    .sidebar-logout:hover{background:rgba(220,38,38,0.2);border-color:rgba(220,38,38,0.35)}
+    .main-content{flex:1;margin-right:var(--sidebar-w);min-height:100vh}
+    .main-topbar{display:none;padding:12px 20px;background:var(--card);border-bottom:1px solid var(--border);align-items:center;gap:12px;position:sticky;top:0;z-index:90}
+    .topbar-toggle{width:40px;height:40px;border-radius:var(--radius-sm);background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:18px;transition:var(--transition)}
+    .topbar-brand{display:flex;align-items:center;gap:10px;flex:1}
+    .topbar-logo{width:36px;height:36px;background:linear-gradient(135deg,var(--gold),#e2c46a);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+    .topbar-title{font-size:16px;font-weight:900}
+    .topbar-logout{padding:8px 14px;border-radius:var(--radius-xs);background:var(--danger-light);color:var(--danger);font-size:12px;font-weight:700;transition:var(--transition)}
+    .main-body{padding:32px 28px}
+
+    /* HERO */
+    .hero-card{background:linear-gradient(135deg,#4f46e5 0%,#6366f1 40%,#818cf8 100%);border-radius:20px;padding:36px 32px;color:#fff;position:relative;overflow:hidden;margin-bottom:28px;animation:fadeSlideUp 0.5s ease both}
+    .hero-card::before{content:'';position:absolute;top:-50%;left:-20%;width:60%;height:200%;background:radial-gradient(circle,rgba(200,168,75,0.12) 0%,transparent 60%);pointer-events:none}
+    .hero-row{display:flex;align-items:center;gap:20px;position:relative;z-index:1}
+    .hero-avatar{width:68px;height:68px;background:rgba(255,255,255,0.15);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;border:2px solid rgba(255,255,255,0.2)}
+    .hero-info{flex:1}
+    .hero-greeting{font-size:13px;color:rgba(255,255,255,0.6);font-weight:600;margin-bottom:4px}
+    .hero-name{font-size:24px;font-weight:900}
+    .hero-id{font-size:12px;color:rgba(255,255,255,0.5);font-family:monospace;font-weight:600;margin-top:4px}
+    .hero-badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;position:relative;z-index:1}
+    .hero-badge{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;backdrop-filter:blur(8px);background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15)}
+
+    /* STATS */
+    .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+    .stat-card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);border:1px solid var(--border-light);transition:var(--transition);position:relative;overflow:hidden}
+    .stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+    .stat-card::before{content:'';position:absolute;top:0;right:0;width:4px;height:100%;border-radius:0 var(--radius) var(--radius) 0}
+    .stat-card.c-purple::before{background:var(--primary)}
+    .stat-card.c-gold::before{background:var(--gold)}
+    .stat-card.c-green::before{background:var(--success)}
+    .stat-card.c-blue::before{background:var(--blue)}
+    .stat-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:14px}
+    .stat-icon.i-purple{background:var(--primary-light)}
+    .stat-icon.i-gold{background:var(--gold-light)}
+    .stat-icon.i-green{background:var(--success-light)}
+    .stat-icon.i-blue{background:var(--blue-light)}
+    .stat-value{font-size:28px;font-weight:900;color:var(--text);line-height:1}
+    .stat-label{font-size:12px;color:var(--text-muted);font-weight:600;margin-top:4px}
+
+    /* CONTENT CARDS */
+    .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+    .section-title{font-size:18px;font-weight:900;color:var(--text);display:flex;align-items:center;gap:8px}
+    .section-count{background:var(--primary-light);color:var(--primary);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:800}
+    .content-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-bottom:32px}
+    .content-card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);border:1px solid var(--border-light);transition:var(--transition);animation:fadeSlideUp 0.5s ease both}
+    .content-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md)}
+    .content-card-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+    .content-card-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+    .content-card-title{font-size:15px;font-weight:800;color:var(--text)}
+    .content-card-sub{font-size:12px;color:var(--text-muted);font-weight:600;margin-top:2px}
+    .content-card-body{font-size:13px;color:var(--text-secondary);line-height:1.7;margin-bottom:14px}
+    .content-card-footer{display:flex;gap:8px}
+    .content-btn{flex:1;padding:10px;border-radius:var(--radius-xs);border:1.5px solid var(--border);background:var(--card);color:var(--text-secondary);font-size:12px;font-weight:700;cursor:pointer;transition:var(--transition);display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:'Tajawal',sans-serif}
+    .content-btn:hover{border-color:var(--primary);background:var(--primary-light);color:var(--primary)}
+    .content-btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .content-btn.primary:hover{background:var(--primary-dark)}
+
+    .portal-footer{text-align:center;padding:24px;font-size:12px;color:var(--text-muted);font-weight:600}
+
+    /* LOADING */
+    .loading-page{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px}
+    .spinner{width:44px;height:44px;border:3.5px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite}
+    .loading-text{font-size:15px;color:var(--text-muted);font-weight:600}
+
+    /* DRAWER */
+    .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;opacity:0;transition:opacity 0.3s ease;backdrop-filter:blur(2px)}
+    .drawer-overlay.open{display:block;opacity:1}
+
+    /* MODAL */
+    .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+    .modal-bg.open{display:flex}
+    .modal{background:var(--card);border-radius:20px;width:100%;max-width:600px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);animation:scaleIn 0.3s ease both}
+    .modal-header{display:flex;align-items:center;gap:12px;padding:20px 24px;border-bottom:1px solid var(--border-light)}
+    .modal-title{flex:1;font-size:17px;font-weight:900}
+    .modal-close{width:32px;height:32px;border-radius:8px;background:var(--danger-light);color:var(--danger);display:flex;align-items:center;justify-content:center;font-size:16px;transition:var(--transition)}
+    .modal-close:hover{background:rgba(220,38,38,0.15)}
+    .modal-body{padding:24px}
+    .form-group{margin-bottom:16px}
+    .form-label{display:block;font-size:13px;font-weight:700;color:var(--text-secondary);margin-bottom:6px}
+    .form-input{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:14px;font-weight:600;color:var(--text);background:var(--card);transition:var(--transition)}
+    .form-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+    textarea.form-input{resize:vertical;min-height:80px}
+    .form-btn{padding:10px 20px;border-radius:var(--radius-xs);font-size:13px;font-weight:700;transition:var(--transition)}
+    .form-btn.primary{background:var(--primary);color:#fff;border:none}
+    .form-btn.primary:hover{background:var(--primary-dark)}
+
+    /* RESPONSIVE */
+    @media(max-width:1024px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:768px){
+      .sidebar{display:none}.main-content{margin-right:0}.main-topbar{display:flex}.main-body{padding:20px 16px}
+      .hero-card{padding:24px 20px;border-radius:16px}.hero-avatar{width:56px;height:56px;font-size:22px}
+      .hero-name{font-size:20px}.stats-grid{grid-template-columns:repeat(2,1fr);gap:12px}
+      .content-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="loading-page"><div class="spinner"></div><div class="loading-text">جاري تحميل لوحة الأستاذ...</div></div>
+  </div>
+  <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+
+  <!-- CONTENT MODAL -->
+  <div class="modal-bg" id="content-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="content-modal-title">إضافة محتوى</div>
+        <button class="modal-close" onclick="closeContentModal()">✕</button>
+      </div>
+      <div class="modal-body" id="content-modal-body"></div>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = { apiKey: "AIzaSyDzUxZQ...placeholder", authDomain: "eplus-center-39.firebaseapp.com", projectId: "eplus-center-39", storageBucket: "eplus-center-39.appspot.com", messagingSenderId: "123456789", appId: "1:123456789:web:placeholder" };
+
+    let db, auth;
+    try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); auth = firebase.auth(); } catch(e) { console.error('Firebase init error:', e); }
+
+    const SESSION_KEY = 'eplus_teacher_session';
+    const SESSION_MAX_AGE = 24*60*60*1000;
+    const SRT_COLLECTION = 'support_teachers';
+    const CONTENT_COLLECTION = 'teacher_content';
+
+    let currentTeacher = null;
+    let currentPage = 'home';
+    let teacherSubjects = [];
+
+    function getSession(){try{const s=localStorage.getItem(SESSION_KEY);if(!s)return null;const o=JSON.parse(s);if(Date.now()-o.loginTime>SESSION_MAX_AGE){localStorage.removeItem(SESSION_KEY);return null;}return o;}catch(e){localStorage.removeItem(SESSION_KEY);return null;}}
+    function saveSession(t){localStorage.setItem(SESSION_KEY,JSON.stringify({teacherId:t.teacherId,id:t.id,loginTime:Date.now()}));}
+    function clearSession(){localStorage.removeItem(SESSION_KEY);}
+
+    function showLoading(){document.getElementById('app').innerHTML='<div class="loading-page"><div class="spinner"></div><div class="loading-text">جاري تحميل لوحة الأستاذ...</div></div>';}
+
+    /* ═══ LOGIN ═══ */
+    function showLogin(errorMsg){
+      document.getElementById('app').innerHTML=`
+        <div class="login-page">
+          <div class="login-bg"></div><div class="login-overlay"></div>
+          <div class="login-shapes"><div class="login-shape"></div><div class="login-shape"></div></div>
+          <div class="login-card">
+            <img class="login-logo-img" src="images/logostudentportal.png" alt="E-PLUS">
+            <div class="login-role-badge">👨‍🏫 لوحة الأستاذ</div>
+            <form onsubmit="handleLogin(event)">
+              <div class="login-field">
+                <label class="login-label">Teacher ID</label>
+                <div class="login-input-wrap">
+                  <input class="login-input" type="text" id="login-id" placeholder="مثال: SRT-XXXXX" required autocomplete="off">
+                  <span class="login-input-icon">🪪</span>
+                </div>
+              </div>
+              <div class="login-field">
+                <label class="login-label">كلمة المرور</label>
+                <div class="login-input-wrap">
+                  <input class="login-input" type="password" id="login-pass" placeholder="كلمة المرور" required autocomplete="off">
+                  <span class="login-input-icon">🔒</span>
+                </div>
+              </div>
+              <button class="login-btn" type="submit" id="login-btn">تسجيل الدخول ✦</button>
+              <div class="login-error" id="login-error">${errorMsg||''}</div>
+            </form>
+            <div class="login-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي</div>
+          </div>
+        </div>`;
+    }
+
+    async function handleLogin(e){
+      e.preventDefault();
+      const id=document.getElementById('login-id').value.trim();
+      const pass=document.getElementById('login-pass').value;
+      const errEl=document.getElementById('login-error');
+      const btn=document.getElementById('login-btn');
+      if(!id||!pass){errEl.textContent='الرجاء ملء جميع الحقول';errEl.style.display='block';return;}
+      btn.disabled=true;btn.textContent='جاري التحقق...';errEl.style.display='none';
+      try{
+        const snap=await db.collection(SRT_COLLECTION).where('teacherId','==',id).limit(1).get();
+        if(snap.empty){errEl.textContent='Teacher ID غير صحيح. الرجاء المحاولة مرة أخرى.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
+        const doc=snap.docs[0];
+        const data=doc.data();
+        if(data.status==='disabled'){errEl.textContent='تم تعطيل حسابك. الرجاء مراجعة الإدارة.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
+        if(data.password!==pass){errEl.textContent='كلمة المرور غير صحيحة. الرجاء المحاولة مرة أخرى.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
+        const teacher={id:doc.id,...data};
+        saveSession(teacher);
+        await db.collection(SRT_COLLECTION).doc(doc.id).update({lastLogin:firebase.firestore.FieldValue.serverTimestamp()});
+        renderDashboard(teacher);
+      }catch(err){console.error('Teacher login error:',err);errEl.textContent='حدث خطأ أثناء التحقق.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';}
+    }
+
+    /* ═══ SIDEBAR ═══ */
+    function renderSidebar(t){
+      const initials=t.name?t.name[0]:'م';
+      return `
+        <div class="sidebar-brand"><div class="sidebar-brand-row"><div class="sidebar-logo">🎓</div><div class="sidebar-brand-text"><div class="sidebar-brand-name">E-PLUS</div><div class="sidebar-brand-sub">Teacher Portal</div></div></div></div>
+        <div class="sidebar-teacher"><div class="sidebar-teacher-avatar">${initials}</div><div class="sidebar-teacher-name">${t.name||'الأستاذ'}</div><div class="sidebar-teacher-id">${t.teacherId||t.id}</div></div>
+        <div class="sidebar-nav">
+          <div class="sidebar-link ${currentPage==='home'?'active':''}" onclick="navigateTo('home')"><span class="sidebar-link-icon">🏠</span>الرئيسية</div>
+          <div class="sidebar-link ${currentPage==='content'?'active':''}" onclick="navigateTo('content')"><span class="sidebar-link-icon">📚</span>المحتوى التعليمي</div>
+          <div class="sidebar-link ${currentPage==='students'?'active':''}" onclick="navigateTo('students')"><span class="sidebar-link-icon">👥</span>الطلاب</div>
+        </div>
+        <div class="sidebar-footer"><button class="sidebar-logout" onclick="handleLogout()">🚪 تسجيل الخروج</button></div>`;
+    }
+
+    function navigateTo(page){currentPage=page;closeDrawer();renderCurrentPage();}
+    function renderCurrentPage(){if(!currentTeacher)return;if(currentPage==='content')renderContentPage();else if(currentPage==='students')renderStudentsPage();else renderDashboard(currentTeacher);}
+
+    function openDrawer(){
+      document.getElementById('drawer-overlay').classList.add('open');
+      let drawer=document.getElementById('mobile-drawer-panel');
+      if(!drawer){drawer=document.createElement('div');drawer.id='mobile-drawer-panel';drawer.style.cssText='display:block;position:fixed;top:0;right:0;bottom:0;width:280px;background:linear-gradient(180deg,#1e1b4b 0%,#312e81 50%,#3730a3 100%);color:#fff;z-index:201;overflow-y:auto;animation:slideInDrawer 0.3s ease both;box-shadow:-4px 0 24px rgba(0,0,0,0.3)';document.body.appendChild(drawer);}
+      drawer.innerHTML=renderSidebar(currentTeacher);drawer.style.display='block';drawer.style.animation='slideInDrawer 0.3s ease both';
+    }
+    function closeDrawer(){
+      document.getElementById('drawer-overlay').classList.remove('open');
+      const d=document.getElementById('mobile-drawer-panel');
+      if(d){d.style.animation='slideOutDrawer 0.3s ease both';setTimeout(()=>{d.style.display='none';},280);}
+    }
+
+    /* ═══ DASHBOARD ═══ */
+    async function renderDashboard(t){
+      currentTeacher=t;currentPage='home';
+      const subjects=Array.isArray(t.subjects)?t.subjects:[];
+      const levels=Array.isArray(t.levels)?t.levels:[];
+      const initials=t.name?t.name[0]:'م';
+
+      let contentCount=0;
+      try{const snap=await db.collection(CONTENT_COLLECTION).where('teacherId','==',t.teacherId||t.id).get();contentCount=snap.size;}catch(e){}
+
+      document.getElementById('app').innerHTML=`
+        <div class="portal-layout">
+          <aside class="sidebar">${renderSidebar(t)}</aside>
+          <div class="main-content">
+            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">👨‍🏫</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
+            <div class="main-body">
+              <div class="hero-card"><div class="hero-row"><div class="hero-avatar">${initials}</div><div class="hero-info"><div class="hero-greeting">مرحباً بك 👋</div><div class="hero-name">${t.name||'الأستاذ'}</div><div class="hero-id">${t.teacherId||t.id}</div></div></div><div class="hero-badges">${subjects.map(s=>`<span class="hero-badge">📚 ${typeof s==='string'?s:(s.subject||'')}</span>`).join('')}${levels.map(l=>`<span class="hero-badge">🎓 ${l}</span>`).join('')}</div></div>
+              <div class="stats-grid">
+                <div class="stat-card c-purple" style="animation:fadeSlideUp 0.5s ease both 0.1s"><div class="stat-icon i-purple">📚</div><div class="stat-value">${subjects.length}</div><div class="stat-label">مادة مُدرَّسة</div></div>
+                <div class="stat-card c-gold" style="animation:fadeSlideUp 0.5s ease both 0.15s"><div class="stat-icon i-gold">📄</div><div class="stat-value">${contentCount}</div><div class="stat-label">محتوى منشور</div></div>
+                <div class="stat-card c-green" style="animation:fadeSlideUp 0.5s ease both 0.2s"><div class="stat-icon i-green">👥</div><div class="stat-value">—</div><div class="stat-label">طالب مسجل</div></div>
+                <div class="stat-card c-blue" style="animation:fadeSlideUp 0.5s ease both 0.25s"><div class="stat-icon i-blue">🕐</div><div class="stat-value" style="font-size:14px;font-weight:700;color:var(--text-muted)">${t.lastLogin?new Date(t.lastLogin.seconds?t.lastLogin.seconds*1000:t.lastLogin).toLocaleDateString('ar-DZ'):'—'}</div><div class="stat-label">آخر دخول</div></div>
+              </div>
+              <div class="section-header"><div class="section-title">⚡ إجراءات سريعة</div></div>
+              <div class="content-grid">
+                <div class="content-card" onclick="navigateTo('content')" style="cursor:pointer"><div class="content-card-header"><div class="content-card-icon" style="background:var(--primary-light)">📚</div><div><div class="content-card-title">إدارة المحتوى</div><div class="content-card-sub">إضافة وتعديل الدروس والتمارين</div></div></div><div class="content-card-body">أضف محتوى تعليمي جديد لطلابك: دروس، تمارين، واجبات، إعلانات.</div><div class="content-card-footer"><button class="content-btn primary">➡️ الذهاب</button></div></div>
+                <div class="content-card" onclick="navigateTo('students')" style="cursor:pointer"><div class="content-card-header"><div class="content-card-icon" style="background:var(--success-light)">👥</div><div><div class="content-card-title">الطلاب المسجلون</div><div class="content-card-sub">عرض قائمة طلابك</div></div></div><div class="content-card-body">اطلع على الطلاب المسجلين في موادك ومستوياتك.</div><div class="content-card-footer"><button class="content-btn primary">➡️ الذهاب</button></div></div>
+              </div>
+              <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
+            </div>
+          </div>
+        </div>`;
+      updateSidebarActive();
+    }
+
+    /* ═══ CONTENT PAGE ═══ */
+    async function renderContentPage(){
+      currentPage='content';
+      const t=currentTeacher;
+      const teacherId=t.teacherId||t.id;
+      let items=[];
+      try{const snap=await db.collection(CONTENT_COLLECTION).where('teacherId','==',teacherId).orderBy('createdAt','desc').get();items=snap.docs.map(d=>({id:d.id,...d.data()}));}catch(e){console.error('Content load error:',e);}
+
+      const lessons=items.filter(i=>i.type==='lesson');
+      const exercises=items.filter(i=>i.type==='exercise');
+      const homework=items.filter(i=>i.type==='homework');
+      const announcements=items.filter(i=>i.type==='announcement');
+
+      function renderContentList(list,typeLabel){
+        if(!list.length)return '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">لا يوجد محتوى بعد</div>';
+        return list.map(c=>`<div class="content-card" style="animation-delay:0.05s">
+          <div class="content-card-header">
+            <div class="content-card-icon" style="background:${c.type==='lesson'?'var(--primary-light)':c.type==='exercise'?'var(--gold-light)':c.type==='homework'?'var(--blue-light)':'var(--success-light)'}">${c.type==='lesson'?'📖':c.type==='exercise'?'📝':c.type==='homework'?'📋':'📢'}</div>
+            <div style="flex:1"><div class="content-card-title">${c.title||'بدون عنوان'}</div><div class="content-card-sub">${c.subject||''} • ${c.createdAt?new Date(c.createdAt.seconds?c.createdAt.seconds*1000:c.createdAt).toLocaleDateString('ar-DZ'):'—'}</div></div>
+          </div>
+          <div class="content-card-body">${c.description||'لا يوجد وصف'}</div>
+          <div class="content-card-footer">
+            <button class="content-btn" onclick="deleteContent('${c.id}')">🗑️ حذف</button>
+          </div>
+        </div>`).join('');
+      }
+
+      document.getElementById('app').innerHTML=`
+        <div class="portal-layout">
+          <aside class="sidebar">${renderSidebar(t)}</aside>
+          <div class="main-content">
+            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">👨‍🏫</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
+            <div class="main-body">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+                <div class="section-title">📚 المحتوى التعليمي</div>
+                <button onclick="openAddContent()" style="padding:10px 20px;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--primary),#8b5cf6);color:#fff;font-size:13px;font-weight:800">➕ إضافة محتوى</button>
+              </div>
+              <div style="margin-bottom:28px"><div style="font-size:15px;font-weight:800;margin-bottom:12px;color:var(--text)">📖 الدروس (${lessons.length})</div>${renderContentList(lessons,'درس')}</div>
+              <div style="margin-bottom:28px"><div style="font-size:15px;font-weight:800;margin-bottom:12px;color:var(--text)">📝 التمارين (${exercises.length})</div>${renderContentList(exercises,'تمرين')}</div>
+              <div style="margin-bottom:28px"><div style="font-size:15px;font-weight:800;margin-bottom:12px;color:var(--text)">📋 الواجبات (${homework.length})</div>${renderContentList(homework,'واجب')}</div>
+              <div style="margin-bottom:28px"><div style="font-size:15px;font-weight:800;margin-bottom:12px;color:var(--text)">📢 الإعلانات (${announcements.length})</div>${renderContentList(announcements,'إعلان')}</div>
+              <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
+            </div>
+          </div>
+        </div>`;
+      updateSidebarActive();
+    }
+
+    function openAddContent(){
+      const t=currentTeacher;
+      const subjects=Array.isArray(t.subjects)?t.subjects:[];
+      const levels=Array.isArray(t.levels)?t.levels:[];
+      const subjectOptions=subjects.map(s=>{const n=typeof s==='string'?s:(s.subject||'');return `<option value="${n}">${n}</option>`;}).join('');
+      const levelOptions=levels.map(l=>`<option value="${l}">${l}</option>`).join('');
+
+      document.getElementById('content-modal-title').textContent='إضافة محتوى جديد';
+      document.getElementById('content-modal-body').innerHTML=`
+        <div class="form-group"><label class="form-label">نوع المحتوى <span style="color:var(--danger)">*</span></label>
+          <select class="form-input" id="cnt-type"><option value="lesson">📖 درس</option><option value="exercise">📝 تمرين</option><option value="homework">📋 واجب</option><option value="announcement">📢 إعلان</option></select></div>
+        <div class="form-group"><label class="form-label">المادة <span style="color:var(--danger)">*</span></label>
+          <select class="form-input" id="cnt-subject">${subjectOptions||'<option value="">—</option>'}</select></div>
+        <div class="form-group"><label class="form-label">المستوى</label>
+          <select class="form-input" id="cnt-level"><option value="">الكل</option>${levelOptions}</select></div>
+        <div class="form-group"><label class="form-label">العنوان <span style="color:var(--danger)">*</span></label><input class="form-input" type="text" id="cnt-title" placeholder="عنوان المحتوى"></div>
+        <div class="form-group"><label class="form-label">الوصف</label><textarea class="form-input" id="cnt-desc" placeholder="وصف المحتوى..."></textarea></div>
+        <div class="form-group"><label class="form-label">رابط خارجي (اختياري)</label><input class="form-input" type="url" id="cnt-url" placeholder="https://..."></div>
+        <div class="form-group"><label class="form-label">نوع الرابط</label>
+          <select class="form-input" id="cnt-urltype"><option value="">بدون</option><option value="youtube">YouTube</option><option value="gdrive">Google Drive</option><option value="link">رابط آخر</option></select></div>
+        <button class="form-btn primary" onclick="saveContent()" style="width:100%">💾 حفظ المحتوى</button>`;
+      document.getElementById('content-modal').classList.add('open');
+    }
+
+    async function saveContent(){
+      const t=currentTeacher;
+      const type=document.getElementById('cnt-type').value;
+      const subject=document.getElementById('cnt-subject').value;
+      const level=document.getElementById('cnt-level').value;
+      const title=document.getElementById('cnt-title').value.trim();
+      const description=document.getElementById('cnt-desc').value.trim();
+      const url=document.getElementById('cnt-url').value.trim();
+      const urlType=document.getElementById('cnt-urltype').value;
+      if(!title){alert('الرجاء إدخال العنوان');return;}
+      try{
+        await db.collection(CONTENT_COLLECTION).add({
+          teacherId:t.teacherId||t.id,teacherName:t.name||'',type,subject,level,title,description,url,urlType,
+          targetLevels:level?[level]:(Array.isArray(t.levels)?t.levels:[]),
+          targetSubjects:subject?[subject]:(Array.isArray(t.subjects)?t.subjects.map(s=>typeof s==='string'?s:s.subject):[]),
+          createdAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+        closeContentModal();renderContentPage();
+      }catch(e){console.error('Save content error:',e);alert('حدث خطأ أثناء الحفظ');}
+    }
+
+    async function deleteContent(id){
+      if(!confirm('هل أنت م chắc من حذف هذا المحتوى؟'))return;
+      try{await db.collection(CONTENT_COLLECTION).doc(id).delete();renderContentPage();}catch(e){console.error('Delete content error:',e);}
+    }
+
+    function closeContentModal(){document.getElementById('content-modal').classList.remove('open');}
+
+    /* ═══ STUDENTS PAGE ═══ */
+    async function renderStudentsPage(){
+      currentPage='students';
+      const t=currentTeacher;
+      const subjects=Array.isArray(t.subjects)?t.subjects.map(s=>typeof s==='string'?s:s.subject):[];
+      const levels=Array.isArray(t.levels)?t.levels:[];
+      let students=[];
+      try{
+        const snap=await db.collection('support_registrations').where('status','==','مسجل نهائياً').get();
+        students=snap.docs.map(d=>({id:d.id,...d.data()})).filter(s=>{
+          if(!Array.isArray(s.subjects))return false;
+          const hasSubject=s.subjects.some(sub=>subjects.includes(sub.subject));
+          const hasLevel=levels.length===0||levels.includes(s.level);
+          return hasSubject&&hasLevel;
+        });
+      }catch(e){console.error('Students load error:',e);}
+
+      const rows=students.length?students.map(s=>{
+        const fullName=(s.first_name||'')+' '+(s.last_name||'');
+        const studentSubjects=(Array.isArray(s.subjects)?s.subjects:[]).filter(sub=>subjects.includes(sub.subject)).map(sub=>sub.subject).join('، ');
+        return `<tr><td style="font-weight:700">${fullName}</td><td style="font-family:monospace;font-size:12px">${s.id}</td><td>${s.level||'—'}</td><td style="font-size:12px">${studentSubjects}</td></tr>`;
+      }).join(''):'<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--text-muted)">لا يوجد طلاب مسجلون في موادك بعد</td></tr>';
+
+      document.getElementById('app').innerHTML=`
+        <div class="portal-layout">
+          <aside class="sidebar">${renderSidebar(t)}</aside>
+          <div class="main-content">
+            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">👨‍🏫</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
+            <div class="main-body">
+              <div class="section-title" style="margin-bottom:20px">👥 الطلاب المسجلون في موادك</div>
+              <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);overflow-x:auto">
+                <table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--border-light)"><th style="padding:12px 16px;text-align:right;font-size:12px;font-weight:800;color:var(--text-muted)">الاسم</th><th style="padding:12px 16px;text-align:right;font-size:12px;font-weight:800;color:var(--text-muted)">المعرف</th><th style="padding:12px 16px;text-align:right;font-size:12px;font-weight:800;color:var(--text-muted)">المستوى</th><th style="padding:12px 16px;text-align:right;font-size:12px;font-weight:800;color:var(--text-muted)">المواد</th></tr></thead><tbody>${rows}</tbody></table>
+              </div>
+              <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
+            </div>
+          </div>
+        </div>`;
+      updateSidebarActive();
+    }
+
+    function updateSidebarActive(){
+      document.querySelectorAll('.sidebar-link').forEach(l=>{
+        l.classList.remove('active');
+        if(currentPage==='home'&&l.textContent.includes('الرئيسية'))l.classList.add('active');
+        if(currentPage==='content'&&l.textContent.includes('المحتوى'))l.classList.add('active');
+        if(currentPage==='students'&&l.textContent.includes('الطلاب'))l.classList.add('active');
+      });
+    }
+
+    function handleLogout(){clearSession();window.location.href='/teacher.html';}
+
+    async function init(){
+      const session=getSession();
+      if(session){
+        showLoading();
+        try{
+          const doc=await db.collection(SRT_COLLECTION).doc(session.id).get();
+          if(!doc.exists){clearSession();showLogin('حساب الأستاذ غير موجود.');return;}
+          const data=doc.data();
+          if(data.status==='disabled'){clearSession();showLogin('تم تعطيل حسابك.');return;}
+          renderDashboard({id:doc.id,...data});
+        }catch(e){console.error('Session restore error:',e);clearSession();showLogin('حدث خطأ أثناء تحميل البيانات.');}
+        return;
+      }
+      showLogin();
+    }
+    init();
+  </script>
+</body>
+</html>
