@@ -1643,6 +1643,11 @@
         <span class="nav-label">تسجيلات الدعم المدرسي</span>
         <span class="nav-badge" id="nav-badge-support">0</span>
       </div>
+      <div class="nav-item" onclick="switchNavSection('support-teachers')">
+        <span class="nav-icon">👨‍🏫</span>
+        <span class="nav-label">أساتذة الدعم المدرسي</span>
+        <span class="nav-badge" id="nav-badge-sr-teachers">0</span>
+      </div>
       <div class="nav-section" data-i18n="mail_service">خدمات البريد</div>
       <div class="nav-item" onclick="switchNavSection('notifications')">
         <span class="nav-icon">📨</span>
@@ -2982,6 +2987,57 @@
         </div>
       </div>
 
+      <!-- ===== SECTION: SUPPORT TEACHERS ===== -->
+      <div id="section-support-teachers" style="display:none">
+        <div class="section-header">
+          <div class="section-title">
+            <div class="section-icon">👨‍🏫</div>
+            <span>أساتذة الدعم المدرسي</span>
+          </div>
+          <button class="btn-sm" onclick="srtOpenAddModal()" style="background:linear-gradient(135deg,var(--primary),#8b5cf6);color:#fff;border:none;padding:8px 20px;font-weight:800">➕ إضافة أستاذ</button>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom:24px">
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--primary-light)">👨‍🏫</div></div><div class="stat-num" id="srt-total">0</div><div class="stat-label">إجمالي الأساتذة</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(16,185,129,0.1)">✅</div></div><div class="stat-num" id="srt-active">0</div><div class="stat-label">أساتذة مفعلين</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(200,168,75,0.1)">📚</div></div><div class="stat-num" id="srt-subjects">0</div><div class="stat-label">مادة مُدرَّسة</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(220,38,38,0.08)">🚫</div></div><div class="stat-num" id="srt-disabled">0</div><div class="stat-label">معطّل</div></div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center">
+          <input type="text" id="srt-search" placeholder="🔍 بحث بالاسم أو المعرف..." oninput="srtFilterTable()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;flex:1;min-width:200px;background:var(--card)">
+          <select id="srt-status-filter" onchange="srtFilterTable()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+            <option value="">الكل</option>
+            <option value="active">مفعل</option>
+            <option value="disabled">معطّل</option>
+          </select>
+        </div>
+
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>الصورة</th>
+                <th>المعرف</th>
+                <th>الاسم الكامل</th>
+                <th>الهاتف</th>
+                <th>البريد الإلكتروني</th>
+                <th>المواد</th>
+                <th>المستويات</th>
+                <th>الحالة</th>
+                <th>تاريخ الإنشاء</th>
+                <th>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="srt-tbody"></tbody>
+          </table>
+        </div>
+        <div id="srt-empty" style="text-align:center;padding:48px 20px;color:var(--text-muted);display:none">
+          <div style="font-size:48px;margin-bottom:12px">👨‍🏫</div>
+          <div style="font-weight:700">لا يوجد أساتذة مسجلين بعد</div>
+        </div>
+      </div>
+
     </div><!-- /dashboard-body -->
   </div><!-- /main -->
 </div><!-- /dashboard -->
@@ -3092,6 +3148,56 @@
       </div>
 
       <button class="btn-primary" onclick="saveTeacherEdit()" style="margin-top:16px">💾 حفظ التعديلات</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SRT ADD/EDIT MODAL ===== -->
+<div class="teacher-modal-bg" id="srt-modal">
+  <div class="teacher-modal" style="max-width:600px">
+    <div class="teacher-modal-header">
+      <div class="panel-icon" style="background:rgba(79,70,229,0.1);border-color:rgba(79,70,229,0.2)" id="srt-modal-icon">➕</div>
+      <div class="teacher-modal-title" id="srt-modal-title">إضافة أستاذ دعم</div>
+      <button class="att-modal-close" onclick="srtCloseModal()">✕</button>
+    </div>
+    <div class="teacher-modal-body">
+      <input type="hidden" id="srt-edit-id" value="">
+      <div class="form-group"><label class="form-label">الاسم الكامل <span class="required">*</span></label><input class="inp" type="text" id="srt-name" placeholder="مثال: محمد بن أحمد"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group"><label class="form-label">رقم الهاتف</label><input class="inp" type="tel" id="srt-phone" placeholder="0555123456"></div>
+        <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input class="inp" type="email" id="srt-email" placeholder="exemple@email.com"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">المواد التي يدرّسها <span class="required">*</span></label>
+        <div id="srt-subjects-list" style="display:flex;flex-direction:column;gap:8px;margin-top:4px"></div>
+        <button type="button" onclick="srtAddSubjectRow()" style="margin-top:8px;padding:6px 14px;border-radius:8px;border:1.5px dashed var(--border);background:transparent;color:var(--primary);font-size:12px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif">+ إضافة مادة</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">المستويات الدراسية</label>
+        <div id="srt-levels-checks" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px"></div>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">ملاحظات</label>
+        <textarea class="inp" id="srt-notes" rows="2" placeholder="ملاحظات داخلية (اختياري)" style="resize:vertical"></textarea>
+      </div>
+      <button class="btn-primary" id="srt-save-btn" onclick="srtSave()" style="margin-top:16px;width:100%">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SRT DELETE MODAL ===== -->
+<div class="teacher-modal-bg" id="srt-delete-modal">
+  <div class="teacher-modal" style="max-width:400px;text-align:center">
+    <div class="teacher-modal-header" style="justify-content:center;border:none">
+      <div style="font-size:48px;margin-bottom:8px">🗑️</div>
+    </div>
+    <div style="padding:0 24px 20px">
+      <div style="font-size:16px;font-weight:900;color:var(--text);margin-bottom:6px">حذف الأستاذ</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px">هل أنت متأكد من حذف هذا الأستاذ؟ لا يمكن التراجع عن هذا الإجراء.</div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button class="btn-sm" onclick="document.getElementById('srt-delete-modal').classList.remove('open')">إلغاء</button>
+        <button class="btn-sm danger" id="srt-delete-confirm-btn">نعم، احذف</button>
+      </div>
     </div>
   </div>
 </div>
@@ -4040,12 +4146,12 @@ document.addEventListener('click', (e) => {
 
 // NAV SWITCHING (sidebar-based, not tabs)
 window.switchNavSection = (section) => {
-  ['home','announcements','summer','students','teachers','finance','settings','notifications','support-registrations'].forEach(s => {
+  ['home','announcements','summer','students','teachers','finance','settings','notifications','support-registrations','support-teachers'].forEach(s => {
     const el = document.getElementById('section-' + s);
     if (el) el.style.display = s === section ? 'block' : 'none';
   });
   document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-  const navMap = {home:0, announcements:1, summer:2, students:3, teachers:4, settings:7, notifications:8, 'support-registrations':9};
+  const navMap = {home:0, announcements:1, summer:2, students:3, teachers:4, settings:7, notifications:8, 'support-registrations':9, 'support-teachers':10};
   const navItems = document.querySelectorAll('.nav-item');
   if (navMap[section] !== undefined) navItems[navMap[section]]?.classList.add('active');
   const finNav = document.getElementById('nav-finance');
@@ -4079,6 +4185,9 @@ window.switchNavSection = (section) => {
   }
   if (section === 'support-registrations') {
     if (typeof srLoadData === 'function') srLoadData();
+  }
+  if (section === 'support-teachers') {
+    if (typeof srtLoadData === 'function') srtLoadData();
   }
 };
 
@@ -22514,6 +22623,206 @@ function srShowToast(msg, type = 'success') {
     applyLang(savedLang);
   }
 })();
+
+/* ═══════════════════════════════════════════════════
+   SUPPORT TEACHERS MANAGEMENT (SRT)
+   ═══════════════════════════════════════════════════ */
+const SRT_COLLECTION = 'support_teachers';
+let srtAllData = [];
+let srtLevels = ['السنة الرابعة متوسط','السنة الأولى ثانوي','السنة الثانية ثانوي','السنة الثالثة ثانوي (بكالوريا)'];
+
+async function srtLoadData() {
+  try {
+    const snap = await getDocs(collection(db, SRT_COLLECTION));
+    srtAllData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    srtRenderStats();
+    srtRenderTable(srtAllData);
+  } catch (e) { console.error('SRT load error:', e); srtAllData = []; srtRenderStats(); srtRenderTable([]); }
+}
+
+function srtRenderStats() {
+  const total = srtAllData.length;
+  const active = srtAllData.filter(t => t.status !== 'disabled').length;
+  const disabled = total - active;
+  const subjects = new Set();
+  srtAllData.forEach(t => { if (Array.isArray(t.subjects)) t.subjects.forEach(s => subjects.add(s.subject || s)); });
+  document.getElementById('srt-total').textContent = total;
+  document.getElementById('srt-active').textContent = active;
+  document.getElementById('srt-subjects').textContent = subjects.size;
+  document.getElementById('srt-disabled').textContent = disabled;
+  const badge = document.getElementById('nav-badge-sr-teachers');
+  if (badge) badge.textContent = total;
+}
+
+function srtRenderTable(data) {
+  const tbody = document.getElementById('srt-tbody');
+  const empty = document.getElementById('srt-empty');
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  tbody.innerHTML = data.map(t => {
+    const isDis = t.status === 'disabled';
+    const statusBadge = isDis
+      ? '<span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:rgba(220,38,38,0.08);color:#dc2626">معطّل</span>'
+      : '<span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:rgba(16,185,129,0.1);color:#059669">مفعل</span>';
+    const subjects = Array.isArray(t.subjects) ? t.subjects.map(s => s.subject || s).join('، ') : '—';
+    const levels = Array.isArray(t.levels) ? t.levels.join('، ') : '—';
+    const photo = t.photoURL ? `<img src="${t.photoURL}" style="width:36px;height:36px;border-radius:10px;object-fit:cover" alt="">` : '<div style="width:36px;height:36px;border-radius:10px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:16px">👤</div>';
+    const created = t.createdAt ? new Date(t.createdAt.seconds ? t.createdAt.seconds * 1000 : t.createdAt).toLocaleDateString('ar-DZ') : '—';
+    return `<tr>
+      <td>${photo}</td>
+      <td><code style="font-size:11px;background:var(--primary-light);padding:2px 8px;border-radius:6px;color:var(--primary)">${t.teacherId || t.id}</code></td>
+      <td style="font-weight:700">${t.name || '—'}</td>
+      <td style="direction:ltr;text-align:left">${t.phone || '—'}</td>
+      <td style="direction:ltr;text-align:left;font-size:12px">${t.email || '—'}</td>
+      <td style="font-size:12px;max-width:180px">${subjects}</td>
+      <td style="font-size:12px;max-width:160px">${levels}</td>
+      <td>${statusBadge}</td>
+      <td style="font-size:12px">${created}</td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="tbl-action" onclick="srtToggleStatus('${t.id}')" title="تبديل الحالة" style="padding:4px 8px;font-size:11px">${isDis ? '✅ تفعيل' : '🚫 تعطيل'}</button>
+          <button class="tbl-action" onclick="srtOpenEditModal('${t.id}')" title="تعديل" style="padding:4px 8px;font-size:11px">✏️</button>
+          <button class="tbl-action del" onclick="srtDelete('${t.id}')" title="حذف" style="padding:4px 8px;font-size:11px">🗑️</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function srtFilterTable() {
+  const q = (document.getElementById('srt-search')?.value || '').trim().toLowerCase();
+  const status = document.getElementById('srt-status-filter')?.value || '';
+  let filtered = srtAllData;
+  if (q) filtered = filtered.filter(t => (t.name || '').toLowerCase().includes(q) || (t.teacherId || t.id || '').toLowerCase().includes(q));
+  if (status) filtered = filtered.filter(t => status === 'disabled' ? t.status === 'disabled' : t.status !== 'disabled');
+  srtRenderTable(filtered);
+}
+
+function srtOpenAddModal() {
+  document.getElementById('srt-edit-id').value = '';
+  document.getElementById('srt-name').value = '';
+  document.getElementById('srt-phone').value = '';
+  document.getElementById('srt-email').value = '';
+  document.getElementById('srt-notes').value = '';
+  document.getElementById('srt-modal-icon').textContent = '➕';
+  document.getElementById('srt-modal-title').textContent = 'إضافة أستاذ دعم';
+  document.getElementById('srt-save-btn').textContent = '💾 إضافة';
+  srtRenderSubjectRows([]);
+  srtRenderLevelsChecks([]);
+  document.getElementById('srt-modal').classList.add('open');
+}
+
+function srtOpenEditModal(id) {
+  const t = srtAllData.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('srt-edit-id').value = id;
+  document.getElementById('srt-name').value = t.name || '';
+  document.getElementById('srt-phone').value = t.phone || '';
+  document.getElementById('srt-email').value = t.email || '';
+  document.getElementById('srt-notes').value = t.notes || '';
+  document.getElementById('srt-modal-icon').textContent = '✏️';
+  document.getElementById('srt-modal-title').textContent = 'تعديل بيانات الأستاذ';
+  document.getElementById('srt-save-btn').textContent = '💾 حفظ التعديلات';
+  srtRenderSubjectRows(Array.isArray(t.subjects) ? t.subjects : []);
+  srtRenderLevelsChecks(Array.isArray(t.levels) ? t.levels : []);
+  document.getElementById('srt-modal').classList.add('open');
+}
+
+function srtCloseModal() { document.getElementById('srt-modal').classList.remove('open'); }
+
+function srtRenderSubjectRows(subjects) {
+  const container = document.getElementById('srt-subjects-list');
+  if (!subjects || subjects.length === 0) {
+    container.innerHTML = '<div class="srt-subject-row" style="display:flex;gap:8px;align-items:center"><input class="inp" type="text" placeholder="اسم المادة" style="flex:1"><input class="inp" type="text" placeholder="اسم الأستاذ (للعرض)" style="flex:1"><button onclick="this.parentElement.remove()" style="padding:4px 10px;border-radius:6px;border:1.5px solid rgba(220,38,38,0.2);background:rgba(220,38,38,0.06);color:#dc2626;cursor:pointer;font-size:14px">✕</button></div>';
+    return;
+  }
+  container.innerHTML = subjects.map(s => {
+    const sub = typeof s === 'string' ? s : (s.subject || '');
+    const tea = typeof s === 'string' ? '' : (s.teacher || '');
+    return `<div class="srt-subject-row" style="display:flex;gap:8px;align-items:center"><input class="inp" type="text" value="${sub}" placeholder="اسم المادة" style="flex:1"><input class="inp" type="text" value="${tea}" placeholder="اسم الأستاذ (للعرض)" style="flex:1"><button onclick="this.parentElement.remove()" style="padding:4px 10px;border-radius:6px;border:1.5px solid rgba(220,38,38,0.2);background:rgba(220,38,38,0.06);color:#dc2626;cursor:pointer;font-size:14px">✕</button></div>`;
+  }).join('');
+}
+
+function srtAddSubjectRow() {
+  const container = document.getElementById('srt-subjects-list');
+  const row = document.createElement('div');
+  row.className = 'srt-subject-row';
+  row.style.cssText = 'display:flex;gap:8px;align-items:center';
+  row.innerHTML = '<input class="inp" type="text" placeholder="اسم المادة" style="flex:1"><input class="inp" type="text" placeholder="اسم الأستاذ (للعرض)" style="flex:1"><button onclick="this.parentElement.remove()" style="padding:4px 10px;border-radius:6px;border:1.5px solid rgba(220,38,38,0.2);background:rgba(220,38,38,0.06);color:#dc2626;cursor:pointer;font-size:14px">✕</button>';
+  container.appendChild(row);
+}
+
+function srtRenderLevelsChecks(selected) {
+  const container = document.getElementById('srt-levels-checks');
+  container.innerHTML = srtLevels.map(l => {
+    const checked = selected.includes(l) ? 'checked' : '';
+    return `<label style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-size:12px;font-weight:600;transition:all .2s;${checked ? 'border-color:var(--primary);background:var(--primary-light);color:var(--primary)' : ''}" onclick="this.querySelector('input').click()"><input type="checkbox" value="${l}" ${checked} style="display:none"><span style="width:16px;height:16px;border-radius:4px;border:1.5px solid ${checked ? 'var(--primary)' : 'var(--border)'};display:flex;align-items:center;justify-content:center;font-size:10px;${checked ? 'background:var(--primary);color:#fff' : ''}">${checked ? '✓' : ''}</span>${l}</label>`;
+  }).join('');
+  container.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', function() {
+      const lbl = this.closest('label');
+      const span = lbl.querySelector('span');
+      if (this.checked) { lbl.style.borderColor = 'var(--primary)'; lbl.style.background = 'var(--primary-light)'; lbl.style.color = 'var(--primary)'; span.style.background = 'var(--primary)'; span.style.color = '#fff'; span.style.borderColor = 'var(--primary)'; span.textContent = '✓'; }
+      else { lbl.style.borderColor = 'var(--border)'; lbl.style.background = 'var(--card)'; lbl.style.color = ''; span.style.background = ''; span.style.color = ''; span.style.borderColor = 'var(--border)'; span.textContent = ''; }
+    });
+  });
+}
+
+async function srtSave() {
+  const editId = document.getElementById('srt-edit-id').value;
+  const name = document.getElementById('srt-name').value.trim();
+  const phone = document.getElementById('srt-phone').value.trim();
+  const email = document.getElementById('srt-email').value.trim();
+  const notes = document.getElementById('srt-notes').value.trim();
+  if (!name) { alert('الرجاء إدخال اسم الأستاذ'); return; }
+
+  const subjectRows = document.querySelectorAll('#srt-subjects-list .srt-subject-row');
+  const subjects = [];
+  subjectRows.forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const sub = inputs[0]?.value.trim();
+    const tea = inputs[1]?.value.trim();
+    if (sub) subjects.push(tea ? { subject: sub, teacher: tea } : sub);
+  });
+  if (subjects.length === 0) { alert('الرجاء إضافة مادة واحدة على الأقل'); return; }
+
+  const levelChecks = document.querySelectorAll('#srt-levels-checks input[type=checkbox]:checked');
+  const levels = Array.from(levelChecks).map(cb => cb.value);
+
+  const btn = document.getElementById('srt-save-btn');
+  btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
+  try {
+    if (editId) {
+      await updateDoc(doc(db, SRT_COLLECTION, editId), { name, phone, email, notes, subjects, levels, updatedAt: serverTimestamp() });
+    } else {
+      const teacherId = 'SRT-' + Date.now().toString(36).toUpperCase();
+      await addDoc(collection(db, SRT_COLLECTION), { teacherId, name, phone, email, notes, subjects, levels, status: 'active', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    }
+    srtCloseModal();
+    await srtLoadData();
+  } catch (e) { console.error('SRT save error:', e); alert('حدث خطأ أثناء الحفظ'); }
+  btn.disabled = false; btn.textContent = '💾 حفظ';
+}
+
+async function srtToggleStatus(id) {
+  const t = srtAllData.find(x => x.id === id);
+  if (!t) return;
+  const newStatus = t.status === 'disabled' ? 'active' : 'disabled';
+  const label = newStatus === 'disabled' ? 'تعطيل' : 'تفعيل';
+  if (!confirm(`هل أنت متأكد من ${label} هذا الأستاذ؟`)) return;
+  try { await updateDoc(doc(db, SRT_COLLECTION, id), { status: newStatus, updatedAt: serverTimestamp() }); await srtLoadData(); } catch (e) { console.error('SRT toggle error:', e); }
+}
+
+function srtDelete(id) {
+  document.getElementById('srt-delete-modal').classList.add('open');
+  document.getElementById('srt-delete-confirm-btn').onclick = async () => {
+    try { await deleteDoc(doc(db, SRT_COLLECTION, id)); document.getElementById('srt-delete-modal').classList.remove('open'); await srtLoadData(); } catch (e) { console.error('SRT delete error:', e); }
+  };
+}
 </script>
 
 </body>

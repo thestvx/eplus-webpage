@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" defer></script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     :root{
@@ -20,8 +22,6 @@
       --warning:#d97706;--warning-light:rgba(217,119,6,0.1);
       --danger:#dc2626;--danger-light:rgba(220,38,38,0.08);
       --blue:#0ea5e9;--blue-light:rgba(14,165,233,0.08);
-      --pink:#ec4899;--pink-light:rgba(236,72,153,0.08);
-      --purple:#a855f7;--purple-light:rgba(168,85,247,0.08);
       --sidebar-w:260px;
       --radius:14px;--radius-sm:10px;--radius-xs:8px;
       --shadow:0 1px 3px rgba(0,0,0,0.04),0 4px 12px rgba(0,0,0,0.04);
@@ -33,42 +33,26 @@
     a{text-decoration:none;color:inherit}
     button{font-family:'Tajawal',sans-serif;cursor:pointer;border:none}
 
-    /* ═══ ANIMATIONS ═══ */
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     @keyframes fadeSlideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes fadeSlideRight{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
-    @keyframes fadeSlideLeft{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
     @keyframes scaleIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
-    @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
     @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
     @keyframes spin{to{transform:rotate(360deg)}}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
     @keyframes bgZoom{from{transform:scale(1.05)}to{transform:scale(1.12)}}
     @keyframes slideInDrawer{from{transform:translateX(100%)}to{transform:translateX(0)}}
     @keyframes slideOutDrawer{from{transform:translateX(0)}to{transform:translateX(100%)}}
 
-    .anim-fade{animation:fadeIn 0.5s ease both}
-    .anim-slide-up{animation:fadeSlideUp 0.6s ease both}
-    .anim-slide-right{animation:fadeSlideRight 0.5s ease both}
-    .anim-scale{animation:scaleIn 0.4s ease both}
-
-    /* ═══════════════════════════════════════════
-       LOGIN PAGE
-    ═══════════════════════════════════════════ */
+    /* ═══ LOGIN ═══ */
     .login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:#1a1a2e}
     .login-bg{position:absolute;inset:0;background:url('images/studentportalbackground.jpg') center/cover no-repeat;animation:bgZoom 20s ease-in-out infinite alternate;z-index:0}
     .login-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(99,102,241,0.85),rgba(55,48,163,0.9));z-index:1;backdrop-filter:blur(2px)}
-    .login-overlay::after{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
     .login-shapes{position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none}
     .login-shape{position:absolute;border-radius:50%;background:rgba(255,255,255,0.04)}
     .login-shape:nth-child(1){width:300px;height:300px;top:-80px;right:-60px;animation:float 6s ease-in-out infinite}
     .login-shape:nth-child(2){width:200px;height:200px;bottom:-40px;left:-40px;animation:float 8s ease-in-out infinite 1s}
     .login-shape:nth-child(3){width:120px;height:120px;top:40%;left:10%;animation:float 7s ease-in-out infinite 2s}
-
     .login-card{background:rgba(255,255,255,0.12);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.18);border-radius:24px;padding:44px 36px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.3);position:relative;z-index:2;text-align:center;animation:fadeSlideUp 0.7s ease both}
-    .login-logo-wrap{width:80px;height:80px;margin:0 auto 20px;background:linear-gradient(135deg,var(--gold),#e2c46a);border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:40px;box-shadow:0 8px 32px rgba(200,168,75,0.3);animation:float 4s ease-in-out infinite}
-    .login-title{font-size:28px;font-weight:900;color:#fff;margin-bottom:6px;text-shadow:0 2px 8px rgba(0,0,0,0.15)}
-    .login-subtitle{font-size:14px;color:rgba(255,255,255,0.7);font-weight:600;margin-bottom:32px}
+    .login-logo-img{max-width:200px;height:auto;margin:0 auto 32px;display:block;animation:scaleIn 0.6s ease both 0.1s;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.15))}
     .login-field{margin-bottom:18px;text-align:right}
     .login-label{display:block;font-size:13px;font-weight:700;color:rgba(255,255,255,0.8);margin-bottom:8px}
     .login-input{width:100%;padding:14px 16px 14px 48px;border:1.5px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);font-size:15px;font-weight:700;font-family:'Tajawal',sans-serif;color:#fff;background:rgba(255,255,255,0.08);transition:var(--transition);direction:ltr;text-align:left}
@@ -83,9 +67,7 @@
     .login-error{background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.3);color:#fca5a5;border-radius:var(--radius-xs);padding:12px 14px;font-size:13px;font-weight:700;margin-top:14px;display:none;backdrop-filter:blur(8px)}
     .login-footer{margin-top:28px;font-size:12px;color:rgba(255,255,255,0.4);font-weight:600}
 
-    /* ═══════════════════════════════════════════
-       PORTAL LAYOUT
-    ═══════════════════════════════════════════ */
+    /* ═══ PORTAL LAYOUT ═══ */
     .portal-layout{display:flex;min-height:100vh}
 
     /* SIDEBAR */
@@ -102,7 +84,6 @@
     .sidebar-student-name{text-align:center;font-size:15px;font-weight:800;margin-bottom:4px}
     .sidebar-student-id{text-align:center;font-size:11px;color:rgba(255,255,255,0.5);font-weight:600;font-family:monospace}
     .sidebar-nav{padding:16px 12px;flex:1}
-    .sidebar-nav-title{font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px;padding:8px 12px;margin-bottom:4px}
     .sidebar-link{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--radius-sm);color:rgba(255,255,255,0.7);font-size:14px;font-weight:600;transition:var(--transition);cursor:pointer;margin-bottom:2px}
     .sidebar-link:hover{background:rgba(255,255,255,0.08);color:#fff}
     .sidebar-link.active{background:linear-gradient(135deg,rgba(200,168,75,0.2),rgba(200,168,75,0.1));color:var(--gold);font-weight:700}
@@ -111,7 +92,7 @@
     .sidebar-logout{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;border-radius:var(--radius-sm);background:rgba(220,38,38,0.12);border:1px solid rgba(220,38,38,0.2);color:#fca5a5;font-size:13px;font-weight:700;transition:var(--transition)}
     .sidebar-logout:hover{background:rgba(220,38,38,0.2);border-color:rgba(220,38,38,0.35)}
 
-    /* MAIN CONTENT */
+    /* MAIN */
     .main-content{flex:1;margin-right:var(--sidebar-w);min-height:100vh;padding:0}
     .main-topbar{display:none;padding:12px 20px;background:var(--card);border-bottom:1px solid var(--border);align-items:center;gap:12px;position:sticky;top:0;z-index:90}
     .topbar-toggle{width:40px;height:40px;border-radius:var(--radius-sm);background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:18px;transition:var(--transition)}
@@ -123,12 +104,11 @@
     .topbar-logout:hover{background:rgba(220,38,38,0.15)}
     .main-body{padding:32px 28px}
 
-    /* HERO SECTION */
+    /* HERO */
     .hero-card{background:linear-gradient(135deg,#6366f1 0%,#4f46e5 40%,#3730a3 100%);border-radius:20px;padding:36px 32px;color:#fff;position:relative;overflow:hidden;margin-bottom:28px;animation:fadeSlideUp 0.5s ease both}
     .hero-card::before{content:'';position:absolute;top:-50%;left:-20%;width:60%;height:200%;background:radial-gradient(circle,rgba(200,168,75,0.12) 0%,transparent 60%);pointer-events:none}
-    .hero-card::after{content:'';position:absolute;bottom:-30%;right:-10%;width:40%;height:120%;background:radial-gradient(circle,rgba(255,255,255,0.05) 0%,transparent 60%);pointer-events:none}
     .hero-row{display:flex;align-items:center;gap:20px;position:relative;z-index:1}
-    .hero-avatar{width:68px;height:68px;background:rgba(255,255,255,0.15);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;border:2px solid rgba(255,255,255,0.2);flex-shrink:0;backdrop-filter:blur(8px)}
+    .hero-avatar{width:68px;height:68px;background:rgba(255,255,255,0.15);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;border:2px solid rgba(255,255,255,0.2);flex-shrink:0}
     .hero-info{flex:1;min-width:0}
     .hero-greeting{font-size:13px;color:rgba(255,255,255,0.6);font-weight:600;margin-bottom:4px}
     .hero-name{font-size:24px;font-weight:900;line-height:1.2}
@@ -158,7 +138,7 @@
     .stat-value{font-size:28px;font-weight:900;color:var(--text);line-height:1}
     .stat-label{font-size:12px;color:var(--text-muted);font-weight:600;margin-top:4px}
 
-    /* SUBJECTS SECTION */
+    /* SUBJECTS */
     .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
     .section-title{font-size:18px;font-weight:900;color:var(--text);display:flex;align-items:center;gap:8px}
     .section-count{background:var(--primary-light);color:var(--primary);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:800}
@@ -186,6 +166,33 @@
 
     .portal-footer{text-align:center;padding:24px;font-size:12px;color:var(--text-muted);font-weight:600}
 
+    /* ═══ CARD PAGE (3D FLIP) ═══ */
+    .card-page-wrap{display:flex;flex-direction:column;align-items:center;animation:fadeSlideUp 0.5s ease both}
+    .card-flip-switch{display:flex;align-items:center;gap:16px;margin-bottom:28px;background:var(--card);border-radius:50px;padding:6px;box-shadow:var(--shadow);border:1px solid var(--border-light)}
+    .card-flip-option{padding:10px 24px;border-radius:50px;font-size:13px;font-weight:700;color:var(--text-muted);cursor:pointer;transition:var(--transition);user-select:none;white-space:nowrap}
+    .card-flip-option.active{background:linear-gradient(135deg,var(--primary),#8b5cf6);color:#fff;box-shadow:0 2px 12px rgba(99,102,241,0.3)}
+    .card-flip-option:not(.active):hover{color:var(--text)}
+    .card-flip-dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:var(--transition)}
+    .card-flip-dot.active{background:var(--primary)}
+
+    .card-scene{perspective:1200px;width:380px;height:228px;cursor:pointer}
+    .card-3d{width:100%;height:100%;position:relative;transition:transform 0.7s cubic-bezier(0.4,0,0.2,1);transform-style:preserve-3d}
+    .card-3d.flipped{transform:rotateY(180deg)}
+    .card-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.18)}
+    .card-front{z-index:2}
+    .card-back{transform:rotateY(180deg);z-index:1}
+    .card-face img{width:100%;height:100%;object-fit:cover;display:block}
+    .card-front-overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:12px}
+    .card-back-overlay{position:absolute;inset:0;display:flex;padding:20px}
+    .card-back-left{flex:1;display:flex;flex-direction:column;justify-content:center;gap:4px}
+    .card-back-right{display:flex;align-items:center;justify-content:center}
+    .card-label{font-size:10px;color:rgba(255,255,255,0.85);font-weight:600;text-shadow:0 2px 6px rgba(0,0,0,0.45)}
+    .card-value{font-size:13px;font-weight:900;color:#ffffff;text-shadow:0 2px 6px rgba(0,0,0,0.45)}
+    .card-value.mono{font-family:monospace;font-size:12px;font-weight:800}
+    .card-value.sm{font-size:11px;font-weight:700}
+    .card-info-hint{text-align:center;margin-top:20px;font-size:13px;color:var(--text-muted);font-weight:600}
+    .card-back-img-fallback{position:absolute;inset:0;background:linear-gradient(135deg,#e0e7ff,#f0f0ff)}
+
     /* ═══ LOADING / ERROR ═══ */
     .loading-page{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px}
     .spinner{width:44px;height:44px;border:3.5px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite}
@@ -195,51 +202,27 @@
     .error-title{font-size:22px;font-weight:900;color:var(--text);margin-bottom:8px}
     .error-msg{font-size:14px;color:var(--text-muted);max-width:400px;line-height:1.7}
 
-    /* ═══ MOBILE DRAWER ═══ */
+    /* ═══ DRAWER ═══ */
     .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;opacity:0;transition:opacity 0.3s ease;backdrop-filter:blur(2px)}
     .drawer-overlay.open{display:block;opacity:1}
-    .mobile-drawer{display:none}
 
     /* ═══ RESPONSIVE ═══ */
-    @media(max-width:1024px){
-      .stats-grid{grid-template-columns:repeat(2,1fr)}
-    }
+    @media(max-width:1024px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:768px){
-      .sidebar{display:none}
-      .mobile-drawer{display:block}
-      .main-content{margin-right:0}
-      .main-topbar{display:flex}
-      .main-body{padding:20px 16px}
-      .hero-card{padding:24px 20px;border-radius:16px}
-      .hero-avatar{width:56px;height:56px;font-size:22px;border-radius:16px}
-      .hero-name{font-size:20px}
-      .hero-badges{gap:6px}
-      .hero-badge{padding:5px 10px;font-size:11px}
-      .stats-grid{grid-template-columns:repeat(2,1fr);gap:12px}
-      .stat-card{padding:16px}
-      .stat-value{font-size:22px}
-      .subjects-grid{grid-template-columns:1fr;gap:12px}
-      .subject-card-top{padding:16px 16px 0}
-      .subject-progress-wrap{padding:12px 16px 0}
-      .subject-stats{margin:12px 0 0}
-      .subject-card-footer{padding:10px 16px 14px}
+      .sidebar{display:none}.main-content{margin-right:0}.main-topbar{display:flex}.main-body{padding:20px 16px}
+      .hero-card{padding:24px 20px;border-radius:16px}.hero-avatar{width:56px;height:56px;font-size:22px;border-radius:16px}.hero-name{font-size:20px}
+      .hero-badges{gap:6px}.hero-badge{padding:5px 10px;font-size:11px}
+      .stats-grid{grid-template-columns:repeat(2,1fr);gap:12px}.stat-card{padding:16px}.stat-value{font-size:22px}
+      .subjects-grid{grid-template-columns:1fr;gap:12px}.subject-card-top{padding:16px 16px 0}.subject-progress-wrap{padding:12px 16px 0}.subject-stats{margin:12px 0 0}.subject-card-footer{padding:10px 16px 14px}
+      .card-scene{width:min(380px,calc(100vw - 40px));height:auto;aspect-ratio:380/228}
     }
-    @media(max-width:480px){
-      .stats-grid{grid-template-columns:1fr 1fr;gap:10px}
-      .hero-row{gap:14px}
-      .hero-name{font-size:18px}
-    }
+    @media(max-width:480px){.hero-row{gap:14px}.hero-name{font-size:18px}.card-flip-option{padding:8px 16px;font-size:12px}}
   </style>
 </head>
 <body>
   <div id="app">
-    <div class="loading-page">
-      <div class="spinner"></div>
-      <div class="loading-text">جاري تحميل بوابة الطالب...</div>
-    </div>
+    <div class="loading-page"><div class="spinner"></div><div class="loading-text">جاري تحميل بوابة الطالب...</div></div>
   </div>
-
-  <!-- MOBILE DRAWER (injected by JS) -->
   <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
 
   <script>
@@ -252,6 +235,7 @@
     const SUBJECT_COLORS=['rgba(99,102,241,0.1)','rgba(16,185,129,0.1)','rgba(200,168,75,0.1)','rgba(239,68,68,0.1)','rgba(168,85,247,0.1)','rgba(14,165,233,0.1)','rgba(236,72,153,0.1)','rgba(34,197,94,0.1)'];
 
     let currentStudent=null;
+    let currentPage='home';
 
     function getTokenFromURL(){
       const m=window.location.pathname.match(/\/s\/(.+)/);
@@ -259,18 +243,12 @@
       const p=new URLSearchParams(window.location.search);
       return p.get('t')||p.get('token')||p.get('id')||'';
     }
-    function getSession(){
-      try{const s=localStorage.getItem(SESSION_KEY);if(!s)return null;const o=JSON.parse(s);if(Date.now()-o.loginTime>SESSION_MAX_AGE){localStorage.removeItem(SESSION_KEY);return null;}return o;}catch(e){localStorage.removeItem(SESSION_KEY);return null;}
-    }
+    function getSession(){try{const s=localStorage.getItem(SESSION_KEY);if(!s)return null;const o=JSON.parse(s);if(Date.now()-o.loginTime>SESSION_MAX_AGE){localStorage.removeItem(SESSION_KEY);return null;}return o;}catch(e){localStorage.removeItem(SESSION_KEY);return null;}}
     function saveSession(r){localStorage.setItem(SESSION_KEY,JSON.stringify({id:r.id,student_token:r.student_token||'',loginTime:Date.now()}));}
     function clearSession(){localStorage.removeItem(SESSION_KEY);}
 
-    function showLoading(){
-      document.getElementById('app').innerHTML='<div class="loading-page"><div class="spinner"></div><div class="loading-text">جاري تحميل بوابة الطالب...</div></div>';
-    }
-    function showError(title,msg){
-      document.getElementById('app').innerHTML='<div class="error-page"><div class="error-icon">🔒</div><div class="error-title">'+title+'</div><div class="error-msg">'+msg+'</div></div>';
-    }
+    function showLoading(){document.getElementById('app').innerHTML='<div class="loading-page"><div class="spinner"></div><div class="loading-text">جاري تحميل بوابة الطالب...</div></div>';}
+    function showError(title,msg){document.getElementById('app').innerHTML='<div class="error-page"><div class="error-icon">🔒</div><div class="error-title">'+title+'</div><div class="error-msg">'+msg+'</div></div>';}
 
     /* ═══ LOGIN ═══ */
     function showLogin(errorMsg){
@@ -278,13 +256,9 @@
         <div class="login-page">
           <div class="login-bg"></div>
           <div class="login-overlay"></div>
-          <div class="login-shapes">
-            <div class="login-shape"></div><div class="login-shape"></div><div class="login-shape"></div>
-          </div>
+          <div class="login-shapes"><div class="login-shape"></div><div class="login-shape"></div><div class="login-shape"></div></div>
           <div class="login-card">
-            <div class="login-logo-wrap">🎓</div>
-            <div class="login-title">بوابة الطالب</div>
-            <div class="login-subtitle">سجّل الدخول للوصول إلى حسابك</div>
+            <img class="login-logo-img" src="images/logostudentportal.png" alt="E-PLUS Student Portal">
             <form id="login-form" onsubmit="handleLogin(event)">
               <div class="login-field">
                 <label class="login-label">رقم التسجيل (Student ID)</label>
@@ -317,27 +291,14 @@
       if(!id||!phone){errEl.textContent='الرجاء ملء جميع الحقول';errEl.style.display='block';return;}
       btn.disabled=true;btn.textContent='جاري التحقق...';errEl.style.display='none';
       try{
-        const res=await fetch(SP_URL+'/rest/v1/registrations?select=*&id=eq.'+encodeURIComponent(id)+'&parent_phone=eq.'+encodeURIComponent(phone)+'&limit=1',{
-          headers:{'Content-Type':'application/json','apikey':SP_KEY,'Authorization':'Bearer '+SP_KEY}
-        });
+        const res=await fetch(SP_URL+'/rest/v1/registrations?select=*&id=eq.'+encodeURIComponent(id)+'&parent_phone=eq.'+encodeURIComponent(phone)+'&limit=1',{headers:{'Content-Type':'application/json','apikey':SP_KEY,'Authorization':'Bearer '+SP_KEY}});
         if(!res.ok)throw new Error('HTTP '+res.status);
         const data=await res.json();
-        if(!data||data.length===0){
-          errEl.textContent='رقم التسجيل أو هاتف ولي الأمر غير صحيح. الرجاء المحاولة مرة أخرى.';
-          errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;
-        }
+        if(!data||data.length===0){errEl.textContent='رقم التسجيل أو هاتف ولي الأمر غير صحيح. الرجاء المحاولة مرة أخرى.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
         const r=data[0];
-        if(r.status!=='مسجل نهائياً'){
-          errEl.textContent='لا يمكن استخدام بوابة الطالب قبل تأكيد التسجيل النهائي من إدارة المركز.';
-          errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;
-        }
-        saveSession(r);
-        renderDashboard(r);
-      }catch(err){
-        console.error('Login error:',err);
-        errEl.textContent='حدث خطأ أثناء التحقق. الرجاء المحاولة لاحقاً.';
-        errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';
-      }
+        if(r.status!=='مسجل نهائياً'){errEl.textContent='لا يمكن استخدام بوابة الطالب قبل تأكيد التسجيل النهائي من إدارة المركز.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
+        saveSession(r);renderDashboard(r);
+      }catch(err){console.error('Login error:',err);errEl.textContent='حدث خطأ أثناء التحقق. الرجاء المحاولة لاحقاً.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';}
     }
 
     /* ═══ SIDEBAR ═══ */
@@ -345,171 +306,171 @@
       const fullName=(r.first_name||'')+' '+(r.last_name||'');
       const initials=(r.first_name?r.first_name[0]:'')+(r.last_name?r.last_name[0]:'');
       return `
-        <div class="sidebar-brand">
-          <div class="sidebar-brand-row">
-            <div class="sidebar-logo">🎓</div>
-            <div class="sidebar-brand-text">
-              <div class="sidebar-brand-name">E-PLUS</div>
-              <div class="sidebar-brand-sub">Student Portal</div>
-            </div>
-          </div>
-        </div>
-        <div class="sidebar-student">
-          <div class="sidebar-student-avatar">${initials}</div>
-          <div class="sidebar-student-name">${fullName}</div>
-          <div class="sidebar-student-id">ID: ${r.id||''}</div>
-        </div>
+        <div class="sidebar-brand"><div class="sidebar-brand-row"><div class="sidebar-logo">🎓</div><div class="sidebar-brand-text"><div class="sidebar-brand-name">E-PLUS</div><div class="sidebar-brand-sub">Student Portal</div></div></div></div>
+        <div class="sidebar-student"><div class="sidebar-student-avatar">${initials}</div><div class="sidebar-student-name">${fullName}</div><div class="sidebar-student-id">ID: ${r.id||''}</div></div>
         <div class="sidebar-nav">
-          <div class="sidebar-nav-title">القائمة</div>
-          <div class="sidebar-link active"><span class="sidebar-link-icon">🏠</span>الرئيسية</div>
-          <div class="sidebar-link"><span class="sidebar-link-icon">📚</span>المواد المسجلة</div>
-          <div class="sidebar-link"><span class="sidebar-link-icon">📊</span>الإحصائيات</div>
-          <div class="sidebar-link"><span class="sidebar-link-icon">📋</span>بطاقتي</div>
+          <div class="sidebar-link ${currentPage==='home'?'active':''}" onclick="navigateTo('home')"><span class="sidebar-link-icon">🏠</span>الرئيسية</div>
+          <div class="sidebar-link ${currentPage==='card'?'active':''}" onclick="navigateTo('card')"><span class="sidebar-link-icon">🪪</span>بطاقتي</div>
         </div>
-        <div class="sidebar-footer">
-          <button class="sidebar-logout" onclick="handleLogout()">🚪 تسجيل الخروج</button>
-        </div>`;
+        <div class="sidebar-footer"><button class="sidebar-logout" onclick="handleLogout()">🚪 تسجيل الخروج</button></div>`;
+    }
+
+    function navigateTo(page){
+      currentPage=page;
+      closeDrawer();
+      renderCurrentPage();
+    }
+    function renderCurrentPage(){
+      if(!currentStudent)return;
+      if(currentPage==='card')renderCardPage(currentStudent);else renderDashboard(currentStudent);
     }
 
     /* ═══ MOBILE DRAWER ═══ */
     function openDrawer(){
-      const overlay=document.getElementById('drawer-overlay');
-      overlay.classList.add('open');
+      document.getElementById('drawer-overlay').classList.add('open');
       let drawer=document.getElementById('mobile-drawer-panel');
-      if(!drawer){
-        drawer=document.createElement('div');
-        drawer.id='mobile-drawer-panel';
-        drawer.style.cssText='display:block;position:fixed;top:0;right:0;bottom:0;width:280px;background:linear-gradient(180deg,#1e1b4b 0%,#312e81 50%,#3730a3 100%);color:#fff;z-index:201;overflow-y:auto;animation:slideInDrawer 0.3s ease both;box-shadow:-4px 0 24px rgba(0,0,0,0.3)';
-        drawer.innerHTML=renderSidebar(currentStudent);
-        document.body.appendChild(drawer);
-      }else{
-        drawer.style.display='block';
-        drawer.style.animation='slideInDrawer 0.3s ease both';
-      }
+      if(!drawer){drawer=document.createElement('div');drawer.id='mobile-drawer-panel';drawer.style.cssText='display:block;position:fixed;top:0;right:0;bottom:0;width:280px;background:linear-gradient(180deg,#1e1b4b 0%,#312e81 50%,#3730a3 100%);color:#fff;z-index:201;overflow-y:auto;animation:slideInDrawer 0.3s ease both;box-shadow:-4px 0 24px rgba(0,0,0,0.3)';document.body.appendChild(drawer);}
+      drawer.innerHTML=renderSidebar(currentStudent);drawer.style.display='block';drawer.style.animation='slideInDrawer 0.3s ease both';
     }
     function closeDrawer(){
-      const overlay=document.getElementById('drawer-overlay');
-      overlay.classList.remove('open');
+      document.getElementById('drawer-overlay').classList.remove('open');
       const drawer=document.getElementById('mobile-drawer-panel');
       if(drawer){drawer.style.animation='slideOutDrawer 0.3s ease both';setTimeout(()=>{drawer.style.display='none';},280);}
     }
 
-    /* ═══ DASHBOARD ═══ */
+    /* ═══ DASHBOARD PAGE ═══ */
     function renderDashboard(r){
-      currentStudent=r;
+      currentStudent=r;currentPage='home';
       const fullName=(r.first_name||'')+' '+(r.last_name||'');
       const subjects=Array.isArray(r.subjects)?r.subjects:[];
       const typeLabel=r.student_type==='حر'?'🎓 طالب حر':'📘 طالب متمدرس';
       const initials=(r.first_name?r.first_name[0]:'')+(r.last_name?r.last_name[0]:'');
-
-      let subjectsHTML='';
-      if(subjects.length===0){
-        subjectsHTML='<div style="text-align:center;padding:48px 20px;color:var(--text-muted);font-size:14px;grid-column:1/-1"><div style="font-size:48px;margin-bottom:12px">📭</div><div style="font-weight:700">لم تسجل في أي مادة بعد</div></div>';
-      }else{
-        subjectsHTML=subjects.map((s,i)=>{
-          const icon=SUBJECT_ICONS[s.subject]||'📘';
-          const color=SUBJECT_COLORS[i%SUBJECT_COLORS.length];
-          return `<div class="subject-card" style="animation-delay:${i*0.08}s">
-            <div class="subject-card-top">
-              <div class="subject-icon" style="background:${color}">${icon}</div>
-              <div class="subject-info">
-                <div class="subject-name">${s.subject||''}</div>
-                <div class="subject-teacher">👨‍🏫 ${s.teacher||''}</div>
-              </div>
-            </div>
-            <div class="subject-progress-wrap">
-              <div class="subject-progress-bar"><div class="subject-progress-fill" style="width:0%"></div></div>
-              <div class="subject-progress-text"><span>تقدمك</span><span>قريباً</span></div>
-            </div>
-            <div class="subject-stats">
-              <div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">الدروس</div></div>
-              <div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">التمارين</div></div>
-              <div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">آخر تحديث</div></div>
-            </div>
-            <div class="subject-card-footer">
-              <button class="subject-btn disabled" disabled>📚 الدروس <span style="font-size:9px;color:var(--text-muted);margin-right:2px">قريباً</span></button>
-              <button class="subject-btn disabled" disabled>📝 التمارين <span style="font-size:9px;color:var(--text-muted);margin-right:2px">قريباً</span></button>
-            </div>
-          </div>`;
-        }).join('');
-      }
-
       const streamText=r.stream?' | '+r.stream:'';
+
+      let subjectsHTML=subjects.length===0?'<div style="text-align:center;padding:48px 20px;color:var(--text-muted);font-size:14px;grid-column:1/-1"><div style="font-size:48px;margin-bottom:12px">📭</div><div style="font-weight:700">لم تسجل في أي مادة بعد</div></div>':
+        subjects.map((s,i)=>{const icon=SUBJECT_ICONS[s.subject]||'📘';const color=SUBJECT_COLORS[i%SUBJECT_COLORS.length];return `<div class="subject-card" style="animation-delay:${i*0.08}s"><div class="subject-card-top"><div class="subject-icon" style="background:${color}">${icon}</div><div class="subject-info"><div class="subject-name">${s.subject||''}</div><div class="subject-teacher">👨‍🏫 ${s.teacher||''}</div></div></div><div class="subject-progress-wrap"><div class="subject-progress-bar"><div class="subject-progress-fill" style="width:0%"></div></div><div class="subject-progress-text"><span>تقدمك</span><span>قريباً</span></div></div><div class="subject-stats"><div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">الدروس</div></div><div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">التمارين</div></div><div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">آخر تحديث</div></div></div><div class="subject-card-footer"><button class="subject-btn disabled" disabled>📚 الدروس <span style="font-size:9px;color:var(--text-muted);margin-right:2px">قريباً</span></button><button class="subject-btn disabled" disabled>📝 التمارين <span style="font-size:9px;color:var(--text-muted);margin-right:2px">قريباً</span></button></div></div>`;}).join('');
 
       document.getElementById('app').innerHTML=`
         <div class="portal-layout">
-          <!-- SIDEBAR (Desktop) -->
           <aside class="sidebar">${renderSidebar(r)}</aside>
-
-          <!-- MAIN -->
           <div class="main-content">
-            <!-- TOPBAR (Mobile) -->
-            <div class="main-topbar">
-              <button class="topbar-toggle" onclick="openDrawer()">☰</button>
-              <div class="topbar-brand">
-                <div class="topbar-logo">🎓</div>
-                <div class="topbar-title">E-PLUS</div>
-              </div>
-              <button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button>
-            </div>
-
+            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">🎓</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
             <div class="main-body">
-              <!-- HERO -->
-              <div class="hero-card">
-                <div class="hero-row">
-                  <div class="hero-avatar">${initials}</div>
-                  <div class="hero-info">
-                    <div class="hero-greeting">مرحباً بك 👋</div>
-                    <div class="hero-name">${fullName}</div>
-                    <div class="hero-id">Student ID: ${r.id||''}</div>
-                  </div>
-                </div>
-                <div class="hero-badges">
-                  <span class="hero-badge level">📚 ${r.level||''}</span>
-                  <span class="hero-badge type">${typeLabel}</span>
-                  <span class="hero-badge status">✅ مسجل نهائياً</span>
-                  ${r.institution?`<span class="hero-badge inst">🏫 ${r.institution}</span>`:''}
-                  ${streamText?`<span class="hero-badge stream">${streamText}</span>`:''}
-                </div>
-              </div>
-
-              <!-- STATS -->
+              <div class="hero-card"><div class="hero-row"><div class="hero-avatar">${initials}</div><div class="hero-info"><div class="hero-greeting">مرحباً بك 👋</div><div class="hero-name">${fullName}</div><div class="hero-id">Student ID: ${r.id||''}</div></div></div><div class="hero-badges"><span class="hero-badge level">📚 ${r.level||''}</span><span class="hero-badge type">${typeLabel}</span><span class="hero-badge status">✅ مسجل نهائياً</span>${r.institution?`<span class="hero-badge inst">🏫 ${r.institution}</span>`:''}${streamText?`<span class="hero-badge stream">${streamText}</span>`:''}</div></div>
               <div class="stats-grid">
-                <div class="stat-card c-purple anim-slide-up" style="animation-delay:0.1s">
-                  <div class="stat-icon i-purple">📚</div>
-                  <div class="stat-value">${subjects.length}</div>
-                  <div class="stat-label">مادة مسجلة</div>
-                </div>
-                <div class="stat-card c-gold anim-slide-up" style="animation-delay:0.15s">
-                  <div class="stat-icon i-gold">📖</div>
-                  <div class="stat-value">—</div>
-                  <div class="stat-label">عدد الدروس</div>
-                </div>
-                <div class="stat-card c-green anim-slide-up" style="animation-delay:0.2s">
-                  <div class="stat-icon i-green">📝</div>
-                  <div class="stat-value">—</div>
-                  <div class="stat-label">عدد التمارين</div>
-                </div>
-                <div class="stat-card c-blue anim-slide-up" style="animation-delay:0.25s">
-                  <div class="stat-icon i-blue">🕐</div>
-                  <div class="stat-value" style="font-size:14px;font-weight:700;color:var(--text-muted)">قريباً</div>
-                  <div class="stat-label">آخر نشاط</div>
-                </div>
+                <div class="stat-card c-purple" style="animation:fadeSlideUp 0.5s ease both 0.1s"><div class="stat-icon i-purple">📚</div><div class="stat-value">${subjects.length}</div><div class="stat-label">مادة مسجلة</div></div>
+                <div class="stat-card c-gold" style="animation:fadeSlideUp 0.5s ease both 0.15s"><div class="stat-icon i-gold">📖</div><div class="stat-value">—</div><div class="stat-label">عدد الدروس</div></div>
+                <div class="stat-card c-green" style="animation:fadeSlideUp 0.5s ease both 0.2s"><div class="stat-icon i-green">📝</div><div class="stat-value">—</div><div class="stat-label">عدد التمارين</div></div>
+                <div class="stat-card c-blue" style="animation:fadeSlideUp 0.5s ease both 0.25s"><div class="stat-icon i-blue">🕐</div><div class="stat-value" style="font-size:14px;font-weight:700;color:var(--text-muted)">قريباً</div><div class="stat-label">آخر نشاط</div></div>
               </div>
-
-              <!-- SUBJECTS -->
-              <div class="section-header">
-                <div class="section-title">📚 موادك المسجلة</div>
-                <div class="section-count">${subjects.length} مادة</div>
-              </div>
+              <div class="section-header"><div class="section-title">📚 موادك المسجلة</div><div class="section-count">${subjects.length} مادة</div></div>
               <div class="subjects-grid">${subjectsHTML}</div>
-
               <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
             </div>
           </div>
         </div>`;
+      updateSidebarActive();document.body.style.overflow='auto';
+    }
 
-      document.body.style.overflow='auto';
+    /* ═══ CARD PAGE (3D FLIP) ═══ */
+    function renderCardPage(r){
+      currentStudent=r;currentPage='card';
+      const fullName=(r.first_name||'')+' '+(r.last_name||'');
+      const today=new Date().toLocaleDateString('ar-DZ',{year:'numeric',month:'long',day:'numeric'});
+      const token=r.student_token||'';
+
+      document.getElementById('app').innerHTML=`
+        <div class="portal-layout">
+          <aside class="sidebar">${renderSidebar(r)}</aside>
+          <div class="main-content">
+            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">🎓</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
+            <div class="main-body">
+              <div class="card-page-wrap">
+                <div class="section-title" style="margin-bottom:24px">🪪 بطاقة التسجيل</div>
+                <div class="card-flip-switch">
+                  <div class="card-flip-option active" id="flip-front-btn" onclick="flipCard(false)">الوجه الأمامي</div>
+                  <div class="card-flip-dot" id="flip-dot"></div>
+                  <div class="card-flip-option" id="flip-back-btn" onclick="flipCard(true)">الوجه الخلفي</div>
+                </div>
+                <div class="card-scene" onclick="toggleFlip()" id="card-scene">
+                  <div class="card-3d" id="card-3d">
+                    <div class="card-face card-front">
+                      <img src="studentidcard/studentidcardfront.jpg" onerror="this.style.background='linear-gradient(135deg,#6366f1,#8b5cf6)'" alt="">
+                      <div class="card-front-overlay">
+                        <div id="card-front-barcode" style="max-width:260px;min-height:40px;display:flex;justify-content:center"></div>
+                      </div>
+                    </div>
+                    <div class="card-face card-back">
+                      <div class="card-back-img-fallback"></div>
+                      <img src="studentidcard/studentidcardback.jpg" onerror="this.style.display='none'" alt="" style="position:absolute;inset:0;z-index:0">
+                      <div class="card-back-overlay">
+                        <div class="card-back-left">
+                          <div class="card-label">الاسم الكامل</div>
+                          <div class="card-value">${fullName}</div>
+                          <div class="card-label" style="margin-top:6px">Student ID</div>
+                          <div class="card-value mono">${r.id||''}</div>
+                          <div class="card-label" style="margin-top:6px">تاريخ التسجيل</div>
+                          <div class="card-value sm">${today}</div>
+                        </div>
+                        <div class="card-back-right"><div id="card-back-qr"></div></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card-info-hint">اضغط على البطاقة أو استخدم الزر أعلاه لقلبها</div>
+              </div>
+              <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
+            </div>
+          </div>
+        </div>`;
+      updateSidebarActive();
+      setTimeout(()=>{renderBarcode(r);renderQR(r,token);},100);
+    }
+
+    function toggleFlip(){
+      const card=document.getElementById('card-3d');
+      if(!card)return;
+      const isFlipped=card.classList.toggle('flipped');
+      updateFlipSwitch(isFlipped);
+    }
+    function flipCard(toBack){
+      const card=document.getElementById('card-3d');
+      if(!card)return;
+      if(toBack)card.classList.add('flipped');else card.classList.remove('flipped');
+      updateFlipSwitch(toBack);
+    }
+    function updateFlipSwitch(isBack){
+      const fBtn=document.getElementById('flip-front-btn');
+      const bBtn=document.getElementById('flip-back-btn');
+      const dot=document.getElementById('flip-dot');
+      if(!fBtn)return;
+      if(isBack){fBtn.classList.remove('active');bBtn.classList.add('active');dot.classList.add('active');}
+      else{fBtn.classList.add('active');bBtn.classList.remove('active');dot.classList.remove('active');}
+    }
+
+    function renderBarcode(r){
+      const el=document.getElementById('card-front-barcode');
+      if(!el)return;
+      el.innerHTML='';
+      if(typeof JsBarcode!=='undefined'){
+        try{const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');el.appendChild(svg);JsBarcode(svg,'EPLUS-'+(r.id||''),{format:'CODE128',displayValue:true,lineColor:'#ffffff',background:'transparent',width:1.5,height:30,fontSize:12,font:'monospace',textMargin:2,xmlDocument:document});svg.style.maxWidth='100%';svg.style.height='auto';}catch(e){console.error('Barcode error:',e);}
+      }
+    }
+    function renderQR(r,token){
+      const el=document.getElementById('card-back-qr');
+      if(!el)return;
+      el.innerHTML='';
+      if(token&&typeof QRCode!=='undefined'){
+        try{new QRCode(el,{text:'https://epluscenter.com/s/'+token,width:100,height:100,colorDark:'#1e293b',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});}catch(e){console.error('QR error:',e);}
+      }
+    }
+
+    function updateSidebarActive(){
+      document.querySelectorAll('.sidebar-link').forEach(l=>{
+        l.classList.remove('active');
+        if(currentPage==='home'&&l.textContent.includes('الرئيسية'))l.classList.add('active');
+        if(currentPage==='card'&&l.textContent.includes('بطاقتي'))l.classList.add('active');
+      });
     }
 
     function handleLogout(){clearSession();window.location.href='/student.html';}
@@ -518,39 +479,17 @@
       const urlToken=getTokenFromURL();
       if(urlToken){
         showLoading();
-        try{
-          const res=await fetch(SP_URL+'/rest/v1/registrations?select=*&student_token=eq.'+encodeURIComponent(urlToken)+'&limit=1',{
-            headers:{'Content-Type':'application/json','apikey':SP_KEY,'Authorization':'Bearer '+SP_KEY}
-          });
-          if(!res.ok)throw new Error('HTTP '+res.status);
-          const data=await res.json();
-          if(!data||data.length===0){showError('طالب غير موجود','لم يتم العثور على تسجيل مرتبط بهذا الرابط.');return;}
-          const r=data[0];
-          if(r.status!=='مسجل نهائياً'){showError('بطاقة غير صالحة','لا يمكن استخدام هذه البطاقة قبل تأكيد التسجيل النهائي من إدارة المركز.');return;}
-          saveSession(r);
-          renderDashboard(r);
-        }catch(e){console.error('Portal error:',e);showError('خطأ في التحميل','حدث خطأ أثناء تحميل البيانات. الرجاء المحاولة لاحقاً.');}
+        try{const res=await fetch(SP_URL+'/rest/v1/registrations?select=*&student_token=eq.'+encodeURIComponent(urlToken)+'&limit=1',{headers:{'Content-Type':'application/json','apikey':SP_KEY,'Authorization':'Bearer '+SP_KEY}});if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json();if(!data||data.length===0){showError('طالب غير موجود','لم يتم العثور على تسجيل مرتبط بهذا الرابط.');return;}const r=data[0];if(r.status!=='مسجل نهائياً'){showError('بطاقة غير صالحة','لا يمكن استخدام هذه البطاقة قبل تأكيد التسجيل النهائي من إدارة المركز.');return;}saveSession(r);renderDashboard(r);}catch(e){console.error('Portal error:',e);showError('خطأ في التحميل','حدث خطأ أثناء تحميل البيانات. الرجاء المحاولة لاحقاً.');}
         return;
       }
       const session=getSession();
       if(session){
         showLoading();
-        try{
-          const res=await fetch(SP_URL+'/rest/v1/registrations?select=*&id=eq.'+encodeURIComponent(session.id)+'&limit=1',{
-            headers:{'Content-Type':'application/json','apikey':SP_KEY,'Authorization':'Bearer '+SP_KEY}
-          });
-          if(!res.ok)throw new Error('HTTP '+res.status);
-          const data=await res.json();
-          if(!data||data.length===0){clearSession();showLogin('الطالب غير موجود في النظام.');return;}
-          const r=data[0];
-          if(r.status!=='مسجل نهائياً'){clearSession();showLogin('لم يتم تأكيد تسجيلك النهائي بعد.');return;}
-          renderDashboard(r);
-        }catch(e){console.error('Session restore error:',e);clearSession();showLogin('حدث خطأ أثناء تحميل البيانات.');}
+        try{const res=await fetch(SP_URL+'/rest/v1/registrations?select=*&id=eq.'+encodeURIComponent(session.id)+'&limit=1',{headers:{'Content-Type':'application/json','apikey':SP_KEY,'Authorization':'Bearer '+SP_KEY}});if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json();if(!data||data.length===0){clearSession();showLogin('الطالب غير موجود في النظام.');return;}const r=data[0];if(r.status!=='مسجل نهائياً'){clearSession();showLogin('لم يتم تأكيد تسجيلك النهائي بعد.');return;}renderDashboard(r);}catch(e){console.error('Session restore error:',e);clearSession();showLogin('حدث خطأ أثناء تحميل البيانات.');}
         return;
       }
       showLogin();
     }
-
     init();
   </script>
 </body>
