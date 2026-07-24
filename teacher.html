@@ -41,7 +41,8 @@
 
     /* LOGIN */
     .login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:#1a1a2e}
-    .login-bg{position:absolute;inset:0;background:url('images/studentportalbackground.jpg') center/cover no-repeat;animation:bgZoom 20s ease-in-out infinite alternate;z-index:0}
+    .login-bg{position:absolute;inset:0;z-index:0;overflow:hidden}
+    .login-bg video{width:100%;height:100%;object-fit:cover}
     .login-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(79,70,229,0.88),rgba(55,48,163,0.92));z-index:1;backdrop-filter:blur(2px)}
     .login-shapes{position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none}
     .login-shape{position:absolute;border-radius:50%;background:rgba(255,255,255,0.04)}
@@ -230,7 +231,7 @@
     function showLogin(errorMsg){
       document.getElementById('app').innerHTML=`
         <div class="login-page">
-          <div class="login-bg"></div><div class="login-overlay"></div>
+          <div class="login-bg"><video autoplay muted loop playsinline><source src="videos/videobackgroundteacher.mp4" type="video/mp4"></video></div><div class="login-overlay"></div>
           <div class="login-shapes"><div class="login-shape"></div><div class="login-shape"></div></div>
           <div class="login-card">
             <img class="login-logo-img" src="images/logostudentportal.png" alt="E-PLUS">
@@ -267,10 +268,11 @@
       if(!username||!pass){errEl.textContent='الرجاء ملء جميع الحقول';errEl.style.display='block';return;}
       btn.disabled=true;btn.textContent='جاري التحقق...';errEl.style.display='none';
       try{
-        const userSnap=await db.collection(USERS_COLLECTION).where('username','==',username).where('role','==','teacher').limit(1).get();
+        const userSnap=await db.collection(USERS_COLLECTION).where('username','==',username).limit(1).get();
         if(userSnap.empty){errEl.textContent='اسم المستخدم غير صحيح. الرجاء المحاولة مرة أخرى.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
         const userDoc=userSnap.docs[0];
         const userData=userDoc.data();
+        if(userData.role!=='teacher'){errEl.textContent='اسم المستخدم غير صحيح. الرجاء المحاولة مرة أخرى.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
         if(userData.status!=='active'){errEl.textContent='تم تعطيل حسابك. الرجاء مراجعة الإدارة.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
         const computedHash=await hashPassword(pass,userData.passwordSalt);
         if(computedHash!==userData.passwordHash){errEl.textContent='كلمة المرور غير صحيحة. الرجاء المحاولة مرة أخرى.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
@@ -281,7 +283,7 @@
         if(teacherData.status==='disabled'){errEl.textContent='تم تعطيل حسابك. الرجاء مراجعة الإدارة.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
         const teacher={id:teacherDoc.id,...teacherData};
         saveSession(userData,teacher);
-        await db.collection(USERS_COLLECTION).doc(userDoc.id).update({lastLogin:firebase.firestore.FieldValue.serverTimestamp()});
+        try{await db.collection(USERS_COLLECTION).doc(userDoc.id).update({lastLogin:firebase.firestore.FieldValue.serverTimestamp()});}catch(e){}
         renderDashboard(teacher);
       }catch(err){console.error('Teacher login error:',err);errEl.textContent='حدث خطأ أثناء التحقق.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';}
     }
