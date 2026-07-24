@@ -12098,7 +12098,7 @@ window.cleanLeakedStudents = async (gid) => {
 // ─── أدوات مساعدة للكونسول (Firebase Functions غير متاحة في الـ Console بسبب module) ───
 window._db = db;
 window._allTeachers = allTeachers;
-window._firestore = { getDoc, setDoc, updateDoc, doc, collection, query, where, getDocs, writeBatch, deleteDoc, serverTimestamp, orderBy };
+window._firestore = { addDoc, getDoc, setDoc, updateDoc, doc, collection, query, where, getDocs, writeBatch, deleteDoc, serverTimestamp, orderBy };
 window._showCurrentTeacher = () => {
   const tid = document.getElementById('att-sum-teacher')?.value || '';
   const t = (allTeachers || []).find(t => t.id === tid);
@@ -22625,12 +22625,14 @@ function srShowToast(msg, type = 'success') {
    SUPPORT TEACHERS MANAGEMENT (SRT)
    ═══════════════════════════════════════════════════ */
 const SRT_COLLECTION = 'support_teachers';
+const srtDB = window._db;
+const { addDoc, updateDoc, deleteDoc, getDocs, collection: srtCollection, doc: srtDoc, serverTimestamp: srtServerTimestamp } = window._firestore;
 let srtAllData = [];
 let srtLevels = ['السنة الرابعة متوسط','السنة الثالثة ثانوي (بكالوريا)'];
 
 async function srtLoadData() {
   try {
-    const snap = await getDocs(collection(db, SRT_COLLECTION));
+    const snap = await getDocs(srtCollection(srtDB, SRT_COLLECTION));
     srtAllData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     srtRenderStats();
     srtRenderTable(srtAllData);
@@ -22794,10 +22796,10 @@ async function srtSave() {
   btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
   try {
     if (editId) {
-      await updateDoc(doc(db, SRT_COLLECTION, editId), { name, phone, email, notes, subjects, levels, updatedAt: serverTimestamp() });
+      await updateDoc(srtDoc(srtDB, SRT_COLLECTION, editId), { name, phone, email, notes, subjects, levels, updatedAt: srtServerTimestamp() });
     } else {
       const teacherId = 'SRT-' + Date.now().toString(36).toUpperCase();
-      await addDoc(collection(db, SRT_COLLECTION), { teacherId, name, phone, email, notes, subjects, levels, status: 'active', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      await addDoc(srtCollection(srtDB, SRT_COLLECTION), { teacherId, name, phone, email, notes, subjects, levels, status: 'active', createdAt: srtServerTimestamp(), updatedAt: srtServerTimestamp() });
     }
     srtCloseModal();
     await srtLoadData();
@@ -22811,13 +22813,13 @@ async function srtToggleStatus(id) {
   const newStatus = t.status === 'disabled' ? 'active' : 'disabled';
   const label = newStatus === 'disabled' ? 'تعطيل' : 'تفعيل';
   if (!confirm(`هل أنت متأكد من ${label} هذا الأستاذ؟`)) return;
-  try { await updateDoc(doc(db, SRT_COLLECTION, id), { status: newStatus, updatedAt: serverTimestamp() }); await srtLoadData(); } catch (e) { console.error('SRT toggle error:', e); }
+  try { await updateDoc(srtDoc(srtDB, SRT_COLLECTION, id), { status: newStatus, updatedAt: srtServerTimestamp() }); await srtLoadData(); } catch (e) { console.error('SRT toggle error:', e); }
 }
 
 function srtDelete(id) {
   document.getElementById('srt-delete-modal').classList.add('open');
   document.getElementById('srt-delete-confirm-btn').onclick = async () => {
-    try { await deleteDoc(doc(db, SRT_COLLECTION, id)); document.getElementById('srt-delete-modal').classList.remove('open'); await srtLoadData(); } catch (e) { console.error('SRT delete error:', e); }
+    try { await deleteDoc(srtDoc(srtDB, SRT_COLLECTION, id)); document.getElementById('srt-delete-modal').classList.remove('open'); await srtLoadData(); } catch (e) { console.error('SRT delete error:', e); }
   };
 }
 </script>
