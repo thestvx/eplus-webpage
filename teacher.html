@@ -282,12 +282,13 @@
           <div class="sidebar-link ${currentPage==='home'?'active':''}" onclick="navigateTo('home')"><span class="sidebar-link-icon">🏠</span>الرئيسية</div>
           <div class="sidebar-link ${currentPage==='content'?'active':''}" onclick="navigateTo('content')"><span class="sidebar-link-icon">📚</span>المحتوى التعليمي</div>
           <div class="sidebar-link ${currentPage==='students'?'active':''}" onclick="navigateTo('students')"><span class="sidebar-link-icon">👥</span>الطلاب</div>
+          <div class="sidebar-link ${currentPage==='finance'?'active':''}" onclick="navigateTo('finance')"><span class="sidebar-link-icon">💰</span>الموارد المالية</div>
         </div>
         <div class="sidebar-footer"><button class="sidebar-logout" onclick="handleLogout()">🚪 تسجيل الخروج</button></div>`;
     }
 
     function navigateTo(page){currentPage=page;closeDrawer();renderCurrentPage();}
-    function renderCurrentPage(){if(!currentTeacher)return;if(currentPage==='content')renderContentPage();else if(currentPage==='students')renderStudentsPage();else renderDashboard(currentTeacher);}
+    function renderCurrentPage(){if(!currentTeacher)return;if(currentPage==='content')renderContentPage();else if(currentPage==='students')renderStudentsPage();else if(currentPage==='finance')renderFinancePage();else renderDashboard(currentTeacher);}
 
     function openDrawer(){
       document.getElementById('drawer-overlay').classList.add('open');
@@ -482,7 +483,53 @@
         if(currentPage==='home'&&l.textContent.includes('الرئيسية'))l.classList.add('active');
         if(currentPage==='content'&&l.textContent.includes('المحتوى'))l.classList.add('active');
         if(currentPage==='students'&&l.textContent.includes('الطلاب'))l.classList.add('active');
+        if(currentPage==='finance'&&l.textContent.includes('المالية'))l.classList.add('active');
       });
+    }
+
+    /* ═══ FINANCE PAGE ═══ */
+    const FIN_COLLECTION = 'teacher_finance';
+    async function renderFinancePage(){
+      currentPage='finance';
+      const t=currentTeacher;
+      const teacherId=t.teacherId||t.id;
+      let financeData={balance:0,totalEarnings:0,totalDues:0,totalPaid:0,lastTransaction:null,transactions:[]};
+      try{
+        const snap=await db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get();
+        if(!snap.empty){const d=snap.docs[0];financeData={id:d.id,...d.data(),transactions:Array.isArray(d.data().transactions)?d.data().transactions:[]};}
+      }catch(e){console.error('Finance load error:',e);}
+
+      const fmt=n=>(n||0).toLocaleString('ar-DZ')+' دج';
+      const txRows=financeData.transactions.length?financeData.transactions.slice(0,10).map(tx=>{
+        const isCredit=tx.type==='credit';
+        return `<tr><td style="padding:10px 14px;border-bottom:1px solid var(--border-light);font-size:13px">${tx.date?new Date(tx.date.seconds?tx.date.seconds*1000:tx.date).toLocaleDateString('ar-DZ'):'—'}</td><td style="padding:10px 14px;border-bottom:1px solid var(--border-light);font-size:13px">${tx.description||'—'}</td><td style="padding:10px 14px;border-bottom:1px solid var(--border-light);font-size:13px;font-weight:700;color:${isCredit?'var(--success)':'var(--danger)'}">${isCredit?'+':'-'} ${fmt(tx.amount)}</td></tr>`;
+      }).join(''):'<tr><td colspan="3" style="text-align:center;padding:32px;color:var(--text-muted);font-size:13px">لا توجد معاملات مالية بعد</td></tr>';
+
+      document.getElementById('app').innerHTML=`
+        <div class="portal-layout">
+          <aside class="sidebar">${renderSidebar(t)}</aside>
+          <div class="main-content">
+            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">👨‍🏫</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
+            <div class="main-body">
+              <div class="section-title" style="margin-bottom:24px">💰 الموارد المالية</div>
+              <div class="stats-grid">
+                <div class="stat-card c-green" style="animation:fadeSlideUp 0.5s ease both 0.1s"><div class="stat-icon i-green">💰</div><div class="stat-value" style="font-size:20px">${fmt(financeData.balance)}</div><div class="stat-label">الرصيد الحالي</div></div>
+                <div class="stat-card c-purple" style="animation:fadeSlideUp 0.5s ease both 0.15s"><div class="stat-icon i-purple">📈</div><div class="stat-value" style="font-size:20px">${fmt(financeData.totalEarnings)}</div><div class="stat-label">إجمالي الأرباح</div></div>
+                <div class="stat-card c-gold" style="animation:fadeSlideUp 0.5s ease both 0.2s"><div class="stat-icon i-gold">📋</div><div class="stat-value" style="font-size:20px">${fmt(financeData.totalDues)}</div><div class="stat-label">إجمالي المستحقات</div></div>
+                <div class="stat-card c-blue" style="animation:fadeSlideUp 0.5s ease both 0.25s"><div class="stat-icon i-blue">✅</div><div class="stat-value" style="font-size:20px">${fmt(financeData.totalPaid)}</div><div class="stat-label">إجمالي المدفوعات</div></div>
+              </div>
+              <div class="section-header" style="margin-top:8px"><div class="section-title">📋 سجل المعاملات</div></div>
+              <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);overflow-x:auto">
+                <table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--border-light)"><th style="padding:10px 14px;text-align:right;font-size:12px;font-weight:800;color:var(--text-muted)">التاريخ</th><th style="padding:10px 14px;text-align:right;font-size:12px;font-weight:800;color:var(--text-muted)">الوصف</th><th style="padding:10px 14px;text-align:right;font-size:12px;font-weight:800;color:var(--text-muted)">المبلغ</th></tr></thead><tbody>${txRows}</tbody></table>
+              </div>
+              <div style="margin-top:24px;padding:20px;background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);text-align:center">
+                <div style="font-size:14px;font-weight:700;color:var(--text-muted)">🔄 سيتم تطوير هذا القسم ليشمل: نسبة الأستاذ من كل طالب، الرواتب، المكافآت، الخصومات، تقارير الأرباح</div>
+              </div>
+              <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
+            </div>
+          </div>
+        </div>`;
+      updateSidebarActive();
     }
 
     function handleLogout(){clearSession();window.location.href='/teacher.html';}
