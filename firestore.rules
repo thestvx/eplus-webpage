@@ -1,0 +1,224 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isTeacher() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/teachers/$(request.auth.uid));
+    }
+    function isAdmin() {
+      return isSignedIn() && !isTeacher();
+    }
+
+    match /registrations/{doc} {
+      allow read: if isSignedIn();
+      allow create: if true;
+      allow update, delete: if isSignedIn();
+    }
+
+    match /announcements/{doc} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /settings/{doc} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /campGallery/{doc} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /pageViews/{doc} {
+      allow read: if isSignedIn();
+      allow create: if true;
+      allow update, delete: if false;
+    }
+
+    match /summerTickets/{doc} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow delete: if isSignedIn();
+      allow update: if isSignedIn()
+        || (
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'activatedAt'])
+        );
+    }
+
+    match /teachers/{teacherId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    match /attendance/{recordId} {
+      allow read: if isSignedIn() &&
+        (
+          isAdmin()
+          || (resource != null && resource.data.teacherId == request.auth.uid)
+        );
+      allow create, update: if isSignedIn() &&
+        (
+          isAdmin()
+          || request.resource.data.teacherId == request.auth.uid
+        );
+      allow delete: if isAdmin();
+    }
+
+    match /sessionAttendance/{recordId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && (
+        isAdmin()
+        || (
+          request.resource.data.teacherId == request.auth.uid
+          || (request.resource.data.teacherId >= request.auth.uid + '_g'
+              && request.resource.data.teacherId < request.auth.uid + '_\ufff0')
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /teacherPayments/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /adminLog/{doc} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    match /messages/{msgId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.senderId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        (
+          resource.data.senderId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['text', 'edited'])
+        )
+        || isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.senderId == request.auth.uid
+        || isAdmin()
+      );
+    }
+
+    match /msgRooms/{roomId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn();
+      allow update: if isSignedIn() && (
+        request.auth.uid in resource.data.participants
+        || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /financeTx/{docId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    match /sessionRebuilder_backups/{docId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /attendanceBackups/{docId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /campRegistrations/{doc} {
+      allow read: if isSignedIn();
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    match /specialRegistrations/{doc} {
+      allow read: if isSignedIn();
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    match /sessionControl/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /teacherMessages/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin();
+      allow update: if isSignedIn() && (
+        resource.data.teacherId == request.auth.uid
+        || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{docId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /attendanceArchive/{docId} {
+      allow read: if isAdmin() || (
+        isSignedIn()
+        && resource != null
+        && resource.data.teacherId == request.auth.uid
+      );
+      allow create: if isAdmin() || (
+        isSignedIn()
+        && request.resource.data.teacherId == request.auth.uid
+      );
+      allow update: if isAdmin() || (
+        isSignedIn()
+        && resource != null
+        && resource.data.teacherId == request.auth.uid
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /attendancePreRepairBackup/{docId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /support_teachers/{docId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /attendanceCycles/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() || (
+        isSignedIn()
+        && request.resource.data.teacherId == request.auth.uid
+      );
+      allow update: if isAdmin() || (
+        isSignedIn()
+        && resource != null
+        && resource.data.teacherId == request.auth.uid
+      );
+      allow delete: if isAdmin();
+    }
+
+  }
+}
