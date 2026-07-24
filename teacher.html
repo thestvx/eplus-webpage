@@ -205,6 +205,7 @@
 
     const SESSION_KEY = 'eplus_teacher_session';
     const SESSION_MAX_AGE = 24*60*60*1000;
+    const USERS_COLLECTION = 'users';
     const SRT_COLLECTION = 'support_teachers';
     const CONTENT_COLLECTION = 'teacher_content';
 
@@ -212,8 +213,15 @@
     let currentPage = 'home';
     let teacherSubjects = [];
 
+    async function hashPassword(password, salt) {
+      const enc = new TextEncoder();
+      const data = enc.encode(salt + ':' + password);
+      const buf = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
     function getSession(){try{const s=localStorage.getItem(SESSION_KEY);if(!s)return null;const o=JSON.parse(s);if(Date.now()-o.loginTime>SESSION_MAX_AGE){localStorage.removeItem(SESSION_KEY);return null;}return o;}catch(e){localStorage.removeItem(SESSION_KEY);return null;}}
-    function saveSession(t){localStorage.setItem(SESSION_KEY,JSON.stringify({teacherId:t.teacherId,id:t.id,loginTime:Date.now()}));}
+    function saveSession(user,teacher){localStorage.setItem(SESSION_KEY,JSON.stringify({userId:user.userId,username:user.username,role:user.role,teacherId:teacher.teacherId,teacherDocId:teacher.id,loginTime:Date.now()}));}
     function clearSession(){localStorage.removeItem(SESSION_KEY);}
 
     function showLoading(){document.getElementById('app').innerHTML='<div class="loading-page"><div class="spinner"></div><div class="loading-text">جاري تحميل لوحة الأستاذ...</div></div>';}
@@ -229,10 +237,10 @@
             <div class="login-role-badge">👨‍🏫 لوحة الأستاذ</div>
             <form onsubmit="handleLogin(event)">
               <div class="login-field">
-                <label class="login-label">Teacher ID</label>
+                <label class="login-label">اسم المستخدم</label>
                 <div class="login-input-wrap">
-                  <input class="login-input" type="text" id="login-id" placeholder="مثال: SRT-XXXXX" required autocomplete="off">
-                  <span class="login-input-icon">🪪</span>
+                  <input class="login-input" type="text" id="login-id" placeholder="اسم المستخدم" required autocomplete="off">
+                  <span class="login-input-icon">👤</span>
                 </div>
               </div>
               <div class="login-field">
@@ -252,22 +260,28 @@
 
     async function handleLogin(e){
       e.preventDefault();
-      const id=document.getElementById('login-id').value.trim();
+      const username=document.getElementById('login-id').value.trim();
       const pass=document.getElementById('login-pass').value;
       const errEl=document.getElementById('login-error');
       const btn=document.getElementById('login-btn');
-      if(!id||!pass){errEl.textContent='الرجاء ملء جميع الحقول';errEl.style.display='block';return;}
+      if(!username||!pass){errEl.textContent='الرجاء ملء جميع الحقول';errEl.style.display='block';return;}
       btn.disabled=true;btn.textContent='جاري التحقق...';errEl.style.display='none';
       try{
-        const snap=await db.collection(SRT_COLLECTION).where('teacherId','==',id).limit(1).get();
-        if(snap.empty){errEl.textContent='Teacher ID غير صحيح. الرجاء المحاولة مرة أخرى.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
-        const doc=snap.docs[0];
-        const data=doc.data();
-        if(data.status==='disabled'){errEl.textContent='تم تعطيل حسابك. الرجاء مراجعة الإدارة.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
-        if(data.password!==pass){errEl.textContent='كلمة المرور غير صحيحة. الرجاء المحاولة مرة أخرى.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
-        const teacher={id:doc.id,...data};
-        saveSession(teacher);
-        await db.collection(SRT_COLLECTION).doc(doc.id).update({lastLogin:firebase.firestore.FieldValue.serverTimestamp()});
+        const userSnap=await db.collection(USERS_COLLECTION).where('username','==',username).where('role','==','teacher').limit(1).get();
+        if(userSnap.empty){errEl.textContent='اسم المستخدم غير صحيح. الرجاء المحاولة مرة أخرى.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
+        const userDoc=userSnap.docs[0];
+        const userData=userDoc.data();
+        if(userData.status!=='active'){errEl.textContent='تم تعطيل حسابك. الرجاء مراجعة الإدارة.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
+        const computedHash=await hashPassword(pass,userData.passwordSalt);
+        if(computedHash!==userData.passwordHash){errEl.textContent='كلمة المرور غير صحيحة. الرجاء المحاولة مرة أخرى.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
+        const teacherSnap=await db.collection(SRT_COLLECTION).where('userId','==',userData.userId).limit(1).get();
+        if(teacherSnap.empty){errEl.textContent='لا يوجد بروفايل مرتبط بهذا الحساب.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
+        const teacherDoc=teacherSnap.docs[0];
+        const teacherData=teacherDoc.data();
+        if(teacherData.status==='disabled'){errEl.textContent='تم تعطيل حسابك. الرجاء مراجعة الإدارة.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
+        const teacher={id:teacherDoc.id,...teacherData};
+        saveSession(userData,teacher);
+        await db.collection(USERS_COLLECTION).doc(userDoc.id).update({lastLogin:firebase.firestore.FieldValue.serverTimestamp()});
         renderDashboard(teacher);
       }catch(err){console.error('Teacher login error:',err);errEl.textContent='حدث خطأ أثناء التحقق.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';}
     }
@@ -537,9 +551,10 @@
     async function init(){
       const session=getSession();
       if(session){
+        if(session.role && session.role!=='teacher'){clearSession();showLogin('صلاحيات غير كافية.');return;}
         showLoading();
         try{
-          const doc=await db.collection(SRT_COLLECTION).doc(session.id).get();
+          const doc=await db.collection(SRT_COLLECTION).doc(session.teacherDocId).get();
           if(!doc.exists){clearSession();showLogin('حساب الأستاذ غير موجود.');return;}
           const data=doc.data();
           if(data.status==='disabled'){clearSession();showLogin('تم تعطيل حسابك.');return;}

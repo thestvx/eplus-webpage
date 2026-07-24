@@ -3167,6 +3167,15 @@
         <div class="form-group"><label class="form-label">رقم الهاتف</label><input class="inp" type="tel" id="srt-phone" placeholder="0555123456"></div>
         <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input class="inp" type="email" id="srt-email" placeholder="exemple@email.com"></div>
       </div>
+      <div style="border:1.5px solid var(--border);border-radius:12px;padding:14px;margin:8px 0;background:var(--primary-light)">
+        <div style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:10px">🔐 بيانات تسجيل الدخول</div>
+        <div class="form-group"><label class="form-label">اسم المستخدم <span class="required">*</span></label><input class="inp" type="text" id="srt-username" placeholder="اسم المستخدم للدخول" autocomplete="off"></div>
+        <div id="srt-password-fields">
+          <div class="form-group"><label class="form-label">كلمة المرور <span class="required" id="srt-pass-required">*</span></label><input class="inp" type="password" id="srt-password" placeholder="كلمة المرور" autocomplete="new-password"></div>
+          <div class="form-group"><label class="form-label">تأكيد كلمة المرور <span class="required" id="srt-pass-confirm-required">*</span></label><input class="inp" type="password" id="srt-password-confirm" placeholder="أعد إدخال كلمة المرور" autocomplete="new-password"></div>
+        </div>
+        <div id="srt-reset-hint" style="display:none;font-size:11px;color:var(--text-secondary);margin-top:4px">💡 لتعديل كلمة المرور، استخدم زر "🔄 إعادة تعيين" في القائمة</div>
+      </div>
       <div class="form-group">
         <label class="form-label">المواد التي يدرّسها <span class="required">*</span></label>
         <div id="srt-subjects-list" style="display:flex;flex-direction:column;gap:8px;margin-top:4px"></div>
@@ -3192,12 +3201,30 @@
       <div style="font-size:48px;margin-bottom:8px">🗑️</div>
     </div>
     <div style="padding:0 24px 20px">
-      <div style="font-size:16px;font-weight:900;color:var(--text);margin-bottom:6px">حذف الأستاذ</div>
-      <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px">هل أنت متأكد من حذف هذا الأستاذ؟ لا يمكن التراجع عن هذا الإجراء.</div>
+      <div style="font-size:16px;font-weight:900;color:var(--text);margin-bottom:6px">تعطيل الأستاذ</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px">هل أنت متأكد من تعطيل هذا الأستاذ؟ لن يتم حذف البيانات، فقط سيتم تعطيل الحساب.</div>
       <div style="display:flex;gap:10px;justify-content:center">
         <button class="btn-sm" onclick="document.getElementById('srt-delete-modal').classList.remove('open')">إلغاء</button>
-        <button class="btn-sm danger" id="srt-delete-confirm-btn">نعم، احذف</button>
+        <button class="btn-sm danger" id="srt-delete-confirm-btn">نعم، تعطّل</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SRT PASSWORD RESET MODAL ===== -->
+<div class="teacher-modal-bg" id="srt-reset-modal">
+  <div class="teacher-modal" style="max-width:420px">
+    <div class="teacher-modal-header">
+      <div class="panel-icon" style="background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.2)">🔑</div>
+      <div class="teacher-modal-title">إعادة تعيين كلمة المرور</div>
+      <button class="att-modal-close" onclick="document.getElementById('srt-reset-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="teacher-modal-body">
+      <input type="hidden" id="srt-reset-user-id" value="">
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">الأستاذ: <strong id="srt-reset-teacher-name"></strong></div>
+      <div class="form-group"><label class="form-label">كلمة المرور الجديدة <span class="required">*</span></label><input class="inp" type="password" id="srt-reset-pass" placeholder="كلمة المرور الجديدة" autocomplete="new-password"></div>
+      <div class="form-group"><label class="form-label">تأكيد كلمة المرور <span class="required">*</span></label><input class="inp" type="password" id="srt-reset-pass-confirm" placeholder="أعد إدخال كلمة المرور" autocomplete="new-password"></div>
+      <button class="btn-primary" id="srt-reset-btn" onclick="srtConfirmResetPassword()" style="margin-top:12px;width:100%">🔄 إعادة تعيين</button>
     </div>
   </div>
 </div>
@@ -22630,6 +22657,51 @@ let srtAllData = [];
 function srtFS(){return window._firestore;}
 function srtDB(){return window._db;}
 
+/* ═══ RBAC: Users Collection ═══ */
+const USERS_COLLECTION = 'users';
+
+async function srtHashPassword(password, salt) {
+  const enc = new TextEncoder();
+  const data = enc.encode(salt + ':' + password);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function srtGenerateSalt() {
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function srtGenerateUserId() {
+  const arr = new Uint8Array(12);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function srtCreateUser(username, password, role) {
+  const {addDoc,collection:c,doc:d}=srtFS(),db=srtDB();
+  const salt = srtGenerateSalt();
+  const hash = await srtHashPassword(password, salt);
+  const userId = srtGenerateUserId();
+  const {setDoc}=srtFS();
+  await setDoc(d(db, USERS_COLLECTION, userId), {
+    userId, username, passwordHash: hash, passwordSalt: salt,
+    role, status: 'active',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
+  return userId;
+}
+
+async function srtResetUserPassword(userId, newPassword) {
+  const {doc:d,updateDoc}=srtFS(),db=srtDB();
+  const salt = srtGenerateSalt();
+  const hash = await srtHashPassword(newPassword, salt);
+  await updateDoc(d(db, USERS_COLLECTION, userId), {
+    passwordHash: hash, passwordSalt: salt,
+    updatedAt: new Date().toISOString()
+  });
+}
+
 async function srtLoadData() {
   const {getDocs,collection:c}=srtFS(),db=srtDB();
   try {
@@ -22686,7 +22758,7 @@ function srtRenderTable(data) {
         <div style="display:flex;gap:4px;flex-wrap:wrap">
           <button class="tbl-action" onclick="srtToggleStatus('${t.id}')" title="تبديل الحالة" style="padding:4px 8px;font-size:11px">${isDis ? '✅ تفعيل' : '🚫 تعطيل'}</button>
           <button class="tbl-action" onclick="srtOpenEditModal('${t.id}')" title="تعديل" style="padding:4px 8px;font-size:11px">✏️</button>
-          <button class="tbl-action del" onclick="srtDelete('${t.id}')" title="حذف" style="padding:4px 8px;font-size:11px">🗑️</button>
+          ${t.userId ? '<button class="tbl-action" onclick="srtResetPassword(\'' + t.id + '\')" title="إعادة تعيين كلمة المرور" style="padding:4px 8px;font-size:11px">🔄</button>' : ''}
         </div>
       </td>
     </tr>`;
@@ -22708,6 +22780,13 @@ function srtOpenAddModal() {
   document.getElementById('srt-phone').value = '';
   document.getElementById('srt-email').value = '';
   document.getElementById('srt-notes').value = '';
+  document.getElementById('srt-username').value = '';
+  document.getElementById('srt-password').value = '';
+  document.getElementById('srt-password-confirm').value = '';
+  document.getElementById('srt-password-fields').style.display = 'block';
+  document.getElementById('srt-reset-hint').style.display = 'none';
+  document.getElementById('srt-pass-required').style.display = '';
+  document.getElementById('srt-pass-confirm-required').style.display = '';
   document.getElementById('srt-modal-icon').textContent = '➕';
   document.getElementById('srt-modal-title').textContent = 'إضافة أستاذ دعم';
   document.getElementById('srt-save-btn').textContent = '💾 إضافة';
@@ -22724,6 +22803,13 @@ function srtOpenEditModal(id) {
   document.getElementById('srt-phone').value = t.phone || '';
   document.getElementById('srt-email').value = t.email || '';
   document.getElementById('srt-notes').value = t.notes || '';
+  document.getElementById('srt-username').value = t.username || t.teacherId || '';
+  document.getElementById('srt-password').value = '';
+  document.getElementById('srt-password-confirm').value = '';
+  document.getElementById('srt-password-fields').style.display = 'none';
+  document.getElementById('srt-reset-hint').style.display = 'block';
+  document.getElementById('srt-pass-required').style.display = 'none';
+  document.getElementById('srt-pass-confirm-required').style.display = 'none';
   document.getElementById('srt-modal-icon').textContent = '✏️';
   document.getElementById('srt-modal-title').textContent = 'تعديل بيانات الأستاذ';
   document.getElementById('srt-save-btn').textContent = '💾 حفظ التعديلات';
@@ -22778,7 +22864,11 @@ async function srtSave() {
   const phone = document.getElementById('srt-phone').value.trim();
   const email = document.getElementById('srt-email').value.trim();
   const notes = document.getElementById('srt-notes').value.trim();
+  const username = document.getElementById('srt-username').value.trim();
+  const password = document.getElementById('srt-password').value;
+  const passwordConfirm = document.getElementById('srt-password-confirm').value;
   if (!name) { alert('الرجاء إدخال اسم الأستاذ'); return; }
+  if (!username) { alert('الرجاء إدخال اسم المستخدم'); return; }
 
   const subjectRows = document.querySelectorAll('#srt-subjects-list .srt-subject-row');
   const subjects = [];
@@ -22795,13 +22885,33 @@ async function srtSave() {
 
   const btn = document.getElementById('srt-save-btn');
   btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
-  const {addDoc,updateDoc,doc:d,collection:c,serverTimestamp:ts}=srtFS(),db=srtDB();
+  const {addDoc,updateDoc,doc:d,collection:c,setDoc}=srtFS(),db=srtDB();
   try {
     if (editId) {
-      await updateDoc(d(db, SRT_COLLECTION, editId), { name, phone, email, notes, subjects, levels, updatedAt: ts() });
+      const t = srtAllData.find(x => x.id === editId);
+      const teacherData = { name, phone, email, notes, subjects, levels, username, updatedAt: new Date().toISOString() };
+      await updateDoc(d(db, SRT_COLLECTION, editId), teacherData);
+      if (t && t.userId) {
+        const {doc:ud}=srtFS();
+        await updateDoc(ud(db, USERS_COLLECTION, t.userId), { username, updatedAt: new Date().toISOString() });
+      }
     } else {
+      if (!password) { alert('الرجاء إدخال كلمة المرور'); btn.disabled = false; btn.textContent = '💾 إضافة'; return; }
+      if (password !== passwordConfirm) { alert('كلمتا المرور غير متطابقتين'); btn.disabled = false; btn.textContent = '💾 إضافة'; return; }
+      if (password.length < 6) { alert('كلمة المرور يجب أن تكون 6 أحرف على الأقل'); btn.disabled = false; btn.textContent = '💾 إضافة'; return; }
       const teacherId = 'SRT-' + Date.now().toString(36).toUpperCase();
-      await addDoc(c(db, SRT_COLLECTION), { teacherId, name, phone, email, notes, subjects, levels, status: 'active', createdAt: ts(), updatedAt: ts() });
+      const userId = srtGenerateUserId();
+      const salt = srtGenerateSalt();
+      const hash = await srtHashPassword(password, salt);
+      await setDoc(d(db, USERS_COLLECTION, userId), {
+        userId, username, passwordHash: hash, passwordSalt: salt,
+        role: 'teacher', status: 'active',
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      });
+      await addDoc(c(db, SRT_COLLECTION), {
+        teacherId, userId, name, phone, email, notes, subjects, levels, username,
+        status: 'active', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      });
     }
     srtCloseModal();
     await srtLoadData();
@@ -22815,15 +22925,57 @@ async function srtToggleStatus(id) {
   const newStatus = t.status === 'disabled' ? 'active' : 'disabled';
   const label = newStatus === 'disabled' ? 'تعطيل' : 'تفعيل';
   if (!confirm(`هل أنت متأكد من ${label} هذا الأستاذ؟`)) return;
-  const {updateDoc,doc:d,serverTimestamp:ts}=srtFS(),db=srtDB();
-  try { await updateDoc(d(db, SRT_COLLECTION, id), { status: newStatus, updatedAt: ts() }); await srtLoadData(); } catch (e) { console.error('SRT toggle error:', e); }
+  const {updateDoc,doc:d}=srtFS(),db=srtDB();
+  try {
+    await updateDoc(d(db, SRT_COLLECTION, id), { status: newStatus, updatedAt: new Date().toISOString() });
+    if (t.userId) {
+      await updateDoc(d(db, USERS_COLLECTION, t.userId), { status: newStatus, updatedAt: new Date().toISOString() });
+    }
+    await srtLoadData();
+  } catch (e) { console.error('SRT toggle error:', e); }
 }
 
 function srtDelete(id) {
   document.getElementById('srt-delete-modal').classList.add('open');
   document.getElementById('srt-delete-confirm-btn').onclick = async () => {
-    try { const {deleteDoc,doc:d}=srtFS(),db=srtDB(); await deleteDoc(d(db, SRT_COLLECTION, id)); document.getElementById('srt-delete-modal').classList.remove('open'); await srtLoadData(); } catch (e) { console.error('SRT delete error:', e); }
+    const {updateDoc,doc:d}=srtFS(),db=srtDB();
+    try {
+      const t = srtAllData.find(x => x.id === id);
+      await updateDoc(d(db, SRT_COLLECTION, id), { status: 'disabled', updatedAt: new Date().toISOString() });
+      if (t && t.userId) {
+        await updateDoc(d(db, USERS_COLLECTION, t.userId), { status: 'disabled', updatedAt: new Date().toISOString() });
+      }
+      document.getElementById('srt-delete-modal').classList.remove('open');
+      await srtLoadData();
+    } catch (e) { console.error('SRT disable error:', e); }
   };
+}
+
+function srtResetPassword(id) {
+  const t = srtAllData.find(x => x.id === id);
+  if (!t || !t.userId) { alert('لا يمكن إعادة تعيين كلمة المرور: لا يوجد حساب مرتبط'); return; }
+  document.getElementById('srt-reset-user-id').value = t.userId;
+  document.getElementById('srt-reset-teacher-name').textContent = t.name || '';
+  document.getElementById('srt-reset-pass').value = '';
+  document.getElementById('srt-reset-pass-confirm').value = '';
+  document.getElementById('srt-reset-modal').classList.add('open');
+}
+
+async function srtConfirmResetPassword() {
+  const userId = document.getElementById('srt-reset-user-id').value;
+  const pass = document.getElementById('srt-reset-pass').value;
+  const passConfirm = document.getElementById('srt-reset-pass-confirm').value;
+  if (!pass) { alert('الرجاء إدخال كلمة المرور الجديدة'); return; }
+  if (pass !== passConfirm) { alert('كلمتا المرور غير متطابقتين'); return; }
+  if (pass.length < 6) { alert('كلمة المرور يجب أن تكون 6 أحرف على الأقل'); return; }
+  const btn = document.getElementById('srt-reset-btn');
+  btn.disabled = true; btn.textContent = '⏳ جاري إعادة التعيين...';
+  try {
+    await srtResetUserPassword(userId, pass);
+    document.getElementById('srt-reset-modal').classList.remove('open');
+    alert('✅ تم إعادة تعيين كلمة المرور بنجاح');
+  } catch (e) { console.error('Password reset error:', e); alert('حدث خطأ أثناء إعادة التعيين'); }
+  btn.disabled = false; btn.textContent = '🔄 إعادة تعيين';
 }
 </script>
 
