@@ -10,6 +10,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <script src="js/registrationService.js"></script>
+  <script src="js/subjectService.js"></script>
+  <script src="js/attendanceService.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
@@ -22369,7 +22372,7 @@ function srShowDetail(id) {
   const statusColor = r.status === 'مسجل نهائياً' ? '#059669' : '#d97706';
   const statusEmoji = r.status === 'مسجل نهائياً' ? '🟢' : '🟡';
   const subjects = Array.isArray(r.subjects)
-    ? r.subjects.map(s => `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;background:var(--primary-light);font-size:12px"><span>📚 ${s.subject || ''}</span><span style="color:var(--text-muted)">—</span><span>🎓 ${s.teacher || ''}</span></div>`).join('')
+    ? r.subjects.map(s => {const icon=SubjectService.getSubjectIcon(s.subject||'');return `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;background:var(--primary-light);font-size:12px"><span>${icon} ${s.subject || ''}</span><span style="color:var(--text-muted)">—</span><span>🎓 ${s.teacher || ''}</span>${s.subjectId?'<span style="font-size:9px;color:var(--text-secondary);font-family:monospace">('+s.subjectId+')</span>':''}</div>`;}).join('')
     : '<div style="color:var(--text-muted);font-size:12px">لا توجد مواد</div>';
 
   let actionsHtml = '';
@@ -22408,20 +22411,21 @@ function srShowDetail(id) {
     <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:16px">
       ${actionsHtml}
     </div>`;
-  // Populate subject dropdown based on level
+  // Populate subject dropdown dynamically with teachers
   const subjectSelect = document.getElementById('sr-subject-add-select');
   if (subjectSelect) {
-    let availableSubjects = [];
-    if (r.level === 'السنة الرابعة متوسط') {
-      availableSubjects = SUBJECTS_BY_LEVEL['السنة الرابعة متوسط'] || [];
-    } else if (r.level === 'السنة الثالثة ثانوي (بكالوريا)' && r.stream) {
-      availableSubjects = SUBJECTS_BY_LEVEL['السنة الثالثة ثانوي (بكالوريا)'][r.stream] || [];
-    }
-    // Filter out already-added subjects
-    const existingSubjects = Array.isArray(r.subjects) ? r.subjects.map(s => (s.subject || s).trim()) : [];
-    const filtered = availableSubjects.filter(s => !existingSubjects.includes(s));
-    subjectSelect.innerHTML = '<option value="">اختر مادة لإضافتها...</option>' + filtered.map(s => `<option value="${s}">${s}</option>`).join('');
-    if (filtered.length === 0) subjectSelect.innerHTML = '<option value="">لا توجد مواد متاحة لهذا المستوى</option>';
+    subjectSelect.innerHTML = '<option value="">جاري تحميل المواد...</option>';
+    SubjectService.buildSubjectTeacherOptions(r.level, r.stream).then(options => {
+      const existingSubjects = Array.isArray(r.subjects) ? r.subjects.map(s => (s.subject || s).trim()) : [];
+      const existingTeacherIds = Array.isArray(r.subjects) ? r.subjects.filter(s => s.teacherId).map(s => s.teacherId) : [];
+      const filtered = options.filter(o => {
+        if (existingSubjects.includes(o.subject) && existingTeacherIds.includes(o.teacherId)) return false;
+        if (existingSubjects.includes(o.subject) && !o.teacherId) return false;
+        return true;
+      });
+      subjectSelect.innerHTML = '<option value="">اختر مادة لإضافتها...</option>' + filtered.map(o => `<option value="${o.value}" data-subject-id="${o.subjectId}" data-teacher-id="${o.teacherId || ''}" data-subject="${o.subject}" data-teacher="${o.teacherName || ''}">${o.label}</option>`).join('');
+      if (filtered.length === 0) subjectSelect.innerHTML = '<option value="">لا توجد مواد متاحة لهذا المستوى</option>';
+    });
   }
 
   document.getElementById('sr-detail-modal').classList.add('open');
@@ -23135,17 +23139,21 @@ async function srAddSubjectToRegistration(id) {
   const r = srAllData.find(x => x.id === id);
   if (!r) return;
   const select = document.getElementById('sr-subject-add-select');
-  const subject = select ? select.value : '';
-  if (!subject) { srShowToast('الرجاء اختيار مادة', 'error'); return; }
+  const selectedOption = select ? select.options[select.selectedIndex] : null;
+  if (!selectedOption || !selectedOption.value) { srShowToast('الرجاء اختيار مادة', 'error'); return; }
+  const subject = selectedOption.getAttribute('data-subject') || selectedOption.value.split('|')[0];
+  const teacherId = selectedOption.getAttribute('data-teacher-id') || '';
+  const teacherName = selectedOption.getAttribute('data-teacher') || '';
+  const subjectId = selectedOption.getAttribute('data-subject-id') || SubjectService.getSubjectId(subject);
   let subjects = Array.isArray(r.subjects) ? [...r.subjects] : [];
-  subjects.push({ subject: subject, teacher: '' });
+  subjects.push({ subject, subjectId, teacherId, teacher: teacherName });
   try {
     const res = await srFetch(`${SR_SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify({ subjects }),
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    srShowToast('✅ تمت إضافة المادة: ' + subject, 'success');
+    srShowToast('✅ تمت إضافة المادة: ' + subject + (teacherName ? ' — الأستاذ ' + teacherName : ''), 'success');
     await srLoadData();
     document.getElementById('sr-detail-modal').classList.remove('open');
     setTimeout(() => srShowDetail(id), 200);

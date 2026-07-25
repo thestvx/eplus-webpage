@@ -9,6 +9,9 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <script src="js/registrationService.js"></script>
+  <script src="js/subjectService.js"></script>
+  <script src="js/attendanceService.js"></script>
   <style>
     *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
     :root{
@@ -849,77 +852,57 @@
       zone.classList.add('active');
       resultEl.innerHTML='<div class="loading-page" style="min-height:200px"><div class="spinner"></div></div>';
       try{
-        let studentId=code.replace(/^EPLUS-/i,'').trim();
-        const res=await fetch(SUPABASE_URL+'/rest/v1/registrations?select=*&id=eq.'+encodeURIComponent(studentId)+'&limit=1',{
-          headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
-        });
-        if(!res.ok)throw new Error('HTTP '+res.status);
-        const data=await res.json();
-        if(!data||data.length===0){
-          resultEl.innerHTML='<div class="student-result" style="border-color:var(--red)"><div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:12px">❌</div><div style="font-size:16px;font-weight:900;color:var(--red)">طالب غير موجود</div><div style="font-size:13px;color:var(--text-muted);margin-top:6px">لم يتم العثور على طالب بهذا الرقم: '+code+'</div></div></div>';
-          setTimeout(()=>{zone.classList.remove('active');},2000);
-          return;
-        }
-        const r=data[0];
-        if(r.status!=='مسجل نهائياً'){
-          const reason=r.status==='مسجل مبدئياً'?'تسجيل الطالب لم يتم تأكيدده بعد':'تم إلغاء تسجيل هذا الطالب';
-          resultEl.innerHTML='<div class="student-result" style="border-color:var(--red)"><div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:12px">⛔</div><div style="font-size:16px;font-weight:900;color:var(--red)">بطاقة غير صالحة</div><div style="font-size:13px;color:var(--text-muted);margin-top:6px">'+reason+'</div></div></div>';
-          setTimeout(()=>{zone.classList.remove('active');},2000);
-          return;
-        }
+        const t=currentTeacher;
+        const teacherId=t.teacherId||t.id;
         const teacherName=t.name||'';
-        const teacherSubjects=Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s):[];
-        const studentSubjects=Array.isArray(r.subjects)?r.subjects:[];
-        const matchedSubjects=studentSubjects.filter(s=>{
-          const sn=s.subject||s;
-          const tn=s.teacher||'';
-          return teacherSubjects.some(ts=>ts===sn)&&(tn===teacherName||tn==='');
-        });
-        if(matchedSubjects.length===0){
-          resultEl.innerHTML='<div class="student-result" style="border-color:var(--gold)"><div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:12px">⚠️</div><div style="font-size:16px;font-weight:900;color:var(--gold)">لا توجد مواد مشتركة</div><div style="font-size:13px;color:var(--text-muted);margin-top:6px">الطالب '+((r.first_name||'')+' '+(r.last_name||''))+' غير مسجل في أي من موادك</div></div></div>';
+        const result=await AttendanceService.processScan(code,teacherId,teacherName);
+        if(!result.success){
+          if(result.type==='invalid'){
+            const icon=result.reason.includes('غير موجود')?'❌':'⛔';
+            const color=result.reason.includes('غير موجود')?'var(--red)':'var(--red)';
+            resultEl.innerHTML='<div class="student-result" style="border-color:var(--red)"><div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:12px">'+icon+'</div><div style="font-size:16px;font-weight:900;color:'+color+'">'+(result.reason.includes('غير موجود')?'طالب غير موجود':'بطاقة غير صالحة')+'</div><div style="font-size:13px;color:var(--text-muted);margin-top:6px">'+result.reason+'</div></div></div>';
+          }else if(result.type==='no_match'){
+            const s=result.student;
+            resultEl.innerHTML='<div class="student-result" style="border-color:var(--gold)"><div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:12px">⚠️</div><div style="font-size:16px;font-weight:900;color:var(--gold)">لا توجد مواد مشتركة</div><div style="font-size:13px;color:var(--text-muted);margin-top:6px">الطالب '+((s.first_name||'')+' '+(s.last_name||''))+' غير مسجل في أي من موادك</div></div></div>';
+          }
           setTimeout(()=>{zone.classList.remove('active');},2000);
           return;
         }
-        const fullName=((r.first_name||'')+' '+(r.last_name||'')).trim();
-        const today=new Date().toISOString().split('T')[0];
-        const now=new Date();
-        const timeStr=now.toLocaleTimeString('ar-DZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-        const attendanceRecords=[];
-        for(const s of matchedSubjects){
-          const subjectName=s.subject||s;
-          const snap=await db.collection(ATTENDANCE_COLLECTION).where('studentId','==',r.id).where('subject','==',subjectName).where('date','==',today).limit(1).get();
-          attendanceRecords.push({subject:subjectName,already:snap.docs.length>0,doc:snap.docs.length>0?snap.docs[0].data():null});
+        const s=result.student;
+        const fullName=((s.first_name||'')+' '+(s.last_name||'')).trim();
+        const timeStr=AttendanceService.nowTime();
+        if(result.type==='single_recorded'){
+          showToast('✅ تم تسجيل حضور الطالب بنجاح — '+result.results[0].subjectName,'success');
+          zone.classList.remove('active');
+          return;
         }
-        const allRecorded=attendanceRecords.every(a=>a.already);
-        let subjectsHtml=attendanceRecords.map(a=>{
-          if(a.already){
-            return '<div class="subject-attendance-item"><span style="font-size:18px">📚</span><div class="subject-attendance-name">'+a.subject+'</div><div class="subject-attendance-btn recorded">✅ مسجل مسبقاً</div></div>';
+        let subjectsHtml=result.results.map(a=>{
+          const icon=SubjectService.getSubjectIcon(a.subjectName);
+          if(a.alreadyRecorded){
+            return '<div class="subject-attendance-item"><span style="font-size:18px">'+icon+'</span><div class="subject-attendance-name">'+a.subjectName+'</div><div class="subject-attendance-btn recorded">✅ مسجل مسبقاً</div></div>';
           }else{
-            const safeSubject=a.subject.replace(/'/g,"\\'");
-            return '<div class="subject-attendance-item"><span style="font-size:18px">📚</span><div class="subject-attendance-name">'+a.subject+'</div><button class="subject-attendance-btn record" onclick="recordSingleAttendance(\''+r.id+'\',\''+teacherName.replace(/'/g,"\\'")+'\',\''+safeSubject+'\')">✅ تسجيل الحضور</button></div>';
+            const safeId=a.subjectId.replace(/'/g,"\\'");
+            const safeName=a.subjectName.replace(/'/g,"\\'");
+            return '<div class="subject-attendance-item"><span style="font-size:18px">'+icon+'</span><div class="subject-attendance-name">'+a.subjectName+'</div><button class="subject-attendance-btn record" onclick="recordSingleAttendance(\''+s.id+'\',\''+teacherId+'\',\''+teacherName.replace(/'/g,"\\'")+'\',\''+safeId+'\',\''+safeName+'\')">✅ تسجيل الحضور</button></div>';
           }
         }).join('');
-        if(matchedSubjects.length===1&&!allRecorded){
-          await recordSingleAttendance(r.id,teacherName,matchedSubjects[0].subject||matchedSubjects[0]);
-          return;
-        }
         resultEl.innerHTML=`
           <div class="student-result">
             <div class="student-result-header">
               <div class="student-result-avatar">${fullName.split(' ').map(w=>w[0]).join('').substring(0,2)}</div>
-              <div><div class="student-result-name">${fullName}</div><div class="student-result-id">Student ID: ${r.id}</div></div>
+              <div><div class="student-result-name">${fullName}</div><div class="student-result-id">Student ID: ${s.id}</div></div>
             </div>
             <div class="student-result-meta">
-              <div class="student-result-meta-item"><div class="student-result-meta-label">المستوى الدراسي</div><div class="student-result-meta-value">${r.level||'—'}</div></div>
-              <div class="student-result-meta-item"><div class="student-result-meta-label">الشعبة</div><div class="student-result-meta-value">${r.stream||'—'}</div></div>
-              <div class="student-result-meta-item"><div class="student-result-meta-label">حالة التسجيل</div><div class="student-result-meta-value" style="color:var(--green)">🟢 ${r.status}</div></div>
+              <div class="student-result-meta-item"><div class="student-result-meta-label">المستوى الدراسي</div><div class="student-result-meta-value">${s.level||'—'}</div></div>
+              <div class="student-result-meta-item"><div class="student-result-meta-label">الشعبة</div><div class="student-result-meta-value">${s.stream||'—'}</div></div>
+              <div class="student-result-meta-item"><div class="student-result-meta-label">حالة التسجيل</div><div class="student-result-meta-value" style="color:var(--green)">🟢 ${s.status}</div></div>
               <div class="student-result-meta-item"><div class="student-result-meta-label">الوقت</div><div class="student-result-meta-value" style="direction:ltr">${timeStr}</div></div>
             </div>
             <div style="padding:16px 24px 8px;font-size:13px;font-weight:800;color:var(--text-muted)">المواد عند الأستاذ ${teacherName}</div>
             ${subjectsHtml}
           </div>`;
         zone.classList.remove('active');
-        if(allRecorded){
+        if(result.allRecorded){
           showToast('تم تسجيل حضور هذا الطالب مسبقاً لهذه الحصة','info');
         }
       }catch(e){
@@ -929,37 +912,14 @@
       }
     }
 
-    async function recordSingleAttendance(studentId,teacherName,subjectName){
-      const resultEl=document.getElementById('attendance-result');
+    async function recordSingleAttendance(studentId,teacherId,teacherName,subjectId,subjectName){
       try{
-        const today=new Date().toISOString().split('T')[0];
-        const now=new Date();
-        const timeStr=now.toLocaleTimeString('ar-DZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-        const existing=await db.collection(ATTENDANCE_COLLECTION).where('studentId','==',studentId).where('subject','==',subjectName).where('date','==',today).limit(1).get();
-        if(!existing.empty){
-          showToast('تم تسجيل حضور هذا الطالب مسبقاً لهذه الحصة','info');
-          return;
+        const result=await AttendanceService.recordSingle(studentId,teacherId,teacherName,subjectId,subjectName);
+        if(result.success){
+          showToast('✅ تم تسجيل حضور الطالب بنجاح — '+subjectName,'success');
+        }else{
+          showToast(result.reason==='duplicate'?'تم تسجيل حضور هذا الطالب مسبقاً لهذه الحصة':result.message||'حدث خطأ','info');
         }
-        const regRes=await fetch(SUPABASE_URL+'/rest/v1/registrations?select=first_name,last_name,id,level,stream,institution&id=eq.'+encodeURIComponent(studentId)+'&limit=1',{
-          headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
-        });
-        const regData=await regRes.json();
-        const reg=regData[0]||{};
-        await db.collection(ATTENDANCE_COLLECTION).add({
-          studentId,
-          studentName:((reg.first_name||'')+' '+(reg.last_name||'')).trim(),
-          teacherId:currentTeacher.teacherId||currentTeacher.id,
-          teacherName,
-          subject:subjectName,
-          date:today,
-          time:timeStr,
-          status:'present',
-          level:reg.level||'',
-          stream:reg.stream||'',
-          institution:reg.institution||'',
-          createdAt:firebase.firestore.FieldValue.serverTimestamp()
-        });
-        showToast('✅ تم تسجيل حضور الطالب بنجاح — '+subjectName,'success');
       }catch(e){
         console.error('Record attendance error:',e);
         showToast('حدث خطأ أثناء تسجيل الحضور: '+e.message,'error');
@@ -995,8 +955,15 @@
           </div>
         </div>`;
       const subjectSel=document.getElementById('att-log-subject');
-      const teacherSubjects=Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s):[];
-      teacherSubjects.forEach(s=>{const opt=document.createElement('option');opt.value=s;opt.textContent=s;subjectSel.appendChild(opt);});
+      const teacherSubjects=Array.isArray(t.subjects)?t.subjects:[];
+      teacherSubjects.forEach(s=>{
+        const name=s.subject||s;
+        const id=s.subjectId||SubjectService.getSubjectId(name);
+        const icon=SubjectService.getSubjectIcon(name);
+        const opt=document.createElement('option');
+        opt.value=id;opt.textContent=icon+' '+name;
+        subjectSel.appendChild(opt);
+      });
       loadAttendanceLog();
     }
 
@@ -1009,18 +976,16 @@
       const countEl=document.getElementById('att-log-count');
       tableEl.innerHTML='<div class="loading-page" style="min-height:200px"><div class="spinner"></div></div>';
       try{
-        let query=db.collection(ATTENDANCE_COLLECTION).where('teacherId','==',teacherId);
-        const snap=await query.get();
-        let records=snap.docs.map(d=>({id:d.id,...d.data()}));
-        if(dateFilter)records=records.filter(r=>r.date===dateFilter);
-        if(subjectFilter)records=records.filter(r=>r.subject===subjectFilter);
-        records.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+        const filters={teacherId};
+        if(dateFilter)filters.date=dateFilter;
+        if(subjectFilter)filters.subjectId=subjectFilter;
+        const records=await AttendanceService.getRecords(filters);
         countEl.textContent=records.length+' سجل';
         if(records.length===0){
           tableEl.innerHTML='<div class="section-card"><div class="section-card-body"><div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">لا توجد سجلات حضور</div><div class="empty-state-sub">لم يتم تسجيل أي حضور بعد'+(dateFilter?' لهذا التاريخ':'')+'</div></div></div></div>';
           return;
         }
-        tableEl.innerHTML='<div class="section-card"><div class="section-card-body" style="padding:0;overflow-x:auto"><table class="data-table"><thead><tr><th>#</th><th>الاسم</th><th>Student ID</th><th>المادة</th><th>المستوى</th><th>التاريخ</th><th>الوقت</th><th>الحالة</th></tr></thead><tbody>'+records.map((r,i)=>'<tr><td style="font-weight:800;color:var(--text-muted)">'+(i+1)+'</td><td style="font-weight:700">'+(r.studentName||'')+'</td><td><code style="font-size:11px;background:var(--primary-light);padding:3px 10px;border-radius:6px;color:var(--primary)">'+r.studentId+'</code></td><td>'+r.subject+'</td><td style="font-size:12px">'+(r.level||'—')+'</td><td style="font-size:12px">'+r.date+'</td><td style="font-size:12px;direction:ltr">'+r.time+'</td><td><span style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;background:var(--green-light);color:var(--green)">🟢 حاضر</span></td></tr>').join('')+'</tbody></table></div></div>';
+        tableEl.innerHTML='<div class="section-card"><div class="section-card-body" style="padding:0;overflow-x:auto"><table class="data-table"><thead><tr><th>#</th><th>الاسم</th><th>Student ID</th><th>المادة</th><th>المستوى</th><th>التاريخ</th><th>وقت الدخول</th><th>وقت الخروج</th><th>الحالة</th></tr></thead><tbody>'+records.map((r,i)=>{const icon=SubjectService.getSubjectIcon(r.subjectName||'');return '<tr><td style="font-weight:800;color:var(--text-muted)">'+(i+1)+'</td><td style="font-weight:700">'+(r.studentName||'')+'</td><td><code style="font-size:11px;background:var(--primary-light);padding:3px 10px;border-radius:6px;color:var(--primary)">'+r.studentId+'</code></td><td>'+icon+' '+(r.subjectName||r.subjectId||'')+'</td><td style="font-size:12px">'+(r.level||'—')+'</td><td style="font-size:12px">'+r.date+'</td><td style="font-size:12px;direction:ltr">'+r.checkInTime+'</td><td style="font-size:12px;direction:ltr">'+(r.checkOutTime||'—')+'</td><td><span style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;background:var(--green-light);color:var(--green)">🟢 حاضر</span></td></tr>';}).join('')+'</tbody></table></div></div>';
       }catch(e){
         console.error('Attendance log error:',e);
         tableEl.innerHTML='<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">حدث خطأ أثناء تحميل سجل الحضور</div></div>';
