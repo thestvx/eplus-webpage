@@ -2973,8 +2973,10 @@
                   </div>
                   <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
                     <div id="sr-card-back-qr"></div>
-                    <div id="sr-card-back-barcode" style="display:flex;justify-content:center;background:#ffffff;border-radius:4px;padding:8px"></div>
                   </div>
+                </div>
+                <div style="position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center">
+                  <div id="sr-card-back-barcode" style="display:flex;justify-content:center;background:#ffffff;border-radius:4px;padding:6px"></div>
                 </div>
               </div>
             </div>
@@ -22377,7 +22379,8 @@ function srShowDetail(id) {
 
   let actionsHtml = '';
   if (isInitial) {
-    actionsHtml += `<button class="tbl-action" onclick="srShowConfirm('${r.id}')" style="border-color:rgba(16,185,129,0.3);color:#059669;font-weight:800;padding:8px 20px;font-size:12px">✅ تأكيد التسجيل النهائي</button>`;
+    actionsHtml += `<button class="tbl-action" onclick="srShowConfirm('${r.id}')" style="border-color:rgba(16,185,129,0.3);color:#059669;font-weight:800;padding:8px 20px;font-size:12px">✅ تأكيد وقبض الرسوم</button>`;
+    actionsHtml += `<button class="tbl-action" onclick="srConfirmFree('${r.id}')" style="border-color:rgba(245,158,11,0.3);color:#d97706;font-weight:800;padding:8px 20px;font-size:12px">🎁 تأكيد بدون رسوم + طباعة</button>`;
   } else {
     actionsHtml += `<button class="tbl-action" onclick="srReprintCard('${r.id}')" style="border-color:rgba(16,185,129,0.3);color:#059669;font-weight:800;padding:8px 20px;font-size:12px">🖨️ إعادة طباعة البطاقة</button>`;
     actionsHtml += `<button class="tbl-action" onclick="srUnregister('${r.id}')" style="border-color:rgba(220,38,38,0.3);color:#dc2626;font-weight:800;padding:8px 20px;font-size:12px">↩️ إلغاء التأكيد</button>`;
@@ -22500,6 +22503,33 @@ async function srDoConfirm() {
   btn.textContent = '✅ تأكيد وطباعة البطاقة';
 }
 
+// ═══ CONFIRM WITHOUT PAYMENT ═══
+async function srConfirmFree(id) {
+  const r = srAllData.find(x => x.id === id);
+  if (!r) return;
+  if (!(await cmConfirm('تأكيد بدون رسوم', 'هل أنت متأكد من تأكيد تسجيل هذا الطالب بدون قبض رسوم التسجيل؟\n\nسيتم:\n• تحويل الحالة إلى "مسجل نهائياً"\n• تفعيل بطاقة الطالب\n• فتح بوابة الطالب\n• لن تُضاف رسوم إلى الموارد المالية', '🎁'))) return;
+  try {
+    const patchData = { status: 'مسجل نهائياً' };
+    if (!r.student_token) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let token = '';
+      for (let i = 0; i < 32; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+      patchData.student_token = token;
+    }
+    const res = await srFetch(`${SR_SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patchData),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    srShowToast('✅ تم التأكيد بدون رسوم. الحالة: مسجل نهائياً', 'success');
+    await srLoadData();
+    const updated = srAllData.find(x => x.id === id) || r || { id, first_name: '', last_name: '' };
+    srShowCard(updated);
+  } catch (e) {
+    srShowToast('فشل التأكيد: ' + e.message, 'error');
+  }
+}
+
 // ═══ STUDENT CARD ═══
 function srBuildCardHTML(r) {
   return '';
@@ -22605,7 +22635,7 @@ function srPrintCard() {
           <div class="label" style="margin-top:6px">تاريخ التسجيل</div>
           <div class="value date">${today}</div>
         </div>
-        <div class="back-right" style="flex-direction:column;gap:8px">${qrImg ? `<img src="${qrImg}" width="80" height="80">` : ''}<div>${barcodeSvg}</div></div>
+        <div class="back-right" style="flex-direction:column;gap:8px">${qrImg ? `<img src="${qrImg}" width="80" height="80">` : ''}<div style="background:#ffffff;padding:6px;border-radius:4px">${barcodeSvg}</div></div>
       </div>
     </div>
     </body></html>`);
