@@ -8,7 +8,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
   <style>
     *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
     :root{
@@ -307,8 +306,12 @@
 
   <script>
     const firebaseConfig={apiKey:"AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",authDomain:"eplus-center-39.firebaseapp.com",projectId:"eplus-center-39",storageBucket:"eplus-center-39.firebasestorage.app",messagingSenderId:"191532732034",appId:"1:191532732034:web:b11449a2f0595db5d02e9b"};
-    let db,storage;
-    try{firebase.initializeApp(firebaseConfig);db=firebase.firestore();storage=firebase.storage();}catch(e){console.error('Firebase init error:',e);}
+    let db;
+    try{firebase.initializeApp(firebaseConfig);db=firebase.firestore();}catch(e){console.error('Firebase init error:',e);}
+
+    const SUPABASE_URL='https://jftfvpultaqufhsekdle.supabase.co';
+    const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzc1MjY3MywiZXhwIjoyMDk5MzI4NjczfQ.fsG8Y7mK2fpODGQ3SMibDDrgAAnW6e424-aSdoMcaMw';
+    const SUPABASE_STORAGE_BUCKET='teacher-content';
 
     const USERS_COLLECTION='users',SRT_COLLECTION='support_teachers',CONTENT_COLLECTION='teacher_content',REG_COLLECTION='support_registrations',FIN_COLLECTION='teacher_finance';
     const SESSION_KEY='eplus_teacher_session',SESSION_MAX_AGE=24*60*60*1000;
@@ -592,9 +595,25 @@
     }
     function removeFile(i){pendingFiles.splice(i,1);renderFileList();}
     async function uploadFileToStorage(fileObj,teacherId){
-      const path='support-content/'+teacherId+'/'+Date.now()+'_'+fileObj.name;
-      const ref=storage.ref(path),task=ref.put(fileObj.file);
-      return new Promise((resolve,reject)=>{task.on('state_changed',snap=>{const pct=Math.round((snap.bytesTransferred/snap.totalBytes)*100);fileObj.progress=pct;renderFileList();},err=>reject(err),async()=>{const url=await task.snapshot.ref.getDownloadURL();fileObj.uploaded=true;fileObj.url=url;fileObj.storagePath=path;fileObj.progress=100;renderFileList();resolve({name:fileObj.name,size:fileObj.size,type:fileObj.type,url,storagePath:path});});});
+      const path=teacherId+'/'+Date.now()+'_'+fileObj.name;
+      const url=SUPABASE_URL+'/storage/v1/object/'+SUPABASE_STORAGE_BUCKET+'/'+encodeURIComponent(path);
+      return new Promise((resolve,reject)=>{
+        const xhr=new XMLHttpRequest();
+        xhr.upload.addEventListener('progress',e=>{if(e.lengthComputable){fileObj.progress=Math.round((e.loaded/e.total)*100);renderFileList();}});
+        xhr.addEventListener('load',()=>{
+          if(xhr.status>=200&&xhr.status<300){
+            const pubUrl=SUPABASE_URL+'/storage/v1/object/public/'+SUPABASE_STORAGE_BUCKET+'/'+encodeURIComponent(path);
+            fileObj.uploaded=true;fileObj.url=pubUrl;fileObj.storagePath=path;fileObj.progress=100;renderFileList();
+            resolve({name:fileObj.name,size:fileObj.size,type:fileObj.type,url:pubUrl,storagePath:path});
+          }else{reject(new Error('Upload failed: '+xhr.status+' '+xhr.responseText));}
+        });
+        xhr.addEventListener('error',()=>reject(new Error('Network error during upload')));
+        xhr.open('POST',url);
+        xhr.setRequestHeader('apikey',SUPABASE_KEY);
+        xhr.setRequestHeader('Authorization','Bearer '+SUPABASE_KEY);
+        xhr.setRequestHeader('Content-Type',fileObj.type);
+        xhr.send(fileObj.file);
+      });
     }
     async function saveContent(){
       const t=currentTeacher,teacherId=t.teacherId||t.id;
