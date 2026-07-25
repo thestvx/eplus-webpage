@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>اختبار الباركود - E-PLUS</title>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Tajawal',system-ui,sans-serif;background:#f1f5f9;color:#1e293b;padding:20px}
+h1{text-align:center;font-size:24px;margin-bottom:8px}
+.subtitle{text-align:center;color:#64748b;margin-bottom:24px;font-size:14px}
+.panel{background:#fff;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+.panel h2{font-size:18px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e2e8f0}
+.input-row{display:flex;gap:10px;margin-bottom:16px;align-items:center}
+.input-row input{flex:1;padding:12px 16px;border:2px solid #e2e8f0;border-radius:8px;font-size:16px;font-family:monospace;direction:ltr;text-align:left}
+.input-row input:focus{outline:none;border-color:#6366f1}
+.input-row button{padding:12px 24px;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn-gen{background:#6366f1;color:#fff}
+.btn-gen:hover{background:#4f46e5}
+.btn-test{background:#10b981;color:#fff}
+.btn-test:hover{background:#059669}
+.btn-clear{background:#e2e8f0;color:#475569}
+.btn-clear:hover{background:#cbd5e1}
+.barcode-display{display:flex;justify-content:center;padding:20px;background:#fff;border:2px solid #e2e8f0;border-radius:8px;margin-bottom:16px;overflow:visible}
+.barcode-display svg{max-width:none!important;height:auto!important}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.info-box{padding:12px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0}
+.info-box .label{font-size:12px;color:#64748b;margin-bottom:4px}
+.info-box .value{font-family:monospace;font-size:16px;font-weight:700;color:#1e293b;word-break:break-all}
+.scale-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.scale-card{text-align:center}
+.scale-card .scale-label{font-size:13px;font-weight:700;color:#64748b;margin-bottom:8px}
+.scale-card .scale-box{background:#fff;border:2px solid #e2e8f0;border-radius:8px;padding:16px;display:flex;justify-content:center;overflow:visible}
+.scale-card .scale-box svg{max-width:none!important;height:auto!important}
+.log-area{background:#1e293b;color:#a5f3fc;border-radius:8px;padding:16px;font-family:monospace;font-size:13px;max-height:250px;overflow-y:auto;line-height:1.6}
+.log-entry{margin-bottom:2px}
+.log-entry.info{color:#67e8f9}
+.log-entry.success{color:#6ee7b7}
+.log-entry.error{color:#fca5a5}
+.log-entry.warn{color:#fde68a}
+.scan-input{font-size:24px;padding:16px;text-align:center;letter-spacing:2px;border:3px solid #10b981;background:#f0fdf4}
+.scan-input:focus{border-color:#6366f1;outline:none;box-shadow:0 0 0 3px rgba(99,102,241,0.2)}
+.status-bar{padding:8px 16px;border-radius:6px;font-size:13px;font-weight:700;text-align:center;margin-top:8px;display:none}
+.status-bar.show{display:block}
+.status-bar.success{background:#dcfce7;color:#166534}
+.status-bar.error{background:#fee2e2;color:#991b1b}
+.status-bar.info{background:#dbeafe;color:#1e40af}
+hr{border:none;border-top:1px solid #e2e8f0;margin:16px 0}
+</style>
+</head>
+<body>
+
+<h1>🔍 اختبار الباركود</h1>
+<p class="subtitle">صفحة مستقلة لاختبار توليد الباركود ومسحه بالجهاز</p>
+
+<!-- Scan Test Panel -->
+<div class="panel">
+  <h2>📷 اختبار المسح</h2>
+  <p style="color:#64748b;font-size:13px;margin-bottom:12px">امسح الباركود بالجهاز الآن — الإدخال سيركز هنا تلقائياً</p>
+  <div class="input-row">
+    <input type="text" id="scan-input" class="scan-input" placeholder="امسح الباركود هنا..." autofocus>
+  </div>
+  <div id="scan-status" class="status-bar"></div>
+</div>
+
+<!-- Generate Panel -->
+<div class="panel">
+  <h2>⚡ توليد باركود</h2>
+  <div class="input-row">
+    <input type="text" id="barcode-input" placeholder="أدخل قيمة الباركود (مثال: EPLUS-001)" value="EPLUS-123">
+    <button class="btn-gen" onclick="generate()">توليد</button>
+    <button class="btn-clear" onclick="clearAll()">مسح</button>
+  </div>
+  <div class="barcode-display" id="barcode-main"></div>
+  <div class="info-grid">
+    <div class="info-box">
+      <div class="label">القيمة الخام</div>
+      <div class="value" id="raw-value">—</div>
+    </div>
+    <div class="info-box">
+      <div class="label">القيمة بعد التنظيف</div>
+      <div class="value" id="clean-value">—</div>
+    </div>
+    <div class="info-box">
+      <div class="label">الطول</div>
+      <div class="value" id="char-count">—</div>
+    </div>
+    <div class="info-box">
+      <div class="label">الحالة</div>
+      <div class="value" id="gen-status">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- Scales Panel -->
+<div class="panel">
+  <h2>📏 مقاسات متعددة</h2>
+  <p style="color:#64748b;font-size:13px;margin-bottom:16px">باركود واحد بأربعة مقاسات مختلفة — جرّب مسح كل مقاس</p>
+  <div class="scale-grid">
+    <div class="scale-card">
+      <div class="scale-label">100% — الأصلي</div>
+      <div class="scale-box" id="scale-100"></div>
+    </div>
+    <div class="scale-card">
+      <div class="scale-label">150%</div>
+      <div class="scale-box" id="scale-150"></div>
+    </div>
+    <div class="scale-card">
+      <div class="scale-label">200%</div>
+      <div class="scale-box" id="scale-200"></div>
+    </div>
+    <div class="scale-card">
+      <div class="scale-label">300% — الأكبر</div>
+      <div class="scale-box" id="scale-300"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Raw SVG Panel -->
+<div class="panel">
+  <h2>🔎 تفاصيل SVG</h2>
+  <div class="info-grid">
+    <div class="info-box">
+      <div class="label">SVG width attribute</div>
+      <div class="value" id="svg-width">—</div>
+    </div>
+    <div class="info-box">
+      <div class="label">SVG height attribute</div>
+      <div class="value" id="svg-height">—</div>
+    </div>
+    <div class="info-box">
+      <div class="label">Computed width (px)</div>
+      <div class="value" id="svg-computed-w">—</div>
+    </div>
+    <div class="info-box">
+      <div class="label">Computed height (px)</div>
+      <div class="value" id="svg-computed-h">—</div>
+    </div>
+    <div class="info-box">
+      <div class="label">Number of bars</div>
+      <div class="value" id="bar-count">—</div>
+    </div>
+    <div class="info-box">
+      <div class="label">Barcode text</div>
+      <div class="value" id="barcode-text">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- Log Panel -->
+<div class="panel">
+  <h2>📋 السجل</h2>
+  <div class="log-area" id="log-area">
+    <div class="log-entry info">جاهز. اكتب قيمة واضغط Enter أو امسح باركود بالجهاز.</div>
+  </div>
+</div>
+
+<script>
+const scanInput = document.getElementById('scan-input');
+const barcodeInput = document.getElementById('barcode-input');
+
+function log(msg, type='info') {
+  const el = document.getElementById('log-area');
+  const time = new Date().toLocaleTimeString('ar-DZ');
+  el.innerHTML += `<div class="log-entry ${type}">[${time}] ${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+  console.log(`[BarcodeTest] [${type}] ${msg}`);
+}
+
+function showStatus(msg, type='info') {
+  const el = document.getElementById('scan-status');
+  el.textContent = msg;
+  el.className = 'status-bar show ' + type;
+}
+
+function makeBarcode(value, container, opts) {
+  container.innerHTML = '';
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  container.appendChild(svg);
+  JsBarcode(svg, value, {
+    format: 'CODE128',
+    displayValue: true,
+    lineColor: '#000000',
+    background: '#ffffff',
+    width: opts.width || 2.5,
+    height: opts.height || 80,
+    margin: opts.margin || 20,
+    fontSize: opts.fontSize || 16,
+    font: 'monospace',
+    fontOptions: 'bold',
+    textMargin: 6,
+    xmlDocument: document,
+  });
+  return svg;
+}
+
+function generate() {
+  const val = barcodeInput.value.trim();
+  if (!val) { log('أدخل قيمة أولاً', 'error'); return; }
+
+  log('توليد باركود: ' + val, 'info');
+
+  try {
+    const svg = makeBarcode(val, document.getElementById('barcode-main'), {});
+
+    document.getElementById('raw-value').textContent = val;
+    document.getElementById('clean-value').textContent = val.replace(/^EPLUS-/i, '').trim();
+    document.getElementById('char-count').textContent = val.length + ' حرف';
+    document.getElementById('gen-status').textContent = '✅ تم التوليد';
+    document.getElementById('gen-status').style.color = '#16a34a';
+
+    document.getElementById('svg-width').textContent = svg.getAttribute('width') + ' px';
+    document.getElementById('svg-height').textContent = svg.getAttribute('height') + ' px';
+    const rect = svg.getBoundingClientRect();
+    document.getElementById('svg-computed-w').textContent = Math.round(rect.width) + ' px';
+    document.getElementById('svg-computed-h').textContent = Math.round(rect.height) + ' px';
+    const rects = svg.querySelectorAll('rect');
+    document.getElementById('bar-count').textContent = rects.length;
+    const textEl = svg.querySelector('text');
+    document.getElementById('barcode-text').textContent = textEl ? textEl.textContent : '—';
+
+    log('SVG أبعاد: ' + svg.getAttribute('width') + ' x ' + svg.getAttribute('height'), 'success');
+    log('DOM أبعاد: ' + Math.round(rect.width) + ' x ' + Math.round(rect.height) + ' px', 'success');
+
+    makeBarcode(val, document.getElementById('scale-100'), { width: 2.5, height: 80, margin: 20, fontSize: 16 });
+    makeBarcode(val, document.getElementById('scale-150'), { width: 3.75, height: 120, margin: 30, fontSize: 24 });
+    makeBarcode(val, document.getElementById('scale-200'), { width: 5, height: 160, margin: 40, fontSize: 32 });
+    makeBarcode(val, document.getElementById('scale-300'), { width: 7.5, height: 240, margin: 60, fontSize: 48 });
+
+    log('تم توليد 4 مقاسات', 'success');
+  } catch(e) {
+    document.getElementById('gen-status').textContent = '❌ خطأ';
+    document.getElementById('gen-status').style.color = '#dc2626';
+    log('خطأ في التوليد: ' + e.message, 'error');
+  }
+}
+
+function clearAll() {
+  barcodeInput.value = '';
+  document.getElementById('barcode-main').innerHTML = '';
+  document.getElementById('scale-100').innerHTML = '';
+  document.getElementById('scale-150').innerHTML = '';
+  document.getElementById('scale-200').innerHTML = '';
+  document.getElementById('scale-300').innerHTML = '';
+  document.getElementById('raw-value').textContent = '—';
+  document.getElementById('clean-value').textContent = '—';
+  document.getElementById('char-count').textContent = '—';
+  document.getElementById('gen-status').textContent = '—';
+  document.getElementById('svg-width').textContent = '—';
+  document.getElementById('svg-height').textContent = '—';
+  document.getElementById('svg-computed-w').textContent = '—';
+  document.getElementById('svg-computed-h').textContent = '—';
+  document.getElementById('bar-count').textContent = '—';
+  document.getElementById('barcode-text').textContent = '—';
+  log('تم المسح', 'info');
+}
+
+barcodeInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') { generate(); }
+});
+
+scanInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    const val = scanInput.value.trim();
+    if (!val) return;
+    log('مسح الجهاز: ' + val, 'success');
+    showStatus('تم المسح: ' + val, 'success');
+
+    const clean = val.replace(/^EPLUS-/i, '').trim();
+    log('قيمة بعد التنظيف: ' + clean, 'info');
+
+    barcodeInput.value = val;
+    generate();
+
+    scanInput.value = '';
+    setTimeout(() => scanInput.focus(), 50);
+  }
+});
+
+let scanBuffer = '';
+let scanTimer = null;
+scanInput.addEventListener('keypress', function(e) {
+  scanBuffer += e.key;
+  clearTimeout(scanTimer);
+  scanTimer = setTimeout(() => { scanBuffer = ''; }, 100);
+});
+
+log('الصفحة جاهزة', 'success');
+log(' JsBarcode نسخة: ' + (typeof JsBarcode !== 'undefined' ? 'محمل' : 'غير محمل'), typeof JsBarcode !== 'undefined' ? 'success' : 'error');
+
+barcodeInput.focus();
+scanInput.focus();
+</script>
+</body>
+</html>
