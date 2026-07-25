@@ -8,6 +8,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
   <style>
     *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
     :root{
@@ -293,6 +294,59 @@
       .main-header{padding:0 16px}
       .content-grid{grid-template-columns:1fr}
     }
+    /* ===== CUSTOM MODAL SYSTEM ===== */
+    .cm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .25s}.cm-overlay.open{opacity:1;pointer-events:auto}
+    .cm-box{background:var(--card);border-radius:var(--radius);padding:32px 28px;max-width:420px;width:92%;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,0.15);transform:translateY(16px);transition:transform .3s cubic-bezier(.22,1,.36,1)}.cm-overlay.open .cm-box{transform:translateY(0)}
+    .cm-icon{font-size:48px;margin-bottom:12px;line-height:1}
+    .cm-title{font-size:18px;font-weight:900;color:var(--text);margin-bottom:8px}
+    .cm-desc{font-size:13px;color:var(--text-muted);line-height:1.7;margin-bottom:20px}
+    .cm-actions{display:flex;gap:10px;justify-content:center}
+    .cm-btn{padding:10px 28px;border:none;border-radius:var(--radius-xs);font-size:14px;font-weight:800;cursor:pointer;transition:var(--transition);font-family:'Tajawal',sans-serif}
+    .cm-btn-cancel{background:var(--bg);color:var(--text-muted);border:1.5px solid var(--border)}.cm-btn-cancel:hover{background:var(--border)}
+    .cm-btn-confirm{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;box-shadow:0 4px 14px rgba(99,102,241,0.25)}.cm-btn-confirm:hover{transform:translateY(-1px)}
+    .cm-btn-danger{background:linear-gradient(135deg,var(--red),#b91c1c);color:#fff}.cm-btn-danger:hover{transform:translateY(-1px)}
+    .cm-btn-success{background:linear-gradient(135deg,var(--green),#047857);color:#fff}.cm-btn-success:hover{transform:translateY(-1px)}
+
+    /* ===== TOAST ===== */
+    .toast-wrap{position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+    .toast{padding:14px 24px;border-radius:var(--radius-sm);font-size:13px;font-weight:700;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,0.15);pointer-events:auto;animation:toastIn .3s cubic-bezier(.22,1,.36,1);display:flex;align-items:center;gap:10px;max-width:420px}
+    .toast.success{background:linear-gradient(135deg,#059669,#10b981)}.toast.error{background:linear-gradient(135deg,#dc2626,#ef4444)}.toast.info{background:linear-gradient(135deg,#6366f1,#818cf8)}
+    @keyframes toastIn{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes toastOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-16px)}}
+
+    /* ===== ATTENDANCE PAGE ===== */
+    .scanner-zone{background:var(--card);border-radius:var(--radius);border:2px dashed var(--primary);padding:40px 24px;text-align:center;transition:var(--transition);margin-bottom:24px}
+    .scanner-zone.active{border-style:solid;border-color:var(--green);background:var(--green-light);animation:pulse 1.5s ease-in-out infinite}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(5,150,105,0.15)}50%{box-shadow:0 0 0 12px rgba(5,150,105,0)}}
+    .scanner-icon{font-size:48px;margin-bottom:12px;opacity:.5}
+    .scanner-label{font-size:16px;font-weight:800;color:var(--text);margin-bottom:6px}
+    .scanner-hint{font-size:12px;color:var(--text-muted);margin-bottom:16px}
+    .scanner-input{width:100%;max-width:400px;padding:16px 20px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:20px;font-weight:800;text-align:center;font-family:monospace;color:var(--text);background:var(--bg);transition:var(--transition);direction:ltr;letter-spacing:2px}
+    .scanner-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 4px rgba(99,102,241,0.1);background:var(--card)}
+    .scanner-input::placeholder{color:var(--text-secondary);letter-spacing:0;font-size:16px}
+    .student-result{background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);overflow:hidden;animation:fadeSlideUp .4s both}
+    .student-result-header{padding:24px;display:flex;align-items:center;gap:20px;background:linear-gradient(135deg,#1e1b4b,#312e81);color:#fff}
+    .student-result-avatar{width:64px;height:64px;border-radius:16px;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;flex-shrink:0}
+    .student-result-name{font-size:20px;font-weight:900}
+    .student-result-id{font-size:12px;opacity:.5;font-family:monospace;margin-top:2px}
+    .student-result-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;padding:20px 24px;border-bottom:1px solid var(--border-light)}
+    .student-result-meta-item{background:var(--bg);border-radius:var(--radius-xs);padding:12px 14px}
+    .student-result-meta-label{font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px}
+    .student-result-meta-value{font-size:13px;font-weight:800}
+    .subject-attendance-item{display:flex;align-items:center;gap:14px;padding:16px 24px;border-bottom:1px solid var(--border-light);transition:var(--transition)}
+    .subject-attendance-item:last-child{border-bottom:none}
+    .subject-attendance-item:hover{background:var(--primary-light)}
+    .subject-attendance-name{flex:1;font-size:14px;font-weight:800}
+    .subject-attendance-btn{padding:10px 24px;border:none;border-radius:var(--radius-xs);font-size:13px;font-weight:800;cursor:pointer;transition:var(--transition);font-family:'Tajawal',sans-serif;display:flex;align-items:center;gap:6px}
+    .subject-attendance-btn.record{background:linear-gradient(135deg,var(--green),#047857);color:#fff;box-shadow:0 3px 12px rgba(5,150,105,0.2)}.subject-attendance-btn.record:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(5,150,105,0.3)}
+    .subject-attendance-btn.recorded{background:var(--green-light);color:var(--green);border:1.5px solid rgba(5,150,105,0.2);cursor:default}
+    .subject-attendance-btn.blocked{background:var(--red-light);color:var(--red);border:1.5px solid rgba(220,38,38,0.15);cursor:default}
+
+    /* ===== FILTER BAR ===== */
+    .filter-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
+    .filter-bar select,.filter-bar input{padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:13px;font-weight:600;color:var(--text);background:var(--card);font-family:'Tajawal',sans-serif;transition:var(--transition)}
+    .filter-bar select:focus,.filter-bar input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(99,102,241,0.08)}
+
   </style>
 </head>
 <body>
@@ -304,6 +358,22 @@
 
   <div class="modal-bg" id="content-modal"><div class="modal"><div class="modal-header"><div class="modal-title" id="content-modal-title">إضافة محتوى جديد</div><button class="modal-close" onclick="closeContentModal()">✕</button></div><div class="modal-body" id="content-modal-body"></div></div></div>
 
+  <!-- CUSTOM MODAL SYSTEM -->
+  <div class="cm-overlay" id="cm-overlay">
+    <div class="cm-box">
+      <div class="cm-icon" id="cm-icon"></div>
+      <div class="cm-title" id="cm-title"></div>
+      <div class="cm-desc" id="cm-desc"></div>
+      <div class="cm-actions">
+        <button class="cm-btn cm-btn-cancel" id="cm-cancel-btn" onclick="cmResolve(false)">إلغاء</button>
+        <button class="cm-btn cm-btn-confirm" id="cm-confirm-btn" onclick="cmResolve(true)">تأكيد</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-wrap" id="toast-wrap"></div>
+
   <script>
     const firebaseConfig={apiKey:"AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",authDomain:"eplus-center-39.firebaseapp.com",projectId:"eplus-center-39",storageBucket:"eplus-center-39.firebasestorage.app",messagingSenderId:"191532732034",appId:"1:191532732034:web:b11449a2f0595db5d02e9b"};
     let db;
@@ -313,7 +383,7 @@
     const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzc1MjY3MywiZXhwIjoyMDk5MzI4NjczfQ.fsG8Y7mK2fpODGQ3SMibDDrgAAnW6e424-aSdoMcaMw';
     const SUPABASE_STORAGE_BUCKET='teacher-content';
 
-    const USERS_COLLECTION='users',SRT_COLLECTION='support_teachers',CONTENT_COLLECTION='teacher_content',REG_COLLECTION='support_registrations',FIN_COLLECTION='teacher_finance';
+    const USERS_COLLECTION='users',SRT_COLLECTION='support_teachers',CONTENT_COLLECTION='teacher_content',REG_COLLECTION='support_registrations',FIN_COLLECTION='teacher_finance',ATTENDANCE_COLLECTION='support_attendance';
     const SESSION_KEY='eplus_teacher_session',SESSION_MAX_AGE=24*60*60*1000;
     const TYPE_LABELS={lesson:'📚 درس',exercise:'📝 تمارين',homework:'📋 واجبات',announcement:'📢 إعلان'};
     const TYPE_COLORS={lesson:'blue',exercise:'green',homework:'gold',announcement:'purple'};
@@ -331,6 +401,37 @@
 
     function togglePassVisibility(id,btn){const inp=document.getElementById(id);if(inp.type==='password'){inp.type='text';btn.textContent='🙈';}else{inp.type='password';btn.textContent='👁️';}inp.focus();}
 
+    /* ===== CUSTOM MODAL SYSTEM ===== */
+    let cmResolve=null;
+    function cmShow(icon,title,desc,opts={}){
+      return new Promise(resolve=>{
+        document.getElementById('cm-icon').textContent=icon;
+        document.getElementById('cm-title').textContent=title;
+        document.getElementById('cm-desc').innerHTML=desc;
+        const cancelBtn=document.getElementById('cm-cancel-btn');
+        const confirmBtn=document.getElementById('cm-confirm-btn');
+        cancelBtn.style.display=opts.hideCancel?'none':'inline-block';
+        cancelBtn.textContent=opts.cancelText||'إلغاء';
+        confirmBtn.textContent=opts.confirmText||'تأكيد';
+        confirmBtn.className='cm-btn '+(opts.danger?'cm-btn-danger':opts.success?'cm-btn-success':'cm-btn-confirm');
+        document.getElementById('cm-overlay').classList.add('open');
+        cmResolve=(val)=>{document.getElementById('cm-overlay').classList.remove('open');resolve(val);};
+        setTimeout(()=>confirmBtn.focus(),100);
+      });
+    }
+    function cmAlert(title,desc,icon='✅'){return cmShow(icon,title,desc,{hideCancel:true,confirmText:'موافق'});}
+    function cmConfirm(title,desc,icon='⚠️',opts={}){return cmShow(icon,title,desc,{...opts});}
+
+    /* ===== TOAST SYSTEM ===== */
+    function showToast(msg,type='success'){
+      const wrap=document.getElementById('toast-wrap');if(!wrap)return;
+      const el=document.createElement('div');
+      el.className='toast '+type;
+      el.innerHTML='<span>'+(type==='success'?'✅':type==='error'?'❌':'ℹ️')+'</span><span>'+msg+'</span>';
+      wrap.appendChild(el);
+      setTimeout(()=>{el.style.animation='toastOut .3s forwards';setTimeout(()=>el.remove(),300);},3500);
+    }
+
     /* ===== SIDEBAR ===== */
     function renderSidebar(t){
       const name=t.name||'الأستاذ',initials=name.split(' ').map(w=>w[0]).join('').substring(0,2)||'م';
@@ -346,6 +447,8 @@
           <div class="sidebar-link ${currentPage==='content'?'active':''}" onclick="navigateTo('content')"><span class="sidebar-link-icon">📚</span>المحتوى التعليمي</div>
           <div class="sidebar-link ${currentPage==='students'?'active':''}" onclick="navigateTo('students')"><span class="sidebar-link-icon">👥</span>الطلاب</div>
           <div class="sidebar-link ${currentPage==='finance'?'active':''}" onclick="navigateTo('finance')"><span class="sidebar-link-icon">💰</span>الموارد المالية</div>
+          <div class="sidebar-link ${currentPage==='attendance'?'active':''}" onclick="navigateTo('attendance')"><span class="sidebar-link-icon">📷</span>تسجيل الحضور</div>
+          <div class="sidebar-link ${currentPage==='attendance-log'?'active':''}" onclick="navigateTo('attendance-log')"><span class="sidebar-link-icon">📋</span>سجل الحضور</div>
         </div>
         <div class="sidebar-footer"><button class="sidebar-logout" onclick="handleLogout()">🚪 تسجيل الخروج</button></div>`;
     }
@@ -359,14 +462,14 @@
         <div class="header-spacer"></div>
         <div class="header-search"><span class="header-search-icon">🔍</span><input type="text" placeholder="بحث..." id="header-search-input" onkeyup="handleGlobalSearch(this.value)"></div>
         <a href="index.html" class="header-home">🏠 <span>الرئيسية</span></a>
-        <button class="header-notify" onclick="alert('لا توجد إشعارات جديدة')"><span>🔔</span><span class="header-notify-dot"></span></button>
+        <button class="header-notify" onclick="showToast('لا توجد إشعارات جديدة','info')"><span>🔔</span><span class="header-notify-dot"></span></button>
         <div class="header-avatar" title="${name}">${initials}</div>
         <button class="header-logout" onclick="handleLogout()">🚪 <span>خروج</span></button>`;
     }
 
     /* ===== NAVIGATION ===== */
     function navigateTo(p){currentPage=p;closeMobileSidebar();renderCurrentPage();}
-    function renderCurrentPage(){if(!currentTeacher)return;if(currentPage==='content')renderContentPage();else if(currentPage==='students')renderStudentsPage();else if(currentPage==='finance')renderFinancePage();else renderDashboard(currentTeacher);}
+    function renderCurrentPage(){if(!currentTeacher)return;if(currentPage==='content')renderContentPage();else if(currentPage==='students')renderStudentsPage();else if(currentPage==='finance')renderFinancePage();else if(currentPage==='attendance')renderAttendancePage();else if(currentPage==='attendance-log')renderAttendanceLogPage();else renderDashboard(currentTeacher);}
 
     function openMobileSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebar-overlay').classList.add('open');}
     function closeMobileSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebar-overlay').classList.remove('open');}
@@ -581,9 +684,9 @@
     }
     function handleFiles(fileList){
       for(const file of fileList){
-        if(!ALLOWED_TYPES.includes(file.type)){alert('نوع الملف غير مدعوم: '+file.name);continue;}
-        if(file.size>MAX_FILE_SIZE){alert('الملف كبير جداً: '+file.name+' (حد أقصى 50MB)');continue;}
-        if(pendingFiles.length>=10){alert('حد أقصى 10 ملفات');break;}
+        if(!ALLOWED_TYPES.includes(file.type)){showToast('نوع الملف غير مدعوم: '+file.name,'error');continue;}
+        if(file.size>MAX_FILE_SIZE){showToast('الملف كبير جداً: '+file.name+' (حد أقصى 50MB)','error');continue;}
+        if(pendingFiles.length>=10){showToast('حد أقصى 10 ملفات','error');break;}
         pendingFiles.push({file,name:file.name,size:file.size,type:file.type,progress:0,uploaded:false,url:''});
       }
       renderFileList();
@@ -619,15 +722,15 @@
       const t=currentTeacher,teacherId=t.teacherId||t.id;
       const type=document.getElementById('cnt-type').value,subject=document.getElementById('cnt-subject').value,level=document.getElementById('cnt-level').value;
       const title=document.getElementById('cnt-title').value.trim(),description=document.getElementById('cnt-desc').value.trim(),url=document.getElementById('cnt-url').value.trim();
-      if(!title){alert('الرجاء إدخال عنوان');return;}
+      if(!title){showToast('الرجاء إدخال عنوان','error');return;}
       const btn=document.getElementById('cnt-save-btn');btn.disabled=true;btn.textContent='⏳ جاري الحفظ...';
       try{const attachments=[];for(const f of pendingFiles){if(!f.uploaded){const result=await uploadFileToStorage(f,teacherId);attachments.push(result);}else{attachments.push({name:f.name,size:f.size,type:f.type,url:f.url,storagePath:f.storagePath});}}
         await db.collection(CONTENT_COLLECTION).add({teacherId,teacherName:t.name||'',type,subject,level,title,description,url:url||'',attachments,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
         closeContentModal();if(currentPage==='content')renderContentPage();
-      }catch(e){console.error('Save content error:',e);alert('حدث خطأ أثناء الحفظ: '+e.message);}
+      }catch(e){console.error('Save content error:',e);showToast('حدث خطأ أثناء الحفظ: '+e.message,'error');}
       btn.disabled=false;btn.textContent='💾 حفظ المحتوى';
     }
-    async function deleteContent(id){if(!confirm('هل أنت متأكد من حذف هذا المحتوى؟'))return;try{await db.collection(CONTENT_COLLECTION).doc(id).delete();if(currentPage==='content')renderContentPage();}catch(e){console.error('Delete error:',e);}}
+    async function deleteContent(id){if(!await cmConfirm('حذف المحتوى','هل أنت متأكد من حذف هذا المحتوى؟','🗑️',{danger:true,confirmText:'حذف'}))return;try{await db.collection(CONTENT_COLLECTION).doc(id).delete();if(currentPage==='content')renderContentPage();}catch(e){console.error('Delete error:',e);}}
     function closeContentModal(){document.getElementById('content-modal').classList.remove('open');pendingFiles=[];}
 
     /* ===== STUDENTS PAGE ===== */
@@ -686,6 +789,242 @@
         document.getElementById('finance-content').innerHTML=`<div class="balance-card"><div class="balance-label">💰 الرصيد الحالي</div><div class="balance-amount">${fmtNum(balance)}</div><div class="balance-currency">دينار جزائري (دج)</div></div>
           <div style="text-align:center;padding:32px 20px;color:var(--text-muted);font-size:13px;font-weight:600;margin-top:28px"><div style="font-size:40px;margin-bottom:12px;opacity:.3">📊</div>سيتم تطوير قسم المالية ليشمل سجل العمليات والأرباح والتقارير</div>`;
       }catch(e){console.error('Finance error:',e);document.getElementById('finance-content').innerHTML='<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">حدث خطأ</div></div>';}
+    }
+
+    /* ===== ATTENDANCE PAGE (SCAN) ===== */
+    let attendanceScanTimeout=null;
+    function renderAttendancePage(){
+      currentTeacher=currentTeacher||{};const t=currentTeacher;
+      currentPage='attendance';
+      document.getElementById('app').innerHTML=`
+        <div class="app-layout">
+          <aside class="sidebar" id="sidebar">${renderSidebar(t)}</aside>
+          <div class="main-area">
+            <header class="main-header">${renderHeader(t)}</header>
+            <div class="main-scroll">
+              <div class="content-inner">
+                <div class="page-header">
+                  <div><div class="page-title"><span class="page-title-icon">📷</span>تسجيل الحضور</div><div class="page-subtitle">مرر بطاقة الطالب على جهاز Barcode Scanner</div></div>
+                </div>
+                <div class="scanner-zone" id="scanner-zone">
+                  <div class="scanner-icon">📷</div>
+                  <div class="scanner-label">جاهز لمسح البطاقة</div>
+                  <div class="scanner-hint">مرر بطاقة الطالب أو اكتب الرقم يدوياً</div>
+                  <input type="text" class="scanner-input" id="scanner-input" placeholder="EPLUS-XXXX" autocomplete="off" autofocus>
+                </div>
+                <div id="attendance-result"></div>
+                <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      setTimeout(()=>{
+        const inp=document.getElementById('scanner-input');
+        if(inp)inp.focus();
+      },100);
+      const inp=document.getElementById('scanner-input');
+      inp.addEventListener('keydown',e=>{
+        if(e.key==='Enter'){
+          e.preventDefault();
+          const val=inp.value.trim();
+          if(val)handleBarcodeScan(val);
+          inp.value='';
+        }
+      });
+      inp.addEventListener('input',()=>{
+        clearTimeout(attendanceScanTimeout);
+        const val=inp.value.trim();
+        if(val.length>8){
+          attendanceScanTimeout=setTimeout(()=>{if(val)handleBarcodeScan(val);inp.value='';},300);
+        }
+      });
+      document.addEventListener('click',function focusScanner(){
+        if(currentPage==='attendance'){const i=document.getElementById('scanner-input');if(i)i.focus();}
+      });
+    }
+
+    async function handleBarcodeScan(code){
+      const resultEl=document.getElementById('attendance-result');
+      const zone=document.getElementById('scanner-zone');
+      zone.classList.add('active');
+      resultEl.innerHTML='<div class="loading-page" style="min-height:200px"><div class="spinner"></div></div>';
+      try{
+        let studentId=code.replace(/^EPLUS-/i,'').trim();
+        const res=await fetch(SUPABASE_URL+'/rest/v1/registrations?select=*&id=eq.'+encodeURIComponent(studentId)+'&limit=1',{
+          headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+        });
+        if(!res.ok)throw new Error('HTTP '+res.status);
+        const data=await res.json();
+        if(!data||data.length===0){
+          resultEl.innerHTML='<div class="student-result" style="border-color:var(--red)"><div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:12px">❌</div><div style="font-size:16px;font-weight:900;color:var(--red)">طالب غير موجود</div><div style="font-size:13px;color:var(--text-muted);margin-top:6px">لم يتم العثور على طالب بهذا الرقم: '+code+'</div></div></div>';
+          setTimeout(()=>{zone.classList.remove('active');},2000);
+          return;
+        }
+        const r=data[0];
+        if(r.status!=='مسجل نهائياً'){
+          const reason=r.status==='مسجل مبدئياً'?'تسجيل الطالب لم يتم تأكيدده بعد':'تم إلغاء تسجيل هذا الطالب';
+          resultEl.innerHTML='<div class="student-result" style="border-color:var(--red)"><div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:12px">⛔</div><div style="font-size:16px;font-weight:900;color:var(--red)">بطاقة غير صالحة</div><div style="font-size:13px;color:var(--text-muted);margin-top:6px">'+reason+'</div></div></div>';
+          setTimeout(()=>{zone.classList.remove('active');},2000);
+          return;
+        }
+        const teacherName=t.name||'';
+        const teacherSubjects=Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s):[];
+        const studentSubjects=Array.isArray(r.subjects)?r.subjects:[];
+        const matchedSubjects=studentSubjects.filter(s=>{
+          const sn=s.subject||s;
+          const tn=s.teacher||'';
+          return teacherSubjects.some(ts=>ts===sn)&&(tn===teacherName||tn==='');
+        });
+        if(matchedSubjects.length===0){
+          resultEl.innerHTML='<div class="student-result" style="border-color:var(--gold)"><div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:12px">⚠️</div><div style="font-size:16px;font-weight:900;color:var(--gold)">لا توجد مواد مشتركة</div><div style="font-size:13px;color:var(--text-muted);margin-top:6px">الطالب '+((r.first_name||'')+' '+(r.last_name||''))+' غير مسجل في أي من موادك</div></div></div>';
+          setTimeout(()=>{zone.classList.remove('active');},2000);
+          return;
+        }
+        const fullName=((r.first_name||'')+' '+(r.last_name||'')).trim();
+        const today=new Date().toISOString().split('T')[0];
+        const now=new Date();
+        const timeStr=now.toLocaleTimeString('ar-DZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        const attendanceRecords=[];
+        for(const s of matchedSubjects){
+          const subjectName=s.subject||s;
+          const snap=await db.collection(ATTENDANCE_COLLECTION).where('studentId','==',r.id).where('subject','==',subjectName).where('date','==',today).limit(1).get();
+          attendanceRecords.push({subject:subjectName,already:snap.docs.length>0,doc:snap.docs.length>0?snap.docs[0].data():null});
+        }
+        const allRecorded=attendanceRecords.every(a=>a.already);
+        let subjectsHtml=attendanceRecords.map(a=>{
+          if(a.already){
+            return '<div class="subject-attendance-item"><span style="font-size:18px">📚</span><div class="subject-attendance-name">'+a.subject+'</div><div class="subject-attendance-btn recorded">✅ مسجل مسبقاً</div></div>';
+          }else{
+            const safeSubject=a.subject.replace(/'/g,"\\'");
+            return '<div class="subject-attendance-item"><span style="font-size:18px">📚</span><div class="subject-attendance-name">'+a.subject+'</div><button class="subject-attendance-btn record" onclick="recordSingleAttendance(\''+r.id+'\',\''+teacherName.replace(/'/g,"\\'")+'\',\''+safeSubject+'\')">✅ تسجيل الحضور</button></div>';
+          }
+        }).join('');
+        if(matchedSubjects.length===1&&!allRecorded){
+          await recordSingleAttendance(r.id,teacherName,matchedSubjects[0].subject||matchedSubjects[0]);
+          return;
+        }
+        resultEl.innerHTML=`
+          <div class="student-result">
+            <div class="student-result-header">
+              <div class="student-result-avatar">${fullName.split(' ').map(w=>w[0]).join('').substring(0,2)}</div>
+              <div><div class="student-result-name">${fullName}</div><div class="student-result-id">Student ID: ${r.id}</div></div>
+            </div>
+            <div class="student-result-meta">
+              <div class="student-result-meta-item"><div class="student-result-meta-label">المستوى الدراسي</div><div class="student-result-meta-value">${r.level||'—'}</div></div>
+              <div class="student-result-meta-item"><div class="student-result-meta-label">الشعبة</div><div class="student-result-meta-value">${r.stream||'—'}</div></div>
+              <div class="student-result-meta-item"><div class="student-result-meta-label">حالة التسجيل</div><div class="student-result-meta-value" style="color:var(--green)">🟢 ${r.status}</div></div>
+              <div class="student-result-meta-item"><div class="student-result-meta-label">الوقت</div><div class="student-result-meta-value" style="direction:ltr">${timeStr}</div></div>
+            </div>
+            <div style="padding:16px 24px 8px;font-size:13px;font-weight:800;color:var(--text-muted)">المواد عند الأستاذ ${teacherName}</div>
+            ${subjectsHtml}
+          </div>`;
+        zone.classList.remove('active');
+        if(allRecorded){
+          showToast('تم تسجيل حضور هذا الطالب مسبقاً لهذه الحصة','info');
+        }
+      }catch(e){
+        console.error('Scan error:',e);
+        resultEl.innerHTML='<div class="student-result" style="border-color:var(--red)"><div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:12px">⚠️</div><div style="font-size:16px;font-weight:900;color:var(--red)">خطأ في البحث</div><div style="font-size:13px;color:var(--text-muted);margin-top:6px">'+e.message+'</div></div></div>';
+        zone.classList.remove('active');
+      }
+    }
+
+    async function recordSingleAttendance(studentId,teacherName,subjectName){
+      const resultEl=document.getElementById('attendance-result');
+      try{
+        const today=new Date().toISOString().split('T')[0];
+        const now=new Date();
+        const timeStr=now.toLocaleTimeString('ar-DZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        const existing=await db.collection(ATTENDANCE_COLLECTION).where('studentId','==',studentId).where('subject','==',subjectName).where('date','==',today).limit(1).get();
+        if(!existing.empty){
+          showToast('تم تسجيل حضور هذا الطالب مسبقاً لهذه الحصة','info');
+          return;
+        }
+        const regRes=await fetch(SUPABASE_URL+'/rest/v1/registrations?select=first_name,last_name,id,level,stream,institution&id=eq.'+encodeURIComponent(studentId)+'&limit=1',{
+          headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+        });
+        const regData=await regRes.json();
+        const reg=regData[0]||{};
+        await db.collection(ATTENDANCE_COLLECTION).add({
+          studentId,
+          studentName:((reg.first_name||'')+' '+(reg.last_name||'')).trim(),
+          teacherId:currentTeacher.teacherId||currentTeacher.id,
+          teacherName,
+          subject:subjectName,
+          date:today,
+          time:timeStr,
+          status:'present',
+          level:reg.level||'',
+          stream:reg.stream||'',
+          institution:reg.institution||'',
+          createdAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+        showToast('✅ تم تسجيل حضور الطالب بنجاح — '+subjectName,'success');
+      }catch(e){
+        console.error('Record attendance error:',e);
+        showToast('حدث خطأ أثناء تسجيل الحضور: '+e.message,'error');
+      }
+    }
+
+    /* ===== ATTENDANCE LOG PAGE ===== */
+    async function renderAttendanceLogPage(){
+      currentTeacher=currentTeacher||{};const t=currentTeacher;
+      currentPage='attendance-log';
+      const today=new Date().toISOString().split('T')[0];
+      document.getElementById('app').innerHTML=`
+        <div class="app-layout">
+          <aside class="sidebar" id="sidebar">${renderSidebar(t)}</aside>
+          <div class="main-area">
+            <header class="main-header">${renderHeader(t)}</header>
+            <div class="main-scroll">
+              <div class="content-inner">
+                <div class="page-header">
+                  <div><div class="page-title"><span class="page-title-icon">📋</span>سجل الحضور</div><div class="page-subtitle">قائمة الطلاب الحاضرين والمتغيبين</div></div>
+                </div>
+                <div class="filter-bar">
+                  <input type="date" id="att-log-date" value="${today}" onchange="loadAttendanceLog()">
+                  <select id="att-log-subject" onchange="loadAttendanceLog()"><option value="">كل المواد</option></select>
+                  <button class="btn-add" onclick="loadAttendanceLog()" style="padding:10px 20px;font-size:12px">🔍 بحث</button>
+                  <div style="flex:1"></div>
+                  <div style="font-size:13px;font-weight:800;color:var(--primary);background:var(--primary-light);padding:8px 16px;border-radius:var(--radius-sm)" id="att-log-count">...</div>
+                </div>
+                <div id="att-log-table"><div class="loading-page"><div class="spinner"></div></div></div>
+                <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      const subjectSel=document.getElementById('att-log-subject');
+      const teacherSubjects=Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s):[];
+      teacherSubjects.forEach(s=>{const opt=document.createElement('option');opt.value=s;opt.textContent=s;subjectSel.appendChild(opt);});
+      loadAttendanceLog();
+    }
+
+    async function loadAttendanceLog(){
+      const t=currentTeacher;
+      const teacherId=t.teacherId||t.id;
+      const dateFilter=document.getElementById('att-log-date').value;
+      const subjectFilter=document.getElementById('att-log-subject').value;
+      const tableEl=document.getElementById('att-log-table');
+      const countEl=document.getElementById('att-log-count');
+      tableEl.innerHTML='<div class="loading-page" style="min-height:200px"><div class="spinner"></div></div>';
+      try{
+        let query=db.collection(ATTENDANCE_COLLECTION).where('teacherId','==',teacherId);
+        const snap=await query.get();
+        let records=snap.docs.map(d=>({id:d.id,...d.data()}));
+        if(dateFilter)records=records.filter(r=>r.date===dateFilter);
+        if(subjectFilter)records=records.filter(r=>r.subject===subjectFilter);
+        records.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+        countEl.textContent=records.length+' سجل';
+        if(records.length===0){
+          tableEl.innerHTML='<div class="section-card"><div class="section-card-body"><div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">لا توجد سجلات حضور</div><div class="empty-state-sub">لم يتم تسجيل أي حضور بعد'+(dateFilter?' لهذا التاريخ':'')+'</div></div></div></div>';
+          return;
+        }
+        tableEl.innerHTML='<div class="section-card"><div class="section-card-body" style="padding:0;overflow-x:auto"><table class="data-table"><thead><tr><th>#</th><th>الاسم</th><th>Student ID</th><th>المادة</th><th>المستوى</th><th>التاريخ</th><th>الوقت</th><th>الحالة</th></tr></thead><tbody>'+records.map((r,i)=>'<tr><td style="font-weight:800;color:var(--text-muted)">'+(i+1)+'</td><td style="font-weight:700">'+(r.studentName||'')+'</td><td><code style="font-size:11px;background:var(--primary-light);padding:3px 10px;border-radius:6px;color:var(--primary)">'+r.studentId+'</code></td><td>'+r.subject+'</td><td style="font-size:12px">'+(r.level||'—')+'</td><td style="font-size:12px">'+r.date+'</td><td style="font-size:12px;direction:ltr">'+r.time+'</td><td><span style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;background:var(--green-light);color:var(--green)">🟢 حاضر</span></td></tr>').join('')+'</tbody></table></div></div>';
+      }catch(e){
+        console.error('Attendance log error:',e);
+        tableEl.innerHTML='<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">حدث خطأ أثناء تحميل سجل الحضور</div></div>';
+      }
     }
 
     /* ===== LOGIN ===== */

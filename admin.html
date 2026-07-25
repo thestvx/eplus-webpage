@@ -1504,6 +1504,19 @@
     .migrate-progress{height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;margin:8px 0}
     .migrate-progress .fill{height:100%;background:#10b981;border-radius:3px;transition:width .3s;width:0}
     .migrate-stat{display:inline-block;background:var(--card-bg);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;margin:2px}
+
+    /* ===== CUSTOM MODAL SYSTEM ===== */
+    .cm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .25s}.cm-overlay.open{opacity:1;pointer-events:auto}
+    .cm-box{background:var(--card-bg);border:1px solid var(--border);border-radius:18px;padding:32px 28px;max-width:420px;width:92%;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,0.15);transform:translateY(16px);transition:transform .3s cubic-bezier(.22,1,.36,1)}.cm-overlay.open .cm-box{transform:translateY(0)}
+    .cm-icon{font-size:48px;margin-bottom:12px;line-height:1}
+    .cm-title{font-size:18px;font-weight:900;color:var(--text);margin-bottom:8px}
+    .cm-desc{font-size:13px;color:var(--text-muted);line-height:1.7;margin-bottom:20px}
+    .cm-actions{display:flex;gap:10px;justify-content:center}
+    .cm-btn{padding:10px 28px;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;transition:all .2s;font-family:'Tajawal',sans-serif}
+    .cm-btn-cancel{background:var(--bg);color:var(--text-muted);border:1.5px solid var(--border)}.cm-btn-cancel:hover{background:var(--border)}
+    .cm-btn-confirm{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;box-shadow:0 4px 14px rgba(124,58,237,0.25)}.cm-btn-confirm:hover{transform:translateY(-1px)}
+    .cm-btn-danger{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff}.cm-btn-danger:hover{transform:translateY(-1px)}
+    .cm-btn-success{background:linear-gradient(135deg,#059669,#047857);color:#fff}.cm-btn-success:hover{transform:translateY(-1px)}
 </style>
 </head>
 <body>
@@ -1516,6 +1529,19 @@
 
 <!-- hidden iframe for printing -->
 <div id="print-frame-wrapper" style="display:none"><iframe id="print-frame" style="width:0;height:0;border:none;position:absolute"></iframe></div>
+
+<!-- CUSTOM MODAL SYSTEM -->
+<div class="cm-overlay" id="cm-overlay">
+  <div class="cm-box">
+    <div class="cm-icon" id="cm-icon"></div>
+    <div class="cm-title" id="cm-title"></div>
+    <div class="cm-desc" id="cm-desc"></div>
+    <div class="cm-actions">
+      <button class="cm-btn cm-btn-cancel" id="cm-cancel-btn" onclick="cmResolve(false)">إلغاء</button>
+      <button class="cm-btn cm-btn-confirm" id="cm-confirm-btn" onclick="cmResolve(true)">تأكيد</button>
+    </div>
+  </div>
+</div>
 
 <!-- Print Preview Modal -->
 <div id="print-preview-modal">
@@ -2944,7 +2970,7 @@
                   </div>
                   <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
                     <div id="sr-card-back-qr"></div>
-                    <div id="sr-card-back-barcode" style="max-width:120px;min-height:30px;display:flex;justify-content:center"></div>
+                    <div id="sr-card-back-barcode" style="max-width:120px;min-height:30px;display:flex;justify-content:center;background:#ffffff;border-radius:4px;padding:4px"></div>
                   </div>
                 </div>
               </div>
@@ -4288,7 +4314,7 @@ window.toggleMaintenance = async () => {
   const snap = await getDoc(doc(db, 'settings', 'maintenance'));
   const isOn = snap.exists() && snap.data().active === true;
   const msg = isOn ? 'هل أنت متأكد من إعادة فتح الموقع للزوار؟' : 'هل أنت متأكد من تفعيل وضع الصيانة وإغلاق الموقع؟';
-  if (!confirm(msg)) return;
+  if (!(await cmConfirm('تأكيد', msg, '⚠️'))) return;
   try {
     await setDoc(doc(db, 'settings', 'maintenance'), { active: !isOn, updatedAt: serverTimestamp() });
     updateMaintenanceUI(!isOn);
@@ -4480,7 +4506,7 @@ window.toggleAnn = async (id, isHidden) => {
   try { await updateDoc(doc(db,'announcements',id), { hidden: !isHidden }); showToast('✅ تم التحديث'); } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
 window.deleteAnn = async (id) => {
-  if (!confirm('⚠️ حذف الإعلان نهائياً؟')) return;
+  if (!(await cmConfirm('حذف الإعلان', '⚠️ حذف الإعلان نهائياً؟', '🗑️', {danger:true, confirmText:'حذف'}))) return;
   try { await deleteDoc(doc(db,'announcements',id)); showToast('🗑️ تم الحذف'); } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
 
@@ -7629,7 +7655,7 @@ window.syncStudentNamesWithTickets = async () => {
   if (!changes.length) { showToast('✅ جميع الأسماء متطابقة مع المخيم الصيفي'); return; }
 
   const summary = changes.map((c, i) => `${i+1}. ${c.teacherName}: "${c.oldName}" ← "${c.newName}"`).join('\n');
-  if (!confirm(`🔄 مزامنة الأسماء مع المخيم الصيفي\n\nسيتم تعديل ${changes.length} اسماً:\n\n${summary}\n\nهل أنت متأكد من تطبيق التغييرات؟`)) return;
+  if (!(await cmConfirm('مزامنة الأسماء', `🔄 مزامنة الأسماء مع المخيم الصيفي\n\nسيتم تعديل ${changes.length} اسماً:\n\n${summary}\n\nهل أنت متأكد من تطبيق التغييرات؟`, '🔄'))) return;
 
   // ── حفظ نسخة احتياطية في Firestore قبل التعديل ──
   const backupEntries = [];
@@ -9888,7 +9914,7 @@ window.deleteArchiveCycle = async (archiveId) => {
   const archiveData = archiveSnap.data();
   const gid = archiveData.gid || '';
 
-  if (!confirm('هل أنت متأكد من حذف هذه الدورة المؤرشفة؟\n\nسيتم حذف هذه الدورة نهائياً وسيتم إعادة ترقيم الدورات المتبقية.')) return;
+  if (!(await cmConfirm('حذف دورة مؤرشفة', 'هل أنت متأكد من حذف هذه الدورة المؤرشفة؟\n\nسيتم حذف هذه الدورة نهائياً وسيتم إعادة ترقيم الدورات المتبقية.', '🗑️', {danger:true, confirmText:'حذف'}))) return;
 
   try {
     await deleteDoc(doc(db, 'attendanceArchive', archiveId));
@@ -9952,7 +9978,7 @@ window.restoreArchiveCycle = async (archiveId) => {
   if (!teacherId) { showToast('⚠️ الرجاء اختيار أستاذ أولاً', true); return; }
   if (!archiveId) { showToast('⚠️ معرف الدورة غير صالح', true); return; }
 
-  if (!confirm('⚠️ سيتم استرجاع هذه الدورة كدورة جديدة مع الاحتفاظ بالدورة الحالية.')) return;
+  if (!(await cmConfirm('استرجاع دورة', '⚠️ سيتم استرجاع هذه الدورة كدورة جديدة مع الاحتفاظ بالدورة الحالية.', '📦'))) return;
 
   showToast('📦 جاري استرجاع الدورة...');
   try {
@@ -10280,7 +10306,7 @@ window.toggleArchiveCell = (td) => {
 
 // ─── حذف تلميذ من الدورة المؤرشفة ───
 window.removeStudentFromArchive = async (archiveId, studentName, studentId, btn) => {
-  if (!confirm(`هل تريد حذف التلميذ "${studentName}" من هذا الأرشيف؟`)) return;
+  if (!(await cmConfirm('حذف تلميذ من الأرشيف', `هل تريد حذف التلميذ "${studentName}" من هذا الأرشيف؟`, '🗑️', {danger:true, confirmText:'حذف'}))) return;
   try {
     showToast('🗑️ جاري حذف التلميذ...');
     const snap = await getDoc(doc(db, 'attendanceArchive', archiveId));
@@ -11052,7 +11078,7 @@ window.removeStudentFromTeacher = async (teacherId, studentName, studentId) => {
   const targetId = studentId || '';
 
   const msg = t('att_del_student_confirm').replace('{name}', studentName).replace('{teacher}', teacher.name);
-  if (!confirm(msg)) return;
+  if (!(await cmConfirm('تأكيد', msg, '⚠️'))) return;
 
   try {
     const teacherRef = doc(db, 'teachers', teacherId);
@@ -12413,7 +12439,7 @@ window.confirmCreateStudentToGroup = async () => {
   if (!_asgTeacherId || !_asgGid) { showToast('⚠️ بيانات غير كاملة', true); return; }
   const existing = (window._soData||[]).find(r => _asgNorm2(r.studentName) === _asgNorm2(name));
   if (existing) {
-    if (!confirm(`⚠️ تم العثور على تلميذ بنفس الاسم "${existing.studentName}" في قاعدة البيانات.\n\nهل تريد استخدام سجله الحالي؟\n\n"موافق" = استخدام التلميذ الموجود\n"إلغاء" = إنشاء تلميذ جديد`)) {
+    if (!(await cmConfirm('تلميذ موجود مسبقاً', `⚠️ تم العثور على تلميذ بنفس الاسم "${existing.studentName}" في قاعدة البيانات.\n\nهل تريد استخدام سجله الحالي؟\n\n"موافق" = استخدام التلميذ الموجود\n"إلغاء" = إنشاء تلميذ جديد`, '⚠️'))) {
       // User chose to create a new student — continue below
     } else {
       showToast('ℹ️ جاري إضافة التلميذ الموجود "'+name+'" إلى الفوج');
@@ -12776,7 +12802,7 @@ window.restoreSyncBackup = async () => {
     return;
   }
 
-  if (!confirm('↩️ استعادة آخر مزامنة\n\nسيتم إرجاع أسماء التلاميذ إلى حالتها قبل المزامنة الأخيرة.\n\nهل أنت متأكد؟')) return;
+  if (!(await cmConfirm('استعادة المزامنة', '↩️ استعادة آخر مزامنة\n\nسيتم إرجاع أسماء التلاميذ إلى حالتها قبل المزامنة الأخيرة.\n\nهل أنت متأكد؟', '↩️'))) return;
 
   const backupChanges = snap.data().changes;
   let restored = 0;
@@ -12809,7 +12835,7 @@ window.restoreSyncBackup = async () => {
 
 // ─── Delete teacher ───
 window.deleteTeacher = async (id, name) => {
-  if (!confirm(`⚠️ حذف الأستاذ "${name}" نهائياً مع كل بياناته؟`)) return;
+  if (!(await cmConfirm('حذف أستاذ', `⚠️ حذف الأستاذ "${name}" نهائياً مع كل بياناته؟`, '🗑️', {danger:true, confirmText:'حذف'}))) return;
   try {
     await deleteDoc(doc(db, 'teachers', id));
     await addLog('🗑️ حذف أستاذ', `تم حذف بيانات الأستاذ ${name}`, '❌');
@@ -12931,7 +12957,7 @@ window.restoreTeacherGroups = async (teacherId, teacherName) => {
         const changes = syncSnap.data().changes || [];
         const match = changes.find(c => c.teacherId === teacherId);
         if (match && match.groups?.length) {
-          if (!confirm(`📦 تم العثور على نسخة احتياطية للأستاذ "${teacherName}" من آخر مزامنة.\n\nالأفواج المحفوظة: ${match.groups.map(g => g.name).join(', ')}\n\nاسترجاعها؟`)) return;
+          if (!(await cmConfirm('استرجاع نسخة احتياطية', `📦 تم العثور على نسخة احتياطية للأستاذ "${teacherName}" من آخر مزامنة.\n\nالأفواج المحفوظة: ${match.groups.map(g => g.name).join(', ')}\n\nاسترجاعها؟`, '📦'))) return;
           await updateDoc(doc(db, 'teachers', teacherId), { groups: match.groups });
           await addLog('📦 استعادة أفواج', `تم استعادة أفواج الأستاذ ${teacherName} من نسخة المزامنة`, '📦');
           showToast('✅ تم استعادة الأفواج بنجاح');
@@ -12946,7 +12972,7 @@ window.restoreTeacherGroups = async (teacherId, teacherName) => {
     const data = snap.data();
     const backupGroups = data.groups || [];
     if (!backupGroups.length) { showToast('⚠️ النسخة الاحتياطية فارغة', true); return; }
-    if (!confirm(`📦 استعادة أفواج "${teacherName}" من آخر نسخة احتياطية؟\n\nالأفواج: ${backupGroups.map(g => g.name).join(', ')}`)) return;
+    if (!(await cmConfirm('استعادة أفواج', `📦 استعادة أفواج "${teacherName}" من آخر نسخة احتياطية؟\n\nالأفواج: ${backupGroups.map(g => g.name).join(', ')}`, '📦'))) return;
     await updateDoc(doc(db, 'teachers', teacherId), { groups: backupGroups });
     await addLog('📦 استعادة أفواج', `تم استعادة أفواج الأستاذ ${teacherName}: ${backupGroups.map(g => g.name).join(', ')}`, '📦');
     showToast('✅ تم استعادة الأفواج بنجاح');
@@ -13007,8 +13033,8 @@ window.checkTeachersGroups = () => {
 
   // عرض المشاكل
   const msg = issues.slice(0, 10).join('\n');
-  if (issues.length > 10) alert(`⚠️ يوجد ${issues.length} مشكلة:\n\n${msg}\n\n... و ${issues.length - 10} مشكلة أخرى (انظر الـ Console)`);
-  else alert(`⚠️ يوجد ${issues.length} مشكلة:\n\n${msg}`);
+  if (issues.length > 10) srShowToast(`⚠️ يوجد ${issues.length} مشكلة:\n\n${msg}\n\n... و ${issues.length - 10} مشكلة أخرى (انظر الـ Console)`, 'error');
+  else srShowToast(`⚠️ يوجد ${issues.length} مشكلة:\n\n${msg}`, 'error');
   console.warn('🔍 Group issues:', issues);
 };
 
@@ -13899,7 +13925,7 @@ window.addStudent = async () => {
 };
 
 window.removeStudent = async (sid) => {
-  if (!confirm('حذف هذا التلميذ نهائياً؟')) return;
+  if (!(await cmConfirm('حذف تلميذ', 'حذف هذا التلميذ نهائياً؟', '🗑️', {danger:true, confirmText:'حذف'}))) return;
   // حذف فوري من DOM
   const row = document.querySelector(`.att-student-row[data-sid="${sid}"]`);
   if (row) row.remove();
@@ -15791,7 +15817,7 @@ window.emergencyAll = async (action) => {
   };
   const info = actionLabels[action] || { title: '⚠️', desc: '', icon: '' };
 
-  if (!confirm(`🚨 ${info.title}\n\n${info.desc} "${teacherName}"؟\n\nهذا الإجراء سيؤثر على كل الحصص الـ 12 × ${groupCount} أفواج.`)) return;
+  if (!(await cmConfirm(info.title, `🚨 ${info.title}\n\n${info.desc} "${teacherName}"؟\n\nهذا الإجراء سيؤثر على كل الحصص الـ 12 × ${groupCount} أفواج.`, info.icon))) return;
 
   const now = new Date().toISOString();
   const batch = writeBatch(db);
@@ -16548,11 +16574,11 @@ window.resetAttendance = async () => {
   if (!tid) return;
   const teacherName = document.getElementById('att-modal-teacher-name')?.textContent || 'الأستاذ';
 
-  const confirmed = confirm(`⚠️ تحذير\n\nسيتم حذف جميع سجلات الحضور للأستاذ "${teacherName}" نهائياً.\n\nهذه العملية لا يمكن التراجع عنها.\n\nهل أنت متأكد؟`);
+  const confirmed = await cmConfirm('تحذير', `⚠️ تحذير\n\nسيتم حذف جميع سجلات الحضور للأستاذ "${teacherName}" نهائياً.\n\nهذه العملية لا يمكن التراجع عنها.\n\nهل أنت متأكد؟`, '⚠️', {danger:true, confirmText:'حذف'});
   if (!confirmed) return;
 
   // تأكيد ثانٍ
-  const confirmed2 = confirm(`تأكيد أخير: حذف كل سجلات حضور "${teacherName}"؟`);
+  const confirmed2 = await cmConfirm('تأكيد أخير', `تأكيد أخير: حذف كل سجلات حضور "${teacherName}"؟`, '⚠️', {danger:true, confirmText:'حذف'});
   if (!confirmed2) return;
 
   try {
@@ -16938,7 +16964,7 @@ window.saveSessionAttendance_g = async (sessionNum, gi) => {
     const dateObj = new Date(todayDateKey + 'T00:00:00');
     const actualDay = arabicDays[dateObj.getDay()];
     if (actualDay !== expectedDay) {
-      if (!confirm(`⚠️ تحذير: اليوم "${actualDay}" لا يتطابق مع يوم الحصة ${sessionNum} المتوقع "${expectedDay}".\n\nالتاريخ المختار: ${todayDateKey} (${actualDay})\nالحصة ${sessionNum} من المفترض أن تكون يوم "${expectedDay}".\n\nهل تريد الحفظ على أية حال؟`)) {
+      if (!(await cmConfirm('تحذير', `⚠️ تحذير: اليوم "${actualDay}" لا يتطابق مع يوم الحصة ${sessionNum} المتوقع "${expectedDay}".\n\nالتاريخ المختار: ${todayDateKey} (${actualDay})\nالحصة ${sessionNum} من المفترض أن تكون يوم "${expectedDay}".\n\nهل تريد الحفظ على أية حال؟`, '⚠️'))) {
         return;
       }
     }
@@ -17422,7 +17448,7 @@ window.startRebuildAnalysis = async () => {
 /* ─── Rollback System ─── */
 window.rollbackRebuild = async () => {
   if (!_rebuildBackupRef) { showToast('⚠️ لا توجد نسخة احتياطية متاحة', true); return; }
-  if (!confirm('⚠️ هل أنت متأكد؟ سيتم استرجاع جميع الحصص إلى ما قبل عملية إعادة البناء.')) return;
+  if (!(await cmConfirm('استرجاع النسخة الاحتياطية', '⚠️ هل أنت متأكد؟ سيتم استرجاع جميع الحصص إلى ما قبل عملية إعادة البناء.', '↩️'))) return;
 
   rbContent(`<div style="text-align:center;padding:40px"><div style="font-size:40px;margin-bottom:16px">↩️</div><div style="font-size:16px;font-weight:900;color:var(--text);margin-bottom:8px">جاري استرجاع النسخة الاحتياطية...</div></div>`);
 
@@ -19135,7 +19161,7 @@ window._openImgLightbox = (src) => {
 // ═══════════════════════════
 window._clearGeneralChat = async () => {
   if (!_db || !_me || !_me.isAdmin) return;
-  const confirmed = confirm('⚠️ هل أنت متأكد من مسح جميع رسائل الغرفة العامة؟\nهذا الإجراء لا يمكن التراجع عنه.');
+  const confirmed = await cmConfirm('مسح الشات العام', '⚠️ هل أنت متأكد من مسح جميع رسائل الغرفة العامة؟\nهذا الإجراء لا يمكن التراجع عنه.', '🗑️', {danger:true, confirmText:'حذف'});
   if (!confirmed) return;
 
   const btn = document.querySelector('[onclick="window._clearGeneralChat()"]');
@@ -19481,7 +19507,7 @@ window.saveFinanceTx = async () => {
 
 // ── حذف معاملة ──
 window.deleteFinanceTx = async (txId) => {
-  if (!confirm('حذف هذه المعاملة نهائياً؟')) return;
+  if (!(await cmConfirm('حذف معاملة', 'حذف هذه المعاملة نهائياً؟', '🗑️', {danger:true, confirmText:'حذف'}))) return;
   try {
     await deleteDoc(doc(getFinDb(), 'financeTx', txId));
     // onSnapshot سيحدّث الجدول تلقائياً
@@ -19519,11 +19545,12 @@ window.importSummerTicketsToFinance = async () => {
     return;
   }
 
-  const confirmed = confirm(
+  const confirmed = await cmConfirm('استيراد التذاكر',
     `☀️ استيراد تذاكر المخيم الصيفي\n\nسيتم إضافة ${toImport.length} تذكرة كمدخول في الموارد المالية:\n` +
     toImport.slice(0, 5).map(t => `• ${t.name} — ${Number(t.amount).toLocaleString('ar-DZ')} دج`).join('\n') +
     (toImport.length > 5 ? `\n... و${toImport.length - 5} تذاكر أخرى` : '') +
-    '\n\nهل تريد المتابعة؟'
+    '\n\nهل تريد المتابعة؟',
+    '📦'
   );
   if (!confirmed) return;
 
@@ -21898,7 +21925,7 @@ async function mFetch(table, rows) {
 
 async function startMigration() {
   const key = document.getElementById('supabaseKey').value.trim();
-  if (!key) { alert('الرجاء إدخال Service Role Key'); return; }
+  if (!key) { srShowToast('الرجاء إدخال Service Role Key', 'error'); return; }
 
   const btn = document.getElementById('migrateStartBtn');
   btn.disabled = true;
@@ -22499,8 +22526,8 @@ function srShowCard(r) {
       JsBarcode(svgEl, 'EPLUS-' + (r.id || ''), {
         format: 'CODE128',
         displayValue: true,
-        lineColor: '#ffffff',
-        background: 'transparent',
+        lineColor: '#000000',
+        background: '#ffffff',
         width: 1.5,
         height: 30,
         fontSize: 12,
@@ -22594,7 +22621,7 @@ function srPreviewPortal(id) {
   if (r.student_token) {
     window.open('/student.html?t=' + encodeURIComponent(r.student_token), '_blank');
   } else {
-    alert('لا يوجد Student Token مرتبط بهذا التسجيل. قم بتأكيد التسجيل أولاً.');
+    srShowToast('لا يوجد Student Token مرتبط بهذا التسجيل. قم بتأكيد التسجيل أولاً.', 'error');
   }
 }
 
@@ -22665,7 +22692,7 @@ function srDelete(id) {
 async function srUnregister(id) {
   const r = srAllData.find(x => x.id === id);
   if (!r) return;
-  if (!confirm('هل أنت متأكد من إلغاء تأكيد تسجيل هذا الطالب؟\n\nسيتم:\n• تحويل الحالة إلى "مسجل مبدئياً"\n• إزالة رسوم التسجيل من الخزينة\n• تعطيل بطاقة الطالب\n• منع الدخول إلى بوابة الطالب')) return;
+  if (!(await cmConfirm('إلغاء تأكيد التسجيل', 'هل أنت متأكد من إلغاء تأكيد تسجيل هذا الطالب؟\n\nسيتم:\n• تحويل الحالة إلى "مسجل مبدئياً"\n• إزالة رسوم التسجيل من الخزينة\n• تعطيل بطاقة الطالب\n• منع الدخول إلى بوابة الطالب', '⚠️'))) return;
   try {
     const res = await srFetch(`${SR_SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(id)}`, {
       method: 'PATCH',
@@ -22769,6 +22796,27 @@ function srShowToast(msg, type = 'success') {
   t.style.transform = 'translate(-50%, 0)';
   setTimeout(() => { t.style.transform = 'translate(-50%, 120px)'; }, 3000);
 }
+
+// ═══ CUSTOM MODAL SYSTEM ═══
+let cmResolve = null;
+function cmShow(icon, title, desc, opts = {}) {
+  return new Promise(resolve => {
+    document.getElementById('cm-icon').textContent = icon;
+    document.getElementById('cm-title').textContent = title;
+    document.getElementById('cm-desc').innerHTML = desc;
+    const cancelBtn = document.getElementById('cm-cancel-btn');
+    const confirmBtn = document.getElementById('cm-confirm-btn');
+    cancelBtn.style.display = opts.hideCancel ? 'none' : 'inline-block';
+    cancelBtn.textContent = opts.cancelText || 'إلغاء';
+    confirmBtn.textContent = opts.confirmText || 'تأكيد';
+    confirmBtn.className = 'cm-btn ' + (opts.danger ? 'cm-btn-danger' : opts.success ? 'cm-btn-success' : 'cm-btn-confirm');
+    document.getElementById('cm-overlay').classList.add('open');
+    cmResolve = (val) => { document.getElementById('cm-overlay').classList.remove('open'); resolve(val); };
+    setTimeout(() => confirmBtn.focus(), 100);
+  });
+}
+function cmAlert(title, desc, icon = '✅') { return cmShow(icon, title, desc, { hideCancel: true, confirmText: 'موافق' }); }
+function cmConfirm(title, desc, icon = '⚠️', opts = {}) { return cmShow(icon, title, desc, { ...opts }); }
 
 // ═══════════════════════════════════════════════════════════
 //  INIT on page load
@@ -23199,8 +23247,8 @@ async function srtSave() {
   const username = document.getElementById('srt-username').value.trim();
   const password = document.getElementById('srt-password').value;
   const passwordConfirm = document.getElementById('srt-password-confirm').value;
-  if (!name) { alert('الرجاء إدخال اسم الأستاذ'); return; }
-  if (!username) { alert('الرجاء إدخال اسم المستخدم'); return; }
+  if (!name) { srShowToast('الرجاء إدخال اسم الأستاذ', 'error'); return; }
+  if (!username) { srShowToast('الرجاء إدخال اسم المستخدم', 'error'); return; }
 
   const subjectRows = document.querySelectorAll('#srt-subjects-list .srt-subject-row');
   const subjects = [];
@@ -23210,7 +23258,7 @@ async function srtSave() {
     const tea = inputs[1]?.value.trim();
     if (sub) subjects.push(tea ? { subject: sub, teacher: tea } : sub);
   });
-  if (subjects.length === 0) { alert('الرجاء إضافة مادة واحدة على الأقل'); return; }
+  if (subjects.length === 0) { srShowToast('الرجاء إضافة مادة واحدة على الأقل', 'error'); return; }
 
   const levelChecks = document.querySelectorAll('#srt-levels-checks input[type=checkbox]:checked');
   const levels = Array.from(levelChecks).map(cb => cb.value);
@@ -23228,9 +23276,9 @@ async function srtSave() {
         await updateDoc(ud(db, USERS_COLLECTION, t.userId), { username, updatedAt: new Date().toISOString() });
       }
     } else {
-      if (!password) { alert('الرجاء إدخال كلمة المرور'); btn.disabled = false; btn.textContent = '💾 إضافة'; return; }
-      if (password !== passwordConfirm) { alert('كلمتا المرور غير متطابقتين'); btn.disabled = false; btn.textContent = '💾 إضافة'; return; }
-      if (password.length < 6) { alert('كلمة المرور يجب أن تكون 6 أحرف على الأقل'); btn.disabled = false; btn.textContent = '💾 إضافة'; return; }
+      if (!password) { srShowToast('الرجاء إدخال كلمة المرور', 'error'); btn.disabled = false; btn.textContent = '💾 إضافة'; return; }
+      if (password !== passwordConfirm) { srShowToast('كلمتا المرور غير متطابقتين', 'error'); btn.disabled = false; btn.textContent = '💾 إضافة'; return; }
+      if (password.length < 6) { srShowToast('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error'); btn.disabled = false; btn.textContent = '💾 إضافة'; return; }
       const teacherId = 'SRT-' + Date.now().toString(36).toUpperCase();
       const userId = srtGenerateUserId();
       const salt = srtGenerateSalt();
@@ -23247,7 +23295,7 @@ async function srtSave() {
     }
     srtCloseModal();
     await srtLoadData();
-  } catch (e) { console.error('SRT save error:', e); alert('حدث خطأ أثناء الحفظ'); }
+  } catch (e) { console.error('SRT save error:', e); srShowToast('حدث خطأ أثناء الحفظ', 'error'); }
   btn.disabled = false; btn.textContent = '💾 حفظ';
 }
 
@@ -23256,7 +23304,7 @@ async function srtToggleStatus(id) {
   if (!t) return;
   const newStatus = t.status === 'disabled' ? 'active' : 'disabled';
   const label = newStatus === 'disabled' ? 'تعطيل' : 'تفعيل';
-  if (!confirm(`هل أنت متأكد من ${label} هذا الأستاذ؟`)) return;
+  if (!(await cmConfirm('تأكيد', `هل أنت متأكد من ${label} هذا الأستاذ؟`, '⚠️'))) return;
   const {updateDoc,doc:d}=srtFS(),db=srtDB();
   try {
     await updateDoc(d(db, SRT_COLLECTION, id), { status: newStatus, updatedAt: new Date().toISOString() });
@@ -23285,7 +23333,7 @@ function srtDelete(id) {
 
 function srtResetPassword(id) {
   const t = srtAllData.find(x => x.id === id);
-  if (!t || !t.userId) { alert('لا يمكن إعادة تعيين كلمة المرور: لا يوجد حساب مرتبط'); return; }
+  if (!t || !t.userId) { srShowToast('لا يمكن إعادة تعيين كلمة المرور: لا يوجد حساب مرتبط', 'error'); return; }
   document.getElementById('srt-reset-user-id').value = t.userId;
   document.getElementById('srt-reset-teacher-name').textContent = t.name || '';
   document.getElementById('srt-reset-pass').value = '';
@@ -23297,16 +23345,16 @@ async function srtConfirmResetPassword() {
   const userId = document.getElementById('srt-reset-user-id').value;
   const pass = document.getElementById('srt-reset-pass').value;
   const passConfirm = document.getElementById('srt-reset-pass-confirm').value;
-  if (!pass) { alert('الرجاء إدخال كلمة المرور الجديدة'); return; }
-  if (pass !== passConfirm) { alert('كلمتا المرور غير متطابقتين'); return; }
-  if (pass.length < 6) { alert('كلمة المرور يجب أن تكون 6 أحرف على الأقل'); return; }
+  if (!pass) { srShowToast('الرجاء إدخال كلمة المرور الجديدة', 'error'); return; }
+  if (pass !== passConfirm) { srShowToast('كلمتا المرور غير متطابقتين', 'error'); return; }
+  if (pass.length < 6) { srShowToast('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error'); return; }
   const btn = document.getElementById('srt-reset-btn');
   btn.disabled = true; btn.textContent = '⏳ جاري إعادة التعيين...';
   try {
     await srtResetUserPassword(userId, pass);
     document.getElementById('srt-reset-modal').classList.remove('open');
-    alert('✅ تم إعادة تعيين كلمة المرور بنجاح');
-  } catch (e) { console.error('Password reset error:', e); alert('حدث خطأ أثناء إعادة التعيين'); }
+    srShowToast('✅ تم إعادة تعيين كلمة المرور بنجاح', 'success');
+  } catch (e) { console.error('Password reset error:', e); srShowToast('حدث خطأ أثناء إعادة التعيين', 'error'); }
   btn.disabled = false; btn.textContent = '🔄 إعادة تعيين';
 }
 </script>
