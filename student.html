@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" defer></script>
+  <script src="js/studentCardRenderer.js?v=1"></script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     :root{
@@ -175,7 +176,7 @@
     .card-flip-dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:var(--transition)}
     .card-flip-dot.active{background:var(--primary)}
 
-    .card-scene{perspective:1200px;width:440px;height:262px;cursor:pointer}
+    .card-scene{perspective:1200px;width:380px;height:228px;cursor:pointer}
     .card-3d{width:100%;height:100%;position:relative;transition:transform 0.7s cubic-bezier(0.4,0,0.2,1);transform-style:preserve-3d}
     .card-3d.flipped{transform:rotateY(180deg)}
     .card-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.18)}
@@ -183,15 +184,7 @@
     .card-back{transform:rotateY(180deg);z-index:1}
     .card-face img{width:100%;height:100%;object-fit:cover;display:block}
     .card-front-overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:12px}
-    .card-back-overlay{position:absolute;inset:0;display:flex;padding:20px}
-    .card-back-left{flex:1;display:flex;flex-direction:column;justify-content:center;gap:4px}
-    .card-back-right{display:flex;align-items:center;justify-content:center}
-    .card-label{font-size:10px;color:rgba(255,255,255,0.85);font-weight:600;text-shadow:0 2px 6px rgba(0,0,0,0.45)}
-    .card-value{font-size:13px;font-weight:900;color:#ffffff;text-shadow:0 2px 6px rgba(0,0,0,0.45)}
-    .card-value.mono{font-family:monospace;font-size:12px;font-weight:800}
-    .card-value.sm{font-size:11px;font-weight:700}
     .card-info-hint{text-align:center;margin-top:20px;font-size:13px;color:var(--text-muted);font-weight:600}
-    .card-back-img-fallback{position:absolute;inset:0;background:linear-gradient(135deg,#e0e7ff,#f0f0ff)}
 
     /* ═══ LOADING / ERROR ═══ */
     .loading-page{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px}
@@ -297,6 +290,7 @@
         const data=await res.json();
         if(!data||data.length===0){errEl.textContent='رقم التسجيل أو هاتف ولي الأمر غير صحيح. الرجاء المحاولة مرة أخرى.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
         const r=data[0];
+        if(r.deleted_at){errEl.textContent='هذا التسجيل تم حذفه من طرف الإدارة.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
         if(r.status!=='مسجل نهائياً'){errEl.textContent='لا يمكن استخدام بوابة الطالب قبل تأكيد التسجيل النهائي من إدارة المركز.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';return;}
         saveSession(r);renderDashboard(r);
       }catch(err){console.error('Login error:',err);errEl.textContent='حدث خطأ أثناء التحقق. الرجاء المحاولة لاحقاً.';errEl.style.display='block';btn.disabled=false;btn.textContent='تسجيل الدخول ✦';}
@@ -378,9 +372,7 @@
     /* ═══ CARD PAGE (3D FLIP) ═══ */
     function renderCardPage(r){
       currentStudent=r;currentPage='card';
-      const fullName=(r.first_name||'')+' '+(r.last_name||'');
-      const today=new Date().toLocaleDateString('ar-DZ',{year:'numeric',month:'long',day:'numeric'});
-      const token=r.student_token||'';
+      const faces=StudentCardRenderer.portalFaces(r);
 
       document.getElementById('app').innerHTML=`
         <div class="portal-layout">
@@ -397,24 +389,8 @@
                 </div>
                 <div class="card-scene" onclick="toggleFlip()" id="card-scene">
                   <div class="card-3d" id="card-3d">
-                    <div class="card-face card-front">
-                      <img src="studentidcard/studentidcardfront.jpg" onerror="this.style.background='linear-gradient(135deg,#6366f1,#8b5cf6)'" alt="">
-                    </div>
-                    <div class="card-face card-back">
-                      <div class="card-back-img-fallback"></div>
-                      <img src="studentidcard/studentidcardback.jpg" onerror="this.style.display='none'" alt="" style="position:absolute;inset:0;z-index:0">
-                      <div class="card-back-overlay">
-                        <div class="card-back-left">
-                          <div class="card-label">الاسم الكامل</div>
-                          <div class="card-value">${fullName}</div>
-                          <div class="card-label" style="margin-top:6px">Student ID</div>
-                          <div class="card-value mono">${r.id||''}</div>
-                          <div class="card-label" style="margin-top:6px">تاريخ التسجيل</div>
-                          <div class="card-value sm">${today}</div>
-                        </div>
-                        <div class="card-back-right" style="flex-direction:column;gap:6px"><div id="card-back-qr"></div><div id="card-front-barcode" style="display:flex;justify-content:center;background:#ffffff;border-radius:4px;padding:4px"></div></div>
-                      </div>
-                    </div>
+                    <div class="card-face card-front">${faces.front}</div>
+                    <div class="card-face card-back">${faces.back}</div>
                   </div>
                 </div>
                 <div class="card-info-hint">اضغط على البطاقة أو استخدم الزر أعلاه لقلبها</div>
@@ -424,7 +400,7 @@
           </div>
         </div>`;
       updateSidebarActive();
-      setTimeout(()=>{renderBarcode(r);renderQR(r,token);},100);
+      setTimeout(()=>{StudentCardRenderer.injectCSS(document);StudentCardRenderer.hydrateRoot(document.getElementById('card-scene'),r);},100);
     }
 
     function toggleFlip(){
@@ -446,32 +422,6 @@
       if(!fBtn)return;
       if(isBack){fBtn.classList.remove('active');bBtn.classList.add('active');dot.classList.add('active');}
       else{fBtn.classList.add('active');bBtn.classList.remove('active');dot.classList.remove('active');}
-    }
-
-    function renderBarcode(r){
-      const el=document.getElementById('card-front-barcode');
-      if(!el)return;
-      el.innerHTML='';
-      if(typeof JsBarcode!=='undefined'){
-        try{
-          const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-          el.appendChild(svg);
-          JsBarcode(svg,'EPLUS-'+(r.id||''),{
-            format:'CODE128',displayValue:true,lineColor:'#000000',background:'#ffffff',
-            width:1.5,height:40,margin:10,fontSize:10,font:'monospace',fontOptions:'bold',textMargin:4,
-            xmlDocument:document
-          });
-          console.log('[Barcode] Generated for:', 'EPLUS-'+(r.id||''), '| SVG dimensions:', svg.getAttribute('width'), 'x', svg.getAttribute('height'));
-        }catch(e){console.error('[Barcode] Generation error:',e);}
-      }
-    }
-    function renderQR(r,token){
-      const el=document.getElementById('card-back-qr');
-      if(!el)return;
-      el.innerHTML='';
-      if(token&&typeof QRCode!=='undefined'){
-        try{new QRCode(el,{text:'https://epluscenter.com/s/'+token,width:100,height:100,colorDark:'#1e293b',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});}catch(e){console.error('QR error:',e);}
-      }
     }
 
     function updateSidebarActive(){

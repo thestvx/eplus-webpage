@@ -5,62 +5,9 @@
 const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
 
-const SUPPORT_STREAMS = {
-  'علوم تجريبية': [
-    { subject: 'العلوم الفيزيائية والتكنولوجيا', teacher: 'نمسي عبد الرحمان' },
-    { subject: 'العلوم الفيزيائية والتكنولوجيا', teacher: 'لكموته لمين' },
-    { subject: 'الرياضيات', teacher: 'نعورة عبدالباسط' },
-    { subject: 'الرياضيات', teacher: 'ترعة فاطمة' },
-    { subject: 'علوم الطبيعة والحياة', teacher: 'شكري صحراوي' },
-    { subject: 'اللغة العربية', teacher: 'موساوي زبيدة' },
-    { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
-    { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
-    { subject: 'العلوم الإسلامية', teacher: 'هبيته ربيع' },
-    { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
-    { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
-  ],
-  'رياضيات': [
-    { subject: 'العلوم الفيزيائية', teacher: 'نمسي عبد الرحمان' },
-    { subject: 'العلوم الفيزيائية', teacher: 'لكموته لمين' },
-    { subject: 'الرياضيات', teacher: 'نعورة عبدالباسط' },
-    { subject: 'الرياضيات', teacher: 'ترعة فاطمة' },
-    { subject: 'اللغة العربية', teacher: 'موساوي زبيدة' },
-    { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
-    { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
-    { subject: 'العلوم الإسلامية', teacher: 'هبيته ربيع' },
-    { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
-    { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
-  ],
-  'تسيير واقتصاد': [
-    { subject: 'اللغة العربية', teacher: 'موساوي زبيدة' },
-    { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
-    { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
-    { subject: 'المحاسبة', teacher: 'عبد الرحمان سرهود' },
-    { subject: 'العلوم الإسلامية', teacher: 'هبيته ربيع' },
-    { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
-    { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
-  ],
-  'تقني رياضي': [
-    { subject: 'العلوم الفيزيائية', teacher: 'نمسي عبد الرحمان' },
-    { subject: 'العلوم الفيزيائية', teacher: 'لكموته لمين' },
-    { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
-    { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
-    { subject: 'العلوم الإسلامية', teacher: 'هبيته ربيع' },
-    { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
-    { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
-  ],
-  'آداب ولغات': [
-    { subject: 'اللغة العربية', teacher: 'موساوي زبيدة' },
-    { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
-    { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
-    { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
-    { subject: 'اللغة الألمانية', teacher: 'حمزة علال' },
-    { subject: 'اللغة الإسبانية', teacher: 'طوالبية ابراهيم' },
-    { subject: 'رياضيات (للأدبيين)', teacher: 'هبيته ربيع' },
-    { subject: 'العلوم الإسلامية', teacher: 'هبيته ربيع' },
-    { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
-  ],
-};
+// Data source: shared with admin/teacher via js/subjectService.js
+const SUPPORT_STREAMS = window.SUPPORT_STREAMS || {};
+const SUPPORT_MIDDLE_SCHOOL = window.SUPPORT_MIDDLE_SCHOOL || [];
 
 const SUPPORT_INSTITUTIONS = {
   'السنة الثالثة ثانوي (بكالوريا)': [
@@ -76,16 +23,6 @@ const SUPPORT_INSTITUTIONS = {
     'متوسطة الرويسي بلقاسم بقمار',
   ],
 };
-
-const SUPPORT_MIDDLE_SCHOOL = [
-  { subject: 'الرياضيات', teacher: 'شامي سهيل' },
-  { subject: 'اللغة الفرنسية', teacher: 'مرغني ريهام' },
-  { subject: 'اللغة الفرنسية', teacher: 'حميدي بلقيس' },
-  { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
-  { subject: 'اللغة الإنجليزية', teacher: 'نصبة فاطمة' },
-  { subject: 'اللغة العربية', teacher: 'سويد هدى' },
-  { subject: 'العلوم الفيزيائية وعلوم الطبيعة والحياة', teacher: 'خنوفة علي' },
-];
 
 const SUPPORT_LAWS = [
   'يلتزم الطالب بحضور جميع الحصص في المواعيد المحددة.',
@@ -606,7 +543,7 @@ async function loadRegistrations() {
       },
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    return await res.json();
+    return (await res.json()).filter(r => !r.deleted_at);
   } catch (e) {
     console.error('Failed to load registrations:', e);
     return [];

@@ -1,7 +1,84 @@
 // ═══════════════════════════════════════════════════════════
 //  SubjectService — Subject-Teacher mapping & dynamic dropdowns
-//  Resolves subjects to IDs, finds teachers per level/subject
+//  SINGLE SOURCE OF TRUTH for all subject/teacher data.
+//  Used by: index.html (initial registration), admin.html (add
+//  subject), teacher.html. Data exposed on window.SUPPORT_STREAMS
+//  and window.SUPPORT_MIDDLE_SCHOOL so register-support.js and
+//  any other script reads from the SAME source.
 // ═══════════════════════════════════════════════════════════
+
+// ── Authoritative Subject + Teacher pairs (same as initial registration) ──
+const SUPPORT_STREAMS = {
+  'علوم تجريبية': [
+    { subject: 'العلوم الفيزيائية والتكنولوجيا', teacher: 'نمسي عبد الرحمان' },
+    { subject: 'العلوم الفيزيائية والتكنولوجيا', teacher: 'لكموته لمين' },
+    { subject: 'الرياضيات', teacher: 'نعورة عبدالباسط' },
+    { subject: 'الرياضيات', teacher: 'ترعة فاطمة' },
+    { subject: 'علوم الطبيعة والحياة', teacher: 'شكري صحراوي' },
+    { subject: 'اللغة العربية', teacher: 'موساوي زبيدة' },
+    { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+    { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
+    { subject: 'العلوم الإسلامية', teacher: 'هبيته ربيع' },
+    { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
+    { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
+  ],
+  'رياضيات': [
+    { subject: 'العلوم الفيزيائية', teacher: 'نمسي عبد الرحمان' },
+    { subject: 'العلوم الفيزيائية', teacher: 'لكموته لمين' },
+    { subject: 'الرياضيات', teacher: 'نعورة عبدالباسط' },
+    { subject: 'الرياضيات', teacher: 'ترعة فاطمة' },
+    { subject: 'اللغة العربية', teacher: 'موساوي زبيدة' },
+    { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+    { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
+    { subject: 'العلوم الإسلامية', teacher: 'هبيته ربيع' },
+    { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
+    { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
+  ],
+  'تسيير واقتصاد': [
+    { subject: 'اللغة العربية', teacher: 'موساوي زبيدة' },
+    { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+    { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
+    { subject: 'المحاسبة', teacher: 'عبد الرحمان سرهود' },
+    { subject: 'العلوم الإسلامية', teacher: 'هبيته ربيع' },
+    { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
+    { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
+  ],
+  'تقني رياضي': [
+    { subject: 'العلوم الفيزيائية', teacher: 'نمسي عبد الرحمان' },
+    { subject: 'العلوم الفيزيائية', teacher: 'لكموته لمين' },
+    { subject: 'الرياضيات', teacher: 'نعورة عبدالباسط' },
+    { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+    { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
+    { subject: 'العلوم الإسلامية', teacher: 'هبيته ربيع' },
+    { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
+    { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
+  ],
+  'آداب ولغات': [
+    { subject: 'اللغة العربية', teacher: 'موساوي زبيدة' },
+    { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
+    { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+    { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
+    { subject: 'اللغة الألمانية', teacher: 'حمزة علال' },
+    { subject: 'اللغة الإسبانية', teacher: 'طوالبية ابراهيم' },
+    { subject: 'رياضيات (للأدبيين)', teacher: 'هبيته ربيع' },
+    { subject: 'العلوم الإسلامية', teacher: 'هبيته ربيع' },
+    { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
+  ],
+};
+
+const SUPPORT_MIDDLE_SCHOOL = [
+  { subject: 'الرياضيات', teacher: 'شامي سهيل' },
+  { subject: 'اللغة الفرنسية', teacher: 'مرغني ريهام' },
+  { subject: 'اللغة الفرنسية', teacher: 'حميدي بلقيس' },
+  { subject: 'الاجتماعيات', teacher: 'أيمن دخان' },
+  { subject: 'اللغة الإنجليزية', teacher: 'نصبة فاطمة' },
+  { subject: 'اللغة العربية', teacher: 'سويد هدى' },
+  { subject: 'العلوم الفيزيائية وعلوم الطبيعة والحياة', teacher: 'خنوفة علي' },
+];
+
+// Expose on window so register-support.js (index.html) reads the SAME data
+window.SUPPORT_STREAMS = SUPPORT_STREAMS;
+window.SUPPORT_MIDDLE_SCHOOL = SUPPORT_MIDDLE_SCHOOL;
 
 const SubjectService = (function () {
 
@@ -14,12 +91,14 @@ const SubjectService = (function () {
     'العلوم الفيزيائية وعلوم الطبيعة والحياة': 'science_4m',
     'الاجتماعيات': 'social',
     'العلوم الفيزيائية والتكنولوجيا': 'physics_tech',
+    'العلوم الفيزيائية': 'physics',
     'علوم الطبيعة والحياة': 'biology',
     'العلوم الإسلامية': 'islamic',
     'الفلسفة': 'philosophy',
     'المحاسبة': 'accounting',
     'اللغة الألمانية': 'german',
-    'اللغة الإسبانية': 'spanish'
+    'اللغة الإسبانية': 'spanish',
+    'رياضيات (للأدبيين)': 'math_lit'
   };
 
   const SUBJECT_ICONS = {
@@ -30,15 +109,17 @@ const SubjectService = (function () {
     'العلوم الفيزيائية وعلوم الطبيعة والحياة': '🔬',
     'الاجتماعيات': '🌍',
     'العلوم الفيزيائية والتكنولوجيا': '⚛️',
+    'العلوم الفيزيائية': '⚛️',
     'علوم الطبيعة والحياة': '🧬',
     'العلوم الإسلامية': '🕌',
     'الفلسفة': '🧠',
     'المحاسبة': '💼',
     'اللغة الألمانية': '🇩🇪',
-    'اللغة الإسبانية': '🇪🇸'
+    'اللغة الإسبانية': '🇪🇸',
+    'رياضيات (للأدبيين)': '📐'
   };
 
-  // ── Level → Subjects Mapping ──────────────────────────
+  // ── Level → Subjects Mapping (subjects only, kept in sync with pairs) ──
   const SUBJECTS_BY_LEVEL = {
     'السنة الرابعة متوسط': [
       'الرياضيات', 'اللغة الفرنسية', 'الاجتماعيات', 'اللغة الإنجليزية',
@@ -48,8 +129,8 @@ const SubjectService = (function () {
       'علوم تجريبية': ['العلوم الفيزيائية والتكنولوجيا', 'الرياضيات', 'علوم الطبيعة والحياة', 'اللغة العربية', 'اللغة الفرنسية', 'اللغة الإنجليزية', 'العلوم الإسلامية', 'الاجتماعيات', 'الفلسفة'],
       'رياضيات': ['العلوم الفيزيائية', 'الرياضيات', 'اللغة العربية', 'اللغة الفرنسية', 'اللغة الإنجليزية', 'العلوم الإسلامية', 'الاجتماعيات', 'الفلسفة'],
       'تسيير واقتصاد': ['اللغة العربية', 'اللغة الفرنسية', 'اللغة الإنجليزية', 'المحاسبة', 'العلوم الإسلامية', 'الاجتماعيات', 'الفلسفة'],
-      'تقني رياضي': ['العلوم الفيزيائية', 'اللغة الفرنسية', 'اللغة الإنجليزية', 'العلوم الإسلامية', 'الاجتماعيات', 'الفلسفة'],
-      'آداب ولغات': ['اللغة العربية', 'الفلسفة', 'اللغة الفرنسية', 'اللغة الإنجليزية', 'اللغة الألمانية', 'اللغة الإسبانية', 'العلوم الإسلامية', 'الاجتماعيات']
+      'تقني رياضي': ['العلوم الفيزيائية', 'الرياضيات', 'اللغة الفرنسية', 'اللغة الإنجليزية', 'العلوم الإسلامية', 'الاجتماعيات', 'الفلسفة'],
+      'آداب ولغات': ['اللغة العربية', 'الفلسفة', 'اللغة الفرنسية', 'اللغة الإنجليزية', 'اللغة الألمانية', 'اللغة الإسبانية', 'رياضيات (للأدبيين)', 'العلوم الإسلامية', 'الاجتماعيات']
     }
   };
 
@@ -70,6 +151,19 @@ const SubjectService = (function () {
     return SUBJECT_ICONS[name] || '📚';
   }
 
+  // ── Authoritative Subject + Teacher Pairs ─────────────
+  // Returns the exact {subject, teacher} pairs used by the
+  // initial registration (index.html) for a given level/stream.
+  function getSubjectTeacherPairs(level, stream) {
+    if (level === 'السنة الرابعة متوسط') {
+      return Array.isArray(SUPPORT_MIDDLE_SCHOOL) ? SUPPORT_MIDDLE_SCHOOL : [];
+    }
+    if (level === 'السنة الثالثة ثانوي (بكالوريا)' && stream && SUPPORT_STREAMS[stream]) {
+      return SUPPORT_STREAMS[stream] || [];
+    }
+    return [];
+  }
+
   // ── Level Subject Lists ───────────────────────────────
 
   function getSubjectsForLevel(level, stream) {
@@ -88,13 +182,19 @@ const SubjectService = (function () {
   let _teachersCacheTime = 0;
   const CACHE_TTL = 60000; // 1 minute
 
+  function _resolveDb() {
+    return window._db || window.db || (typeof db !== 'undefined' ? db : null);
+  }
+
   async function _loadTeachers() {
     const now = Date.now();
     if (_teachersCache && (now - _teachersCacheTime) < CACHE_TTL) {
       return _teachersCache;
     }
+    const fdb = _resolveDb();
+    if (!fdb) { _teachersCache = []; _teachersCacheTime = now; return _teachersCache; }
     try {
-      const snap = await db.collection('support_teachers')
+      const snap = await fdb.collection('support_teachers')
         .where('status', '==', 'active')
         .get();
       _teachersCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -104,6 +204,19 @@ const SubjectService = (function () {
       _teachersCache = [];
     }
     return _teachersCache;
+  }
+
+  // Find the Firestore teacher matching a name (for teacherId enrichment)
+  function _findTeacherByName(teachers, teacherName, level) {
+    if (!teacherName) return null;
+    const norm = name => String(name || '').replace(/\s+/g, '').toLowerCase();
+    const target = norm(teacherName);
+    return teachers.find(t => {
+      if (norm(t.name) !== target) return false;
+      if (!level) return true;
+      const tLevels = Array.isArray(t.levels) ? t.levels : [];
+      return tLevels.length === 0 || tLevels.includes(level);
+    }) || null;
   }
 
   async function getTeachersForSubject(subjectName, level) {
@@ -129,34 +242,28 @@ const SubjectService = (function () {
   }
 
   // ── Dynamic Dropdown Builder ──────────────────────────
-
+  // Builds options from the AUTHORITATIVE registration pairs,
+  // then enriches each with the Firestore teacherId when the
+  // teacher exists. Guarantees the admin dropdown exactly
+  // matches what the student saw during initial registration.
   async function buildSubjectTeacherOptions(level, stream) {
-    const subjects = getSubjectsForLevel(level, stream);
+    const pairs = getSubjectTeacherPairs(level, stream);
+    const teachers = await _loadTeachers();
     const options = [];
 
-    for (const subject of subjects) {
-      const teachers = await getTeachersForSubject(subject, level);
-      if (teachers.length === 0) {
-        options.push({
-          label: getSubjectIcon(subject) + ' ' + subject + ' — (بدون أستاذ)',
-          value: subject,
-          subjectId: getSubjectId(subject),
-          subject: subject,
-          teacherId: null,
-          teacherName: null
-        });
-      } else {
-        for (const teacher of teachers) {
-          options.push({
-            label: getSubjectIcon(subject) + ' ' + subject + ' — الأستاذ ' + (teacher.name || ''),
-            value: subject + '|' + (teacher.teacherId || teacher.id),
-            subjectId: getSubjectId(subject),
-            subject: subject,
-            teacherId: teacher.teacherId || teacher.id,
-            teacherName: teacher.name || ''
-          });
-        }
-      }
+    for (const p of pairs) {
+      const subject = p.subject;
+      const teacherName = p.teacher;
+      const t = _findTeacherByName(teachers, teacherName, level);
+      options.push({
+        label: getSubjectIcon(subject) + ' ' + subject + ' — الأستاذ ' + teacherName,
+        value: subject + '|' + (t ? (t.teacherId || t.id) : teacherName),
+        subjectId: getSubjectId(subject),
+        subject: subject,
+        teacherId: t ? (t.teacherId || t.id) : '',
+        teacherName: teacherName,
+        teacher: teacherName
+      });
     }
     return options;
   }
@@ -169,7 +276,7 @@ const SubjectService = (function () {
     }
     return subjects.map(s => {
       const name = s.subject || s;
-      const teacher = s.teacher || '—';
+      const teacher = s.teacher || s.teacherName || '—';
       const icon = getSubjectIcon(name);
       return `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;background:var(--primary-light);font-size:12px">
         <span>${icon} ${name}</span>
@@ -190,9 +297,12 @@ const SubjectService = (function () {
     SUBJECT_IDS,
     SUBJECT_ICONS,
     SUBJECTS_BY_LEVEL,
+    SUPPORT_STREAMS,
+    SUPPORT_MIDDLE_SCHOOL,
     getSubjectId,
     getSubjectName,
     getSubjectIcon,
+    getSubjectTeacherPairs,
     getSubjectsForLevel,
     getTeachersForSubject,
     getTeachersForLevel,

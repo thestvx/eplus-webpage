@@ -98,6 +98,9 @@ CREATE TABLE IF NOT EXISTS registrations (
 -- ترحيل: إضافة student_token إذا لم يكن موجوداً (للقواعد الموجودة مسبقاً)
 ALTER TABLE registrations ADD COLUMN IF NOT EXISTS student_token TEXT DEFAULT '';
 
+-- ترحيل: إضافة deleted_at للحذف الناعم (يحفظ السجل التاريخي ويزيل من القائمة النشطة)
+ALTER TABLE registrations ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+
 -- ملء التوكنات الفارغة بقيم عشوائية فريدة
 UPDATE registrations
 SET student_token = substr(md5(random()::text || clock_timestamp()::text || id), 1, 32)

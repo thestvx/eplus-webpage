@@ -64,7 +64,7 @@ async function loadData() {
       },
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    allData = await res.json();
+    allData = (await res.json()).filter(r => !r.deleted_at);
     applyFilters();
   } catch (e) {
     console.error('Failed to load:', e);
