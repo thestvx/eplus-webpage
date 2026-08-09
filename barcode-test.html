@@ -6,7 +6,7 @@
 <title>اختبار الباركود SP-1160 - E-PLUS</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script src="js/ean13.js"></script>
-<script src="js/studentCardRenderer.js?v=2"></script>
+<script src="js/studentCardRenderer.js?v=3"></script>
 <script>
   const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
@@ -20,25 +20,32 @@ h1{text-align:center;font-size:24px;margin-bottom:8px}
 .panel{background:#fff;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
 .panel h2{font-size:18px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e2e8f0}
 .panel h2 small{font-size:12px;color:#64748b;font-weight:600}
-.test-note{font-size:12.5px;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;line-height:1.7}
+.test-note{font-size:12.5px;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;line-height:1.8}
+.test-note b{color:#1e293b}
 .input-row{display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
 .input-row input{flex:1;min-width:160px;padding:12px 16px;border:2px solid #e2e8f0;border-radius:8px;font-size:16px;font-family:monospace;direction:ltr;text-align:left}
 .input-row input:focus{outline:none;border-color:#6366f1}
 .input-row button{padding:12px 24px;border:none;border-radius:8px;font-size:15px;font-weight:800;cursor:pointer;white-space:nowrap}
-.btn-gen{background:#6366f1;color:#fff}
-.btn-gen:hover{background:#4f46e5}
-.btn-test{background:#10b981;color:#fff}
-.btn-test:hover{background:#059669}
 .btn-print{background:#0ea5e9;color:#fff}
 .btn-print:hover{background:#0284c7}
-.barcode-display{display:flex;justify-content:center;padding:20px;background:#fff;border:2px solid #e2e8f0;border-radius:8px;margin-bottom:16px;overflow:visible}
-.barcode-display svg{max-width:none!important;height:auto!important}
+.btn-gen{background:#6366f1;color:#fff}
+.btn-gen:hover{background:#4f46e5}
+.barcode-display{display:flex;justify-content:center;align-items:center;padding:16px;background:#fff;border:2px solid #e2e8f0;border-radius:8px;margin-bottom:16px;overflow:visible}
+.barcode-display svg{display:block}
+.spec-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.spec-box{padding:12px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0;text-align:center}
+.spec-box .label{font-size:11px;color:#64748b;margin-bottom:4px}
+.spec-box .value{font-family:monospace;font-size:15px;font-weight:700;color:#1e293b}
 .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}
 .info-box{padding:12px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0}
 .info-box .label{font-size:12px;color:#64748b;margin-bottom:4px}
 .info-box .value{font-family:monospace;font-size:16px;font-weight:700;color:#1e293b;word-break:break-all}
 .info-box .value.ok{color:#059669}
 .info-box .value.bad{color:#dc2626}
+.verdict{padding:12px 16px;border-radius:8px;font-size:13px;font-weight:700;margin-bottom:14px;display:none}
+.verdict.show{display:block}
+.verdict.pass{background:#dcfce7;color:#166534;border:1.5px solid #86efac}
+.verdict.fail{background:#fee2e2;color:#991b1b;border:1.5px solid #fca5a5}
 .log-area{background:#1e293b;color:#a5f3fc;border-radius:8px;padding:16px;font-family:monospace;font-size:13px;max-height:250px;overflow-y:auto;line-height:1.6}
 .log-entry{margin-bottom:2px}
 .log-entry.info{color:#67e8f9}
@@ -60,13 +67,13 @@ hr{border:none;border-top:1px solid #e2e8f0;margin:16px 0}
 </head>
 <body>
 
-<h1>🧪 اختبار الباركود — SP-1160</h1>
-<p class="subtitle">صفحة قبول ماسح SP-1160: توليد + مسح حقيقي لباركود EAN-13 على بطاقة مطبوعة</p>
+<h1>🧪 Barcode Hardware Test — SP-1160</h1>
+<p class="subtitle">اختبار القبول النهائي للجهاز: كل اختبارين يطبعان بنفس الأبعاد الفيزيائية تماماً (EAN-13 قياسي)</p>
 
-<!-- Scan Test Panel -->
+<!-- Scanner Status Panel -->
 <div class="panel">
-  <h2>📷 اختبار المسح <small>— Scanner Status</small></h2>
-  <p style="color:#64748b;font-size:13px;margin-bottom:12px">امسح الباركود بالجهاز الآن — الإدخال سيركز هنا تلقائياً (لا حاجة لضغطة)</p>
+  <h2>📷 Scanner Status <small>— Smart SP-1160</small></h2>
+  <p style="color:#64748b;font-size:13px;margin-bottom:12px">امسح الباركود بالجهاز الآن — الإدخال سيركز هنا تلقائياً (لا حاجة لضغطة). الباركود يُطبَع ويُمسح، وقيمته الخام تظهر هنا.</p>
   <div class="input-row">
     <input type="text" id="scan-input" class="scan-input" placeholder="امسح الباركود هنا..." autofocus>
   </div>
@@ -80,52 +87,53 @@ hr{border:none;border-top:1px solid #e2e8f0;margin:16px 0}
   <div id="scan-student" class="student-result"></div>
 </div>
 
-<!-- Test 1: Reference barcode -->
+<!-- TEST A — Product barcode -->
 <div class="panel">
-  <h2>الاختبار 1 — الباركود المرجعي (منتج حقيقي) <small>value: 6132633200060</small></h2>
-  <div class="test-note">باركود منتج حقيقي صالح — يجب أن يمسحه الجهاز بنجاح. إذا لم يُقرأ فأعد ضبط الجهاز على وضع HID Keyboard قبل المتابعة.</div>
-  <div class="barcode-display" id="test1-barcode"></div>
-  <div class="info-grid">
-    <div class="info-box"><div class="label">EAN-13 صالح؟</div><div class="value" id="test1-valid">—</div></div>
-    <div class="info-box"><div class="label">طول (أرقام)</div><div class="value" id="test1-len">—</div></div>
+  <h2>TEST A — باركود المنتج <small>value: 6132633200060</small></h2>
+  <div class="test-note">
+    باركود منتج حقيقي يقرؤه الجهاز. يُعرض ويُطبع الآن بنفس الأبعاد القياسية المستخدمة في باركود الطالب.
+    <b>طريقة الاختبار:</b> اضغط <b>🖨️ Print TEST A</b>، أطبع على ورقة A4، ثم امسح الباركود المطبوع بالجهاز —
+    افتح <b>Notepad</b> وامسحه، يجب أن يظهر <code style="direction:ltr;display:inline-block">6132633200060</code>.
   </div>
-</div>
-
-<!-- Test 2: Per-student EAN-13 -->
-<div class="panel">
-  <h2>الاختبار 2 — باركود الطالب (EAN-13) <small>مولّد من رقم التسجيل</small></h2>
-  <div class="test-note">باركود ثابت لكل طالب: <b>200 + رقم التسجيل (9 خانات) + خانة تحقق</b>. نفس الطالب = نفس الباركود دائماً، لا يتغيّر بإعادة الطباعة أو فتح البوابة أو تعديل البيانات.</div>
+  <div class="barcode-display" id="testA-barcode"></div>
+  <div class="spec-grid" id="testA-spec"></div>
   <div class="input-row">
-    <input type="text" id="test2-input" placeholder="رقم تسجيل الطالب (مثال: 901)" value="901" inputmode="numeric">
-    <button class="btn-gen" onclick="runTest2()">توليد</button>
-  </div>
-  <div class="barcode-display" id="test2-barcode"></div>
-  <div class="info-grid">
-    <div class="info-box"><div class="label">رقم التسجيل</div><div class="value" id="test2-id">—</div></div>
-    <div class="info-box"><div class="label">قيمة الباركود</div><div class="value" id="test2-value">—</div></div>
-    <div class="info-box"><div class="label">خانة التحقق</div><div class="value" id="test2-check">—</div></div>
-    <div class="info-box"><div class="label">EAN-13 صالح؟</div><div class="value" id="test2-valid">—</div></div>
+    <button class="btn-print" onclick="printBarcode('6132633200060')">🖨️ Print TEST A — 6132633200060</button>
   </div>
 </div>
 
-<!-- Test 3: Card size -->
+<!-- TEST B — Student barcode -->
 <div class="panel">
-  <h2>الاختبار 3 — حجم البطاقة الحالي <small>نفس أبعاد باركود بطاقة الطالب</small></h2>
-  <div class="test-note">نفس <code>BARCODE_OPTS</code> المستخدم في بطاقة الطالب (مقاس PVC صغير، أسود على أبيض، منطقة صمت على الجانبين). امسحه من شاشة وبعد الطباعة.</div>
-  <div class="barcode-display" id="test3-barcode"></div>
-  <div class="info-grid">
-    <div class="info-box"><div class="label">الصيغة</div><div class="value" id="test3-format">EAN13</div></div>
-    <div class="info-box"><div class="label">العرض × الارتفاع</div><div class="value" id="test3-size">—</div></div>
+  <h2>TEST B — باركود الطالب <small>value: 2000000007304</small></h2>
+  <div class="test-note">
+    باركود بطاقة الطالب المطبوعة. يُعرض ويُطبع بنفس <b>العرض، الارتفاع، X-dimension، منطقة الصمت، جودة التصيير</b> المستخدمة في TEST A بالضبط.
+    <b>طريقة الاختبار:</b> اضغط <b>🖨️ Print TEST B</b>، اطبع، ثم امسحه في <b>Notepad</b> — يجب أن يظهر
+    <code style="direction:ltr;display:inline-block">2000000007304</code>.
+    إذا قرأ الجهاز TEST A ولم يقرأ TEST B بنفس الأبعاد، فالمشكلة في الترميز نفسه (وليس الحجم).
   </div>
-</div>
-
-<!-- Test 4: Print only -->
-<div class="panel">
-  <h2>الاختبار 4 — طباعة الباركود فقط <small>ورقة بيضاء لا شيء غير الباركود</small></h2>
-  <div class="test-note">يطبع ورقة بيضاء تحتوي الباركود فقط — للتحقق النهائي من قراءة الجهاز للباركود المطبوع (شرط القبول الأساسي).</div>
+  <div class="barcode-display" id="testB-barcode"></div>
+  <div class="spec-grid" id="testB-spec"></div>
   <div class="input-row">
-    <input type="text" id="test4-input" placeholder="رقم تسجيل الطالب (مثال: 901)" value="901" inputmode="numeric">
-    <button class="btn-print" onclick="printTestBarcode()">🖨️ Print Test Barcode</button>
+    <button class="btn-print" onclick="printBarcode('2000000007304')">🖨️ Print TEST B — 2000000007304</button>
+  </div>
+  <div class="verdict" id="testB-verdict"></div>
+</div>
+
+<!-- Generator (optional) -->
+<div class="panel">
+  <h2>⚙️ مولّد باركود أي طالب <small>— بنفس الأبعاد القياسية</small></h2>
+  <div class="test-note">أدخل رقم تسجيل أي طالب ليُولَّد باركوده EAN-13 ويعرض ويطبع بنفس الأبعاد. القيمة تعتمد على رقم التسجيل فقط (ثابتة دائماً).</div>
+  <div class="input-row">
+    <input type="text" id="gen-input" placeholder="رقم تسجيل الطالب (مثال: 730)" value="730" inputmode="numeric">
+    <button class="btn-gen" onclick="runGenerator()">توليد</button>
+    <button class="btn-print" onclick="printGenerator()">🖨️ Print</button>
+  </div>
+  <div class="barcode-display" id="gen-barcode"></div>
+  <div class="info-grid">
+    <div class="info-box"><div class="label">رقم التسجيل</div><div class="value" id="gen-id">—</div></div>
+    <div class="info-box"><div class="label">قيمة الباركود</div><div class="value" id="gen-value">—</div></div>
+    <div class="info-box"><div class="label">خانة التحقق</div><div class="value" id="gen-check">—</div></div>
+    <div class="info-box"><div class="label">EAN-13 صالح؟</div><div class="value" id="gen-valid">—</div></div>
   </div>
 </div>
 
@@ -152,99 +160,94 @@ function setStatus(msg, type='info'){
   el.className='status-bar show '+type;
 }
 
-function makeBarcode(value, container, opts){
+// Render an EAN-13 at the exact GS1 physical size — SAME renderer for
+// TEST A, TEST B, the card, and the portal. Never scale the SVG.
+function renderAtPhysicalSize(value, containerId){
+  const container=byId(containerId);
   if(!container) return null;
   container.innerHTML='';
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
   container.appendChild(svg);
-  try{
-    JsBarcode(svg, value, Object.assign({ xmlDocument: document }, opts));
-    return svg;
-  }catch(e){
-    container.innerHTML='<div style="color:#dc2626;font-weight:800;font-size:13px">❌ '+(e.message||'فشل التوليد')+'</div>';
-    log('خطأ في التوليد: '+e.message,'error');
+  const ok=StudentCardRenderer.renderBarcodeSVG(svg, String(value), document);
+  if(!ok){
+    container.innerHTML='<div style="color:#dc2626;font-weight:800;font-size:13px">❌ فشل توليد الباركود</div>';
     return null;
   }
+  return svg;
 }
 
-function barcodeOpts(over){
-  return Object.assign({
-    format:'EAN13',
-    displayValue:true,
-    lineColor:'#000000',
-    background:'#ffffff',
-    width:1.6,
-    height:32,
-    margin:6,
-    fontSize:9,
-    font:'monospace',
-    fontOptions:'bold',
-    textMargin:3
-  }, over||{});
+function fillSpec(containerId){
+  const spec=StudentCardRenderer.barcodeSpec();
+  const el=byId(containerId);
+  if(!el) return;
+  el.innerHTML=
+    '<div class="spec-box"><div class="label">Symbology</div><div class="value">EAN-13</div></div>'+
+    '<div class="spec-box"><div class="label">X-dimension</div><div class="value">'+spec.Xmm.toFixed(2)+' mm</div></div>'+
+    '<div class="spec-box"><div class="label">ارتفاع الأشرطة</div><div class="value">'+spec.barHeightMm.toFixed(1)+' mm</div></div>'+
+    '<div class="spec-box"><div class="label">منطقة الصمت</div><div class="value">'+spec.quietMm.toFixed(2)+' mm /جانب</div></div>'+
+    '<div class="spec-box"><div class="label">العرض الكلي</div><div class="value">'+spec.widthMm.toFixed(2)+' mm</div></div>'+
+    '<div class="spec-box"><div class="label">الارتفاع الكلي</div><div class="value">'+spec.heightMm.toFixed(2)+' mm</div></div>'+
+    '<div class="spec-box"><div class="label">الألوان</div><div class="value">#000 / #FFF</div></div>';
 }
 
-// ── Test 1: reference product barcode ──
-function runTest1(){
+// ── TEST A — product barcode ──
+function runTestA(){
   const value='6132633200060';
-  makeBarcode(value, byId('test1-barcode'), barcodeOpts());
+  renderAtPhysicalSize(value,'testA-barcode');
+  fillSpec('testA-spec');
+  log('TEST A: الباركود المرجعي '+value+' — صالح: '+EAN13.isValid(value),EAN13.isValid(value)?'success':'error');
+}
+
+// ── TEST B — student barcode (the printed card value) ──
+function runTestB(){
+  const value='2000000007304';
+  renderAtPhysicalSize(value,'testB-barcode');
+  fillSpec('testB-spec');
   const valid=EAN13.isValid(value);
-  byId('test1-valid').textContent=valid?'✅ صالح':'❌ غير صالح';
-  byId('test1-valid').className='value '+(valid?'ok':'bad');
-  byId('test1-len').textContent=value.length+' رقم';
-  log('الاختبار 1: الباركود المرجعي 6132633200060 — '+(valid?'صالح':'غير صالح'),valid?'success':'error');
-}
-
-// ── Test 2: per-student EAN-13 ──
-function runTest2(){
-  const raw=byId('test2-input').value.trim();
-  const id=String(raw||'').replace(/\D/g,'');
-  if(!id){log('أدخل رقم تسجيل صحيح','error');return;}
-  const value=EAN13.make(id);
-  if(!value){log('تعذر توليد قيمة الباركود','error');return;}
-  makeBarcode(value, byId('test2-barcode'), barcodeOpts());
-  const valid=EAN13.isValid(value);
-  byId('test2-id').textContent=id;
-  byId('test2-value').textContent=value;
-  byId('test2-check').textContent=value.slice(-1);
-  byId('test2-valid').textContent=valid?'✅ صالح':'❌ غير صالح';
-  byId('test2-valid').className='value '+(valid?'ok':'bad');
-  log('الاختبار 2: طالب '+id+' → '+value+' ('+(valid?'صالح':'غير صالح')+')',valid?'success':'error');
-}
-
-// ── Test 3: card size ──
-function runTest3(){
-  const id=byId('test2-input').value.trim() || '901';
-  const value=EAN13.make(id);
-  if(!value){log('تعذر توليد قيمة الباركود','error');return;}
-  const svg=makeBarcode(value, byId('test3-barcode'), barcodeOpts());
-  if(svg){
-    const w=parseInt(svg.getAttribute('width')||'0',10);
-    const h=parseInt(svg.getAttribute('height')||'0',10);
-    byId('test3-size').textContent=w+' × '+h+' px';
-    log('الاختبار 3: الباركود بمقاس البطاقة '+w+' × '+h+' px','success');
+  const verdict=byId('testB-verdict');
+  if(valid){
+    verdict.className='verdict show pass';
+    verdict.innerHTML='✅ <b>باركود الطالب صالح EAN-13 وخانة التحقق صحيحة.</b> الآن اطبع TEST B (الأبعاد مطابقة تماماً لـ TEST A) وامسحه بالجهاز.';
+  }else{
+    verdict.className='verdict show fail';
+    verdict.textContent='❌ الباركود غير صالح!';
   }
+  log('TEST B: باركود الطالب '+value+' — صالح: '+valid,valid?'success':'error');
 }
 
-// ── Test 4: print only barcode ──
-function printTestBarcode(){
-  const raw=byId('test4-input').value.trim();
+// ── Print single barcode at exact physical size (@page margin:0) ──
+function printBarcode(value){
+  if(!EAN13.isValid(String(value))){ log('قيمة غير صالحة للطباعة: '+value,'error'); return; }
+  const win=window.open('','_blank','width=760,height=460');
+  if(!win){ log('⚠️ يرجى السماح بالنوافذ المنبثقة للطباعة','warn'); return; }
+  win.document.write(StudentCardRenderer.buildBarcodePrintHTML(String(value)));
+  win.document.close();
+  log('أُرسل باركود الطباعة ('+value+') — الأبعاد: '+StudentCardRenderer.barcodeSpec().widthMm+'mm × '+StudentCardRenderer.barcodeSpec().heightMm+'mm','success');
+}
+
+// ── Generator ──
+function genValue(){
+  const raw=byId('gen-input').value.trim();
   const id=String(raw||'').replace(/\D/g,'');
-  const value=id?EAN13.make(id):'6132633200060';
-  if(!value){log('تعذر توليد قيمة الباركود','error');return;}
-  const printWin=window.open('','_blank','width=600,height=400');
-  if(!printWin){log('⚠️ يرجى السماح بالنوافذ المنبثقة للطباعة','warn');return;}
-  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-  try{
-    JsBarcode(svg, value, Object.assign({}, barcodeOpts(), { height:60, fontSize:16, xmlDocument: document }));
-  }catch(e){
-    printWin.close();
-    log('خطأ في توليد باركود الطباعة: '+e.message,'error');
-    return;
-  }
-  const svgStr=new XMLSerializer().serializeToString(svg);
-  printWin.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>طباعة باركود الاختبار</title><style>@media print{@page{margin:0}html,body{width:100%;height:100%}body{margin:0;padding:0;background:#ffffff}svg{position:fixed;inset:0;margin:auto}}body{margin:0;background:#ffffff;display:flex;align-items:center;justify-content:center;min-height:100vh}svg{max-width:94vw;height:auto}</style></head><body>'+svgStr+'<script>window.onafterprint=function(){window.close();};window.matchMedia&&window.matchMedia("print").addEventListener("change",function(m){if(!m.matches)window.close();});setTimeout(function(){try{window.print();}catch(e){}},300);<\/script></body></html>');
-  printWin.document.close();
-  log('الاختبار 4: أُرسل باركود الطباعة ('+value+')','success');
+  if(!id){ log('أدخل رقم تسجيل صحيح','error'); return null; }
+  const value=EAN13.make(id);
+  if(!value){ log('تعذر توليد قيمة الباركود','error'); return null; }
+  return { id, value };
+}
+function runGenerator(){
+  const g=genValue(); if(!g) return;
+  renderAtPhysicalSize(g.value,'gen-barcode');
+  byId('gen-id').textContent=g.id;
+  byId('gen-value').textContent=g.value;
+  byId('gen-check').textContent=g.value.slice(-1);
+  const valid=EAN13.isValid(g.value);
+  byId('gen-valid').textContent=valid?'✅ صالح':'❌ غير صالح';
+  byId('gen-valid').className='value '+(valid?'ok':'bad');
+  log('المولّد: طالب '+g.id+' → '+g.value+' ('+(valid?'صالح':'غير صالح')+')',valid?'success':'error');
+}
+function printGenerator(){
+  const g=genValue(); if(!g) return;
+  printBarcode(g.value);
 }
 
 // ── Scan handling ──
@@ -254,9 +257,7 @@ let processing=false;
 
 function detectFormat(raw){
   const numeric=String(raw).replace(/\D/g,'');
-  if(numeric.length===13){
-    return { label:'EAN-13', numeric };
-  }
+  if(numeric.length===13) return { label:'EAN-13', numeric };
   if(numeric.length===8) return { label:'EAN-8', numeric };
   if(/^EPLUS-/i.test(raw)) return { label:'EPLUS (قديم)', numeric:'' };
   return { label:'غير معروف', numeric:'' };
@@ -357,9 +358,9 @@ document.addEventListener('click',function(){
 log('الصفحة جاهزة','success');
 log('JsBarcode: '+(typeof JsBarcode!=='undefined'?'محمل':'غير محمل'),typeof JsBarcode!=='undefined'?'success':'error');
 log('EAN13: '+(typeof EAN13!=='undefined'?'محمل':'غير محمل'),typeof EAN13!=='undefined'?'success':'error');
-runTest1();
-runTest2();
-runTest3();
+log('الأبعاد الفيزيائية: '+StudentCardRenderer.barcodeSpec().widthMm+'mm × '+StudentCardRenderer.barcodeSpec().heightMm+'mm (X='+StudentCardRenderer.barcodeSpec().Xmm+'mm, bars='+StudentCardRenderer.barcodeSpec().barHeightMm+'mm, quiet='+StudentCardRenderer.barcodeSpec().quietMm+'mm)','info');
+runTestA();
+runTestB();
 setTimeout(()=>scanInput.focus(),100);
 </script>
 </body>
