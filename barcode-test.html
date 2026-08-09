@@ -3,8 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>اختبار الباركود - E-PLUS</title>
+<title>اختبار الباركود SP-1160 - E-PLUS</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="js/ean13.js"></script>
+<script src="js/studentCardRenderer.js?v=2"></script>
+<script>
+  const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
+</script>
+<script src="js/registrationService.js?v=1"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Tajawal',system-ui,sans-serif;background:#f1f5f9;color:#1e293b;padding:20px}
@@ -12,27 +19,26 @@ h1{text-align:center;font-size:24px;margin-bottom:8px}
 .subtitle{text-align:center;color:#64748b;margin-bottom:24px;font-size:14px}
 .panel{background:#fff;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
 .panel h2{font-size:18px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e2e8f0}
-.input-row{display:flex;gap:10px;margin-bottom:16px;align-items:center}
-.input-row input{flex:1;padding:12px 16px;border:2px solid #e2e8f0;border-radius:8px;font-size:16px;font-family:monospace;direction:ltr;text-align:left}
+.panel h2 small{font-size:12px;color:#64748b;font-weight:600}
+.test-note{font-size:12.5px;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;line-height:1.7}
+.input-row{display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+.input-row input{flex:1;min-width:160px;padding:12px 16px;border:2px solid #e2e8f0;border-radius:8px;font-size:16px;font-family:monospace;direction:ltr;text-align:left}
 .input-row input:focus{outline:none;border-color:#6366f1}
-.input-row button{padding:12px 24px;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;white-space:nowrap}
+.input-row button{padding:12px 24px;border:none;border-radius:8px;font-size:15px;font-weight:800;cursor:pointer;white-space:nowrap}
 .btn-gen{background:#6366f1;color:#fff}
 .btn-gen:hover{background:#4f46e5}
 .btn-test{background:#10b981;color:#fff}
 .btn-test:hover{background:#059669}
-.btn-clear{background:#e2e8f0;color:#475569}
-.btn-clear:hover{background:#cbd5e1}
+.btn-print{background:#0ea5e9;color:#fff}
+.btn-print:hover{background:#0284c7}
 .barcode-display{display:flex;justify-content:center;padding:20px;background:#fff;border:2px solid #e2e8f0;border-radius:8px;margin-bottom:16px;overflow:visible}
 .barcode-display svg{max-width:none!important;height:auto!important}
-.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}
 .info-box{padding:12px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0}
 .info-box .label{font-size:12px;color:#64748b;margin-bottom:4px}
 .info-box .value{font-family:monospace;font-size:16px;font-weight:700;color:#1e293b;word-break:break-all}
-.scale-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.scale-card{text-align:center}
-.scale-card .scale-label{font-size:13px;font-weight:700;color:#64748b;margin-bottom:8px}
-.scale-card .scale-box{background:#fff;border:2px solid #e2e8f0;border-radius:8px;padding:16px;display:flex;justify-content:center;overflow:visible}
-.scale-card .scale-box svg{max-width:none!important;height:auto!important}
+.info-box .value.ok{color:#059669}
+.info-box .value.bad{color:#dc2626}
 .log-area{background:#1e293b;color:#a5f3fc;border-radius:8px;padding:16px;font-family:monospace;font-size:13px;max-height:250px;overflow-y:auto;line-height:1.6}
 .log-entry{margin-bottom:2px}
 .log-entry.info{color:#67e8f9}
@@ -46,105 +52,80 @@ h1{text-align:center;font-size:24px;margin-bottom:8px}
 .status-bar.success{background:#dcfce7;color:#166534}
 .status-bar.error{background:#fee2e2;color:#991b1b}
 .status-bar.info{background:#dbeafe;color:#1e40af}
+.student-result{padding:14px 18px;border-radius:10px;font-size:14px;font-weight:700;margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.student-result.found{background:#ecfdf5;border:1.5px solid #10b981;color:#065f46}
+.student-result.notfound{background:#fffbeb;border:1.5px solid #f59e0b;color:#92400e}
 hr{border:none;border-top:1px solid #e2e8f0;margin:16px 0}
 </style>
 </head>
 <body>
 
-<h1>🔍 اختبار الباركود</h1>
-<p class="subtitle">صفحة مستقلة لاختبار توليد الباركود ومسحه بالجهاز</p>
+<h1>🧪 اختبار الباركود — SP-1160</h1>
+<p class="subtitle">صفحة قبول ماسح SP-1160: توليد + مسح حقيقي لباركود EAN-13 على بطاقة مطبوعة</p>
 
 <!-- Scan Test Panel -->
 <div class="panel">
-  <h2>📷 اختبار المسح</h2>
-  <p style="color:#64748b;font-size:13px;margin-bottom:12px">امسح الباركود بالجهاز الآن — الإدخال سيركز هنا تلقائياً</p>
+  <h2>📷 اختبار المسح <small>— Scanner Status</small></h2>
+  <p style="color:#64748b;font-size:13px;margin-bottom:12px">امسح الباركود بالجهاز الآن — الإدخال سيركز هنا تلقائياً (لا حاجة لضغطة)</p>
   <div class="input-row">
     <input type="text" id="scan-input" class="scan-input" placeholder="امسح الباركود هنا..." autofocus>
   </div>
-  <div id="scan-status" class="status-bar"></div>
+  <div id="scan-status" class="status-bar info show">⏳ في انتظار المسح...</div>
+  <div class="info-grid" style="margin-top:12px">
+    <div class="info-box"><div class="label">القيمة الخام</div><div class="value" id="scan-raw">—</div></div>
+    <div class="info-box"><div class="label">الطول</div><div class="value" id="scan-len">—</div></div>
+    <div class="info-box"><div class="label">الصيغة</div><div class="value" id="scan-format">—</div></div>
+    <div class="info-box"><div class="label">الصلاحية</div><div class="value" id="scan-valid">—</div></div>
+  </div>
+  <div id="scan-student" class="student-result"></div>
 </div>
 
-<!-- Generate Panel -->
+<!-- Test 1: Reference barcode -->
 <div class="panel">
-  <h2>⚡ توليد باركود</h2>
+  <h2>الاختبار 1 — الباركود المرجعي (منتج حقيقي) <small>value: 6132633200060</small></h2>
+  <div class="test-note">باركود منتج حقيقي صالح — يجب أن يمسحه الجهاز بنجاح. إذا لم يُقرأ فأعد ضبط الجهاز على وضع HID Keyboard قبل المتابعة.</div>
+  <div class="barcode-display" id="test1-barcode"></div>
+  <div class="info-grid">
+    <div class="info-box"><div class="label">EAN-13 صالح؟</div><div class="value" id="test1-valid">—</div></div>
+    <div class="info-box"><div class="label">طول (أرقام)</div><div class="value" id="test1-len">—</div></div>
+  </div>
+</div>
+
+<!-- Test 2: Per-student EAN-13 -->
+<div class="panel">
+  <h2>الاختبار 2 — باركود الطالب (EAN-13) <small>مولّد من رقم التسجيل</small></h2>
+  <div class="test-note">باركود ثابت لكل طالب: <b>200 + رقم التسجيل (9 خانات) + خانة تحقق</b>. نفس الطالب = نفس الباركود دائماً، لا يتغيّر بإعادة الطباعة أو فتح البوابة أو تعديل البيانات.</div>
   <div class="input-row">
-    <input type="text" id="barcode-input" placeholder="أدخل قيمة الباركود (مثال: EPLUS-001)" value="EPLUS-123">
-    <button class="btn-gen" onclick="generate()">توليد</button>
-    <button class="btn-clear" onclick="clearAll()">مسح</button>
+    <input type="text" id="test2-input" placeholder="رقم تسجيل الطالب (مثال: 901)" value="901" inputmode="numeric">
+    <button class="btn-gen" onclick="runTest2()">توليد</button>
   </div>
-  <div class="barcode-display" id="barcode-main"></div>
+  <div class="barcode-display" id="test2-barcode"></div>
   <div class="info-grid">
-    <div class="info-box">
-      <div class="label">القيمة الخام</div>
-      <div class="value" id="raw-value">—</div>
-    </div>
-    <div class="info-box">
-      <div class="label">القيمة بعد التنظيف</div>
-      <div class="value" id="clean-value">—</div>
-    </div>
-    <div class="info-box">
-      <div class="label">الطول</div>
-      <div class="value" id="char-count">—</div>
-    </div>
-    <div class="info-box">
-      <div class="label">الحالة</div>
-      <div class="value" id="gen-status">—</div>
-    </div>
+    <div class="info-box"><div class="label">رقم التسجيل</div><div class="value" id="test2-id">—</div></div>
+    <div class="info-box"><div class="label">قيمة الباركود</div><div class="value" id="test2-value">—</div></div>
+    <div class="info-box"><div class="label">خانة التحقق</div><div class="value" id="test2-check">—</div></div>
+    <div class="info-box"><div class="label">EAN-13 صالح؟</div><div class="value" id="test2-valid">—</div></div>
   </div>
 </div>
 
-<!-- Scales Panel -->
+<!-- Test 3: Card size -->
 <div class="panel">
-  <h2>📏 مقاسات متعددة</h2>
-  <p style="color:#64748b;font-size:13px;margin-bottom:16px">باركود واحد بأربعة مقاسات مختلفة — جرّب مسح كل مقاس</p>
-  <div class="scale-grid">
-    <div class="scale-card">
-      <div class="scale-label">100% — الأصلي</div>
-      <div class="scale-box" id="scale-100"></div>
-    </div>
-    <div class="scale-card">
-      <div class="scale-label">150%</div>
-      <div class="scale-box" id="scale-150"></div>
-    </div>
-    <div class="scale-card">
-      <div class="scale-label">200%</div>
-      <div class="scale-box" id="scale-200"></div>
-    </div>
-    <div class="scale-card">
-      <div class="scale-label">300% — الأكبر</div>
-      <div class="scale-box" id="scale-300"></div>
-    </div>
+  <h2>الاختبار 3 — حجم البطاقة الحالي <small>نفس أبعاد باركود بطاقة الطالب</small></h2>
+  <div class="test-note">نفس <code>BARCODE_OPTS</code> المستخدم في بطاقة الطالب (مقاس PVC صغير، أسود على أبيض، منطقة صمت على الجانبين). امسحه من شاشة وبعد الطباعة.</div>
+  <div class="barcode-display" id="test3-barcode"></div>
+  <div class="info-grid">
+    <div class="info-box"><div class="label">الصيغة</div><div class="value" id="test3-format">EAN13</div></div>
+    <div class="info-box"><div class="label">العرض × الارتفاع</div><div class="value" id="test3-size">—</div></div>
   </div>
 </div>
 
-<!-- Raw SVG Panel -->
+<!-- Test 4: Print only -->
 <div class="panel">
-  <h2>🔎 تفاصيل SVG</h2>
-  <div class="info-grid">
-    <div class="info-box">
-      <div class="label">SVG width attribute</div>
-      <div class="value" id="svg-width">—</div>
-    </div>
-    <div class="info-box">
-      <div class="label">SVG height attribute</div>
-      <div class="value" id="svg-height">—</div>
-    </div>
-    <div class="info-box">
-      <div class="label">Computed width (px)</div>
-      <div class="value" id="svg-computed-w">—</div>
-    </div>
-    <div class="info-box">
-      <div class="label">Computed height (px)</div>
-      <div class="value" id="svg-computed-h">—</div>
-    </div>
-    <div class="info-box">
-      <div class="label">Number of bars</div>
-      <div class="value" id="bar-count">—</div>
-    </div>
-    <div class="info-box">
-      <div class="label">Barcode text</div>
-      <div class="value" id="barcode-text">—</div>
-    </div>
+  <h2>الاختبار 4 — طباعة الباركود فقط <small>ورقة بيضاء لا شيء غير الباركود</small></h2>
+  <div class="test-note">يطبع ورقة بيضاء تحتوي الباركود فقط — للتحقق النهائي من قراءة الجهاز للباركود المطبوع (شرط القبول الأساسي).</div>
+  <div class="input-row">
+    <input type="text" id="test4-input" placeholder="رقم تسجيل الطالب (مثال: 901)" value="901" inputmode="numeric">
+    <button class="btn-print" onclick="printTestBarcode()">🖨️ Print Test Barcode</button>
   </div>
 </div>
 
@@ -152,145 +133,234 @@ hr{border:none;border-top:1px solid #e2e8f0;margin:16px 0}
 <div class="panel">
   <h2>📋 السجل</h2>
   <div class="log-area" id="log-area">
-    <div class="log-entry info">جاهز. اكتب قيمة واضغط Enter أو امسح باركود بالجهاز.</div>
+    <div class="log-entry info">جاهز. امسح أي باركود بالجهاز أو استخدم الاختبارات أعلاه.</div>
   </div>
 </div>
 
 <script>
-const scanInput = document.getElementById('scan-input');
-const barcodeInput = document.getElementById('barcode-input');
-
-function log(msg, type='info') {
-  const el = document.getElementById('log-area');
-  const time = new Date().toLocaleTimeString('ar-DZ');
-  el.innerHTML += `<div class="log-entry ${type}">[${time}] ${msg}</div>`;
-  el.scrollTop = el.scrollHeight;
-  console.log(`[BarcodeTest] [${type}] ${msg}`);
+function byId(id){return document.getElementById(id);}
+function log(msg, type='info'){
+  const el=byId('log-area');
+  const time=new Date().toLocaleTimeString('ar-DZ');
+  el.innerHTML+='<div class="log-entry '+type+'">['+time+'] '+msg+'</div>';
+  el.scrollTop=el.scrollHeight;
+  console.log('[BarcodeTest] ['+type+'] '+msg);
+}
+function setStatus(msg, type='info'){
+  const el=byId('scan-status');
+  el.textContent=msg;
+  el.className='status-bar show '+type;
 }
 
-function showStatus(msg, type='info') {
-  const el = document.getElementById('scan-status');
-  el.textContent = msg;
-  el.className = 'status-bar show ' + type;
-}
-
-function makeBarcode(value, container, opts) {
-  container.innerHTML = '';
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+function makeBarcode(value, container, opts){
+  if(!container) return null;
+  container.innerHTML='';
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
   container.appendChild(svg);
-  JsBarcode(svg, value, {
-    format: 'CODE128',
-    displayValue: true,
-    lineColor: '#000000',
-    background: '#ffffff',
-    width: opts.width || 1.5,
-    height: opts.height || 40,
-    margin: opts.margin || 10,
-    fontSize: opts.fontSize || 10,
-    font: 'monospace',
-    fontOptions: 'bold',
-    textMargin: 4,
-    xmlDocument: document,
-  });
-  return svg;
-}
-
-function generate() {
-  const val = barcodeInput.value.trim();
-  if (!val) { log('أدخل قيمة أولاً', 'error'); return; }
-
-  log('توليد باركود: ' + val, 'info');
-
-  try {
-    const svg = makeBarcode(val, document.getElementById('barcode-main'), {});
-
-    document.getElementById('raw-value').textContent = val;
-    document.getElementById('clean-value').textContent = val.replace(/^EPLUS-/i, '').trim();
-    document.getElementById('char-count').textContent = val.length + ' حرف';
-    document.getElementById('gen-status').textContent = '✅ تم التوليد';
-    document.getElementById('gen-status').style.color = '#16a34a';
-
-    document.getElementById('svg-width').textContent = svg.getAttribute('width') + ' px';
-    document.getElementById('svg-height').textContent = svg.getAttribute('height') + ' px';
-    const rect = svg.getBoundingClientRect();
-    document.getElementById('svg-computed-w').textContent = Math.round(rect.width) + ' px';
-    document.getElementById('svg-computed-h').textContent = Math.round(rect.height) + ' px';
-    const rects = svg.querySelectorAll('rect');
-    document.getElementById('bar-count').textContent = rects.length;
-    const textEl = svg.querySelector('text');
-    document.getElementById('barcode-text').textContent = textEl ? textEl.textContent : '—';
-
-    log('SVG أبعاد: ' + svg.getAttribute('width') + ' x ' + svg.getAttribute('height'), 'success');
-    log('DOM أبعاد: ' + Math.round(rect.width) + ' x ' + Math.round(rect.height) + ' px', 'success');
-
-    makeBarcode(val, document.getElementById('scale-100'), { width: 1.5, height: 40, margin: 10, fontSize: 10 });
-    makeBarcode(val, document.getElementById('scale-150'), { width: 2.25, height: 60, margin: 15, fontSize: 15 });
-    makeBarcode(val, document.getElementById('scale-200'), { width: 3, height: 80, margin: 20, fontSize: 20 });
-    makeBarcode(val, document.getElementById('scale-300'), { width: 4.5, height: 120, margin: 30, fontSize: 30 });
-
-    log('تم توليد 4 مقاسات', 'success');
-  } catch(e) {
-    document.getElementById('gen-status').textContent = '❌ خطأ';
-    document.getElementById('gen-status').style.color = '#dc2626';
-    log('خطأ في التوليد: ' + e.message, 'error');
+  try{
+    JsBarcode(svg, value, Object.assign({ xmlDocument: document }, opts));
+    return svg;
+  }catch(e){
+    container.innerHTML='<div style="color:#dc2626;font-weight:800;font-size:13px">❌ '+(e.message||'فشل التوليد')+'</div>';
+    log('خطأ في التوليد: '+e.message,'error');
+    return null;
   }
 }
 
-function clearAll() {
-  barcodeInput.value = '';
-  document.getElementById('barcode-main').innerHTML = '';
-  document.getElementById('scale-100').innerHTML = '';
-  document.getElementById('scale-150').innerHTML = '';
-  document.getElementById('scale-200').innerHTML = '';
-  document.getElementById('scale-300').innerHTML = '';
-  document.getElementById('raw-value').textContent = '—';
-  document.getElementById('clean-value').textContent = '—';
-  document.getElementById('char-count').textContent = '—';
-  document.getElementById('gen-status').textContent = '—';
-  document.getElementById('svg-width').textContent = '—';
-  document.getElementById('svg-height').textContent = '—';
-  document.getElementById('svg-computed-w').textContent = '—';
-  document.getElementById('svg-computed-h').textContent = '—';
-  document.getElementById('bar-count').textContent = '—';
-  document.getElementById('barcode-text').textContent = '—';
-  log('تم المسح', 'info');
+function barcodeOpts(over){
+  return Object.assign({
+    format:'EAN13',
+    displayValue:true,
+    lineColor:'#000000',
+    background:'#ffffff',
+    width:1.6,
+    height:32,
+    margin:6,
+    fontSize:9,
+    font:'monospace',
+    fontOptions:'bold',
+    textMargin:3
+  }, over||{});
 }
 
-barcodeInput.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') { generate(); }
-});
+// ── Test 1: reference product barcode ──
+function runTest1(){
+  const value='6132633200060';
+  makeBarcode(value, byId('test1-barcode'), barcodeOpts());
+  const valid=EAN13.isValid(value);
+  byId('test1-valid').textContent=valid?'✅ صالح':'❌ غير صالح';
+  byId('test1-valid').className='value '+(valid?'ok':'bad');
+  byId('test1-len').textContent=value.length+' رقم';
+  log('الاختبار 1: الباركود المرجعي 6132633200060 — '+(valid?'صالح':'غير صالح'),valid?'success':'error');
+}
 
-scanInput.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') {
-    const val = scanInput.value.trim();
-    if (!val) return;
-    log('مسح الجهاز: ' + val, 'success');
-    showStatus('تم المسح: ' + val, 'success');
+// ── Test 2: per-student EAN-13 ──
+function runTest2(){
+  const raw=byId('test2-input').value.trim();
+  const id=String(raw||'').replace(/\D/g,'');
+  if(!id){log('أدخل رقم تسجيل صحيح','error');return;}
+  const value=EAN13.make(id);
+  if(!value){log('تعذر توليد قيمة الباركود','error');return;}
+  makeBarcode(value, byId('test2-barcode'), barcodeOpts());
+  const valid=EAN13.isValid(value);
+  byId('test2-id').textContent=id;
+  byId('test2-value').textContent=value;
+  byId('test2-check').textContent=value.slice(-1);
+  byId('test2-valid').textContent=valid?'✅ صالح':'❌ غير صالح';
+  byId('test2-valid').className='value '+(valid?'ok':'bad');
+  log('الاختبار 2: طالب '+id+' → '+value+' ('+(valid?'صالح':'غير صالح')+')',valid?'success':'error');
+}
 
-    const clean = val.replace(/^EPLUS-/i, '').trim();
-    log('قيمة بعد التنظيف: ' + clean, 'info');
+// ── Test 3: card size ──
+function runTest3(){
+  const id=byId('test2-input').value.trim() || '901';
+  const value=EAN13.make(id);
+  if(!value){log('تعذر توليد قيمة الباركود','error');return;}
+  const svg=makeBarcode(value, byId('test3-barcode'), barcodeOpts());
+  if(svg){
+    const w=parseInt(svg.getAttribute('width')||'0',10);
+    const h=parseInt(svg.getAttribute('height')||'0',10);
+    byId('test3-size').textContent=w+' × '+h+' px';
+    log('الاختبار 3: الباركود بمقاس البطاقة '+w+' × '+h+' px','success');
+  }
+}
 
-    barcodeInput.value = val;
-    generate();
+// ── Test 4: print only barcode ──
+function printTestBarcode(){
+  const raw=byId('test4-input').value.trim();
+  const id=String(raw||'').replace(/\D/g,'');
+  const value=id?EAN13.make(id):'6132633200060';
+  if(!value){log('تعذر توليد قيمة الباركود','error');return;}
+  const printWin=window.open('','_blank','width=600,height=400');
+  if(!printWin){log('⚠️ يرجى السماح بالنوافذ المنبثقة للطباعة','warn');return;}
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  try{
+    JsBarcode(svg, value, Object.assign({}, barcodeOpts(), { height:60, fontSize:16, xmlDocument: document }));
+  }catch(e){
+    printWin.close();
+    log('خطأ في توليد باركود الطباعة: '+e.message,'error');
+    return;
+  }
+  const svgStr=new XMLSerializer().serializeToString(svg);
+  printWin.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>طباعة باركود الاختبار</title><style>@media print{@page{margin:0}html,body{width:100%;height:100%}body{margin:0;padding:0;background:#ffffff}svg{position:fixed;inset:0;margin:auto}}body{margin:0;background:#ffffff;display:flex;align-items:center;justify-content:center;min-height:100vh}svg{max-width:94vw;height:auto}</style></head><body>'+svgStr+'<script>window.onafterprint=function(){window.close();};window.matchMedia&&window.matchMedia("print").addEventListener("change",function(m){if(!m.matches)window.close();});setTimeout(function(){try{window.print();}catch(e){}},300);<\/script></body></html>');
+  printWin.document.close();
+  log('الاختبار 4: أُرسل باركود الطباعة ('+value+')','success');
+}
 
-    scanInput.value = '';
-    setTimeout(() => scanInput.focus(), 50);
+// ── Scan handling ──
+let scanBuffer='';
+let scanTimer=null;
+let processing=false;
+
+function detectFormat(raw){
+  const numeric=String(raw).replace(/\D/g,'');
+  if(numeric.length===13){
+    return { label:'EAN-13', numeric };
+  }
+  if(numeric.length===8) return { label:'EAN-8', numeric };
+  if(/^EPLUS-/i.test(raw)) return { label:'EPLUS (قديم)', numeric:'' };
+  return { label:'غير معروف', numeric:'' };
+}
+
+async function handleScan(raw){
+  if(processing) return;
+  processing=true;
+  const val=String(raw||'').trim();
+  setStatus('⏳ جارٍ المعالجة...','info');
+  byId('scan-raw').textContent=val||'—';
+  byId('scan-len').textContent=String(val.length);
+  byId('scan-student').innerHTML='';
+
+  const fmt=detectFormat(val);
+  byId('scan-format').textContent=fmt.label;
+
+  const isEan=fmt.numeric.length===13;
+  const valid=isEan?EAN13.isValid(fmt.numeric):false;
+  const validEl=byId('scan-valid');
+  if(isEan){
+    validEl.textContent=valid?'✅ YES':'❌ NO';
+    validEl.className='value '+(valid?'ok':'bad');
+  }else{
+    validEl.textContent='N/A';
+    validEl.className='value';
+  }
+
+  log('مسح: "'+val+'" — الصيغة: '+fmt.label+(isEan?' — صالح: '+(valid?'نعم':'لا'):''), isEan&&valid?'success':'info');
+
+  try{
+    let student=null;
+    if(isEan&&valid){
+      try{ student=await RegistrationService.getByBarcode(fmt.numeric); }catch(e){}
+      if(!student){
+        const decodedId=EAN13.decode(fmt.numeric);
+        if(decodedId){ try{ student=await RegistrationService.getById(decodedId); }catch(e){} }
+      }
+    }else{
+      const legacyId=val.replace(/^EPLUS-/i,'').trim();
+      try{ student=await RegistrationService.getById(legacyId); }catch(e){}
+    }
+
+    const res=byId('scan-student');
+    if(student){
+      const name=((student.first_name||'')+' '+(student.last_name||'')).trim();
+      res.className='student-result found';
+      res.innerHTML='✅ <b>تم التعرف على الطالب:</b> '+name+' <span style="opacity:.7">—</span> <code style="font-size:12px">'+student.id+'</code> <span style="opacity:.7">—</span> '+student.level;
+      setStatus('✅ تم التعرف على الطالب','success');
+      log('الطالب: '+name+' (ID: '+student.id+')','success');
+    }else{
+      res.className='student-result notfound';
+      res.innerHTML='⚠️ <b>Barcode recognized / Student not found</b> — الباركود صالح لكن لا يوجد طالب مرتبط به';
+      setStatus('⚠️ باركود معروف / لا يوجد طالب','warn');
+      log('باركود معروف لكن لا يوجد طالب مرتبط به','warn');
+    }
+  }catch(e){
+    console.error('Lookup error:',e);
+    byId('scan-student').className='student-result notfound';
+    byId('scan-student').innerHTML='⚠️ <b>Barcode recognized / Student not found</b> — الباركود صالح لكن لا يوجد طالب مرتبط به';
+    setStatus('⚠️ باركود معروف / لا يوجد طالب','warn');
+    log('تعذر البحث (تم عرض "طالب غير موجود"): '+e.message,'warn');
+  }finally{
+    processing=false;
+  }
+}
+
+const scanInput=byId('scan-input');
+scanInput.addEventListener('keydown',function(e){
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const val=scanInput.value.trim();
+    if(val){
+      clearTimeout(scanTimer);
+      scanBuffer='';
+      handleScan(val);
+    }
+    scanInput.value='';
+    setTimeout(()=>scanInput.focus(),30);
   }
 });
-
-let scanBuffer = '';
-let scanTimer = null;
-scanInput.addEventListener('keypress', function(e) {
-  scanBuffer += e.key;
+scanInput.addEventListener('input',function(){
   clearTimeout(scanTimer);
-  scanTimer = setTimeout(() => { scanBuffer = ''; }, 100);
+  const val=scanInput.value.trim();
+  if(val.length>=8){
+    scanTimer=setTimeout(()=>{
+      if(scanInput.value.trim()){ handleScan(scanInput.value.trim()); scanInput.value=''; }
+      setTimeout(()=>scanInput.focus(),30);
+    },250);
+  }
+});
+document.addEventListener('click',function(){
+  const active=document.activeElement;
+  if(!active||active.tagName!=='INPUT'){ scanInput.focus(); }
 });
 
-log('الصفحة جاهزة', 'success');
-log(' JsBarcode نسخة: ' + (typeof JsBarcode !== 'undefined' ? 'محمل' : 'غير محمل'), typeof JsBarcode !== 'undefined' ? 'success' : 'error');
-
-barcodeInput.focus();
-scanInput.focus();
+// ── Init ──
+log('الصفحة جاهزة','success');
+log('JsBarcode: '+(typeof JsBarcode!=='undefined'?'محمل':'غير محمل'),typeof JsBarcode!=='undefined'?'success':'error');
+log('EAN13: '+(typeof EAN13!=='undefined'?'محمل':'غير محمل'),typeof EAN13!=='undefined'?'success':'error');
+runTest1();
+runTest2();
+runTest3();
+setTimeout(()=>scanInput.focus(),100);
 </script>
 </body>
 </html>

@@ -114,10 +114,10 @@ const SubjectService = (function () {
     _deletedTeachers.delete(_normName(teacherName)); _persistDeleted();
   }
   async function loadDeletedTeachers() {
-    const fdb = _resolveDb();
-    if (!fdb) return;
     try {
-      const snap = await fdb.collection('support_teachers').where('status', '==', 'deleted').get();
+      const q = _queryTeachersByStatus('deleted');
+      if (!q) return;
+      const snap = await q;
       snap.docs.forEach(d => { const n = _normName(d.data().name); if (n) _deletedTeachers.add(n); });
       _persistDeleted();
     } catch (e) {
@@ -234,23 +234,42 @@ const SubjectService = (function () {
     return window._db || window.db || (typeof db !== 'undefined' ? db : null);
   }
 
+  // Query support_teachers through whichever Firestore API is live:
+  //  • admin.html  → modular v11: helpers in window._firestore + db in window._db
+  //  • teacher.html→ compat 9.23.0: global `db` with .collection()
+  function _queryTeachersByStatus(status) {
+    const fs = window._firestore;
+    const db = _resolveDb();
+    if (fs && db && typeof fs.getDocs === 'function' && typeof fs.collection === 'function' && typeof fs.query === 'function' && typeof fs.where === 'function') {
+      return fs.getDocs(fs.query(fs.collection(db, 'support_teachers'), fs.where('status', '==', status)));
+    }
+    const fdb = _resolveDb();
+    return fdb && typeof fdb.collection === 'function'
+      ? fdb.collection('support_teachers').where('status', '==', status).get()
+      : null;
+  }
+
   async function _loadTeachers() {
     const now = Date.now();
     if (_teachersCache && (now - _teachersCacheTime) < CACHE_TTL) {
       return _teachersCache;
     }
-    const fdb = _resolveDb();
-    if (!fdb) { _teachersCache = []; _teachersCacheTime = now; return _teachersCache; }
     try {
-      const snap = await fdb.collection('support_teachers')
-        .where('status', '==', 'active')
-        .get();
-      _teachersCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      _teachersCacheTime = now;
+      const q = _queryTeachersByStatus('active');
+      if (q) {
+        const snap = await q;
+        _teachersCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        _teachersCacheTime = now;
+        return _teachersCache;
+      }
     } catch (e) {
       console.error('SubjectService: Failed to load teachers', e);
       _teachersCache = [];
+      _teachersCacheTime = now;
+      return _teachersCache;
     }
+    _teachersCache = [];
+    _teachersCacheTime = now;
     return _teachersCache;
   }
 
@@ -364,3 +383,4 @@ const SubjectService = (function () {
     filterActiveTeachers
   };
 })();
+window.SubjectService = SubjectService;

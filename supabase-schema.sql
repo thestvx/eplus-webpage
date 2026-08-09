@@ -106,6 +106,33 @@ UPDATE registrations
 SET student_token = substr(md5(random()::text || clock_timestamp()::text || id), 1, 32)
 WHERE student_token = '' OR student_token IS NULL;
 
+-- ترحيل: barcode_value — باركود EAN-13 ثابت لكل طالب
+-- الصيغة: '200' + رقم التسجيل (9 خانات) + خانة تحقق EAN-13
+ALTER TABLE registrations ADD COLUMN IF NOT EXISTS barcode_value TEXT DEFAULT '';
+
+-- دالة حساب خانة التحقق EAN-13 (تستخدم للترحيل فقط)
+CREATE OR REPLACE FUNCTION ean13_check_digit(d12 TEXT) RETURNS TEXT AS $$
+DECLARE
+  i INT; s INT := 0; n INT;
+BEGIN
+  IF d12 IS NULL OR length(d12) <> 12 THEN RETURN ''; END IF;
+  FOR i IN 1..12 LOOP
+    n := CAST(substr(d12, i, 1) AS INT);
+    IF (i % 2) = 1 THEN s := s + n; ELSE s := s + n * 3; END IF;
+  END LOOP;
+  RETURN CAST(((10 - (s % 10)) % 10) AS TEXT);
+END; $$ LANGUAGE plpgsql;
+
+-- تعبئة الباركود الحتمي للطلاب الحاليين (لا يتغير أبداً بعد ذلك)
+UPDATE registrations
+SET barcode_value = '200'
+  || lpad(left(regexp_replace(id, '[^0-9]', '', 'g'), 9), 9, '0')
+  || ean13_check_digit('200' || lpad(left(regexp_replace(id, '[^0-9]', '', 'g'), 9), 9, '0'))
+WHERE (barcode_value IS NULL OR barcode_value = '')
+  AND left(regexp_replace(id, '[^0-9]', '', 'g'), 9) <> '';
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_barcode ON registrations(barcode_value) WHERE barcode_value != '';
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_attendance_student ON attendance_records(student_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_group_session ON attendance_records(group_id, session_num);

@@ -5,7 +5,7 @@
 
 const RegistrationService = (function () {
   const TABLE = 'registrations';
-  const COLUMNS = 'id,first_name,last_name,parent_name,parent_phone,birth_date,student_type,level,stream,institution,subjects,fee_amount,status,student_token,created_at,timestamp';
+  const COLUMNS = 'id,first_name,last_name,parent_name,parent_phone,birth_date,student_type,level,stream,institution,subjects,fee_amount,status,student_token,barcode_value,created_at,timestamp';
 
   function headers() {
     return {
@@ -30,6 +30,13 @@ const RegistrationService = (function () {
 
   async function getByToken(token) {
     const res = await fetch(baseQuery('select=' + COLUMNS + '&student_token=eq.' + encodeURIComponent(token) + '&limit=1'), { headers: headers() });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    return data && data.length > 0 ? data[0] : null;
+  }
+
+  async function getByBarcode(barcodeValue) {
+    const res = await fetch(baseQuery('select=' + COLUMNS + '&barcode_value=eq.' + encodeURIComponent(barcodeValue) + '&limit=1'), { headers: headers() });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     return data && data.length > 0 ? data[0] : null;
@@ -97,6 +104,7 @@ const RegistrationService = (function () {
   return {
     getById,
     getByToken,
+    getByBarcode,
     getAll,
     getConfirmed,
     getSubjects,

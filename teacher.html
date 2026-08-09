@@ -9,9 +9,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-  <script src="js/registrationService.js"></script>
-  <script src="js/subjectService.js?v=2"></script>
-  <script src="js/attendanceService.js"></script>
+  <script src="js/ean13.js"></script>
+  <script src="js/registrationService.js?v=1"></script>
+  <script src="js/subjectService.js?v=3"></script>
+  <script src="js/attendanceService.js?v=1"></script>
   <style>
     *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
     :root{
@@ -812,8 +813,8 @@
                 <div class="scanner-zone" id="scanner-zone">
                   <div class="scanner-icon">📷</div>
                   <div class="scanner-label">جاهز لمسح البطاقة</div>
-                  <div class="scanner-hint">مرر بطاقة الطالب أو اكتب الرقم يدوياً</div>
-                  <input type="text" class="scanner-input" id="scanner-input" placeholder="EPLUS-XXXX" autocomplete="off" autofocus>
+                  <div class="scanner-hint">مرر بطاقة الطالب أو اكتب رقم التسجيل يدوياً</div>
+                  <input type="text" class="scanner-input" id="scanner-input" placeholder="امسح البطاقة هنا..." autocomplete="off" autofocus>
                 </div>
                 <div id="attendance-result"></div>
                 <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
@@ -858,9 +859,11 @@
         const result=await AttendanceService.processScan(code,teacherId,teacherName);
         if(!result.success){
           if(result.type==='invalid'){
-            const icon=result.reason.includes('غير موجود')?'❌':'⛔';
-            const color=result.reason.includes('غير موجود')?'var(--red)':'var(--red)';
-            resultEl.innerHTML='<div class="student-result" style="border-color:var(--red)"><div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:12px">'+icon+'</div><div style="font-size:16px;font-weight:900;color:'+color+'">'+(result.reason.includes('غير موجود')?'طالب غير موجود':'بطاقة غير صالحة')+'</div><div style="font-size:13px;color:var(--text-muted);margin-top:6px">'+result.reason+'</div></div></div>';
+            const isNotFound=result.reason.includes('غير موجود');
+            const isProvisional=result.reason.includes('غير مسجل نهائياً');
+            const icon=isNotFound?'❌':(isProvisional?'⛔':'⛔');
+            const title=isNotFound?'طالب غير موجود':(isProvisional?'لا يمكن تسجيل الحضور':'بطاقة غير صالحة');
+            resultEl.innerHTML='<div class="student-result" style="border-color:var(--red)"><div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:12px">'+icon+'</div><div style="font-size:16px;font-weight:900;color:var(--red)">'+title+'</div><div style="font-size:13px;color:var(--text-muted);margin-top:6px">'+result.reason+'</div></div></div>';
           }else if(result.type==='no_match'){
             const s=result.student;
             resultEl.innerHTML='<div class="student-result" style="border-color:var(--gold)"><div style="padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:12px">⚠️</div><div style="font-size:16px;font-weight:900;color:var(--gold)">لا توجد مواد مشتركة</div><div style="font-size:13px;color:var(--text-muted);margin-top:6px">الطالب '+((s.first_name||'')+' '+(s.last_name||''))+' غير مسجل في أي من موادك</div></div></div>';
@@ -878,12 +881,13 @@
         }
         let subjectsHtml=result.results.map(a=>{
           const icon=SubjectService.getSubjectIcon(a.subjectName);
+          const label=a.subjectName+(a.teacherName?' — الأستاذ '+a.teacherName:'');
           if(a.alreadyRecorded){
-            return '<div class="subject-attendance-item"><span style="font-size:18px">'+icon+'</span><div class="subject-attendance-name">'+a.subjectName+'</div><div class="subject-attendance-btn recorded">✅ مسجل مسبقاً</div></div>';
+            return '<div class="subject-attendance-item"><span style="font-size:18px">'+icon+'</span><div class="subject-attendance-name">'+label+'</div><div class="subject-attendance-btn recorded">✅ مسجل مسبقاً</div></div>';
           }else{
             const safeId=a.subjectId.replace(/'/g,"\\'");
             const safeName=a.subjectName.replace(/'/g,"\\'");
-            return '<div class="subject-attendance-item"><span style="font-size:18px">'+icon+'</span><div class="subject-attendance-name">'+a.subjectName+'</div><button class="subject-attendance-btn record" onclick="recordSingleAttendance(\''+s.id+'\',\''+teacherId+'\',\''+teacherName.replace(/'/g,"\\'")+'\',\''+safeId+'\',\''+safeName+'\')">✅ تسجيل الحضور</button></div>';
+            return '<div class="subject-attendance-item"><span style="font-size:18px">'+icon+'</span><div class="subject-attendance-name">'+label+'</div><button class="subject-attendance-btn record" onclick="recordSingleAttendance(\''+s.id+'\',\''+teacherId+'\',\''+teacherName.replace(/'/g,"\\'")+'\',\''+safeId+'\',\''+safeName+'\')">✅ تسجيل الحضور</button></div>';
           }
         }).join('');
         resultEl.innerHTML=`

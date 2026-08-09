@@ -37,13 +37,15 @@ const AttendanceService = (function () {
   }
 
   // ── Duplicate Check ───────────────────────────────────
+  // Duplicate = same student + same teacher + same subject + same day/session.
 
-  async function isDuplicate(studentId, subjectId, date, sessionNumber) {
+  async function isDuplicate(studentId, subjectId, date, sessionNumber, teacherId) {
     let q = db.collection(COLLECTION)
       .where('studentId', '==', studentId)
       .where('subjectId', '==', subjectId)
       .where('date', '==', date || today());
     if (sessionNumber) q = q.where('sessionNumber', '==', sessionNumber);
+    if (teacherId) q = q.where('teacherId', '==', teacherId);
     const snap = await q.limit(1).get();
     return !snap.empty;
   }
@@ -53,9 +55,31 @@ const AttendanceService = (function () {
   async function validateStudent(studentId) {
     const student = await RegistrationService.getById(studentId);
     if (!student) return { valid: false, reason: 'طالب غير موجود', student: null };
-    if (student.status === 'مسجل مبدئياً') return { valid: false, reason: 'تسجيل الطالب لم يتم تأكيدده بعد', student };
+    if (student.status === 'مسجل مبدئياً') return { valid: false, reason: '⚠️ لا يمكن تسجيل الحضور هذا الطالب غير مسجل نهائياً', student };
     if (student.status !== 'مسجل نهائياً') return { valid: false, reason: 'بطاقة غير صالحة — ' + student.status, student };
     return { valid: true, student };
+  }
+
+  // ── Scan Resolution ───────────────────────────────────
+  // 1) EAN-13 from our system (numeric, '200' prefix) → barcode_value → student.
+  // 2) Legacy students (no barcode_value row yet) → decode the ID from the
+  //    deterministic barcode and look up by ID.
+  // 3) Backward-compatible EPLUS-xxx / plain ID scans.
+  async function resolveStudentFromScan(raw) {
+    const clean = String(raw || '').trim();
+    if (!clean) return { student: null, source: null };
+    const numeric = String(clean).replace(/\D/g, '');
+    if (numeric.length === 13 && numeric.startsWith('200')) {
+      let student = null;
+      try { student = await RegistrationService.getByBarcode(numeric); } catch (e) { /* fall through */ }
+      if (!student && typeof EAN13 !== 'undefined' && EAN13.isValid(numeric)) {
+        const decodedId = EAN13.decode(numeric);
+        if (decodedId) { try { student = await RegistrationService.getById(decodedId); } catch (e) {} }
+      }
+      return { student, source: 'barcode' };
+    }
+    const legacyId = clean.replace(/^EPLUS-/i, '').trim();
+    return { student: await RegistrationService.getById(legacyId), source: 'id' };
   }
 
   // ── Subject Matching ──────────────────────────────────
@@ -88,7 +112,7 @@ const AttendanceService = (function () {
     const recTime = checkInTime || nowTime();
     const recSession = sessionNumber || 1;
 
-    const dup = await isDuplicate(studentId, subjectId, recDate, recSession);
+    const dup = await isDuplicate(studentId, subjectId, recDate, recSession, teacherId);
     if (dup) return { success: false, reason: 'duplicate', message: 'تم تسجيل حضور هذا الطالب مسبقاً لهذه الحصة' };
 
     const doc = {
@@ -204,13 +228,15 @@ const AttendanceService = (function () {
   // ── Main Scan Handler ─────────────────────────────────
 
   async function processScan(barcode, teacherId, teacherName) {
-    const studentId = barcode.replace(/^EPLUS-/i, '').trim();
-    const validation = await validateStudent(studentId);
+    const { student } = await resolveStudentFromScan(barcode);
+    if (!student) {
+      return { success: false, type: 'invalid', reason: 'طالب غير موجود', student: null };
+    }
+    const validation = await validateStudent(student.id);
     if (!validation.valid) {
       return { success: false, type: 'invalid', reason: validation.reason, student: validation.student };
     }
 
-    const student = validation.student;
     const matchedSubjects = matchStudentSubjects(student, teacherId);
 
     if (matchedSubjects.length === 0) {
@@ -231,10 +257,12 @@ const AttendanceService = (function () {
     for (const s of matchedSubjects) {
       const subId = s.subjectId || SubjectService.getSubjectId(s.subject || s.subjectName || '');
       const subName = s.subject || s.subjectName || '';
-      const dup = await isDuplicate(student.id, subId, recDate);
+      const tName = s.teacher || s.teacherName || teacherName || '';
+      const dup = await isDuplicate(student.id, subId, recDate, null, teacherId);
       results.push({
         subjectId: subId,
         subjectName: subName,
+        teacherName: tName,
         alreadyRecorded: dup
       });
     }
@@ -301,6 +329,7 @@ const AttendanceService = (function () {
     nowTime,
     isDuplicate,
     validateStudent,
+    resolveStudentFromScan,
     matchStudentSubjects,
     matchStudentSubjectsByName,
     record,

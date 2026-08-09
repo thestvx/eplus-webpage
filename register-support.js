@@ -402,6 +402,7 @@ function onSubmitClick() {
     status: 'مسجل مبدئياً',
     fee_amount: 500,
     student_token: _genToken(32),
+    barcode_value: (typeof EAN13 !== 'undefined' && EAN13.make(id)) || '',
   };
 
   openLawsModal();
@@ -502,6 +503,20 @@ function closeLoadingModal() {
   if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
 }
 
+// حماية من الترحيل الناقص: يُحذف barcode_value من الحمولة ما دام العمود
+// غير موجود في قاعدة البيانات، حتى لا يفشل التسجيل قبل تطبيق السكيما.
+let _barcodeColOk = null;
+async function _barcodeColumnAvailable() {
+  if (_barcodeColOk !== null) return _barcodeColOk;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations?select=barcode_value&limit=1`, {
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+    });
+    _barcodeColOk = res.ok;
+  } catch (e) { _barcodeColOk = false; }
+  return _barcodeColOk;
+}
+
 async function onLawsConfirm() {
   if (!sFormData) return;
   const btn = byId('lawsConfirmBtn');
@@ -509,6 +524,10 @@ async function onLawsConfirm() {
   closeLawsModal();
   openLoadingModal();
   try {
+    const payload = Object.assign({}, sFormData);
+    if (typeof EAN13 !== 'undefined' && !(await _barcodeColumnAvailable())) {
+      delete payload.barcode_value;
+    }
     const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations`, {
       method: 'POST',
       headers: {
@@ -517,7 +536,7 @@ async function onLawsConfirm() {
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
         'Prefer': 'return=minimal',
       },
-      body: JSON.stringify(sFormData),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const txt = await res.text();

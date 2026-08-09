@@ -16,17 +16,17 @@ const StudentCardRenderer = (function () {
   const QR_SIZE = 100;         // QR size in px, identical everywhere
 
   const BARCODE_OPTS = {
-    format: 'CODE128',
+    format: 'EAN13',
     displayValue: true,
     lineColor: '#000000',
     background: '#ffffff',
-    width: 2.2,
-    height: 30,
-    margin: 8,
-    fontSize: 10,
+    width: 1.6,
+    height: 32,
+    margin: 6,
+    fontSize: 9,
     font: 'monospace',
     fontOptions: 'bold',
-    textMargin: 4
+    textMargin: 3
   };
 
   const CARD_CSS = `
@@ -51,7 +51,16 @@ const StudentCardRenderer = (function () {
   // ── Data helpers ───────────────────────────────────────
   const fullName = r => `${r.first_name || ''} ${r.last_name || ''}`.trim();
   const regDate = () => new Date().toLocaleDateString('ar-DZ', { year: 'numeric', month: 'long', day: 'numeric' });
-  const barcodeValue = r => 'EPLUS-' + (r.id || '');
+  const barcodeValue = r => {
+    if (!r) return '';
+    const stored = r.barcode_value || r.barcodeValue;
+    if (stored) return String(stored);
+    if (typeof EAN13 !== 'undefined') {
+      const ean = EAN13.make(r.id);
+      if (ean) return ean;
+    }
+    return 'EPLUS-' + (r.id || '');
+  };
   const qrUrl = r => (r.student_token ? 'https://epluscenter.com/s/' + r.student_token : '');
 
   // ── Markup builders (pure HTML, data-ec-role hooks) ───
