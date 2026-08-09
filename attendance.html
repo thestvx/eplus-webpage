@@ -793,18 +793,22 @@
     $('last-read').textContent = val;
     setPill('جارٍ المعالجة…', false);
     logScanner('Looking up student for "' + val + '"...');
+    console.log('[ATTENDANCE] Scanned value: "' + val + '" — searching registrations.barcode_value...');
 
     try {
       var resolved = await AttendanceService.resolveStudentFromScan(val);
       var student = resolved ? resolved.student : null;
 
       if (!student) {
+        console.log('[ATTENDANCE] NOT FOUND — barcode "' + val + '" matches no registration.');
         logScanner('Student NOT found for "' + val + '"');
         animateCard('rejected');
         setPill('لم يتم العثور على الطالب', false);
         openModal('error', 'طالب غير موجود', 'الباركود <b>' + esc(val) + '</b> غير مرتبط بأي تسجيل.<br>تأكد من صحة البطاقة أو أعد طباعتها من نظام E-PLUS.');
         return;
       }
+
+      console.log('[ATTENDANCE] FOUND — student ' + student.id + ' (' + (student.first_name || '') + ' ' + (student.last_name || '') + ') | matchedBy: ' + (resolved.matchedBy || 'unknown') + ' | status: ' + (student.status || '?'));
 
       var status = student.status;
       if (status === 'مسجل مبدئياً') {

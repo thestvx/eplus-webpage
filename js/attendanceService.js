@@ -73,25 +73,49 @@ const AttendanceService = (function () {
   }
 
   // ── Scan Resolution ───────────────────────────────────
-  // 1) EAN-13 from our system (numeric, '200' prefix) → barcode_value → student.
-  // 2) Legacy students (no barcode_value row yet) → decode the ID from the
+  // 1) EAN-13 from our system (numeric, '200' prefix) → explicit
+  //    registrations.barcode_value search (the value printed on the card).
+  // 2) Fallback (migration not applied / legacy rows): decode the ID from the
   //    deterministic barcode and look up by ID.
   // 3) Backward-compatible EPLUS-xxx / plain ID scans.
+  // Resolves to { student, source, matchedBy } — matchedBy tells the caller
+  // which path produced the match ('barcode_value' | 'id' | 'token' | null).
   async function resolveStudentFromScan(raw) {
     const clean = String(raw || '').trim();
-    if (!clean) return { student: null, source: null };
+    if (!clean) return { student: null, source: null, matchedBy: null };
     const numeric = String(clean).replace(/\D/g, '');
     if (numeric.length === 13 && numeric.startsWith('200')) {
       let student = null;
-      try { student = await RegistrationService.getByBarcode(numeric); } catch (e) { /* fall through */ }
-      if (!student && typeof EAN13 !== 'undefined' && EAN13.isValid(numeric)) {
-        const decodedId = EAN13.decode(numeric);
-        if (decodedId) { try { student = await RegistrationService.getById(decodedId); } catch (e) {} }
+      let matchedBy = null;
+      // Path A — explicit barcode_value search (primary).
+      try {
+        student = await RegistrationService.getByBarcode(numeric);
+        if (student) matchedBy = 'barcode_value';
+      } catch (e) { /* fall through to id path */ }
+      if (student) {
+        console.log('[SCAN-LOOKUP] barcode_value found for ' + numeric + ' → student ' + student.id + ' (' + (student.first_name || '') + ' ' + (student.last_name || '') + ')');
+      } else {
+        // Path B — deterministic decode + getById (for legacy rows / pre-migration).
+        if (typeof EAN13 !== 'undefined' && EAN13.isValid(numeric)) {
+          const decodedId = EAN13.decode(numeric);
+          if (decodedId) {
+            try {
+              student = await RegistrationService.getById(decodedId);
+              if (student) matchedBy = 'id';
+            } catch (e) { /* ignore */ }
+          }
+        }
+        if (student) {
+          console.log('[SCAN-LOOKUP] id fallback found for ' + numeric + ' → student ' + student.id + ' (' + (student.first_name || '') + ' ' + (student.last_name || '') + ')');
+        } else {
+          console.log('[SCAN-LOOKUP] not found for ' + numeric);
+        }
       }
-      return { student, source: 'barcode' };
+      return { student, source: 'barcode', matchedBy };
     }
     const legacyId = clean.replace(/^EPLUS-/i, '').trim();
-    return { student: await RegistrationService.getById(legacyId), source: 'id' };
+    const student = await RegistrationService.getById(legacyId);
+    return { student, source: 'id', matchedBy: student ? 'id' : null };
   }
 
   // ── Subject Matching ──────────────────────────────────

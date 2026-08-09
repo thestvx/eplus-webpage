@@ -6,6 +6,11 @@
 <title>Barcode Scanner Diagnostic — E-PLUS</title>
 <link rel="icon" type="image/x-icon" href="images/eplus-icon.ico">
 <script src="js/ean13.js"></script>
+<script>
+  const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
+</script>
+<script src="js/registrationService.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -126,6 +131,18 @@
     <div class="row-btns" style="margin-top:14px">
       <button class="btn reset" id="btn-reset" type="button">🧹 مسح البيانات</button>
       <button class="btn test" id="btn-test" type="button">⚡ محاكاة مسح رقمي (2000000009018)</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🗄️ بحث في قاعدة البيانات <span class="badge">A/B/C</span></h2>
+    <div class="note">
+      <b>A</b> القيمة الممسوحة = عمود <code>barcode_value</code> في جدول <code>registrations</code>؟<br>
+      <b>B</b> القيمة الممسوحة = <code>EAN13.make(id)</code> (الخوارزمية المستخدمة في طباعة البطاقات)؟<br>
+      <b>C</b> عمود <code>barcode_value</code> في القاعدة = <code>EAN13.make(id)</code> (مُعبَّأ ومتسق)؟
+    </div>
+    <div id="db-result" style="margin-top:12px">
+      <div class="note">امسح بطاقة لعرض نتيجة البحث في قاعدة البيانات…</div>
     </div>
   </div>
 
@@ -292,6 +309,58 @@
     }
   }
 
+  // ── DB lookup (A/B/C) ──────────────────────────────────
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  async function lookupDb(codeVal) {
+    var el = $('db-result');
+    var isEan = /^\d{13}$/.test(codeVal || '');
+    if (!isEan) {
+      el.innerHTML = '<div class="note">القيمة ليست EAN-13 رقمية (13 خانة) — لا بحث في القاعدة.</div>';
+      return;
+    }
+    el.innerHTML = '<div class="note">جارٍ البحث في registrations…</div>';
+    logScanner('[LOOKUP] searching barcode_value=eq.' + codeVal + ' …');
+
+    var dbStudent = null;
+    try { dbStudent = await RegistrationService.getByBarcode(codeVal); } catch (e) { logScanner('[LOOKUP] barcode_value error: ' + (e && e.message ? e.message : e)); }
+
+    var decodedId = (typeof EAN13 !== 'undefined' && EAN13.isValid(codeVal)) ? EAN13.decode(codeVal) : null;
+    var expected = (decodedId && typeof EAN13 !== 'undefined') ? EAN13.make(decodedId) : null;
+
+    var idStudent = null;
+    if (decodedId) { try { idStudent = await RegistrationService.getById(decodedId); } catch (e) { idStudent = null; } }
+
+    // A — scanned value == registrations.barcode_value ?
+    var aOk = !!dbStudent;
+    // B — scanned value == EAN13.make(decodedId) ?
+    var bOk = expected !== null && expected === codeVal;
+    // C — stored barcode_value == EAN13.make(id) ?
+    var storedBc = idStudent ? (idStudent.barcode_value || null) : null;
+    var cOk = decodedId && storedBc !== null && storedBc === expected;
+
+    function note(label, ok, txt) {
+      return '<div class="note" style="margin-top:6px">' + label + ': ' +
+        (ok ? '<b style="color:#4ade80">مطابق ✓</b> ' : '<b style="color:#f87171">لا ✗</b> ') + txt + '</div>';
+    }
+
+    var html = '';
+    html += note('A · registrations.barcode_value', aOk,
+      aOk ? 'الطالب <b>' + esc(dbStudent.id) + '</b> — ' + esc(dbStudent.first_name + ' ' + dbStudent.last_name) + ' — ' + esc(dbStudent.status)
+          : 'لا يوجد صف بعمود barcode_value = ' + codeVal + (dbStudent === null ? ' (العمود غير موجود بعد؟ نفّذ السكيما)' : ''));
+    html += note('B · EAN13.make(id)', bOk,
+      bOk ? 'الرقم الممسوح يطابق الخوارزمية (id=' + decodedId + ')' : (decodedId ? 'id المُفكَّك = ' + decodedId + '، المتوقع = ' + (expected || '—') : 'تعذّر فك الرقم'));
+    html += note('C · barcode_value = EAN13.make(id)', cOk,
+      decodedId
+        ? ('id=' + decodedId + ' · المخزّن في القاعدة: <code>' + esc(storedBc || '—') + '</code> · المتوقع: <code>' + esc(expected || '—') + '</code>')
+        : 'لا id');
+    if (idStudent) {
+      html += note('الطالب حسب id', true, 'id=' + esc(idStudent.id) + ' — ' + esc(idStudent.first_name + ' ' + idStudent.last_name) + ' — ' + esc(idStudent.status));
+    }
+    el.innerHTML = html;
+    logScanner('[LOOKUP] A=' + aOk + ' B=' + bOk + ' C=' + cOk + (idStudent ? ' | student ' + idStudent.id : ''));
+  }
+
   function finalizeScan() {
     if (!bufCode.length) return;
     renderFinal();
@@ -299,6 +368,7 @@
     setStatus('done', bufCode.length ? 'تم استقبال ' + bufCode.length + ' حرفاً' : 'Scanner Ready');
     feed('== finalize: code="' + codeVal + '" key="' + bufKey.join('') + '" ==', 'x');
     resetBuffers();
+    lookupDb(codeVal);
   }
 
   function resetBuffers() {
