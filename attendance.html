@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>نقطة الحضور SP-1160 — E-PLUS Academy</title>
+<link rel="icon" type="image/x-icon" href="images/eplus-icon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
+  const firebaseConfig = { apiKey: "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo", authDomain: "eplus-center-39.firebaseapp.com", projectId: "eplus-center-39", storageBucket: "eplus-center-39.firebasestorage.app", messagingSenderId: "191532732034", appId: "1:191532732034:web:b11449a2f0595db5d02e9b" };
+  let fbReady = false;
+  try {
+    firebase.initializeApp(firebaseConfig);
+    window.db = firebase.firestore();
+    fbReady = true;
+  } catch (e) { console.error('Firebase init error:', e); }
+</script>
+<script src="js/ean13.js"></script>
+<script src="js/registrationService.js?v=1"></script>
+<script src="js/subjectService.js?v=3"></script>
+<script src="js/attendanceService.js?v=2"></script>
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --primary:#6366f1;--primary-dark:#4f46e5;--primary-light:rgba(99,102,241,0.10);
+    --gold:#c8a84b;--gold-light:rgba(200,168,75,0.12);
+    --bg:#eef0f6;--card:#fff;--text:#1e1b4b;--text-muted:#6b7280;--text-soft:#94a3b8;
+    --border:#e2e4ea;--border-light:#eef0f4;
+    --green:#059669;--green-light:rgba(5,150,105,0.10);
+    --red:#dc2626;--red-light:rgba(220,38,38,0.10);
+    --amber:#b45309;--amber-light:rgba(180,83,9,0.10);
+    --blue:#2563eb;--blue-light:rgba(37,99,235,0.10);
+    --radius:18px;--radius-sm:12px;--shadow-lg:0 18px 48px rgba(30,27,75,0.12);
+  }
+  html,body{height:100%}
+  body{
+    font-family:'Tajawal',system-ui,sans-serif;
+    background:linear-gradient(160deg,#1e1b4b 0%,#312e81 45%,#4338ca 100%);
+    color:var(--text);line-height:1.6;overflow:hidden;
+  }
+  #app{height:100vh;display:flex;flex-direction:column}
+  .app-glow{position:fixed;inset:0;pointer-events:none;background:radial-gradient(60% 45% at 50% 0%,rgba(200,168,75,0.16),transparent 70%);}
+
+  /* ===== HEADER ===== */
+  header.topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 26px;background:rgba(255,255,255,0.07);backdrop-filter:blur(8px);
+    border-bottom:1px solid rgba(255,255,255,0.10);
+  }
+  .brand{display:flex;align-items:center;gap:14px}
+  .brand .logo{
+    width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#4338ca);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:16px;
+    box-shadow:0 6px 18px rgba(99,102,241,0.5);border:1px solid rgba(255,255,255,0.25);
+  }
+  .brand .title{color:#fff}
+  .brand .title .en{font-size:15px;font-weight:900;letter-spacing:1px}
+  .brand .title .ar{font-size:12px;color:#c7d2fe;font-weight:600}
+  .clock{text-align:left;color:#fff}
+  .clock .time{font-size:24px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:1px}
+  .clock .date{font-size:12px;color:#c7d2fe}
+  .live-badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;color:#86efac;background:rgba(5,150,105,0.15);border:1px solid rgba(5,150,105,0.4);border-radius:99px;padding:2px 10px;margin-inline-start:10px;vertical-align:middle}
+  .live-badge .dot{width:7px;height:7px;border-radius:50%;background:#22c55e;animation:blink 1.4s infinite}
+
+  /* ===== MAIN ===== */
+  main{flex:1;position:relative;overflow:hidden}
+  .view{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;padding:22px;overflow-y:auto}
+  .view.active{display:flex;animation:fadeIn .35s ease both}
+
+  /* ===== READY ===== */
+  .ready-inner{max-width:640px;width:100%;text-align:center}
+  .scan-stage{position:relative;width:230px;height:230px;margin:0 auto 26px}
+  .scan-stage .ring{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(255,255,255,0.16)}
+  .scan-stage .ring.r1{animation:ringPulse 2.6s infinite}
+  .scan-stage .ring.r2{animation:ringPulse 2.6s .8s infinite}
+  .scan-stage .ring.r3{animation:ringPulse 2.6s 1.6s infinite}
+  .scan-card{
+    position:absolute;inset:34px;border-radius:22px;background:linear-gradient(145deg,#ffffff,#eef0ff);
+    box-shadow:0 20px 50px rgba(0,0,0,0.35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    border:2px solid rgba(200,168,75,0.5);
+  }
+  .scan-card .bars{display:flex;align-items:flex-end;gap:4px;height:52px}
+  .scan-card .bars i{background:#1e1b4b;border-radius:2px;display:block}
+  .scan-card .code-num{font-family:monospace;font-size:11px;color:#4338ca;letter-spacing:3px;font-weight:700}
+  .scan-card .chip{font-size:9px;font-weight:900;color:#fff;background:#6366f1;border-radius:6px;padding:2px 10px;letter-spacing:1px}
+  .scan-card.verified{animation:cardPop .5s ease}
+  .scan-card.verified .chip{background:var(--green)}
+  .scan-card.rejected{animation:shake .4s ease}
+  .scan-card.rejected .chip{background:var(--red)}
+  h1.ready-title{color:#fff;font-size:30px;font-weight:900;margin-bottom:6px}
+  p.ready-sub{color:#c7d2fe;font-size:15px;margin-bottom:26px}
+  .status-pill{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:800;color:#fff;background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.18);border-radius:99px;padding:10px 22px}
+  .status-pill .dot{width:10px;height:10px;border-radius:50%;background:#22c55e;animation:blink 1.4s infinite}
+  .last-read{font-family:monospace;font-size:13px;color:#a5b4fc;margin-top:14px;min-height:20px;letter-spacing:2px}
+  .manual-toggle{color:#a5b4fc;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;font-family:inherit;margin-top:10px;text-decoration:underline}
+  .manual-row{display:none;margin-top:14px;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+  .manual-row.show{display:flex}
+  .manual-row input{font-family:monospace;font-size:16px;padding:10px 14px;border-radius:10px;border:2px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.08);color:#fff;width:220px;text-align:center;direction:ltr;outline:none}
+  .manual-row input:focus{border-color:var(--primary)}
+  .manual-row button{font-family:inherit;font-size:13px;font-weight:800;color:#fff;background:var(--primary);border:none;border-radius:10px;padding:10px 18px;cursor:pointer}
+  .manual-row button:hover{background:var(--primary-dark)}
+
+  /* ===== STUDENT VIEW ===== */
+  .student-inner{max-width:680px;width:100%}
+  .back-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .back-btn{
+    display:inline-flex;align-items:center;gap:8px;font-family:inherit;font-size:13px;font-weight:800;
+    color:#c7d2fe;background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.18);
+    border-radius:99px;padding:9px 18px;cursor:pointer;transition:.2s;
+  }
+  .back-btn:hover{background:rgba(255,255,255,0.18);color:#fff}
+  .scan-hint-chip{font-size:12px;color:#a5b4fc;font-weight:700;display:inline-flex;align-items:center;gap:8px}
+  .scan-hint-chip .dot{width:8px;height:8px;border-radius:50%;background:#22c55e;animation:blink 1.4s infinite}
+
+  .student-card{
+    background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow-lg);
+    padding:22px 24px;margin-bottom:18px;animation:slideUp .35s ease both;
+  }
+  .sc-head{display:flex;align-items:center;gap:16px}
+  .avatar{
+    width:74px;height:74px;border-radius:50%;color:#fff;font-size:30px;font-weight:900;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    box-shadow:0 8px 20px rgba(0,0,0,0.15);
+  }
+  .sc-info{flex:1;min-width:0}
+  .sc-name{font-size:21px;font-weight:900;color:var(--text);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .sc-id{font-size:12px;color:var(--text-muted);font-weight:700;margin-top:2px;font-family:monospace}
+  .sc-tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .tag{font-size:12px;font-weight:800;border-radius:8px;padding:4px 12px;background:var(--primary-light);color:var(--primary-dark)}
+  .tag.gold{background:var(--gold-light);color:#8a6d1f}
+  .tag.green{background:var(--green-light);color:var(--green)}
+  .sc-divider{height:1px;background:var(--border-light);margin:18px 0 14px}
+  .sc-note{font-size:13px;color:var(--text-muted);font-weight:600}
+  .sc-note b{color:var(--text)}
+
+  .subjects-title{display:flex;align-items:center;gap:10px;color:#fff;font-size:17px;font-weight:900;margin-bottom:12px}
+  .subjects-title .count{background:var(--gold);color:#fff;border-radius:99px;font-size:12px;padding:1px 10px;font-weight:900}
+  .subject-list{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
+  .subject-card{
+    background:var(--card);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:14px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.10);animation:slideUp .35s ease both;
+    transition:transform .15s,box-shadow .15s,opacity .25s;
+  }
+  .subject-card:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,0.16)}
+  .subject-card.recorded{opacity:.55}
+  .subject-icon{width:48px;height:48px;border-radius:12px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+  .subject-info{flex:1;min-width:0}
+  .subject-name{font-size:16px;font-weight:900;color:var(--text)}
+  .subject-teacher{font-size:13px;color:var(--text-muted);font-weight:700;margin-top:2px}
+  .subject-teacher b{color:#4338ca}
+  .record-btn{
+    font-family:inherit;font-size:14px;font-weight:900;color:#fff;background:linear-gradient(135deg,#10b981,#059669);
+    border:none;border-radius:12px;padding:12px 20px;cursor:pointer;white-space:nowrap;transition:.2s;
+    box-shadow:0 6px 16px rgba(5,150,105,0.35);
+  }
+  .record-btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .record-btn:active{transform:translateY(0)}
+  .record-btn:disabled{background:#cbd5e1;box-shadow:none;cursor:not-allowed;filter:none}
+  .record-btn.busy{background:var(--primary);animation:blink 1s infinite}
+  .empty-subjects{background:rgba(255,255,255,0.08);border:1px dashed rgba(255,255,255,0.25);border-radius:14px;color:#c7d2fe;padding:22px;text-align:center;font-weight:700}
+
+  /* ===== SUCCESS VIEW ===== */
+  .success-card{
+    background:var(--card);border-radius:24px;box-shadow:var(--shadow-lg);
+    padding:40px 44px;text-align:center;max-width:460px;width:100%;animation:cardPop .5s ease both;
+    border-top:6px solid var(--green);
+  }
+  .check-circle{width:92px;height:92px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
+  .check-circle svg{width:52px;height:52px;stroke:var(--green);fill:none;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+  .check-circle svg path{stroke-dasharray:48;stroke-dashoffset:48;animation:drawCheck .6s .2s ease forwards}
+  .succ-title{font-size:24px;font-weight:900;color:var(--green);margin-bottom:4px}
+  .succ-student{font-size:18px;font-weight:900;color:var(--text);margin-bottom:2px}
+  .succ-id{font-size:12px;color:var(--text-muted);font-family:monospace;margin-bottom:18px}
+  .succ-facts{display:flex;flex-direction:column;gap:10px;background:var(--primary-light);border-radius:14px;padding:16px;margin-bottom:22px}
+  .fact{display:flex;align-items:center;justify-content:space-between;font-size:14px;gap:12px}
+  .fact .k{color:var(--text-muted);font-weight:700}
+  .fact .v{color:var(--text);font-weight:900}
+  .fact .v.time-chip{background:var(--green-light);color:var(--green);border-radius:8px;padding:2px 12px;font-family:monospace}
+  .reset-btn{
+    font-family:inherit;font-size:15px;font-weight:900;color:#fff;background:linear-gradient(135deg,#6366f1,#4338ca);
+    border:none;border-radius:12px;padding:14px 28px;cursor:pointer;transition:.2s;
+    box-shadow:0 8px 20px rgba(99,102,241,0.4);
+  }
+  .reset-btn:hover{filter:brightness(1.08)}
+  .succ-hint{font-size:12px;color:var(--text-soft);margin-top:14px;font-weight:700}
+
+  /* ===== MODAL ===== */
+  .overlay{
+    position:fixed;inset:0;background:rgba(15,15,30,0.55);backdrop-filter:blur(3px);
+    display:none;align-items:center;justify-content:center;z-index:100;padding:20px;
+  }
+  .overlay.show{display:flex;animation:fadeIn .25s ease both}
+  .modal{
+    background:var(--card);border-radius:20px;box-shadow:var(--shadow-lg);max-width:440px;width:100%;
+    padding:28px;text-align:center;animation:cardPop .35s ease both;
+  }
+  .modal .m-icon{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:30px}
+  .modal.info .m-icon{background:var(--blue-light)}
+  .modal.warn .m-icon{background:var(--amber-light)}
+  .modal.error .m-icon{background:var(--red-light)}
+  .modal h3{font-size:19px;font-weight:900;color:var(--text);margin-bottom:8px}
+  .modal .m-msg{font-size:14px;color:var(--text-muted);font-weight:600;line-height:1.8;margin-bottom:20px}
+  .modal .m-msg b{color:var(--text)}
+  .modal .m-msg .modal-name{color:var(--primary-dark);font-weight:900}
+  .modal .m-msg .time-chip{background:var(--blue-light);color:var(--blue);border-radius:8px;padding:2px 10px;font-family:monospace}
+  .modal-close{
+    font-family:inherit;font-size:14px;font-weight:900;color:#fff;background:linear-gradient(135deg,#6366f1,#4338ca);
+    border:none;border-radius:11px;padding:11px 30px;cursor:pointer;transition:.2s;
+  }
+  .modal-close:hover{filter:brightness(1.08)}
+
+  /* ===== ANIMATIONS ===== */
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes slideUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes cardPop{0%{opacity:0;transform:scale(.9)}70%{transform:scale(1.03)}100%{opacity:1;transform:scale(1)}}
+  @keyframes ringPulse{0%{transform:scale(.85);opacity:.8}100%{transform:scale(1.25);opacity:0}}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+  @keyframes drawCheck{to{stroke-dashoffset:0}}
+  @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+  @keyframes popDone{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+
+  /* ===== HIDDEN SCAN INPUT ===== */
+  #scan-input{position:absolute;left:-9999px;top:auto;width:1px;height:1px;opacity:0;pointer-events:none}
+
+  @media (max-width:640px){
+    h1.ready-title{font-size:23px}
+    .clock .time{font-size:18px}
+    .subject-card{flex-wrap:wrap}
+    .record-btn{width:100%}
+    .success-card{padding:26px 20px}
+  }
+</style>
+</head>
+<body>
+<div class="app-glow"></div>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">E+</div>
+      <div class="title">
+        <div class="en">E-PLUS <span class="live-badge"><span class="dot"></span>نظام الحضور</span></div>
+        <div class="ar">نقطة الحضور SP-1160</div>
+      </div>
+    </div>
+    <div class="clock">
+      <div class="time" id="clock-time">--:--:--</div>
+      <div class="date" id="clock-date"></div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ===== READY ===== -->
+    <section class="view active" id="view-ready">
+      <div class="ready-inner">
+        <div class="scan-stage">
+          <div class="ring r1"></div>
+          <div class="ring r2"></div>
+          <div class="ring r3"></div>
+          <div class="scan-card" id="scan-card">
+            <div class="bars" id="scan-bars"></div>
+            <div class="code-num" id="scan-code">•••••••••••••</div>
+            <div class="chip">SP-1160</div>
+          </div>
+        </div>
+        <h1 class="ready-title">مرر بطاقة الطالب أمام الماسح</h1>
+        <p class="ready-sub">بعد المسح يتم عرض مواد الطالب المسجلة لاختيار الأستاذ</p>
+        <div class="status-pill" id="ready-pill"><span class="dot"></span>بانتظار المسح</div>
+        <div class="last-read" id="last-read"></div>
+        <button class="manual-toggle" id="manual-toggle" type="button">⌨️ إدخال يدوي</button>
+        <div class="manual-row" id="manual-row">
+          <input type="text" id="manual-input" autocomplete="off" placeholder="رقم الطالب أو الباركود">
+          <button type="button" id="manual-submit">تسجيل</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== STUDENT ===== -->
+    <section class="view" id="view-student">
+      <div class="student-inner">
+        <div class="back-row">
+          <button class="back-btn" id="back-ready" type="button">↩️ مسح بطاقة أخرى</button>
+          <span class="scan-hint-chip"><span class="dot"></span>يمكنك مسح بطاقة جديدة الآن</span>
+        </div>
+        <div class="student-card">
+          <div class="sc-head">
+            <div class="avatar" id="st-avatar">؟</div>
+            <div class="sc-info">
+              <div class="sc-name">
+                <span id="st-name">—</span>
+                <span class="tag green" id="st-status">مسجل نهائياً</span>
+              </div>
+              <div class="sc-id">ID: <span id="st-id">—</span></div>
+              <div class="sc-tags" id="st-tags"></div>
+            </div>
+          </div>
+          <div class="sc-divider"></div>
+          <div class="sc-note" id="st-note">المواد التالية هي المواد المسجلة لهذا الطالب فقط.</div>
+        </div>
+        <div class="subjects-title">مواد الطالب المسجلة <span class="count" id="subj-count">0</span></div>
+        <div class="subject-list" id="subject-list"></div>
+      </div>
+    </section>
+
+    <!-- ===== SUCCESS ===== -->
+    <section class="view" id="view-success">
+      <div class="success-card">
+        <div class="check-circle">
+          <svg viewBox="0 0 52 52"><path d="M14 27l8 8 16-16"></path></svg>
+        </div>
+        <div class="succ-title">تم تسجيل الحضور بنجاح</div>
+        <div class="succ-student" id="sv-name">—</div>
+        <div class="succ-id" id="sv-id"></div>
+        <div class="succ-facts">
+          <div class="fact"><span class="k">المادة</span><span class="v" id="sv-subject">—</span></div>
+          <div class="fact"><span class="k">الأستاذ</span><span class="v" id="sv-teacher">—</span></div>
+          <div class="fact"><span class="k">وقت الحضور</span><span class="v time-chip" id="sv-time">—</span></div>
+          <div class="fact"><span class="k">التاريخ</span><span class="v" id="sv-date">—</span></div>
+        </div>
+        <button class="reset-btn" id="sv-reset" type="button">↩️ مسح بطاقة أخرى</button>
+        <div class="succ-hint">سيتم إعادة تعيين الشاشة تلقائياً بعد قليل</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ===== MODAL ===== -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal">
+    <div class="m-icon" id="m-icon">ℹ️</div>
+    <h3 id="m-title"></h3>
+    <div class="m-msg" id="m-msg"></div>
+    <button class="modal-close" id="m-close" type="button">إغلاق</button>
+  </div>
+</div>
+
+<input type="text" id="scan-input" autocomplete="off" inputmode="numeric" tabindex="-1" aria-hidden="true">
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ── Escape (XSS-safe rendering) ────────────────────────
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function studentFullName(s) {
+    return ((s && (s.first_name || '') + ' ' + (s.last_name || '')) || '').trim();
+  }
+
+  var AVATAR_COLORS = ['#6366f1', '#0891b2', '#059669', '#d97706', '#db2777', '#7c3aed', '#2563eb', '#0d9488'];
+  function avatarColor(id) {
+    var h = 0, str = String(id || '');
+    for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    return AVATAR_COLORS[h % AVATAR_COLORS.length];
+  }
+
+  // ── State ──────────────────────────────────────────────
+  var processing = false;
+  var attending = false;
+  var currentStudent = null;
+  var currentScanValue = '';
+  var subjectPairs = [];
+  var teacherMap = null;
+  var successTimer = null;
+  var scanTimer = null;
+  var scanBuffer = '';
+
+  // ── Firebase init flag check ───────────────────────────
+  if (!fbReady) {
+    openModal('error', 'فشل الاتصال بقاعدة البيانات', 'تعذر تحميل نظام البيانات. أعد تشغيل الصفحة أو تأكد من الاتصال بالإنترنت.');
+    return;
+  }
+
+  // ── Clock ──────────────────────────────────────────────
+  function tick() {
+    var now = new Date();
+    $('clock-time').textContent = now.toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    $('clock-date').textContent = now.toLocaleDateString('ar-DZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  // ── Decorative barcode bars on ready screen ────────────
+  (function buildBars() {
+    var widths = [3,1,2,1,1,3,1,2,1,1,3,2,1,1,2,3,1,1,1,2,1,3,2,1,1,1,2,3];
+    var heights = [34,50,42,50,50,34,50,42,50,50,34,42,50,50,42,34,50,50,50,42,50,34,42,50,50,50,42,34];
+    var bars = '';
+    for (var i = 0; i < widths.length; i++) {
+      bars += '<i style="width:' + widths[i] + 'px;height:' + heights[i] + 'px"></i>';
+    }
+    $('scan-bars').innerHTML = bars;
+  })();
+
+  function refocusScanner() {
+    if ($('manual-row').classList.contains('show')) return;
+    setTimeout(function () { try { $('scan-input').focus(); } catch (e) {} }, 20);
+  }
+
+  // ── View switching ─────────────────────────────────────
+  function switchView(name) {
+    var views = document.querySelectorAll('.view');
+    for (var i = 0; i < views.length; i++) views[i].classList.remove('active');
+    var v = $('view-' + name);
+    if (v) v.classList.add('active');
+    if (name === 'ready' || name === 'student') refocusScanner();
+  }
+
+  function goReady() {
+    clearTimeout(successTimer);
+    currentStudent = null;
+    currentScanValue = '';
+    subjectPairs = [];
+    attending = false;
+    $('last-read').textContent = '';
+    setPill('بانتظار المسح', true);
+    switchView('ready');
+  }
+
+  function setPill(text, active) {
+    var pill = $('ready-pill');
+    pill.innerHTML = '<span class="dot"></span>' + esc(text);
+  }
+
+  // ── Teacher map (support_teachers by normalized name) ──
+  function normName(name) { return String(name || '').replace(/\s+/g, '').toLowerCase(); }
+
+  async function loadTeacherMap() {
+    if (teacherMap) return teacherMap;
+    var map = new Map();
+    try {
+      var snap = await db.collection('support_teachers').get();
+      snap.forEach(function (d) {
+        var t = d.data() || {};
+        var key = normName(t.name);
+        if (!key) return;
+        if (!map.has(key)) map.set(key, { teacherId: t.teacherId || t.id || d.id, name: t.name || '' });
+      });
+    } catch (e) { console.warn('loadTeacherMap failed', e); }
+    teacherMap = map;
+    return map;
+  }
+
+  // ── Resolve the student's registered subjects ──────────
+  async function resolveSubjects(student) {
+    var map = await loadTeacherMap();
+    var arr = Array.isArray(student.subjects) ? student.subjects : [];
+    var pairs = [];
+    for (var i = 0; i < arr.length; i++) {
+      var s = arr[i];
+      var subjectName = typeof s === 'string' ? s : (s.subject || s.subjectName || '');
+      var teacherName = typeof s === 'string' ? '' : (s.teacher || s.teacherName || '');
+      var t = teacherName ? map.get(normName(teacherName)) : null;
+      pairs.push({
+        idx: i,
+        subjectName: subjectName,
+        subjectId: (s && s.subjectId) || SubjectService.getSubjectId(subjectName) || '',
+        teacherName: teacherName,
+        teacherId: (s && s.teacherId) || (t ? t.teacherId : '') || '',
+        icon: SubjectService.getSubjectIcon(subjectName) || '📘',
+        recording: false
+      });
+    }
+    return pairs;
+  }
+
+  // ── Render student view ────────────────────────────────
+  async function showStudent(student) {
+    var name = studentFullName(student);
+    $('st-name').textContent = name || '—';
+    $('st-id').textContent = student.id || '—';
+    $('st-avatar').textContent = (name || '?').charAt(0);
+    $('st-avatar').style.background = avatarColor(student.id);
+    $('st-status').textContent = student.status || 'مسجل نهائياً';
+    $('st-status').className = 'tag green';
+
+    var tags = [];
+    if (student.level) tags.push('<span class="tag">' + esc(student.level) + '</span>');
+    if (student.stream) tags.push('<span class="tag gold">' + esc(student.stream) + '</span>');
+    if (student.institution) tags.push('<span class="tag">' + esc(student.institution) + '</span>');
+    $('st-tags').innerHTML = tags.join('');
+
+    subjectPairs = await resolveSubjects(student);
+    $('subj-count').textContent = subjectPairs.length;
+
+    if (subjectPairs.length === 0) {
+      $('subject-list').innerHTML = '<div class="empty-subjects">لم يسجل هذا الطالب في أي مادة بعد</div>';
+      $('st-note').textContent = 'المواد التالية هي المواد المسجلة لهذا الطالب فقط.';
+    } else {
+      $('st-note').textContent = 'المواد التالية هي المواد المسجلة لهذا الطالب فقط — اختر الأستاذ لتسجيل الحضور:';
+      renderSubjects();
+    }
+    switchView('student');
+  }
+
+  function renderSubjects() {
+    var html = '';
+    for (var i = 0; i < subjectPairs.length; i++) {
+      var p = subjectPairs[i];
+      var teacherLine = p.teacherName
+        ? 'الأستاذ: <b>' + esc(p.teacherName) + '</b>'
+        : 'لا يتوفر أستاذ مسجل لهذه المادة';
+      html +=
+        '<div class="subject-card" id="subj-card-' + i + '">' +
+          '<div class="subject-icon">' + esc(p.icon) + '</div>' +
+          '<div class="subject-info">' +
+            '<div class="subject-name">' + esc(p.subjectName || '—') + '</div>' +
+            '<div class="subject-teacher">' + teacherLine + '</div>' +
+          '</div>' +
+          '<button class="record-btn" id="rec-btn-' + i + '" type="button" onclick="window.__mark(' + i + ')">تسجيل الحضور</button>' +
+        '</div>';
+    }
+    $('subject-list').innerHTML = html;
+  }
+
+  function setRecordBusy(busy) {
+    var btn = $('rec-btn-' + subjectBusyIdx);
+    if (btn) {
+      btn.disabled = busy;
+      btn.className = busy ? 'record-btn busy' : 'record-btn';
+      btn.textContent = busy ? 'جارٍ التسجيل…' : 'تسجيل الحضور';
+    }
+  }
+  var subjectBusyIdx = -1;
+
+  // ── Record attendance for one subject ──────────────────
+  async function markAttendance(idx) {
+    if (attending || !currentStudent || !subjectPairs[idx]) return;
+    var pair = subjectPairs[idx];
+    if (pair.recording) { openModal('info', 'تسجيل مسبق موجود', 'تم تسجيل حضور هذا الطالب في هذه المادة مسبقاً.'); return; }
+
+    var date = AttendanceService.today();
+    var dup = await AttendanceService.isDuplicate(currentStudent.id, pair.subjectId, date, null, pair.teacherId);
+    if (dup) { showAlreadyAttended(pair); return; }
+
+    attending = true;
+    subjectBusyIdx = idx;
+    setRecordBusy(true);
+    try {
+      var res = await AttendanceService.recordSingle(
+        currentStudent.id, pair.teacherId, pair.teacherName,
+        pair.subjectId, pair.subjectName, currentScanValue
+      );
+      if (res && res.success) {
+        pair.recording = true;
+        var card = $('subj-card-' + idx);
+        if (card) card.classList.add('recorded');
+        setRecordBusy(false);
+        subjectBusyIdx = -1;
+        showSuccess(pair, res.doc);
+      } else if (res && res.reason === 'duplicate') {
+        setRecordBusy(false);
+        subjectBusyIdx = -1;
+        showAlreadyAttended(pair);
+      } else {
+        setRecordBusy(false);
+        subjectBusyIdx = -1;
+        openModal('error', 'تعذر تسجيل الحضور', (res && res.message) || 'حدث خطأ غير متوقع. حاول مجدداً.');
+      }
+    } catch (e) {
+      console.error('record error:', e);
+      setRecordBusy(false);
+      subjectBusyIdx = -1;
+      openModal('error', 'خطأ في الاتصال', 'تعذر حفظ الحضور. تأكد من اتصال النظام بالإنترنت وحاول مجدداً.');
+    } finally {
+      attending = false;
+    }
+  }
+
+  function showAlreadyAttended(pair) {
+    var date = AttendanceService.today();
+    var time = null;
+    AttendanceService.getRecords({ studentId: currentStudent.id, subjectId: pair.subjectId, teacherId: pair.teacherId, date: date })
+      .then(function (recs) {
+        if (recs && recs.length && recs[0].checkInTime) time = recs[0].checkInTime;
+      })
+      .catch(function () {})
+      .then(function () {
+        openModal('info', 'تسجيل مسبق موجود', 'تم تسجيل حضور هذا الطالب لدى الأستاذ <b>' + esc(pair.teacherName) + '</b> في مادة <b>' + esc(pair.subjectName) + '</b>' +
+          (time ? ' الساعة <span class="time-chip">' + esc(time) + '</span>' : '') +
+          ' — لا يسمح بالتسجيل المكرر.');
+      });
+  }
+
+  function showSuccess(pair, doc) {
+    $('sv-name').textContent = studentFullName(currentStudent) || '—';
+    $('sv-id').textContent = 'رقم التسجيل: ' + (currentStudent.id || '—');
+    $('sv-subject').textContent = pair.subjectName || '—';
+    $('sv-teacher').textContent = pair.teacherName || '—';
+    $('sv-time').textContent = (doc && doc.checkInTime) || AttendanceService.nowTime();
+    $('sv-date').textContent = (doc && doc.date) || AttendanceService.today();
+    switchView('success');
+    clearTimeout(successTimer);
+    successTimer = setTimeout(goReady, 4000);
+  }
+
+  // ── Modal ──────────────────────────────────────────────
+  var modalIcons = { info: 'ℹ️', warn: '⚠️', error: '⛔' };
+  function openModal(type, title, msg) {
+    $('overlay').classList.add('show');
+    $('modal').className = 'modal ' + type;
+    $('m-icon').textContent = modalIcons[type] || 'ℹ️';
+    $('m-title').textContent = title;
+    $('m-msg').innerHTML = msg;
+    refocusScanner();
+  }
+  function closeModal() {
+    $('overlay').classList.remove('show');
+    refocusScanner();
+  }
+  $('m-close').addEventListener('click', function () {
+    closeModal();
+    if (!$('view-student').classList.contains('active')) goReady();
+  });
+  $('overlay').addEventListener('click', function (e) {
+    if (e.target === $('overlay')) { closeModal(); if (!$('view-student').classList.contains('active')) goReady(); }
+  });
+
+  // ── Scan handling ──────────────────────────────────────
+  function animateCard(state) {
+    var card = $('scan-card');
+    card.classList.remove('verified', 'rejected');
+    void card.offsetWidth;
+    if (state) card.classList.add(state);
+  }
+
+  async function handleScan(raw) {
+    if (processing || !fbReady) return;
+    clearTimeout(successTimer);
+    $('overlay').classList.remove('show');
+    var val = String(raw || '').replace(/\r/g, '').trim();
+    if (!val) return;
+    processing = true;
+    $('last-read').textContent = val;
+    setPill('جارٍ المعالجة…', false);
+
+    try {
+      var resolved = await AttendanceService.resolveStudentFromScan(val);
+      var student = resolved ? resolved.student : null;
+
+      if (!student) {
+        animateCard('rejected');
+        setPill('لم يتم العثور على الطالب', false);
+        openModal('error', 'طالب غير موجود', 'الباركود <b>' + esc(val) + '</b> غير مرتبط بأي تسجيل.<br>تأكد من صحة البطاقة أو أعد طباعتها من نظام E-PLUS.');
+        return;
+      }
+
+      var status = student.status;
+      if (status === 'مسجل مبدئياً') {
+        animateCard('rejected');
+        setPill('حضور غير مسموح', false);
+        openModal('warn', 'حضور غير مسموح', 'لا يمكن تسجيل الحضور — هذا الطالب <b>غير مسجل نهائياً</b> بعد.<br><span class="modal-name">' + esc(studentFullName(student)) + '</span>');
+        return;
+      }
+      if (status !== 'مسجل نهائياً') {
+        animateCard('rejected');
+        setPill('بطاقة غير صالحة', false);
+        openModal('error', 'بطاقة غير صالحة', 'حالة الطالب: <b>' + esc(status || 'غير معروفة') + '</b>.<br>لا يسمح بتسجيل الحضور لهذه البطاقة.');
+        return;
+      }
+
+      animateCard('verified');
+      setPill('تم التعرف على الطالب', false);
+      currentStudent = student;
+      currentScanValue = val;
+      await showStudent(student);
+    } catch (e) {
+      console.error('scan error:', e);
+      animateCard('rejected');
+      setPill('تعذر الاتصال', false);
+      openModal('error', 'خطأ في الاتصال', 'تعذر جلب بيانات الطالب. تأكد من اتصال النظام بالإنترنت وحاول مجدداً.');
+    } finally {
+      processing = false;
+    }
+  }
+
+  // ── Scanner (HID) input wiring ─────────────────────────
+  var scanInput = $('scan-input');
+  scanInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      var val = scanInput.value.trim();
+      if (val) {
+        clearTimeout(scanTimer);
+        scanBuffer = '';
+        handleScan(val);
+      }
+      scanInput.value = '';
+      setTimeout(function () { scanInput.focus(); }, 30);
+    }
+  });
+  scanInput.addEventListener('input', function () {
+    clearTimeout(scanTimer);
+    var val = scanInput.value.trim();
+    if (val.length >= 8) {
+      scanTimer = setTimeout(function () {
+        if (scanInput.value.trim()) {
+          handleScan(scanInput.value.trim());
+          scanInput.value = '';
+        }
+        setTimeout(function () { scanInput.focus(); }, 30);
+      }, 250);
+    }
+  });
+  document.addEventListener('click', function () {
+    var active = document.activeElement;
+    if (!active || (active.tagName !== 'INPUT' && active.tagName !== 'TEXTAREA')) refocusScanner();
+  });
+
+  // ── Manual entry ───────────────────────────────────────
+  $('manual-toggle').addEventListener('click', function () {
+    var row = $('manual-row');
+    row.classList.toggle('show');
+    if (row.classList.contains('show')) $('manual-input').focus();
+  });
+  $('manual-input').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); $('manual-submit').click(); }
+  });
+  $('manual-submit').addEventListener('click', function () {
+    var v = $('manual-input').value.trim();
+    if (!v) return;
+    $('manual-input').value = '';
+    handleScan(v);
+  });
+
+  // ── Back / reset buttons ───────────────────────────────
+  $('back-ready').addEventListener('click', goReady);
+  $('sv-reset').addEventListener('click', goReady);
+
+  // Expose for inline onclick handlers
+  window.__mark = markAttendance;
+
+  // ── Init ───────────────────────────────────────────────
+  refocusScanner();
+  setInterval(function () { if (!$('view-student').classList.contains('active') && !$('view-success').classList.contains('active')) refocusScanner(); }, 4000);
+})();
+</script>
+</body>
+</html>

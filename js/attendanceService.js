@@ -24,7 +24,9 @@ const AttendanceService = (function () {
   //   level:          string
   //   stream:         string
   //   institution:    string
-  //   createdAt:      string (ISO)
+  //   barcodeValue:   string  (the scanned card value, for tracing)
+  //   createdAt:      string (ISO, client clock)
+  //   serverTime:     Timestamp|null (Firestore server timestamp, when available)
   //   updatedAt:      string | null
   // }
 
@@ -34,6 +36,16 @@ const AttendanceService = (function () {
 
   function nowTime() {
     return new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  }
+
+  // Firestore server timestamp when available (compat firebase), else null.
+  function _serverTimestamp() {
+    try {
+      if (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) {
+        return firebase.firestore.FieldValue.serverTimestamp();
+      }
+    } catch (e) {}
+    return null;
   }
 
   // ── Duplicate Check ───────────────────────────────────
@@ -105,7 +117,8 @@ const AttendanceService = (function () {
     const {
       studentId, studentName, teacherId, teacherName,
       subjectId, subjectName, date, checkInTime,
-      status, sessionNumber, level, stream, institution
+      status, sessionNumber, level, stream, institution,
+      barcodeValue
     } = data;
 
     const recDate = date || today();
@@ -130,12 +143,45 @@ const AttendanceService = (function () {
       level: level || '',
       stream: stream || '',
       institution: institution || '',
+      barcodeValue: barcodeValue || '',
       createdAt: new Date().toISOString(),
+      serverTime: _serverTimestamp(),
       updatedAt: null
     };
 
-    const ref = await db.collection(COLLECTION).add(doc);
-    return { success: true, id: ref.id, doc };
+    // Database-level duplicate prevention: a deterministic document ID
+    // (student+teacher+subject+date+session) written inside a transaction.
+    // Two concurrent scans of the same student/subject can never both succeed —
+    // Firestore resolves the transaction conflict, and docExists() gives the
+    // second writer the exact same "already recorded" result.
+    const key = (studentId + '_' + (teacherId || 'x') + '_' + (subjectId || 'x') + '_' + recDate + '_' + recSession)
+      .replace(/[^A-Za-z0-9_.\-]/g, '_');
+
+    if (typeof db.runTransaction === 'function') {
+      const ref = db.collection(COLLECTION).doc(key);
+      try {
+        return await db.runTransaction(async tx => {
+          const snap = await tx.get(ref);
+          if (snap.exists) {
+            return { success: false, reason: 'duplicate', message: 'تم تسجيل حضور هذا الطالب مسبقاً لهذه الحصة' };
+          }
+          await tx.set(ref, doc);
+          return { success: true, id: ref.id, doc };
+        });
+      } catch (e) {
+        if (e && e.code === 'aborted') {
+          return { success: false, reason: 'duplicate', message: 'تم تسجيل حضور هذا الطالب مسبقاً لهذه الحصة' };
+        }
+        throw e;
+      }
+    }
+
+    // Fallback (no transaction support): explicit get/set on the deterministic id.
+    const ref2 = db.collection(COLLECTION).doc(key);
+    const existing = await ref2.get();
+    if (existing.exists) return { success: false, reason: 'duplicate', message: 'تم تسجيل حضور هذا الطالب مسبقاً لهذه الحصة' };
+    await ref2.set(doc);
+    return { success: true, id: ref2.id, doc };
   }
 
   // ── Check-out ─────────────────────────────────────────
@@ -304,7 +350,7 @@ const AttendanceService = (function () {
 
   // ── Single Subject Record (from UI) ───────────────────
 
-  async function recordSingle(studentId, teacherId, teacherName, subjectId, subjectName) {
+  async function recordSingle(studentId, teacherId, teacherName, subjectId, subjectName, barcodeValue) {
     const student = await RegistrationService.getById(studentId);
     if (!student) return { success: false, reason: 'student_not_found' };
     if (!RegistrationService.isValidConfirmed(student)) return { success: false, reason: 'invalid_registration' };
@@ -316,6 +362,7 @@ const AttendanceService = (function () {
       teacherName,
       subjectId,
       subjectName,
+      barcodeValue: barcodeValue || '',
       level: student.level || '',
       stream: student.stream || '',
       institution: student.institution || ''
