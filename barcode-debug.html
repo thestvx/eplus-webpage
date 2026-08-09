@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Barcode Scanner Diagnostic — E-PLUS</title>
+<link rel="icon" type="image/x-icon" href="images/eplus-icon.ico">
+<script src="js/ean13.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --primary:#6366f1;--primary-dark:#4f46e5;
+    --green:#22c55e;--red:#ef4444;--amber:#f59e0b;
+    --bg:#0f172a;--card:#1e293b;--line:#334155;--text:#e2e8f0;--muted:#94a3b8;
+  }
+  body{font-family:'Tajawal',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:0 0 60px}
+  header{
+    background:linear-gradient(135deg,#1e1b4b,#312e81);padding:18px 22px;display:flex;align-items:center;
+    justify-content:space-between;gap:14px;flex-wrap:wrap;border-bottom:1px solid #4f46e5;
+  }
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand .logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#6366f1,#4338ca);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:14px;border:1px solid rgba(255,255,255,.25)}
+  .brand h1{font-size:17px;font-weight:900}
+  .brand h1 small{display:block;font-size:12px;font-weight:600;color:#c7d2fe}
+  .status{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:900;border-radius:99px;padding:8px 16px;border:1px solid var(--line);background:rgba(255,255,255,.05)}
+  .status .dot{width:10px;height:10px;border-radius:50%;background:var(--green);animation:blink 1.4s infinite}
+  .status.scanning{color:#fde68a;border-color:rgba(245,158,11,.5)}
+  .status.scanning .dot{background:var(--amber)}
+  .status.done{color:#86efac;border-color:rgba(34,197,94,.5)}
+  main{max-width:860px;margin:22px auto 0;padding:0 16px;display:flex;flex-direction:column;gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
+  .card h2{font-size:14px;font-weight:900;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .card h2 .badge{font-size:10px;background:#4f46e5;border-radius:6px;padding:1px 8px;color:#fff}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+  .val-box{background:#0b1220;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .val-box .lbl{font-size:11px;color:var(--muted);font-weight:700;margin-bottom:6px}
+  .val-box .val{font-family:Consolas,monospace;font-size:22px;font-weight:700;color:#7dd3fc;letter-spacing:2px;word-break:break-all;direction:ltr;text-align:left}
+  .val-box .val.bad{color:#f87171}
+  .val-box .val.hint{color:#475569;font-size:13px}
+  .meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .chip{font-size:12px;font-weight:800;background:#0b1220;border:1px solid var(--line);color:#cbd5e1;border-radius:8px;padding:4px 12px;font-family:monospace}
+  .chip .k{color:var(--muted);font-weight:700}
+  .chip.ok{color:#4ade80;border-color:rgba(34,197,94,.4)}
+  .chip.no{color:#f87171;border-color:rgba(239,68,68,.4)}
+  .note{font-size:12.5px;line-height:1.9;color:#cbd5e1;background:#0b1220;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .note b{color:#fbbf24}
+  .note code{background:#1e293b;border-radius:5px;padding:1px 6px;font-size:12px;direction:ltr;display:inline-block}
+  .layout-warn{display:none;font-size:13px;font-weight:800;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.45);color:#fde68a;border-radius:12px;padding:10px 14px;margin-top:10px;line-height:1.8}
+  .layout-warn.show{display:block}
+  table{width:100%;border-collapse:collapse;font-family:Consolas,monospace;font-size:12px;direction:ltr;text-align:left}
+  th,td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--muted);font-weight:800;font-size:11px;position:sticky;top:0;background:var(--card)}
+  td.num{color:#7dd3fc}
+  td.k{color:#e2e8f0}
+  td.bad{color:#f87171}
+  .feed{background:#0b1220;border-radius:10px;padding:10px;max-height:220px;overflow-y:auto;font-family:Consolas,monospace;font-size:11.5px;color:#67e8f9;direction:ltr;text-align:left;line-height:1.8}
+  .feed .x{color:#475569}
+  .feed .w{color:#fde68a}
+  .row-btns{display:flex;gap:10px;flex-wrap:wrap}
+  .btn{font-family:inherit;font-size:13px;font-weight:900;border:none;border-radius:10px;padding:10px 20px;cursor:pointer;transition:.2s}
+  .btn.reset{background:var(--card);border:1px solid var(--line);color:#e2e8f0}
+  .btn.reset:hover{background:#334155}
+  .btn.test{background:linear-gradient(135deg,#6366f1,#4338ca);color:#fff}
+  .btn.test:hover{filter:brightness(1.1)}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">E+</div>
+    <h1>E-PLUS<small>Barcode Scanner Diagnostic — SP-1160</small></h1>
+  </div>
+  <div class="status" id="status"><span class="dot"></span><span id="status-text">Scanner Ready</span></div>
+</header>
+
+<main>
+  <div class="card">
+    <h2>🧪 كيف تختبر؟ <span class="badge">قارن مع Notepad</span></h2>
+    <div class="note">
+      <b>1)</b> افتح هذا الصفحة واتركها مفتوحة، وافتح أيضاً <b>مفكرة Notepad</b> في Windows.<br>
+      <b>2)</b> مرر نفس البطاقة على الماسح في كل مرة (منتجات + بطاقات الطلاب).<br>
+      <b>3)</b> قارن النتيجة:
+      <table style="margin-top:8px">
+        <tr><th>المكان</th><th>القيمة المتوقعة</th><th>ماذا يعني؟</th></tr>
+        <tr><td>Notepad</td><td class="num">2000000009018</td><td class="k">الماسح نفسه يرسل أرقاماً صحيحة ✓</td></tr>
+        <tr><td>هذه الصفحة (event.code)</td><td class="num">2000000009018</td><td class="k">نظامنا يستقبل صحيحاً ✓</td></tr>
+        <tr><td>هذه الصفحة (event.key)</td><td class="bad">éàààà…</td><td class="k">تخطيط لوحة المفاتيح غير EN/US — يتطلب ضبط Windows</td></tr>
+      </table>
+      إذا ظهر التشويش <b>في Notepad أيضاً</b> ⇒ المشكلة في إعدادات الماسح نفسه (يجب تغيير Keyboard Layout من دليل SP-1160 إلى US/English).<br>
+      إذا كان Notepad صحيحاً وevent.key مشوهاً ⇒ تخطيط Windows فرنسي/عربي — والحل: استخدم <b>event.code</b> (وقد طبقناه في attendance.html تلقائياً).
+    </div>
+    <div class="layout-warn" id="layout-warn">⚠️ <b>تخطيط لوحة المفاتيح ليس EN/US.</b><br>event.key يعيد رسم الأرقام كأحرف (مثل é/à/&) — لكن النظام يعتمد event.code الذي يحدد المفتاح الفيزيائي ولا يتأثر بالتخطيط، لذا تُعرض القيمة الصحيحة أدناه.</div>
+  </div>
+
+  <div class="card">
+    <h2>📡 آخر مسح <span class="badge">Raw Scan</span></h2>
+    <div class="grid2">
+      <div class="val-box">
+        <div class="lbl">القيمة حسب event.code — <b>موثوقة (لا تتأثر بالتخطيط)</b></div>
+        <div class="val" id="val-code">بانتظار المسح…</div>
+      </div>
+      <div class="val-box">
+        <div class="lbl">القيمة حسب event.key — <b>تتأثر بتخطيط لوحة المفاتيح</b></div>
+        <div class="val" id="val-key">—</div>
+      </div>
+    </div>
+    <div class="meta">
+      <span class="chip"><span class="k">Length:</span> <span id="meta-len">0</span></span>
+      <span class="chip"><span class="k">Duration:</span> <span id="meta-dur">—</span></span>
+      <span class="chip" id="meta-enter"><span class="k">Enter received:</span> —</span>
+      <span class="chip" id="meta-ean"><span class="k">Valid EAN-13:</span> —</span>
+      <span class="chip"><span class="k">Layout:</span> <span id="meta-layout">—</span></span>
+    </div>
+    <div style="margin-top:14px">
+      <h2 style="margin-bottom:8px">🔤 الأحرف المستلمة <span class="badge">Characters</span></h2>
+      <div style="max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:10px">
+        <table id="char-table">
+          <thead><tr><th>#</th><th>event.code</th><th>event.key</th><th>keyCode</th><th>which</th><th>t(ms)</th></tr></thead>
+          <tbody id="char-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="row-btns" style="margin-top:14px">
+      <button class="btn reset" id="btn-reset" type="button">🧹 مسح البيانات</button>
+      <button class="btn test" id="btn-test" type="button">⚡ محاكاة مسح رقمي (2000000009018)</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🕘 Key Events (مباشر)</h2>
+    <div class="feed" id="feed"></div>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function logScanner() {
+    try {
+      var args = ['[SCANNER]'].concat([].slice.call(arguments));
+      console.log.apply(console, args);
+    } catch (e) {}
+  }
+
+  function feed(line, cls) {
+    var el = document.createElement('div');
+    el.textContent = line;
+    if (cls) el.className = cls;
+    $('feed').appendChild(el);
+    while ($('feed').childNodes.length > 80) $('feed').removeChild($('feed').firstChild);
+    $('feed').scrollTop = $('feed').scrollHeight;
+  }
+
+  // ── State ──────────────────────────────────────────────
+  var bufCode = [];
+  var bufKey = [];
+  var keys = [];
+  var startTs = 0;
+  var lastTs = 0;
+  var enterSeen = false;
+  var layoutProbed = false;
+
+  function setStatus(state, text) {
+    var el = $('status');
+    el.className = 'status' + (state ? ' ' + state : '');
+    $('status-text').textContent = text;
+  }
+
+  // ── Rendering ──────────────────────────────────────────
+  function renderLive() {
+    $('val-code').textContent = bufCode.join('') || '';
+    $('val-code').className = 'val' + (/^\d+$/.test(bufCode.join('')) ? '' : ' bad');
+    $('val-key').textContent = bufKey.join('') || '—';
+    $('val-key').className = 'val' + (bufKey.join('') === bufCode.join('') ? '' : ' bad');
+    $('meta-len').textContent = bufCode.length;
+    if (startTs) $('meta-dur').textContent = (Date.now() - startTs) + ' ms';
+    $('meta-enter').textContent = enterSeen ? 'YES' : (startTs ? '…' : '—');
+    $('meta-enter').className = 'chip' + (enterSeen ? ' ok' : (startTs ? '' : ''));
+  }
+
+  function renderFinal() {
+    var codeVal = bufCode.join('');
+    var keyVal = bufKey.join('');
+    var dur = lastTs - startTs;
+
+    $('val-code').textContent = codeVal || '—';
+    $('val-code').className = 'val' + (/^\d+$/.test(codeVal) && codeVal.length > 0 ? '' : ' bad');
+    $('val-key').textContent = keyVal || '—';
+    $('val-key').className = 'val' + (keyVal === codeVal && codeVal ? '' : ' bad');
+    $('meta-len').textContent = codeVal.length;
+    $('meta-dur').textContent = dur + ' ms';
+    $('meta-enter').textContent = enterSeen ? 'YES' : 'NO';
+    $('meta-enter').className = 'chip' + (enterSeen ? ' ok' : ' no');
+
+    if (codeVal.length === 13 && /^\d+$/.test(codeVal)) {
+      var valid = (typeof EAN13 !== 'undefined') ? EAN13.isValid(codeVal) : null;
+      $('meta-ean').textContent = valid === null ? '—' : (valid ? 'true ✓' : 'false ✗');
+      $('meta-ean').className = 'chip' + (valid ? ' ok' : ' no');
+    } else {
+      $('meta-ean').textContent = '—';
+      $('meta-ean').className = 'chip';
+    }
+
+    // characters table
+    var rows = '';
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      var isDigit = /^(Digit|Numpad)[0-9]$/.test(k.code);
+      rows += '<tr><td class="num">' + (i + 1) + '</td>' +
+        '<td class="k">' + k.code + '</td>' +
+        '<td class="' + (isDigit && /^[0-9]$/.test(k.key) ? 'k' : 'bad') + '">' + (k.key === ' ' ? '␣' : k.key) + '</td>' +
+        '<td class="num">' + k.keyCode + '</td>' +
+        '<td class="num">' + k.which + '</td>' +
+        '<td class="num">' + k.t + '</td></tr>';
+    }
+    $('char-body').innerHTML = rows || '<tr><td colspan="6" class="x" style="color:#475569;padding:10px">لا توجد مفاتيح بعد</td></tr>';
+
+    logScanner('Scan completed | duration ' + dur + 'ms | Enter: ' + (enterSeen ? 'YES' : 'NO'));
+    logScanner('Raw value (event.code): "' + codeVal + '"');
+    logScanner('Raw value (event.key) : "' + keyVal + '"');
+  }
+
+  function resetScan() {
+    bufCode = []; bufKey = []; keys = []; startTs = 0; lastTs = 0; enterSeen = false;
+    $('val-code').textContent = 'بانتظار المسح…';
+    $('val-code').className = 'val hint';
+    $('val-key').textContent = '—';
+    $('val-key').className = 'val';
+    $('meta-len').textContent = '0';
+    $('meta-dur').textContent = '—';
+    $('meta-enter').textContent = '—';
+    $('meta-enter').className = 'chip';
+    $('meta-ean').textContent = '—';
+    $('meta-ean').className = 'chip';
+    $('char-body').innerHTML = '<tr><td colspan="6" class="x" style="color:#475569;padding:10px">لا توجد مفاتيح بعد</td></tr>';
+    setStatus('', 'Scanner Ready');
+    logScanner('Reset');
+  }
+
+  // ── Layout probe ───────────────────────────────────────
+  function probeLayout(m, key) {
+    if (layoutProbed) return;
+    var digit = m[2];
+    var ok = typeof key === 'string' && key === digit;
+    $('meta-layout').textContent = ok ? 'EN/US ✓' : 'غير EN/US ⚠ (Digit' + digit + ' → "' + key + '")';
+    if (!ok) $('layout-warn').classList.add('show');
+    layoutProbed = true;
+  }
+
+  // ── Key handling ───────────────────────────────────────
+  function handleKeydown(e) {
+    var now = Date.now();
+
+    // burst boundary: gap > 120ms between keys = new scan
+    if (bufCode.length && now - lastTs > 120) finalizeScan();
+
+    if (bufCode.length === 0) {
+      startTs = now;
+      enterSeen = false;
+      setStatus('scanning', 'جارٍ المسح…');
+      logScanner('Scan started');
+    }
+    lastTs = now;
+
+    var code = e.code || '';
+    var m = /^(Digit|Numpad)([0-9])$/.exec(code);
+
+    if (m) {
+      e.preventDefault();
+      bufCode.push(m[2]);
+      bufKey.push(typeof e.key === 'string' ? e.key : '');
+      keys.push({ code: code, key: typeof e.key === 'string' ? e.key : '', keyCode: e.keyCode || e.which, which: e.which || '', t: lastTs - startTs });
+      probeLayout(m, e.key);
+      renderLive();
+      logScanner('Raw key: "' + e.key + '" | event.code: ' + code + ' | keyCode: ' + (e.keyCode || e.which) + ' | Buffer: ' + bufCode.join(''));
+      feed('code=' + code + '  key=' + JSON.stringify(e.key) + '  keyCode=' + (e.keyCode || e.which) + '  buf=' + bufCode.join(''));
+    } else if (e.key === 'Enter' || code === 'Enter' || code === 'NumpadEnter') {
+      if (bufCode.length > 0) {
+        e.preventDefault();
+        enterSeen = true;
+        finalizeScan();
+      }
+    } else if (/^Key[A-Z]$/.test(code) || /^F\d+$/.test(code)) {
+      feed('ignore  code=' + code + '  key=' + JSON.stringify(e.key) + '  (غير رقمي)', 'w');
+      logScanner('Non-digit key: code=' + code + ' key=' + JSON.stringify(e.key) + ' (ignored)');
+    }
+  }
+
+  function finalizeScan() {
+    if (!bufCode.length) return;
+    renderFinal();
+    var codeVal = bufCode.join('');
+    setStatus('done', bufCode.length ? 'تم استقبال ' + bufCode.length + ' حرفاً' : 'Scanner Ready');
+    feed('== finalize: code="' + codeVal + '" key="' + bufKey.join('') + '" ==', 'x');
+    resetBuffers();
+  }
+
+  function resetBuffers() {
+    bufCode = []; bufKey = []; keys = []; startTs = 0; lastTs = 0; enterSeen = false;
+    setTimeout(function () { setStatus('', 'Scanner Ready'); }, 2500);
+  }
+
+  // ── Global listener ────────────────────────────────────
+  document.addEventListener('keydown', handleKeydown);
+  document.addEventListener('paste', function () { feed('تم لصق نص (paste) — المسح عبر HID يظهر كـ keydown فقط', 'w'); });
+
+  // ── Buttons ────────────────────────────────────────────
+  $('btn-reset').addEventListener('click', resetScan);
+  $('btn-test').addEventListener('click', function () {
+    var seq = '2000000009018'.split('');
+    var delay = 0;
+    for (var i = 0; i < seq.length; i++) {
+      (function (d, idx) {
+        setTimeout(function () {
+          var ev = new KeyboardEvent('keydown', { key: d, code: 'Digit' + d, keyCode: d.charCodeAt(0), which: d.charCodeAt(0), bubbles: true });
+          handleKeydown(ev);
+        }, delay + idx * 25);
+      })(seq[i], i);
+    }
+    setTimeout(function () {
+      handleKeydown(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+    }, delay + seq.length * 25 + 40);
+    feed('تمت محاكاة مسح: 2000000009018', 'w');
+  });
+
+  // ── Init ───────────────────────────────────────────────
+  logScanner('Diagnostic ready — SP-1160 HID capture active on document keydown');
+  feed('الاستماع إلى المفاتيح جاهز. مرر البطاقة على الماسح…');
+  setStatus('', 'Scanner Ready');
+})();
+</script>
+</body>
+</html>
