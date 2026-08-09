@@ -5,8 +5,8 @@
 
 const RegistrationService = (function () {
   const TABLE = 'registrations';
-  const COLUMNS = 'id,first_name,last_name,parent_name,parent_phone,birth_date,student_type,level,stream,institution,subjects,fee_amount,status,student_token,barcode_value,created_at,timestamp';
-  const COLUMNS_NO_BARCODE = 'id,first_name,last_name,parent_name,parent_phone,birth_date,student_type,level,stream,institution,subjects,fee_amount,status,student_token,created_at,timestamp';
+  const COLUMNS = 'id,first_name,last_name,parent_name,parent_phone,birth_date,student_type,level,stream,institution,subjects,fee_amount,status,student_token,barcode_value,created_at';
+  const COLUMNS_NO_BARCODE = 'id,first_name,last_name,parent_name,parent_phone,birth_date,student_type,level,stream,institution,subjects,fee_amount,status,student_token,created_at';
 
   function headers() {
     return {

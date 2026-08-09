@@ -20,7 +20,7 @@
   } catch (e) { console.error('Firebase init error:', e); }
 </script>
 <script src="js/ean13.js"></script>
-<script src="js/registrationService.js?v=1"></script>
+  <script src="js/registrationService.js?v=4"></script>
 <script src="js/subjectService.js?v=3"></script>
 <script src="js/attendanceService.js?v=2"></script>
 <style>
@@ -561,6 +561,26 @@
     e.stopPropagation();
     e.stopImmediatePropagation();
   }, true);
+
+  // Keep keyboard focus on the page: the SP-1160 types into whatever has
+  // focus, so after any click on the page we drop focus onto a neutral
+  // element (never the manual-entry input). If focus sits in the DevTools
+  // console instead, the scanned text would be typed there and evaluated as
+  // JS on Enter — click the page before scanning to avoid that.
+  function grabScanFocus() {
+    try {
+      var t = document.activeElement;
+      if (t && (t.id === 'manual-input' || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      if (!document.body.hasAttribute('tabindex')) document.body.setAttribute('tabindex', '-1');
+      if (t === document.body || t === document.documentElement || t === null) {
+        document.body.focus({ preventScroll: true });
+      }
+    } catch (e) {}
+  }
+  document.addEventListener('pointerdown', function () { setTimeout(grabScanFocus, 0); }, true);
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('focus', grabScanFocus);
+  }
 
   function finalizeScan() {
     if (!scanActive && scanBufCode.length === 0) return;
