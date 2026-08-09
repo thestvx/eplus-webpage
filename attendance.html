@@ -441,12 +441,16 @@
   var scanLastTs = 0;
   var scanEnterSeen = false;
   var scanSawNonDigit = false;
+  var scanActive = false;
+  var scanTimer = null;
+  var SCAN_FINALIZE_MS = 250;   // idle gap after last key = scan complete (no Enter needed)
+  var SCAN_BURST_GAP_MS = 120;  // gap between keys larger than this = new scan
   var layoutInfo = '—';
   var dbOpen = false;
 
   function logScanner() {
     try {
-      console.log.apply(console, ['[SCANNER]'].concat([].slice.call(arguments)));
+      console.log.apply(console, ['[ATTENDANCE SCANNER]'].concat([].slice.call(arguments)));
     } catch (e) {}
   }
 
@@ -482,68 +486,118 @@
     if (m) probeLayout(e, m);
   }
 
-  // ── Global scanner capture ─────────────────────────────
-  document.addEventListener('keydown', function (e) {
-    var t = e.target;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+  // ── Global scanner capture (capture phase — works with no focus) ──
+  // The SP-1160 is a USB HID keyboard. We rebuild the barcode value ONLY
+  // from event.code (physical key = layout-independent). event.key is
+  // layout-dependent (Arabic/French layouts garble digits into é/à/&) and
+  // is kept ONLY for diagnostics — never used to build the value.
+  function scannerHandler(e) {
+    // The manual-entry input is the only element that lets typed keys pass
+    // (the operator is typing by hand there). The SP-1160 scanner does NOT
+    // need focus — this capture-phase listener intercepts every key first.
+    if (e.target && e.target.id === 'manual-input') return;
 
     var now = Date.now();
-    if (scanBufCode.length && now - scanLastTs > 120) finalizeScan();
-    if (scanBufCode.length === 0) {
-      scanStartTs = now;
-      scanSawNonDigit = false;
-      logScanner('Scan started');
-    }
-    scanLastTs = now;
-
     var code = e.code || '';
+
+    // Gap between keys larger than a burst = previous scan already ended.
+    if (scanActive && now - scanLastTs > SCAN_BURST_GAP_MS) finalizeScan();
+
     var m = /^(Digit|Numpad)([0-9])$/.exec(code);
+
     if (m) {
+      // ── Digit key → part of a barcode scan ──────────────
+      if (!scanActive) {
+        scanActive = true;
+        scanStartTs = now;
+        scanSawNonDigit = false;
+        scanEnterSeen = false;
+        logScanner('Scan started');
+      }
+      scanLastTs = now;
+
+      // Block the key from ever reaching the browser/DOM/console
+      // (so é/à/& never become text and are never evaluated as JS).
       e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
       scanBufCode.push(m[2]);
       scanBufKey.push(typeof e.key === 'string' ? e.key : '');
-      logScanner('Raw key: "' + e.key + '" | event.code: ' + code + ' | keyCode: ' + (e.keyCode || e.which) + ' | Buffer: ' + scanBufCode.join(''));
-      dbAppend('code=' + code + ' key=' + JSON.stringify(e.key) + ' keyCode=' + (e.keyCode || e.which) + ' buf=' + scanBufCode.join(''));
+      logScanner('code=' + code + ' mapped=' + m[2] + ' buffer=' + scanBufCode.join(''));
+      dbAppend('code=' + code + ' mapped=' + m[2] + ' key=' + JSON.stringify(e.key) + ' buf=' + scanBufCode.join(''));
       updateDebugLive(e, m);
-    } else if (e.key === 'Enter' || code === 'Enter' || code === 'NumpadEnter') {
-      if (scanBufCode.length > 0) {
+
+      // Idle finalize: the scanner sends digits then stops (may send no Enter).
+      clearTimeout(scanTimer);
+      scanTimer = setTimeout(function () { if (scanActive) finalizeScan(); }, SCAN_FINALIZE_MS);
+      return;
+    }
+
+    if (code === 'Enter' || code === 'NumpadEnter' || e.key === 'Enter') {
+      if (scanActive) {
         e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
         scanEnterSeen = true;
         finalizeScan();
       }
-    } else if (/^Key[A-Z]$/.test(code) || /^F\d+$/.test(code)) {
+      return;
+    }
+
+    if (/^Key[A-Z]$/.test(code) || /^F\d+$/.test(code)) {
       scanSawNonDigit = true;
       logScanner('Non-digit key: code=' + code + ' key=' + JSON.stringify(e.key) + ' (ignored)');
     }
-  });
+  }
+
+  document.addEventListener('keydown', scannerHandler, true);
+
+  // Defensive: while a scan burst is active, also stop any keypress text
+  // insertion (Firefox) so garbled chars never reach the page/console.
+  document.addEventListener('keypress', function (e) {
+    if (!scanActive) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+  }, true);
 
   function finalizeScan() {
+    if (!scanActive && scanBufCode.length === 0) return;
     var codeVal = scanBufCode.join('');
     var keyVal = scanBufKey.join('');
-    var duration = scanBufCode.length ? (scanLastTs - scanStartTs) : 0;
+    var duration = codeVal.length ? (scanLastTs - scanStartTs) : 0;
     var gotEnter = scanEnterSeen;
     var sawNonDigit = scanSawNonDigit;
+
+    scanActive = false;
+    if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
     scanBufCode = [];
     scanBufKey = [];
     scanEnterSeen = false;
     scanSawNonDigit = false;
 
-    logScanner('Scan completed | duration ' + duration + 'ms | Enter: ' + (gotEnter ? 'YES' : 'NO'));
-    logScanner('Raw value (event.code): "' + codeVal + '"');
-    logScanner('Raw value (event.key):  "' + keyVal + '"');
-
     $('db-enter').textContent = gotEnter ? 'YES' : 'NO';
     $('db-timing').textContent = duration + ' ms';
     dbAppend('done: code="' + codeVal + '" key="' + keyVal + '" enter=' + (gotEnter ? 'Y' : 'N'));
 
-    if (!codeVal) return;
+    if (!codeVal) {
+      logScanner('Scan complete');
+      logScanner('rawCodeValue= (empty)');
+      return;
+    }
+
+    logScanner('Scan complete');
+    logScanner('rawCodeValue=' + codeVal);
+    logScanner('length=' + codeVal.length);
+
     if (!/^\d+$/.test(codeVal)) {
-      logScanner('INVALID — barcode value contains non-digit characters');
+      logScanner('INVALID — non-digit characters in rawCodeValue');
       showInvalidScan(codeVal, keyVal, duration, sawNonDigit);
       return;
     }
     if (codeVal.length === 13) logScanner('Valid EAN-13: ' + EAN13.isValid(codeVal));
-    logScanner('Normalized value: "' + codeVal + '" | Looking up student...');
+    logScanner('Looking up student...');
     handleScan(codeVal);
   }
 
@@ -792,15 +846,14 @@
     processing = true;
     $('last-read').textContent = val;
     setPill('جارٍ المعالجة…', false);
-    logScanner('Looking up student for "' + val + '"...');
-    console.log('[ATTENDANCE] Scanned value: "' + val + '" — searching registrations.barcode_value...');
+    console.log('[ATTENDANCE SCANNER] Looking up student for barcode "' + val + '"...');
 
     try {
       var resolved = await AttendanceService.resolveStudentFromScan(val);
       var student = resolved ? resolved.student : null;
 
       if (!student) {
-        console.log('[ATTENDANCE] NOT FOUND — barcode "' + val + '" matches no registration.');
+        console.log('[ATTENDANCE SCANNER] NOT FOUND');
         logScanner('Student NOT found for "' + val + '"');
         animateCard('rejected');
         setPill('لم يتم العثور على الطالب', false);
@@ -808,7 +861,8 @@
         return;
       }
 
-      console.log('[ATTENDANCE] FOUND — student ' + student.id + ' (' + (student.first_name || '') + ' ' + (student.last_name || '') + ') | matchedBy: ' + (resolved.matchedBy || 'unknown') + ' | status: ' + (student.status || '?'));
+      console.log('[ATTENDANCE SCANNER] FOUND');
+      console.log('[ATTENDANCE SCANNER] matchedBy=' + (resolved.matchedBy || 'unknown') + ' student=' + student.id + ' (' + (student.first_name || '') + ' ' + (student.last_name || '') + ') status=' + (student.status || '?'));
 
       var status = student.status;
       if (status === 'مسجل مبدئياً') {
