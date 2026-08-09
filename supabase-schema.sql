@@ -123,3 +123,69 @@ DROP POLICY IF EXISTS "anon_select_registrations" ON registrations;
 CREATE POLICY "anon_select_registrations" ON registrations FOR SELECT TO anon USING (true);
 DROP POLICY IF EXISTS "anon_update_registrations" ON registrations;
 CREATE POLICY "anon_update_registrations" ON registrations FOR UPDATE TO anon USING (true);
+
+-- 8. TEACHER BALANCES (توازن مستحقات الأساتذة — مستمد من دفتر المعاملات)
+CREATE TABLE IF NOT EXISTS teacher_balances (
+  teacher_id TEXT PRIMARY KEY,
+  teacher_name TEXT NOT NULL DEFAULT '',
+  total_due INTEGER DEFAULT 0,
+  total_paid INTEGER DEFAULT 0,
+  pending INTEGER DEFAULT 0,
+  student_count INTEGER DEFAULT 0,
+  session_count INTEGER DEFAULT 0,
+  rate INTEGER DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 9. TEACHER TRANSACTIONS (دفتر معاملات الأساتذة)
+-- dues = مستحقات (student × subject × teacher × session_count × lesson_rate)
+-- payment = دفعة مدفوعة مستقلة (لا خصم يدوي أبداً)
+-- lesson_rate = snapshot سعر الحصة لحظة إنشاء المعاملة (لن يتغير مع تغيّر الأسعار لاحقاً)
+CREATE TABLE IF NOT EXISTS teacher_transactions (
+  id TEXT PRIMARY KEY,
+  teacher_id TEXT NOT NULL DEFAULT '',
+  teacher_name TEXT DEFAULT '',
+  student_id TEXT DEFAULT '',
+  student_name TEXT DEFAULT '',
+  subject_id TEXT DEFAULT '',
+  subject_name TEXT DEFAULT '',
+  session_count INTEGER DEFAULT 0,
+  lesson_rate INTEGER DEFAULT 0,
+  amount INTEGER DEFAULT 0,
+  transaction_type TEXT DEFAULT 'dues',
+  status TEXT DEFAULT 'pending',
+  date TEXT DEFAULT '',
+  notes TEXT DEFAULT '',
+  admin_name TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_teacher_tx_teacher ON teacher_transactions(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_teacher_tx_date ON teacher_transactions(date);
+CREATE INDEX IF NOT EXISTS idx_teacher_tx_student ON teacher_transactions(student_id);
+
+-- 10. TEACHER RECEIPTS (إيصالات الدفع)
+CREATE TABLE IF NOT EXISTS teacher_receipts (
+  id TEXT PRIMARY KEY,
+  transaction_id TEXT DEFAULT '',
+  teacher_id TEXT DEFAULT '',
+  teacher_name TEXT DEFAULT '',
+  amount INTEGER DEFAULT 0,
+  date TEXT DEFAULT '',
+  admin_name TEXT DEFAULT '',
+  notes TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_teacher_receipts_teacher ON teacher_receipts(teacher_id);
+
+-- RLS للمالية (نفس نمط registrations)
+ALTER TABLE teacher_balances ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_all_teacher_balances" ON teacher_balances;
+CREATE POLICY "anon_all_teacher_balances" ON teacher_balances FOR ALL TO anon USING (true) WITH CHECK (true);
+
+ALTER TABLE teacher_transactions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_all_teacher_transactions" ON teacher_transactions;
+CREATE POLICY "anon_all_teacher_transactions" ON teacher_transactions FOR ALL TO anon USING (true) WITH CHECK (true);
+
+ALTER TABLE teacher_receipts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_all_teacher_receipts" ON teacher_receipts;
+CREATE POLICY "anon_all_teacher_receipts" ON teacher_receipts FOR ALL TO anon USING (true) WITH CHECK (true);

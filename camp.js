@@ -627,28 +627,28 @@ function validateMainForm() {
 
   if (isAdultBasic) {
     const sel = [...document.querySelectorAll(`input[name="adultLang"]:checked`)].map(c => c.value);
-    if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
+    if (!sel.length) { EPUI.alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
     langs = sel.join(" + ");
   } else if (isAdultAdv) {
     // لغة واحدة إجبارية (radio)
     const selLang = document.querySelector(`input[name="adultAdvLang"]:checked`)?.value || "";
-    if (!selLang) { alert("يرجى اختيار لغة واحدة للباقة المتقدمة"); return null; }
+    if (!selLang) { EPUI.alert("يرجى اختيار لغة واحدة للباقة المتقدمة"); return null; }
     langs = selLang;
     // مسار الإعلام الآلي: checkbox — واحد أو الاثنين
     const selTracks = [...document.querySelectorAll(`input[name="itTrack"]:checked`)].map(c => c.value);
-    if (!selTracks.length) { alert("يرجى اختيار مسار الإعلام الآلي"); return null; }
+    if (!selTracks.length) { EPUI.alert("يرجى اختيار مسار الإعلام الآلي"); return null; }
     itTrack = selTracks.join(" + ");
   } else if (is510) {
     const sel = [...document.querySelectorAll(`input[name="lang510"]:checked`)].map(c => c.value);
-    if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
+    if (!sel.length) { EPUI.alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
     langs = sel.join(" + ");
   } else if (isBac) {
     const sel = [...document.querySelectorAll(`input[name="bacLang"]:checked`)].map(c => c.value);
-    if (!sel.length) { alert("يرجى اختيار لغتين للبكالوريا"); return null; }
+    if (!sel.length) { EPUI.alert("يرجى اختيار لغتين للبكالوريا"); return null; }
     langs = sel.join(" + ");
   } else if (is1114 || (is1518 && !isBac)) {
     const sel = [...document.querySelectorAll(`input[name="langPlus"]:checked`)].map(c => c.value);
-    if (!sel.length) { alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
+    if (!sel.length) { EPUI.alert("يرجى اختيار لغة واحدة على الأقل"); return null; }
     langs = sel.join(" + ");
   }
 
@@ -735,7 +735,7 @@ function validateSpecialForm() {
   };
 
   if (!programs.length) {
-    alert("⚠️ الرجاء اختيار نوع البرنامج.");
+    EPUI.alert("⚠️ الرجاء اختيار نوع البرنامج.");
     return null;
   }
 

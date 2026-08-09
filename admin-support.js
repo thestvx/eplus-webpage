@@ -328,34 +328,30 @@ async function deleteYes() {
 }
 
 // ── Edit ──
-function editReg(id) {
+async function editReg(id) {
   const r = allData.find(x => x.id === id);
   if (!r) return;
-  const fn = prompt('الاسم', r.first_name);
-  if (!fn) return;
-  const ln = prompt('اللقب', r.last_name);
-  if (!ln) return;
-  const bd = prompt('تاريخ الميلاد', r.birth_date || '');
-  const pn = prompt('اسم ولي الأمر', r.parent_name || '');
-  const pp = prompt('رقم ولي الأمر', r.parent_phone || '');
-  fetch(`${SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(id)}`, {
+  const values = await EPUI.form([
+    { name: 'first_name', label: 'الاسم', value: r.first_name },
+    { name: 'last_name', label: 'اللقب', value: r.last_name },
+    { name: 'birth_date', label: 'تاريخ الميلاد', value: r.birth_date || '' },
+    { name: 'parent_name', label: 'اسم ولي الأمر', value: r.parent_name || '' },
+    { name: 'parent_phone', label: 'رقم ولي الأمر', value: r.parent_phone || '' },
+  ], { title: 'تحرير بيانات التلميذ' });
+  if (!values) return;
+  const { first_name: fn, last_name: ln, birth_date: bd, parent_name: pn, parent_phone: pp } = values;
+  if (!fn || !ln) { EPUI.alert('⚠️ الاسم واللقب إلزاميان'); return; }
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
       'apikey': SUPABASE_ANON_KEY,
       'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
     },
-    body: JSON.stringify({
-      first_name: fn,
-      last_name: ln,
-      birth_date: bd,
-      parent_name: pn,
-      parent_phone: pp,
-    }),
-  }).then(res => {
-    if (res.ok) { showToast('✅ تم التعديل'); loadData(); }
-    else showToast('❌ فشل التعديل', 'error');
+    body: JSON.stringify({ first_name: fn, last_name: ln, birth_date: bd, parent_name: pn, parent_phone: pp }),
   });
+  if (res.ok) { showToast('✅ تم التعديل'); loadData(); }
+  else showToast('❌ فشل التعديل', 'error');
 }
 
 // ── Export ──

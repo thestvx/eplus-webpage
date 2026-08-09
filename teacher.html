@@ -1029,7 +1029,7 @@
         const teacherSnap=await db.collection(SRT_COLLECTION).where('userId','==',userData.userId).limit(1).get();
         if(teacherSnap.empty){errEl.textContent='لا يوجد بروفايل مرتبط بهذا الحساب.';errEl.style.display='block';btn.classList.remove('loading');btn.disabled=false;return;}
         const teacherDoc=teacherSnap.docs[0],teacherData=teacherDoc.data();
-        if(teacherData.status==='disabled'){errEl.textContent='تم تعطيل حسابك.';errEl.style.display='block';btn.classList.remove('loading');btn.disabled=false;return;}
+        if(teacherData.status!=='active'){errEl.textContent='تم تعطيل حسابك.';errEl.style.display='block';btn.classList.remove('loading');btn.disabled=false;return;}
         saveSession(userData,{id:teacherDoc.id,...teacherData});
         try{await db.collection(USERS_COLLECTION).doc(userDoc.id).update({lastLogin:firebase.firestore.FieldValue.serverTimestamp()});}catch(e){}
         renderDashboard({id:teacherDoc.id,...teacherData});
@@ -1044,7 +1044,7 @@
         document.getElementById('app').innerHTML='<div class="loading-page"><div class="spinner"></div></div>';
         try{const doc=await db.collection(SRT_COLLECTION).doc(session.teacherDocId).get();
           if(!doc.exists){clearSession();showLogin('حساب الأستاذ غير موجود.');return;}
-          const data=doc.data();if(data.status==='disabled'){clearSession();showLogin('تم تعطيل حسابك.');return;}
+          const data=doc.data();if(data.status!=='active'){clearSession();showLogin('تم تعطيل حسابك.');return;}
           renderDashboard({id:doc.id,...data});
         }catch(e){console.error('Session restore error:',e);clearSession();showLogin('حدث خطأ أثناء تحميل البيانات.');}
         return;

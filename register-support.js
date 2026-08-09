@@ -6,8 +6,22 @@ const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
 
 // Data source: shared with admin/teacher via js/subjectService.js
-const SUPPORT_STREAMS = window.SUPPORT_STREAMS || {};
-const SUPPORT_MIDDLE_SCHOOL = window.SUPPORT_MIDDLE_SCHOOL || [];
+// NOTE: read via window.* (NOT top-level const) to avoid a global-scope
+// SyntaxError, because js/subjectService.js already declares
+// const SUPPORT_STREAMS / const SUPPORT_MIDDLE_SCHOOL in the same scope.
+const supportStreams = () => {
+  const raw = window.SUPPORT_STREAMS || {};
+  if (window.SubjectService && SubjectService.filterActiveTeachers) {
+    const out = {};
+    Object.keys(raw).forEach(k => { out[k] = SubjectService.filterActiveTeachers(raw[k]); });
+    return out;
+  }
+  return raw;
+};
+const supportMiddleSchool = () => {
+  const raw = window.SUPPORT_MIDDLE_SCHOOL || [];
+  return (window.SubjectService && SubjectService.filterActiveTeachers) ? SubjectService.filterActiveTeachers(raw) : raw;
+};
 
 const SUPPORT_INSTITUTIONS = {
   'السنة الثالثة ثانوي (بكالوريا)': [
@@ -41,6 +55,34 @@ const SUPPORT_LAWS = [
   'القوانين الداخلية للمركز ملزمة للجميع. الموافقة على القوانين شرط أساسي للتسجيل.',
   'أتحمل المسؤولية الكاملة عن صحة المعلومات المقدمة.',
 ];
+
+// ── Custom Alert (replaces native alert()) ──
+function regAlert(message, title = 'تنبيه') {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.style.cssText = 'display:flex;align-items:center;justify-content:center;padding:20px;position:fixed;inset:0;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);z-index:99999;';
+  overlay.innerHTML = `
+    <div class="modal-box" style="max-width:400px;text-align:center;">
+      <div class="modal-header"><h3 class="modal-title">${title}</h3></div>
+      <div style="padding:20px 24px;font-size:14px;color:var(--text,#e5e5e5);line-height:1.7;">${message}</div>
+      <div style="padding:0 24px 22px;display:flex;justify-content:center;">
+        <button class="ep-btn-primary" style="min-width:120px;">حسناً</button>
+      </div>
+    </div>`;
+  overlay.querySelector('button').onclick = () => overlay.remove();
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+// ── Custom Toast (replaces console-only feedback) ──
+function regToast(message, type = 'success') {
+  const colors = { success: '#10b981', error: '#ef4444', warn: '#f59e0b' };
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;bottom:24px;right:50%;transform:translateX(50%);background:#0d1520;border:1px solid ${colors[type] || colors.success};color:#fff;padding:12px 22px;border-radius:12px;font-size:13px;font-weight:700;z-index:999999;box-shadow:0 8px 30px rgba(0,0,0,0.5);font-family:'Tajawal',sans-serif;max-width:90vw;`;
+  el.textContent = message;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.transition = 'opacity 0.3s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 320); }, 2600);
+}
 
 // ── State ──
 let sStudentType = null;
@@ -192,7 +234,7 @@ function showMiddleSchoolSubjects() {
 function renderMiddleSchoolSubjects() {
   const opts = byId('ms-options');
   if (!opts) return;
-  opts.innerHTML = SUPPORT_MIDDLE_SCHOOL.map((item, i) =>
+  opts.innerHTML = supportMiddleSchool().map((item, i) =>
     `<div class="ms-opt ${sSubjects.includes(i)?'selected':''}" data-idx="${i}" onclick="msSelect(${i})"><strong>${item.subject}</strong> <span style="opacity:0.6;font-weight:400;">— 🎓 ${item.teacher}</span></div>`
   ).join('');
   updateMsLabel();
@@ -211,7 +253,7 @@ function showStream() {
 function renderStreams() {
   const c = byId('s-streams-container');
   if (!c) return;
-  c.innerHTML = Object.keys(SUPPORT_STREAMS).map(s =>
+  c.innerHTML = Object.keys(supportStreams()).map(s =>
     `<label class="check-option">
       <input type="radio" name="sStream" value="${s}" onchange="onStreamChange('${s}')" />
       <span class="check-box"></span>
@@ -236,7 +278,7 @@ function onStreamChange(stream) {
 function renderSubjects() {
   const opts = byId('ms-options');
   if (!opts) return;
-  const items = SUPPORT_STREAMS[sStream] || [];
+  const items = supportStreams()[sStream] || [];
   opts.innerHTML = items.map((item, i) =>
     `<div class="ms-opt ${sSubjects.includes(i)?'selected':''}" data-idx="${i}" onclick="msSelect(${i})"><strong>${item.subject}</strong> <span style="opacity:0.6;font-weight:400;">— 🎓 ${item.teacher}</span></div>`
   ).join('');
@@ -294,7 +336,7 @@ function updateMsLabel() {
 function updateMsTags() {
   const c = byId('msTags');
   if (!c) return;
-  const items = sLevel === 'السنة الرابعة متوسط' ? SUPPORT_MIDDLE_SCHOOL : (SUPPORT_STREAMS[sStream] || []);
+  const items = sLevel === 'السنة الرابعة متوسط' ? supportMiddleSchool() : (supportStreams()[sStream] || []);
   c.innerHTML = sSubjects.map(i =>
     `<span class="ms-tag"><strong>${items[i]?.subject || ''}</strong> <span style="opacity:0.7;">${items[i]?.teacher || ''}</span> <span class="ms-tag-rm" onclick="msRemove(${i})">×</span></span>`
   ).join('');
@@ -309,28 +351,28 @@ function onSubmitClick() {
   const parentPhone = byId('sParentPhone')?.value?.trim();
 
   if (!firstName || !lastName || !birthDate || !parentName || !parentPhone) {
-    alert('⚠️ الرجاء ملء جميع الحقول الإلزامية'); return;
+    regAlert('⚠️ الرجاء ملء جميع الحقول الإلزامية'); return;
   }
-  if (!sStudentType) { alert('⚠️ الرجاء اختيار نوع الطالب'); return; }
-  if (sStudentType === 'متمدرس' && !sLevel) { alert('⚠️ الرجاء اختيار المستوى الدراسي'); return; }
+  if (!sStudentType) { regAlert('⚠️ الرجاء اختيار نوع الطالب'); return; }
+  if (sStudentType === 'متمدرس' && !sLevel) { regAlert('⚠️ الرجاء اختيار المستوى الدراسي'); return; }
   if (sStudentType === 'متمدرس') {
-    if (!sInstitutionVal) { alert('⚠️ الرجاء اختيار المؤسسة التعليمية'); return; }
+    if (!sInstitutionVal) { regAlert('⚠️ الرجاء اختيار المؤسسة التعليمية'); return; }
     if (sInstitutionVal === 'أخرى') {
       const instInp = byId('sInstitutionInput')?.value?.trim();
-      if (!instInp) { alert('⚠️ الرجاء إدخال اسم المؤسسة التعليمية'); return; }
+      if (!instInp) { regAlert('⚠️ الرجاء إدخال اسم المؤسسة التعليمية'); return; }
     }
   }
   if (sLevel === 'السنة الثالثة ثانوي (بكالوريا)' && !sStream) {
-    alert('⚠️ الرجاء اختيار الشعبة'); return;
+    regAlert('⚠️ الرجاء اختيار الشعبة'); return;
   }
-  if (sSubjects.length === 0) { alert('⚠️ الرجاء اختيار مادة واحدة على الأقل'); return; }
+  if (sSubjects.length === 0) { regAlert('⚠️ الرجاء اختيار مادة واحدة على الأقل'); return; }
 
   const institution = sInstitutionVal === 'أخرى'
     ? (byId('sInstitutionInput')?.value?.trim() || '')
     : sInstitutionVal;
 
   const isMiddleSchool = sLevel === 'السنة الرابعة متوسط';
-  const items = isMiddleSchool ? SUPPORT_MIDDLE_SCHOOL : (SUPPORT_STREAMS[sStream] || []);
+  const items = isMiddleSchool ? supportMiddleSchool() : (supportStreams()[sStream] || []);
   const selectedSubjects = sSubjects.map(i => items[i]);
 
   const year = new Date().getFullYear();
@@ -488,7 +530,7 @@ async function onLawsConfirm() {
     openLawsModal();
     if (byId('lawsAgree')) byId('lawsAgree').checked = true;
     if (byId('lawsConfirmBtn')) { byId('lawsConfirmBtn').disabled = false; byId('lawsConfirmBtn').textContent = 'تأكيد التسجيل الأولي'; }
-    setTimeout(() => alert('❌ فشل التسجيل: ' + e.message), 200);
+    setTimeout(() => regAlert('❌ فشل التسجيل: ' + e.message, 'خطأ'), 200);
   }
 }
 
@@ -606,3 +648,17 @@ async function updateRegistration(id, data) {
     return false;
   }
 }
+
+// ── Init: load deleted teachers so choices stay in sync ──
+(function initDeletedTeachers() {
+  if (window.SubjectService && typeof SubjectService.loadDeletedTeachers === 'function') {
+    SubjectService.loadDeletedTeachers().then(() => {
+      try {
+        if (byId('s-subjects-group')?.style.display === 'block') {
+          if (sLevel === 'السنة الرابعة متوسط') { renderMiddleSchoolSubjects(); }
+          else if (sStream) { onStreamChange(sStream); }
+        }
+      } catch (e) { console.warn('Re-render after deleted-teachers load failed:', e); }
+    }).catch(() => {});
+  }
+})();

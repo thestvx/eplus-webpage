@@ -2082,7 +2082,7 @@ async function proceedToRegister() {
     console.error('❌ Registration error:', error);
     btn?.classList.remove('loading');
     hideLoadingPopup();
-    alert(__('submit_error', 'An error occurred, please try again.'));
+    EPUI.alert(__('submit_error', 'An error occurred, please try again.'));
     unlockPageScroll();
   }
 }
@@ -2280,7 +2280,7 @@ async function submitJoinForm(e) {
     submitBtn?.classList.remove('loading');
     if (submitBtn) submitBtn.disabled = false;
     hideLoadingPopup();
-    alert(
+    EPUI.alert(
       currentLang === 'ar'
         ? 'تعذر الاتصال. تحقق من الإنترنت ثم حاول مجدداً.'
         : 'Connection failed. Check your internet and try again.'

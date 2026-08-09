@@ -20,9 +20,9 @@ const StudentCardRenderer = (function () {
     displayValue: true,
     lineColor: '#000000',
     background: '#ffffff',
-    width: 1.5,
-    height: 40,
-    margin: 10,
+    width: 2.2,
+    height: 30,
+    margin: 8,
     fontSize: 10,
     font: 'monospace',
     fontOptions: 'bold',
@@ -30,18 +30,19 @@ const StudentCardRenderer = (function () {
   };
 
   const CARD_CSS = `
-.ec-card{width:${CARD_W}px;height:${CARD_H}px;position:relative;overflow:hidden;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.15);flex-shrink:0;font-family:'Tajawal',Arial,sans-serif;background:#fff}
+.ec-card{width:${CARD_W}px;height:${CARD_H}px;position:relative;overflow:hidden;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.15);flex-shrink:0;font-family:'Tajawal',Arial,sans-serif;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .ec-card img.bg{width:100%;height:100%;object-fit:cover;display:block}
 .ec-overlay{position:absolute;inset:0}
-.ec-back-overlay{display:flex;padding:20px}
-.ec-back-left{flex:1;display:flex;flex-direction:column;justify-content:center;gap:4px}
-.ec-back-right{display:flex;align-items:center;justify-content:center}
+.ec-back-overlay{display:flex;flex-direction:column;padding:16px 20px}
+.ec-back-info{display:flex;flex:1;align-items:center;gap:16px;min-height:0}
+.ec-back-left{flex:1;display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:0}
+.ec-back-right{display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .ec-label{font-size:10px;color:rgba(255,255,255,0.85);font-weight:600;text-shadow:0 2px 6px rgba(0,0,0,0.45)}
 .ec-value{font-size:13px;font-weight:900;color:#ffffff;text-shadow:0 2px 6px rgba(0,0,0,0.45)}
 .ec-value.id{font-family:monospace;font-size:12px;font-weight:800}
 .ec-value.date{font-size:11px;font-weight:700}
-.ec-barcode{display:flex;justify-content:center;background:#ffffff;border-radius:4px;padding:6px}
-.ec-barcode svg{display:block}
+.ec-barcode{display:flex;justify-content:center;align-items:center;background:#ffffff;border-radius:6px;padding:4px 6px;margin-top:8px;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.ec-barcode svg{display:block;max-width:100%;height:auto}
 .ec-front-fallback,.ec-back-fallback{position:absolute;inset:0;display:block;width:100%;height:100%}
 @media print{
   .ec-card{box-shadow:none;border-radius:0}
@@ -65,18 +66,18 @@ const StudentCardRenderer = (function () {
     return `<div class="ec-card ec-back">
       <img class="bg ec-back-fallback" src="${BACK_IMG}" onerror="this.style.background='linear-gradient(135deg,#e0e7ff,#f0f0ff)'" alt="">
       <div class="ec-overlay ec-back-overlay">
-        <div class="ec-back-left">
-          <div class="ec-label">الاسم الكامل</div>
-          <div class="ec-value">${n}</div>
-          <div class="ec-label" style="margin-top:6px">Student ID</div>
-          <div class="ec-value id">${r.id || ''}</div>
-          <div class="ec-label" style="margin-top:6px">تاريخ التسجيل</div>
-          <div class="ec-value date">${regDate()}</div>
+        <div class="ec-back-info">
+          <div class="ec-back-left">
+            <div class="ec-label">الاسم الكامل</div>
+            <div class="ec-value">${n}</div>
+            <div class="ec-label" style="margin-top:6px">Student ID</div>
+            <div class="ec-value id">${r.id || ''}</div>
+            <div class="ec-label" style="margin-top:6px">تاريخ التسجيل</div>
+            <div class="ec-value date">${regDate()}</div>
+          </div>
+          <div class="ec-back-right"><div data-ec-role="qr"></div></div>
         </div>
-        <div class="ec-back-right" style="flex-direction:column;gap:8px">
-          <div data-ec-role="qr"></div>
-          <div data-ec-role="barcode" class="ec-barcode"></div>
-        </div>
+        <div data-ec-role="barcode" class="ec-barcode"></div>
       </div>
     </div>`;
   }

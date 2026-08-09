@@ -82,6 +82,52 @@ window.SUPPORT_MIDDLE_SCHOOL = SUPPORT_MIDDLE_SCHOOL;
 
 const SubjectService = (function () {
 
+  // ── Deleted-teacher registry ──────────────────────────
+  // Teachers deleted from the admin (status='deleted') are hidden
+  // from new-registration choices + admin dropdowns while their
+  // historical student/attendance/finance data stays intact.
+  const _deletedTeachers = new Set();
+
+  function _normName(name) {
+    return String(name || '').replace(/\s+/g, '').toLowerCase();
+  }
+  function _persistDeleted() {
+    try { sessionStorage.setItem('eplus_deleted_teachers', JSON.stringify(Array.from(_deletedTeachers))); } catch (e) {}
+  }
+  function _restoreDeleted() {
+    try {
+      const raw = sessionStorage.getItem('eplus_deleted_teachers');
+      if (raw) JSON.parse(raw).forEach(n => n && _deletedTeachers.add(n));
+    } catch (e) {}
+  }
+  _restoreDeleted();
+  window.EPLUS_DELETED_TEACHERS = _deletedTeachers;
+
+  function isTeacherDeleted(teacherName) {
+    return _deletedTeachers.has(_normName(teacherName));
+  }
+  function markTeacherDeleted(teacherName) {
+    const n = _normName(teacherName);
+    if (n) { _deletedTeachers.add(n); _persistDeleted(); }
+  }
+  function markTeacherRestored(teacherName) {
+    _deletedTeachers.delete(_normName(teacherName)); _persistDeleted();
+  }
+  async function loadDeletedTeachers() {
+    const fdb = _resolveDb();
+    if (!fdb) return;
+    try {
+      const snap = await fdb.collection('support_teachers').where('status', '==', 'deleted').get();
+      snap.docs.forEach(d => { const n = _normName(d.data().name); if (n) _deletedTeachers.add(n); });
+      _persistDeleted();
+    } catch (e) {
+      console.warn('SubjectService: loadDeletedTeachers failed', e);
+    }
+  }
+  function filterActiveTeachers(pairs) {
+    return Array.isArray(pairs) ? pairs.filter(p => !isTeacherDeleted(p.teacher)) : pairs;
+  }
+
   // ── Subject ID Mapping ────────────────────────────────
   const SUBJECT_IDS = {
     'الرياضيات': 'math',
@@ -155,13 +201,15 @@ const SubjectService = (function () {
   // Returns the exact {subject, teacher} pairs used by the
   // initial registration (index.html) for a given level/stream.
   function getSubjectTeacherPairs(level, stream) {
+    let pairs;
     if (level === 'السنة الرابعة متوسط') {
-      return Array.isArray(SUPPORT_MIDDLE_SCHOOL) ? SUPPORT_MIDDLE_SCHOOL : [];
+      pairs = Array.isArray(SUPPORT_MIDDLE_SCHOOL) ? SUPPORT_MIDDLE_SCHOOL : [];
+    } else if (level === 'السنة الثالثة ثانوي (بكالوريا)' && stream && SUPPORT_STREAMS[stream]) {
+      pairs = SUPPORT_STREAMS[stream] || [];
+    } else {
+      pairs = [];
     }
-    if (level === 'السنة الثالثة ثانوي (بكالوريا)' && stream && SUPPORT_STREAMS[stream]) {
-      return SUPPORT_STREAMS[stream] || [];
-    }
-    return [];
+    return filterActiveTeachers(pairs);
   }
 
   // ── Level Subject Lists ───────────────────────────────
@@ -308,6 +356,11 @@ const SubjectService = (function () {
     getTeachersForLevel,
     buildSubjectTeacherOptions,
     buildSubjectDisplayList,
-    invalidateCache
+    invalidateCache,
+    isTeacherDeleted,
+    markTeacherDeleted,
+    markTeacherRestored,
+    loadDeletedTeachers,
+    filterActiveTeachers
   };
 })();

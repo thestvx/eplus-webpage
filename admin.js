@@ -320,7 +320,7 @@ window.toggleMaintenance = async () => {
   const snap = await getDoc(doc(db, 'settings', 'maintenance'));
   const isOn = snap.exists() && snap.data().active === true;
   const msg = isOn ? 'هل أنت متأكد من إعادة فتح الموقع للزوار؟' : 'هل أنت متأكد من تفعيل وضع الصيانة وإغلاق الموقع؟';
-  if (!confirm(msg)) return;
+  if (!(await EPUI.confirm(msg, 'وضع الصيانة'))) return;
   try {
     await setDoc(doc(db, 'settings', 'maintenance'), { active: !isOn, updatedAt: serverTimestamp() });
     updateMaintenanceUI(!isOn);
@@ -508,7 +508,7 @@ window.toggleAnn = async (id, isHidden) => {
   try { await updateDoc(doc(db,'announcements',id), { hidden: !isHidden }); showToast('✅ تم التحديث'); } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
 window.deleteAnn = async (id) => {
-  if (!confirm('⚠️ حذف الإعلان نهائياً؟')) return;
+  if (!(await EPUI.confirm('⚠️ حذف الإعلان نهائياً؟', 'حذف الإعلان', { danger: true }))) return;
   try { await deleteDoc(doc(db,'announcements',id)); showToast('🗑️ تم الحذف'); } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
 
@@ -2560,7 +2560,7 @@ function renderTeachersGrid(teachers) {
 
 // ─── Delete teacher ───
 window.deleteTeacher = async (id, name) => {
-  if (!confirm(`⚠️ حذف الأستاذ "${name}" نهائياً مع كل بياناته؟`)) return;
+  if (!(await EPUI.confirm(`⚠️ حذف الأستاذ "${name}" نهائياً مع كل بياناته؟`, 'حذف أستاذ', { danger: true }))) return;
   try {
     await deleteDoc(doc(db, 'teachers', id));
     await addLog('🗑️ حذف أستاذ', `تم حذف بيانات الأستاذ ${name}`, '❌');
@@ -3725,7 +3725,7 @@ window.addStudent = async () => {
 };
 
 window.removeStudent = async (sid) => {
-  if (!confirm('حذف هذا التلميذ نهائياً؟')) return;
+  if (!(await EPUI.confirm('حذف هذا التلميذ نهائياً؟', 'حذف تلميذ', { danger: true }))) return;
   // حذف فوري من DOM
   const row = document.querySelector(`.att-student-row[data-sid="${sid}"]`);
   if (row) row.remove();
@@ -4435,11 +4435,11 @@ window.resetAttendance = async () => {
   if (!tid) return;
   const teacherName = document.getElementById('att-modal-teacher-name')?.textContent || 'الأستاذ';
 
-  const confirmed = confirm(`⚠️ تحذير\n\nسيتم حذف جميع سجلات الحضور للأستاذ "${teacherName}" نهائياً.\n\nهذه العملية لا يمكن التراجع عنها.\n\nهل أنت متأكد؟`);
+  const confirmed = await EPUI.confirm(`⚠️ سيتم حذف جميع سجلات الحضور للأستاذ "${teacherName}" نهائياً.\n\nهذه العملية لا يمكن التراجع عنها.\n\nهل أنت متأكد؟`, 'حذف الحضور', { danger: true });
   if (!confirmed) return;
 
   // تأكيد ثانٍ
-  const confirmed2 = confirm(`تأكيد أخير: حذف كل سجلات حضور "${teacherName}"؟`);
+  const confirmed2 = await EPUI.confirm(`تأكيد أخير: حذف كل سجلات حضور "${teacherName}"؟`, 'تأكيد نهائي', { danger: true });
   if (!confirmed2) return;
 
   try {
@@ -5196,8 +5196,8 @@ window.summaryAddStudent = () => {
 };
 
 // ─── حذف تلميذ من الملخص ───
-window.removeSummaryStudent = (id) => {
-  if (!confirm('حذف هذا التلميذ من ملخص الشهر؟')) return;
+window.removeSummaryStudent = async (id) => {
+  if (!(await EPUI.confirm('حذف هذا التلميذ من ملخص الشهر؟', 'حذف من الملخص', { danger: true }))) return;
   const name = _summaryStudentStats[id]?.name || 'التلميذ';
   delete _summaryStudentStats[id];
   if (_summaryEdits[id]) delete _summaryEdits[id];
@@ -6053,7 +6053,7 @@ window._openImgLightbox = (src) => {
 // ═══════════════════════════
 window._clearGeneralChat = async () => {
   if (!_db || !_me || !_me.isAdmin) return;
-  const confirmed = confirm('⚠️ هل أنت متأكد من مسح جميع رسائل الغرفة العامة؟\nهذا الإجراء لا يمكن التراجع عنه.');
+  const confirmed = await EPUI.confirm('⚠️ هل أنت متأكد من مسح جميع رسائل الغرفة العامة؟\nهذا الإجراء لا يمكن التراجع عنه.', 'مسح الشات', { danger: true });
   if (!confirmed) return;
 
   const btn = document.querySelector('[onclick="window._clearGeneralChat()"]');
@@ -6347,7 +6347,7 @@ window.saveFinanceTx = async () => {
 
 // ── حذف معاملة ──
 window.deleteFinanceTx = async (txId) => {
-  if (!confirm('حذف هذه المعاملة نهائياً؟')) return;
+  if (!(await EPUI.confirm('حذف هذه المعاملة نهائياً؟', 'حذف معاملة', { danger: true }))) return;
   try {
     await deleteDoc(doc(getFinDb(), 'financeTx', txId));
     // onSnapshot سيحدّث الجدول تلقائياً
@@ -6395,11 +6395,12 @@ window.importSummerTicketsToFinance = async () => {
     return;
   }
 
-  const confirmed = confirm(
-    `☀️ استيراد تذاكر المخيم الصيفي\n\nسيتم إضافة ${toImport.length} تذكرة كمدخول في الموارد المالية:\n` +
+  const confirmed = await EPUI.confirm(
+    `☀️ سيتم إضافة ${toImport.length} تذكرة كمدخول في الموارد المالية:\n` +
     toImport.slice(0, 5).map(t => `• ${t.name} — ${Number(t.amount).toLocaleString('ar-DZ')} دج`).join('\n') +
     (toImport.length > 5 ? `\n... و${toImport.length - 5} تذاكر أخرى` : '') +
-    '\n\nهل تريد المتابعة؟'
+    '\n\nهل تريد المتابعة؟',
+    'استيراد تذاكر المخيم'
   );
   if (!confirmed) return;
 
@@ -7077,7 +7078,7 @@ window.sovFullCheck = function() {
     });
   }
   
-  alert(report);
+  EPUI.alert(report, '📋 تقرير التذاكر');
   
   window._sovTab = "noticket";
   document.querySelectorAll("#sov-tab-all, #sov-tab-active, #sov-tab-noticket").forEach(function(b) { b.classList.remove("active"); });

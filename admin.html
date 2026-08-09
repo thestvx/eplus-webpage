@@ -14,6 +14,7 @@
   <script src="js/registrationService.js"></script>
   <script src="js/subjectService.js?v=2"></script>
   <script src="js/attendanceService.js"></script>
+  <script src="js/teacherFinance.js?v=1"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
@@ -1518,7 +1519,7 @@
     .cm-actions{display:flex;gap:10px;justify-content:center}
     .cm-btn{padding:10px 28px;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;transition:all .2s;font-family:'Tajawal',sans-serif}
     .cm-btn-cancel{background:var(--bg);color:var(--text-muted);border:1.5px solid var(--border)}.cm-btn-cancel:hover{background:var(--border)}
-    .cm-btn-confirm{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;box-shadow:0 4px 14px rgba(124,58,237,0.25)}.cm-btn-confirm:hover{transform:translateY(-1px)}
+    .cm-btn-confirm{background:linear-gradient(135deg,var(--primary),var(--primary-2));color:#fff;box-shadow:0 4px 14px rgba(124,58,237,0.25)}.cm-btn-confirm:hover{transform:translateY(-1px)}
     .cm-btn-danger{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff}.cm-btn-danger:hover{transform:translateY(-1px)}
     .cm-btn-success{background:linear-gradient(135deg,#059669,#047857);color:#fff}.cm-btn-success:hover{transform:translateY(-1px)}
 </style>
@@ -3181,23 +3182,6 @@
   </div>
 </div>
 
-<!-- ===== SRT DELETE MODAL ===== -->
-<div class="teacher-modal-bg" id="srt-delete-modal">
-  <div class="teacher-modal" style="max-width:400px;text-align:center">
-    <div class="teacher-modal-header" style="justify-content:center;border:none">
-      <div style="font-size:48px;margin-bottom:8px">🗑️</div>
-    </div>
-    <div style="padding:0 24px 20px">
-      <div style="font-size:16px;font-weight:900;color:var(--text);margin-bottom:6px">تعطيل الأستاذ</div>
-      <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px">هل أنت متأكد من تعطيل هذا الأستاذ؟ لن يتم حذف البيانات، فقط سيتم تعطيل الحساب.</div>
-      <div style="display:flex;gap:10px;justify-content:center">
-        <button class="btn-sm" onclick="document.getElementById('srt-delete-modal').classList.remove('open')">إلغاء</button>
-        <button class="btn-sm danger" id="srt-delete-confirm-btn">نعم، تعطّل</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- ===== SRT PASSWORD RESET MODAL ===== -->
 <div class="teacher-modal-bg" id="srt-reset-modal">
   <div class="teacher-modal" style="max-width:420px">
@@ -3216,35 +3200,56 @@
   </div>
 </div>
 
-<!-- ===== SRT BALANCE MODAL ===== -->
-<div class="teacher-modal-bg" id="srt-balance-modal">
-  <div class="teacher-modal" style="max-width:480px">
+<!-- ===== SRT FINANCE MODAL (دفتر مستحقات الأستاذ) ===== -->
+<div class="teacher-modal-bg" id="srt-finance-modal">
+  <div class="teacher-modal" style="max-width:860px;max-height:92vh;display:flex;flex-direction:column">
     <div class="teacher-modal-header">
       <div class="panel-icon" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.2)">💰</div>
-      <div class="teacher-modal-title">إدارة رصيد الأستاذ</div>
-      <button class="att-modal-close" onclick="document.getElementById('srt-balance-modal').classList.remove('open')">✕</button>
+      <div class="teacher-modal-title">الحسابات المالية — <span id="srt-finance-teacher-name" style="color:var(--primary)"></span></div>
+      <button class="att-modal-close" onclick="srtCloseFinance()">✕</button>
     </div>
-    <div class="teacher-modal-body">
-      <input type="hidden" id="srt-balance-teacher-id" value="">
-      <div style="background:var(--primary-light);border-radius:14px;padding:18px 20px;margin-bottom:18px;text-align:center">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">الرصيد الحالي</div>
-        <div id="srt-balance-current" style="font-size:28px;font-weight:900;color:var(--primary);direction:ltr;display:inline-block">0 دج</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">الأستاذ: <strong id="srt-balance-teacher-name"></strong></div>
+    <div class="teacher-modal-body" style="overflow-y:auto;padding:20px 24px">
+
+      <!-- بطاقات الرصيد -->
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px" id="srt-finance-cards">
+        <div style="background:linear-gradient(135deg,rgba(99,102,241,0.1),rgba(99,102,241,0.04));border:1px solid rgba(99,102,241,0.18);border-radius:12px;padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">إجمالي المستحقات</div>
+          <div id="srt-fin-card-due" style="font-weight:900;font-size:16px;color:var(--primary)">0 دج</div>
+        </div>
+        <div style="background:linear-gradient(135deg,rgba(16,185,129,0.1),rgba(16,185,129,0.04));border:1px solid rgba(16,185,129,0.18);border-radius:12px;padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">المدفوع</div>
+          <div id="srt-fin-card-paid" style="font-weight:900;font-size:16px;color:#059669">0 دج</div>
+        </div>
+        <div style="background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(245,158,11,0.04));border:1px solid rgba(245,158,11,0.2);border-radius:12px;padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">المتبقي</div>
+          <div id="srt-fin-card-pending" style="font-weight:900;font-size:16px;color:#d97706">0 دج</div>
+        </div>
+        <div style="background:var(--primary-light);border-radius:12px;padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">التلاميذ</div>
+          <div id="srt-fin-card-students" style="font-weight:900;font-size:16px">0</div>
+        </div>
+        <div style="background:var(--primary-light);border-radius:12px;padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">الحصص</div>
+          <div id="srt-fin-card-sessions" style="font-weight:900;font-size:16px">0</div>
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">العملية <span class="required">*</span></label>
-        <div style="padding:8px 12px;border-radius:8px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15);font-size:13px;font-weight:700;color:#059669;margin-bottom:14px">✅ إضافة رصيد فقط</div>
+
+      <!-- سعر الحصة + الأزرار -->
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:14px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;margin-bottom:16px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" style="font-size:11px">سعر الحصة (دج)</label>
+          <input class="inp" type="number" id="srt-finance-rate" min="0" step="50" style="width:140px;padding:9px 12px" placeholder="0">
+        </div>
+        <button class="btn-primary" onclick="srtFinanceSaveRate()" style="padding:10px 16px;font-weight:800;font-size:12px">💾 حفظ السعر</button>
+        <div style="flex:1"></div>
+        <button class="btn-primary" onclick="srtFinanceComputeDues()" style="padding:10px 16px;font-weight:800;font-size:12px;background:linear-gradient(135deg,#7C3AED,#6d28d9)">🔄 حساب المستحقات من الحضور</button>
+        <button class="btn-primary" onclick="srtFinanceAddPayment()" style="padding:10px 16px;font-weight:800;font-size:12px;background:linear-gradient(135deg,#059669,#047857)">💵 تسجيل دفعة + إيصال</button>
       </div>
-      <div class="form-group">
-        <label class="form-label">المبلغ (دج) <span class="required">*</span></label>
-        <input class="inp" type="number" id="srt-balance-amount" min="1" step="100" placeholder="أدخل المبلغ" style="padding:10px 14px">
-      </div>
-      <div class="form-group">
-        <label class="form-label">السبب / ملاحظة</label>
-        <input class="inp" type="text" id="srt-balance-note" placeholder="مثال: دفع راتب شهري، خصم..." style="padding:10px 14px">
-      </div>
-      <div id="srt-balance-error" style="display:none;background:rgba(220,38,38,0.08);color:#dc2626;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:600;margin-bottom:10px"></div>
-      <button class="btn-primary" onclick="srtConfirmBalance()" style="width:100%;margin-top:8px;padding:12px;font-weight:800">💾 تأكيد العملية</button>
+
+      <!-- دفتر المعاملات -->
+      <div style="font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:8px">📒 دفتر معاملات الأستاذ</div>
+      <div id="srt-finance-ledger" style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;padding:4px 2px"></div>
+
     </div>
   </div>
 </div>
@@ -5295,6 +5300,8 @@ window.executePrint = () => {
     +   'function doPrint(){'
     +     'window.print();'
     +   '}'
+    +   'window.onafterprint=function(){window.close();};'
+    +   'if(window.matchMedia){try{window.matchMedia("print").addEventListener("change",function(m){if(!m.matches)window.close();});}catch(e){}}'
     +   'var images=document.querySelectorAll("img");'
     +   'var total=images.length,done=0;'
     +   'if(!total){setTimeout(doPrint,500);return;}'
@@ -19902,6 +19909,7 @@ window.saveEditTicket = async () => {
 </div>
 
 
+<script src="js/ep-ui.js?v=1"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
 //  THEME SYSTEM
@@ -22506,10 +22514,18 @@ function srPrintCard() {
   if (!win) { srShowToast('الرجاء السماح بالنوافذ المنبثقة لطباعة البطاقة', 'error'); return; }
   win.document.write(StudentCardRenderer.buildPrintHTML(r));
   win.document.close();
+  const closeWin = () => { try { win.close(); } catch (e) {} };
+  const afterPrint = () => { closeWin(); window.focus(); };
+  win.onafterprint = afterPrint;
+  try {
+    win.matchMedia('print').addEventListener('change', mql => { if (!mql.matches) afterPrint(); });
+  } catch (e) {}
   setTimeout(() => {
+    if (!win || !win.document) return;
     StudentCardRenderer.hydratePrint(win, r);
-    win.print();
+    setTimeout(() => { try { win.focus(); win.print(); } catch (e) {} }, 120);
   }, 600);
+  setTimeout(closeWin, 60000);
 }
 
 function srReprintCard(id) {
@@ -22697,7 +22713,11 @@ function srPrint() {
   <p style="text-align:center;margin-top:20px;color:#999;font-size:11px">تم التصدير من لوحة إدارة E-PLUS</p>
   </body></html>`);
   win.document.close();
-  setTimeout(() => { win.print(); }, 300);
+  const closeWin = () => { try { win.close(); } catch (e) {} window.focus(); };
+  win.onafterprint = closeWin;
+  try { win.matchMedia('print').addEventListener('change', mql => { if (!mql.matches) closeWin(); }); } catch (e) {}
+  setTimeout(() => { try { win.focus(); win.print(); } catch (e) {} }, 300);
+  setTimeout(closeWin, 60000);
 }
 
 function srShowToast(msg, type = 'success') {
@@ -22807,83 +22827,195 @@ async function srtResetUserPassword(userId, newPassword) {
 const SRT_TREASURY_COLLECTION = 'support_treasury';
 const SRT_TREASURY_LOG_COLLECTION = 'support_treasury_transactions';
 
-function srtOpenBalanceModal(teacherId) {
+function srtFinAdminName() { return document.getElementById('admin-name')?.textContent || 'الإدارة'; }
+
+let _srtFinanceTeacher = null;
+
+function srtOpenFinance(teacherId) {
   const teacher = srtAllData.find(t => t.id === teacherId);
   if (!teacher) return;
-  document.getElementById('srt-balance-teacher-id').value = teacherId;
-  document.getElementById('srt-balance-current').textContent = (teacher.balance || 0).toLocaleString('ar-DZ') + ' دج';
-  document.getElementById('srt-balance-teacher-name').textContent = teacher.name || '—';
-  document.getElementById('srt-balance-action').value = 'add';
-  document.getElementById('srt-balance-amount').value = '';
-  document.getElementById('srt-balance-note').value = '';
-  document.getElementById('srt-balance-error').style.display = 'none';
-  document.getElementById('srt-balance-modal').classList.add('open');
+  _srtFinanceTeacher = teacher;
+  document.getElementById('srt-finance-teacher-name').textContent = teacher.name || '—';
+  document.getElementById('srt-finance-rate').value = teacher.rate || 0;
+  document.getElementById('srt-finance-modal').classList.add('open');
+  srtFinanceRefresh();
 }
 
-async function srtConfirmBalance() {
-  const teacherId = document.getElementById('srt-balance-teacher-id').value;
-  const action = 'add';
-  const amount = parseInt(document.getElementById('srt-balance-amount').value);
-  const note = document.getElementById('srt-balance-note').value.trim();
-  const errEl = document.getElementById('srt-balance-error');
-  errEl.style.display = 'none';
+function srtCloseFinance() {
+  _srtFinanceTeacher = null;
+  document.getElementById('srt-finance-modal').classList.remove('open');
+}
 
-  if (!amount || amount <= 0) { errEl.textContent = '⚠️ أدخل مبلغ صحيح'; errEl.style.display = 'block'; return; }
-
-  const teacher = srtAllData.find(t => t.id === teacherId);
-  if (!teacher) { errEl.textContent = '⚠️ الأستاذ غير موجود'; errEl.style.display = 'block'; return; }
-
-  const currentBalance = teacher.balance || 0;
-  if (action === 'deduct' && amount > currentBalance) { errEl.textContent = '⚠️ الرصيد غير كافٍ (الرصيد الحالي: ' + currentBalance.toLocaleString('ar-DZ') + ' دج)'; errEl.style.display = 'block'; return; }
-
-  const {doc:d,updateDoc,getDocs,collection:c,addDoc}=srtFS(),db=srtDB();
-  const newBalance = action === 'add' ? currentBalance + amount : currentBalance - amount;
-
+async function srtFinanceRefresh() {
+  const t = _srtFinanceTeacher;
+  if (!t) return;
+  const id = t.teacherId || t.id;
   try {
-    await updateDoc(d(db, SRT_COLLECTION, teacherId), {
-      balance: newBalance,
-      balanceUpdatedAt: new Date().toISOString()
-    });
+    const bal = await TeacherFinance.getBalance(id) || {};
+    document.getElementById('srt-fin-card-due').textContent = (bal.total_due || 0).toLocaleString('ar-DZ') + ' دج';
+    document.getElementById('srt-fin-card-paid').textContent = (bal.total_paid || 0).toLocaleString('ar-DZ') + ' دج';
+    const pending = (bal.pending || 0).toLocaleString('ar-DZ') + ' دج';
+    const pendingEl = document.getElementById('srt-fin-card-pending');
+    pendingEl.textContent = pending;
+    pendingEl.style.color = (bal.pending || 0) <= 0 ? '#059669' : '#d97706';
+    document.getElementById('srt-fin-card-students').textContent = bal.student_count || 0;
+    document.getElementById('srt-fin-card-sessions').textContent = bal.session_count || 0;
+    if (bal.rate && document.getElementById('srt-finance-rate').value === '0') document.getElementById('srt-finance-rate').value = bal.rate;
 
-    await addDoc(c(db, SRT_TREASURY_LOG_COLLECTION), {
-      teacherId, teacherName: teacher.name || '',
-      action, amount, note: note || (action === 'add' ? 'إضافة رصيد' : 'خصم رصيد'),
-      previousBalance: currentBalance, newBalance,
-      createdAt: new Date().toISOString()
-    });
-
-    if (action === 'add') {
-      try {
-        const treasurySnap = await getDocs(c(db, SRT_TREASURY_COLLECTION));
-        if (treasurySnap.empty) {
-          const {setDoc}=srtFS();
-          await setDoc(d(db, SRT_TREASURY_COLLECTION, 'main'), { balance: amount, updatedAt: new Date().toISOString() });
-        } else {
-          const treasuryDoc = treasurySnap.docs[0];
-          const treasuryBalance = treasuryDoc.data().balance || 0;
-          await updateDoc(d(db, SRT_TREASURY_COLLECTION, treasuryDoc.id), {
-            balance: treasuryBalance - amount,
-            updatedAt: new Date().toISOString()
-          });
-        }
-      } catch (treasuryErr) { console.warn('Treasury log failed (non-critical):', treasuryErr); }
+    const ledger = await TeacherFinance.getLedger(id);
+    const body = document.getElementById('srt-finance-ledger');
+    if (!ledger.length) {
+      body.innerHTML = '<div style="text-align:center;padding:28px;color:var(--text-muted);font-size:13px;font-weight:700">لا توجد معاملات بعد — اضغط «حساب المستحقات من الحضور»</div>';
+      return;
     }
-
-    teacher.balance = newBalance;
-    document.getElementById('srt-balance-modal').classList.remove('open');
-    srtRenderStats();
-    srtRenderTable(srtAllData.filter(t => {
-      const q = (document.getElementById('srt-search')?.value || '').trim().toLowerCase();
-      const status = document.getElementById('srt-status-filter')?.value || '';
-      if (q && !t.name?.toLowerCase().includes(q) && !(t.teacherId || t.id || '').toLowerCase().includes(q)) return false;
-      if (status && (status === 'disabled' ? t.status !== 'disabled' : t.status === 'disabled')) return false;
-      return true;
-    }));
-    srtShowToast('✅ تم ' + (action === 'add' ? 'إضافة' : 'خصم') + ' ' + amount.toLocaleString('ar-DZ') + ' دج بنجاح', 'success');
+    const fmtD = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('ar-DZ', { day:'2-digit', month:'2-digit', year:'numeric' }) : '—';
+    body.innerHTML = ledger.map(tx => {
+      const isDue = tx.transaction_type === 'dues';
+      const typeBadge = isDue
+        ? '<span style="font-size:10px;font-weight:800;background:rgba(124,58,237,0.1);color:#7C3AED;padding:2px 9px;border-radius:999px">📚 مستحقات</span>'
+        : '<span style="font-size:10px;font-weight:800;background:rgba(5,150,105,0.12);color:#059669;padding:2px 9px;border-radius:999px">💵 دفعة</span>';
+      const amountHtml = isDue
+        ? '<span style="font-weight:900;color:#7C3AED;direction:ltr;display:inline-block">+' + (tx.amount||0).toLocaleString('ar-DZ') + ' دج</span>'
+        : '<span style="font-weight:900;color:#059669;direction:ltr;display:inline-block">−' + (tx.amount||0).toLocaleString('ar-DZ') + ' دج</span>';
+      const detail = isDue
+        ? (tx.student_name || '') + (tx.subject_name ? ' — ' + tx.subject_name : '') + (tx.session_count ? ' — ' + tx.session_count + ' حصة' : '')
+        : (tx.notes || 'دفعة مالية');
+      const printBtn = !isDue
+        ? `<button onclick="srtFinancePrintReceipt('${tx.id.replace(/'/g, '')}')" title="طباعة الإيصال" style="padding:6px 10px;border-radius:8px;border:1.5px solid rgba(5,150,105,0.3);background:rgba(5,150,105,0.06);color:#059669;cursor:pointer;font-size:12px;font-weight:800">🖨️ إيصال</button>`
+        : '';
+      return `<div style="display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            ${typeBadge}
+            <span style="font-size:11px;color:var(--text-muted);font-weight:700">${fmtD(tx.date)}</span>
+            ${isDue ? `<span style="font-size:10px;font-family:monospace;background:var(--primary-light);color:var(--primary);padding:2px 7px;border-radius:6px">${tx.session_count} × ${tx.lesson_rate}</span>` : ''}
+          </div>
+          <div style="font-size:12.5px;font-weight:700;margin-top:4px;color:var(--text)">${detail}</div>
+          ${isDue ? '<div style="font-size:10.5px;color:var(--text-muted);margin-top:2px">' + (tx.notes || '') + '</div>' : ''}
+        </div>
+        ${amountHtml}
+        ${printBtn}
+        <button onclick="srtFinanceDeleteTx('${tx.id.replace(/'/g, '')}')" title="حذف المعاملة" style="padding:6px 10px;border-radius:8px;border:1.5px solid rgba(220,38,38,0.2);background:rgba(220,38,38,0.05);color:#dc2626;cursor:pointer;font-size:12px">🗑️</button>
+      </div>`;
+    }).join('');
   } catch (e) {
-    console.error('Balance update error:', e);
-    errEl.textContent = '❌ فشل العملية: ' + e.message;
-    errEl.style.display = 'block';
+    console.error('Finance refresh error:', e);
+    document.getElementById('srt-finance-ledger').innerHTML = '<div style="text-align:center;padding:24px;color:#dc2626;font-size:13px;font-weight:700">❌ فشل تحميل البيانات: ' + e.message + '</div>';
+  }
+}
+
+async function srtFinanceSaveRate() {
+  const t = _srtFinanceTeacher;
+  if (!t) return;
+  const rate = parseInt(document.getElementById('srt-finance-rate').value);
+  if (!rate || rate <= 0) { srtShowToast('⚠️ أدخل سعر حصة صحيح', 'error'); return; }
+  const id = t.teacherId || t.id;
+  try {
+    await TeacherFinance.saveTeacherRate(id, rate, srtFinAdminName());
+    t.rate = rate;
+    srtShowToast('✅ تم حفظ سعر الحصة: ' + rate.toLocaleString('ar-DZ') + ' دج', 'success');
+  } catch (e) {
+    srtShowToast('فشل حفظ السعر: ' + e.message, 'error');
+  }
+}
+
+async function srtFinanceComputeDues() {
+  const t = _srtFinanceTeacher;
+  if (!t) return;
+  const id = t.teacherId || t.id;
+  if (!(await cmConfirm('حساب المستحقات', 'سيتم احتساب مستحقات الأستاذ من سجلات الحضور الفعلية:\n\n• كل حضور = حصة واحدة × سعر الحصة\n• المعرّف ثابت ⇒ لا تتكرر المستحقات عند إعادة الحساب\n\nمتابعة؟', '🔄'))) return;
+  document.getElementById('srt-finance-ledger').innerHTML = '<div style="text-align:center;padding:24px;font-size:13px;font-weight:700;color:var(--text-muted)">⏳ جارٍ حساب المستحقات من الحضور...</div>';
+  try {
+    const res = await TeacherFinance.computeDuesForTeacher(t, t.rate || 0, srtFinAdminName());
+    srtShowToast('✅ تم حساب ' + res.duesRows.length + ' مستحقات (' + res.totalSessions + ' حصة، ' + res.studentCount + ' تلميذ)', 'success');
+    await srtFinanceRefresh();
+  } catch (e) {
+    console.error('Compute dues error:', e);
+    srtShowToast('فشل حساب المستحقات: ' + e.message, 'error');
+    await srtFinanceRefresh();
+  }
+}
+
+async function srtTreasuryAdjust(delta) {
+  try {
+    const {getDocs,collection:c,doc:d,setDoc,updateDoc}=srtFS(),db=srtDB();
+    const treasurySnap = await getDocs(c(db, SRT_TREASURY_COLLECTION));
+    if (treasurySnap.empty) {
+      await setDoc(d(db, SRT_TREASURY_COLLECTION, 'main'), { balance: Math.max(0, delta), updatedAt: new Date().toISOString() });
+    } else {
+      const tDoc = treasurySnap.docs[0];
+      await updateDoc(d(db, SRT_TREASURY_COLLECTION, tDoc.id), {
+        balance: Math.max(0, (tDoc.data().balance || 0) + delta),
+        updatedAt: new Date().toISOString()
+      });
+    }
+    srtLoadTreasuryBalance();
+  } catch (e) { console.warn('Treasury adjust failed (non-critical):', e); }
+}
+
+async function srtFinanceAddPayment() {
+  const t = _srtFinanceTeacher;
+  if (!t) return;
+  const id = t.teacherId || t.id;
+  const bal = await TeacherFinance.getBalance(id);
+  const pending = (bal && bal.pending) || 0;
+  const form = await EPUI.form([
+    { name: 'amount', label: 'المبلغ المدفوع (دج) ' + (pending > 0 ? '— المتبقي ' + pending.toLocaleString('ar-DZ') + ' دج' : ''), value: pending > 0 ? String(pending) : '' },
+    { name: 'note', label: 'البيان / ملاحظة (اختياري)' }
+  ], { title: '💵 تسجيل دفعة للأستاذ ' + (t.name || ''), confirmText: 'تسجيل الدفعة' });
+  if (!form) return;
+  const amount = parseInt(form.amount);
+  if (!amount || amount <= 0) { srtShowToast('⚠️ أدخل مبلغ صحيح', 'error'); return; }
+  try {
+    const res = await TeacherFinance.addPayment(t, amount, form.note || '', srtFinAdminName());
+    srtTreasuryAdjust(-amount);
+    await srtFinanceRefresh();
+    srtShowToast('✅ تم تسجيل دفعة ' + amount.toLocaleString('ar-DZ') + ' دج وإصدار إيصال ' + res.receiptId, 'success');
+    const print = await cmConfirm('الإيصال', 'هل تريد طباعة إيصال الدفع الآن؟\n\nرقم الإيصال: ' + res.receiptId, '🧾');
+    if (print) srtFinancePrintReceipt(res.txId);
+  } catch (e) {
+    console.error('Payment error:', e);
+    srtShowToast('فشل تسجيل الدفعة: ' + e.message, 'error');
+  }
+}
+
+async function srtFinancePrintReceipt(txId) {
+  const t = _srtFinanceTeacher;
+  if (!t) return;
+  const id = t.teacherId || t.id;
+  try {
+    const receipts = await TeacherFinance.getReceipts(id);
+    const rcpt = receipts.find(x => x.transaction_id === txId) || receipts[0];
+    const ledger = await TeacherFinance.getLedger(id);
+    const tx = ledger.find(x => x.id === txId) || (rcpt ? { amount: rcpt.amount, date: rcpt.date, notes: rcpt.notes } : null);
+    if (!tx) return;
+    TeacherFinance.printReceipt({
+      receiptId: (rcpt && rcpt.id) || ('RCP-' + (tx.date || TeacherFinance.today()).replace(/-/g, '') + '-' + txId.slice(-4)),
+      teacherName: t.name || tx.teacher_name || '',
+      studentName: tx.student_name || '',
+      subjectName: tx.subject_name || '',
+      sessions: tx.session_count || 0,
+      rate: tx.lesson_rate || 0,
+      amount: (rcpt && rcpt.amount) || tx.amount || 0,
+      date: (rcpt && rcpt.date) || tx.date || TeacherFinance.today(),
+      adminName: (rcpt && rcpt.admin_name) || tx.admin_name || srtFinAdminName(),
+      note: tx.notes || ''
+    });
+  } catch (e) {
+    srtShowToast('فشل طباعة الإيصال: ' + e.message, 'error');
+  }
+}
+
+async function srtFinanceDeleteTx(txId) {
+  const t = _srtFinanceTeacher;
+  if (!t) return;
+  if (!(await cmConfirm('حذف معاملة', 'هل أنت متأكد من حذف هذه المعاملة من الدفتر؟\n\nسيُعاد حساب رصيد الأستاذ تلقائياً بعد الحذف.', '🗑️', { danger: true }))) return;
+  try {
+    await TeacherFinance.deleteTransaction(t.teacherId || t.id, t.name || '', txId, t.rate || 0, srtFinAdminName());
+    srtShowToast('✅ تم حذف المعاملة وإعادة حساب الرصيد', 'success');
+    await srtFinanceRefresh();
+  } catch (e) {
+    srtShowToast('فشل حذف المعاملة: ' + e.message, 'error');
   }
 }
 
@@ -22903,7 +23035,21 @@ async function srtLoadData() {
   const {getDocs,collection:c}=srtFS(),db=srtDB();
   try {
     const snap = await getDocs(c(db,SRT_COLLECTION));
-    srtAllData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    srtAllData = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.status !== 'deleted');
+    try {
+      const res = await fetch('https://jftfvpultaqufhsekdle.supabase.co/rest/v1/teacher_balances?select=*', {
+        headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc' }
+      });
+      if (res.ok) {
+        const balances = await res.json();
+        const byId = {};
+        balances.forEach(b => { byId[b.teacher_id] = b; });
+        srtAllData.forEach(t => {
+          const b = byId[t.teacherId || t.id];
+          if (b) { t.pending = b.pending || 0; t.rate = b.rate || t.rate; }
+        });
+      }
+    } catch (e) { console.warn('Balances merge failed:', e); }
     srtRenderStats();
     srtRenderTable(srtAllData);
     srtLoadTreasuryBalance();
@@ -22952,7 +23098,7 @@ function srtRenderTable(data) {
       <td style="font-size:12px;max-width:160px">${levels}</td>
       <td>${statusBadge}</td>
       <td style="font-size:12px">${created}</td>
-      <td style="font-weight:700;font-size:13px;direction:ltr;text-align:center">${(t.balance || 0).toLocaleString('ar-DZ')} دج</td>
+      <td style="font-weight:700;font-size:13px;direction:ltr;text-align:center;color:${(t.pending || 0) > 0 ? '#d97706' : '#059669'}">${(t.pending || 0).toLocaleString('ar-DZ')} دج</td>
       <td style="font-size:11px;color:var(--text-muted);font-style:italic">انقر مرتين</td>
     </tr>`;
   }).join('');
@@ -22981,7 +23127,6 @@ function srtShowDetail(id) {
   }).join('') : '<div style="color:var(--text-muted);font-size:12px">لا توجد مواد</div>';
   const levels = Array.isArray(t.levels) ? t.levels.join('، ') : '—';
   const created = t.createdAt ? new Date(t.createdAt.seconds ? t.createdAt.seconds * 1000 : t.createdAt).toLocaleDateString('ar-DZ', { year:'numeric', month:'long', day:'numeric' }) : '—';
-  const balance = (t.balance || 0).toLocaleString('ar-DZ');
 
   // Find linked user
   let usernameHtml = '—';
@@ -22993,7 +23138,7 @@ function srtShowDetail(id) {
   let actionsHtml = '';
   actionsHtml += `<button class="tbl-action" onclick="document.getElementById('srt-detail-modal').classList.remove('open');srtOpenEditModal('${t.id}')" style="border-color:rgba(99,102,241,0.3);color:var(--primary);font-weight:800;padding:8px 16px;font-size:12px">✏️ تعديل بيانات الأستاذ</button>`;
   actionsHtml += `<button class="tbl-action" onclick="document.getElementById('srt-detail-modal').classList.remove('open');srtResetPassword('${t.id}')" style="border-color:rgba(245,158,11,0.3);color:#d97706;font-weight:800;padding:8px 16px;font-size:12px">🔑 إعادة تعيين كلمة المرور</button>`;
-  actionsHtml += `<button class="tbl-action" onclick="document.getElementById('srt-detail-modal').classList.remove('open');srtOpenBalanceModal('${t.id}')" style="border-color:rgba(16,185,129,0.3);color:#059669;font-weight:800;padding:8px 16px;font-size:12px">💰 إدارة الرصيد</button>`;
+  actionsHtml += `<button class="tbl-action" onclick="document.getElementById('srt-detail-modal').classList.remove('open');srtOpenFinance('${t.id}')" style="border-color:rgba(16,185,129,0.3);color:#059669;font-weight:800;padding:8px 16px;font-size:12px">💰 الحسابات المالية</button>`;
   actionsHtml += `<button class="tbl-action" onclick="srtToggleStatusFromDetail('${t.id}')" style="border-color:rgba(${isDis ? '16,185,129' : '220,38,38'},0.3);color:${isDis ? '#059669' : '#dc2626'};font-weight:800;padding:8px 16px;font-size:12px">${isDis ? '🟢 تفعيل الحساب' : '🔴 تعطيل الحساب'}</button>`;
   actionsHtml += `<button class="tbl-action del" onclick="srtDeleteFromDetail('${t.id}')" style="padding:8px 16px;font-size:12px">🗑️ حذف الأستاذ</button>`;
 
@@ -23015,7 +23160,7 @@ function srtShowDetail(id) {
       <div><strong style="color:var(--text-muted);font-size:11px">تاريخ إنشاء الحساب</strong><div style="font-weight:700;margin-top:2px">${created}</div></div>
       <div><strong style="color:var(--text-muted);font-size:11px">آخر تسجيل دخول</strong><div style="font-weight:700;margin-top:2px">${t.lastLogin ? new Date(t.lastLogin.seconds ? t.lastLogin.seconds * 1000 : t.lastLogin).toLocaleString('ar-DZ') : 'لم يسجل دخول بعد'}</div></div>
       <div><strong style="color:var(--text-muted);font-size:11px">الملاحظات</strong><div style="font-weight:700;margin-top:2px">${t.notes || '—'}</div></div>
-      <div style="background:linear-gradient(135deg,rgba(5,150,105,0.08),rgba(16,185,129,0.12));border-radius:10px;padding:12px 14px"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">💰 الرصيد الحالي</div><div style="font-weight:900;font-size:18px;color:#059669">${balance} دج</div></div>
+      <div style="background:linear-gradient(135deg,rgba(5,150,105,0.08),rgba(16,185,129,0.12));border-radius:10px;padding:12px 14px"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">💰 المتبقي (مستحق الدفع)</div><div style="font-weight:900;font-size:18px;color:${(t.pending || 0) > 0 ? '#d97706' : '#059669'}">${(t.pending || 0).toLocaleString('ar-DZ')} دج</div><div style="font-size:10px;color:var(--text-muted);margin-top:3px">سعر الحصة: ${(t.rate || 0).toLocaleString('ar-DZ')} دج</div></div>
       <div style="grid-column:1/-1"><strong style="color:var(--text-muted);font-size:11px">المواد التي يدرسها</strong><div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">${subjects}</div></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:16px">
@@ -23245,20 +23390,41 @@ async function srtToggleStatus(id) {
   } catch (e) { console.error('SRT toggle error:', e); }
 }
 
-function srtDelete(id) {
-  document.getElementById('srt-delete-modal').classList.add('open');
-  document.getElementById('srt-delete-confirm-btn').onclick = async () => {
-    const {updateDoc,doc:d}=srtFS(),db=srtDB();
-    try {
-      const t = srtAllData.find(x => x.id === id);
-      await updateDoc(d(db, SRT_COLLECTION, id), { status: 'disabled', updatedAt: new Date().toISOString() });
-      if (t && t.userId) {
-        await updateDoc(d(db, USERS_COLLECTION, t.userId), { status: 'disabled', updatedAt: new Date().toISOString() });
-      }
-      document.getElementById('srt-delete-modal').classList.remove('open');
-      await srtLoadData();
-    } catch (e) { console.error('SRT disable error:', e); }
-  };
+async function srtDelete(id) {
+  const t = srtAllData.find(x => x.id === id);
+  if (!t) return;
+  const ok = await cmConfirm(
+    'حذف الأستاذ نهائياً؟',
+    `سيتم حذف "${t.name || ''}" نهائياً من القوائم النشطة:\n` +
+    `• تعطيل الحساب ومنع تسجيل الدخول\n` +
+    `• إخفاؤه من اختيارات التسجيل والإدارة\n` +
+    `• الاحتفاظ بسجلات التلاميذ والحضور والمالية السابقة\n\n` +
+    `لا يمكن التراجع عن هذا الإجراء.`,
+    '🗑️',
+    { danger: true, confirmText: 'حذف نهائياً', cancelText: 'إلغاء' }
+  );
+  if (!ok) return;
+  const {updateDoc,doc:d}=srtFS(),db=srtDB();
+  try {
+    await updateDoc(d(db, SRT_COLLECTION, id), {
+      status: 'deleted',
+      deletedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    if (t.userId) {
+      await updateDoc(d(db, USERS_COLLECTION, t.userId), {
+        status: 'deleted',
+        deletedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    }
+    if (window.SubjectService) {
+      if (typeof SubjectService.markTeacherDeleted === 'function') SubjectService.markTeacherDeleted(t.name);
+      if (typeof SubjectService.invalidateCache === 'function') SubjectService.invalidateCache();
+    }
+    srtShowToast('🗑️ تم حذف الأستاذ نهائياً من القوائم النشطة', 'success');
+    await srtLoadData();
+  } catch (e) { console.error('SRT delete error:', e); srtShowToast('فشل حذف الأستاذ: ' + e.message, 'error'); }
 }
 
 function srtResetPassword(id) {
