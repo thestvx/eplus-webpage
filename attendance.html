@@ -71,10 +71,12 @@
     animation:cardPop .45s ease both;
   }
   .pin-logo{
-    width:68px;height:68px;margin:0 auto 16px;border-radius:18px;
-    background:linear-gradient(135deg,#6366f1,#4338ca);border:1px solid rgba(255,255,255,0.28);
-    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:24px;
-    box-shadow:0 12px 30px rgba(99,102,241,0.5);animation:float 3.6s ease-in-out infinite;
+    width:180px;margin:0 auto 18px;line-height:0;
+    filter:drop-shadow(0 16px 34px rgba(200,168,75,0.28));
+    animation:logoIn .7s ease both;
+  }
+  .pin-logo img{
+    width:100%;height:auto;object-fit:contain;display:block;
   }
   .pin-brand-en{font-size:15px;font-weight:900;letter-spacing:2px;color:#fff}
   .pin-brand-ar{font-size:12px;color:#c7d2fe;font-weight:700;margin-bottom:22px}
@@ -304,6 +306,7 @@
   @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
   @keyframes scanSweep{0%{top:8%;opacity:0}14%{opacity:1}86%{opacity:1}100%{top:86%;opacity:0}}
   @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+  @keyframes logoIn{from{opacity:0;transform:translateY(10px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
 
   /* ── SCANNER DEBUG PANEL ── */
   .debug-toggle{
@@ -352,7 +355,7 @@
 <!-- ===== PIN SCREEN ===== -->
 <section class="view" id="view-pin">
   <div class="pin-card">
-    <div class="pin-logo">E+</div>
+    <div class="pin-logo"><img src="images/eplus-logo.png" alt="E-PLUS" draggable="false"></div>
     <div class="pin-brand-en">E-PLUS ACADEMY</div>
     <div class="pin-brand-ar">مركز الدعم المدرسي</div>
     <div class="pin-lock">🔐</div>
@@ -611,7 +614,7 @@
     appUnlocked = true;
     $('view-pin').classList.remove('active');
     $('app').classList.remove('locked');
-    switchView('ready');
+    goReady();
   }
   function unlockApp(pin) {
     return checkPin(pin).then(function (ok) {
@@ -619,7 +622,7 @@
         clearPinError();
         showApp();
         logScanner('PIN OK — system unlocked');
-        ensureAuth();
+        ensureAttendanceAuth();
       } else {
         showPinError();
         logScanner('PIN rejected');
@@ -628,7 +631,7 @@
     });
   }
   function lockApp() {
-    clearTimeout(successTimer);
+    resetAttendanceSession();
     showPin();
     logScanner('System locked');
   }
@@ -645,10 +648,11 @@
   window.__attLock = lockApp;
 
   // ── Firebase anonymous auth (write protection layer) ───
-  function ensureAuth() {
-    if (authState.tried) return Promise.resolve(authState);
-    authState.tried = true;
+  // Retried on every call until a signed-in session exists, so a
+  // transient network failure can never permanently block writes.
+  function ensureAttendanceAuth() {
     return new Promise(function (resolve) {
+      if (authState.signedIn) { resolve(authState); return; }
       try {
         if (typeof firebase === 'undefined' || !firebase.auth || typeof firebase.auth !== 'function') {
           authState.reason = 'firebase-auth SDK missing';
@@ -657,6 +661,7 @@
         }
         firebase.auth().signInAnonymously().then(function () {
           authState.signedIn = true;
+          authState.reason = '';
           console.log('[ATTENDANCE AUTH] anonymous signed in');
           resolve(authState);
         }).catch(function (e) {
@@ -882,6 +887,50 @@
     if (v) v.classList.add('active');
   }
 
+  // ── Full session reset (used on Lock / stale-state cleanup) ──
+  // Wipes ALL student/scan state and returns to the ready view so
+  // nothing (student, subjects, scan value, success overlay) survives
+  // a Lock. No student data is ever persisted to storage.
+  function resetAttendanceSession() {
+    clearTimeout(successTimer);
+    successTimer = null;
+    currentStudent = null;
+    currentScanValue = '';
+    subjectPairs = [];
+    attending = false;
+    subjectBusyIdx = -1;
+
+    // scanner HID buffer
+    scanActive = false;
+    scanEnterSeen = false;
+    scanSawNonDigit = false;
+    scanBufCode = [];
+    scanBufKey = [];
+    if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
+
+    // status pill / last-read
+    $('last-read').textContent = '';
+    setPill('جهاز الماسح جاهز', true);
+
+    // student panel
+    $('st-name').textContent = '—';
+    $('st-id').textContent = '—';
+    $('st-status').textContent = 'مسجل نهائياً';
+    $('st-status').className = 'tag green';
+    $('st-tags').innerHTML = '';
+    $('st-note').textContent = 'المواد التالية هي المواد المسجلة لهذا الطالب فقط.';
+    $('subj-count').textContent = '0';
+    $('subject-list').innerHTML = '';
+    $('st-avatar').src = 'icons/student.png';
+
+    // scan card state + any open modal
+    var card = $('scan-card');
+    if (card) card.classList.remove('verified', 'rejected');
+    $('overlay').classList.remove('show');
+
+    switchView('ready');
+  }
+
   function goReady() {
     clearTimeout(successTimer);
     currentStudent = null;
@@ -1014,12 +1063,12 @@
     subjectBusyIdx = idx;
     setRecordBusy(true);
     try {
-      await ensureAuth();
+      await ensureAttendanceAuth();
       if (!authState.signedIn) {
         console.error('[ATTENDANCE RECORD] blocked — ' + authState.reason);
         setRecordBusy(false);
         subjectBusyIdx = -1;
-        openModal('error', 'تعذر تسجيل الحضور', 'حدثت مشكلة أثناء حفظ سجل الحضور. حاول مرة أخرى.');
+        openModal('warn', '⚠️ تعذر الاتصال بنظام الحضور', 'تعذر التحقق من جلسة النظام. حاول مرة أخرى.');
         return;
       }
       var res = await AttendanceService.recordSingle(
@@ -1196,7 +1245,7 @@
   // ── Init ───────────────────────────────────────────────
   logScanner('Attendance station ready — SP-1160 HID capture active (event.code based)');
   logScanner('لمعاينة المفاتيح الخام افتح barcode-debug.html');
-  ensureAuth();
+  ensureAttendanceAuth();
   if (isUnlocked()) showApp(); else showPin();
 })();
 </script>
