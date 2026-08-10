@@ -6,6 +6,7 @@
 
 const AttendanceService = (function () {
   const COLLECTION = 'support_attendance';
+  const ALGERIA_TZ = 'Africa/Algiers';
 
   // ── Schema (reference) ────────────────────────────────
   // {
@@ -30,12 +31,46 @@ const AttendanceService = (function () {
   //   updatedAt:      string | null
   // }
 
+  // All dates/times are expressed in Algeria local time (Africa/Algiers),
+  // regardless of the client device's own timezone. FormatToParts + Latin
+  // digits guarantee stable YYYY-MM-DD and HH:MM:SS output.
+  function _algiersParts() {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: ALGERIA_TZ,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false
+    }).formatToParts(new Date());
+  }
+
+  function _partsMap() {
+    const parts = _algiersParts();
+    const m = {};
+    parts.forEach(p => { m[p.type] = p.value; });
+    if (m.hour === '24') m.hour = '00';
+    return m;
+  }
+
   function today() {
-    return new Date().toISOString().split('T')[0];
+    try {
+      const m = _partsMap();
+      return m.year + '-' + m.month + '-' + m.day;
+    } catch (e) {
+      return new Date().toISOString().split('T')[0];
+    }
   }
 
   function nowTime() {
-    return new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    try {
+      const m = _partsMap();
+      return m.hour + ':' + m.minute + ':' + m.second;
+    } catch (e) {
+      return new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    }
+  }
+
+  function nowYearMonth() {
+    return today().slice(0, 7);
   }
 
   // Firestore server timestamp when available (compat firebase), else null.
@@ -269,7 +304,7 @@ const AttendanceService = (function () {
   }
 
   async function getMonthlyReport(teacherId, yearMonth) {
-    const ym = yearMonth || new Date().toISOString().slice(0, 7);
+    const ym = yearMonth || nowYearMonth();
     const all = await getRecords({ teacherId });
     return all.filter(r => r.date.startsWith(ym));
   }
@@ -398,6 +433,7 @@ const AttendanceService = (function () {
     COLLECTION,
     today,
     nowTime,
+    nowYearMonth,
     isDuplicate,
     validateStudent,
     resolveStudentFromScan,

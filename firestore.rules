@@ -9,8 +9,13 @@ service cloud.firestore {
       return isSignedIn() &&
         exists(/databases/$(database)/documents/teachers/$(request.auth.uid));
     }
+    // Admin = a signed-in, non-anonymous user who is not a teacher.
+    // Anonymous sign-in is used by the attendance kiosk (attendance.html);
+    // excluding it here stops random anonymous sessions from counting as admin.
     function isAdmin() {
-      return isSignedIn() && !isTeacher();
+      return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && !isTeacher();
     }
 
     match /registrations/{doc} {
@@ -227,7 +232,7 @@ service cloud.firestore {
 
     match /teacher_content/{docId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if true;
     }
 
     match /teacher_finance/{docId} {
@@ -242,8 +247,10 @@ service cloud.firestore {
     }
 
     match /support_attendance/{docId} {
-      allow read: if true;
-      allow create: if true;
+      // Attendance kiosk signs in anonymously after the PIN gate; reads and
+      // creates require a signed-in session (never fully public).
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
 
