@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>نظام تسجيل حضور الطلاب — E-PLUS Academy</title>
+<title>نظام تسجيل حضور الطلاب — E-PLUS Education Center</title>
 <link rel="icon" type="image/x-icon" href="images/eplus-icon.ico">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -24,6 +24,7 @@
   <script src="js/registrationService.js?v=4"></script>
 <script src="js/subjectService.js?v=3"></script>
 <script src="js/attendanceService.js?v=4"></script>
+<script src="js/subscriptionService.js?v=1"></script>
 <style>
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
   :root{
@@ -116,9 +117,9 @@
   }
   .brand{display:flex;align-items:center;gap:14px;min-width:0}
   .brand .logo{
-    width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,#6366f1,#4338ca);
-    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:16px;
-    box-shadow:0 8px 20px rgba(99,102,241,0.5);border:1px solid rgba(255,255,255,0.25);flex-shrink:0;
+    height:46px;width:auto;max-width:180px;object-fit:contain;flex-shrink:0;
+    border-radius:8px;filter:drop-shadow(0 4px 14px rgba(0,0,0,0.35));
+    background:rgba(255,255,255,0.94);padding:5px 10px;
   }
   .brand .title{color:#fff;min-width:0}
   .brand .title .en{font-size:15px;font-weight:900;letter-spacing:1px;white-space:nowrap}
@@ -244,7 +245,62 @@
   .record-btn:active{transform:translateY(0)}
   .record-btn:disabled{background:#cbd5e1;box-shadow:none;cursor:not-allowed;filter:none}
   .record-btn.busy{background:var(--primary);animation:blink 1s infinite}
+  .record-btn.recorded{background:#e2e8f0;color:#64748b;box-shadow:none;cursor:not-allowed}
   .empty-subjects{background:rgba(255,255,255,0.08);border:1px dashed rgba(255,255,255,0.28);border-radius:14px;color:#e0e7ff;padding:24px;text-align:center;font-weight:700}
+
+  /* ── SUBSCRIPTION PANEL (transparency) ── */
+  .subscription-panel{
+    background:var(--card);border-radius:16px;padding:16px 18px;margin-top:6px;box-shadow:var(--shadow-sm);
+    border:1px solid var(--border-light);animation:slideUp .35s ease both;
+  }
+  .sub-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+  .sub-title{font-size:15px;font-weight:900;color:var(--ink);display:flex;align-items:center;gap:8px}
+  .sub-badge{font-size:11px;font-weight:900;border-radius:99px;padding:3px 12px;white-space:nowrap}
+  .sub-badge.ok{background:var(--green-light);color:var(--green)}
+  .sub-badge.no{background:var(--amber-light, rgba(245,158,11,0.12));color:var(--amber, #b45309)}
+  .sub-badge.full{background:var(--red-light, rgba(239,68,68,0.12));color:#dc2626}
+  .sub-status{font-size:12px;color:var(--muted);font-weight:700;margin-bottom:12px}
+  .sub-status b{color:var(--ink)}
+  .month-cards{display:flex;flex-direction:column;gap:9px;margin-bottom:14px}
+  .month-card{
+    background:var(--primary-soft);border-radius:12px;padding:10px 13px;
+    display:flex;align-items:center;gap:12px;border:1px solid var(--border-light);
+  }
+  .month-card .m-idx{width:34px;height:34px;border-radius:9px;background:#4338ca;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .month-card .m-main{flex:1;min-width:0}
+  .month-card .m-name{font-size:13px;font-weight:900;color:var(--ink)}
+  .month-card .m-range{font-size:11px;color:var(--muted);font-weight:700;margin-top:1px}
+  .month-card .m-usage{font-size:11px;font-weight:900;color:var(--ink);white-space:nowrap}
+  .month-card .m-usage .u{color:var(--green)}
+  .month-card .m-progress{width:110px;height:7px;border-radius:99px;background:var(--border-light);overflow:hidden;flex-shrink:0}
+  .month-card .m-progress > i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#10b981,#059669)}
+  .month-card.full{opacity:.6}
+  .month-card.full .m-idx{background:var(--border-light);color:var(--muted)}
+  .month-card.active{border-color:#4338ca}
+  .month-card.active .m-idx{background:linear-gradient(135deg,#6366f1,#4338ca)}
+  .sub-counters{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+  .sub-counter{background:var(--primary-soft);border-radius:12px;padding:11px 8px;text-align:center;border:1px solid var(--border-light)}
+  .sub-counter .k{font-size:11px;color:var(--muted);font-weight:700;display:block}
+  .sub-counter .v{font-size:19px;font-weight:900;color:var(--ink);display:block;margin-top:2px}
+  .sub-counter .v.u{color:var(--green)}
+  .sub-counter .v.r{color:#4338ca}
+  .sub-section-title{font-size:12px;font-weight:900;color:var(--ink);margin:4px 0 8px;display:flex;align-items:center;gap:8px}
+  .sub-section-title::before{content:'';width:3px;height:13px;border-radius:2px;background:#4338ca}
+  .sub-teachers{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+  .sub-teacher{display:flex;align-items:center;gap:10px;background:var(--primary-soft);border-radius:11px;padding:9px 12px;border:1px solid var(--border-light)}
+  .sub-teacher .t-name{flex:1;font-size:13px;font-weight:900;color:var(--ink);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sub-teacher .t-bar{width:90px;height:6px;border-radius:99px;background:var(--border-light);overflow:hidden;flex-shrink:0}
+  .sub-teacher .t-bar > i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#6366f1,#4338ca)}
+  .sub-teacher .t-count{font-size:12px;font-weight:900;color:var(--ink);white-space:nowrap}
+  .sub-teacher .t-count .u{color:#4338ca}
+  .sub-timeline{display:flex;flex-direction:column;gap:7px}
+  .sub-event{display:flex;align-items:center;gap:10px;background:var(--primary-soft);border-radius:11px;padding:9px 12px;border:1px solid var(--border-light)}
+  .sub-event .e-dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;box-shadow:0 0 0 3px var(--green-light)}
+  .sub-event .e-main{flex:1;min-width:0}
+  .sub-event .e-subject{font-size:13px;font-weight:900;color:var(--ink)}
+  .sub-event .e-teacher{font-size:11px;color:var(--muted);font-weight:700}
+  .sub-event .e-time{font-size:11px;font-weight:900;color:#4338ca;white-space:nowrap;font-family:monospace}
+  .sub-empty{font-size:12px;color:var(--muted);font-weight:700;text-align:center;padding:10px 0}
 
   /* ── SUCCESS VIEW ── */
   .success-card{
@@ -356,22 +412,22 @@
 <section class="view" id="view-pin">
   <div class="pin-card">
     <div class="pin-logo"><img src="images/eplus-logo.png" alt="E-PLUS" draggable="false"></div>
-    <div class="pin-brand-en">E-PLUS ACADEMY</div>
-    <div class="pin-brand-ar">مركز الدعم المدرسي</div>
+    <div class="pin-brand-en">E-PLUS EDUCATION CENTER</div>
+    <div class="pin-brand-ar">مركز التعليم والدعم المدرسي</div>
     <div class="pin-lock">🔐</div>
     <div class="pin-title">الدخول إلى نظام تسجيل الحضور</div>
     <div class="pin-sub">أدخل رمز PIN الخاص بالنظام</div>
     <input type="password" id="pin-input" class="pin-input" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="••••">
     <button type="button" class="pin-btn" id="pin-btn">دخول</button>
     <div class="pin-error" id="pin-error">رمز PIN غير صحيح</div>
-    <div class="pin-foot">E-PLUS Academy — نظام تسجيل حضور الطلاب</div>
+    <div class="pin-foot">E-PLUS Education Center — نظام تسجيل حضور الطلاب</div>
   </div>
 </section>
 
 <div id="app" class="locked">
   <header class="topbar">
     <div class="brand">
-      <div class="logo">E+</div>
+      <img class="logo" src="images/education-plus-center-logo.png" alt="Education Plus Center" draggable="false">
       <div class="title">
         <div class="en">E-PLUS <span class="live-badge"><span class="dot"></span>نظام الحضور</span></div>
         <div class="ar">نقطة تسجيل حضور الطلاب — الاستقبال</div>
@@ -458,6 +514,23 @@
         </div>
         <div class="subjects-title">الأساتذة المسجل عندهم الطالب <span class="count" id="subj-count">0</span></div>
         <div class="subject-list" id="subject-list"></div>
+        <div class="subscription-panel" id="subscription-panel">
+          <div class="sub-head">
+            <div class="sub-title">📅 الاشتراك الشهري</div>
+            <span class="sub-badge" id="sub-badge">—</span>
+          </div>
+          <div class="sub-status" id="sub-status">جارٍ تحميل الاشتراك…</div>
+          <div class="month-cards" id="month-cards"></div>
+          <div class="sub-counters">
+            <div class="sub-counter"><span class="k">حصص الشهر الحالي</span><span class="v" id="subc-total">—</span></div>
+            <div class="sub-counter"><span class="k">حضور مسجل</span><span class="v u" id="subc-used">—</span></div>
+            <div class="sub-counter"><span class="k">حصص متبقية</span><span class="v r" id="subc-remaining">—</span></div>
+          </div>
+          <div class="sub-section-title">حصص الأساتذة — الشهر الحالي</div>
+          <div class="sub-teachers" id="sub-teachers"></div>
+          <div class="sub-section-title">سجل حضور هذا الشهر</div>
+          <div class="sub-timeline" id="sub-timeline"></div>
+        </div>
       </div>
     </section>
 
@@ -476,7 +549,7 @@
           <div class="fact"><span class="k">التاريخ والوقت</span><span class="v time-chip" id="sv-datetime">—</span></div>
         </div>
         <button class="reset-btn" id="sv-reset" type="button">↩️ مسح بطاقة أخرى</button>
-        <div class="succ-hint">سيتم إعادة تعيين الشاشة تلقائياً بعد قليل</div>
+        <div class="succ-hint">سيتم العودة تلقائياً إلى بطاقة الطالب لتسجيل مواد أخرى</div>
       </div>
     </section>
   </main>
@@ -497,6 +570,8 @@
   'use strict';
 
   var $ = function (id) { return document.getElementById(id); };
+
+  SubscriptionService.init(SUPABASE_URL, SUPABASE_KEY);
 
   // ── Constants ──────────────────────────────────────────
   var ALGERIA_TZ = 'Africa/Algiers';
@@ -538,6 +613,10 @@
   var teacherMap = null;
   var successTimer = null;
   var authState = { signedIn: false, tried: false, reason: '' };
+  var currentSub = null;
+  var subState = { active: false, reason: '', period: null, today: '' };
+  var subEvents = [];
+  var attendedToday = {};
 
   // ── Firebase init flag check ───────────────────────────
   if (!fbReady) {
@@ -923,6 +1002,21 @@
     $('subject-list').innerHTML = '';
     $('st-avatar').src = 'icons/student.png';
 
+    // subscription panel
+    currentSub = null;
+    subState = { active: false, reason: '', period: null, today: '' };
+    subEvents = [];
+    attendedToday = {};
+    $('sub-badge').textContent = '—';
+    $('sub-badge').className = 'sub-badge';
+    $('sub-status').textContent = 'جارٍ تحميل الاشتراك…';
+    $('month-cards').innerHTML = '';
+    $('subc-total').textContent = '—';
+    $('subc-used').textContent = '—';
+    $('subc-remaining').textContent = '—';
+    $('sub-teachers').innerHTML = '';
+    $('sub-timeline').innerHTML = '';
+
     // scan card state + any open modal
     var card = $('scan-card');
     if (card) card.classList.remove('verified', 'rejected');
@@ -937,6 +1031,10 @@
     currentScanValue = '';
     subjectPairs = [];
     attending = false;
+    currentSub = null;
+    subState = { active: false, reason: '', period: null, today: '' };
+    subEvents = [];
+    attendedToday = {};
     $('last-read').textContent = '';
     setPill('جهاز الماسح جاهز', true);
     switchView('ready');
@@ -1003,6 +1101,17 @@
     if (student.institution) tags.push('<span class="tag">' + esc(student.institution) + '</span>');
     $('st-tags').innerHTML = tags.join('');
 
+    // real attendance recorded today (to mark already-recorded subjects)
+    attendedToday = {};
+    try {
+      var todayRecs = await AttendanceService.getRecords({ studentId: student.id, date: AttendanceService.today() });
+      todayRecs.forEach(function (r) {
+        if (r.subjectId && r.teacherId) attendedToday[r.subjectId + '|' + r.teacherId] = true;
+      });
+    } catch (e) { console.warn('[ATTENDANCE] load today attendance failed', e); }
+
+    await loadSubscription(student);
+
     subjectPairs = await resolveSubjects(student);
     $('subj-count').textContent = subjectPairs.length;
 
@@ -1023,8 +1132,12 @@
       var teacherLine = p.teacherName
         ? 'الأستاذ: <b>' + esc(p.teacherName) + '</b>'
         : 'لا يتوفر أستاذ مسجل لهذه المادة';
+      var done = p.subjectId && p.teacherId ? !!attendedToday[p.subjectId + '|' + p.teacherId] : false;
+      var btn = done
+        ? '<button class="record-btn recorded" type="button" disabled>✓ تم التسجيل</button>'
+        : '<button class="record-btn" id="rec-btn-' + i + '" type="button" onclick="window.__mark(' + i + ')">تسجيل الحضور</button>';
       html +=
-        '<div class="subject-card" id="subj-card-' + i + '">' +
+        '<div class="subject-card' + (done ? ' recorded' : '') + '" id="subj-card-' + i + '">' +
           '<div class="subject-tile">' + esc(p.icon) + '</div>' +
           '<div class="subject-info">' +
             '<div class="subject-name">' + esc(p.subjectName || '—') + '</div>' +
@@ -1033,10 +1146,164 @@
               '<span>' + teacherLine + '</span>' +
             '</div>' +
           '</div>' +
-          '<button class="record-btn" id="rec-btn-' + i + '" type="button" onclick="window.__mark(' + i + ')">تسجيل الحضور</button>' +
+          btn +
         '</div>';
     }
     $('subject-list').innerHTML = html;
+  }
+
+  // ── Subscription transparency panel ────────────────────
+  async function loadSubscription(student) {
+    var today = SubscriptionService.today();
+    subState.today = today;
+    currentSub = null;
+    subEvents = [];
+
+    var data = null;
+    try {
+      data = await SubscriptionService.getActiveSubscription(student.id, today);
+    } catch (e) { console.warn('[ATTENDANCE] loadSubscription failed', e); }
+
+    if (!data || !data.subscription) {
+      currentSub = null;
+      subState = { active: false, reason: 'no_subscription', period: null, today: today, used: 0, total: 0, remaining: 0 };
+      $('sub-badge').textContent = 'لا يوجد اشتراك';
+      $('sub-badge').className = 'sub-badge no';
+      $('sub-status').textContent = 'هذا الطالب لا يملك اشتراكاً نشطاً — يرجى مراجعة الإدارة لتفعيل الاشتراك قبل تسجيل الحضور.';
+      $('month-cards').innerHTML = '';
+      $('subc-total').textContent = '—';
+      $('subc-used').textContent = '—';
+      $('subc-remaining').textContent = '—';
+      $('sub-teachers').innerHTML = '<div class="sub-empty">لا يوجد اشتراك لحساب حصص الأساتذة</div>';
+      $('sub-timeline').innerHTML = '<div class="sub-empty">لا توجد حصص مسجلة</div>';
+      return;
+    }
+
+    currentSub = data;
+    var periods = data.periods || [];
+    var period = SubscriptionService.activePeriod(periods, today) || null;
+
+    var cardsHtml = '';
+    for (var i = 0; i < periods.length; i++) {
+      var p = periods[i];
+      var isActive = period && period.id === p.id;
+      var full = (p.used_sessions || 0) >= (p.total_sessions || 0);
+      var pct = p.total_sessions ? Math.round(((p.used_sessions || 0) / p.total_sessions) * 100) : 0;
+      cardsHtml +=
+        '<div class="month-card' + (isActive ? ' active' : '') + (full ? ' full' : '') + '">' +
+          '<div class="m-idx">' + (p.month_number || i + 1) + '</div>' +
+          '<div class="m-main">' +
+            '<div class="m-name">الشهر ' + (p.month_number || i + 1) + (isActive ? ' — الحالي' : '') + '</div>' +
+            '<div class="m-range">' + esc(SubscriptionService.fmtAr(p.start_date)) + ' → ' + esc(SubscriptionService.fmtAr(p.end_date, true)) + '</div>' +
+          '</div>' +
+          '<div class="m-usage"><span class="u">' + (p.used_sessions || 0) + '</span> / ' + (p.total_sessions || 0) + '</div>' +
+          '<div class="m-progress"><i style="width:' + pct + '%"></i></div>' +
+        '</div>';
+    }
+    $('month-cards').innerHTML = cardsHtml || '<div class="sub-empty">لا توجد أشهر محددة للاشتراك</div>';
+
+    var recs = [];
+    try {
+      recs = await AttendanceService.getRecords({ studentId: student.id, subscriptionPeriodId: period ? period.id : '' });
+    } catch (e) { console.warn('[ATTENDANCE] loadSubscription events failed', e); }
+    subEvents = recs;
+
+    if (period) {
+      var used = period.used_sessions || 0;
+      var total = period.total_sessions || SubscriptionService.SESSIONS_PER_MONTH;
+      var remaining = Math.max(0, total - used);
+      subState = { active: true, reason: '', period: period, today: today, used: used, total: total, remaining: remaining };
+      $('sub-badge').textContent = remaining > 0 ? 'اشتراك نشط' : 'اكتملت حصص الشهر';
+      $('sub-badge').className = 'sub-badge ' + (remaining > 0 ? 'ok' : 'full');
+      $('sub-status').innerHTML = 'الشهر الحالي: <b>' + esc(SubscriptionService.fmtAr(period.start_date)) + ' → ' + esc(SubscriptionService.fmtAr(period.end_date, true)) + '</b>' +
+        (remaining > 0 ? ' — يمكن تسجيل الحضور.' : ' — تم استهلاك كل حصص هذا الشهر.');
+      $('subc-total').textContent = total;
+      $('subc-used').textContent = used;
+      $('subc-remaining').textContent = remaining;
+      renderSubTeacherCounters(recs, period);
+      renderSubTimeline(recs);
+    } else {
+      var allUsed = 0, allTotal = 0;
+      for (var j = 0; j < periods.length; j++) { allUsed += periods[j].used_sessions || 0; allTotal += periods[j].total_sessions || 0; }
+      subState = { active: false, reason: 'expired', period: null, today: today, used: allUsed, total: allTotal, remaining: 0 };
+      $('sub-badge').textContent = 'انتهى الاشتراك';
+      $('sub-badge').className = 'sub-badge no';
+      $('sub-status').textContent = 'انتهى الاشتراك — لا يمكن تسجيل حضور جديد حتى يتم تجديد الاشتراك لدى الإدارة.';
+      $('subc-total').textContent = allTotal || '—';
+      $('subc-used').textContent = allUsed || '—';
+      $('subc-remaining').textContent = '0';
+      renderSubTeacherCounters(recs, null);
+      renderSubTimeline(recs);
+    }
+  }
+
+  function renderSubTeacherCounters(recs, period) {
+    var el = $('sub-teachers');
+    if (!period) { el.innerHTML = '<div class="sub-empty">لا يوجد شهر حالي لحساب حصص الأساتذة</div>'; return; }
+    var map = {};
+    recs.forEach(function (r) {
+      if (!r.teacherName) return;
+      var k = r.teacherName;
+      if (!map[k]) map[k] = { teacher: r.teacherName, subject: r.subjectName || '', count: 0 };
+      map[k].count++;
+    });
+    var names = Object.keys(map);
+    if (!names.length) { el.innerHTML = '<div class="sub-empty">لا توجد حصص مسجلة هذا الشهر بعد</div>'; return; }
+    var html = '';
+    names.forEach(function (k) {
+      var t = map[k];
+      var pct = period.total_sessions ? Math.min(100, Math.round((t.count / period.total_sessions) * 100)) : 0;
+      html +=
+        '<div class="sub-teacher">' +
+          '<div class="t-name">' + esc(t.teacher) + '</div>' +
+          '<div class="t-bar"><i style="width:' + pct + '%"></i></div>' +
+          '<div class="t-count"><span class="u">' + t.count + '</span> حصة</div>' +
+        '</div>';
+    });
+    el.innerHTML = html;
+  }
+
+  function renderSubTimeline(recs) {
+    var el = $('sub-timeline');
+    if (!recs || !recs.length) { el.innerHTML = '<div class="sub-empty">لا توجد حصص مسجلة هذا الشهر بعد</div>'; return; }
+    var html = '';
+    recs.forEach(function (r) {
+      html +=
+        '<div class="sub-event">' +
+          '<div class="e-dot"></div>' +
+          '<div class="e-main">' +
+            '<div class="e-subject">' + esc(r.subjectName || '—') + '</div>' +
+            '<div class="e-teacher">' + esc(r.teacherName || '—') + ' — ' + esc(r.date || '') + '</div>' +
+          '</div>' +
+          '<div class="e-time">' + esc(r.checkInTime || r.time || '—') + '</div>' +
+        '</div>';
+    });
+    el.innerHTML = html;
+  }
+
+  function subGate() {
+    if (subState.active && subState.remaining > 0) return null;
+    var title = 'تسجيل غير مسموح';
+    var msg;
+    if (!subState.active && subState.reason === 'expired') {
+      msg = 'انتهى اشتراك هذا الطالب — لا يمكن تسجيل حضور جديد.<br>يرجى تجديد الاشتراك لدى الإدارة.';
+    } else if (!subState.active) {
+      msg = 'لا يوجد اشتراك نشط لهذا الطالب.<br>يرجى تفعيل الاشتراك لدى الإدارة قبل تسجيل الحضور.';
+    } else {
+      msg = 'تم استهلاك كل حصص هذا الشهر (' + subState.used + '/' + subState.total + ').<br>يرجى تجديد الاشتراك لدى الإدارة.';
+    }
+    return { title: title, msg: msg };
+  }
+
+  async function returnToStudent() {
+    if (!currentStudent) { goReady(); return; }
+    try {
+      await loadSubscription(currentStudent);
+      await showStudent(currentStudent);
+    } catch (e) {
+      console.error('[ATTENDANCE] returnToStudent error:', e);
+      goReady();
+    }
   }
 
   function setRecordBusy(busy) {
@@ -1055,6 +1322,9 @@
     var pair = subjectPairs[idx];
     if (pair.recording) { openModal('info', 'تسجيل مسبق موجود', 'تم تسجيل حضور هذا الطالب في هذه المادة مسبقاً.'); return; }
 
+    var gate = subGate();
+    if (gate) { openModal('warn', gate.title, gate.msg); return; }
+
     var date = AttendanceService.today();
     var dup = await AttendanceService.isDuplicate(currentStudent.id, pair.subjectId, date, null, pair.teacherId);
     if (dup) { showAlreadyAttended(pair); return; }
@@ -1071,9 +1341,17 @@
         openModal('warn', '⚠️ تعذر الاتصال بنظام الحضور', 'تعذر التحقق من جلسة النظام. حاول مرة أخرى.');
         return;
       }
+      var subCtx = null;
+      if (currentSub && currentSub.subscription && subState.period) {
+        subCtx = {
+          subscriptionId: currentSub.subscription.id,
+          subscriptionPeriodId: subState.period.id,
+          monthNumber: subState.period.month_number || 0
+        };
+      }
       var res = await AttendanceService.recordSingle(
         currentStudent.id, pair.teacherId, pair.teacherName,
-        pair.subjectId, pair.subjectName, currentScanValue
+        pair.subjectId, pair.subjectName, currentScanValue, subCtx
       );
       if (res && res.success) {
         pair.recording = true;
@@ -1081,6 +1359,14 @@
         if (card) card.classList.add('recorded');
         setRecordBusy(false);
         subjectBusyIdx = -1;
+        if (subCtx) {
+          var inc = await SubscriptionService.incrementPeriodUsage(subCtx.subscriptionPeriodId, 1);
+          if (inc && inc.used_sessions != null) {
+            subState.used = inc.used_sessions;
+            subState.remaining = Math.max(0, subState.total - subState.used);
+            subState.period.used_sessions = inc.used_sessions;
+          }
+        }
         showSuccess(pair, res.doc);
       } else if (res && res.reason === 'duplicate') {
         setRecordBusy(false);
@@ -1124,7 +1410,7 @@
     $('sv-datetime').textContent = fmtAlgeriaTime(new Date()) + ' — ' + fmtAlgeriaDate(new Date());
     switchView('success');
     clearTimeout(successTimer);
-    successTimer = setTimeout(goReady, 5000);
+    successTimer = setTimeout(returnToStudent, 4000);
   }
 
   // ── Modal ──────────────────────────────────────────────

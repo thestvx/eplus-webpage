@@ -16,6 +16,7 @@
   <script src="js/subjectService.js?v=3"></script>
   <script src="js/attendanceService.js?v=2"></script>
   <script src="js/teacherFinance.js?v=1"></script>
+  <script src="js/subscriptionService.js?v=1"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
@@ -1681,7 +1682,12 @@
         <span class="nav-label">أساتذة الدعم المدرسي</span>
         <span class="nav-badge" id="nav-badge-sr-teachers">0</span>
       </div>
-      <a href="barcode-test.html" class="nav-item">
+      <div class="nav-item" onclick="switchNavSection('subscriptions')">
+        <span class="nav-icon">📅</span>
+        <span class="nav-label">الاشتراكات الشهرية</span>
+        <span class="nav-badge" id="nav-badge-subscriptions">0</span>
+      </div>
+      <a href="barcode-test.html" class="nav-item" style="display:none" data-hidden="barcode-test">
         <span class="nav-icon">🧪</span>
         <span class="nav-label">اختبار الباركود SP-1160</span>
       </a>
@@ -2978,6 +2984,80 @@
         </div>
       </div>
 
+      <!-- ===== SECTION: SUBSCRIPTIONS ===== -->
+      <div id="section-subscriptions" style="display:none">
+        <div class="section-header">
+          <div class="section-title">
+            <div class="section-icon">📅</div>
+            <span>الاشتراكات الشهرية</span>
+          </div>
+          <button class="btn-sm" onclick="subxResetEditor()" style="background:linear-gradient(135deg,var(--primary),#8b5cf6);color:#fff;border:none;padding:8px 20px;font-weight:800">➕ اشتراك جديد</button>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom:24px">
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--primary-light)">📅</div></div><div class="stat-num" id="subx-total">0</div><div class="stat-label">إجمالي الاشتراكات</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(16,185,129,0.1)">🟢</div></div><div class="stat-num" id="subx-active" style="color:var(--success)">0</div><div class="stat-label">اشتراكات نشطة</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(245,158,11,0.1)">💰</div></div><div class="stat-num" id="subx-revenue" style="direction:ltr">0 دج</div><div class="stat-label">إيرادات الأشهر</div></div>
+        </div>
+
+        <!-- Editor -->
+        <div class="panel" style="padding:20px;margin-bottom:20px">
+          <div style="font-size:15px;font-weight:900;margin-bottom:14px;display:flex;align-items:center;gap:8px">🧾 محرر الاشتراك</div>
+          <div style="display:flex;flex-wrap:wrap;gap:14px">
+            <div style="flex:1;min-width:240px">
+              <label style="font-size:12px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:6px">الطالب (التسجيل النهائي)</label>
+              <input class="inp" id="subx-student" list="subx-students" placeholder="اكتب اسم الطالب أو رقم التسجيل..." style="width:100%" oninput="subxOnStudentInput()">
+              <datalist id="subx-students"></datalist>
+            </div>
+            <div style="min-width:200px">
+              <label style="font-size:12px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:6px">مدة الاشتراك</label>
+              <select class="inp" id="subx-months" style="width:100%" onchange="subxPreview()">
+                <option value="1">شهر واحد — 2000 دج / 8 حصص</option>
+                <option value="2">شهران — 4000 دج / 16 حصة</option>
+                <option value="3">3 أشهر — 6000 دج / 24 حصة</option>
+              </select>
+            </div>
+            <div style="min-width:200px">
+              <label style="font-size:12px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:6px">تاريخ بداية الاشتراك</label>
+              <input class="inp" type="date" id="subx-start" style="width:100%" onchange="subxPreview()">
+            </div>
+            <div style="display:flex;align-items:flex-end">
+              <button class="btn-sm" id="subx-save" onclick="subxCreate()" style="background:linear-gradient(135deg,#059669,#10b981);color:white;border:none;padding:11px 26px;border-radius:10px;font-weight:800;cursor:pointer">💳 تأكيد الدفع والتفعيل</button>
+            </div>
+          </div>
+
+          <!-- Preview -->
+          <div id="subx-preview" style="margin-top:16px;border:1.5px dashed var(--border);border-radius:12px;padding:14px;background:var(--bg,#f8f9fc)">
+            <div style="font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:10px">معاينة الاشتراك — اختر طالباً لعرض التفاصيل</div>
+            <div id="subx-preview-body"></div>
+          </div>
+        </div>
+
+        <!-- List -->
+        <div class="panel" style="padding:0;overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border)">
+            <div style="font-size:14px;font-weight:900">آخر الاشتراكات</div>
+            <button class="tbl-action" onclick="subxLoadList()" style="font-size:12px;border-color:rgba(245,158,11,0.3);color:#d97706">🔄 تحديث</button>
+          </div>
+          <div class="tbl-wrap" style="border:none">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>الطالب</th>
+                  <th>رقم التسجيل</th>
+                  <th>المدة</th>
+                  <th>المبلغ</th>
+                  <th>البداية</th>
+                  <th>النهاية</th>
+                  <th>الحالة</th>
+                </tr>
+              </thead>
+              <tbody id="subx-tbody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">جارٍ التحميل…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- ===== SECTION: SUPPORT TEACHERS ===== -->
       <div id="section-support-teachers" style="display:none">
         <div class="section-header">
@@ -4070,7 +4150,7 @@ onAuthStateChanged(auth, async user => {
     ls.classList.add('hidden');
     setTimeout(() => ls.style.display = 'none', 600);
     dash.style.display = 'flex';
-    const uname = empCfg ? empCfg.name : user.email.split('@')[0];
+    const uname = empCfg ? empCfg.name : String(user.email || '').split('@')[0] || 'مشرف';
     document.getElementById('admin-name').textContent = uname;
     window.setGreeting(uname);
     document.querySelector('.admin-role').textContent = empCfg ? ('👔 ' + empCfg.role) : 'مشرف النظام';
@@ -4225,7 +4305,7 @@ document.addEventListener('click', (e) => {
 
 // NAV SWITCHING (sidebar-based, not tabs)
 window.switchNavSection = (section) => {
-  ['home','announcements','summer','students','teachers','finance','settings','notifications','support-registrations','support-teachers'].forEach(s => {
+  ['home','announcements','summer','students','teachers','finance','settings','notifications','support-registrations','support-teachers','subscriptions'].forEach(s => {
     const el = document.getElementById('section-' + s);
     if (el) el.style.display = s === section ? 'block' : 'none';
   });
@@ -4264,6 +4344,9 @@ window.switchNavSection = (section) => {
   }
   if (section === 'support-teachers') {
     if (typeof srtLoadData === 'function') srtLoadData();
+  }
+  if (section === 'subscriptions') {
+    if (typeof subxLoadAll === 'function') subxLoadAll();
   }
 };
 
@@ -21853,6 +21936,228 @@ window.verifyAttendanceIntegrity = async () => {
 //  SUPABASE MIGRATION
 // ═══════════════════════════════════════════════════════════
 const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
+SubscriptionService.init(SUPABASE_URL, SUPABASE_KEY);
+
+// ═══════════════════════════════════════════════════════════
+//  Subscription Editor (الاشتراكات الشهرية — إدارة)
+//  معاينة الأشهر + دفعة Idempotent عبر payment_id الفريد
+// ═══════════════════════════════════════════════════════════
+(function () {
+  const $x = (id) => document.getElementById(id);
+  const AR_MONTHS = ['يناير','فبراير','مارس','أبريل','ماي','جوان','جويلية','أوت','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  let regs = [];
+  let selectedStudent = null;
+
+  function fmtAr(d) {
+    if (!d || !/^\d{4}-\d{2}-\d{2}/.test(d)) return d || '—';
+    const p = d.slice(0, 10).split('-');
+    return +p[2] + ' ' + AR_MONTHS[+p[1] - 1] + ' ' + p[0];
+  }
+  function subxHeaders(json) {
+    const h = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    if (json) h['Content-Type'] = 'application/json';
+    return h;
+  }
+
+  window.subxResetEditor = function () {
+    selectedStudent = null;
+    $x('subx-student').value = '';
+    $x('subx-months').value = '1';
+    $x('subx-start').value = SubscriptionService.today();
+    subxPreview();
+  };
+
+  async function loadRegs() {
+    if (regs.length) return regs;
+    try {
+      const rows = await TeacherFinance.loadConfirmedRegistrations();
+      regs = rows || [];
+    } catch (e) { regs = []; }
+    const dl = $x('subx-students');
+    dl.innerHTML = '';
+    regs.forEach(r => {
+      const name = ((r.first_name || '') + ' ' + (r.last_name || '')).trim() || r.id;
+      const opt = document.createElement('option');
+      opt.value = name + '  —  ' + r.id;
+      dl.appendChild(opt);
+    });
+    return regs;
+  }
+
+  window.subxOnStudentInput = function () {
+    const v = $x('subx-student').value.trim();
+    selectedStudent = null;
+    if (!v) { subxPreview(); return; }
+    loadRegs().then(() => {
+      const low = v.toLowerCase();
+      const byId = regs.find(r => String(r.id).toLowerCase() === low);
+      const byName = regs.find(r => ((r.first_name || '') + ' ' + (r.last_name || '')).toLowerCase() === low);
+      if (byId) selectedStudent = byId;
+      else if (byName) selectedStudent = byName;
+      else {
+        const tag = '—';
+        const parts = v.split('—').map(s => s.trim());
+        if (parts.length > 1) {
+          const id = parts[parts.length - 1].toLowerCase();
+          const found = regs.find(r => String(r.id).toLowerCase() === id);
+          if (found) selectedStudent = found;
+        }
+      }
+      subxPreview();
+    });
+  };
+
+  window.subxPreview = function () {
+    const months = parseInt($x('subx-months').value, 10) || 1;
+    const start = $x('subx-start').value || SubscriptionService.today();
+    const periods = SubscriptionService.buildPeriods(start, months);
+    const totals = SubscriptionService.computeSubscriptionTotals(periods);
+    const price = months === 1 ? 2000 : months === 2 ? 4000 : 6000;
+
+    let html = '';
+    if (selectedStudent) {
+      const name = ((selectedStudent.first_name || '') + ' ' + (selectedStudent.last_name || '')).trim();
+      html += '<div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:10px">👤 ' + escX(name) + ' — <span style="font-family:monospace;color:var(--text-muted)">' + escX(selectedStudent.id) + '</span></div>';
+    }
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12.5px">' +
+      '<thead><tr style="color:var(--text-muted);font-weight:800"><th style="text-align:right;padding:4px 6px">الشهر</th><th style="text-align:right;padding:4px 6px">البداية</th><th style="text-align:right;padding:4px 6px">النهاية</th><th style="text-align:right;padding:4px 6px">الحصص</th><th style="text-align:right;padding:4px 6px">الحالة</th></tr></thead><tbody>';
+    periods.forEach((p, i) => {
+      html += '<tr style="border-top:1px solid var(--border)"><td style="padding:6px;font-weight:800">الشهر ' + (i + 1) + '</td>' +
+        '<td style="padding:6px">' + fmtAr(p.startDate) + '</td>' +
+        '<td style="padding:6px">' + fmtAr(p.endDate) + '</td>' +
+        '<td style="padding:6px">' + p.totalSessions + '</td>' +
+        '<td style="padding:6px">' + (p.status === 'upcoming' ? '⏳ لم يبدأ' : p.status === 'completed' ? '✅ اكتمل' : '🟢 جاري') + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div style="margin-top:10px;padding:10px 12px;background:var(--primary-light);border-radius:10px;font-size:13px;font-weight:800">' +
+      'إجمالي الحصص: <b>' + totals.totalSessions + '</b> — المبلغ الإجمالي: <b style="color:#059669">' + SubscriptionService.fmtPrice(price) + '</b></div>';
+    html += '<div style="margin-top:8px;font-size:11.5px;color:var(--text-muted);font-weight:700">⚠️ عند التأكيد تُسجَّل دفعة واحدة idempotent (payment_id فريد) ويُفعَّل الاشتراك فوراً.</div>';
+    $x('subx-preview-body').innerHTML = html;
+  };
+
+  async function subxFindByPaymentId(pid) {
+    try {
+      const res = await fetch(SUPABASE_URL + '/rest/v1/student_subscriptions?select=*&payment_id=eq.' + encodeURIComponent(pid), { headers: subxHeaders() });
+      if (!res.ok) return null;
+      const d = await res.json();
+      return Array.isArray(d) && d.length ? d[0] : null;
+    } catch (e) { return null; }
+  }
+
+  window.subxCreate = async function () {
+    if (!selectedStudent) { srShowToast('اختر الطالب من قائمة التسجيلات أولاً', 'error'); return; }
+    const months = parseInt($x('subx-months').value, 10) || 1;
+    const start = $x('subx-start').value || SubscriptionService.today();
+    const btn = $x('subx-save');
+    btn.disabled = true;
+
+    try {
+      const existing = await SubscriptionService.getActiveSubscription(selectedStudent.id, start);
+      if (existing && existing.subscription) {
+        btn.disabled = false;
+        const ok = await cmConfirm('تنبيه',
+          'هذا الطالب لديه اشتراك نشط في هذه الفترة (' + existing.subscription.id + ').\nهل تريد إنشاء اشتراك جديد مع دفعة جديدة؟', '⚠️');
+        if (!ok) return;
+        btn.disabled = true;
+      }
+      const paymentId = 'SUBPAY-' + selectedStudent.id + '-' + start + '-' + months;
+      const created = await SubscriptionService.createSubscription({
+        studentId: selectedStudent.id,
+        months: months,
+        startDate: start,
+        paymentId: paymentId,
+        notes: 'أنشئ من لوحة الإدارة — الدفعة ' + paymentId
+      });
+      if (created && created.subscription) {
+        srShowToast('✅ تم تفعيل الاشتراك وتسجيل الدفعة (id=' + created.subscription.id + ')', 'success');
+        subxLoadAll();
+        subxPreview();
+      }
+    } catch (e) {
+      const msg = String((e && e.message) || e);
+      if (msg.indexOf('23505') >= 0 || /duplicate key|duplicate/i.test(msg)) {
+        const dup = await subxFindByPaymentId('SUBPAY-' + selectedStudent.id + '-' + start + '-' + months);
+        if (dup) {
+          srShowToast('🔁 الدفعة مسجلة مسبقاً — الاشتراك ' + dup.id + ' موجود (عملية Idempotent، لم تُسجَّل دفعة مكررة)', 'success');
+          subxLoadAll();
+          subxPreview();
+        } else {
+          srShowToast('تعذر الإنشاء — اشتراك مكرر محتمل. تفقد قائمة الاشتراكات.', 'error');
+        }
+      } else {
+        srShowToast('تعذر إنشاء الاشتراك: ' + msg, 'error');
+      }
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  function escX(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  window.subxLoadAll = async function () {
+    const all = await subxLoadList();
+    if (!all) return;
+    const today = SubscriptionService.today();
+    let active = 0, revenue = 0;
+    all.forEach(s => {
+      if (s.status !== 'cancelled') revenue += (s.total_price || 0);
+      if (s.status !== 'cancelled' && today >= (s.start_date || '') && today <= (s.end_date || '')) active++;
+    });
+    $x('subx-total').textContent = all.length;
+    $x('subx-active').textContent = active;
+    $x('subx-revenue').textContent = revenue.toLocaleString('ar-DZ') + ' دج';
+    const badge = document.getElementById('nav-badge-subscriptions');
+    if (badge) badge.textContent = active;
+  };
+
+  window.subxLoadList = async function () {
+    try {
+      const res = await fetch(SUPABASE_URL + '/rest/v1/student_subscriptions?select=*&order=created_at.desc&limit=50', { headers: subxHeaders() });
+      if (!res.ok) { $x('subx-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#d97706;padding:18px;font-size:13px">⚠️ جدول student_subscriptions غير موجود بعد — نفّذ supabase-migration.sql في Supabase Dashboard.</td></tr>'; return null; }
+      const all = await res.json();
+      const rows = Array.isArray(all) ? all : [];
+      if (!rows.length) {
+        $x('subx-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">لا توجد اشتراكات بعد — أنشئ أول اشتراك من المحرر أعلاه.</td></tr>';
+        return rows;
+      }
+      await loadRegs();
+      const nameOf = (id) => {
+        const r = regs.find(rr => String(rr.id) === String(id));
+        return r ? ((r.first_name || '') + ' ' + (r.last_name || '')).trim() : (id || '—');
+      };
+      let html = '';
+      rows.forEach(s => {
+        const st = s.status === 'cancelled' ? '<span style="color:#dc2626">ملغى</span>' : (todayInRange(s) ? '<span style="color:#059669">🟢 نشط</span>' : '<span style="color:var(--text-muted)">انتهى</span>');
+        html += '<tr>' +
+          '<td style="font-weight:800">' + escX(nameOf(s.student_id)) + '</td>' +
+          '<td style="font-family:monospace;font-size:12px;color:var(--text-muted)">' + escX(s.student_id) + '</td>' +
+          '<td>' + (s.months || '—') + ' شهر</td>' +
+          '<td style="direction:ltr">' + (s.total_price || 0).toLocaleString('ar-DZ') + ' دج</td>' +
+          '<td>' + fmtAr(s.start_date) + '</td>' +
+          '<td>' + fmtAr(s.end_date) + '</td>' +
+          '<td>' + st + '</td></tr>';
+      });
+      $x('subx-tbody').innerHTML = html;
+      return rows;
+    } catch (e) {
+      $x('subx-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#dc2626;padding:18px;font-size:13px">تعذر تحميل الاشتراكات: ' + escX(e.message || e) + '</td></tr>';
+      return null;
+    }
+  };
+
+  function todayInRange(s) {
+    const today = SubscriptionService.today();
+    return today >= (s.start_date || '') && today <= (s.end_date || '');
+  }
+
+  window.addEventListener('DOMContentLoaded', function () {
+    loadRegs();
+    $x('subx-start').value = SubscriptionService.today();
+  });
+})();
 
 window.migrateToSupabase = function() {
   document.getElementById('migrateModal').classList.add('open');

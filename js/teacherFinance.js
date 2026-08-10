@@ -39,7 +39,14 @@ window.TeacherFinance = (function () {
 
   async function _list(table, query) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*${query || ''}`, { headers: _headers() });
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' on ' + table);
+    if (!res.ok) {
+      // PGRST205 = relation does not exist — migrations may not be applied yet
+      if (res.status === 404) {
+        console.warn('[TeacherFinance] table "' + table + '" غير موجودة بعد — نفّذ supabase-migration.sql في Supabase Dashboard.');
+        return [];
+      }
+      throw new Error('HTTP ' + res.status + ' on ' + table);
+    }
     return res.json();
   }
   async function _upsert(table, rows) {

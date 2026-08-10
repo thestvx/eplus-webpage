@@ -177,7 +177,8 @@ const AttendanceService = (function () {
       studentId, studentName, teacherId, teacherName,
       subjectId, subjectName, date, checkInTime,
       status, sessionNumber, level, stream, institution,
-      barcodeValue
+      barcodeValue,
+      subscriptionId, subscriptionPeriodId, monthNumber
     } = data;
 
     const recDate = date || today();
@@ -195,6 +196,7 @@ const AttendanceService = (function () {
       subjectId: subjectId,
       subjectName: subjectName || '',
       date: recDate,
+      time: recTime,
       checkInTime: recTime,
       checkOutTime: null,
       status: status || 'present',
@@ -203,6 +205,9 @@ const AttendanceService = (function () {
       stream: stream || '',
       institution: institution || '',
       barcodeValue: barcodeValue || '',
+      subscriptionId: subscriptionId || '',
+      subscriptionPeriodId: subscriptionPeriodId || '',
+      monthNumber: monthNumber || 0,
       createdAt: new Date().toISOString(),
       serverTime: _serverTimestamp(),
       updatedAt: null
@@ -276,6 +281,8 @@ const AttendanceService = (function () {
     if (filters.date) q = q.where('date', '==', filters.date);
     if (filters.subjectId) q = q.where('subjectId', '==', filters.subjectId);
     if (filters.level) q = q.where('level', '==', filters.level);
+    if (filters.subscriptionId) q = q.where('subscriptionId', '==', filters.subscriptionId);
+    if (filters.subscriptionPeriodId) q = q.where('subscriptionPeriodId', '==', filters.subscriptionPeriodId);
 
     const snap = await q.get();
     let records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -409,7 +416,7 @@ const AttendanceService = (function () {
 
   // ── Single Subject Record (from UI) ───────────────────
 
-  async function recordSingle(studentId, teacherId, teacherName, subjectId, subjectName, barcodeValue) {
+  async function recordSingle(studentId, teacherId, teacherName, subjectId, subjectName, barcodeValue, subCtx) {
     const student = await RegistrationService.getById(studentId);
     if (!student) return { success: false, reason: 'student_not_found' };
     if (!RegistrationService.isValidConfirmed(student)) return { success: false, reason: 'invalid_registration' };
@@ -424,7 +431,10 @@ const AttendanceService = (function () {
       barcodeValue: barcodeValue || '',
       level: student.level || '',
       stream: student.stream || '',
-      institution: student.institution || ''
+      institution: student.institution || '',
+      subscriptionId: (subCtx && subCtx.subscriptionId) || '',
+      subscriptionPeriodId: (subCtx && subCtx.subscriptionPeriodId) || '',
+      monthNumber: (subCtx && subCtx.monthNumber) || 0
     });
   }
 

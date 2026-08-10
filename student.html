@@ -10,8 +10,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="js/ean13.js"></script>
   <script src="js/studentCardRenderer.js?v=4"></script>
+  <script src="js/subscriptionService.js?v=1"></script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     :root{
@@ -200,6 +203,44 @@
     .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;opacity:0;transition:opacity 0.3s ease;backdrop-filter:blur(2px)}
     .drawer-overlay.open{display:block;opacity:1}
 
+    /* ═══ SUBSCRIPTION (شفافية الاشتراك الشهري) ═══ */
+    .sub-panel{background:var(--card);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);border:1px solid var(--border-light);margin-bottom:28px;animation:fadeSlideUp 0.5s ease both 0.3s}
+    .sub-panel .section-title{font-size:17px}
+    .sub-badge-st{display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:800}
+    .sub-badge-st.ok{background:var(--success-light);color:var(--success)}
+    .sub-badge-st.no{background:var(--warning-light);color:var(--warning)}
+    .sub-badge-st.full{background:var(--danger-light);color:var(--danger)}
+    .sub-status-line{font-size:13px;color:var(--text-muted);font-weight:600;margin-top:4px}
+    .sub-month-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:16px}
+    .sub-month-card{background:var(--bg);border:1px solid var(--border-light);border-radius:var(--radius-sm);padding:14px;cursor:pointer;transition:var(--transition)}
+    .sub-month-card:hover{border-color:var(--primary);box-shadow:var(--shadow-md)}
+    .sub-month-card.active{border-color:var(--primary);background:var(--primary-light)}
+    .sub-month-head{display:flex;align-items:center;gap:10px}
+    .sub-month-idx{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--primary),#8b5cf6);color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .sub-month-main{flex:1;min-width:0}
+    .sub-month-name{font-size:13px;font-weight:800;color:var(--text)}
+    .sub-month-range{font-size:11px;color:var(--text-muted);font-weight:600;margin-top:1px}
+    .sub-month-usage{font-size:12px;font-weight:900;color:var(--text);white-space:nowrap}
+    .sub-month-usage .u{color:var(--success)}
+    .sub-month-progress{width:100%;height:7px;border-radius:99px;background:var(--border);overflow:hidden;margin-top:9px}
+    .sub-month-progress>i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--primary),#8b5cf6);transition:width .6s ease}
+    .sub-month-detail{display:none;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border)}
+    .sub-month-card.open .sub-month-detail{display:block}
+    .sub-ev-list{display:flex;flex-direction:column;gap:7px}
+    .sub-ev{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--border-light);border-radius:var(--radius-xs);padding:8px 11px}
+    .sub-ev-dot{width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;box-shadow:0 0 0 3px var(--success-light)}
+    .sub-ev-main{flex:1;min-width:0}
+    .sub-ev-subj{font-size:12.5px;font-weight:800;color:var(--text)}
+    .sub-ev-teach{font-size:11px;color:var(--text-muted);font-weight:600}
+    .sub-ev-date{font-size:11px;font-weight:800;color:var(--primary);white-space:nowrap}
+    .sub-empty-msg{font-size:12.5px;color:var(--text-muted);font-weight:600;padding:8px 2px}
+    .sub-summary{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+    .sub-sum-card{background:var(--bg);border:1px solid var(--border-light);border-radius:var(--radius-xs);padding:10px 16px;text-align:center}
+    .sub-sum-card .k{font-size:11px;color:var(--text-muted);font-weight:700;display:block}
+    .sub-sum-card .v{font-size:18px;font-weight:900;color:var(--text);display:block;margin-top:2px}
+    .sub-sum-card .v.u{color:var(--success)}
+    .sub-sum-card .v.r{color:var(--primary)}
+
     /* ═══ RESPONSIVE ═══ */
     @media(max-width:1024px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:768px){
@@ -224,6 +265,111 @@
     const SP_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
     const SESSION_KEY='eplus_student_session';
     const SESSION_MAX_AGE=24*60*60*1000;
+
+    /* Firestore for real attendance + subscriptions */
+    let _fbReady=false;
+    try{
+      firebase.initializeApp({apiKey:"AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",authDomain:"eplus-center-39.firebaseapp.com",projectId:"eplus-center-39",storageBucket:"eplus-center-39.firebasestorage.app",messagingSenderId:"191532732034",appId:"1:191532732034:web:b11449a2f0595db5d02e9b"});
+      window._fdb=firebase.firestore();
+      _fbReady=true;
+    }catch(e){console.error('Firestore init error:',e);}
+    SubscriptionService.init(SP_URL,SP_KEY);
+
+    const SUB_AR_MONTHS=['يناير','فبراير','مارس','أبريل','ماي','جوان','جويلية','أوت','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+    function subFmtAr(d){
+      if(!d||!/^\d{4}-\d{2}-\d{2}/.test(d))return d||'—';
+      const p=d.slice(0,10).split('-');
+      return (+p[2])+' '+SUB_AR_MONTHS[(+p[1])-1]+' '+p[0];
+    }
+    function subEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+    async function fetchStudentAttendance(studentId){
+      if(!_fbReady)return[];
+      try{
+        const snap=await window._fdb.collection('support_attendance').where('studentId','==',studentId).get();
+        return snap.docs.map(d=>d.data());
+      }catch(e){console.warn('fetchStudentAttendance failed',e);return[];}
+    }
+
+    async function loadStudentSubscription(studentId){
+      const badge=document.getElementById('student-sub-badge');
+      const content=document.getElementById('student-sub-content');
+      if(!badge||!content)return;
+
+      let data=null;
+      try{data=await SubscriptionService.getActiveSubscription(studentId);}catch(e){console.warn('sub load failed',e);}
+
+      if(!data||!data.subscription){
+        badge.textContent='لا يوجد اشتراك';
+        badge.className='sub-badge-st no';
+        content.innerHTML='<div class="sub-status-line">لا يوجد اشتراك نشط لهذا الحساب حالياً — يمكنك متابعة المواد، وللاطلاع على تفاصيل حصصك الشهرية يرجى التواصل مع إدارة المركز.</div>';
+        return;
+      }
+
+      const today=SubscriptionService.today();
+      const periods=data.periods||[];
+      const activePeriod=SubscriptionService.activePeriod(periods,today)||null;
+
+      let events=[];
+      try{events=await fetchStudentAttendance(studentId);}catch(e){}
+      const inRange=(ev,p)=>ev&&ev.date&&p&&ev.date>=p.start_date&&ev.date<=p.end_date;
+
+      const totalEvents=events.length;
+      const monthEvents=periods.map(p=>events.filter(ev=>inRange(ev,p)));
+
+      let activeCount=0,revenueNote='';
+      periods.forEach(p=>{if(today>=p.start_date&&today<=p.end_date)activeCount++;});
+
+      const statusOk=!!activePeriod;
+      const activeUsed=activePeriod?(activePeriod.used_sessions||0):0;
+      const activeTotal=activePeriod?(activePeriod.total_sessions||SubscriptionService.SESSIONS_PER_MONTH):0;
+      const activeRemain=Math.max(0,activeTotal-activeUsed);
+
+      if(statusOk){
+        badge.textContent=activeRemain>0?'اشتراك نشط':'اكتملت حصص الشهر';
+        badge.className='sub-badge-st '+(activeRemain>0?'ok':'full');
+      }else{
+        badge.textContent='انتهى الاشتراك';
+        badge.className='sub-badge-st no';
+      }
+
+      let monthsHTML=periods.map((p,i)=>{
+        const used=p.used_sessions||0;
+        const total=p.total_sessions||SubscriptionService.SESSIONS_PER_MONTH;
+        const pct=total?Math.round((used/total)*100):0;
+        const isActive=activePeriod&&activePeriod.id===p.id;
+        const evs=monthEvents[i]||[];
+        let evHTML='';
+        if(!evs.length)evHTML='<div class="sub-empty-msg">لا توجد حصص مسجلة في هذا الشهر</div>';
+        else evHTML='<div class="sub-ev-list">'+evs.slice(0,20).map(ev=>
+          '<div class="sub-ev"><div class="sub-ev-dot"></div><div class="sub-ev-main"><div class="sub-ev-subj">'+subEsc(ev.subjectName||'—')+'</div><div class="sub-ev-teach">'+subEsc(ev.teacherName||'—')+'</div></div><div class="sub-ev-date">'+subFmtAr(ev.date)+' — '+subEsc(ev.checkInTime||ev.time||'—')+'</div></div>'
+        ).join('')+'</div>'+(evs.length>20?'<div class="sub-empty-msg">و '+ (evs.length-20) +' حصص أخرى…</div>':'');
+        return '<div class="sub-month-card'+(isActive?' active':'')+'" onclick="this.classList.toggle(\'open\')">'+
+          '<div class="sub-month-head"><div class="sub-month-idx">'+(p.month_number||(i+1))+'</div>'+
+          '<div class="sub-month-main"><div class="sub-month-name">الشهر '+(p.month_number||(i+1))+(isActive?' — الحالي':'')+'</div>'+
+          '<div class="sub-month-range">'+subFmtAr(p.start_date)+' → '+subFmtAr(p.end_date)+'</div></div>'+
+          '<div class="sub-month-usage"><span class="u">'+used+'</span> / '+total+'</div></div>'+
+          '<div class="sub-month-progress"><i style="width:'+pct+'%"></i></div>'+
+          '<div class="sub-month-detail">'+evHTML+'</div></div>';
+      }).join('');
+
+      let statusLine;
+      if(statusOk){
+        statusLine='الاشتراك ساري — الشهر الحالي: <b>'+subFmtAr(activePeriod.start_date)+' → '+subFmtAr(activePeriod.end_date)+'</b>.'+(activeRemain>0?' يمكنك حضور '+activeRemain+' حصة متبقية.':' تم استهلاك كل حصص هذا الشهر.');
+      }else{
+        statusLine='انتهى الاشتراك — لا يمكن تسجيل حضور جديد حتى التجديد لدى الإدارة.';
+      }
+
+      content.innerHTML=
+        '<div class="sub-status-line">'+statusLine+'</div>'+
+        '<div class="sub-summary">'+
+          '<div class="sub-sum-card"><span class="k">عدد الأشهر</span><span class="v">'+(data.subscription.months||periods.length)+'</span></div>'+
+          '<div class="sub-sum-card"><span class="k">إجمالي الحصص</span><span class="v">'+(data.subscription.total_sessions||periods.reduce((a,p)=>a+(p.total_sessions||0),0))+'</span></div>'+
+          '<div class="sub-sum-card"><span class="k">حضور الشهر الحالي</span><span class="v u">'+(statusOk?activeUsed:0)+'</span></div>'+
+          '<div class="sub-sum-card"><span class="k">متبقي الشهر الحالي</span><span class="v r">'+(statusOk?activeRemain:0)+'</span></div>'+
+        '</div>'+
+        '<div class="sub-month-grid">'+monthsHTML+'</div>';
+    }
 
     const SUBJECT_ICONS={'الرياضيات':'📐','الفيزياء':'⚡','علوم الطبيعة والحياة':'🌿','العلوم التجريبية':'🔬','التقني رياضي':'💻','تسيير واقتصاد':'📊','آداب ولغات':'📖','اللغة العربية':'🕌','اللغة الفرنسية':'🇫🇷','اللغة الإنجليزية':'🇬🇧','التاريخ والجغرافيا':'🌍','الفلسفة':'🧠','الدين الإسلامي':'📖','الموسيقى':'🎵'};
     const SUBJECT_COLORS=['rgba(99,102,241,0.1)','rgba(16,185,129,0.1)','rgba(200,168,75,0.1)','rgba(239,68,68,0.1)','rgba(168,85,247,0.1)','rgba(14,165,233,0.1)','rgba(236,72,153,0.1)','rgba(34,197,94,0.1)'];
@@ -361,6 +507,11 @@
                 <div class="stat-card c-green" style="animation:fadeSlideUp 0.5s ease both 0.2s"><div class="stat-icon i-green">📝</div><div class="stat-value">—</div><div class="stat-label">عدد التمارين</div></div>
                 <div class="stat-card c-blue" style="animation:fadeSlideUp 0.5s ease both 0.25s"><div class="stat-icon i-blue">🕐</div><div class="stat-value" style="font-size:14px;font-weight:700;color:var(--text-muted)">قريباً</div><div class="stat-label">آخر نشاط</div></div>
               </div>
+              <div class="sub-panel">
+                <div class="section-title" style="margin-bottom:6px">📅 اشتراكي الشهري</div>
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="sub-badge-st" id="student-sub-badge">—</span></div>
+                <div id="student-sub-content"><div class="sub-status-line">جاري تحميل الاشتراك…</div></div>
+              </div>
               <div class="section-header"><div class="section-title">📚 موادك المسجلة</div><div class="section-count">${subjects.length} مادة</div></div>
               <div class="subjects-grid">${subjectsHTML}</div>
               <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
@@ -368,6 +519,7 @@
           </div>
         </div>`;
       updateSidebarActive();document.body.style.overflow='auto';
+      loadStudentSubscription(r.id);
     }
 
     /* ═══ CARD PAGE (3D FLIP) ═══ */
