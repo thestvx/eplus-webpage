@@ -147,3 +147,4 @@ const RegistrationService = (function () {
     baseQuery
   };
 })();
+window.RegistrationService = RegistrationService;

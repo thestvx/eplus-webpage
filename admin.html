@@ -4283,6 +4283,7 @@ onAuthStateChanged(auth, async user => {
       // وضع الأدمين الكامل
       loadBtnSettings();
       switchNavSection('home');
+      setTimeout(() => { if (typeof window.subxLoadAll === 'function') window.subxLoadAll(); }, 400);
     }
   } else {
     isTeacherMode = false;
@@ -4442,7 +4443,7 @@ window.switchNavSection = (section) => {
     if (typeof srtLoadData === 'function') srtLoadData();
   }
   if (section === 'subscriptions') {
-    if (typeof subxLoadAll === 'function') subxLoadAll();
+    if (typeof window.subxLoadAll === 'function') window.subxLoadAll();
   }
 };
 
@@ -22068,13 +22069,15 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   async function loadRegs(force) {
     if (regs.length && !force) return regs;
     try {
-      if (window.RegistrationService && typeof window.RegistrationService.getConfirmed === 'function') {
+      if (RegistrationService && typeof RegistrationService.getConfirmed === 'function') {
         regs = (await RegistrationService.getConfirmed()) || [];
       } else {
         regs = (await TeacherFinance.loadConfirmedRegistrations()) || [];
       }
     } catch (e) {
       console.warn('[SUBSCRIPTIONS] load regs failed', e);
+      const au = window._auth && window._auth.currentUser;
+      if (!au || au.isAnonymous) { regs = []; return regs; }
       try { regs = (await TeacherFinance.loadConfirmedRegistrations()) || []; }
       catch (e2) { console.warn('[SUBSCRIPTIONS] fallback load regs failed', e2); regs = []; }
     }
@@ -22496,6 +22499,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
 
   // ── القائمة + الإحصائيات ──
   window.subxLoadAll = async function () {
+    const au = window._auth && window._auth.currentUser;
+    if (!au || au.isAnonymous) return null;
     try {
       const all = await SubscriptionService.adminListSubscriptions();
       allSubs = Array.isArray(all) ? all : [];
