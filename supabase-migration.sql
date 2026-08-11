@@ -88,6 +88,11 @@ CREATE INDEX IF NOT EXISTS idx_teacher_receipts_teacher ON teacher_receipts(teac
 CREATE TABLE IF NOT EXISTS student_subscriptions (
   id TEXT PRIMARY KEY,
   student_id TEXT NOT NULL DEFAULT '',
+  -- كل اشتراك يخص مادة + أستاذ واحد بالضبط (فصل الحصص والمالية بين المواد)
+  teacher_id TEXT DEFAULT '',
+  subject_id TEXT DEFAULT '',
+  teacher_name TEXT DEFAULT '',
+  subject_name TEXT DEFAULT '',
   start_date TEXT NOT NULL DEFAULT '',
   end_date TEXT NOT NULL DEFAULT '',
   months INTEGER NOT NULL DEFAULT 1,
@@ -99,6 +104,12 @@ CREATE TABLE IF NOT EXISTS student_subscriptions (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_subscriptions_student ON student_subscriptions(student_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_subject_teacher ON student_subscriptions(student_id, subject_id, teacher_id);
+-- ترقية آمنة للقواعد الموجودة (لا حذف لأي صف): إضافة أعمدة المادة/الأستاذ
+ALTER TABLE student_subscriptions ADD COLUMN IF NOT EXISTS teacher_id TEXT;
+ALTER TABLE student_subscriptions ADD COLUMN IF NOT EXISTS subject_id TEXT;
+ALTER TABLE student_subscriptions ADD COLUMN IF NOT EXISTS teacher_name TEXT;
+ALTER TABLE student_subscriptions ADD COLUMN IF NOT EXISTS subject_name TEXT;
 -- منع تكرار الدفع: نفس payment_id لمرة واحدة فقط (خط دفاع إضافي)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_subscriptions_payment ON student_subscriptions(payment_id) WHERE payment_id != '';
 
@@ -296,14 +307,17 @@ BEGIN
        AND r.status = 'مسجل نهائياً'
   ) THEN RAISE EXCEPTION 'student not registered (final)'; END IF;
 
-  -- 2) الاشتراك نشط وغير ملغى
+  -- 2) الاشتراك نشط وغير ملغى، ويخص نفس المادة + نفس الأستاذ المسجلين
+  --    (عزل تام: حضور الرياضيات لا يُخصم من اشتراك الفيزياء ولا العكس)
   IF p_subscription_id IS NULL OR p_subscription_id = '' THEN RAISE EXCEPTION 'subscription_id required'; END IF;
   IF NOT EXISTS (
     SELECT 1 FROM student_subscriptions s
      WHERE s.id = p_subscription_id
        AND s.student_id = p_student_id
        AND s.status <> 'cancelled'
-  ) THEN RAISE EXCEPTION 'subscription not active'; END IF;
+       AND (s.subject_id = '' OR s.subject_id = COALESCE(p_subject_id, ''))
+       AND (s.teacher_id = '' OR s.teacher_id = COALESCE(p_teacher_id, ''))
+  ) THEN RAISE EXCEPTION 'subscription not active for this subject/teacher'; END IF;
 
   -- 3) الشهر الحالي (period) يخص هذا الاشتراك ويتضمن التاريخ المطلوب
   IF p_subscription_period_id IS NULL OR p_subscription_period_id = '' THEN RAISE EXCEPTION 'subscription_period_id required'; END IF;
@@ -418,7 +432,11 @@ CREATE OR REPLACE FUNCTION admin_create_subscription(
   p_months INT,
   p_total_price INT,
   p_payment_id TEXT,
-  p_notes TEXT DEFAULT NULL
+  p_notes TEXT DEFAULT NULL,
+  p_teacher_id TEXT DEFAULT NULL,
+  p_subject_id TEXT DEFAULT NULL,
+  p_teacher_name TEXT DEFAULT NULL,
+  p_subject_name TEXT DEFAULT NULL
 )
 RETURNS JSONB AS $$
 DECLARE
@@ -430,6 +448,8 @@ DECLARE
   v_end TEXT;
   v_total INT;
   v_today TEXT := to_char(CURRENT_DATE, 'YYYY-MM-DD');
+  v_teacher_id TEXT := COALESCE(NULLIF(p_teacher_id, ''), '');
+  v_subject_id TEXT := COALESCE(NULLIF(p_subject_id, ''), '');
 BEGIN
   IF NOT is_admin(p_admin_uid) THEN RAISE EXCEPTION 'unauthorized'; END IF;
   IF p_student_id IS NULL OR p_student_id = '' THEN RAISE EXCEPTION 'student_id required'; END IF;
@@ -440,28 +460,48 @@ BEGIN
   IF EXISTS (SELECT 1 FROM student_subscriptions WHERE payment_id = p_payment_id) THEN
     RAISE EXCEPTION 'payment already exists: %', p_payment_id USING ERRCODE = '23505';
   END IF;
+  -- الاشتراك يجب أن يخص مادة + أستاذ (لا اشتراكات عامة جديدة)
+  IF v_subject_id = '' THEN RAISE EXCEPTION 'subject_id required (per-subject subscription)'; END IF;
+  IF v_teacher_id = '' THEN RAISE EXCEPTION 'teacher_id required (per-subject subscription)'; END IF;
   v_total := COALESCE(p_total_price, v_months * 2000);
   IF v_total < 0 THEN RAISE EXCEPTION 'total_price must be >= 0'; END IF;
+
+  -- الطالب مسجل فعلاً لدى هذا الأستاذ في هذه المادة (مصدر واحد للتسجيل)
+  IF NOT EXISTS (
+    SELECT 1 FROM registrations r,
+           jsonb_array_elements(CASE WHEN jsonb_typeof(r.subjects) = 'array' THEN r.subjects ELSE '[]'::jsonb END) el
+     WHERE r.id = p_student_id
+       AND r.deleted_at IS NULL
+       AND r.status = 'مسجل نهائياً'
+       AND el->>'subjectId' = v_subject_id
+       AND (el->>'teacherId' = v_teacher_id OR (el->>'teacherId' IS NULL OR el->>'teacherId' = ''))
+  ) THEN RAISE EXCEPTION 'student not enrolled for this subject/teacher'; END IF;
 
   v_sub_id := 'SUB-' || p_student_id || '-' || to_char(now(), 'YYYYMMDDHH24MISSMS');
   v_cur := p_start_date::date;
   v_next := v_cur + (v_months * interval '1 month');
   v_end := to_char(v_next - interval '1 day', 'YYYY-MM-DD');
 
-  -- منع التداخل: لا يُنشأ اشتراك نشط يتداخل زمنياً مع اشتراك غير ملغى لنفس الطالب.
-  -- لو أراد الأدمن اشتراكاً جديداً، يبدأ تاريخ بدايته بعد نهاية الاشتراك الحالي.
+  -- منع التداخل: لا يتداخل اشتراك مع اشتراك آخر نشط لنفس الطالب
+  -- في نفس المادة + نفس الأستاذ. (الطلبة قد يملكون اشتراكات مختلفة
+  -- في مواد مختلفة بشكل متوازٍ — وهذا مسموح.)
   IF EXISTS (
     SELECT 1 FROM student_subscriptions s
      WHERE s.student_id = p_student_id
        AND s.status <> 'cancelled'
+       AND s.subject_id = v_subject_id
+       AND s.teacher_id = v_teacher_id
        AND p_start_date <= s.end_date
        AND v_end >= s.start_date
-  ) THEN RAISE EXCEPTION 'overlapping active subscription for this student'; END IF;
+  ) THEN RAISE EXCEPTION 'overlapping active subscription for this student/subject/teacher'; END IF;
 
   INSERT INTO student_subscriptions
-    (id, student_id, start_date, end_date, months, total_price, total_sessions, status, payment_id, notes)
+    (id, student_id, teacher_id, subject_id, teacher_name, subject_name,
+     start_date, end_date, months, total_price, total_sessions, status, payment_id, notes)
   VALUES
-    (v_sub_id, p_student_id, p_start_date, v_end, v_months, v_total, v_months * 8, 'active', p_payment_id, COALESCE(p_notes, ''));
+    (v_sub_id, p_student_id, v_teacher_id, v_subject_id,
+     COALESCE(p_teacher_name, ''), COALESCE(p_subject_name, ''),
+     p_start_date, v_end, v_months, v_total, v_months * 8, 'active', p_payment_id, COALESCE(p_notes, ''));
 
   FOR i IN 1..v_months LOOP
     v_start := to_char(v_cur, 'YYYY-MM-DD');
@@ -805,7 +845,7 @@ REVOKE ALL ON FUNCTION admin_remove_admin(TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_admins(TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION record_attendance(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION undo_attendance(TEXT, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_subscriptions(TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_subscriptions_rich(TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_get_subscription_detail(TEXT, TEXT) FROM PUBLIC;
@@ -832,7 +872,7 @@ GRANT EXECUTE ON FUNCTION admin_remove_admin(TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_admins(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION record_attendance(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION undo_attendance(TEXT, TEXT) TO service_role;
-GRANT EXECUTE ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_subscriptions(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_subscriptions_rich(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_get_subscription_detail(TEXT, TEXT) TO service_role;

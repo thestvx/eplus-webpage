@@ -80,6 +80,10 @@ Deno.serve(async (req) => {
         p_total_price: Number(body.totalPrice) ?? 0,
         p_payment_id: String(body.paymentId || ''),
         p_notes: body.notes == null ? null : String(body.notes),
+        p_teacher_id: String(body.teacherId || ''),
+        p_subject_id: String(body.subjectId || ''),
+        p_teacher_name: body.teacherName == null ? null : String(body.teacherName),
+        p_subject_name: body.subjectName == null ? null : String(body.subjectName),
       });
 
     case 'get-balance':

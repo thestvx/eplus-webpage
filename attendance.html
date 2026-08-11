@@ -618,6 +618,8 @@
   var subState = { active: false, reason: '', period: null, today: '' };
   var subEvents = [];
   var attendedToday = {};
+  // حالة اشتراك كل مادة+أستاذ: {active, remaining, total, used, reason, subscription, period}
+  var subjectSubState = {};
 
   // ── Firebase init flag check ───────────────────────────
   if (!fbReady) {
@@ -1123,9 +1125,61 @@
       $('st-note').textContent = 'المواد التالية هي المواد المسجلة لهذا الطالب فقط.';
     } else {
       $('st-note').textContent = 'المواد التالية هي المواد المسجلة لهذا الطالب فقط — اختر الأستاذ لتسجيل الحضور:';
+      await loadSubjectSubStates();
       renderSubjects();
     }
     switchView('student');
+  }
+
+  // ── Per-subject/teacher subscription state ─────────────
+  // كل مادة + أستاذ له اشتراكه المستقل: لا يوجد اشتراك → رسالة محددة؛
+  // اكتملت حصص الشهر → رسالة محددة؛ نشط + متبقية → يُسمح بالتسجيل.
+  async function loadSubjectSubStates() {
+    subjectSubState = {};
+    if (!currentStudent) return;
+    var today = SubscriptionService.today();
+    for (var i = 0; i < subjectPairs.length; i++) {
+      var p = subjectPairs[i];
+      var key = (p.subjectId || '') + '|' + (p.teacherId || '');
+      var data = null;
+      try {
+        data = await SubscriptionService.getActiveSubscriptionForSubject(currentStudent.id, p.subjectId, p.teacherId, today);
+      } catch (e) { console.warn('[ATTENDANCE] subject sub state failed', e); }
+      if (!data || !data.subscription) {
+        subjectSubState[key] = { active: false, reason: 'no_subscription', remaining: 0, total: 0, used: 0, subscription: null, period: null };
+        continue;
+      }
+      var period = SubscriptionService.activePeriod(data.periods, today);
+      if (!period) {
+        subjectSubState[key] = { active: false, reason: 'expired', remaining: 0, total: 0, used: 0, subscription: data.subscription, period: null };
+        continue;
+      }
+      var used = period.used_sessions || 0;
+      var total = period.total_sessions || SubscriptionService.SESSIONS_PER_MONTH;
+      var remaining = Math.max(0, total - used);
+      subjectSubState[key] = {
+        active: remaining > 0,
+        reason: remaining > 0 ? '' : 'full',
+        remaining: remaining, total: total, used: used,
+        subscription: data.subscription, period: period
+      };
+    }
+  }
+
+  function subjectSubKey(pair) { return (pair.subjectId || '') + '|' + (pair.teacherId || ''); }
+
+  // الرسالة الدقيقة لكل حالة (نص ثابت موحّد)
+  function subjectSubMessage(st) {
+    if (st && st.active) return '';
+    if (st && st.reason === 'full') return 'انتهت حصص هذا الشهر لهذه المادة.';
+    return 'لا يوجد اشتراك نشط لهذه المادة عند هذا الأستاذ.';
+  }
+
+  function subGateFor(pair) {
+    var st = subjectSubState[subjectSubKey(pair)];
+    var msg = subjectSubMessage(st);
+    if (!msg) return null;
+    return { title: 'تسجيل غير مسموح', msg: msg };
   }
 
   function renderSubjects() {
@@ -1136,9 +1190,16 @@
         ? 'الأستاذ: <b>' + esc(p.teacherName) + '</b>'
         : 'لا يتوفر أستاذ مسجل لهذه المادة';
       var done = p.subjectId && p.teacherId ? !!attendedToday[p.subjectId + '|' + p.teacherId] : false;
-      var btn = done
-        ? '<button class="record-btn recorded" type="button" disabled>✓ تم التسجيل</button>'
-        : '<button class="record-btn" id="rec-btn-' + i + '" type="button" onclick="window.__mark(' + i + ')">تسجيل الحضور</button>';
+      var st = subjectSubState[subjectSubKey(p)];
+      var gateMsg = subjectSubMessage(st);
+      var btn;
+      if (done) {
+        btn = '<button class="record-btn recorded" type="button" disabled>✓ تم التسجيل</button>';
+      } else if (gateMsg) {
+        btn = '<button class="record-btn no-sub" type="button" disabled>غير متاح</button>';
+      } else {
+        btn = '<button class="record-btn" id="rec-btn-' + i + '" type="button" onclick="window.__mark(' + i + ')">تسجيل الحضور</button>';
+      }
       html +=
         '<div class="subject-card' + (done ? ' recorded' : '') + '" id="subj-card-' + i + '">' +
           '<div class="subject-tile">' + esc(p.icon) + '</div>' +
@@ -1148,6 +1209,7 @@
               '<img class="t-avatar" src="icons/teacher.png" alt="" onerror="this.onerror=null;this.src=window.__svgIcon(\'teacher\')">' +
               '<span>' + teacherLine + '</span>' +
             '</div>' +
+            (gateMsg ? '<div class="subject-submsg">' + esc(gateMsg) + '</div>' : '') +
           '</div>' +
           btn +
         '</div>';
@@ -1162,12 +1224,19 @@
     currentSub = null;
     subEvents = [];
 
-    var data = null;
+    var rows = [];
     try {
-      data = await SubscriptionService.getActiveSubscription(student.id, today);
+      rows = await SubscriptionService.getSubscriptions(student.id);
     } catch (e) { console.warn('[ATTENDANCE] loadSubscription failed', e); }
 
-    if (!data || !data.subscription) {
+    var subs = [];
+    (Array.isArray(rows) ? rows : []).forEach(function (row) {
+      var s = row.subscription || {};
+      if (s.status === 'cancelled') return;
+      subs.push({ subscription: s, periods: row.periods || [] });
+    });
+
+    if (!subs.length) {
       currentSub = null;
       subState = { active: false, reason: 'no_subscription', period: null, today: today, used: 0, total: 0, remaining: 0 };
       $('sub-badge').textContent = 'لا يوجد اشتراك';
@@ -1182,26 +1251,38 @@
       return;
     }
 
-    currentSub = data;
-    var periods = data.periods || [];
-    var period = SubscriptionService.activePeriod(periods, today) || null;
-
+    // كل اشتراك = مادة + أستاذ مستقلان؛ نعرض كل الأشهر عبر الاشتراكات
     var cardsHtml = '';
-    for (var i = 0; i < periods.length; i++) {
-      var p = periods[i];
-      var isActive = period && period.id === p.id;
-      var full = (p.used_sessions || 0) >= (p.total_sessions || 0);
-      var pct = p.total_sessions ? Math.round(((p.used_sessions || 0) / p.total_sessions) * 100) : 0;
-      cardsHtml +=
-        '<div class="month-card' + (isActive ? ' active' : '') + (full ? ' full' : '') + '">' +
-          '<div class="m-idx">' + (p.month_number || i + 1) + '</div>' +
-          '<div class="m-main">' +
-            '<div class="m-name">الشهر ' + (p.month_number || i + 1) + (isActive ? ' — الحالي' : '') + '</div>' +
-            '<div class="m-range">' + esc(SubscriptionService.fmtAr(p.start_date)) + ' → ' + esc(SubscriptionService.fmtAr(p.end_date, true)) + '</div>' +
-          '</div>' +
-          '<div class="m-usage"><span class="u">' + (p.used_sessions || 0) + '</span> / ' + (p.total_sessions || 0) + '</div>' +
-          '<div class="m-progress"><i style="width:' + pct + '%"></i></div>' +
-        '</div>';
+    var activePeriodIds = [];
+    var activeUsed = 0, activeTotal = 0, activeRemaining = 0;
+    var anyActive = false;
+    for (var si = 0; si < subs.length; si++) {
+      var sub = subs[si].subscription;
+      var periods = subs[si].periods;
+      var subLabel = (sub.subject_name || '') + (sub.teacher_name ? ' — ' + sub.teacher_name : '');
+      for (var pi = 0; pi < periods.length; pi++) {
+        var p = periods[pi];
+        var isActive = today >= (p.start_date || '') && today <= (p.end_date || '');
+        var full = (p.used_sessions || 0) >= (p.total_sessions || 0);
+        var pct = p.total_sessions ? Math.round(((p.used_sessions || 0) / p.total_sessions) * 100) : 0;
+        if (isActive) {
+          activePeriodIds.push(p.id);
+          anyActive = true;
+          activeUsed += (p.used_sessions || 0);
+          activeTotal += (p.total_sessions || SubscriptionService.SESSIONS_PER_MONTH);
+          activeRemaining += Math.max(0, (p.total_sessions || SubscriptionService.SESSIONS_PER_MONTH) - (p.used_sessions || 0));
+        }
+        cardsHtml +=
+          '<div class="month-card' + (isActive ? ' active' : '') + (full ? ' full' : '') + '">' +
+            '<div class="m-idx">' + (p.month_number || pi + 1) + '</div>' +
+            '<div class="m-main">' +
+              '<div class="m-name">' + esc(subLabel || '') + (subLabel ? ' — ' : '') + 'الشهر ' + (p.month_number || pi + 1) + (isActive ? ' — الحالي' : '') + '</div>' +
+              '<div class="m-range">' + esc(SubscriptionService.fmtAr(p.start_date)) + ' → ' + esc(SubscriptionService.fmtAr(p.end_date, true)) + '</div>' +
+            '</div>' +
+            '<div class="m-usage"><span class="u">' + (p.used_sessions || 0) + '</span> / ' + (p.total_sessions || 0) + '</div>' +
+            '<div class="m-progress"><i style="width:' + pct + '%"></i></div>' +
+          '</div>';
+      }
     }
     $('month-cards').innerHTML = cardsHtml || '<div class="sub-empty">لا توجد أشهر محددة للاشتراك</div>';
 
@@ -1209,32 +1290,33 @@
     try {
       var allEvents = await SubscriptionService.getStudentEvents(student.id);
       recs = (Array.isArray(allEvents) ? allEvents : []).filter(function (ev) {
-        return period ? ev.subscriptionPeriodId === period.id : true;
+        return activePeriodIds.length ? activePeriodIds.indexOf(ev.subscriptionPeriodId) >= 0 : true;
       });
     } catch (e) { console.warn('[ATTENDANCE] loadSubscription events failed', e); }
     subEvents = recs;
 
-    if (period) {
-      var used = period.used_sessions || 0;
-      var total = period.total_sessions || SubscriptionService.SESSIONS_PER_MONTH;
-      var remaining = Math.max(0, total - used);
-      subState = { active: true, reason: '', period: period, today: today, used: used, total: total, remaining: remaining };
-      $('sub-badge').textContent = remaining > 0 ? 'اشتراك نشط' : 'اكتملت حصص الشهر';
-      $('sub-badge').className = 'sub-badge ' + (remaining > 0 ? 'ok' : 'full');
-      $('sub-status').innerHTML = 'الشهر الحالي: <b>' + esc(SubscriptionService.fmtAr(period.start_date)) + ' → ' + esc(SubscriptionService.fmtAr(period.end_date, true)) + '</b>' +
-        (remaining > 0 ? ' — يمكن تسجيل الحضور.' : ' — تم استهلاك كل حصص هذا الشهر.');
-      $('subc-total').textContent = total;
-      $('subc-used').textContent = used;
-      $('subc-remaining').textContent = remaining;
-      renderSubTeacherCounters(recs, period);
+    if (anyActive) {
+      subState = { active: true, reason: '', period: null, today: today, used: activeUsed, total: activeTotal, remaining: activeRemaining };
+      $('sub-badge').textContent = activeRemaining > 0 ? 'اشتراك نشط' : 'اكتملت حصص الشهر';
+      $('sub-badge').className = 'sub-badge ' + (activeRemaining > 0 ? 'ok' : 'full');
+      $('sub-status').innerHTML = activePeriodIds.length > 1
+        ? 'يوجد <b>' + activePeriodIds.length + '</b> اشتراكات نشطة هذا الشهر — كل مادة تُحسب حصصها بشكل مستقل.'
+        : 'يوجد اشتراك نشط لهذه المادة — يمكن تسجيل الحضور حسب المادة.';
+      $('subc-total').textContent = activeTotal;
+      $('subc-used').textContent = activeUsed;
+      $('subc-remaining').textContent = activeRemaining;
+      renderSubTeacherCounters(recs, activeTotal);
       renderSubTimeline(recs);
     } else {
       var allUsed = 0, allTotal = 0;
-      for (var j = 0; j < periods.length; j++) { allUsed += periods[j].used_sessions || 0; allTotal += periods[j].total_sessions || 0; }
+      for (var j = 0; j < subs.length; j++) {
+        var pp = subs[j].periods;
+        for (var k2 = 0; k2 < pp.length; k2++) { allUsed += pp[k2].used_sessions || 0; allTotal += pp[k2].total_sessions || 0; }
+      }
       subState = { active: false, reason: 'expired', period: null, today: today, used: allUsed, total: allTotal, remaining: 0 };
-      $('sub-badge').textContent = 'انتهى الاشتراك';
+      $('sub-badge').textContent = 'لا توجد أشهر نشطة';
       $('sub-badge').className = 'sub-badge no';
-      $('sub-status').textContent = 'انتهى الاشتراك — لا يمكن تسجيل حضور جديد حتى يتم تجديد الاشتراك لدى الإدارة.';
+      $('sub-status').textContent = 'لا توجد أشهر نشطة حالياً لهذه الاشتراكات — يرجى مراجعة الإدارة.';
       $('subc-total').textContent = allTotal || '—';
       $('subc-used').textContent = allUsed || '—';
       $('subc-remaining').textContent = '0';
@@ -1243,9 +1325,9 @@
     }
   }
 
-  function renderSubTeacherCounters(recs, period) {
+  function renderSubTeacherCounters(recs, totalRef) {
     var el = $('sub-teachers');
-    if (!period) { el.innerHTML = '<div class="sub-empty">لا يوجد شهر حالي لحساب حصص الأساتذة</div>'; return; }
+    if (!totalRef) { el.innerHTML = '<div class="sub-empty">لا يوجد شهر حالي لحساب حصص الأساتذة</div>'; return; }
     var map = {};
     recs.forEach(function (r) {
       if (!r.teacherName) return;
@@ -1258,7 +1340,7 @@
     var html = '';
     names.forEach(function (k) {
       var t = map[k];
-      var pct = period.total_sessions ? Math.min(100, Math.round((t.count / period.total_sessions) * 100)) : 0;
+      var pct = totalRef ? Math.min(100, Math.round((t.count / totalRef) * 100)) : 0;
       html +=
         '<div class="sub-teacher">' +
           '<div class="t-name">' + esc(t.teacher) + '</div>' +
@@ -1285,20 +1367,6 @@
         '</div>';
     });
     el.innerHTML = html;
-  }
-
-  function subGate() {
-    if (subState.active && subState.remaining > 0) return null;
-    var title = 'تسجيل غير مسموح';
-    var msg;
-    if (!subState.active && subState.reason === 'expired') {
-      msg = 'انتهى اشتراك هذا الطالب — لا يمكن تسجيل حضور جديد.<br>يرجى تجديد الاشتراك لدى الإدارة.';
-    } else if (!subState.active) {
-      msg = 'لا يوجد اشتراك نشط لهذا الطالب.<br>يرجى تفعيل الاشتراك لدى الإدارة قبل تسجيل الحضور.';
-    } else {
-      msg = 'تم استهلاك كل حصص هذا الشهر (' + subState.used + '/' + subState.total + ').<br>يرجى تجديد الاشتراك لدى الإدارة.';
-    }
-    return { title: title, msg: msg };
   }
 
   async function returnToStudent() {
@@ -1355,7 +1423,7 @@
     var pair = subjectPairs[idx];
     if (pair.recording) { openModal('info', 'تسجيل مسبق موجود', 'تم تسجيل حضور هذا الطالب في هذه المادة مسبقاً.'); return; }
 
-    var gate = subGate();
+    var gate = subGateFor(pair);
     if (gate) { openModal('warn', gate.title, gate.msg); return; }
 
     var date = AttendanceService.today();
@@ -1374,12 +1442,14 @@
         openModal('warn', '⚠️ تعذر الاتصال بنظام الحضور', 'تعذر التحقق من جلسة النظام. حاول مرة أخرى.');
         return;
       }
+      // الاشتراك الخاص بهذه المادة + هذا الأستاذ (وليس أي اشتراك آخر)
       var subCtx = null;
-      if (currentSub && currentSub.subscription && subState.period) {
+      var stNow = subjectSubState[subjectSubKey(pair)];
+      if (stNow && stNow.subscription && stNow.period) {
         subCtx = {
-          subscriptionId: currentSub.subscription.id,
-          subscriptionPeriodId: subState.period.id,
-          monthNumber: subState.period.month_number || 0
+          subscriptionId: stNow.subscription.id,
+          subscriptionPeriodId: stNow.period.id,
+          monthNumber: stNow.period.month_number || 0
         };
       }
       var mirrorId = mirrorIdFor(currentStudent.id, pair, date);
@@ -1441,17 +1511,29 @@
         return;
       }
 
-      // 3) تحديث واجهة الشهر من النتيجة الذرّية
+      // 3) تحديث واجهة الشهر من النتيجة الذرّية (في اشتراك المادة المعنية فقط)
       pair.recording = true;
       var card = $('subj-card-' + idx);
       if (card) card.classList.add('recorded');
       setRecordBusy(false);
       subjectBusyIdx = -1;
       if (subCtx && rec && rec.used_sessions != null) {
+        var stNow2 = subjectSubState[subjectSubKey(pair)];
+        if (stNow2) {
+          stNow2.used = rec.used_sessions;
+          stNow2.remaining = Math.max(0, rec.remaining_sessions);
+          stNow2.active = stNow2.remaining > 0;
+          if (stNow2.period) {
+            stNow2.period.used_sessions = rec.used_sessions;
+            stNow2.period.remaining_sessions = rec.remaining_sessions;
+          }
+        }
         subState.used = rec.used_sessions;
         subState.remaining = Math.max(0, rec.remaining_sessions);
-        subState.period.used_sessions = rec.used_sessions;
-        subState.period.remaining_sessions = rec.remaining_sessions;
+        if (subState.period) {
+          subState.period.used_sessions = rec.used_sessions;
+          subState.period.remaining_sessions = rec.remaining_sessions;
+        }
       }
       showSuccess(pair, { id: mirrorId });
     } catch (e) {
@@ -1461,10 +1543,16 @@
       var msg = (e && e.message) || '';
       if ((e && e.code === '23505') || /duplicate/i.test(msg) || /already recorded/i.test(msg)) {
         showAlreadyAttended(pair);
-      } else if (/subscription|اشتراك|no sessions remaining|remaining/i.test(msg)) {
-        openModal('warn', 'لا يمكن تسجيل الحضور', msg);
+      } else if (/subscription not active for this subject\/teacher/i.test(msg)) {
+        openModal('warn', 'لا يمكن تسجيل الحضور', 'لا يوجد اشتراك نشط لهذه المادة عند هذا الأستاذ.');
+      } else if (/no sessions remaining|period not active|remaining/i.test(msg)) {
+        openModal('warn', 'لا يمكن تسجيل الحضور', 'انتهت حصص هذا الشهر لهذه المادة.');
+      } else if (/student not registered \(final\)/i.test(msg)) {
+        openModal('warn', 'لا يمكن تسجيل الحضور', 'الطالب غير مسجل نهائياً في النظام.');
+      } else if (/subscription|اشتراك/i.test(msg)) {
+        openModal('warn', 'لا يمكن تسجيل الحضور', 'لا يوجد اشتراك نشط لهذه المادة عند هذا الأستاذ.');
       } else {
-        openModal('error', 'تعذر تسجيل الحضور', msg || 'حدثت مشكلة أثناء حفظ سجل الحضور. حاول مرة أخرى.');
+        openModal('error', 'تعذر تسجيل الحضور', 'تعذر تسجيل الحضور حالياً. حاول مرة أخرى.');
       }
     } finally {
       attending = false;

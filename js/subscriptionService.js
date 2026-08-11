@@ -225,6 +225,29 @@ const SubscriptionService = (function () {
     return null;
   }
 
+  // اشتراك مادة+أستاذ محدد نشط في تاريخ معيّن (فصل الحصص بين المواد)
+  // يطابق: نفس الطالب + نفس المادة + نفس الأستاذ. لو الاشتراك قديم (بدون
+  // teacher_id/subject_id) يعمل بالتوافق على أساس أن المادة غير محددة = كل المواد.
+  async function getActiveSubscriptionForSubject(studentId, subjectId, teacherId, refDate) {
+    const rows = await getSubscriptions(studentId);
+    if (!rows.length) return null;
+    const r = refDate || today();
+    const matches = function (s) {
+      if (s.subject_id && s.subject_id !== (subjectId || '')) return false;
+      if (s.teacher_id && s.teacher_id !== (teacherId || '')) return false;
+      return true;
+    };
+    for (const row of rows) {
+      const s = row.subscription || {};
+      if (s.status === 'cancelled') continue;
+      if (!matches(s)) continue;
+      if (r >= s.start_date && r <= s.end_date) {
+        return { subscription: s, periods: row.periods || [] };
+      }
+    }
+    return null;
+  }
+
   function activePeriod(periods, refDate) {
     const r = refDate || today();
     return (periods || []).find(p => r >= p.start_date && r <= p.end_date) || null;
@@ -246,14 +269,18 @@ const SubscriptionService = (function () {
     const months = parseInt(opts.months, 10) || 1;
     const start = opts.startDate || today();
     const pkg = packageByMonths(months);
-    const paymentId = opts.paymentId || ('SUBPAY-' + opts.studentId + '-' + start + '-' + months);
+    const paymentId = opts.paymentId || ('SUBPAY-' + opts.studentId + '-' + (opts.subjectId || '') + '-' + start + '-' + months);
     const data = await _adminCall('create-subscription', {
       studentId: opts.studentId,
       months: months,
       startDate: start,
       totalPrice: pkg.price,
       paymentId: paymentId,
-      notes: opts.notes || ''
+      notes: opts.notes || '',
+      subjectId: opts.subjectId || '',
+      teacherId: opts.teacherId || '',
+      subjectName: opts.subjectName || '',
+      teacherName: opts.teacherName || ''
     });
     if (!data) throw new Error('create-subscription returned no data');
     return data;
@@ -269,7 +296,8 @@ const SubscriptionService = (function () {
   }
 
   // يبحث عن اشتراك فعّال متداخل مع النافذة المطلوبة [start, end]
-  async function findOverlapping(studentId, start, months) {
+  // للنفس الطالب + نفس المادة + نفس الأستاذ (لا يمنع مواد أخرى متوازية)
+  async function findOverlapping(studentId, start, months, subjectId, teacherId) {
     const end = endDateFor(start, months);
     let rows = [];
     try { rows = await adminListSubscriptions(); } catch (e) { return null; }
@@ -278,6 +306,8 @@ const SubscriptionService = (function () {
       const s = row.subscription || {};
       if (String(s.student_id) !== String(studentId)) continue;
       if (s.status === 'cancelled') continue;
+      if (subjectId && s.subject_id && s.subject_id !== String(subjectId)) continue;
+      if (teacherId && s.teacher_id && s.teacher_id !== String(teacherId)) continue;
       const sStart = s.start_date || '';
       const sEnd = s.end_date || '';
       if (sStart && sEnd && start <= sEnd && end >= sStart) return row;
@@ -358,6 +388,7 @@ const SubscriptionService = (function () {
     computeSubscriptionTotals,
     getSubscriptions,
     getActiveSubscription,
+    getActiveSubscriptionForSubject,
     activePeriod,
     getStudentEvents,
     createSubscription,

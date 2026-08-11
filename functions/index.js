@@ -4,14 +4,54 @@ const { Resend } = require('resend');
 
 admin.initializeApp();
 
-const RESEND_API_KEY = 're_Jo35xAob_BZWbKF7oSCZxudzdRYdzXRdk';
-const resend = new Resend(RESEND_API_KEY);
+// ── الأمان: لا مفاتيح في الكود إطلاقاً ─────────────────────────
+// تُقرأ من متغير البيئة RESEND_API_KEY أو من Firebase functions config.
+// الإعداد: firebase functions:config:set resend.apikey="..."  أو
+//          export RESEND_API_KEY="..." (gen2 / Cloud Run).
+const ALLOWED_ORIGINS = [
+  'https://epluscenter.com',
+  'https://www.epluscenter.com',
+  'http://localhost:5500',
+  'http://127.0.0.1:5500',
+  'http://localhost:8080',
+  'http://localhost:3000',
+  'http://localhost:5173',
+];
+
+function resolveResendApiKey() {
+  if (process.env.RESEND_API_KEY) return process.env.RESEND_API_KEY;
+  const cfg = functions.config();
+  if (cfg.resend && cfg.resend.apikey) return cfg.resend.apikey;
+  return '';
+}
+
+const RESEND_API_KEY = resolveResendApiKey();
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
+
+if (!RESEND_API_KEY) {
+  console.error('[sendEmail] RESEND_API_KEY is not configured (env or `firebase functions:config:set resend.apikey=...`)');
+}
+
+function allowedOrigin(req) {
+  const origin = (req.get && req.get('Origin')) || req.headers.origin || '';
+  if (!origin) return null;
+  return ALLOWED_ORIGINS.includes(origin) ? origin : null;
+}
+
+function corsHeadersFor(req) {
+  const origin = allowedOrigin(req);
+  const headers = {
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Vary': 'Origin',
+  };
+  if (origin) headers['Access-Control-Allow-Origin'] = origin;
+  return headers;
+}
 
 exports.sendEmail = functions.https.onRequest(async (req, res) => {
   // CORS headers (set before any logic)
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  res.set(corsHeadersFor(req));
 
   // Handle preflight
   if (req.method === 'OPTIONS') {
@@ -29,6 +69,12 @@ exports.sendEmail = functions.https.onRequest(async (req, res) => {
 
   if (!from || !to || !subject || !html) {
     res.status(400).json({ error: 'Missing required fields: from, to, subject, html' });
+    return;
+  }
+
+  if (!resend) {
+    console.error('[sendEmail] RESEND_API_KEY is not configured');
+    res.status(500).json({ error: 'Email service is not configured.' });
     return;
   }
 

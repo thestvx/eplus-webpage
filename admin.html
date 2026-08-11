@@ -3063,11 +3063,35 @@
           <div class="teacher-modal-body" style="overflow:auto;max-height:72vh;padding:22px 26px">
             <div class="form-group">
               <label class="form-label">الطالب</label>
-              <div class="subx-combo">
-                <input class="inp" type="text" id="subx-student" placeholder="ابحث بالاسم أو اللقب أو Student ID..." autocomplete="off" style="width:100%" oninput="subxOnStudentInput()" onfocus="subxOnStudentInput()">
-                <div class="subx-combo-list" id="subx-combo-list"></div>
+              <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
+                <button class="btn-sm" id="subx-scan-btn" type="button" onclick="subxStartScan()" style="flex:0 0 auto;background:linear-gradient(135deg,#7C3AED,#8b5cf6);color:#fff;border:none;padding:10px 16px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;white-space:nowrap">📷 مسح بطاقة الطالب</button>
+                <div class="subx-combo" style="flex:1">
+                  <input class="inp" type="text" id="subx-student" placeholder="🔎 ابحث بالاسم أو اللقب أو Student ID..." autocomplete="off" style="width:100%" oninput="subxOnStudentInput()" onfocus="subxOnStudentInput()">
+                  <div class="subx-combo-list" id="subx-combo-list"></div>
+                </div>
               </div>
-              <div id="subx-student-info" class="subx-note" style="margin-top:6px"></div>
+              <input type="text" id="subx-scan-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-hidden="true" style="position:fixed;top:-200px;left:-200px;opacity:0;width:4px;height:4px;border:0;padding:0;background:transparent">
+              <div id="subx-scan-hint" class="subx-note" style="margin-top:2px">المسح اليدوي: اضغط زر المسح ثم مرّر البطاقة على الماسح. أو ابحث بالاسم / اللقب / الاسم الكامل / Student ID.</div>
+              <div id="subx-student-card" style="display:none;margin-top:10px;border:1.5px solid rgba(16,185,129,0.35);background:rgba(16,185,129,0.06);border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.9">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                  <span style="background:rgba(16,185,129,0.15);color:#059669;font-weight:800;padding:3px 12px;border-radius:20px;font-size:11.5px">✅ تم العثور على الطالب</span>
+                  <span id="subx-scan-source" style="font-size:11px;color:var(--text-muted);font-weight:700"></span>
+                </div>
+                <div style="font-weight:900;font-size:15px" id="subx-card-name">—</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:2px">
+                  <span id="subx-card-id" style="color:var(--text-muted);font-weight:700;font-family:monospace">—</span>
+                  <span id="subx-card-level">—</span>
+                  <span id="subx-card-stream">—</span>
+                </div>
+                <div id="subx-card-status" style="margin-top:4px"></div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">المادة + الأستاذ</label>
+              <select class="inp" id="subx-subject" style="width:100%" onchange="subxOnSubjectChange()" disabled>
+                <option value="">— اختر المادة —</option>
+              </select>
+              <div id="subx-subject-note" class="subx-note" style="margin-top:6px"></div>
             </div>
             <div class="form-group">
               <label class="form-label">الباقة</label>
@@ -3100,6 +3124,7 @@
               <div style="font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:10px">معاينة الاشتراك</div>
               <div id="subx-preview-body"></div>
             </div>
+            <div id="subx-valid-msg" style="display:none;margin-top:10px;border:1.5px solid rgba(245,158,11,0.4);background:rgba(245,158,11,0.08);border-radius:12px;padding:10px 14px;font-size:12.5px;font-weight:700;color:#b45309;line-height:1.9"></div>
             <div style="display:flex;gap:10px;margin-top:18px">
               <button class="btn-sm" id="subx-create-btn" onclick="subxCreate()" style="flex:1;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;padding:12px 20px;border-radius:12px;font-weight:800;cursor:pointer;font-size:14px">✅ تأكيد الاشتراك</button>
               <button class="btn-sm" onclick="subxCloseEditor()" style="background:var(--card);border:1.5px solid var(--border);color:var(--text);padding:12px 24px;border-radius:12px;font-weight:800;cursor:pointer">إلغاء</button>
@@ -22017,8 +22042,10 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   let regs = [];
   let allSubs = [];
   let selectedStudent = null;
+  let selectedSubject = null;   // الدخلة المختارة من subjects الخاصة بالطالب
   let selectedPkg = 1;
   let comboIndex = 0;
+  let _subjectOptions = [];     // خيارات المادة+الأستاذ للطالب المختار
 
   function escX(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -22026,21 +22053,59 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   function studentFullName(r) {
     return r ? ((r.first_name || '') + ' ' + (r.last_name || '')).trim() : '';
   }
+  function _norm(name) { return String(name || '').replace(/\s+/g, '').toLowerCase(); }
+
+  // مصدر واحد للطلاب النهائيين — نفس مصدر نظام الحضور (registrations عبر REST)
+  // مع احتياط عبر admin-api. الخطأ لا يُترجم أبداً إلى "غير مسجل" — يُظهر
+  // رسالة تحميل فاشلة بدلاً من رسالة مضللة.
   async function loadRegs(force) {
     if (regs.length && !force) return regs;
-    try { regs = (await TeacherFinance.loadConfirmedRegistrations()) || []; }
-    catch (e) { regs = []; console.warn('[SUBSCRIPTIONS] load regs failed', e); }
+    try {
+      if (window.RegistrationService && typeof window.RegistrationService.getConfirmed === 'function') {
+        regs = (await RegistrationService.getConfirmed()) || [];
+      } else {
+        regs = (await TeacherFinance.loadConfirmedRegistrations()) || [];
+      }
+    } catch (e) {
+      console.warn('[SUBSCRIPTIONS] load regs failed', e);
+      try { regs = (await TeacherFinance.loadConfirmedRegistrations()) || []; }
+      catch (e2) { console.warn('[SUBSCRIPTIONS] fallback load regs failed', e2); regs = []; }
+    }
     return regs;
+  }
+
+  function renderStudentCard(r, source) {
+    const card = $x('subx-student-card');
+    if (!r) { if (card) card.style.display = 'none'; return; }
+    if (!card) return;
+    card.style.display = 'block';
+    $x('subx-card-name').textContent = studentFullName(r) || String(r.id);
+    $x('subx-card-id').textContent = 'Student ID: ' + r.id;
+    $x('subx-card-level').textContent = r.level || '';
+    $x('subx-card-stream').textContent = r.stream || '';
+    $x('subx-scan-source').textContent = source || '';
+    $x('subx-card-status').innerHTML = r.status === 'مسجل نهائياً'
+      ? '<span class="subx-status" style="background:rgba(16,185,129,0.12);color:#059669">حالة التسجيل: مسجل نهائياً</span>'
+      : '<span class="subx-status" style="background:rgba(245,158,11,0.14);color:#d97706">حالة التسجيل: ' + escX(r.status || '—') + '</span>';
   }
 
   // ── Editor ──
   window.subxOpenEditor = async function () {
     selectedStudent = null;
+    selectedSubject = null;
+    _subjectOptions = [];
     selectedPkg = 1;
     comboIndex = 0;
     $x('subx-student').value = '';
-    $x('subx-student-info').innerHTML = '';
     $x('subx-combo-list').classList.remove('open');
+    renderStudentCard(null);
+    const subj = $x('subx-subject');
+    subj.innerHTML = '<option value="">— اختر المادة —</option>';
+    subj.disabled = true;
+    $x('subx-subject-note').innerHTML = '';
+    $x('subx-valid-msg').style.display = 'none';
+    $x('subx-scan-input').value = '';
+    $x('subx-scan-hint').innerHTML = 'المسح اليدوي: اضغط زر المسح ثم مرّر البطاقة على الماسح. أو ابحث بالاسم / اللقب / الاسم الكامل / Student ID.';
     $x('subx-start').value = SubscriptionService.today();
     subxSelectPackage(1);
     subxRenderPreview();
@@ -22052,7 +22117,120 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     $x('subx-combo-list').classList.remove('open');
   };
 
-  // ── Combobox للطالب (بحث بالاسم / اللقب / Student ID) ──
+  // ── المسح بالبطاقة (نفس منطق كيوسك الحضور بالضبط) ──
+  window.subxStartScan = function () {
+    const inp = $x('subx-scan-input');
+    inp.value = '';
+    $x('subx-scan-hint').innerHTML = '⌛ الماسح جاهز — مرّر بطاقة الطالب الآن…';
+    inp.focus();
+  };
+  function subxHandleScan(raw) {
+    const val = String(raw || '').trim();
+    if (!val) return;
+    $x('subx-scan-hint').innerHTML = 'جارٍ البحث عن الطالب…';
+    AttendanceService.resolveStudentFromScan(val).then(function (res) {
+      const st = res && res.student;
+      if (!st) {
+        $x('subx-scan-hint').innerHTML = '❌ لم يتم العثور على بطاقة مسجلة بهذا الرمز — جرّب البحث اليدوي أو تأكد من البطاقة.';
+        srShowToast('البطاقة غير مسجلة في النظام', 'error');
+        return;
+      }
+      if (st.status !== 'مسجل نهائياً') {
+        $x('subx-scan-hint').innerHTML = '⚠️ الطالب غير مسجل نهائياً — لا يمكن إنشاء اشتراك له.';
+        srShowToast('الطالب غير مسجل نهائياً — لا يمكن إنشاء اشتراك', 'error');
+        return;
+      }
+      const src = res.source === 'barcode'
+        ? (res.matchedBy === 'barcode_value' ? 'عبر الباركود المطبوع' : 'عبر الباركود (فك الترميز)')
+        : 'عبر Student ID';
+      subxApplyStudent(st, src);
+    }).catch(function (e) {
+      console.error('[SUBSCRIPTIONS] scan resolve failed', e);
+      $x('subx-scan-hint').innerHTML = 'تعذر تحميل البيانات حالياً. حاول مرة أخرى.';
+    });
+  }
+  $x('subx-scan-input').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      subxHandleScan($x('subx-scan-input').value);
+      $x('subx-scan-input').value = '';
+    }
+  });
+  $x('subx-scan-input').addEventListener('input', function () {
+    const v = $x('subx-scan-input').value.trim();
+    if (/^\d{13,}$/.test(v)) { subxHandleScan(v); $x('subx-scan-input').value = ''; }
+  });
+
+  async function subxApplyStudent(r, source) {
+    selectedStudent = r;
+    selectedSubject = null;
+    _subjectOptions = [];
+    $x('subx-student').value = studentFullName(r) || r.id;
+    renderStudentCard(r, source);
+    $x('subx-combo-list').classList.remove('open');
+    await subxLoadSubjectOptions();
+    subxRenderPreview();
+  }
+
+  // ── المادة + الأستاذ (من subjects الطالب — مصدر التسجيل الموحّد) ──
+  async function subxLoadSubjectOptions() {
+    const subj = $x('subx-subject');
+    subj.innerHTML = '<option value="">— اختر المادة —</option>';
+    subj.disabled = true;
+    $x('subx-subject-note').innerHTML = '';
+    _subjectOptions = [];
+    if (!selectedStudent) return;
+    const arr = Array.isArray(selectedStudent.subjects) ? selectedStudent.subjects : [];
+    if (!arr.length) {
+      subj.innerHTML = '<option value="">لا توجد مواد مسجلة لهذا الطالب</option>';
+      $x('subx-subject-note').innerHTML = 'لم يسجل هذا الطالب في أي مادة بعد — يجب تسجيل المواد لدى الإدارة أولاً.';
+      return;
+    }
+    const level = selectedStudent.level || '';
+    for (let i = 0; i < arr.length; i++) {
+      const s = arr[i];
+      const subjectName = typeof s === 'string' ? s : (s.subject || s.subjectName || '');
+      const teacherName = typeof s === 'string' ? '' : (s.teacher || s.teacherName || '');
+      if (!subjectName) continue;
+      let subjectId = (s && s.subjectId) || (window.SubjectService && SubjectService.getSubjectId(subjectName)) || '';
+      let teacherId = (s && s.teacherId) || '';
+      if (!teacherId && teacherName && window.SubjectService && typeof SubjectService.getTeachersForSubject === 'function') {
+        try {
+          const ts = await SubjectService.getTeachersForSubject(subjectName, level);
+          const t = ts.find(function (x) { return _norm(x.name) === _norm(teacherName); }) || (ts.length ? ts[0] : null);
+          if (t) teacherId = t.teacherId || t.id || '';
+        } catch (e) { console.warn('[SUBSCRIPTIONS] teacher resolve failed', e); }
+      }
+      _subjectOptions.push({
+        index: i,
+        subjectName: subjectName,
+        subjectId: subjectId,
+        teacherName: teacherName,
+        teacherId: teacherId,
+        icon: (window.SubjectService && SubjectService.getSubjectIcon(subjectName)) || '📚'
+      });
+    }
+    if (!_subjectOptions.length) {
+      subj.innerHTML = '<option value="">لا توجد مواد صالحة</option>';
+      $x('subx-subject-note').innerHTML = 'لا توجد مواد مكتملة البيانات لهذا الطالب.';
+      return;
+    }
+    subj.disabled = false;
+    subj.innerHTML = '<option value="">— اختر المادة —</option>' + _subjectOptions.map(function (o, i) {
+      return '<option value="' + i + '">' + o.icon + ' ' + escX(o.subjectName) + (o.teacherName ? ' — الأستاذ ' + escX(o.teacherName) : '') + '</option>';
+    }).join('');
+  }
+
+  window.subxOnSubjectChange = function () {
+    const idx = $x('subx-subject').value;
+    selectedSubject = (idx !== '' && _subjectOptions[Number(idx)]) ? _subjectOptions[Number(idx)] : null;
+    $x('subx-subject-note').innerHTML = selectedSubject
+      ? selectedSubject.icon + ' ' + escX(selectedSubject.subjectName) + ' — الأستاذ: <b>' + escX(selectedSubject.teacherName || 'غير معروف') + '</b>' + (selectedSubject.teacherId ? '' : ' <span style="color:#d97706">(تعذر ربط ID الأستاذ — تأكد من بيانات الأستاذ)</span>')
+      : '';
+    subxRenderPreview();
+  };
+
+  // ── Combobox للطالب (بحث بالاسم / اللقب / الاسم الكامل / Student ID) ──
   window.subxOnStudentInput = function () {
     const v = $x('subx-student').value.trim();
     const list = $x('subx-combo-list');
@@ -22060,8 +22238,14 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       const selVal = studentFullName(selectedStudent) || String(selectedStudent.id);
       if (selVal.toLowerCase() !== v.toLowerCase()) selectedStudent = null;
     }
-    if (!v) { list.classList.remove('open'); $x('subx-student-info').innerHTML = ''; subxRenderPreview(); return; }
+    if (!v) { list.classList.remove('open'); renderStudentCard(null); subxRenderPreview(); return; }
     loadRegs().then(() => {
+      if (!regs.length && !v) return;
+      if (!regs.length) {
+        list.innerHTML = '<div class="subx-combo-item" style="color:#dc2626;cursor:default">تعذر تحميل قائمة الطلاب حالياً. حاول مرة أخرى.</div>';
+        list.classList.add('open');
+        return;
+      }
       const low = v.toLowerCase();
       const items = regs.filter(r => {
         const name = studentFullName(r).toLowerCase();
@@ -22084,14 +22268,10 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       list.classList.add('open');
     });
   };
-  window.subxPickStudent = function (id) {
+  window.subxPickStudent = async function (id) {
     const r = regs.find(x => String(x.id) === String(id));
     if (!r) return;
-    selectedStudent = r;
-    $x('subx-student').value = studentFullName(r) || r.id;
-    $x('subx-student-info').innerHTML = '👤 Student ID: <b>' + escX(r.id) + '</b> — ' + escX(r.level || '—') + (r.stream ? ' — ' + escX(r.stream) : '');
-    $x('subx-combo-list').classList.remove('open');
-    subxRenderPreview();
+    await subxApplyStudent(r, '');
   };
   function subxComboMove(d) {
     const items = $x('subx-combo-list').querySelectorAll('.subx-combo-item[data-id]');
@@ -22122,6 +22302,29 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     subxRenderPreview();
   };
 
+  // ── التحقق: زر التأكيد لا يعمل إلا باكتمال كل عناصر الاشتراك ──
+  function subxValidate() {
+    const missing = [];
+    if (!selectedStudent) missing.push('اختيار الطالب');
+    else if (selectedStudent.status !== 'مسجل نهائياً') missing.push('تسجيل الطالب نهائياً');
+    if (!selectedSubject) missing.push('اختيار المادة + الأستاذ');
+    if (!(selectedPkg >= 1 && selectedPkg <= 3)) missing.push('اختيار الباقة');
+    if (!$x('subx-start').value) missing.push('تاريخ البداية');
+    const el = $x('subx-valid-msg');
+    const btn = $x('subx-create-btn');
+    if (missing.length) {
+      if (el) {
+        el.style.display = 'block';
+        el.innerHTML = '⏳ لإتمام الاشتراك أكمل ما يلي: ' + missing.map(m => '<b>• ' + escX(m) + '</b>').join(' ');
+      }
+      if (btn) btn.disabled = true;
+      return false;
+    }
+    if (el) el.style.display = 'none';
+    if (btn) btn.disabled = false;
+    return true;
+  }
+
   // ── معاينة قبل التأكيد ──
   window.subxRenderPreview = function () {
     const pkg = SubscriptionService.packageByMonths(selectedPkg);
@@ -22130,11 +22333,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     const body = $x('subx-preview-body');
     if (!selectedStudent) {
       body.innerHTML = '<div class="subx-note">اختر الطالب أولاً لعرض معاينة الاشتراك.</div>';
+      subxValidate();
       return;
     }
     const name = studentFullName(selectedStudent);
     let html = '<table style="width:100%;border-collapse:collapse;font-size:13px">';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700;width:130px">الطالب</td><td style="padding:5px 6px;font-weight:800">' + escX(name) + ' <span style="font-family:monospace;font-size:11px;color:var(--text-muted)">' + escX(selectedStudent.id) + '</span></td></tr>';
+    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">المادة — الأستاذ</td><td style="padding:5px 6px;font-weight:800">' + (selectedSubject ? escX(selectedSubject.icon + ' ' + selectedSubject.subjectName + ' — ' + (selectedSubject.teacherName || '—')) : '<span style="color:#b45309">لم تُختر بعد</span>') + '</td></tr>';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">الباقة</td><td style="padding:5px 6px;font-weight:800">' + escX(pkg.label) + '</td></tr>';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">السعر</td><td style="padding:5px 6px;font-weight:800;color:#059669">' + SubscriptionService.fmtPrice(pkg.price) + '</td></tr>';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">عدد الحصص</td><td style="padding:5px 6px;font-weight:800">' + pkg.sessions + ' حصة (' + pkg.months + ' × 8)</td></tr>';
@@ -22151,33 +22356,34 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     });
     html += '</div>';
     body.innerHTML = html;
+    subxValidate();
   };
 
   // ── إنشاء الاشتراك ──
   window.subxCreate = async function () {
-    if (!selectedStudent) { srShowToast('اختر الطالب أولاً', 'error'); return; }
+    if (!subxValidate()) { srShowToast('أكمل البيانات الناقصة أولاً', 'error'); return; }
+    if (!selectedStudent || !selectedSubject) { srShowToast('أكمل البيانات الناقصة أولاً', 'error'); return; }
     const pkg = SubscriptionService.packageByMonths(selectedPkg);
     const btn = $x('subx-create-btn');
     let start = $x('subx-start').value || SubscriptionService.today();
 
     btn.disabled = true;
     try {
-      // منع التداخل: لو يوجد اشتراك نشط متداخل نعرض خياراً واضحاً
-      const overlap = await SubscriptionService.findOverlapping(selectedStudent.id, start, pkg.months);
+      // منع التداخل: نفس الطالب + نفس المادة + نفس الأستاذ فقط
+      const overlap = await SubscriptionService.findOverlapping(selectedStudent.id, start, pkg.months, selectedSubject.subjectId, selectedSubject.teacherId);
       if (overlap && overlap.subscription) {
         btn.disabled = false;
         const until = SubscriptionService.fmtAr(overlap.subscription.end_date, true);
         const ask = await cmShow('⚠️',
           'اشتراك نشط موجود',
-          'هذا الطالب لديه اشتراك نشط بالفعل حتى <b>' + until + '</b>.<br><br>' +
-          'لا يمكن إنشاء اشتراك متداخل معه بشكل عشوائي.',
+          'هذا الطالب لديه اشتراك نشط في <b>' + escX(selectedSubject.subjectName) + ' — ' + escX(selectedSubject.teacherName || '') + '</b> حتى <b>' + until + '</b>.<br><br>' +
+          'لا يمكن إنشاء اشتراك متداخل معه لهذه المادة.',
           { confirmText: 'إنشاء بعد انتهاء الاشتراك الحالي', cancelText: 'إلغاء', success: true });
-        if (!ask) return;
+        if (!ask) { btn.disabled = false; return; }
         start = SubscriptionService.addDays(overlap.subscription.end_date, 1);
         $x('subx-start').value = start;
         subxRenderPreview();
         srShowToast('سيبدأ الاشتراك الجديد من ' + SubscriptionService.fmtAr(start, true), 'success');
-        btn.disabled = true;
       }
 
       const name = studentFullName(selectedStudent);
@@ -22185,6 +22391,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       const summary =
         '<div style="text-align:right;font-size:13px;line-height:2">' +
           '<div><b>الطالب:</b> ' + escX(name) + ' <span style="font-family:monospace;font-size:11px;color:var(--text-muted)">' + escX(selectedStudent.id) + '</span></div>' +
+          '<div><b>المادة — الأستاذ:</b> ' + escX(selectedSubject.icon + ' ' + selectedSubject.subjectName + ' — ' + (selectedSubject.teacherName || '—')) + '</div>' +
           '<div><b>الباقة:</b> ' + escX(pkg.label) + '</div>' +
           '<div><b>السعر:</b> ' + SubscriptionService.fmtPrice(pkg.price) + '</div>' +
           '<div><b>الحصص:</b> ' + pkg.sessions + ' حصة</div>' +
@@ -22193,15 +22400,18 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         '</div>';
       const ok = await cmShow('📅', 'تأكيد الاشتراك', summary + '<div style="margin-top:8px;font-size:12px;color:var(--text-muted)">هل تريد تأكيد إنشاء هذا الاشتراك؟</div>', { confirmText: 'تأكيد الاشتراك', success: true });
       if (!ok) { btn.disabled = false; return; }
-      btn.disabled = true;
 
-      const paymentId = 'SUBPAY-' + selectedStudent.id + '-' + start + '-' + pkg.months;
+      const paymentId = 'SUBPAY-' + selectedStudent.id + '-' + (selectedSubject.subjectId || 'x') + '-' + start + '-' + pkg.months;
       const created = await SubscriptionService.createSubscription({
         studentId: selectedStudent.id,
         months: pkg.months,
         startDate: start,
         paymentId: paymentId,
-        notes: 'أنشئ من لوحة الإدارة'
+        notes: 'أنشئ من لوحة الإدارة',
+        subjectId: selectedSubject.subjectId,
+        teacherId: selectedSubject.teacherId,
+        subjectName: selectedSubject.subjectName,
+        teacherName: selectedSubject.teacherName
       });
       if (created && created.subscription) {
         const successHtml =
@@ -22210,6 +22420,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
             '<div style="font-weight:900;font-size:15px;margin-bottom:12px">تم إنشاء الاشتراك بنجاح</div>' +
             '<div style="text-align:right;line-height:2">' +
               '<div><b>الطالب:</b> ' + escX(name) + '</div>' +
+              '<div><b>المادة — الأستاذ:</b> ' + escX(selectedSubject.icon + ' ' + selectedSubject.subjectName + ' — ' + (selectedSubject.teacherName || '—')) + '</div>' +
               '<div><b>الباقة:</b> ' + escX(pkg.label) + '</div>' +
               '<div><b>المبلغ:</b> ' + SubscriptionService.fmtPrice(pkg.price) + '</div>' +
               '<div><b>الحصص:</b> ' + pkg.sessions + ' حصة</div>' +
@@ -22222,16 +22433,22 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       }
     } catch (e) {
       const msg = String((e && e.message) || e);
-      if ((e && e.code === '23505') || msg.indexOf('23505') >= 0 || /overlapping active subscription/i.test(msg)) {
-        srShowToast('🔁 اشتراك مكرر أو متداخل — تفقد قائمة الاشتراكات.', 'error');
+      console.error('[SUBSCRIPTIONS] create failed', e);
+      if ((e && e.code === '23505') || msg.indexOf('23505') >= 0 || /payment already exists/i.test(msg)) {
+        srShowToast('🔁 اشتراك مكرر — تحقق من قائمة الاشتراكات.', 'error');
         await subxLoadAll();
+      } else if (/overlapping active subscription/i.test(msg)) {
+        srShowToast('⏰ توجد اشتراك نشط متداخل لنفس المادة والأستاذ.', 'error');
+      } else if (/student not enrolled for this subject\/teacher/i.test(msg)) {
+        srShowToast('⚠️ الطالب غير مسجل نهائياً لدى هذا الأستاذ في هذه المادة.', 'error');
       } else if (/unauthorized|forbidden/i.test(msg)) {
         srShowToast('⚠️ جلسة الأدمن غير معتمدة — أعد تسجيل الدخول.', 'error');
       } else {
-        srShowToast('تعذر إنشاء الاشتراك: ' + msg, 'error');
+        srShowToast('تعذر إنشاء الاشتراك حالياً. حاول مرة أخرى.', 'error');
       }
     } finally {
       btn.disabled = false;
+      subxValidate();
     }
   };
 
@@ -22242,7 +22459,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       allSubs = Array.isArray(all) ? all : [];
     } catch (e) {
       console.error('[SUBSCRIPTIONS] load failed', e);
-      $x('subx-tbody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#dc2626;padding:18px;font-size:13px">تعذر تحميل الاشتراكات: ' + escX(e.message || e) + '</td></tr>';
+      $x('subx-tbody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#dc2626;padding:18px;font-size:13px">تعذر تحميل البيانات حالياً. حاول مرة أخرى.</td></tr>';
       return null;
     }
     const today = SubscriptionService.today();
@@ -22279,7 +22496,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       if (f && st !== f) return;
       const reg = regs.find(rr => String(rr.id) === String(s.student_id));
       const name = reg ? studentFullName(reg) : (s.student_id || '—');
-      if (q && name.toLowerCase().indexOf(q) < 0 && String(s.student_id).toLowerCase().indexOf(q) < 0) return;
+      if (q && name.toLowerCase().indexOf(q) < 0 && String(s.student_id).toLowerCase().indexOf(q) < 0
+        && String(s.subject_name || '').toLowerCase().indexOf(q) < 0
+        && String(s.teacher_name || '').toLowerCase().indexOf(q) < 0) return;
       shown++;
       const used = periods.reduce((a, p) => a + ((p.used_sessions || 0)), 0);
       const total = s.total_sessions || (s.months || 1) * 8;
@@ -22291,7 +22510,11 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         : 'background:var(--border);color:var(--text-muted)';
       html += '<tr>' +
         '<td style="font-weight:800">' + escX(name) + '<div style="font-size:11px;color:var(--text-muted);font-weight:700;font-family:monospace">' + escX(s.student_id) + '</div></td>' +
-        '<td>' + escX(pkg ? pkg.label : ((s.months || '—') + ' شهر')) + '</td>' +
+        '<td>' +
+          (s.subject_name ? '<div style="font-weight:800">' + escX(s.subject_name) + '</div>' +
+           '<div style="font-size:11px;color:var(--text-muted);font-weight:700">الأستاذ: ' + escX(s.teacher_name || '—') + '</div>' : '') +
+          '<div style="font-size:11px;color:var(--text-muted);font-weight:700">' + escX(pkg ? pkg.label : ((s.months || '—') + ' شهر')) + '</div>' +
+        '</td>' +
         '<td style="direction:ltr">' + (s.total_price || 0).toLocaleString('ar-DZ') + ' دج</td>' +
         '<td>' + SubscriptionService.fmtAr(s.start_date) + '</td>' +
         '<td>' + SubscriptionService.fmtAr(s.end_date) + '</td>' +
@@ -22334,6 +22557,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       // معلومات الاشتراك
       html += '<div style="font-size:13px;font-weight:900;margin:16px 0 8px;color:var(--primary)">📅 معلومات الاشتراك</div>';
       html += '<div style="background:var(--bg,#f8f9fc);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:13px;line-height:2">' +
+        '<div><b>المادة — الأستاذ:</b> ' + escX(((sub.subject_name || '—') + ' — ' + (sub.teacher_name || '—'))) + '</div>' +
         '<div><b>الباقة:</b> ' + escX(pkg ? pkg.label : ((sub.months || '—') + ' شهر')) + '</div>' +
         '<div><b>السعر:</b> ' + SubscriptionService.fmtPrice(sub.total_price) + '</div>' +
         '<div><b>تاريخ البداية:</b> ' + SubscriptionService.fmtAr(sub.start_date, true) + '</div>' +
@@ -22371,7 +22595,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       });
       body.innerHTML = html;
     } catch (e) {
-      body.innerHTML = '<div style="text-align:center;color:#dc2626;padding:18px;font-size:13px;font-weight:800">تعذر تحميل التفاصيل: ' + escX(e.message || e) + '</div>';
+      console.error('[SUBSCRIPTIONS] detail load failed', e);
+      body.innerHTML = '<div style="text-align:center;color:#dc2626;padding:18px;font-size:13px;font-weight:800">تعذر تحميل البيانات حالياً. حاول مرة أخرى.</div>';
     }
   };
   window.subxCloseDetail = function () {
