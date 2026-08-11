@@ -448,6 +448,16 @@ BEGIN
   v_next := v_cur + (v_months * interval '1 month');
   v_end := to_char(v_next - interval '1 day', 'YYYY-MM-DD');
 
+  -- منع التداخل: لا يُنشأ اشتراك نشط يتداخل زمنياً مع اشتراك غير ملغى لنفس الطالب.
+  -- لو أراد الأدمن اشتراكاً جديداً، يبدأ تاريخ بدايته بعد نهاية الاشتراك الحالي.
+  IF EXISTS (
+    SELECT 1 FROM student_subscriptions s
+     WHERE s.student_id = p_student_id
+       AND s.status <> 'cancelled'
+       AND p_start_date <= s.end_date
+       AND v_end >= s.start_date
+  ) THEN RAISE EXCEPTION 'overlapping active subscription for this student'; END IF;
+
   INSERT INTO student_subscriptions
     (id, student_id, start_date, end_date, months, total_price, total_sessions, status, payment_id, notes)
   VALUES
@@ -481,6 +491,36 @@ BEGIN
   IF NOT is_admin(p_admin_uid) THEN RAISE EXCEPTION 'unauthorized'; END IF;
   RETURN (SELECT COALESCE(jsonb_agg(to_jsonb(s) ORDER BY s.created_at DESC), '[]'::jsonb)
             FROM (SELECT * FROM student_subscriptions ORDER BY created_at DESC LIMIT 200) s);
+END; $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+-- قائمة الاشتراكات الغنية: كل اشتراك + أشهره (للوحة الإدارة)
+CREATE OR REPLACE FUNCTION admin_list_subscriptions_rich(p_admin_uid TEXT)
+RETURNS JSONB AS $$
+BEGIN
+  IF NOT is_admin(p_admin_uid) THEN RAISE EXCEPTION 'unauthorized'; END IF;
+  RETURN (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+    'subscription', to_jsonb(s),
+    'periods', (SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.month_number), '[]'::jsonb)
+                FROM subscription_periods p WHERE p.subscription_id = s.id)
+  ) ORDER BY s.created_at DESC), '[]'::jsonb)
+            FROM (SELECT * FROM student_subscriptions ORDER BY created_at DESC LIMIT 200) s);
+END; $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+-- تفاصيل اشتراك واحد + أشهره + بيانات الطالب (لنافذة التفاصيل)
+CREATE OR REPLACE FUNCTION admin_get_subscription_detail(p_admin_uid TEXT, p_subscription_id TEXT)
+RETURNS JSONB AS $$
+DECLARE
+  v_sub JSONB;
+  v_periods JSONB;
+  v_student JSONB;
+BEGIN
+  IF NOT is_admin(p_admin_uid) THEN RAISE EXCEPTION 'unauthorized'; END IF;
+  SELECT to_jsonb(s) INTO v_sub FROM student_subscriptions s WHERE s.id = p_subscription_id;
+  IF v_sub IS NULL THEN RAISE EXCEPTION 'subscription not found'; END IF;
+  SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.month_number), '[]'::jsonb) INTO v_periods
+    FROM subscription_periods p WHERE p.subscription_id = p_subscription_id;
+  SELECT to_jsonb(r) INTO v_student FROM registrations r WHERE r.id = v_sub->>'student_id';
+  RETURN jsonb_build_object('subscription', v_sub, 'periods', v_periods, 'student', v_student);
 END; $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- قائمة التسجيلات النهائية (لمحرر الاشتراكات والمستحقات)
@@ -767,6 +807,8 @@ REVOKE ALL ON FUNCTION record_attendance(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEX
 REVOKE ALL ON FUNCTION undo_attendance(TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_subscriptions(TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION admin_list_subscriptions_rich(TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION admin_get_subscription_detail(TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_registrations(TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_upsert_transactions(TEXT, JSONB) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_upsert_balance(TEXT, JSONB) FROM PUBLIC;
@@ -792,6 +834,8 @@ GRANT EXECUTE ON FUNCTION record_attendance(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, 
 GRANT EXECUTE ON FUNCTION undo_attendance(TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_subscriptions(TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION admin_list_subscriptions_rich(TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION admin_get_subscription_detail(TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_registrations(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_upsert_transactions(TEXT, JSONB) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_upsert_balance(TEXT, JSONB) TO service_role;

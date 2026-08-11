@@ -1687,10 +1687,6 @@
         <span class="nav-label">الاشتراكات الشهرية</span>
         <span class="nav-badge" id="nav-badge-subscriptions">0</span>
       </div>
-      <a href="barcode-test.html" class="nav-item" style="display:none" data-hidden="barcode-test">
-        <span class="nav-icon">🧪</span>
-        <span class="nav-label">اختبار الباركود SP-1160</span>
-      </a>
       <div class="nav-section" data-i18n="mail_service">خدمات البريد</div>
       <div class="nav-item" onclick="switchNavSection('notifications')">
         <span class="nav-icon">📨</span>
@@ -2985,75 +2981,143 @@
       </div>
 
       <!-- ===== SECTION: SUBSCRIPTIONS ===== -->
+      <style>
+        .subx-pkg{flex:1;min-width:150px;border:2px solid var(--border);border-radius:16px;padding:18px 12px;text-align:center;cursor:pointer;background:var(--card);transition:all .2s;position:relative}
+        .subx-pkg:hover{border-color:var(--primary);transform:translateY(-2px)}
+        .subx-pkg.sel{border-color:var(--primary);background:var(--primary-light);box-shadow:0 8px 24px rgba(124,58,237,.15)}
+        .subx-pkg .p-name{font-size:15px;font-weight:900;color:var(--text)}
+        .subx-pkg .p-price{font-size:20px;font-weight:900;color:#059669;margin:6px 0 2px;direction:ltr}
+        .subx-pkg .p-sess{font-size:12px;font-weight:700;color:var(--text-muted)}
+        .subx-pkg .p-check{position:absolute;top:8px;left:8px;width:22px;height:22px;border-radius:50%;background:var(--primary);color:#fff;display:none;align-items:center;justify-content:center;font-size:12px;font-weight:900}
+        .subx-pkg.sel .p-check{display:flex}
+        .subx-combo{position:relative}
+        .subx-combo-list{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;max-height:240px;overflow:auto;z-index:60;display:none;box-shadow:0 12px 32px rgba(0,0,0,.14)}
+        .subx-combo-list.open{display:block}
+        .subx-combo-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px}
+        .subx-combo-item:last-child{border-bottom:none}
+        .subx-combo-item:hover,.subx-combo-item.hl{background:var(--primary-light)}
+        .subx-combo-item .s-name{font-weight:800;color:var(--text)}
+        .subx-combo-item .s-meta{font-size:11px;color:var(--text-muted);font-weight:600}
+        .subx-note{font-size:11.5px;color:var(--text-muted);font-weight:700}
+        .subx-status{padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:800;white-space:nowrap}
+      </style>
       <div id="section-subscriptions" style="display:none">
         <div class="section-header">
           <div class="section-title">
             <div class="section-icon">📅</div>
             <span>الاشتراكات الشهرية</span>
           </div>
-          <button class="btn-sm" onclick="subxResetEditor()" style="background:linear-gradient(135deg,var(--primary),#8b5cf6);color:#fff;border:none;padding:8px 20px;font-weight:800">➕ اشتراك جديد</button>
+          <button class="btn-sm" onclick="subxOpenEditor()" style="background:linear-gradient(135deg,var(--primary),#8b5cf6);color:#fff;border:none;padding:8px 20px;font-weight:800">➕ اشتراك جديد</button>
         </div>
 
         <div class="stats-grid" style="margin-bottom:24px">
           <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--primary-light)">📅</div></div><div class="stat-num" id="subx-total">0</div><div class="stat-label">إجمالي الاشتراكات</div></div>
           <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(16,185,129,0.1)">🟢</div></div><div class="stat-num" id="subx-active" style="color:var(--success)">0</div><div class="stat-label">اشتراكات نشطة</div></div>
-          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(245,158,11,0.1)">💰</div></div><div class="stat-num" id="subx-revenue" style="direction:ltr">0 دج</div><div class="stat-label">إيرادات الأشهر</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(245,158,11,0.1)">💰</div></div><div class="stat-num" id="subx-revenue" style="direction:ltr">0 دج</div><div class="stat-label">إيرادات الاشتراكات</div></div>
         </div>
 
-        <!-- Editor -->
-        <div class="panel" style="padding:20px;margin-bottom:20px">
-          <div style="font-size:15px;font-weight:900;margin-bottom:14px;display:flex;align-items:center;gap:8px">🧾 محرر الاشتراك</div>
-          <div style="display:flex;flex-wrap:wrap;gap:14px">
-            <div style="flex:1;min-width:240px">
-              <label style="font-size:12px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:6px">الطالب (التسجيل النهائي)</label>
-              <input class="inp" id="subx-student" list="subx-students" placeholder="اكتب اسم الطالب أو رقم التسجيل..." style="width:100%" oninput="subxOnStudentInput()">
-              <datalist id="subx-students"></datalist>
-            </div>
-            <div style="min-width:200px">
-              <label style="font-size:12px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:6px">مدة الاشتراك</label>
-              <select class="inp" id="subx-months" style="width:100%" onchange="subxPreview()">
-                <option value="1">شهر واحد — 2000 دج / 8 حصص</option>
-                <option value="2">شهران — 4000 دج / 16 حصة</option>
-                <option value="3">3 أشهر — 6000 دج / 24 حصة</option>
-              </select>
-            </div>
-            <div style="min-width:200px">
-              <label style="font-size:12px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:6px">تاريخ بداية الاشتراك</label>
-              <input class="inp" type="date" id="subx-start" style="width:100%" onchange="subxPreview()">
-            </div>
-            <div style="display:flex;align-items:flex-end">
-              <button class="btn-sm" id="subx-save" onclick="subxCreate()" style="background:linear-gradient(135deg,#059669,#10b981);color:white;border:none;padding:11px 26px;border-radius:10px;font-weight:800;cursor:pointer">💳 تأكيد الدفع والتفعيل</button>
-            </div>
-          </div>
-
-          <!-- Preview -->
-          <div id="subx-preview" style="margin-top:16px;border:1.5px dashed var(--border);border-radius:12px;padding:14px;background:var(--bg,#f8f9fc)">
-            <div style="font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:10px">معاينة الاشتراك — اختر طالباً لعرض التفاصيل</div>
-            <div id="subx-preview-body"></div>
-          </div>
+        <!-- List controls -->
+        <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center">
+          <input type="text" id="subx-search" placeholder="🔍 بحث بالطالب أو رقم التسجيل..." oninput="subxFilterList()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;flex:1;min-width:200px;background:var(--card)">
+          <select id="subx-filter-status" onchange="subxFilterList()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+            <option value="">كل الحالات</option>
+            <option value="active">نشط</option>
+            <option value="upcoming">لم يبدأ</option>
+            <option value="done">مكتمل الحصص</option>
+            <option value="expired">انتهى</option>
+            <option value="cancelled">ملغى</option>
+          </select>
+          <button class="tbl-action" onclick="subxLoadAll()" style="font-size:12px;border-color:rgba(245,158,11,0.3);color:#d97706">🔄 تحديث</button>
         </div>
 
         <!-- List -->
         <div class="panel" style="padding:0;overflow:hidden">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border)">
-            <div style="font-size:14px;font-weight:900">آخر الاشتراكات</div>
-            <button class="tbl-action" onclick="subxLoadList()" style="font-size:12px;border-color:rgba(245,158,11,0.3);color:#d97706">🔄 تحديث</button>
-          </div>
           <div class="tbl-wrap" style="border:none">
             <table class="tbl">
               <thead>
                 <tr>
                   <th>الطالب</th>
-                  <th>رقم التسجيل</th>
-                  <th>المدة</th>
+                  <th>الباقة</th>
                   <th>المبلغ</th>
                   <th>البداية</th>
                   <th>النهاية</th>
+                  <th>الحصص</th>
                   <th>الحالة</th>
+                  <th>الإجراءات</th>
                 </tr>
               </thead>
-              <tbody id="subx-tbody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">جارٍ التحميل…</td></tr></tbody>
+              <tbody id="subx-tbody"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">جارٍ التحميل…</td></tr></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SUBSCRIPTION EDITOR MODAL ===== -->
+      <div class="teacher-modal-bg" id="subx-modal">
+        <div class="teacher-modal" style="max-width:640px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:rgba(79,70,229,0.1);border-color:rgba(79,70,229,0.2)">📅</div>
+            <div class="teacher-modal-title">اشتراك جديد</div>
+            <button class="att-modal-close" onclick="subxCloseEditor()">✕</button>
+          </div>
+          <div class="teacher-modal-body" style="overflow:auto;max-height:72vh;padding:22px 26px">
+            <div class="form-group">
+              <label class="form-label">الطالب</label>
+              <div class="subx-combo">
+                <input class="inp" type="text" id="subx-student" placeholder="ابحث بالاسم أو اللقب أو Student ID..." autocomplete="off" style="width:100%" oninput="subxOnStudentInput()" onfocus="subxOnStudentInput()">
+                <div class="subx-combo-list" id="subx-combo-list"></div>
+              </div>
+              <div id="subx-student-info" class="subx-note" style="margin-top:6px"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">الباقة</label>
+              <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <div class="subx-pkg" id="subx-pkg-1" onclick="subxSelectPackage(1)">
+                  <div class="p-check">✓</div>
+                  <div class="p-name">شهر واحد</div>
+                  <div class="p-price">2,000 دج</div>
+                  <div class="p-sess">8 حصص</div>
+                </div>
+                <div class="subx-pkg" id="subx-pkg-2" onclick="subxSelectPackage(2)">
+                  <div class="p-check">✓</div>
+                  <div class="p-name">شهرين</div>
+                  <div class="p-price">4,000 دج</div>
+                  <div class="p-sess">16 حصة</div>
+                </div>
+                <div class="subx-pkg" id="subx-pkg-3" onclick="subxSelectPackage(3)">
+                  <div class="p-check">✓</div>
+                  <div class="p-name">3 أشهر</div>
+                  <div class="p-price">6,000 دج</div>
+                  <div class="p-sess">24 حصة</div>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">تاريخ بداية الاشتراك</label>
+              <input class="inp" type="date" id="subx-start" style="width:100%" onchange="subxRenderPreview()">
+            </div>
+            <div id="subx-preview" style="margin-top:6px;border:1.5px dashed var(--border);border-radius:12px;padding:14px;background:var(--bg,#f8f9fc)">
+              <div style="font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:10px">معاينة الاشتراك</div>
+              <div id="subx-preview-body"></div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:18px">
+              <button class="btn-sm" id="subx-create-btn" onclick="subxCreate()" style="flex:1;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;padding:12px 20px;border-radius:12px;font-weight:800;cursor:pointer;font-size:14px">✅ تأكيد الاشتراك</button>
+              <button class="btn-sm" onclick="subxCloseEditor()" style="background:var(--card);border:1.5px solid var(--border);color:var(--text);padding:12px 24px;border-radius:12px;font-weight:800;cursor:pointer">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SUBSCRIPTION DETAILS MODAL ===== -->
+      <div class="teacher-modal-bg" id="subx-detail-modal">
+        <div class="teacher-modal" style="max-width:640px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.2)">📋</div>
+            <div class="teacher-modal-title">تفاصيل الاشتراك</div>
+            <button class="att-modal-close" onclick="subxCloseDetail()">✕</button>
+          </div>
+          <div class="teacher-modal-body" style="overflow:auto;max-height:72vh;padding:22px 26px">
+            <div id="subx-detail-body"></div>
           </div>
         </div>
       </div>
@@ -21939,155 +22003,230 @@ const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
 SubscriptionService.init(SUPABASE_URL, SUPABASE_KEY);
 TeacherFinance.init(SUPABASE_URL + '/functions/v1/admin-api');
-const adminAuthTokenProvider = () => (auth && auth.currentUser) ? auth.currentUser.getIdToken() : null;
+const adminAuthTokenProvider = () => (window._auth && window._auth.currentUser) ? window._auth.currentUser.getIdToken() : null;
 SubscriptionService.setAuthTokenProvider(adminAuthTokenProvider);
 TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
 
 // ═══════════════════════════════════════════════════════════
-//  Subscription Editor (الاشتراكات الشهرية — إدارة)
-//  معاينة الأشهر + دفعة Idempotent عبر payment_id الفريد
+//  Subscription Editor (الاشتراكات الشهرية — واجهة بسيطة)
+//  باقات ثابتة (1/2/3 أشهر) → اختيار الطالب + الباقة + البداية فقط.
+//  كل التواريخ بـ Africa/Algiers. لا alert/confirm/prompt.
 // ═══════════════════════════════════════════════════════════
 (function () {
   const $x = (id) => document.getElementById(id);
-  const AR_MONTHS = ['يناير','فبراير','مارس','أبريل','ماي','جوان','جويلية','أوت','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
   let regs = [];
+  let allSubs = [];
   let selectedStudent = null;
+  let selectedPkg = 1;
+  let comboIndex = 0;
 
-  function fmtAr(d) {
-    if (!d || !/^\d{4}-\d{2}-\d{2}/.test(d)) return d || '—';
-    const p = d.slice(0, 10).split('-');
-    return +p[2] + ' ' + AR_MONTHS[+p[1] - 1] + ' ' + p[0];
+  function escX(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
-  function subxHeaders(json) {
-    const h = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
-    if (json) h['Content-Type'] = 'application/json';
-    return h;
+  function studentFullName(r) {
+    return r ? ((r.first_name || '') + ' ' + (r.last_name || '')).trim() : '';
   }
-
-  window.subxResetEditor = function () {
-    selectedStudent = null;
-    $x('subx-student').value = '';
-    $x('subx-months').value = '1';
-    $x('subx-start').value = SubscriptionService.today();
-    subxPreview();
-  };
-
-  async function loadRegs() {
-    if (regs.length) return regs;
-    try {
-      const rows = await TeacherFinance.loadConfirmedRegistrations();
-      regs = rows || [];
-    } catch (e) { regs = []; }
-    const dl = $x('subx-students');
-    dl.innerHTML = '';
-    regs.forEach(r => {
-      const name = ((r.first_name || '') + ' ' + (r.last_name || '')).trim() || r.id;
-      const opt = document.createElement('option');
-      opt.value = name + '  —  ' + r.id;
-      dl.appendChild(opt);
-    });
+  async function loadRegs(force) {
+    if (regs.length && !force) return regs;
+    try { regs = (await TeacherFinance.loadConfirmedRegistrations()) || []; }
+    catch (e) { regs = []; console.warn('[SUBSCRIPTIONS] load regs failed', e); }
     return regs;
   }
 
+  // ── Editor ──
+  window.subxOpenEditor = async function () {
+    selectedStudent = null;
+    selectedPkg = 1;
+    comboIndex = 0;
+    $x('subx-student').value = '';
+    $x('subx-student-info').innerHTML = '';
+    $x('subx-combo-list').classList.remove('open');
+    $x('subx-start').value = SubscriptionService.today();
+    subxSelectPackage(1);
+    subxRenderPreview();
+    $x('subx-modal').classList.add('open');
+    setTimeout(() => $x('subx-student').focus(), 120);
+  };
+  window.subxCloseEditor = function () {
+    $x('subx-modal').classList.remove('open');
+    $x('subx-combo-list').classList.remove('open');
+  };
+
+  // ── Combobox للطالب (بحث بالاسم / اللقب / Student ID) ──
   window.subxOnStudentInput = function () {
     const v = $x('subx-student').value.trim();
-    selectedStudent = null;
-    if (!v) { subxPreview(); return; }
+    const list = $x('subx-combo-list');
+    if (selectedStudent) {
+      const selVal = studentFullName(selectedStudent) || String(selectedStudent.id);
+      if (selVal.toLowerCase() !== v.toLowerCase()) selectedStudent = null;
+    }
+    if (!v) { list.classList.remove('open'); $x('subx-student-info').innerHTML = ''; subxRenderPreview(); return; }
     loadRegs().then(() => {
       const low = v.toLowerCase();
-      const byId = regs.find(r => String(r.id).toLowerCase() === low);
-      const byName = regs.find(r => ((r.first_name || '') + ' ' + (r.last_name || '')).toLowerCase() === low);
-      if (byId) selectedStudent = byId;
-      else if (byName) selectedStudent = byName;
-      else {
-        const tag = '—';
-        const parts = v.split('—').map(s => s.trim());
-        if (parts.length > 1) {
-          const id = parts[parts.length - 1].toLowerCase();
-          const found = regs.find(r => String(r.id).toLowerCase() === id);
-          if (found) selectedStudent = found;
-        }
+      const items = regs.filter(r => {
+        const name = studentFullName(r).toLowerCase();
+        const ln = (r.last_name || '').toLowerCase();
+        const fn = (r.first_name || '').toLowerCase();
+        return name.includes(low) || ln.includes(low) || fn.includes(low) || String(r.id).toLowerCase().includes(low);
+      }).slice(0, 8);
+      if (!items.length) {
+        list.innerHTML = '<div class="subx-combo-item" style="color:#dc2626;cursor:default">لا يمكن إنشاء اشتراك — الطالب غير مسجل نهائياً.</div>';
+        list.classList.add('open');
+        return;
       }
-      subxPreview();
+      comboIndex = 0;
+      list.innerHTML = items.map((r, i) =>
+        '<div class="subx-combo-item' + (i === 0 ? ' hl' : '') + '" data-id="' + escX(String(r.id)) + '" onmousedown="event.preventDefault();subxPickStudent(this.getAttribute(\'data-id\'))">' +
+          '<div class="s-name">' + escX(studentFullName(r) || r.id) + '</div>' +
+          '<div class="s-meta">Student ID: ' + escX(r.id) + ' — ' + escX(r.level || '—') + (r.stream ? ' — ' + escX(r.stream) : '') + '</div>' +
+        '</div>'
+      ).join('');
+      list.classList.add('open');
     });
   };
-
-  window.subxPreview = function () {
-    const months = parseInt($x('subx-months').value, 10) || 1;
-    const start = $x('subx-start').value || SubscriptionService.today();
-    const periods = SubscriptionService.buildPeriods(start, months);
-    const totals = SubscriptionService.computeSubscriptionTotals(periods);
-    const price = months === 1 ? 2000 : months === 2 ? 4000 : 6000;
-
-    let html = '';
-    if (selectedStudent) {
-      const name = ((selectedStudent.first_name || '') + ' ' + (selectedStudent.last_name || '')).trim();
-      html += '<div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:10px">👤 ' + escX(name) + ' — <span style="font-family:monospace;color:var(--text-muted)">' + escX(selectedStudent.id) + '</span></div>';
-    }
-    html += '<table style="width:100%;border-collapse:collapse;font-size:12.5px">' +
-      '<thead><tr style="color:var(--text-muted);font-weight:800"><th style="text-align:right;padding:4px 6px">الشهر</th><th style="text-align:right;padding:4px 6px">البداية</th><th style="text-align:right;padding:4px 6px">النهاية</th><th style="text-align:right;padding:4px 6px">الحصص</th><th style="text-align:right;padding:4px 6px">الحالة</th></tr></thead><tbody>';
-    periods.forEach((p, i) => {
-      html += '<tr style="border-top:1px solid var(--border)"><td style="padding:6px;font-weight:800">الشهر ' + (i + 1) + '</td>' +
-        '<td style="padding:6px">' + fmtAr(p.startDate) + '</td>' +
-        '<td style="padding:6px">' + fmtAr(p.endDate) + '</td>' +
-        '<td style="padding:6px">' + p.totalSessions + '</td>' +
-        '<td style="padding:6px">' + (p.status === 'upcoming' ? '⏳ لم يبدأ' : p.status === 'completed' ? '✅ اكتمل' : '🟢 جاري') + '</td></tr>';
-    });
-    html += '</tbody></table>';
-    html += '<div style="margin-top:10px;padding:10px 12px;background:var(--primary-light);border-radius:10px;font-size:13px;font-weight:800">' +
-      'إجمالي الحصص: <b>' + totals.totalSessions + '</b> — المبلغ الإجمالي: <b style="color:#059669">' + SubscriptionService.fmtPrice(price) + '</b></div>';
-    html += '<div style="margin-top:8px;font-size:11.5px;color:var(--text-muted);font-weight:700">⚠️ عند التأكيد تُسجَّل دفعة واحدة idempotent (payment_id فريد) ويُفعَّل الاشتراك فوراً.</div>';
-    $x('subx-preview-body').innerHTML = html;
+  window.subxPickStudent = function (id) {
+    const r = regs.find(x => String(x.id) === String(id));
+    if (!r) return;
+    selectedStudent = r;
+    $x('subx-student').value = studentFullName(r) || r.id;
+    $x('subx-student-info').innerHTML = '👤 Student ID: <b>' + escX(r.id) + '</b> — ' + escX(r.level || '—') + (r.stream ? ' — ' + escX(r.stream) : '');
+    $x('subx-combo-list').classList.remove('open');
+    subxRenderPreview();
   };
-
-  async function subxFindByPaymentId(pid) {
-    try {
-      const all = await SubscriptionService.adminListSubscriptions();
-      const arr = Array.isArray(all) ? all : [];
-      return arr.find(s => s.payment_id === pid) || null;
-    } catch (e) { return null; }
+  function subxComboMove(d) {
+    const items = $x('subx-combo-list').querySelectorAll('.subx-combo-item[data-id]');
+    if (!items.length) return;
+    comboIndex = Math.min(items.length - 1, Math.max(0, comboIndex + d));
+    items.forEach((el, i) => el.classList.toggle('hl', i === comboIndex));
   }
+  $x('subx-student').addEventListener('keydown', function (e) {
+    const list = $x('subx-combo-list');
+    if (!list.classList.contains('open')) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); subxComboMove(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); subxComboMove(-1); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      const it = list.querySelector('.subx-combo-item.hl[data-id]');
+      if (it) window.subxPickStudent(it.getAttribute('data-id'));
+    } else if (e.key === 'Escape') { list.classList.remove('open'); }
+  });
+  document.addEventListener('click', function (e) {
+    const list = $x('subx-combo-list');
+    if (list && !e.target.closest('.subx-combo')) list.classList.remove('open');
+  });
 
-  window.subxCreate = async function () {
-    if (!selectedStudent) { srShowToast('اختر الطالب من قائمة التسجيلات أولاً', 'error'); return; }
-    const months = parseInt($x('subx-months').value, 10) || 1;
+  // ── اختيار الباقة ──
+  window.subxSelectPackage = function (n) {
+    selectedPkg = n;
+    [1, 2, 3].forEach(i => { const el = $x('subx-pkg-' + i); if (el) el.classList.toggle('sel', i === n); });
+    subxRenderPreview();
+  };
+
+  // ── معاينة قبل التأكيد ──
+  window.subxRenderPreview = function () {
+    const pkg = SubscriptionService.packageByMonths(selectedPkg);
     const start = $x('subx-start').value || SubscriptionService.today();
-    const btn = $x('subx-save');
-    btn.disabled = true;
+    const end = SubscriptionService.endDateFor(start, pkg.months);
+    const body = $x('subx-preview-body');
+    if (!selectedStudent) {
+      body.innerHTML = '<div class="subx-note">اختر الطالب أولاً لعرض معاينة الاشتراك.</div>';
+      return;
+    }
+    const name = studentFullName(selectedStudent);
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700;width:130px">الطالب</td><td style="padding:5px 6px;font-weight:800">' + escX(name) + ' <span style="font-family:monospace;font-size:11px;color:var(--text-muted)">' + escX(selectedStudent.id) + '</span></td></tr>';
+    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">الباقة</td><td style="padding:5px 6px;font-weight:800">' + escX(pkg.label) + '</td></tr>';
+    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">السعر</td><td style="padding:5px 6px;font-weight:800;color:#059669">' + SubscriptionService.fmtPrice(pkg.price) + '</td></tr>';
+    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">عدد الحصص</td><td style="padding:5px 6px;font-weight:800">' + pkg.sessions + ' حصة (' + pkg.months + ' × 8)</td></tr>';
+    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">تاريخ البداية</td><td style="padding:5px 6px;font-weight:800">' + SubscriptionService.fmtAr(start, true) + '</td></tr>';
+    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">تاريخ النهاية</td><td style="padding:5px 6px;font-weight:800">' + SubscriptionService.fmtAr(end, true) + '</td></tr>';
+    html += '</table>';
+    const periods = SubscriptionService.buildPeriods(start, pkg.months);
+    html += '<div style="margin-top:10px;font-size:12px;font-weight:800;color:var(--text-muted)">الحصص حسب الشهر:</div>';
+    html += '<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">';
+    periods.forEach(p => {
+      html += '<div style="flex:1;min-width:120px;background:var(--primary-light);border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:800">الشهر ' + p.monthNumber +
+        '<div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-top:2px">' + SubscriptionService.fmtAr(p.startDate) + ' → ' + SubscriptionService.fmtAr(p.endDate) + '</div>' +
+        '<div style="color:#059669;margin-top:2px">8 حصص</div></div>';
+    });
+    html += '</div>';
+    body.innerHTML = html;
+  };
 
+  // ── إنشاء الاشتراك ──
+  window.subxCreate = async function () {
+    if (!selectedStudent) { srShowToast('اختر الطالب أولاً', 'error'); return; }
+    const pkg = SubscriptionService.packageByMonths(selectedPkg);
+    const btn = $x('subx-create-btn');
+    let start = $x('subx-start').value || SubscriptionService.today();
+
+    btn.disabled = true;
     try {
-      const existing = await SubscriptionService.getActiveSubscription(selectedStudent.id, start);
-      if (existing && existing.subscription) {
+      // منع التداخل: لو يوجد اشتراك نشط متداخل نعرض خياراً واضحاً
+      const overlap = await SubscriptionService.findOverlapping(selectedStudent.id, start, pkg.months);
+      if (overlap && overlap.subscription) {
         btn.disabled = false;
-        const ok = await cmConfirm('تنبيه',
-          'هذا الطالب لديه اشتراك نشط في هذه الفترة (' + existing.subscription.id + ').\nهل تريد إنشاء اشتراك جديد مع دفعة جديدة؟', '⚠️');
-        if (!ok) return;
+        const until = SubscriptionService.fmtAr(overlap.subscription.end_date, true);
+        const ask = await cmShow('⚠️',
+          'اشتراك نشط موجود',
+          'هذا الطالب لديه اشتراك نشط بالفعل حتى <b>' + until + '</b>.<br><br>' +
+          'لا يمكن إنشاء اشتراك متداخل معه بشكل عشوائي.',
+          { confirmText: 'إنشاء بعد انتهاء الاشتراك الحالي', cancelText: 'إلغاء', success: true });
+        if (!ask) return;
+        start = SubscriptionService.addDays(overlap.subscription.end_date, 1);
+        $x('subx-start').value = start;
+        subxRenderPreview();
+        srShowToast('سيبدأ الاشتراك الجديد من ' + SubscriptionService.fmtAr(start, true), 'success');
         btn.disabled = true;
       }
-      const paymentId = 'SUBPAY-' + selectedStudent.id + '-' + start + '-' + months;
+
+      const name = studentFullName(selectedStudent);
+      const end = SubscriptionService.endDateFor(start, pkg.months);
+      const summary =
+        '<div style="text-align:right;font-size:13px;line-height:2">' +
+          '<div><b>الطالب:</b> ' + escX(name) + ' <span style="font-family:monospace;font-size:11px;color:var(--text-muted)">' + escX(selectedStudent.id) + '</span></div>' +
+          '<div><b>الباقة:</b> ' + escX(pkg.label) + '</div>' +
+          '<div><b>السعر:</b> ' + SubscriptionService.fmtPrice(pkg.price) + '</div>' +
+          '<div><b>الحصص:</b> ' + pkg.sessions + ' حصة</div>' +
+          '<div><b>البداية:</b> ' + SubscriptionService.fmtAr(start, true) + '</div>' +
+          '<div><b>النهاية:</b> ' + SubscriptionService.fmtAr(end, true) + '</div>' +
+        '</div>';
+      const ok = await cmShow('📅', 'تأكيد الاشتراك', summary + '<div style="margin-top:8px;font-size:12px;color:var(--text-muted)">هل تريد تأكيد إنشاء هذا الاشتراك؟</div>', { confirmText: 'تأكيد الاشتراك', success: true });
+      if (!ok) { btn.disabled = false; return; }
+      btn.disabled = true;
+
+      const paymentId = 'SUBPAY-' + selectedStudent.id + '-' + start + '-' + pkg.months;
       const created = await SubscriptionService.createSubscription({
         studentId: selectedStudent.id,
-        months: months,
+        months: pkg.months,
         startDate: start,
         paymentId: paymentId,
-        notes: 'أنشئ من لوحة الإدارة — الدفعة ' + paymentId
+        notes: 'أنشئ من لوحة الإدارة'
       });
       if (created && created.subscription) {
-        srShowToast('✅ تم تفعيل الاشتراك وتسجيل الدفعة (id=' + created.subscription.id + ')', 'success');
-        subxLoadAll();
-        subxPreview();
+        const successHtml =
+          '<div style="text-align:center;font-size:13px">' +
+            '<div style="font-size:38px;margin-bottom:6px">✅</div>' +
+            '<div style="font-weight:900;font-size:15px;margin-bottom:12px">تم إنشاء الاشتراك بنجاح</div>' +
+            '<div style="text-align:right;line-height:2">' +
+              '<div><b>الطالب:</b> ' + escX(name) + '</div>' +
+              '<div><b>الباقة:</b> ' + escX(pkg.label) + '</div>' +
+              '<div><b>المبلغ:</b> ' + SubscriptionService.fmtPrice(pkg.price) + '</div>' +
+              '<div><b>الحصص:</b> ' + pkg.sessions + ' حصة</div>' +
+              SubscriptionService.buildPeriods(start, pkg.months).map(p => '<div><b>الشهر ' + p.monthNumber + ':</b> 8 حصص</div>').join('') +
+            '</div>' +
+          '</div>';
+        await cmShow('✅', 'تم بنجاح', successHtml, { hideCancel: true, confirmText: 'موافق', success: true });
+        subxCloseEditor();
+        await subxLoadAll();
       }
     } catch (e) {
       const msg = String((e && e.message) || e);
-      if (e && e.code === '23505' || msg.indexOf('23505') >= 0 || /duplicate key|duplicate/i.test(msg)) {
-        const dup = await subxFindByPaymentId('SUBPAY-' + selectedStudent.id + '-' + start + '-' + months);
-        if (dup) {
-          srShowToast('🔁 الدفعة مسجلة مسبقاً — الاشتراك ' + dup.id + ' موجود (عملية Idempotent، لم تُسجَّل دفعة مكررة)', 'success');
-          subxLoadAll();
-          subxPreview();
-        } else {
-          srShowToast('تعذر الإنشاء — اشتراك مكرر محتمل. تفقد قائمة الاشتراكات.', 'error');
-        }
+      if ((e && e.code === '23505') || msg.indexOf('23505') >= 0 || /overlapping active subscription/i.test(msg)) {
+        srShowToast('🔁 اشتراك مكرر أو متداخل — تفقد قائمة الاشتراكات.', 'error');
+        await subxLoadAll();
+      } else if (/unauthorized|forbidden/i.test(msg)) {
+        srShowToast('⚠️ جلسة الأدمن غير معتمدة — أعد تسجيل الدخول.', 'error');
       } else {
         srShowToast('تعذر إنشاء الاشتراك: ' + msg, 'error');
       }
@@ -22096,67 +22235,152 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     }
   };
 
-  function escX(s) {
-    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
+  // ── القائمة + الإحصائيات ──
   window.subxLoadAll = async function () {
-    const all = await subxLoadList();
-    if (!all) return;
+    try {
+      const all = await SubscriptionService.adminListSubscriptions();
+      allSubs = Array.isArray(all) ? all : [];
+    } catch (e) {
+      console.error('[SUBSCRIPTIONS] load failed', e);
+      $x('subx-tbody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#dc2626;padding:18px;font-size:13px">تعذر تحميل الاشتراكات: ' + escX(e.message || e) + '</td></tr>';
+      return null;
+    }
     const today = SubscriptionService.today();
     let active = 0, revenue = 0;
-    all.forEach(s => {
+    allSubs.forEach(row => {
+      const s = row.subscription || {};
       if (s.status !== 'cancelled') revenue += (s.total_price || 0);
-      if (s.status !== 'cancelled' && today >= (s.start_date || '') && today <= (s.end_date || '')) active++;
+      const st = SubscriptionService.subscriptionStatus(s, today);
+      if (st === 'active') active++;
     });
-    $x('subx-total').textContent = all.length;
+    $x('subx-total').textContent = allSubs.length;
     $x('subx-active').textContent = active;
     $x('subx-revenue').textContent = revenue.toLocaleString('ar-DZ') + ' دج';
     const badge = document.getElementById('nav-badge-subscriptions');
     if (badge) badge.textContent = active;
+    subxFilterList();
+    return allSubs;
   };
 
-  window.subxLoadList = async function () {
+  window.subxFilterList = function () {
+    const q = ($x('subx-search').value || '').trim().toLowerCase();
+    const f = $x('subx-filter-status').value;
+    const today = SubscriptionService.today();
+    if (!allSubs.length) {
+      $x('subx-tbody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">لا توجد اشتراكات بعد — اضغط "➕ اشتراك جديد".</td></tr>';
+      return;
+    }
+    let html = '';
+    let shown = 0;
+    allSubs.forEach(row => {
+      const s = row.subscription || {};
+      const periods = row.periods || [];
+      const st = SubscriptionService.subscriptionStatus(s, today);
+      if (f && st !== f) return;
+      const reg = regs.find(rr => String(rr.id) === String(s.student_id));
+      const name = reg ? studentFullName(reg) : (s.student_id || '—');
+      if (q && name.toLowerCase().indexOf(q) < 0 && String(s.student_id).toLowerCase().indexOf(q) < 0) return;
+      shown++;
+      const used = periods.reduce((a, p) => a + ((p.used_sessions || 0)), 0);
+      const total = s.total_sessions || (s.months || 1) * 8;
+      const pkg = SubscriptionService.packageByMonths(s.months);
+      const bg = st === 'active' ? 'background:rgba(16,185,129,0.12);color:#059669'
+        : st === 'done' ? 'background:rgba(245,158,11,0.14);color:#d97706'
+        : st === 'upcoming' ? 'background:rgba(59,130,246,0.1);color:#2563eb'
+        : st === 'cancelled' ? 'background:rgba(239,68,68,0.12);color:#dc2626'
+        : 'background:var(--border);color:var(--text-muted)';
+      html += '<tr>' +
+        '<td style="font-weight:800">' + escX(name) + '<div style="font-size:11px;color:var(--text-muted);font-weight:700;font-family:monospace">' + escX(s.student_id) + '</div></td>' +
+        '<td>' + escX(pkg ? pkg.label : ((s.months || '—') + ' شهر')) + '</td>' +
+        '<td style="direction:ltr">' + (s.total_price || 0).toLocaleString('ar-DZ') + ' دج</td>' +
+        '<td>' + SubscriptionService.fmtAr(s.start_date) + '</td>' +
+        '<td>' + SubscriptionService.fmtAr(s.end_date) + '</td>' +
+        '<td>' + used + ' / ' + total + '</td>' +
+        '<td><span class="subx-status" style="' + bg + '">' + SubscriptionService.subscriptionStatusLabel(st) + '</span></td>' +
+        '<td><button class="tbl-action" style="font-size:12px" onclick="subxShowDetail(\'' + escX(s.id) + '\')">👁️ عرض التفاصيل</button></td>' +
+        '</tr>';
+    });
+    $x('subx-tbody').innerHTML = shown ? html : '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">لا توجد نتائج مطابقة.</td></tr>';
+  };
+
+  window.subxLoadList = window.subxFilterList;
+
+  // ── تفاصيل الاشتراك (مودال) ──
+  window.subxShowDetail = async function (id) {
+    const body = $x('subx-detail-body');
+    body.innerHTML = '<div class="subx-note" style="text-align:center;padding:18px">جارٍ تحميل التفاصيل…</div>';
+    $x('subx-detail-modal').classList.add('open');
     try {
-      const all = await SubscriptionService.adminListSubscriptions();
-      const rows = Array.isArray(all) ? all : [];
-      if (!rows.length) {
-        $x('subx-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">لا توجد اشتراكات بعد — أنشئ أول اشتراك من المحرر أعلاه.</td></tr>';
-        return rows;
-      }
-      await loadRegs();
-      const nameOf = (id) => {
-        const r = regs.find(rr => String(rr.id) === String(id));
-        return r ? ((r.first_name || '') + ' ' + (r.last_name || '')).trim() : (id || '—');
-      };
+      const d = await SubscriptionService.adminSubscriptionDetail(id);
+      const sub = (d && d.subscription) || {};
+      const periods = (d && d.periods) || [];
+      const stu = (d && d.student) || regs.find(r => String(r.id) === String(sub.student_id)) || {};
+      const today = SubscriptionService.today();
+      const pkg = SubscriptionService.packageByMonths(sub.months);
+      const used = periods.reduce((a, p) => a + ((p.used_sessions || 0)), 0);
+      const total = sub.total_sessions || (sub.months || 1) * 8;
+
       let html = '';
-      rows.forEach(s => {
-        const st = s.status === 'cancelled' ? '<span style="color:#dc2626">ملغى</span>' : (todayInRange(s) ? '<span style="color:#059669">🟢 نشط</span>' : '<span style="color:var(--text-muted)">انتهى</span>');
-        html += '<tr>' +
-          '<td style="font-weight:800">' + escX(nameOf(s.student_id)) + '</td>' +
-          '<td style="font-family:monospace;font-size:12px;color:var(--text-muted)">' + escX(s.student_id) + '</td>' +
-          '<td>' + (s.months || '—') + ' شهر</td>' +
-          '<td style="direction:ltr">' + (s.total_price || 0).toLocaleString('ar-DZ') + ' دج</td>' +
-          '<td>' + fmtAr(s.start_date) + '</td>' +
-          '<td>' + fmtAr(s.end_date) + '</td>' +
-          '<td>' + st + '</td></tr>';
+      // معلومات الطالب
+      html += '<div style="font-size:13px;font-weight:900;margin-bottom:8px;color:var(--primary)">👤 معلومات الطالب</div>';
+      html += '<div style="background:var(--bg,#f8f9fc);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:13px;line-height:2">' +
+        '<div><b>الاسم الكامل:</b> ' + escX(studentFullName(stu) || sub.student_id) + '</div>' +
+        '<div><b>Student ID:</b> <span style="font-family:monospace">' + escX(sub.student_id) + '</span></div>' +
+        '<div><b>المستوى:</b> ' + escX(stu.level || '—') + '</div>' +
+        (stu.stream ? '<div><b>الشعبة:</b> ' + escX(stu.stream) + '</div>' : '') +
+        (stu.institution ? '<div><b>المؤسسة:</b> ' + escX(stu.institution) + '</div>' : '') +
+        '</div>';
+
+      // معلومات الاشتراك
+      html += '<div style="font-size:13px;font-weight:900;margin:16px 0 8px;color:var(--primary)">📅 معلومات الاشتراك</div>';
+      html += '<div style="background:var(--bg,#f8f9fc);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:13px;line-height:2">' +
+        '<div><b>الباقة:</b> ' + escX(pkg ? pkg.label : ((sub.months || '—') + ' شهر')) + '</div>' +
+        '<div><b>السعر:</b> ' + SubscriptionService.fmtPrice(sub.total_price) + '</div>' +
+        '<div><b>تاريخ البداية:</b> ' + SubscriptionService.fmtAr(sub.start_date, true) + '</div>' +
+        '<div><b>تاريخ النهاية:</b> ' + SubscriptionService.fmtAr(sub.end_date, true) + '</div>' +
+        '<div><b>إجمالي الحصص:</b> ' + total + ' حصة — المستخدمة: ' + used + ' — المتبقية: ' + Math.max(0, total - used) + '</div>' +
+        '<div><b>الحالة:</b> <span class="subx-status">' + SubscriptionService.subscriptionStatusLabel(SubscriptionService.subscriptionStatus(sub, today)) + '</span></div>' +
+        '</div>';
+
+      // تفاصيل الأشهر (كل شهر كيان مستقل)
+      html += '<div style="font-size:13px;font-weight:900;margin:16px 0 8px;color:var(--primary)">🗓️ تفاصيل الأشهر</div>';
+      periods.forEach(p => {
+        const ms = SubscriptionService.monthStatus(p, today);
+        const u = p.used_sessions || 0;
+        const t = p.total_sessions || 8;
+        const rem = Math.max(0, t - u);
+        const pct = t ? Math.round((u / t) * 100) : 0;
+        const msBg = ms === 'active' ? 'background:rgba(16,185,129,0.1);color:#059669'
+          : ms === 'full' ? 'background:rgba(239,68,68,0.1);color:#dc2626'
+          : ms === 'completed' ? 'background:rgba(16,185,129,0.1);color:#059669'
+          : ms === 'expired_remain' ? 'background:rgba(245,158,11,0.14);color:#d97706'
+          : 'background:var(--border);color:var(--text-muted)';
+        html += '<div style="border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between">' +
+            '<div style="font-weight:900;font-size:13px">الشهر ' + (p.month_number || '—') + '</div>' +
+            '<span class="subx-status" style="' + msBg + '">' + SubscriptionService.monthStatusLabel(ms) + '</span>' +
+          '</div>' +
+          '<div style="font-size:12px;color:var(--text-muted);font-weight:700;margin:4px 0 8px">' + SubscriptionService.fmtAr(p.start_date, true) + ' → ' + SubscriptionService.fmtAr(p.end_date, true) + '</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;font-size:12px;font-weight:800">' +
+            '<div style="background:var(--bg,#f8f9fc);border-radius:10px;padding:8px">الحصص<div style="color:var(--text);margin-top:2px">' + t + '</div></div>' +
+            '<div style="background:var(--bg,#f8f9fc);border-radius:10px;padding:8px">حضر<div style="color:#2563eb;margin-top:2px">' + u + '</div></div>' +
+            '<div style="background:var(--bg,#f8f9fc);border-radius:10px;padding:8px">متبقي<div style="color:#059669;margin-top:2px">' + rem + '</div></div>' +
+          '</div>' +
+          '<div style="height:6px;background:var(--border);border-radius:99px;margin-top:10px;overflow:hidden"><i style="display:block;height:100%;width:' + pct + '%;background:linear-gradient(90deg,#059669,#10b981);border-radius:99px"></i></div>' +
+        '</div>';
       });
-      $x('subx-tbody').innerHTML = html;
-      return rows;
+      body.innerHTML = html;
     } catch (e) {
-      $x('subx-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#dc2626;padding:18px;font-size:13px">تعذر تحميل الاشتراكات: ' + escX(e.message || e) + '</td></tr>';
-      return null;
+      body.innerHTML = '<div style="text-align:center;color:#dc2626;padding:18px;font-size:13px;font-weight:800">تعذر تحميل التفاصيل: ' + escX(e.message || e) + '</div>';
     }
   };
-
-  function todayInRange(s) {
-    const today = SubscriptionService.today();
-    return today >= (s.start_date || '') && today <= (s.end_date || '');
-  }
+  window.subxCloseDetail = function () {
+    $x('subx-detail-modal').classList.remove('open');
+  };
 
   window.addEventListener('DOMContentLoaded', function () {
     loadRegs();
-    $x('subx-start').value = SubscriptionService.today();
+    subxLoadAll();
   });
 })();
 

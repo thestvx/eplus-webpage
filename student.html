@@ -220,8 +220,10 @@
     .sub-month-main{flex:1;min-width:0}
     .sub-month-name{font-size:13px;font-weight:800;color:var(--text)}
     .sub-month-range{font-size:11px;color:var(--text-muted);font-weight:600;margin-top:1px}
+    .sub-month-status{display:inline-flex;margin-top:5px;padding:2px 9px;border-radius:99px;font-size:10.5px;font-weight:800}
     .sub-month-usage{font-size:12px;font-weight:900;color:var(--text);white-space:nowrap}
     .sub-month-usage .u{color:var(--success)}
+    .sub-month-usage .r{color:var(--primary)}
     .sub-month-progress{width:100%;height:7px;border-radius:99px;background:var(--border);overflow:hidden;margin-top:9px}
     .sub-month-progress>i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--primary),#8b5cf6);transition:width .6s ease}
     .sub-month-detail{display:none;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border)}
@@ -335,8 +337,12 @@
       let monthsHTML=periods.map((p,i)=>{
         const used=p.used_sessions||0;
         const total=p.total_sessions||SubscriptionService.SESSIONS_PER_MONTH;
+        const remain=Math.max(0,total-used);
         const pct=total?Math.round((used/total)*100):0;
         const isActive=activePeriod&&activePeriod.id===p.id;
+        const ms=SubscriptionService.monthStatus(p,today);
+        const msTxt=SubscriptionService.monthStatusLabel(ms);
+        const msBg=ms==='active'?'background:rgba(16,185,129,0.14);color:#10b981':ms==='upcoming'?'background:rgba(148,163,184,0.16);color:#64748b':ms==='full'?'background:rgba(239,68,68,0.14);color:#ef4444':ms==='expired_remain'?'background:rgba(245,158,11,0.14);color:#d97706':'background:rgba(99,102,241,0.14);color:#6366f1';
         const evs=monthEvents[i]||[];
         let evHTML='';
         if(!evs.length)evHTML='<div class="sub-empty-msg">لا توجد حصص مسجلة في هذا الشهر</div>';
@@ -346,8 +352,9 @@
         return '<div class="sub-month-card'+(isActive?' active':'')+'" onclick="this.classList.toggle(\'open\')">'+
           '<div class="sub-month-head"><div class="sub-month-idx">'+(p.month_number||(i+1))+'</div>'+
           '<div class="sub-month-main"><div class="sub-month-name">الشهر '+(p.month_number||(i+1))+(isActive?' — الحالي':'')+'</div>'+
-          '<div class="sub-month-range">'+subFmtAr(p.start_date)+' → '+subFmtAr(p.end_date)+'</div></div>'+
-          '<div class="sub-month-usage"><span class="u">'+used+'</span> / '+total+'</div></div>'+
+          '<div class="sub-month-range">'+subFmtAr(p.start_date)+' → '+subFmtAr(p.end_date)+'</div>'+
+          '<div class="sub-month-status" style="'+msBg+'">'+msTxt+'</div></div>'+
+          '<div class="sub-month-usage">حضر <span class="u">'+used+'</span> · متبقي <span class="r">'+remain+'</span> / '+total+'</div></div>'+
           '<div class="sub-month-progress"><i style="width:'+pct+'%"></i></div>'+
           '<div class="sub-month-detail">'+evHTML+'</div></div>';
       }).join('');

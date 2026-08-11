@@ -24,6 +24,12 @@ const SubscriptionService = (function () {
   const SESSIONS_PER_MONTH = 8;
   const MONTH_PRICES = { 1: 2000, 2: 4000, 3: 6000 };
   const MONTH_SESSIONS = { 1: 8, 2: 16, 3: 24 };
+  // الباقات الثابتة فقط — السعر والحصص محسوبان ولا يُكتبان يدوياً أبداً
+  const PACKAGES = [
+    { months: 1, label: 'شهر واحد', price: 2000, sessions: 8 },
+    { months: 2, label: 'شهرين', price: 4000, sessions: 16 },
+    { months: 3, label: '3 أشهر', price: 6000, sessions: 24 }
+  ];
   const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'ماي', 'جوان', 'جويلية', 'أوت', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 
   let SUPABASE_URL = '';
@@ -46,6 +52,14 @@ const SubscriptionService = (function () {
       return await AUTH_TOKEN_PROVIDER();
     }
     return null;
+  }
+
+  function packageByMonths(n) {
+    return PACKAGES.find(p => p.months === (parseInt(n, 10) || 1)) || PACKAGES[0];
+  }
+
+  function endDateFor(startDate, months) {
+    return addDays(addCalendarMonths(startDate, months), -1);
   }
 
   // ── Africa/Algiers helpers ───────────────────────────────
@@ -231,12 +245,13 @@ const SubscriptionService = (function () {
   async function createSubscription(opts) {
     const months = parseInt(opts.months, 10) || 1;
     const start = opts.startDate || today();
+    const pkg = packageByMonths(months);
     const paymentId = opts.paymentId || ('SUBPAY-' + opts.studentId + '-' + start + '-' + months);
     const data = await _adminCall('create-subscription', {
       studentId: opts.studentId,
       months: months,
       startDate: start,
-      totalPrice: MONTH_PRICES[months] || (months * PRICE_PER_MONTH),
+      totalPrice: pkg.price,
       paymentId: paymentId,
       notes: opts.notes || ''
     });
@@ -244,8 +259,76 @@ const SubscriptionService = (function () {
     return data;
   }
 
+  // قائمة غنية: كل اشتراك مع أشهره (للوحة الإدارة)
   async function adminListSubscriptions() {
-    return await _adminCall('list-subscriptions', {});
+    return await _adminCall('list-subscriptions-rich', {});
+  }
+
+  async function adminSubscriptionDetail(subscriptionId) {
+    return await _adminCall('get-subscription-detail', { subscriptionId: subscriptionId });
+  }
+
+  // يبحث عن اشتراك فعّال متداخل مع النافذة المطلوبة [start, end]
+  async function findOverlapping(studentId, start, months) {
+    const end = endDateFor(start, months);
+    let rows = [];
+    try { rows = await adminListSubscriptions(); } catch (e) { return null; }
+    const arr = Array.isArray(rows) ? rows : [];
+    for (const row of arr) {
+      const s = row.subscription || {};
+      if (String(s.student_id) !== String(studentId)) continue;
+      if (s.status === 'cancelled') continue;
+      const sStart = s.start_date || '';
+      const sEnd = s.end_date || '';
+      if (sStart && sEnd && start <= sEnd && end >= sStart) return row;
+    }
+    return null;
+  }
+
+  // ── حالات العرض (لا تعتمد على التاريخ فقط) ─────────────
+  // اشتراك: active | upcoming | expired | done | cancelled
+  function subscriptionStatus(sub, refDate) {
+    const r = refDate || today();
+    if (sub.status === 'cancelled') return 'cancelled';
+    if (r < (sub.start_date || '')) return 'upcoming';
+    if (r > (sub.end_date || '')) return 'expired';
+    const periods = (sub.periods || []);
+    const active = periods.find(p => p && r >= p.start_date && r <= p.end_date);
+    if (active && (active.remaining_sessions || 0) <= 0) return 'done';
+    return 'active';
+  }
+
+  function subscriptionStatusLabel(st) {
+    switch (st) {
+      case 'active': return '🟢 نشط';
+      case 'upcoming': return '⏳ لم يبدأ';
+      case 'done': return '📌 مكتمل الحصص';
+      case 'expired': return '⚪ انتهى';
+      case 'cancelled': return '🚫 ملغى';
+      default: return '—';
+    }
+  }
+
+  // شهر واحد: upcoming | active | full | completed | expired_remain
+  function monthStatus(p, refDate) {
+    const r = refDate || today();
+    const used = p.used_sessions || 0;
+    const total = p.total_sessions || SESSIONS_PER_MONTH;
+    const remaining = Math.max(0, total - used);
+    if (r < (p.start_date || '')) return 'upcoming';
+    if (r > (p.end_date || '')) return remaining > 0 ? 'expired_remain' : 'completed';
+    return remaining <= 0 ? 'full' : 'active';
+  }
+
+  function monthStatusLabel(st) {
+    switch (st) {
+      case 'active': return '🟢 نشط';
+      case 'upcoming': return '⚪ لم يبدأ';
+      case 'full': return '🔴 انتهت الحصص';
+      case 'completed': return '✅ مكتمل';
+      case 'expired_remain': return '⏰ انتهى الشهر — توجد حصص غير مستخدمة';
+      default: return '—';
+    }
   }
 
   // ── Formatting (عرض عربي) ────────────────────────────────
@@ -279,12 +362,21 @@ const SubscriptionService = (function () {
     getStudentEvents,
     createSubscription,
     adminListSubscriptions,
+    adminSubscriptionDetail,
+    findOverlapping,
+    subscriptionStatus,
+    subscriptionStatusLabel,
+    monthStatus,
+    monthStatusLabel,
+    packageByMonths,
+    endDateFor,
     fmtAr,
     fmtPrice,
     statusLabel,
     SESSIONS_PER_MONTH,
     PRICE_PER_MONTH,
     MONTH_PRICES,
-    MONTH_SESSIONS
+    MONTH_SESSIONS,
+    PACKAGES
   };
 })();
