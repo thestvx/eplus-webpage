@@ -9,25 +9,24 @@
 //  • لا يوجد خصم يدوي إطلاقاً — الدفعات تُسجّل كمعاملات مستقلة
 //  • lessonRateAtTransaction = snapshot، تغيّر الأسعار لاحقاً لا يمسّ التاريخ
 //  • الرصيد مُستمد من دفتر المعاملات (لا يُخزّن يدوياً)
+//
+//  الأمان (بعد إعادة التصميم): كل قراءة/كتابة عبر Edge Function
+//  admin-api (Authorization: Bearer <firebase id token>) → دوال admin_*
+//  بمفتاح service_role في الخادم فقط. لا أسرار REST مباشرة في المتصفح.
 // ═══════════════════════════════════════════════════════════
 
 window.TeacherFinance = (function () {
-  const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
-
   const ATT_COLLECTION = 'support_attendance';
-  const REG_TABLE = 'registrations';
-  const BAL_TABLE = 'teacher_balances';
-  const TX_TABLE = 'teacher_transactions';
-  const RCPT_TABLE = 'teacher_receipts';
 
-  function _headers(json) {
-    const h = {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-    };
-    if (json) h['Content-Type'] = 'application/json';
-    return h;
+  let ADMIN_API_URL = '';
+  let AUTH_TOKEN_PROVIDER = null;
+
+  function init(url) {
+    ADMIN_API_URL = url || '';
+  }
+
+  function setAuthTokenProvider(fn) {
+    AUTH_TOKEN_PROVIDER = typeof fn === 'function' ? fn : null;
   }
 
   function today() { return new Date().toISOString().split('T')[0]; }
@@ -35,43 +34,34 @@ window.TeacherFinance = (function () {
   function _fb() { return window._db || window.db || (typeof db !== 'undefined' ? db : null); }
   function _norm(name) { return String(name || '').replace(/\s+/g, '').toLowerCase(); }
 
-  // ── Supabase helpers ───────────────────────────────────
-
-  async function _list(table, query) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*${query || ''}`, { headers: _headers() });
-    if (!res.ok) {
-      // PGRST205 = relation does not exist — migrations may not be applied yet
-      if (res.status === 404) {
-        console.warn('[TeacherFinance] table "' + table + '" غير موجودة بعد — نفّذ supabase-migration.sql في Supabase Dashboard.');
-        return [];
-      }
-      throw new Error('HTTP ' + res.status + ' on ' + table);
+  async function _idToken() {
+    if (typeof AUTH_TOKEN_PROVIDER === 'function') {
+      return await AUTH_TOKEN_PROVIDER();
     }
-    return res.json();
+    return null;
   }
-  async function _upsert(table, rows) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=id`, {
+
+  // ── admin-api helper ───────────────────────────────────
+  // كل الدوال تستدعي admin-api بـ action + payload (معرّف من Firebase ID token)
+
+  async function _adminCall(action, payload) {
+    if (!ADMIN_API_URL) throw new Error('TeacherFinance not initialized (init)');
+    const token = await _idToken();
+    if (!token) throw new Error('admin auth required');
+    const res = await fetch(ADMIN_API_URL, {
       method: 'POST',
-      headers: _headers(true),
-      body: JSON.stringify(rows),
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(Object.assign({ action: action }, payload || {})),
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' on ' + table);
-    return res.json();
-  }
-  async function _patch(table, id, data) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      headers: _headers(true),
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' on ' + table);
-  }
-  async function _remove(table, id) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-      headers: _headers(),
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' on ' + table);
+    let r = null;
+    try { r = await res.json(); } catch (e) {}
+    if (!res.ok || !r || !r.ok) {
+      const err = new Error((r && r.error) || ('HTTP ' + res.status));
+      err.code = (r && r.code) || null;
+      err.status = res.status;
+      throw err;
+    }
+    return r.data;
   }
 
   // ── Attendance (Firestore) — 1 حضور = 1 حصة ───────────
@@ -92,11 +82,11 @@ window.TeacherFinance = (function () {
     }
   }
 
-  // ── Registrations (Supabase) ───────────────────────────
+  // ── Registrations (عبر admin-api) ──────────────────────
 
   async function loadConfirmedRegistrations() {
-    const rows = await _list(REG_TABLE, '');
-    return rows.filter(r => !r.deleted_at && r.status === 'مسجل نهائياً' && Array.isArray(r.subjects));
+    const rows = await _adminCall('list-registrations', {});
+    return (Array.isArray(rows) ? rows : []).filter(r => !r.deleted_at && r.status === 'مسجل نهائياً' && Array.isArray(r.subjects));
   }
 
   // ── Dues: تحويل الحضور إلى مستحقات ────────────────────
@@ -148,8 +138,8 @@ window.TeacherFinance = (function () {
       }
     }
 
-    // Upsert دفتر المستحقات (يحدّث بدل التكرار)
-    if (duesRows.length) await _upsert(TX_TABLE, duesRows);
+    // Upsert دفتر المستحقات (يحدّث بدل التكرار) عبر admin-api
+    if (duesRows.length) await _adminCall('upsert-transactions', { rows: duesRows });
 
     await recomputeBalance(teacherId, teacherName, totalSessions, uniqueStudents.size, baseRate, adminName);
     return { duesRows, totalSessions, studentCount: uniqueStudents.size, rate: baseRate };
@@ -161,81 +151,47 @@ window.TeacherFinance = (function () {
     const teacherId = teacher.teacherId || teacher.id || '';
     const teacherName = teacher.name || '';
     const amt = Math.max(0, Math.round(Number(amount) || 0));
-    const txId = _uid('pay');
-    const date = today();
-
-    await _upsert(TX_TABLE, [{
-      id: txId,
-      teacher_id: teacherId,
-      teacher_name: teacherName,
-      student_id: '',
-      student_name: '',
-      subject_id: '',
-      subject_name: '',
-      session_count: 0,
-      lesson_rate: 0,
+    const r = await _adminCall('add-payment', {
+      teacherId: teacherId,
+      teacherName: teacherName,
       amount: amt,
-      transaction_type: 'payment',
-      status: 'paid',
-      date: date,
-      notes: note || 'دفعة مالية',
-      admin_name: adminName || '',
-    }]);
-
-    const rcptId = 'RCP-' + date.replace(/-/g, '') + '-' + Math.floor(1000 + Math.random() * 9000);
-    await _upsert(RCPT_TABLE, [{
-      id: rcptId,
-      transaction_id: txId,
-      teacher_id: teacherId,
-      teacher_name: teacherName,
-      amount: amt,
-      date: date,
-      admin_name: adminName || '',
-      notes: note || '',
-    }]);
-
-    await recomputeBalance(teacherId, teacherName, null, null, teacher.rate || 0, adminName);
-    return { txId, receiptId: rcptId, amount: amt, date };
+      note: note || '',
+      adminName: adminName || '',
+      rate: teacher.rate || 0,
+    });
+    return { txId: r.tx_id, receiptId: r.receipt_id, amount: r.amount, date: r.date };
   }
 
   // ── Balance: مُستمد بالكامل من دفتر المعاملات ──────────
 
   async function recomputeBalance(teacherId, teacherName, sessionOverride, studentOverride, rate, adminName) {
-    const all = await _list(TX_TABLE, '&teacher_id=eq.' + encodeURIComponent(teacherId));
-    let totalDue = 0, totalPaid = 0, sessions = 0;
-    const students = new Set();
-    let lastRate = Number(rate) || 0;
-    all.forEach(t => {
-      if (t.transaction_type === 'dues') { totalDue += (t.amount || 0); sessions += (t.session_count || 0); if (t.student_id) students.add(t.student_id); if (Number(t.lesson_rate) > 0) lastRate = Number(t.lesson_rate); }
-      else if (t.transaction_type === 'payment') { totalPaid += (t.amount || 0); }
+    return await _adminCall('recompute-balance', {
+      teacherId: teacherId,
+      teacherName: teacherName || '',
+      sessionOverride: sessionOverride == null ? null : Number(sessionOverride),
+      studentOverride: studentOverride == null ? null : Number(studentOverride),
+      rate: Number(rate) || 0,
+      adminName: adminName || '',
     });
-    const row = {
-      teacher_id: teacherId,
-      teacher_name: teacherName || '',
-      total_due: totalDue,
-      total_paid: totalPaid,
-      pending: totalDue - totalPaid,
-      student_count: studentOverride != null ? studentOverride : students.size,
-      session_count: sessionOverride != null ? sessionOverride : sessions,
-      rate: lastRate,
-      updated_at: new Date().toISOString(),
-    };
-    await _upsert(BAL_TABLE, [row]);
-    return row;
   }
 
   async function getBalance(teacherId) {
-    const rows = await _list(BAL_TABLE, '&teacher_id=eq.' + encodeURIComponent(teacherId));
-    return rows[0] || null;
+    return await _adminCall('get-balance', { teacherId: teacherId }) || null;
+  }
+
+  async function listBalances() {
+    const rows = await _adminCall('list-balances', {});
+    return Array.isArray(rows) ? rows : [];
   }
 
   async function getLedger(teacherId) {
-    const rows = await _list(TX_TABLE, '&teacher_id=eq.' + encodeURIComponent(teacherId) + '&order=date.desc');
-    return rows;
+    const rows = await _adminCall('get-ledger', { teacherId: teacherId });
+    return Array.isArray(rows) ? rows : [];
   }
 
   async function getReceipts(teacherId) {
-    return await _list(RCPT_TABLE, '&teacher_id=eq.' + encodeURIComponent(teacherId) + '&order=date.desc');
+    const rows = await _adminCall('get-receipts', { teacherId: teacherId });
+    return Array.isArray(rows) ? rows : [];
   }
 
   // تحديث سعر الحصة الحالي في ملف الأستاذ (Firestore) + دفتر الرصيد
@@ -245,19 +201,19 @@ window.TeacherFinance = (function () {
     if (db) {
       try { await db.collection('support_teachers').doc(teacherId).update({ rate: r, updatedAt: new Date().toISOString() }); } catch (e) { console.warn('rate save failed', e); }
     }
-    await _upsert(BAL_TABLE, [{
-      teacher_id: teacherId,
-      rate: r,
-      updated_at: new Date().toISOString(),
-    }]);
-    return r;
+    return await _adminCall('set-rate', { teacherId: teacherId, rate: r });
   }
 
   // ── حذف معاملة (مع إعادة حساب الرصيد) ──────────────────
 
   async function deleteTransaction(teacherId, teacherName, txId, rate, adminName) {
-    await _remove(TX_TABLE, txId);
-    await recomputeBalance(teacherId, teacherName, null, null, rate, adminName);
+    return await _adminCall('delete-transaction', {
+      teacherId: teacherId,
+      teacherName: teacherName || '',
+      txId: txId,
+      rate: Number(rate) || 0,
+      adminName: adminName || '',
+    });
   }
 
   // ── Receipt Print (RTL، هوية E-PLUS، بدون تنسيق المتصفح الافتراضي) ──
@@ -324,9 +280,10 @@ window.TeacherFinance = (function () {
 
   // ── Expose ────────────────────────────────────────────
   return {
+    init, setAuthTokenProvider,
     today, countAttendance, loadConfirmedRegistrations,
     computeDuesForTeacher, addPayment, recomputeBalance,
-    getBalance, getLedger, getReceipts, saveTeacherRate,
+    getBalance, listBalances, getLedger, getReceipts, saveTeacherRate,
     deleteTransaction, printReceipt
   };
 })();

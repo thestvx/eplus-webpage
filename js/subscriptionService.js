@@ -7,6 +7,15 @@
 //    بحيث يكون لكل شهر: تواريخه، عدّاده، وحالته (upcoming / active / completed)
 //  • كل التواريخ بـ Africa/Algiers (لا تعتمد على Timezone الجهاز)
 //  • payment_id يجعل عملية الدفع Idempotent (لا تكرار للمدفوعات)
+//
+//  الأمان (بعد إعادة التصميم):
+//  • القراءة: RPCs مقصورة بكل طالب (get_student_subscription,
+//    get_student_attendance_events) — لا قراءة REST مباشرة للجداول.
+//  • الإنشاء/الإدارة: عبر Edge Function admin-api (Authorization:
+//    Bearer <firebase id token>) → دوال admin_* بمفتاح service_role
+//    في الخادم فقط. لا أسرار في المتصفح.
+//  • تسجيل الحضور: عبر Edge Function record-attendance (ذرّي في القاعدة)
+//    — راجع attendance.html.
 // ═══════════════════════════════════════════════════════════════
 
 const SubscriptionService = (function () {
@@ -15,16 +24,28 @@ const SubscriptionService = (function () {
   const SESSIONS_PER_MONTH = 8;
   const MONTH_PRICES = { 1: 2000, 2: 4000, 3: 6000 };
   const MONTH_SESSIONS = { 1: 8, 2: 16, 3: 24 };
-  const SUB_TABLE = 'student_subscriptions';
-  const PERIOD_TABLE = 'subscription_periods';
   const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'ماي', 'جوان', 'جويلية', 'أوت', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 
   let SUPABASE_URL = '';
   let SUPABASE_KEY = '';
+  let ADMIN_API_URL = '';
+  let AUTH_TOKEN_PROVIDER = null;
 
   function init(url, key) {
     SUPABASE_URL = url || '';
     SUPABASE_KEY = key || '';
+    ADMIN_API_URL = (SUPABASE_URL ? SUPABASE_URL + '/functions/v1/admin-api' : '');
+  }
+
+  function setAuthTokenProvider(fn) {
+    AUTH_TOKEN_PROVIDER = typeof fn === 'function' ? fn : null;
+  }
+
+  async function _idToken() {
+    if (typeof AUTH_TOKEN_PROVIDER === 'function') {
+      return await AUTH_TOKEN_PROVIDER();
+    }
+    return null;
   }
 
   // ── Africa/Algiers helpers ───────────────────────────────
@@ -117,69 +138,74 @@ const SubscriptionService = (function () {
     return { totalSessions: total, usedSessions: used, remainingSessions: Math.max(0, total - used) };
   }
 
-  // ── REST helpers (raw fetch like the rest of the project) ──
+  // ── REST helpers (RPC فقط — لا قراءة مباشرة للجداول) ─────
   function _headers(json) {
     const h = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
     if (json) h['Content-Type'] = 'application/json';
     return h;
   }
-  function _enc(v) { return encodeURIComponent(v); }
 
-  async function _list(table, query) {
+  async function _rpc(fn, args) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: _headers(true),
+      body: JSON.stringify(args || {}),
+    });
+    if (!res.ok) {
+      const e = new Error('HTTP ' + res.status + ' on rpc ' + fn);
+      e.status = res.status;
+      throw e;
+    }
+    return res.json();
+  }
+
+  async function _adminCall(action, payload) {
+    if (!ADMIN_API_URL) throw new Error('SubscriptionService not initialized');
+    const token = await _idToken();
+    if (!token) throw new Error('admin auth required');
+    const res = await fetch(ADMIN_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(Object.assign({ action: action }, payload || {})),
+    });
+    let r = null;
+    try { r = await res.json(); } catch (e) {}
+    if (!res.ok || !r || !r.ok) {
+      const err = new Error((r && r.error) || ('HTTP ' + res.status));
+      err.code = (r && r.code) || null;
+      err.status = res.status;
+      throw err;
+    }
+    return r.data;
+  }
+
+  // ── Data access (RPC مقصورة بكل طالب) ───────────────────
+  async function getSubscriptions(studentId) {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*${query || ''}`, { headers: _headers() });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
+      const rows = await _rpc('get_student_subscription', { p_student_id: studentId });
+      return Array.isArray(rows) ? rows : [];
     } catch (e) {
-      console.warn('[SubscriptionService] list ' + table + ' failed:', e);
+      console.warn('[SubscriptionService] get_student_subscription failed:', e);
       return [];
     }
   }
 
-  async function _insert(table, rows) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=id`, {
-      method: 'POST',
-      headers: _headers(true),
-      body: JSON.stringify(rows),
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' on ' + table + ': ' + await res.text());
-    return res.json();
-  }
-
-  async function _patch(table, id, data) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${_enc(id)}`, {
-      method: 'PATCH',
-      headers: _headers(true),
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' on ' + table);
-  }
-
-  // ── Data access ──────────────────────────────────────────
-  async function getSubscriptions(studentId) {
-    return _list(SUB_TABLE, '&student_id=eq.' + _enc(studentId) + '&order=created_at.desc');
-  }
-
-  async function getPeriods(subscriptionId) {
-    return _list(PERIOD_TABLE, '&subscription_id=eq.' + _enc(subscriptionId) + '&order=month_number.asc');
-  }
-
   // الاشتراك الفعّال في تاريخ معيّن؛ إن لم يوجد فعّال نعيد آخر اشتراك غير ملغى
-  // (لتعرض الواجهات "انتهى الاشتراك" بصدق بدلاً من اختلاق بيانات).
   async function getActiveSubscription(studentId, refDate) {
-    const subs = await getSubscriptions(studentId);
-    if (!subs.length) return null;
+    const rows = await getSubscriptions(studentId);
+    if (!rows.length) return null;
     const r = refDate || today();
-    for (const s of subs) {
+    for (const row of rows) {
+      const s = row.subscription || {};
       if (s.status === 'cancelled') continue;
       if (r >= s.start_date && r <= s.end_date) {
-        return { subscription: s, periods: await getPeriods(s.id) };
+        return { subscription: s, periods: row.periods || [] };
       }
     }
-    for (const s of subs) {
+    for (const row of rows) {
+      const s = row.subscription || {};
       if (s.status !== 'cancelled') {
-        return { subscription: s, periods: await getPeriods(s.id) };
+        return { subscription: s, periods: row.periods || [] };
       }
     }
     return null;
@@ -190,95 +216,36 @@ const SubscriptionService = (function () {
     return (periods || []).find(p => r >= p.start_date && r <= p.end_date) || null;
   }
 
-  // إنشاء اشتراك جديد (Subscription B لا يعيد استخدام Subscription A)
+  // أحداث حضور الطالب من قاعدة البيانات الموثوقة (attendance_sessions)
+  async function getStudentEvents(studentId) {
+    try {
+      const rows = await _rpc('get_student_attendance_events', { p_student_id: studentId });
+      return Array.isArray(rows) ? rows : [];
+    } catch (e) {
+      console.warn('[SubscriptionService] get_student_attendance_events failed:', e);
+      return [];
+    }
+  }
+
+  // ── إدارة (عبر Edge Function admin-api — لا أسرار) ──────
   async function createSubscription(opts) {
     const months = parseInt(opts.months, 10) || 1;
     const start = opts.startDate || today();
-    const periods = buildPeriods(start, months);
-    const end = periods[periods.length - 1].endDate;
-    const id = 'SUB-' + opts.studentId + '-' + Date.now().toString(36);
-    const paymentId = opts.paymentId || ('SUBPAY-' + opts.studentId + '-' + Date.now().toString(36));
-
-    const sub = {
-      id,
-      student_id: opts.studentId,
-      start_date: start,
-      end_date: end,
-      months,
-      total_price: MONTH_PRICES[months] || (months * PRICE_PER_MONTH),
-      total_sessions: MONTH_SESSIONS[months] || (months * SESSIONS_PER_MONTH),
-      status: 'active',
-      payment_id: paymentId,
-      notes: opts.notes || '',
-      created_at: new Date().toISOString()
-    };
-    await _insert(SUB_TABLE, sub);
-
-    const nowIso = new Date().toISOString();
-    const periodRows = periods.map(p => ({
-      id: id + '-M' + p.monthNumber,
-      subscription_id: id,
-      month_number: p.monthNumber,
-      start_date: p.startDate,
-      end_date: p.endDate,
-      total_sessions: p.totalSessions,
-      used_sessions: 0,
-      remaining_sessions: p.totalSessions,
-      status: p.status,
-      updated_at: nowIso
-    }));
-    await _insert(PERIOD_TABLE, periodRows);
-
-    return { subscription: sub, periods: periodRows };
+    const paymentId = opts.paymentId || ('SUBPAY-' + opts.studentId + '-' + start + '-' + months);
+    const data = await _adminCall('create-subscription', {
+      studentId: opts.studentId,
+      months: months,
+      startDate: start,
+      totalPrice: MONTH_PRICES[months] || (months * PRICE_PER_MONTH),
+      paymentId: paymentId,
+      notes: opts.notes || ''
+    });
+    if (!data) throw new Error('create-subscription returned no data');
+    return data;
   }
 
-  // عدّاد ذرّي (RPC) — يمنع تجاوز حصص الشهر في قاعدة البيانات نفسها
-  async function incrementPeriodUsage(periodId, count) {
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_period_usage`, {
-        method: 'POST',
-        headers: _headers(true),
-        body: JSON.stringify({ p_period_id: periodId, p_used: count || 1 })
-      });
-      if (!res.ok) return null;
-      const r = await res.json();
-      return (r && r[0]) || null;
-    } catch (e) {
-      console.warn('[SubscriptionService] increment_period_usage failed:', e);
-      return null;
-    }
-  }
-
-  async function setPeriodUsage(periodId, used) {
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/set_period_usage`, {
-        method: 'POST',
-        headers: _headers(true),
-        body: JSON.stringify({ p_period_id: periodId, p_used: used || 0 })
-      });
-      if (!res.ok) return null;
-      const r = await res.json();
-      return (r && r[0]) || null;
-    } catch (e) {
-      console.warn('[SubscriptionService] set_period_usage failed:', e);
-      return null;
-    }
-  }
-
-  async function refreshPeriodStatus(periodId, refDate) {
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/refresh_period_status`, {
-        method: 'POST',
-        headers: _headers(true),
-        body: JSON.stringify({ p_period_id: periodId, p_today: refDate || today() })
-      });
-      if (!res.ok) return null;
-      const r = await res.json();
-      return (r && r[0] && r[0].refresh_period_status) || r || null;
-    } catch (e) {
-      console.warn('[SubscriptionService] refresh_period_status failed:', e);
-      return null;
-    }
+  async function adminListSubscriptions() {
+    return await _adminCall('list-subscriptions', {});
   }
 
   // ── Formatting (عرض عربي) ────────────────────────────────
@@ -298,6 +265,7 @@ const SubscriptionService = (function () {
 
   return {
     init,
+    setAuthTokenProvider,
     today,
     nowTime,
     addCalendarMonths,
@@ -306,13 +274,11 @@ const SubscriptionService = (function () {
     buildPeriods,
     computeSubscriptionTotals,
     getSubscriptions,
-    getPeriods,
     getActiveSubscription,
     activePeriod,
+    getStudentEvents,
     createSubscription,
-    incrementPeriodUsage,
-    setPeriodUsage,
-    refreshPeriodStatus,
+    adminListSubscriptions,
     fmtAr,
     fmtPrice,
     statusLabel,

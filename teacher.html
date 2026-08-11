@@ -384,7 +384,8 @@
     try{firebase.initializeApp(firebaseConfig);db=firebase.firestore();}catch(e){console.error('Firebase init error:',e);}
 
     const SUPABASE_URL='https://jftfvpultaqufhsekdle.supabase.co';
-    const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzc1MjY3MywiZXhwIjoyMDk5MzI4NjczfQ.fsG8Y7mK2fpODGQ3SMibDDrgAAnW6e424-aSdoMcaMw';
+    const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
+    const CONTENT_UPLOAD_URL=SUPABASE_URL+'/functions/v1/content-upload';
     const SUPABASE_STORAGE_BUCKET='teacher-content';
 
     const USERS_COLLECTION='users',SRT_COLLECTION='support_teachers',CONTENT_COLLECTION='teacher_content',REG_COLLECTION='support_registrations',FIN_COLLECTION='teacher_finance',ATTENDANCE_COLLECTION='support_attendance';
@@ -701,25 +702,40 @@
       container.innerHTML=pendingFiles.map((f,i)=>{const icon=f.type.startsWith('image/')?'🖼️':f.type==='application/pdf'?'📄':f.type.includes('video')?'🎬':'📎';const size=f.size>1024*1024?(f.size/(1024*1024)).toFixed(1)+'MB':(f.size/1024).toFixed(0)+'KB';return '<div class="file-item"><span class="file-item-icon">'+icon+'</span><div class="file-item-info"><div class="file-item-name">'+f.name+'</div><div class="file-item-size">'+size+'</div>'+(f.progress>0&&f.progress<100?'<div class="file-progress"><div class="file-progress-bar" style="width:'+f.progress+'%"></div></div>':'')+(f.uploaded?'<div style="color:var(--green);font-size:11px;font-weight:700">✅ تم الرفع</div>':'')+'</div><button class="file-item-remove" onclick="removeFile('+i+')">✕</button></div>';}).join('');
     }
     function removeFile(i){pendingFiles.splice(i,1);renderFileList();}
+    let _uploadTokenPromise=null;
+    function uploadToken(){
+      if(!_uploadTokenPromise){
+        _uploadTokenPromise=new Promise(function(resolve){
+          if(typeof firebase!=='undefined'&&firebase.auth&&typeof firebase.auth==='function'){
+            firebase.auth().signInAnonymously().then(function(){resolve(firebase.auth().currentUser.getIdToken());}).catch(function(){resolve(null);});
+          }else{resolve(null);}
+        });
+      }
+      return _uploadTokenPromise;
+    }
     async function uploadFileToStorage(fileObj,teacherId){
       const path=teacherId+'/'+Date.now()+'_'+fileObj.name;
-      const url=SUPABASE_URL+'/storage/v1/object/'+SUPABASE_STORAGE_BUCKET+'/'+encodeURIComponent(path);
+      const url=CONTENT_UPLOAD_URL+'?teacherId='+encodeURIComponent(teacherId)+'&filename='+encodeURIComponent(fileObj.name);
       return new Promise((resolve,reject)=>{
-        const xhr=new XMLHttpRequest();
-        xhr.upload.addEventListener('progress',e=>{if(e.lengthComputable){fileObj.progress=Math.round((e.loaded/e.total)*100);renderFileList();}});
-        xhr.addEventListener('load',()=>{
-          if(xhr.status>=200&&xhr.status<300){
-            const pubUrl=SUPABASE_URL+'/storage/v1/object/public/'+SUPABASE_STORAGE_BUCKET+'/'+encodeURIComponent(path);
-            fileObj.uploaded=true;fileObj.url=pubUrl;fileObj.storagePath=path;fileObj.progress=100;renderFileList();
-            resolve({name:fileObj.name,size:fileObj.size,type:fileObj.type,url:pubUrl,storagePath:path});
-          }else{reject(new Error('Upload failed: '+xhr.status+' '+xhr.responseText));}
-        });
-        xhr.addEventListener('error',()=>reject(new Error('Network error during upload')));
-        xhr.open('POST',url);
-        xhr.setRequestHeader('apikey',SUPABASE_KEY);
-        xhr.setRequestHeader('Authorization','Bearer '+SUPABASE_KEY);
-        xhr.setRequestHeader('Content-Type',fileObj.type);
-        xhr.send(fileObj.file);
+        uploadToken().then(function(token){
+          if(!token){reject(new Error('تعذر التحقق من الجلسة — حاول مرة أخرى'));return;}
+          const xhr=new XMLHttpRequest();
+          xhr.upload.addEventListener('progress',e=>{if(e.lengthComputable){fileObj.progress=Math.round((e.loaded/e.total)*100);renderFileList();}});
+          xhr.addEventListener('load',()=>{
+            if(xhr.status>=200&&xhr.status<300){
+              let r=null;try{r=JSON.parse(xhr.responseText);}catch(e){}
+              if(r&&r.ok&&r.url){
+                fileObj.uploaded=true;fileObj.url=r.url;fileObj.storagePath=r.path;fileObj.progress=100;renderFileList();
+                resolve({name:fileObj.name,size:fileObj.size,type:fileObj.type,url:r.url,storagePath:r.path});
+              }else{reject(new Error((r&&r.error)||('Upload failed: '+xhr.status)));}
+            }else{reject(new Error('Upload failed: '+xhr.status+' '+xhr.responseText));}
+          });
+          xhr.addEventListener('error',()=>reject(new Error('Network error during upload')));
+          xhr.open('POST',url);
+          xhr.setRequestHeader('Authorization','Bearer '+token);
+          xhr.setRequestHeader('Content-Type',fileObj.type);
+          xhr.send(fileObj.file);
+        }).catch(function(e){reject(e);});
       });
     }
     async function saveContent(){

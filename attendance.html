@@ -12,6 +12,7 @@
 <script>
   const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
+  const ATTENDANCE_EDGE_URL = SUPABASE_URL + '/functions/v1/record-attendance';
   const firebaseConfig = { apiKey: "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo", authDomain: "eplus-center-39.firebaseapp.com", projectId: "eplus-center-39", storageBucket: "eplus-center-39.firebasestorage.app", messagingSenderId: "191532732034", appId: "1:191532732034:web:b11449a2f0595db5d02e9b" };
   let fbReady = false;
   try {
@@ -1102,12 +1103,14 @@
     $('st-tags').innerHTML = tags.join('');
 
     // real attendance recorded today (to mark already-recorded subjects)
+    // المصدر الموثوق: قاعدة البيانات (attendance_sessions) عبر RPC مقصور بالطالب
     attendedToday = {};
     try {
-      var todayRecs = await AttendanceService.getRecords({ studentId: student.id, date: AttendanceService.today() });
-      todayRecs.forEach(function (r) {
-        if (r.subjectId && r.teacherId) attendedToday[r.subjectId + '|' + r.teacherId] = true;
-      });
+      var todayEvents = await SubscriptionService.getStudentEvents(student.id);
+      todayEvents.filter(function (ev) { return ev.date === AttendanceService.today(); })
+        .forEach(function (ev) {
+          if (ev.subjectId && ev.teacherId) attendedToday[ev.subjectId + '|' + ev.teacherId] = true;
+        });
     } catch (e) { console.warn('[ATTENDANCE] load today attendance failed', e); }
 
     await loadSubscription(student);
@@ -1204,7 +1207,10 @@
 
     var recs = [];
     try {
-      recs = await AttendanceService.getRecords({ studentId: student.id, subscriptionPeriodId: period ? period.id : '' });
+      var allEvents = await SubscriptionService.getStudentEvents(student.id);
+      recs = (Array.isArray(allEvents) ? allEvents : []).filter(function (ev) {
+        return period ? ev.subscriptionPeriodId === period.id : true;
+      });
     } catch (e) { console.warn('[ATTENDANCE] loadSubscription events failed', e); }
     subEvents = recs;
 
@@ -1317,6 +1323,33 @@
   var subjectBusyIdx = -1;
 
   // ── Record attendance for one subject ──────────────────
+  // المصدر الموثوق: record_attendance (ذرّي في Supabase عبر Edge Function).
+  // بعد النجاح نكتب مرآة إلى Firestore للعرض؛ عند فشل المرآة نلغي الحضور
+  // (undo_attendance) ليعود الطالب حصته — لا حضور ناقص ولا حصة ضائعة.
+  async function recordAttendanceEdge(payload) {
+    var token = null;
+    try { if (firebase.auth().currentUser) token = await firebase.auth().currentUser.getIdToken(); } catch (e) {}
+    if (!token) throw new Error('auth token missing');
+    var res = await fetch(ATTENDANCE_EDGE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload)
+    });
+    var r = null;
+    try { r = await res.json(); } catch (e) {}
+    if (!res.ok || !r || !r.ok) {
+      var err = new Error((r && r.error) || ('HTTP ' + res.status));
+      err.code = (r && r.code) || null;
+      throw err;
+    }
+    return r;
+  }
+
+  function mirrorIdFor(studentId, pair, date) {
+    return (studentId + '_' + (pair.teacherId || 'x') + '_' + (pair.subjectId || 'x') + '_' + date + '_1')
+      .replace(/[^A-Za-z0-9_.\-]/g, '_');
+  }
+
   async function markAttendance(idx) {
     if (attending || !currentStudent || !subjectPairs[idx]) return;
     var pair = subjectPairs[idx];
@@ -1349,39 +1382,90 @@
           monthNumber: subState.period.month_number || 0
         };
       }
-      var res = await AttendanceService.recordSingle(
-        currentStudent.id, pair.teacherId, pair.teacherName,
-        pair.subjectId, pair.subjectName, currentScanValue, subCtx
-      );
-      if (res && res.success) {
-        pair.recording = true;
-        var card = $('subj-card-' + idx);
-        if (card) card.classList.add('recorded');
-        setRecordBusy(false);
-        subjectBusyIdx = -1;
-        if (subCtx) {
-          var inc = await SubscriptionService.incrementPeriodUsage(subCtx.subscriptionPeriodId, 1);
-          if (inc && inc.used_sessions != null) {
-            subState.used = inc.used_sessions;
-            subState.remaining = Math.max(0, subState.total - subState.used);
-            subState.period.used_sessions = inc.used_sessions;
-          }
+      var mirrorId = mirrorIdFor(currentStudent.id, pair, date);
+
+      // 1) تسجيل ذرّي موثوق (Supabase)
+      var rec = await recordAttendanceEdge({
+        action: 'record',
+        studentId: currentStudent.id,
+        teacherId: pair.teacherId || '',
+        teacherName: pair.teacherName || '',
+        subjectId: pair.subjectId || '',
+        subjectName: pair.subjectName || '',
+        barcodeValue: currentScanValue || '',
+        subscriptionId: (subCtx && subCtx.subscriptionId) || '',
+        periodId: (subCtx && subCtx.subscriptionPeriodId) || '',
+        monthNumber: (subCtx && subCtx.monthNumber) || 0,
+        date: date,
+        checkInTime: AttendanceService.nowTime(),
+        mirrorId: mirrorId
+      });
+
+      // 2) مرآة إلى Firestore (للـ reports والبوابات) مع تعويض عند الفشل
+      try {
+        await AttendanceService.writeMirror({
+          id: mirrorId,
+          studentId: currentStudent.id,
+          studentName: studentFullName(currentStudent),
+          teacherId: pair.teacherId || '',
+          teacherName: pair.teacherName || '',
+          subjectId: pair.subjectId || '',
+          subjectName: pair.subjectName || '',
+          date: date,
+          checkInTime: rec.check_in_time || AttendanceService.nowTime(),
+          status: 'present',
+          sessionNumber: 1,
+          createdAt: new Date().toISOString(),
+          level: currentStudent.level || '',
+          stream: currentStudent.stream || '',
+          institution: currentStudent.institution || '',
+          barcodeValue: currentScanValue || '',
+          subscriptionId: (subCtx && subCtx.subscriptionId) || '',
+          subscriptionPeriodId: (subCtx && subCtx.subscriptionPeriodId) || '',
+          monthNumber: (subCtx && subCtx.monthNumber) || 0
+        });
+      } catch (mirrorErr) {
+        console.error('[ATTENDANCE RECORD] mirror failed — undoing DB record', mirrorErr);
+        try {
+          await recordAttendanceEdge({
+            action: 'undo',
+            attendanceId: mirrorId,
+            periodId: (subCtx && subCtx.subscriptionPeriodId) || ''
+          });
+        } catch (undoErr) {
+          console.error('[ATTENDANCE RECORD] undo failed (manual reconciliation needed)', undoErr);
         }
-        showSuccess(pair, res.doc);
-      } else if (res && res.reason === 'duplicate') {
         setRecordBusy(false);
         subjectBusyIdx = -1;
-        showAlreadyAttended(pair);
-      } else {
-        setRecordBusy(false);
-        subjectBusyIdx = -1;
-        openModal('error', 'تعذر تسجيل الحضور', (res && res.message) || 'حدثت مشكلة أثناء حفظ سجل الحضور. حاول مرة أخرى.');
+        openModal('error', 'تعذر مزامنة الحضور', 'تم تسجيل الحضور في قاعدة البيانات لكن تعذرت مزامنته مع النظام المحلي وسيُلغى تلقائياً. حاول مرة أخرى.');
+        return;
       }
+
+      // 3) تحديث واجهة الشهر من النتيجة الذرّية
+      pair.recording = true;
+      var card = $('subj-card-' + idx);
+      if (card) card.classList.add('recorded');
+      setRecordBusy(false);
+      subjectBusyIdx = -1;
+      if (subCtx && rec && rec.used_sessions != null) {
+        subState.used = rec.used_sessions;
+        subState.remaining = Math.max(0, rec.remaining_sessions);
+        subState.period.used_sessions = rec.used_sessions;
+        subState.period.remaining_sessions = rec.remaining_sessions;
+      }
+      showSuccess(pair, { id: mirrorId });
     } catch (e) {
       console.error('[ATTENDANCE RECORD] error:', e);
       setRecordBusy(false);
       subjectBusyIdx = -1;
-      openModal('error', 'تعذر تسجيل الحضور', 'حدثت مشكلة أثناء حفظ سجل الحضور. حاول مرة أخرى.');
+      var msg = (e && e.message) || '';
+      if ((e && e.code === '23505') || /duplicate/i.test(msg) || /already recorded/i.test(msg)) {
+        showAlreadyAttended(pair);
+      } else if (/subscription|اشتراك|no sessions remaining|remaining/i.test(msg)) {
+        openModal('warn', 'لا يمكن تسجيل الحضور', msg);
+      } else {
+        openModal('error', 'تعذر تسجيل الحضور', msg || 'حدثت مشكلة أثناء حفظ سجل الحضور. حاول مرة أخرى.');
+      }
     } finally {
       attending = false;
     }

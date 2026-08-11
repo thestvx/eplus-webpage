@@ -3801,8 +3801,8 @@
         ⚠️ الترحيل يقرأ من Firebase Firestore ويكتب إلى Supabase. بيانات Firebase تبقى سليمة.
       </div>
       <div style="margin:8px 0">
-        <label style="font-weight:600;font-size:13px">Supabase Service Role Key</label>
-        <input id="supabaseKey" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:13px;margin-top:4px" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzc1MjY3MywiZXhwIjoyMDk5MzI4NjczfQ.fsG8Y7mK2fpODGQ3SMibDDrgAAnW6e424-aSdoMcaMw">
+        <label style="font-weight:600;font-size:13px">Supabase Service Role Key <span style="color:#dc2626;font-size:11px;font-weight:700">(الصق مؤقتاً عند الترحيل فقط — لا يُحفظ)</span></label>
+        <input id="supabaseKey" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:13px;margin-top:4px" value="">
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button id="migrateStartBtn" style="flex:1;padding:10px;background:#10b981;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px">🚀 بدء الترحيل</button>
@@ -21938,6 +21938,10 @@ window.verifyAttendanceIntegrity = async () => {
 const SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
 SubscriptionService.init(SUPABASE_URL, SUPABASE_KEY);
+TeacherFinance.init(SUPABASE_URL + '/functions/v1/admin-api');
+const adminAuthTokenProvider = () => (auth && auth.currentUser) ? auth.currentUser.getIdToken() : null;
+SubscriptionService.setAuthTokenProvider(adminAuthTokenProvider);
+TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
 
 // ═══════════════════════════════════════════════════════════
 //  Subscription Editor (الاشتراكات الشهرية — إدارة)
@@ -22038,10 +22042,9 @@ SubscriptionService.init(SUPABASE_URL, SUPABASE_KEY);
 
   async function subxFindByPaymentId(pid) {
     try {
-      const res = await fetch(SUPABASE_URL + '/rest/v1/student_subscriptions?select=*&payment_id=eq.' + encodeURIComponent(pid), { headers: subxHeaders() });
-      if (!res.ok) return null;
-      const d = await res.json();
-      return Array.isArray(d) && d.length ? d[0] : null;
+      const all = await SubscriptionService.adminListSubscriptions();
+      const arr = Array.isArray(all) ? all : [];
+      return arr.find(s => s.payment_id === pid) || null;
     } catch (e) { return null; }
   }
 
@@ -22076,7 +22079,7 @@ SubscriptionService.init(SUPABASE_URL, SUPABASE_KEY);
       }
     } catch (e) {
       const msg = String((e && e.message) || e);
-      if (msg.indexOf('23505') >= 0 || /duplicate key|duplicate/i.test(msg)) {
+      if (e && e.code === '23505' || msg.indexOf('23505') >= 0 || /duplicate key|duplicate/i.test(msg)) {
         const dup = await subxFindByPaymentId('SUBPAY-' + selectedStudent.id + '-' + start + '-' + months);
         if (dup) {
           srShowToast('🔁 الدفعة مسجلة مسبقاً — الاشتراك ' + dup.id + ' موجود (عملية Idempotent، لم تُسجَّل دفعة مكررة)', 'success');
@@ -22115,9 +22118,7 @@ SubscriptionService.init(SUPABASE_URL, SUPABASE_KEY);
 
   window.subxLoadList = async function () {
     try {
-      const res = await fetch(SUPABASE_URL + '/rest/v1/student_subscriptions?select=*&order=created_at.desc&limit=50', { headers: subxHeaders() });
-      if (!res.ok) { $x('subx-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#d97706;padding:18px;font-size:13px">⚠️ جدول student_subscriptions غير موجود بعد — نفّذ supabase-migration.sql في Supabase Dashboard.</td></tr>'; return null; }
-      const all = await res.json();
+      const all = await SubscriptionService.adminListSubscriptions();
       const rows = Array.isArray(all) ? all : [];
       if (!rows.length) {
         $x('subx-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">لا توجد اشتراكات بعد — أنشئ أول اشتراك من المحرر أعلاه.</td></tr>';
@@ -23354,18 +23355,13 @@ async function srtLoadData() {
     const snap = await getDocs(c(db,SRT_COLLECTION));
     srtAllData = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.status !== 'deleted');
     try {
-      const res = await fetch('https://jftfvpultaqufhsekdle.supabase.co/rest/v1/teacher_balances?select=*', {
-        headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc' }
+      const balances = await TeacherFinance.listBalances();
+      const byId = {};
+      balances.forEach(b => { byId[b.teacher_id] = b; });
+      srtAllData.forEach(t => {
+        const b = byId[t.teacherId || t.id];
+        if (b) { t.pending = b.pending || 0; t.rate = b.rate || t.rate; }
       });
-      if (res.ok) {
-        const balances = await res.json();
-        const byId = {};
-        balances.forEach(b => { byId[b.teacher_id] = b; });
-        srtAllData.forEach(t => {
-          const b = byId[t.teacherId || t.id];
-          if (b) { t.pending = b.pending || 0; t.rate = b.rate || t.rate; }
-        });
-      }
     } catch (e) { console.warn('Balances merge failed:', e); }
     srtRenderStats();
     srtRenderTable(srtAllData);

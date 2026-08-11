@@ -170,6 +170,22 @@ const AttendanceService = (function () {
     });
   }
 
+  // ── Mirror to Firestore (secondary/display copy) ───────
+  // The authoritative record lives in Supabase (attendance_sessions),
+  // written atomically by the record-attendance Edge Function.
+  // writeMirror copies it to Firestore for reports/portals; if this copy
+  // fails the caller calls undo_attendance to restore the session count.
+  async function writeMirror(rec) {
+    const mirrorId = rec.id;
+    const doc = Object.assign({}, rec, {
+      serverTime: _serverTimestamp(),
+      updatedAt: new Date().toISOString()
+    });
+    delete doc.id;
+    await db.collection(COLLECTION).doc(mirrorId).set(doc);
+    return { success: true, id: mirrorId, doc };
+  }
+
   // ── Record Attendance ─────────────────────────────────
 
   async function record(data) {
@@ -451,6 +467,7 @@ const AttendanceService = (function () {
     matchStudentSubjectsByName,
     record,
     recordSingle,
+    writeMirror,
     checkOut,
     getRecords,
     getDailyReport,
