@@ -15,6 +15,7 @@
   <script src="js/registrationService.js?v=4"></script>
   <script src="js/subjectService.js?v=4"></script>
   <script src="js/attendanceService.js?v=2"></script>
+  <script src="js/barcodeScanner.js?v=1"></script>
   <script src="js/teacherFinance.js?v=1"></script>
   <script src="js/subscriptionService.js?v=1"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
@@ -3064,14 +3065,12 @@
             <div class="form-group">
               <label class="form-label">الطالب</label>
               <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
-                <button class="btn-sm" id="subx-scan-btn" type="button" onclick="subxStartScan()" style="flex:0 0 auto;background:linear-gradient(135deg,#7C3AED,#8b5cf6);color:#fff;border:none;padding:10px 16px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;white-space:nowrap">📷 مسح بطاقة الطالب</button>
                 <div class="subx-combo" style="flex:1">
                   <input class="inp" type="text" id="subx-student" placeholder="🔎 ابحث بالاسم أو اللقب أو Student ID..." autocomplete="off" style="width:100%" oninput="subxOnStudentInput()" onfocus="subxOnStudentInput()">
                   <div class="subx-combo-list" id="subx-combo-list"></div>
                 </div>
               </div>
-              <input type="text" id="subx-scan-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-hidden="true" style="position:fixed;top:-200px;left:-200px;opacity:0;width:4px;height:4px;border:0;padding:0;background:transparent">
-              <div id="subx-scan-hint" class="subx-note" style="margin-top:2px">المسح اليدوي: اضغط زر المسح ثم مرّر البطاقة على الماسح. أو ابحث بالاسم / اللقب / الاسم الكامل / Student ID.</div>
+              <div id="subx-scan-hint" class="subx-note" style="margin-top:2px">🟢 بانتظار مسح بطاقة الطالب…</div>
               <div id="subx-student-card" style="display:none;margin-top:10px;border:1.5px solid rgba(16,185,129,0.35);background:rgba(16,185,129,0.06);border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.9">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
                   <span style="background:rgba(16,185,129,0.15);color:#059669;font-weight:800;padding:3px 12px;border-radius:20px;font-size:11.5px">✅ تم العثور على الطالب</span>
@@ -22104,45 +22103,75 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     subj.disabled = true;
     $x('subx-subject-note').innerHTML = '';
     $x('subx-valid-msg').style.display = 'none';
-    $x('subx-scan-input').value = '';
-    $x('subx-scan-hint').innerHTML = 'المسح اليدوي: اضغط زر المسح ثم مرّر البطاقة على الماسح. أو ابحث بالاسم / اللقب / الاسم الكامل / Student ID.';
+    $x('subx-scan-hint').innerHTML = '🟢 بانتظار مسح بطاقة الطالب…';
     $x('subx-start').value = SubscriptionService.today();
     subxSelectPackage(1);
     subxRenderPreview();
     $x('subx-modal').classList.add('open');
-    setTimeout(() => $x('subx-student').focus(), 120);
+    // Auto-activate the scanner: SP-1160 captures with NO input focus.
+    subxScannerSetActive(true);
   };
   window.subxCloseEditor = function () {
-    if (subxBarTimer) { clearTimeout(subxBarTimer); subxBarTimer = null; }
-    subxBarActive = false;
-    subxBarBuf = [];
+    subxScannerSetActive(false);
     $x('subx-modal').classList.remove('open');
     $x('subx-combo-list').classList.remove('open');
   };
 
-  // ── المسح بالبطاقة (نفس منطق كيوسك الحضور بالضبط) ──
-  window.subxStartScan = function () {
-    if (subxBarTimer) { clearTimeout(subxBarTimer); subxBarTimer = null; }
-    subxBarActive = false;
-    subxBarBuf = [];
-    const inp = $x('subx-scan-input');
-    inp.value = '';
-    $x('subx-scan-hint').innerHTML = '⌛ الماسح جاهز — مرّر بطاقة الطالب الآن…';
-    inp.focus();
-  };
+  // ── ماسح الاشتراكات بالبطاقة (نفس utility الخاص بالحضور) ──
+  // يعيد بناء قيمة الباركود من event.code (المفتاح الفيزيائي) فقط، فلا
+  // يتأثر بتخطيط لوحة المفاتيح (عربي/فرنسي → é/à/&/_). Scanner يعمل
+  // تلقائياً ما دامت النافذة مفتوحة — لا حاجة لزر ولا لتركيز مدخل.
+  var subxScanner = new window.BarcodeScanner.Scanner({
+    logPrefix: '[SUBSCRIPTION SCANNER]',
+    shouldIgnoreKey: function (e) {
+      // صندوق البحث اليدوي يترك مفاتيح الكتابة تمر بشكل طبيعي.
+      return !!(e.target && e.target.id === 'subx-student');
+    },
+    onScan: function (codeVal) {
+      console.log('[SUBSCRIPTION SCANNER] Scan complete');
+      console.log('[SUBSCRIPTION SCANNER] rawCodeValue=' + codeVal);
+      console.log('[SUBSCRIPTION SCANNER] length=' + codeVal.length);
+      console.log('[SUBSCRIPTION SCANNER] Looking up student...');
+      subxHandleScan(codeVal);
+    }
+  });
+  var subxScannerOn = false;
+  function subxScannerSetActive(on) {
+    if (on) {
+      if (!subxScannerOn) { subxScannerOn = true; subxScanner.start(); }
+    } else {
+      if (subxScannerOn) { subxScannerOn = false; subxScanner.stop(); }
+    }
+  }
+
+  var subxScanBusy = false; // debounce: عملية بحث واحدة في كل مرة
   function subxHandleScan(raw) {
-    const val = String(raw || '').trim();
+    if (subxScanBusy) return;
+    const val = String(raw || '').replace(/\r/g, '').trim();
     if (!val) return;
-    $x('subx-scan-hint').innerHTML = 'جارٍ البحث عن الطالب…';
+    subxScanBusy = true;
+    subxScanner.setBusy(true);
+    $x('subx-scan-hint').innerHTML =
+      '✅ تم مسح بطاقة الطالب<br>' +
+      '<span class="time-chip">Barcode: ' + escX(val) + '</span><br>' +
+      '<span style="font-size:12px;color:var(--text-muted)">جارٍ البحث عن الطالب…</span>';
     AttendanceService.resolveStudentFromScan(val).then(function (res) {
       const st = res && res.student;
       if (!st) {
-        $x('subx-scan-hint').innerHTML = '❌ لم يتم العثور على بطاقة مسجلة بهذا الرمز — جرّب البحث اليدوي أو تأكد من البطاقة.';
+        console.log('[SUBSCRIPTION SCANNER] NOT FOUND');
+        $x('subx-scan-hint').innerHTML =
+          '⛔ الطالب غير موجود<br>' +
+          '<span class="time-chip">Barcode: ' + escX(val) + '</span><br>' +
+          '<span style="font-size:12px;color:var(--text-muted)">مرّر بطاقة أخرى مباشرة، أو استخدم البحث اليدوي.</span>';
         srShowToast('البطاقة غير مسجلة في النظام', 'error');
         return;
       }
+      console.log('[SUBSCRIPTION SCANNER] FOUND student=' + st.id);
       if (st.status !== 'مسجل نهائياً') {
-        $x('subx-scan-hint').innerHTML = '⚠️ الطالب غير مسجل نهائياً — لا يمكن إنشاء اشتراك له.';
+        $x('subx-scan-hint').innerHTML =
+          '⛔ لا يمكن إنشاء اشتراك<br>' +
+          'الطالب ليس "مسجلاً نهائياً".<br>' +
+          '<span style="font-size:12px;color:var(--text-muted)">مرّر بطاقة أخرى مباشرة.</span>';
         srShowToast('الطالب غير مسجل نهائياً — لا يمكن إنشاء اشتراك', 'error');
         return;
       }
@@ -22151,66 +22180,15 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         : 'عبر Student ID';
       subxApplyStudent(st, src);
     }).catch(function (e) {
-      console.error('[SUBSCRIPTIONS] scan resolve failed', e);
-      $x('subx-scan-hint').innerHTML = 'تعذر تحميل البيانات حالياً. حاول مرة أخرى.';
+      console.error('[SUBSCRIPTION SCANNER] resolve failed', e);
+      $x('subx-scan-hint').innerHTML =
+        'تعذر تحميل البيانات حالياً.<br>' +
+        '<span style="font-size:12px;color:var(--text-muted)">أعد مسح البطاقة أو استخدم البحث اليدوي.</span>';
+    }).finally(function () {
+      subxScanBusy = false;
+      subxScanner.setBusy(false);
     });
   }
-  $x('subx-scan-input').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      subxHandleScan($x('subx-scan-input').value);
-      $x('subx-scan-input').value = '';
-    }
-  });
-  $x('subx-scan-input').addEventListener('input', function () {
-    const v = $x('subx-scan-input').value.trim();
-    if (/^\d{13,}$/.test(v)) { subxHandleScan(v); $x('subx-scan-input').value = ''; }
-  });
-
-  // ── Rebuild the barcode from event.code (layout-independent) ──
-  // The SP-1160 types digits as physical keys, but Arabic/French layouts
-  // convert them into é/à/&/_/... We rebuild the numeric value from
-  // event.code (Digit/Numpad) so the barcode is always correct, then
-  // resolve the student. Same logic as the attendance kiosk.
-  var subxBarBuf = [];
-  var subxBarActive = false;
-  var subxBarTimer = null;
-  var subxBarLastTs = 0;
-  var SUBX_SCAN_FINALIZE_MS = 250;
-  var SUBX_SCAN_BURST_GAP_MS = 120;
-  function subxFinalizeScan() {
-    subxBarActive = false;
-    if (subxBarTimer) { clearTimeout(subxBarTimer); subxBarTimer = null; }
-    var val = subxBarBuf.join('');
-    subxBarBuf = [];
-    if (val) subxHandleScan(val);
-  }
-  document.addEventListener('keydown', function (e) {
-    var inp = $x('subx-scan-input');
-    if (!inp || document.activeElement !== inp) return;
-    var now = Date.now();
-    var code = e.code || '';
-    if (subxBarActive && now - subxBarLastTs > SUBX_SCAN_BURST_GAP_MS) subxFinalizeScan();
-    var m = /^(Digit|Numpad)([0-9])$/.exec(code);
-    if (m) {
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      subxBarActive = true;
-      subxBarLastTs = now;
-      subxBarBuf.push(m[2]);
-      inp.value = '';
-      clearTimeout(subxBarTimer);
-      subxBarTimer = setTimeout(subxFinalizeScan, SUBX_SCAN_FINALIZE_MS);
-      return;
-    }
-    if (code === 'Enter' || code === 'NumpadEnter' || e.key === 'Enter') {
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      subxFinalizeScan();
-    }
-  }, true);
 
   async function subxApplyStudent(r, source) {
     selectedStudent = r;

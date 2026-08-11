@@ -22,6 +22,7 @@
   } catch (e) { console.error('Firebase init error:', e); }
 </script>
 <script src="js/ean13.js"></script>
+  <script src="js/barcodeScanner.js?v=1"></script>
   <script src="js/registrationService.js?v=4"></script>
 <script src="js/subjectService.js?v=4"></script>
 <script src="js/attendanceService.js?v=4"></script>
@@ -758,21 +759,11 @@
     });
   }
 
-  // ── Scanner state & debug (SP-1160 / HID) ──────────────
-  // SP-1160 works as a USB HID keyboard. We rebuild the value from
+  // ── Scanner (shared BarcodeScanner utility — event.code based) ──
+  // SP-1160 works as a USB HID keyboard. We rebuild the value ONLY from
   // event.code (physical key = layout-independent). event.key is
-  // layout-dependent (Arabic/French layouts garble digits into
-  // é/à/&) and is kept ONLY for diagnostics — never sent to backend.
-  var scanBufCode = [];
-  var scanBufKey = [];
-  var scanStartTs = 0;
-  var scanLastTs = 0;
-  var scanEnterSeen = false;
-  var scanSawNonDigit = false;
-  var scanActive = false;
-  var scanTimer = null;
-  var SCAN_FINALIZE_MS = 250;   // idle gap after last key = scan complete (no Enter needed)
-  var SCAN_BURST_GAP_MS = 120;  // gap between keys larger than this = new scan
+  // layout-dependent (Arabic/French layouts garble digits into é/à/&)
+  // and is kept ONLY for diagnostics — never used to build the value.
   var layoutInfo = '—';
   var dbOpen = false;
 
@@ -792,26 +783,22 @@
     logEl.scrollTop = logEl.scrollHeight;
   }
 
-  function probeLayout(e, m) {
-    if (layoutInfo !== '—' || !m) return;
-    var digit = m[2];
-    layoutInfo = (typeof e.key === 'string' && e.key === digit)
-      ? 'EN/US ✓'
-      : 'غير EN/US ⚠ (Digit' + digit + ' → "' + e.key + '")';
-    $('db-layout').textContent = layoutInfo;
-  }
-
-  function updateDebugLive(e, m) {
-    $('db-key').textContent = typeof e.key === 'string' ? e.key : String(e.key);
-    $('db-code').textContent = e.code || '';
-    $('db-keycode').textContent = e.keyCode || e.which || '';
-    $('db-which').textContent = e.which || '';
-    var joined = scanBufCode.join('');
+  function updateDebugLive(info) {
+    $('db-key').textContent = info.key;
+    $('db-code').textContent = info.code || '';
+    $('db-keycode').textContent = (info.evt && (info.evt.keyCode || info.evt.which)) || '';
+    $('db-which').textContent = (info.evt && info.evt.which) || '';
+    var joined = info.buffer.join('');
     $('db-buffer').textContent = joined || '—';
     $('db-buffer').className = 'v' + (/^\d+$/.test(joined) && joined ? ' good' : '');
-    $('db-len').textContent = scanBufCode.length;
-    $('db-timing').textContent = (scanStartTs ? (Date.now() - scanStartTs) : 0) + ' ms';
-    if (m) probeLayout(e, m);
+    $('db-len').textContent = info.buffer.length;
+    $('db-timing').textContent = (info.startTs ? (Date.now() - info.startTs) : 0) + ' ms';
+    if (info.digit != null && layoutInfo === '—') {
+      layoutInfo = (typeof info.key === 'string' && info.key === info.digit)
+        ? 'EN/US ✓'
+        : 'غير EN/US ⚠ (Digit' + info.digit + ' → "' + info.key + '")';
+      $('db-layout').textContent = layoutInfo;
+    }
   }
 
   // ── Global scanner capture (capture phase — works with no focus) ──
@@ -819,76 +806,39 @@
   // from event.code (physical key = layout-independent). event.key is
   // layout-dependent (Arabic/French layouts garble digits into é/à/&) and
   // is kept ONLY for diagnostics — never used to build the value.
-  function scannerHandler(e) {
-    // Manual entry + PIN inputs are the only elements that let typed keys
-    // pass through. The SP-1160 scanner does NOT need focus — this
-    // capture-phase listener intercepts every other key first.
-    if (e.target && (e.target.id === 'manual-input' || e.target.id === 'pin-input')) return;
-
-    var now = Date.now();
-    var code = e.code || '';
-
-    // Gap between keys larger than a burst = previous scan already ended.
-    if (scanActive && now - scanLastTs > SCAN_BURST_GAP_MS) finalizeScan();
-
-    var m = /^(Digit|Numpad)([0-9])$/.exec(code);
-
-    if (m) {
-      // ── Digit key → part of a barcode scan ──────────────
-      if (!scanActive) {
-        scanActive = true;
-        scanStartTs = now;
-        scanSawNonDigit = false;
-        scanEnterSeen = false;
+  var scanner = new window.BarcodeScanner.Scanner({
+    logPrefix: '[ATTENDANCE SCANNER]',
+    shouldIgnoreKey: function (e) {
+      // Manual entry + PIN inputs are the only elements that let typed keys
+      // pass through. The SP-1160 scanner does NOT need focus.
+      return !!(e.target && (e.target.id === 'manual-input' || e.target.id === 'pin-input'));
+    },
+    onState: function (name, data) {
+      if (name === 'start') {
         logScanner('Scan started');
+      } else if (name === 'key') {
+        dbAppend('code=' + data.code + ' mapped=' + data.mapped + ' key=' + JSON.stringify(data.key) + ' buf=' + data.buffer.join(''));
+        updateDebugLive(data);
+      } else if (name === 'nondigit') {
+        logScanner('Non-digit key: code=' + data.code + ' key=' + JSON.stringify(data.key) + ' (ignored)');
       }
-      scanLastTs = now;
-
-      // Block the key from ever reaching the browser/DOM/console
-      // (so é/à/& never become text and are never evaluated as JS).
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-
-      scanBufCode.push(m[2]);
-      scanBufKey.push(typeof e.key === 'string' ? e.key : '');
-      logScanner('code=' + code + ' mapped=' + m[2] + ' buffer=' + scanBufCode.join(''));
-      dbAppend('code=' + code + ' mapped=' + m[2] + ' key=' + JSON.stringify(e.key) + ' buf=' + scanBufCode.join(''));
-      updateDebugLive(e, m);
-
-      // Idle finalize: the scanner sends digits then stops (may send no Enter).
-      clearTimeout(scanTimer);
-      scanTimer = setTimeout(function () { if (scanActive) finalizeScan(); }, SCAN_FINALIZE_MS);
-      return;
+    },
+    onScan: function (codeVal, meta) {
+      $('db-enter').textContent = meta.enter ? 'YES' : 'NO';
+      $('db-timing').textContent = meta.duration + ' ms';
+      dbAppend('done: code="' + codeVal + '" enter=' + (meta.enter ? 'Y' : 'N'));
+      logScanner('Scan complete');
+      logScanner('rawCodeValue=' + codeVal);
+      logScanner('length=' + codeVal.length);
+      if (codeVal.length === 13) logScanner('Valid EAN-13: ' + EAN13.isValid(codeVal));
+      logScanner('Looking up student...');
+      handleScan(codeVal);
+    },
+    onInvalid: function (codeVal, meta) {
+      showInvalidScan(codeVal, meta.keyVal || '', meta.duration, meta.sawNonDigit);
     }
-
-    if (code === 'Enter' || code === 'NumpadEnter' || e.key === 'Enter') {
-      if (scanActive) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        scanEnterSeen = true;
-        finalizeScan();
-      }
-      return;
-    }
-
-    if (/^Key[A-Z]$/.test(code) || /^F\d+$/.test(code)) {
-      scanSawNonDigit = true;
-      logScanner('Non-digit key: code=' + code + ' key=' + JSON.stringify(e.key) + ' (ignored)');
-    }
-  }
-
-  document.addEventListener('keydown', scannerHandler, true);
-
-  // Defensive: while a scan burst is active, also stop any keypress text
-  // insertion (Firefox) so garbled chars never reach the page/console.
-  document.addEventListener('keypress', function (e) {
-    if (!scanActive) return;
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-  }, true);
+  });
+  scanner.start();
 
   // Keep keyboard focus on the page: the SP-1160 types into whatever has
   // focus, so after any click on the page we drop focus onto a neutral
@@ -908,45 +858,6 @@
   document.addEventListener('pointerdown', function () { setTimeout(grabScanFocus, 0); }, true);
   if (typeof window !== 'undefined' && window.addEventListener) {
     window.addEventListener('focus', grabScanFocus);
-  }
-
-  function finalizeScan() {
-    if (!scanActive && scanBufCode.length === 0) return;
-    var codeVal = scanBufCode.join('');
-    var keyVal = scanBufKey.join('');
-    var duration = codeVal.length ? (scanLastTs - scanStartTs) : 0;
-    var gotEnter = scanEnterSeen;
-    var sawNonDigit = scanSawNonDigit;
-
-    scanActive = false;
-    if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
-    scanBufCode = [];
-    scanBufKey = [];
-    scanEnterSeen = false;
-    scanSawNonDigit = false;
-
-    $('db-enter').textContent = gotEnter ? 'YES' : 'NO';
-    $('db-timing').textContent = duration + ' ms';
-    dbAppend('done: code="' + codeVal + '" key="' + keyVal + '" enter=' + (gotEnter ? 'Y' : 'N'));
-
-    if (!codeVal) {
-      logScanner('Scan complete');
-      logScanner('rawCodeValue= (empty)');
-      return;
-    }
-
-    logScanner('Scan complete');
-    logScanner('rawCodeValue=' + codeVal);
-    logScanner('length=' + codeVal.length);
-
-    if (!/^\d+$/.test(codeVal)) {
-      logScanner('INVALID — non-digit characters in rawCodeValue');
-      showInvalidScan(codeVal, keyVal, duration, sawNonDigit);
-      return;
-    }
-    if (codeVal.length === 13) logScanner('Valid EAN-13: ' + EAN13.isValid(codeVal));
-    logScanner('Looking up student...');
-    handleScan(codeVal);
   }
 
   function showInvalidScan(codeVal, keyVal, duration, sawNonDigit) {
@@ -983,12 +894,7 @@
     subjectBusyIdx = -1;
 
     // scanner HID buffer
-    scanActive = false;
-    scanEnterSeen = false;
-    scanSawNonDigit = false;
-    scanBufCode = [];
-    scanBufKey = [];
-    if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
+    if (scanner && scanner.reset) scanner.reset();
 
     // status pill / last-read
     $('last-read').textContent = '';
