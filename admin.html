@@ -13,7 +13,7 @@
   <script src="js/ean13.js"></script>
   <script src="js/studentCardRenderer.js?v=4"></script>
   <script src="js/registrationService.js?v=4"></script>
-  <script src="js/subjectService.js?v=3"></script>
+  <script src="js/subjectService.js?v=4"></script>
   <script src="js/attendanceService.js?v=2"></script>
   <script src="js/teacherFinance.js?v=1"></script>
   <script src="js/subscriptionService.js?v=1"></script>
@@ -22113,12 +22113,18 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     setTimeout(() => $x('subx-student').focus(), 120);
   };
   window.subxCloseEditor = function () {
+    if (subxBarTimer) { clearTimeout(subxBarTimer); subxBarTimer = null; }
+    subxBarActive = false;
+    subxBarBuf = [];
     $x('subx-modal').classList.remove('open');
     $x('subx-combo-list').classList.remove('open');
   };
 
   // ── المسح بالبطاقة (نفس منطق كيوسك الحضور بالضبط) ──
   window.subxStartScan = function () {
+    if (subxBarTimer) { clearTimeout(subxBarTimer); subxBarTimer = null; }
+    subxBarActive = false;
+    subxBarBuf = [];
     const inp = $x('subx-scan-input');
     inp.value = '';
     $x('subx-scan-hint').innerHTML = '⌛ الماسح جاهز — مرّر بطاقة الطالب الآن…';
@@ -22161,6 +22167,51 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     if (/^\d{13,}$/.test(v)) { subxHandleScan(v); $x('subx-scan-input').value = ''; }
   });
 
+  // ── Rebuild the barcode from event.code (layout-independent) ──
+  // The SP-1160 types digits as physical keys, but Arabic/French layouts
+  // convert them into é/à/&/_/... We rebuild the numeric value from
+  // event.code (Digit/Numpad) so the barcode is always correct, then
+  // resolve the student. Same logic as the attendance kiosk.
+  var subxBarBuf = [];
+  var subxBarActive = false;
+  var subxBarTimer = null;
+  var subxBarLastTs = 0;
+  var SUBX_SCAN_FINALIZE_MS = 250;
+  var SUBX_SCAN_BURST_GAP_MS = 120;
+  function subxFinalizeScan() {
+    subxBarActive = false;
+    if (subxBarTimer) { clearTimeout(subxBarTimer); subxBarTimer = null; }
+    var val = subxBarBuf.join('');
+    subxBarBuf = [];
+    if (val) subxHandleScan(val);
+  }
+  document.addEventListener('keydown', function (e) {
+    var inp = $x('subx-scan-input');
+    if (!inp || document.activeElement !== inp) return;
+    var now = Date.now();
+    var code = e.code || '';
+    if (subxBarActive && now - subxBarLastTs > SUBX_SCAN_BURST_GAP_MS) subxFinalizeScan();
+    var m = /^(Digit|Numpad)([0-9])$/.exec(code);
+    if (m) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      subxBarActive = true;
+      subxBarLastTs = now;
+      subxBarBuf.push(m[2]);
+      inp.value = '';
+      clearTimeout(subxBarTimer);
+      subxBarTimer = setTimeout(subxFinalizeScan, SUBX_SCAN_FINALIZE_MS);
+      return;
+    }
+    if (code === 'Enter' || code === 'NumpadEnter' || e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      subxFinalizeScan();
+    }
+  }, true);
+
   async function subxApplyStudent(r, source) {
     selectedStudent = r;
     selectedSubject = null;
@@ -22194,11 +22245,16 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       if (!subjectName) continue;
       let subjectId = (s && s.subjectId) || (window.SubjectService && SubjectService.getSubjectId(subjectName)) || '';
       let teacherId = (s && s.teacherId) || '';
-      if (!teacherId && teacherName && window.SubjectService && typeof SubjectService.getTeachersForSubject === 'function') {
+      if (!teacherId && teacherName && window.SubjectService) {
         try {
-          const ts = await SubjectService.getTeachersForSubject(subjectName, level);
-          const t = ts.find(function (x) { return _norm(x.name) === _norm(teacherName); }) || (ts.length ? ts[0] : null);
-          if (t) teacherId = t.teacherId || t.id || '';
+          if (typeof SubjectService.resolveTeacherId === 'function') {
+            teacherId = await SubjectService.resolveTeacherId(subjectName, teacherName, level);
+          }
+          if (!teacherId && typeof SubjectService.getTeachersForSubject === 'function') {
+            const ts = await SubjectService.getTeachersForSubject(subjectName, level);
+            const t = ts.find(function (x) { return _norm(x.name) === _norm(teacherName); }) || (ts.length ? ts[0] : null);
+            if (t) teacherId = t.teacherId || t.id || '';
+          }
         } catch (e) { console.warn('[SUBSCRIPTIONS] teacher resolve failed', e); }
       }
       _subjectOptions.push({

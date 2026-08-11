@@ -1,4 +1,3 @@
-const FIREBASE_PROJECT_ID = 'eplus-center-39';
 const DEFAULT_WEB_API_KEY = 'AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo';
 
 export interface VerifiedUser {
@@ -11,17 +10,18 @@ export async function verifyFirebaseToken(idToken: string): Promise<VerifiedUser
   const key = Deno.env.get('FIREBASE_WEB_API_KEY') || DEFAULT_WEB_API_KEY;
   try {
     const res = await fetch(
-      `https://securetoken.googleapis.com/v1/tokeninfo?key=${encodeURIComponent(key)}`,
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(key)}`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `id_token=${encodeURIComponent(idToken)}`,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
       }
     );
     if (!res.ok) return null;
     const data = await res.json();
-    if (!data || !data.user_id || !data.aud || data.aud !== FIREBASE_PROJECT_ID) return null;
-    return { uid: data.user_id, email: data.email || '' };
+    const user = Array.isArray(data.users) ? data.users[0] : null;
+    if (!user || !user.localId) return null;
+    return { uid: String(user.localId), email: user.email ? String(user.email) : '' };
   } catch (e) {
     console.error('[verifyFirebaseToken]', e);
     return null;

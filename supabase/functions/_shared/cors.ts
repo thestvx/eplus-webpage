@@ -24,14 +24,15 @@ const ALLOWED_ORIGINS = [
 let _currentOrigin: string | null = null;
 
 function buildHeaders(origin: string | null): Record<string, string> {
-  return {
-    // Reflect the Origin only when allowlisted; otherwise omit it so the
-    // browser refuses the cross-origin response.
-    'Access-Control-Allow-Origin': origin || ALLOWED_ORIGINS[0],
+  const headers: Record<string, string> = {
+    // Access-Control-Allow-Headers/Methods are harmless to send; the Origin
+    // reflect header is only added when the request origin is allowlisted.
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
     'Vary': 'Origin',
   };
+  if (origin) headers['Access-Control-Allow-Origin'] = origin;
+  return headers;
 }
 
 export function resolveOrigin(req: Request): string | null {

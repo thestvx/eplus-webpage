@@ -308,6 +308,30 @@ const SubjectService = (function () {
     });
   }
 
+  // Resolve a teacherId by name (robust: name-first like attendance kiosk,
+  // level used only as a soft preference). Falls back to partial name match.
+  async function resolveTeacherId(subjectName, teacherName, level) {
+    const teachers = await _loadTeachers();
+    if (!teacherName) return '';
+    const norm = name => String(name || '').replace(/\s+/g, '').toLowerCase();
+    const target = norm(teacherName);
+    const exact = teachers.filter(t => norm(t.name) === target);
+    if (exact.length) {
+      if (level) {
+        const byLevel = exact.find(t => (Array.isArray(t.levels) ? t.levels : []).includes(level));
+        if (byLevel) return byLevel.teacherId || byLevel.id || '';
+      }
+      const t = exact[0];
+      return t.teacherId || t.id || '';
+    }
+    const partial = teachers.find(t => {
+      const n = norm(t.name);
+      return n && (n.includes(target) || target.includes(n));
+    });
+    if (partial) return partial.teacherId || partial.id || '';
+    return '';
+  }
+
   // ── Dynamic Dropdown Builder ──────────────────────────
   // Builds options from the AUTHORITATIVE registration pairs,
   // then enriches each with the Firestore teacherId when the
@@ -373,6 +397,7 @@ const SubjectService = (function () {
     getSubjectsForLevel,
     getTeachersForSubject,
     getTeachersForLevel,
+    resolveTeacherId,
     buildSubjectTeacherOptions,
     buildSubjectDisplayList,
     invalidateCache,

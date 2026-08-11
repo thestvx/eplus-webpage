@@ -104,12 +104,15 @@ CREATE TABLE IF NOT EXISTS student_subscriptions (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_subscriptions_student ON student_subscriptions(student_id);
-CREATE INDEX IF NOT EXISTS idx_subscriptions_subject_teacher ON student_subscriptions(student_id, subject_id, teacher_id);
 -- ترقية آمنة للقواعد الموجودة (لا حذف لأي صف): إضافة أعمدة المادة/الأستاذ
+-- ⚠️ الترتيب حاسم: أضف الأعمدة أولاً ثم أنشئ الفهرس الذي يعتمد عليها
+--    (خلاف ذلك يفشل الترقية بخطأ "column subject_id does not exist"
+--     عند وجود الجدول من نسخة قديمة بلا هذه الأعمدة).
 ALTER TABLE student_subscriptions ADD COLUMN IF NOT EXISTS teacher_id TEXT;
 ALTER TABLE student_subscriptions ADD COLUMN IF NOT EXISTS subject_id TEXT;
 ALTER TABLE student_subscriptions ADD COLUMN IF NOT EXISTS teacher_name TEXT;
 ALTER TABLE student_subscriptions ADD COLUMN IF NOT EXISTS subject_name TEXT;
+CREATE INDEX IF NOT EXISTS idx_subscriptions_subject_teacher ON student_subscriptions(student_id, subject_id, teacher_id);
 -- منع تكرار الدفع: نفس payment_id لمرة واحدة فقط (خط دفاع إضافي)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_subscriptions_payment ON student_subscriptions(payment_id) WHERE payment_id != '';
 
