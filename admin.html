@@ -4093,6 +4093,14 @@ function applyEmployeeMode(cfg) {
 onAuthStateChanged(auth, async user => {
   const ls = document.getElementById('login-screen');
   const dash = document.getElementById('dashboard');
+  if (user && user.isAnonymous) {
+    // جلسة مجهولة (من كيوسك الحضور مثلاً) لا تُعد تسجيل دخولاً إدارياً:
+    // قواعد Firestore تمنع المجهول من isAdmin() فترفض كل كتابة (حذف/تعديل...).
+    ls.style.display = 'flex';
+    ls.classList.remove('hidden');
+    dash.style.display = 'none';
+    return;
+  }
   if (user) {
     // تحقق هل هذا المستخدم أستاذ
     try {
