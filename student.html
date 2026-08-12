@@ -210,6 +210,7 @@
     .sub-badge-st.ok{background:var(--success-light);color:var(--success)}
     .sub-badge-st.no{background:var(--warning-light);color:var(--warning)}
     .sub-badge-st.full{background:var(--danger-light);color:var(--danger)}
+    .sub-badge-st.paused{background:rgba(147,51,234,0.14);color:#7c3aed}
     .sub-status-line{font-size:13px;color:var(--text-muted);font-weight:600;margin-top:4px}
     .sub-month-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:16px}
     .sub-month-card{background:var(--bg);border:1px solid var(--border-light);border-radius:var(--radius-sm);padding:14px;cursor:pointer;transition:var(--transition)}
@@ -326,7 +327,11 @@
       const activeTotal=activePeriod?(activePeriod.total_sessions||SubscriptionService.SESSIONS_PER_MONTH):0;
       const activeRemain=Math.max(0,activeTotal-activeUsed);
 
-      if(statusOk){
+      const pausedSub=(data.subscription.status==='paused');
+      if(pausedSub){
+        badge.textContent='⏸️ متوقف مؤقتاً';
+        badge.className='sub-badge-st paused';
+      }else if(statusOk){
         badge.textContent=activeRemain>0?'اشتراك نشط':'اكتملت حصص الشهر';
         badge.className='sub-badge-st '+(activeRemain>0?'ok':'full');
       }else{
@@ -360,7 +365,9 @@
       }).join('');
 
       let statusLine;
-      if(statusOk){
+      if(pausedSub){
+        statusLine='⏸️ اشتراكك متوقف مؤقتاً — لن يُسجَّل أي حضور حتى يستأنفه الإدارة.';
+      }else if(statusOk){
         statusLine='الاشتراك ساري — الشهر الحالي: <b>'+subFmtAr(activePeriod.start_date)+' → '+subFmtAr(activePeriod.end_date)+'</b>.'+(activeRemain>0?' يمكنك حضور '+activeRemain+' حصة متبقية.':' تم استهلاك كل حصص هذا الشهر.');
       }else{
         statusLine='انتهى الاشتراك — لا يمكن تسجيل حضور جديد حتى التجديد لدى الإدارة.';

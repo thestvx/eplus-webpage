@@ -1033,6 +1033,7 @@
       $('st-note').textContent = 'المواد التالية هي المواد المسجلة لهذا الطالب فقط — اختر الأستاذ لتسجيل الحضور:';
       await loadSubjectSubStates();
       renderSubjects();
+      showPausedNotice();
     }
     switchView('student');
   }
@@ -1055,6 +1056,10 @@
         subjectSubState[key] = { active: false, reason: 'no_subscription', remaining: 0, total: 0, used: 0, subscription: null, period: null };
         continue;
       }
+      if (data.subscription.status === 'paused') {
+        subjectSubState[key] = { active: false, reason: 'paused', remaining: 0, total: 0, used: 0, subscription: data.subscription, period: null };
+        continue;
+      }
       var period = SubscriptionService.activePeriod(data.periods, today);
       if (!period) {
         subjectSubState[key] = { active: false, reason: 'expired', remaining: 0, total: 0, used: 0, subscription: data.subscription, period: null };
@@ -1074,9 +1079,26 @@
 
   function subjectSubKey(pair) { return (pair.subjectId || '') + '|' + (pair.teacherId || ''); }
 
+  // عند المسح: تنبيه فوري يوضح الاشتراكات الموقوفة مؤقتاً (المادة + الأستاذ)
+  function showPausedNotice() {
+    var items = [];
+    Object.keys(subjectSubState).forEach(function (k) {
+      var st = subjectSubState[k];
+      if (st && st.reason === 'paused' && st.subscription) items.push(st.subscription);
+    });
+    if (!items.length) return;
+    var html = 'الاشتراك التالي <b>متوقف مؤقتاً</b> من الإدارة:<br><br>';
+    items.forEach(function (s) {
+      html += '• مادة <b>' + esc(s.subject_name || '—') + '</b> عند الأستاذ <b>' + esc(s.teacher_name || '—') + '</b><br>';
+    });
+    html += '<br><span style="opacity:.75">لن يُسجَّل الحضور حتى يستأنف الإدارة الاشتراك.</span>';
+    openModal('warn', '⏸️ اشتراك متوقف مؤقتاً', html);
+  }
+
   // الرسالة الدقيقة لكل حالة (نص ثابت موحّد)
   function subjectSubMessage(st) {
     if (st && st.active) return '';
+    if (st && st.reason === 'paused') return 'الاشتراك متوقف مؤقتاً — راجع الإدارة.';
     if (st && st.reason === 'full') return 'انتهت حصص هذا الشهر لهذه المادة.';
     return 'لا يوجد اشتراك نشط لهذه المادة عند هذا الأستاذ.';
   }
@@ -1102,7 +1124,8 @@
       if (done) {
         btn = '<button class="record-btn recorded" type="button" disabled>✓ تم التسجيل</button>';
       } else if (gateMsg) {
-        btn = '<button class="record-btn no-sub" type="button" disabled>غير متاح</button>';
+        var pausedBtn = st && st.reason === 'paused';
+        btn = '<button class="record-btn no-sub" type="button" disabled>' + esc(pausedBtn ? 'موقوف مؤقتاً' : 'غير متاح') + '</button>';
       } else {
         btn = '<button class="record-btn" id="rec-btn-' + i + '" type="button" onclick="window.__mark(' + i + ')">تسجيل الحضور</button>';
       }
