@@ -295,6 +295,14 @@ const SubscriptionService = (function () {
     return await _adminCall('get-subscription-detail', { subscriptionId: subscriptionId });
   }
 
+  // إيقاف مؤقت (paused) / استئناف (active) — الحضور يتوقف حتى الاستئناف
+  async function adminSetSubscriptionPaused(subscriptionId, paused) {
+    return await _adminCall('pause-subscription', {
+      subscriptionId: subscriptionId,
+      paused: paused === true
+    });
+  }
+
   // يبحث عن اشتراك فعّال متداخل مع النافذة المطلوبة [start, end]
   // للنفس الطالب + نفس المادة + نفس الأستاذ (لا يمنع مواد أخرى متوازية)
   async function findOverlapping(studentId, start, months, subjectId, teacherId) {
@@ -320,6 +328,7 @@ const SubscriptionService = (function () {
   function subscriptionStatus(sub, refDate) {
     const r = refDate || today();
     if (sub.status === 'cancelled') return 'cancelled';
+    if (sub.status === 'paused') return 'paused';
     if (r < (sub.start_date || '')) return 'upcoming';
     if (r > (sub.end_date || '')) return 'expired';
     const periods = (sub.periods || []);
@@ -335,6 +344,7 @@ const SubscriptionService = (function () {
       case 'done': return '📌 مكتمل الحصص';
       case 'expired': return '⚪ انتهى';
       case 'cancelled': return '🚫 ملغى';
+      case 'paused': return '⏸️ موقوف مؤقتاً';
       default: return '—';
     }
   }
@@ -394,6 +404,7 @@ const SubscriptionService = (function () {
     createSubscription,
     adminListSubscriptions,
     adminSubscriptionDetail,
+    adminSetSubscriptionPaused,
     findOverlapping,
     subscriptionStatus,
     subscriptionStatusLabel,

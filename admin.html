@@ -3026,6 +3026,7 @@
             <option value="upcoming">لم يبدأ</option>
             <option value="done">مكتمل الحصص</option>
             <option value="expired">انتهى</option>
+            <option value="paused">موقوف مؤقتاً</option>
             <option value="cancelled">ملغى</option>
           </select>
           <button class="tbl-action" onclick="subxLoadAll()" style="font-size:12px;border-color:rgba(245,158,11,0.3);color:#d97706">🔄 تحديث</button>
@@ -22554,8 +22555,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         : st === 'done' ? 'background:rgba(245,158,11,0.14);color:#d97706'
         : st === 'upcoming' ? 'background:rgba(59,130,246,0.1);color:#2563eb'
         : st === 'cancelled' ? 'background:rgba(239,68,68,0.12);color:#dc2626'
+        : st === 'paused' ? 'background:rgba(147,51,234,0.12);color:#7c3aed'
         : 'background:var(--border);color:var(--text-muted)';
-      html += '<tr>' +
+      html += '<tr ondblclick="subxShowDetail(\'' + escX(s.id) + '\')" style="cursor:pointer" title="اضغط مرتين لعرض التفاصيل">' +
         '<td style="font-weight:800">' + escX(name) + '<div style="font-size:11px;color:var(--text-muted);font-weight:700;font-family:monospace">' + escX(s.student_id) + '</div></td>' +
         '<td>' +
           (s.subject_name ? '<div style="font-weight:800">' + escX(s.subject_name) + '</div>' +
@@ -22613,6 +22615,19 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         '<div><b>الحالة:</b> <span class="subx-status">' + SubscriptionService.subscriptionStatusLabel(SubscriptionService.subscriptionStatus(sub, today)) + '</span></div>' +
         '</div>';
 
+      // أزرار التحكم (إيقاف مؤقت / استئناف / طباعة الوصل)
+      const stNow = SubscriptionService.subscriptionStatus(sub, today);
+      html += '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:16px">';
+      if (stNow !== 'cancelled') {
+        if (sub.status === 'paused') {
+          html += '<button class="btn btn-primary" style="flex:1;min-width:150px" onclick="subxSetPaused(\'' + escX(sub.id) + '\',false)">▶️ استئناف الاشتراك</button>';
+        } else {
+          html += '<button class="btn btn-primary" style="flex:1;min-width:150px;background:linear-gradient(135deg,#7c3aed,#a855f7)" onclick="subxSetPaused(\'' + escX(sub.id) + '\',true)">⏸️ إيقاف مؤقت</button>';
+        }
+      }
+      html += '<button class="btn btn-primary" style="flex:1;min-width:150px" onclick="subxPrintReceipt(\'' + escX(sub.id) + '\')">🖨️ طباعة وصل</button>';
+      html += '</div>';
+
       // تفاصيل الأشهر (كل شهر كيان مستقل)
       html += '<div style="font-size:13px;font-weight:900;margin:16px 0 8px;color:var(--primary)">🗓️ تفاصيل الأشهر</div>';
       periods.forEach(p => {
@@ -22646,6 +22661,95 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       body.innerHTML = '<div style="text-align:center;color:#dc2626;padding:18px;font-size:13px;font-weight:800">تعذر تحميل البيانات حالياً. حاول مرة أخرى.</div>';
     }
   };
+  window.subxSetPaused = async function (id, paused) {
+    const action = paused ? 'إيقاف الاشتراك مؤقتاً' : 'استئناف الاشتراك';
+    const hint = paused ? '\nلن يُسجَّل الحضور لهذا الاشتراك حتى يتم الاستئناف.' : '';
+    if (!confirm('تأكيد ' + action + '؟' + hint)) return;
+    try {
+      await SubscriptionService.adminSetSubscriptionPaused(id, paused);
+      showToast(paused ? '✔️ تم إيقاف الاشتراك مؤقتاً.' : '✔️ تم استئناف الاشتراك.');
+      subxShowDetail(id);
+      subxLoadAll();
+    } catch (e) {
+      console.error('[SUBSCRIPTIONS] pause toggle failed', e);
+      showToast('❌ ' + ((e && e.message) || 'تعذر تنفيذ العملية'), true);
+    }
+  };
+
+  window.subxPrintReceipt = async function (id) {
+    try {
+      const d = await SubscriptionService.adminSubscriptionDetail(id);
+      const sub = (d && d.subscription) || {};
+      const periods = (d && d.periods) || [];
+      const stu = (d && d.student) || regs.find(r => String(r.id) === String(sub.student_id)) || {};
+      const used = periods.reduce((a, p) => a + ((p.used_sessions || 0)), 0);
+      const total = sub.total_sessions || (sub.months || 1) * 8;
+      const rem = Math.max(0, total - used);
+      const pkg = SubscriptionService.packageByMonths(sub.months);
+      const st = SubscriptionService.subscriptionStatus(sub, SubscriptionService.today());
+      const stLbl = SubscriptionService.subscriptionStatusLabel(st);
+      const price = (sub.total_price || 0).toLocaleString('ar-DZ') + ' دج';
+
+      const w = window.open('', '_blank', 'width=780,height=920');
+      if (!w) { showToast('⚠️ ائتمحور عدم فتح نافذة الطباعة (مانع النوافذ المنبثقة)', true); return; }
+      const rows = periods.map(p =>
+        '<tr>' +
+          '<td>' + (p.month_number || '—') + '</td>' +
+          '<td>' + SubscriptionService.fmtAr(p.start_date, true) + '</td>' +
+          '<td>' + SubscriptionService.fmtAr(p.end_date, true) + '</td>' +
+          '<td>' + (p.used_sessions || 0) + ' / ' + (p.total_sessions || 8) + '</td>' +
+        '</tr>'
+      ).join('');
+      w.document.write(
+        '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">' +
+        '<title>وصل اشتراك — E-PLUS</title>' +
+        '<style>' +
+        '*{box-sizing:border-box}body{font-family:"Tajawal",Tahoma,sans-serif;margin:0;padding:24px;color:#1e1e2e;background:#fff}' +
+        '.head{text-align:center;border-bottom:3px solid #7c3aed;padding-bottom:12px;margin-bottom:16px}' +
+        '.head h1{margin:0;font-size:22px;color:#6d28d9}' +
+        '.head p{margin:4px 0 0;color:#666;font-size:12px}' +
+        '.rec{text-align:center;font-size:15px;font-weight:900;background:#f3e8ff;border:1px solid #e9d5ff;border-radius:10px;padding:8px;margin-bottom:16px}' +
+        'table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px}' +
+        'th,td{border:1px solid #ddd;padding:7px 9px;text-align:center}' +
+        'th{background:#f5f3ff;font-weight:800}' +
+        '.info{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}' +
+        '.info td{border:none;padding:5px 2px;text-align:right}' +
+        '.info td:first-child{width:130px;color:#666;font-weight:700}' +
+        '.total{margin-top:14px;border-top:2px dashed #aaa;padding-top:10px;display:flex;justify-content:space-between;font-size:15px;font-weight:900}' +
+        '.foot{margin-top:34px;display:flex;justify-content:space-between;font-size:12px;color:#555}' +
+        '@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}' +
+        '</style></head><body>' +
+        '<div class="head"><h1>مركز E-PLUS التعليمي</h1><p>وصل اشتراك — رقم الاشتراك: ' + escX(sub.id) + '</p></div>' +
+        '<div class="rec">الحالة: ' + escX(stLbl) + '</div>' +
+        '<table class="info">' +
+          '<tr><td>الطالب:</td><td>' + escX(studentFullName(stu) || sub.student_id) + '</td></tr>' +
+          '<tr><td>Student ID:</td><td>' + escX(sub.student_id) + '</td></tr>' +
+          '<tr><td>المستوى:</td><td>' + escX(stu.level || '—') + (stu.stream ? ' — شعبة ' + escX(stu.stream) : '') + '</td></tr>' +
+          (stu.institution ? '<tr><td>المؤسسة:</td><td>' + escX(stu.institution) + '</td></tr>' : '') +
+          '<tr><td>المادة — الأستاذ:</td><td>' + escX((sub.subject_name || '—') + ' — ' + (sub.teacher_name || '—')) + '</td></tr>' +
+          '<tr><td>الباقة:</td><td>' + escX(pkg ? pkg.label : ((sub.months || '—') + ' شهر')) + '</td></tr>' +
+          '<tr><td>الفترة:</td><td>' + SubscriptionService.fmtAr(sub.start_date, true) + ' ← ' + SubscriptionService.fmtAr(sub.end_date, true) + '</td></tr>' +
+          '<tr><td>إجمالي الحصص:</td><td>' + total + ' حصة (المستخدمة: ' + used + '، المتبقية: ' + rem + ')</td></tr>' +
+          (sub.payment_id ? '<tr><td>رقم الدفع:</td><td>' + escX(sub.payment_id) + '</td></tr>' : '') +
+          (sub.notes ? '<tr><td>ملاحظات:</td><td>' + escX(sub.notes) + '</td></tr>' : '') +
+        '</table>' +
+        '<table>' +
+          '<thead><tr><th>الشهر</th><th>من</th><th>إلى</th><th>الحصص المستخدمة</th></tr></thead>' +
+          '<tbody>' + (rows || '<tr><td colspan="4">لا توجد تفاصيل أشهر.</td></tr>') + '</tbody>' +
+        '</table>' +
+        '<div class="total"><span>المبلغ الإجمالي</span><span>' + price + '</span></div>' +
+        '<div class="foot"><span>التوقيع: ______________________</span><span>التاريخ: ' + SubscriptionService.fmtAr(SubscriptionService.today(), true) + '</span></div>' +
+        '</body></html>'
+      );
+      w.document.close();
+      w.focus();
+      setTimeout(function () { w.print(); }, 250);
+    } catch (e) {
+      console.error('[SUBSCRIPTIONS] print failed', e);
+      showToast('❌ تعذر تجهيز الوصل للطباعة', true);
+    }
+  };
+
   window.subxCloseDetail = function () {
     $x('subx-detail-modal').classList.remove('open');
   };

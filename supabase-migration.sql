@@ -317,7 +317,7 @@ BEGIN
     SELECT 1 FROM student_subscriptions s
      WHERE s.id = p_subscription_id
        AND s.student_id = p_student_id
-       AND s.status <> 'cancelled'
+       AND s.status NOT IN ('cancelled', 'paused')
        AND (s.subject_id = '' OR s.subject_id = COALESCE(p_subject_id, ''))
        AND (s.teacher_id = '' OR s.teacher_id = COALESCE(p_teacher_id, ''))
   ) THEN RAISE EXCEPTION 'subscription not active for this subject/teacher'; END IF;
@@ -542,6 +542,30 @@ BEGIN
     'periods', (SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.month_number), '[]'::jsonb)
                 FROM subscription_periods p WHERE p.subscription_id = s.id)
   ) FROM student_subscriptions s WHERE s.id = v_sub_id);
+END; $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+-- إيقاف/استئناف اشتراك مؤقتاً: الحالة تصير 'paused' (لا يُسجَّل حضور)
+-- حتى يُستأنف → 'active'. لا يمكن تغيير اشتراك ملغى.
+CREATE OR REPLACE FUNCTION admin_pause_subscription(
+  p_admin_uid TEXT,
+  p_subscription_id TEXT,
+  p_paused BOOLEAN
+)
+RETURNS JSONB AS $$
+DECLARE
+  v_status TEXT;
+BEGIN
+  IF NOT is_admin(p_admin_uid) THEN RAISE EXCEPTION 'unauthorized'; END IF;
+  IF p_subscription_id IS NULL OR p_subscription_id = '' THEN RAISE EXCEPTION 'subscription_id required'; END IF;
+  IF EXISTS (SELECT 1 FROM student_subscriptions s
+              WHERE s.id = p_subscription_id AND s.status = 'cancelled') THEN
+    RAISE EXCEPTION 'cannot change a cancelled subscription';
+  END IF;
+  v_status := CASE WHEN p_paused THEN 'paused' ELSE 'active' END;
+  UPDATE student_subscriptions SET status = v_status
+   WHERE id = p_subscription_id;
+  RETURN (SELECT jsonb_build_object('subscription', to_jsonb(s))
+            FROM student_subscriptions s WHERE s.id = p_subscription_id);
 END; $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- قائمة الاشتراكات (للوحة الإدارة)
@@ -866,6 +890,7 @@ REVOKE ALL ON FUNCTION admin_list_admins(TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION record_attendance(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION undo_attendance(TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION admin_pause_subscription(TEXT, TEXT, BOOLEAN) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_subscriptions(TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_subscriptions_rich(TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_get_subscription_detail(TEXT, TEXT) FROM PUBLIC;
@@ -893,6 +918,7 @@ GRANT EXECUTE ON FUNCTION admin_list_admins(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION record_attendance(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION undo_attendance(TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION admin_pause_subscription(TEXT, TEXT, BOOLEAN) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_subscriptions(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_subscriptions_rich(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_get_subscription_detail(TEXT, TEXT) TO service_role;

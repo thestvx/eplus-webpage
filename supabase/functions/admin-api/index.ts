@@ -86,6 +86,13 @@ Deno.serve(async (req) => {
         p_subject_name: body.subjectName == null ? null : String(body.subjectName),
       });
 
+    case 'pause-subscription':
+      return rpc('admin_pause_subscription', {
+        p_admin_uid: uid,
+        p_subscription_id: String(body.subscriptionId || ''),
+        p_paused: body.paused === true,
+      });
+
     case 'get-balance':
       return rpc('admin_get_teacher_balance', {
         p_admin_uid: uid,

@@ -16,8 +16,8 @@
   const firebaseConfig = { apiKey: "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo", authDomain: "eplus-center-39.firebaseapp.com", projectId: "eplus-center-39", storageBucket: "eplus-center-39.firebasestorage.app", messagingSenderId: "191532732034", appId: "1:191532732034:web:b11449a2f0595db5d02e9b" };
   let fbReady = false;
   try {
-    firebase.initializeApp(firebaseConfig);
-    window.db = firebase.firestore();
+    firebase.initializeApp(firebaseConfig, 'kiosk');
+    window.db = firebase.app('kiosk').firestore();
     fbReady = true;
   } catch (e) { console.error('Firebase init error:', e); }
 </script>
@@ -742,7 +742,7 @@
           resolve(authState);
           return;
         }
-        firebase.auth().signInAnonymously().then(function () {
+        firebase.app('kiosk').auth().signInAnonymously().then(function () {
           authState.signedIn = true;
           authState.reason = '';
           console.log('[ATTENDANCE AUTH] anonymous signed in');
@@ -1302,7 +1302,7 @@
   // (undo_attendance) ليعود الطالب حصته — لا حضور ناقص ولا حصة ضائعة.
   async function recordAttendanceEdge(payload) {
     var token = null;
-    try { if (firebase.auth().currentUser) token = await firebase.auth().currentUser.getIdToken(); } catch (e) {}
+    try { const k = firebase.app('kiosk').auth().currentUser; if (k) token = await k.getIdToken(); } catch (e) {}
     if (!token) throw new Error('auth token missing');
     var res = await fetch(ATTENDANCE_EDGE_URL, {
       method: 'POST',

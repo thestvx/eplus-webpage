@@ -23,6 +23,16 @@ const supportMiddleSchool = () => {
   return (window.SubjectService && SubjectService.filterActiveTeachers) ? SubjectService.filterActiveTeachers(raw) : raw;
 };
 
+// ── استثناءات نموذج التسجيل فقط ──
+// مادة معينة عند أستاذ معين لا تُعرض للتسجيلات الجديدة، بينما التلاميذ
+// الذين سبق واختاروها يحتفظون بها ضمن موادهم المسجلة (لا يُمسّ سجلهم).
+function registrationFormItems(pairs) {
+  const active = (window.SubjectService && SubjectService.filterActiveTeachers) ? SubjectService.filterActiveTeachers(pairs) : (pairs || []);
+  return (Array.isArray(active) ? active : []).filter(p =>
+    !(p.subject === 'الرياضيات' && p.teacher === 'نعورة عبدالباسط')
+  );
+}
+
 const SUPPORT_INSTITUTIONS = {
   'السنة الثالثة ثانوي (بكالوريا)': [
     'ثانوية هالي عبدالكريم بقمار',
@@ -236,7 +246,7 @@ function showMiddleSchoolSubjects() {
 function renderMiddleSchoolSubjects() {
   const opts = byId('ms-options');
   if (!opts) return;
-  opts.innerHTML = supportMiddleSchool().map((item, i) =>
+  opts.innerHTML = registrationFormItems(supportMiddleSchool()).map((item, i) =>
     `<div class="ms-opt ${sSubjects.includes(i)?'selected':''}" data-idx="${i}" onclick="msSelect(${i})"><strong>${item.subject}</strong> <span style="opacity:0.6;font-weight:400;">— 🎓 ${item.teacher}</span></div>`
   ).join('');
   updateMsLabel();
@@ -280,7 +290,7 @@ function onStreamChange(stream) {
 function renderSubjects() {
   const opts = byId('ms-options');
   if (!opts) return;
-  const items = supportStreams()[sStream] || [];
+  const items = registrationFormItems(supportStreams()[sStream] || []);
   opts.innerHTML = items.map((item, i) =>
     `<div class="ms-opt ${sSubjects.includes(i)?'selected':''}" data-idx="${i}" onclick="msSelect(${i})"><strong>${item.subject}</strong> <span style="opacity:0.6;font-weight:400;">— 🎓 ${item.teacher}</span></div>`
   ).join('');
@@ -374,7 +384,7 @@ function onSubmitClick() {
     : sInstitutionVal;
 
   const isMiddleSchool = sLevel === 'السنة الرابعة متوسط';
-  const items = isMiddleSchool ? supportMiddleSchool() : (supportStreams()[sStream] || []);
+  const items = registrationFormItems(isMiddleSchool ? supportMiddleSchool() : (supportStreams()[sStream] || []));
   const selectedSubjects = sSubjects.map(i => items[i]);
 
   const year = new Date().getFullYear();
