@@ -428,6 +428,12 @@ END; $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 -- 10. إنشاء اشتراك (إدارة فقط) — ذرّي: اشتراك + كل الأشهر
 --     payment_id يجعل الدفع Idempotent (يرفض التكرار بـ 23505).
 -- ────────────────────────────────────────────────────────────────
+-- تطبيع اسم (إزالة مسافات + خفض حالة) لمطابقة أسماء المواد والأساتذة
+-- بحساسية تجاه اختلاف المسافات فقط (البيانات التاريخية قد تحوي مسافات زائدة).
+CREATE OR REPLACE FUNCTION _sn(p TEXT) RETURNS TEXT AS $$
+  SELECT lower(regexp_replace(COALESCE(p, ''), '\s+', '', 'g'));
+$$ LANGUAGE sql IMMUTABLE;
+
 CREATE OR REPLACE FUNCTION admin_create_subscription(
   p_admin_uid TEXT,
   p_student_id TEXT,
@@ -469,15 +475,26 @@ BEGIN
   v_total := COALESCE(p_total_price, v_months * 2000);
   IF v_total < 0 THEN RAISE EXCEPTION 'total_price must be >= 0'; END IF;
 
-  -- الطالب مسجل فعلاً لدى هذا الأستاذ في هذه المادة (مصدر واحد للتسجيل)
+  -- الطالب مسجل فعلاً لدى هذا الأستاذ في هذه المادة (مصدر واحد للتسجيل).
+  -- المطابقة بالاسم أولاً: بيانات التسجيل القديمة قد لا تحوي subjectId/teacherId
+  -- (فقط subject + teacher)، لذا المطابقة الصارمة بالـ IDs تُفشل طلاباً مسجلين فعلاً.
+  -- الـ IDs تُستخدم كتطابق إضافي إن وُجدت، مع بديل اسمي: الاجتماعيات = التاريخ ( دورة ).
   IF NOT EXISTS (
     SELECT 1 FROM registrations r,
            jsonb_array_elements(CASE WHEN jsonb_typeof(r.subjects) = 'array' THEN r.subjects ELSE '[]'::jsonb END) el
      WHERE r.id = p_student_id
        AND r.deleted_at IS NULL
        AND r.status = 'مسجل نهائياً'
-       AND el->>'subjectId' = v_subject_id
-       AND (el->>'teacherId' = v_teacher_id OR (el->>'teacherId' IS NULL OR el->>'teacherId' = ''))
+       AND (
+             (el->>'subjectId' IS NOT NULL AND el->>'subjectId' <> '' AND el->>'subjectId' = v_subject_id)
+          OR (COALESCE(p_subject_name, '') <> '' AND _sn(el->>'subject') = _sn(p_subject_name))
+          OR (_sn(el->>'subject') IN ('الاجتماعيات','التاريخ(دورة)') AND _sn(p_subject_name) IN ('الاجتماعيات','التاريخ(دورة)'))
+       )
+       AND (
+             (el->>'teacherId' IS NOT NULL AND el->>'teacherId' <> '' AND el->>'teacherId' = v_teacher_id)
+          OR _sn(el->>'teacher') = _sn(p_teacher_name)
+          OR (el->>'teacher' IS NULL OR el->>'teacher' = '')
+       )
   ) THEN RAISE EXCEPTION 'student not enrolled for this subject/teacher'; END IF;
 
   v_sub_id := 'SUB-' || p_student_id || '-' || to_char(now(), 'YYYYMMDDHH24MISSMS');
