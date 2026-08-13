@@ -179,8 +179,7 @@ function updateMsUI() {
     ).join('');
   }
 
-  const cbtn = byId('s-confirm-btn');
-  if (cbtn) cbtn.disabled = sSubjects.length === 0;
+  byId('s-submit-btn') && (byId('s-submit-btn').style.display = sSubjects.length ? 'block' : 'none');
 }
 
 // إعادة التحقق عند تغيير المستوى/الشعبة: تُحذف المواد غير المتاحة
@@ -204,7 +203,7 @@ function openSupportReg() {
   const f = byId('support-reg-form');
   if (f) f.reset();
   [byId('s-level-group'),byId('s-institution-group'),byId('s-institution-input-group'),
-   byId('s-stream-group'),byId('s-submit-btn')].forEach(el=>{
+   byId('s-stream-group'),byId('s-subjects-group'),byId('s-submit-btn')].forEach(el=>{
     if (el) el.style.display = 'none';
   });
   document.querySelectorAll('input[name="sStdType"]').forEach(r=>r.checked=false);
@@ -231,7 +230,7 @@ function onStdTypeChange(type) {
   sStudentType = type;
   sLevel = null; sInstitutionVal = null; sStream = null; sSubjects = [];
   [byId('s-institution-group'),byId('s-institution-input-group'),
-   byId('s-stream-group'),byId('s-submit-btn')].forEach(el=>{
+   byId('s-stream-group'),byId('s-subjects-group'),byId('s-submit-btn')].forEach(el=>{
     if (el) el.style.display = 'none';
   });
   byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
@@ -264,7 +263,7 @@ function onLevelChange() {
     showInstitution();
   } else {
     [byId('s-institution-group'),byId('s-institution-input-group'),
-     byId('s-stream-group'),byId('s-submit-btn')].forEach(el=>{
+     byId('s-stream-group'),byId('s-subjects-group'),byId('s-submit-btn')].forEach(el=>{
       if (el) el.style.display = 'none';
     });
   }
@@ -283,6 +282,7 @@ function showInstitution() {
   }
   byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='none');
   byId('s-stream-group')&&(byId('s-stream-group').style.display='none');
+  byId('s-subjects-group')&&(byId('s-subjects-group').style.display='none');
   byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
 }
 
@@ -292,6 +292,7 @@ function onInstitutionChange() {
   if (!sInstitutionVal) return;
   sStream = null;
   byId('s-stream-group')&&(byId('s-stream-group').style.display='none');
+  byId('s-subjects-group')&&(byId('s-subjects-group').style.display='none');
   byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
   byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
   byId('msStrip')&&(byId('msStrip').style.display='none');
@@ -315,24 +316,24 @@ function onInstitutionChange() {
 function onInstitutionInputChange() {
   const inp = byId('sInstitutionInput');
   if (inp && inp.value.trim().length >= 2) {
-    showInstitutionSubmit();
+    if (sLevel === 'السنة الرابعة متوسط') {
+      showMiddleSchoolSubjects();
+    } else {
+      showStream();
+    }
   } else {
     byId('s-stream-group')&&(byId('s-stream-group').style.display='none');
-    byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
+    byId('s-subjects-group')&&(byId('s-subjects-group').style.display='none');
   }
-}
-
-// إظهار زر "متابعة إلى القوانين" بعد اكتمال بيانات مرحلة المعلومات
-// (اختيار المؤسسة للمتوسط أو الشعبة للثانوي) مع تمرير ناعم نحوه.
-function showInstitutionSubmit() {
-  byId('s-submit-btn')&&(byId('s-submit-btn').style.display='block');
-  sScrollToPhase(byId('s-submit-btn'), { offset: 28 });
 }
 
 function showMiddleSchoolSubjects() {
   revalidateSubjects();
   byId('msDropdown')&&(byId('msDropdown').style.display='none');
-  showInstitutionSubmit();
+  const sg = byId('s-subjects-group');
+  if (sg) sg.style.display = 'block';
+  renderMiddleSchoolSubjects();
+  sScrollToPhase(sg, { offset: 32 });
 }
 
 function renderMiddleSchoolSubjects() {
@@ -372,7 +373,10 @@ function onStreamChange(stream, opts) {
   sStream = stream;
   byId('msDropdown')&&(byId('msDropdown').style.display='none');
   revalidateSubjects();
-  if (!opts || !opts.skipScroll) showInstitutionSubmit();
+  const sg = byId('s-subjects-group');
+  if (sg) sg.style.display = 'block';
+  renderSubjects();
+  if (!opts || !opts.skipScroll) sScrollToPhase(sg, { offset: 32 });
 }
 
 // ── Step 5: Subjects (Multi-Select Dropdown — per stream) ──
@@ -451,6 +455,9 @@ function onSubmitClick() {
   if (sLevel === 'السنة الثالثة ثانوي (بكالوريا)' && !sStream) {
     regAlert('⚠️ الرجاء اختيار الشعبة'); return;
   }
+  if (sLevel === 'السنة الرابعة متوسط' || sStream) {
+    if (sSubjects.length === 0) { regAlert('⚠️ الرجاء اختيار مادة واحدة على الأقل'); return; }
+  }
 
   const institution = sInstitutionVal === 'أخرى'
     ? (byId('sInstitutionInput')?.value?.trim() || '')
@@ -476,7 +483,7 @@ function onSubmitClick() {
     level: sLevel,
     institution,
     stream: sStream,
-    subjects: [],
+    subjects: sSubjects.map(p => ({ subject: p.subject, teacher: p.teacher })),
     terms_accepted: true,
     status: 'مسجل مبدئياً',
     fee_amount: 500,
@@ -614,57 +621,13 @@ async function _barcodeColumnAvailable() {
   return _barcodeColOk;
 }
 
-// الموافقة على قوانين المركز → الانتقال إلى مرحلة اختيار المواد المطلوبة
-// (الإرسال النهائي للبيانات يتم في onSubjectsConfirm بعد اختيار المواد)
-function onLawsConfirm() {
-  if (!sFormData) return;
-  closeLawsModal();
-  openSubjectsModal();
-}
-
-function closeLawsModal() {
-  const modal = byId('laws-modal');
-  if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
-}
-
-function closeLawsModalOutside(e) {
-  if (e.target === byId('laws-modal')) lawsBackToForm();
-}
-
-// ── Subjects Phase — مرحلة اختيار المواد المطلوبة ──
-function openSubjectsModal() {
-  const modal = byId('subjects-modal');
-  if (!modal) return;
-  byId('msDropdown')&&(byId('msDropdown').style.display='block');
-  if (sLevel === 'السنة الرابعة متوسط') renderMiddleSchoolSubjects();
-  else renderSubjects();
-  modal.style.display = 'flex';
-  modal.classList.add('active');
-  modal.scrollTop = 0;
-  // تمرير ناعم إلى بداية مرحلة المواد بحيث يظهر العنوان والقائمة معاً
-  sScrollToPhase(byId('msTrigger') || byId('ms-options'), { offset: 20 });
-}
-
-// الخروج من مرحلة المواد بإعادة فتح مرحلة القوانين (للتراجع) مع الحفاظ على البيانات
-function closeSubjectsOutside(e) {
-  if (e.target === byId('subjects-modal')) {
-    closeSubjectsModal();
-    openLawsModal();
-  }
-}
-
-function closeSubjectsModal() {
-  const modal = byId('subjects-modal');
-  if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
-}
-
-// تأكيد التسجيل النهائي بعد اختيار المواد: إرسال البيانات إلى قاعدة البيانات
-async function onSubjectsConfirm() {
+// الموافقة على قوانين المركز → الإرسال النهائي للبيانات إلى قاعدة البيانات
+async function onLawsConfirm() {
   if (!sFormData) return;
   if (sSubjects.length === 0) { regAlert('⚠️ الرجاء اختيار مادة واحدة على الأقل'); return; }
   sFormData.subjects = sSubjects.map(p => ({ subject: p.subject, teacher: p.teacher }));
   sFormData.terms_accepted = true;
-  const btn = byId('s-confirm-btn');
+  const btn = byId('lawsConfirmBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'جاري التسجيل...'; }
   openLoadingModal();
   try {
@@ -693,7 +656,7 @@ async function onSubjectsConfirm() {
       });
       if (res.ok) {
         closeLoadingModal();
-        closeSubjectsModal();
+        closeLawsModal();
         openSuccessModal(sFormData.id);
         return;
       }
@@ -704,10 +667,18 @@ async function onSubjectsConfirm() {
     throw new Error('لا توجد Registration IDs ثلاثية متاحة حالياً');
   } catch (e) {
     closeLoadingModal();
-    openSubjectsModal();
-    if (byId('s-confirm-btn')) { byId('s-confirm-btn').disabled = false; byId('s-confirm-btn').textContent = 'تأكيد التسجيل ✦'; }
+    if (byId('lawsConfirmBtn')) { byId('lawsConfirmBtn').disabled = false; byId('lawsConfirmBtn').textContent = 'تأكيد التسجيل الأولي'; }
     setTimeout(() => regAlert('❌ فشل التسجيل: ' + e.message, 'خطأ'), 200);
   }
+}
+
+function closeLawsModal() {
+  const modal = byId('laws-modal');
+  if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
+}
+
+function closeLawsModalOutside(e) {
+  if (e.target === byId('laws-modal')) lawsBackToForm();
 }
 
 // ── Success Modal ──
@@ -822,7 +793,7 @@ async function updateRegistration(id, data) {
   if (window.SubjectService && typeof SubjectService.loadDeletedTeachers === 'function') {
     SubjectService.loadDeletedTeachers().then(() => {
       try {
-        if (byId('subjects-modal')?.style.display === 'flex') {
+        if (byId('s-subjects-group')?.style.display === 'block') {
           if (sLevel === 'السنة الرابعة متوسط') { renderMiddleSchoolSubjects(); }
           else if (sStream) { onStreamChange(sStream, { skipScroll: true }); }
         }
