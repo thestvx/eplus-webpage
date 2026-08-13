@@ -706,6 +706,16 @@ function openSuccessModal(id) {
     if (lvl) lvl.textContent = sFormData.level || '—';
     const cnt = byId('success-subjects-count');
     if (cnt) cnt.textContent = (Array.isArray(sFormData.subjects) ? sFormData.subjects.length : 0) + ' مواد';
+    const stream = byId('success-stream');
+    const streamChip = byId('success-stream-chip');
+    if (stream && streamChip) {
+      if (sFormData.stream) {
+        stream.textContent = sFormData.stream;
+        streamChip.style.display = 'inline-flex';
+      } else {
+        streamChip.style.display = 'none';
+      }
+    }
   }
   const modal = byId('success-modal');
   if (modal) {
