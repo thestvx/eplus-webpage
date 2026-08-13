@@ -103,7 +103,6 @@ let sInstitutionVal = null;
 let sStream = null;
 let sSubjects = []; // [{ subject, teacher }] — unique Subject+Teacher pairs
 let sFormData = null;
-let sPhase = 1; // 1: شخصية، 2: مستوى، 3: مؤسسة، 4: شعبة، 5: مواد
 
 function byId(id) { return document.getElementById(id); }
 
@@ -124,10 +123,36 @@ function _genRegId() {
   return String(Math.floor(Math.random() * 1000)).padStart(3, '0');
 }
 
-function sScrollTo(el, block) {
+// ── Smooth scroll بين المراحل الرئيسية ──
+// container: العنصر القابل للتمرير (نافذة المودال أو الصفحة)
+// لا نستخدم scrollIntoView بشكل أعمى حتى لا يختفي رأس المرحلة خلف الـ sticky header.
+function smoothScrollTo(container, targetTop, duration) {
+  if (!container) return;
+  const start = container.scrollTop;
+  const maxScroll = container.scrollHeight - container.clientHeight;
+  const target = Math.max(0, Math.min(targetTop, maxScroll));
+  if (Math.abs(target - start) < 1) return;
+  const t0 = performance.now();
+  function step(now) {
+    const t = Math.min(1, (now - t0) / duration);
+    const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // easeInOutCubic
+    container.scrollTop = start + (target - start) * eased;
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// تمرير العنصر إلى بداية المرحلة مع إزاحة قابلة للضبط
+// opts.offset: مسافة إضافية أعلى العنصر (افتراضياً 24px لمراعاة الـ sticky header/حشوة المودال)
+// opts.duration: مدة التمرير (افتراضياً 550ms ضمن النطاق المطلوب 400–700ms)
+function sScrollToPhase(el, opts) {
   if (!el) return;
-  try { el.scrollIntoView({ behavior: 'smooth', block: block || 'center' }); }
-  catch (e) { el.scrollIntoView(); }
+  const o = opts || {};
+  const container = el.closest('.modal-overlay') || document.scrollingElement;
+  if (!container) return;
+  const headerOffset = (o.offset != null) ? o.offset : 24;
+  const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - headerOffset;
+  smoothScrollTo(container, top, o.duration || 550);
 }
 
 // شريط "تم اختيار X مادة" + قائمة "المواد المختارة" + زر الإتمام
@@ -154,7 +179,8 @@ function updateMsUI() {
     ).join('');
   }
 
-  byId('s-submit-btn') && (byId('s-submit-btn').style.display = sSubjects.length ? 'block' : 'none');
+  const cbtn = byId('s-confirm-btn');
+  if (cbtn) cbtn.disabled = sSubjects.length === 0;
 }
 
 // إعادة التحقق عند تغيير المستوى/الشعبة: تُحذف المواد غير المتاحة
@@ -171,46 +197,16 @@ function revalidateSubjects(items) {
   }
 }
 
-function updateBackBtn() {
-  const b = byId('s-back-btn');
-  if (b) b.style.display = sPhase >= 2 ? 'flex' : 'none';
-}
-
-// زر "← السابق": خطوة واحدة إلى الخلف مع حفظ كل البيانات وتمرير سلس
-function sGoBack() {
-  if (sPhase <= 1) return;
-  const hide = (id) => { const el = byId(id); if (el) el.style.display = 'none'; };
-  const show = (id, disp) => { const el = byId(id); if (el) el.style.display = disp || 'block'; };
-  const isBac = sLevel === 'السنة الثالثة ثانوي (بكالوريا)';
-
-  if (sPhase === 5) {
-    hide('s-subjects-group'); hide('s-submit-btn');
-    if (isBac) { show('s-stream-group'); sPhase = 4; sScrollTo(byId('s-stream-group')); }
-    else { show('s-institution-group'); show('s-institution-input-group', sInstitutionVal === 'أخرى' ? 'block' : 'none'); sPhase = 3; sScrollTo(byId('s-institution-group')); }
-  } else if (sPhase === 4) {
-    hide('s-stream-group');
-    if (sStudentType === 'حر') { show('s-level-group'); sPhase = 2; sScrollTo(byId('s-level-group')); }
-    else { show('s-institution-group'); show('s-institution-input-group', sInstitutionVal === 'أخرى' ? 'block' : 'none'); sPhase = 3; sScrollTo(byId('s-institution-group')); }
-  } else if (sPhase === 3) {
-    hide('s-institution-group'); hide('s-institution-input-group');
-    show('s-level-group'); sPhase = 2; sScrollTo(byId('s-level-group'));
-  } else if (sPhase === 2) {
-    hide('s-level-group'); sPhase = 1; sScrollTo(byId('s-personal-group'), 'start');
-  }
-  updateBackBtn();
-}
-
 // ── Open / Close main modal ──
 function openSupportReg() {
   sStudentType = null; sLevel = null; sInstitutionVal = null; sStream = null;
-  sSubjects = []; sFormData = null; sPhase = 1;
+  sSubjects = []; sFormData = null;
   const f = byId('support-reg-form');
   if (f) f.reset();
   [byId('s-level-group'),byId('s-institution-group'),byId('s-institution-input-group'),
-   byId('s-stream-group'),byId('s-subjects-group'),byId('s-submit-btn')].forEach(el=>{
+   byId('s-stream-group'),byId('s-submit-btn')].forEach(el=>{
     if (el) el.style.display = 'none';
   });
-  byId('s-back-btn')&&(byId('s-back-btn').style.display='none');
   document.querySelectorAll('input[name="sStdType"]').forEach(r=>r.checked=false);
   byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
   byId('msStrip')&&(byId('msStrip').style.display='none');
@@ -218,7 +214,7 @@ function openSupportReg() {
   byId('msDropdown')&&(byId('msDropdown').style.display='none');
   byId('ms-options')&&(byId('ms-options').innerHTML='');
   const modal = byId('support-reg-modal');
-  if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
+  if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); modal.scrollTop = 0; }
 }
 
 function closeSupportReg() {
@@ -233,9 +229,9 @@ function closeSupportRegOutside(e) {
 // ── Step 1: Student Type ──
 function onStdTypeChange(type) {
   sStudentType = type;
-  sLevel = null; sInstitutionVal = null; sStream = null; sSubjects = []; sPhase = 1;
+  sLevel = null; sInstitutionVal = null; sStream = null; sSubjects = [];
   [byId('s-institution-group'),byId('s-institution-input-group'),
-   byId('s-stream-group'),byId('s-subjects-group'),byId('s-submit-btn')].forEach(el=>{
+   byId('s-stream-group'),byId('s-submit-btn')].forEach(el=>{
     if (el) el.style.display = 'none';
   });
   byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
@@ -248,7 +244,6 @@ function onStdTypeChange(type) {
     if (lg) { lg.style.display = 'block'; }
     const sel = byId('sLevel');
     if (sel) { sel.disabled = false; sel.value = ''; }
-    sPhase = 2;
   } else if (type === 'حر') {
     sLevel = 'السنة الثالثة ثانوي (بكالوريا)';
     sInstitutionVal = 'غير محدد';
@@ -258,7 +253,6 @@ function onStdTypeChange(type) {
     if (sel) { sel.value = 'السنة الثالثة ثانوي (بكالوريا)'; sel.disabled = true; }
     showStream();
   }
-  updateBackBtn();
 }
 
 // ── Step 2: Level ──
@@ -270,11 +264,9 @@ function onLevelChange() {
     showInstitution();
   } else {
     [byId('s-institution-group'),byId('s-institution-input-group'),
-     byId('s-stream-group'),byId('s-subjects-group'),byId('s-submit-btn')].forEach(el=>{
+     byId('s-stream-group'),byId('s-submit-btn')].forEach(el=>{
       if (el) el.style.display = 'none';
     });
-    sPhase = 2;
-    updateBackBtn();
   }
 }
 
@@ -291,10 +283,7 @@ function showInstitution() {
   }
   byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='none');
   byId('s-stream-group')&&(byId('s-stream-group').style.display='none');
-  byId('s-subjects-group')&&(byId('s-subjects-group').style.display='none');
   byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
-  sPhase = 3;
-  updateBackBtn();
 }
 
 function onInstitutionChange() {
@@ -303,7 +292,6 @@ function onInstitutionChange() {
   if (!sInstitutionVal) return;
   sStream = null;
   byId('s-stream-group')&&(byId('s-stream-group').style.display='none');
-  byId('s-subjects-group')&&(byId('s-subjects-group').style.display='none');
   byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
   byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
   byId('msStrip')&&(byId('msStrip').style.display='none');
@@ -313,8 +301,6 @@ function onInstitutionChange() {
   if (sInstitutionVal === 'أخرى') {
     byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='block');
     byId('sInstitutionInput')&&(byId('sInstitutionInput').value='');
-    sPhase = 3;
-    updateBackBtn();
     return;
   }
   byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='none');
@@ -329,27 +315,24 @@ function onInstitutionChange() {
 function onInstitutionInputChange() {
   const inp = byId('sInstitutionInput');
   if (inp && inp.value.trim().length >= 2) {
-    if (sLevel === 'السنة الرابعة متوسط') {
-      showMiddleSchoolSubjects();
-    } else {
-      showStream();
-    }
+    showInstitutionSubmit();
   } else {
     byId('s-stream-group')&&(byId('s-stream-group').style.display='none');
-    byId('s-subjects-group')&&(byId('s-subjects-group').style.display='none');
-    sPhase = 3;
-    updateBackBtn();
+    byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
   }
+}
+
+// إظهار زر "متابعة إلى القوانين" بعد اكتمال بيانات مرحلة المعلومات
+// (اختيار المؤسسة للمتوسط أو الشعبة للثانوي) مع تمرير ناعم نحوه.
+function showInstitutionSubmit() {
+  byId('s-submit-btn')&&(byId('s-submit-btn').style.display='block');
+  sScrollToPhase(byId('s-submit-btn'), { offset: 28 });
 }
 
 function showMiddleSchoolSubjects() {
   revalidateSubjects();
   byId('msDropdown')&&(byId('msDropdown').style.display='none');
-  const sg = byId('s-subjects-group');
-  if (sg) sg.style.display = 'block';
-  renderMiddleSchoolSubjects();
-  sPhase = 5;
-  updateBackBtn();
+  showInstitutionSubmit();
 }
 
 function renderMiddleSchoolSubjects() {
@@ -371,8 +354,6 @@ function showStream() {
   byId('s-institution-group')&&(byId('s-institution-group').style.display='none');
   byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='none');
   renderStreams();
-  sPhase = 4;
-  updateBackBtn();
 }
 
 function renderStreams() {
@@ -387,14 +368,11 @@ function renderStreams() {
   ).join('');
 }
 
-function onStreamChange(stream) {
+function onStreamChange(stream, opts) {
   sStream = stream;
   byId('msDropdown')&&(byId('msDropdown').style.display='none');
-  const sg = byId('s-subjects-group');
-  if (sg) sg.style.display = 'block';
   revalidateSubjects();
-  sPhase = 5;
-  updateBackBtn();
+  if (!opts || !opts.skipScroll) showInstitutionSubmit();
 }
 
 // ── Step 5: Subjects (Multi-Select Dropdown — per stream) ──
@@ -473,13 +451,10 @@ function onSubmitClick() {
   if (sLevel === 'السنة الثالثة ثانوي (بكالوريا)' && !sStream) {
     regAlert('⚠️ الرجاء اختيار الشعبة'); return;
   }
-  if (sSubjects.length === 0) { regAlert('⚠️ الرجاء اختيار مادة واحدة على الأقل'); return; }
 
   const institution = sInstitutionVal === 'أخرى'
     ? (byId('sInstitutionInput')?.value?.trim() || '')
     : sInstitutionVal;
-
-  const selectedSubjects = sSubjects.map(p => ({ subject: p.subject, teacher: p.teacher }));
 
   const id = _genRegId();
 
@@ -501,7 +476,7 @@ function onSubmitClick() {
     level: sLevel,
     institution,
     stream: sStream,
-    subjects: selectedSubjects,
+    subjects: [],
     terms_accepted: true,
     status: 'مسجل مبدئياً',
     fee_amount: 500,
@@ -517,16 +492,14 @@ function openLawsFromHero() {
   const lawsText = byId('laws-text');
   if (lawsText) {
     lawsText.innerHTML = SUPPORT_LAWS.map((l, i) =>
-      `<div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:13px;line-height:1.7;">
-        <strong style="color:var(--gold,#c8a84b);">${i + 1}.</strong> ${l}
-      </div>`
+      `<div class="law-item"><strong class="law-num">${i + 1}.</strong> ${l}</div>`
     ).join('');
   }
   byId('laws-checkbox-area')&&(byId('laws-checkbox-area').style.display='none');
   byId('lawsAgree')&&(byId('lawsAgree').checked=false);
   byId('lawsConfirmBtn')&&(byId('lawsConfirmBtn').disabled=true);
   const modal = byId('laws-modal');
-  if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
+  if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); modal.scrollTop = 0; }
   const area = byId('laws-scroll-area');
   if (area) { area.scrollTop = 0; }
   setTimeout(setupLawsScroll, 100);
@@ -537,9 +510,7 @@ function openLawsModal() {
   const lawsText = byId('laws-text');
   if (lawsText) {
     lawsText.innerHTML = SUPPORT_LAWS.map((l, i) =>
-      `<div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:13px;line-height:1.7;">
-        <strong style="color:var(--gold,#c8a84b);">${i + 1}.</strong> ${l}
-      </div>`
+      `<div class="law-item"><strong class="law-num">${i + 1}.</strong> ${l}</div>`
     ).join('');
   }
   byId('laws-checkbox-area')&&(byId('laws-checkbox-area').style.display='none');
@@ -547,10 +518,32 @@ function openLawsModal() {
   byId('lawsConfirmBtn')&&(byId('lawsConfirmBtn').disabled=true);
   closeSupportReg();
   const modal = byId('laws-modal');
-  if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
+  if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); modal.scrollTop = 0; }
   const area = byId('laws-scroll-area');
   if (area) { area.scrollTop = 0; }
   setTimeout(setupLawsScroll, 100);
+}
+
+// العودة من مرحلة القوانين إلى مرحلة معلومات الطالب (المرحلة كاملة)
+// مع الحفاظ على كل البيانات بدون إعادة تحميل وبدون فقدان المواد المختارة.
+function lawsBackToForm() {
+  resetLawsModalState();
+  closeLawsModal();
+  const formModal = byId('support-reg-modal');
+  if (formModal) {
+    formModal.style.display = 'flex';
+    formModal.classList.add('active');
+    sScrollToPhase(byId('s-personal-group') || formModal, { offset: 20 });
+  }
+}
+
+// إعادة ضبط حالة مودال القوانين (قبل الفتح أو الرجوع)
+function resetLawsModalState() {
+  byId('laws-checkbox-area')&&(byId('laws-checkbox-area').style.display='none');
+  byId('lawsAgree')&&(byId('lawsAgree').checked=false);
+  byId('lawsConfirmBtn')&&(byId('lawsConfirmBtn').disabled=true);
+  const area = byId('laws-scroll-area');
+  if (area) area.scrollTop = 0;
 }
 
 function setupLawsScroll() {
@@ -621,11 +614,58 @@ async function _barcodeColumnAvailable() {
   return _barcodeColOk;
 }
 
-async function onLawsConfirm() {
+// الموافقة على قوانين المركز → الانتقال إلى مرحلة اختيار المواد المطلوبة
+// (الإرسال النهائي للبيانات يتم في onSubjectsConfirm بعد اختيار المواد)
+function onLawsConfirm() {
   if (!sFormData) return;
-  const btn = byId('lawsConfirmBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'جاري التسجيل...'; }
   closeLawsModal();
+  openSubjectsModal();
+}
+
+function closeLawsModal() {
+  const modal = byId('laws-modal');
+  if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
+}
+
+function closeLawsModalOutside(e) {
+  if (e.target === byId('laws-modal')) lawsBackToForm();
+}
+
+// ── Subjects Phase — مرحلة اختيار المواد المطلوبة ──
+function openSubjectsModal() {
+  const modal = byId('subjects-modal');
+  if (!modal) return;
+  byId('msDropdown')&&(byId('msDropdown').style.display='block');
+  if (sLevel === 'السنة الرابعة متوسط') renderMiddleSchoolSubjects();
+  else renderSubjects();
+  modal.style.display = 'flex';
+  modal.classList.add('active');
+  modal.scrollTop = 0;
+  // تمرير ناعم إلى بداية مرحلة المواد بحيث يظهر العنوان والقائمة معاً
+  sScrollToPhase(byId('msTrigger') || byId('ms-options'), { offset: 20 });
+}
+
+// الخروج من مرحلة المواد بإعادة فتح مرحلة القوانين (للتراجع) مع الحفاظ على البيانات
+function closeSubjectsOutside(e) {
+  if (e.target === byId('subjects-modal')) {
+    closeSubjectsModal();
+    openLawsModal();
+  }
+}
+
+function closeSubjectsModal() {
+  const modal = byId('subjects-modal');
+  if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
+}
+
+// تأكيد التسجيل النهائي بعد اختيار المواد: إرسال البيانات إلى قاعدة البيانات
+async function onSubjectsConfirm() {
+  if (!sFormData) return;
+  if (sSubjects.length === 0) { regAlert('⚠️ الرجاء اختيار مادة واحدة على الأقل'); return; }
+  sFormData.subjects = sSubjects.map(p => ({ subject: p.subject, teacher: p.teacher }));
+  sFormData.terms_accepted = true;
+  const btn = byId('s-confirm-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'جاري التسجيل...'; }
   openLoadingModal();
   try {
     // ID ثلاثي الأرقام (000–999): عند تصادم 23505 نعيد توليد ID جديد
@@ -653,6 +693,7 @@ async function onLawsConfirm() {
       });
       if (res.ok) {
         closeLoadingModal();
+        closeSubjectsModal();
         openSuccessModal(sFormData.id);
         return;
       }
@@ -663,41 +704,32 @@ async function onLawsConfirm() {
     throw new Error('لا توجد Registration IDs ثلاثية متاحة حالياً');
   } catch (e) {
     closeLoadingModal();
-    openLawsModal();
-    if (byId('lawsAgree')) byId('lawsAgree').checked = true;
-    if (byId('lawsConfirmBtn')) { byId('lawsConfirmBtn').disabled = false; byId('lawsConfirmBtn').textContent = 'تأكيد التسجيل الأولي'; }
+    openSubjectsModal();
+    if (byId('s-confirm-btn')) { byId('s-confirm-btn').disabled = false; byId('s-confirm-btn').textContent = 'تأكيد التسجيل ✦'; }
     setTimeout(() => regAlert('❌ فشل التسجيل: ' + e.message, 'خطأ'), 200);
   }
-}
-
-function closeLawsModal() {
-  const modal = byId('laws-modal');
-  if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
-}
-
-function closeLawsModalOutside(e) {
-  if (e.target === byId('laws-modal')) closeLawsModal();
 }
 
 // ── Success Modal ──
 function openSuccessModal(id) {
   byId('success-id-display')&&(byId('success-id-display').textContent=id);
+  if (sFormData) {
+    const lvl = byId('success-level');
+    if (lvl) lvl.textContent = sFormData.level || '—';
+    const cnt = byId('success-subjects-count');
+    if (cnt) cnt.textContent = (Array.isArray(sFormData.subjects) ? sFormData.subjects.length : 0) + ' مواد';
+  }
   const modal = byId('success-modal');
-  if (modal) { 
-    modal.style.display = 'flex'; 
+  if (modal) {
+    modal.style.display = 'flex';
     modal.classList.add('active');
-    const box = modal.querySelector('.ep-success-box');
-    if (box) {
-      box.style.animation = 'none';
-      void box.offsetHeight;
-      box.style.animation = '';
-    }
-    const icon = modal.querySelector('.ep-success-icon');
-    if (icon) {
-      icon.style.animation = 'none';
-      void icon.offsetHeight;
-      icon.style.animation = '';
-    }
+    modal.scrollTop = 0;
+    const animEls = modal.querySelectorAll('.success-stagger, .success-check-wrap, .success-check-circle, .success-check-mark, .ep-success-box');
+    animEls.forEach(el => {
+      el.style.animation = 'none';
+      void el.offsetWidth;
+      el.style.animation = '';
+    });
   }
 }
 
@@ -790,9 +822,9 @@ async function updateRegistration(id, data) {
   if (window.SubjectService && typeof SubjectService.loadDeletedTeachers === 'function') {
     SubjectService.loadDeletedTeachers().then(() => {
       try {
-        if (byId('s-subjects-group')?.style.display === 'block') {
+        if (byId('subjects-modal')?.style.display === 'flex') {
           if (sLevel === 'السنة الرابعة متوسط') { renderMiddleSchoolSubjects(); }
-          else if (sStream) { onStreamChange(sStream); }
+          else if (sStream) { onStreamChange(sStream, { skipScroll: true }); }
         }
       } catch (e) { console.warn('Re-render after deleted-teachers load failed:', e); }
     }).catch(() => {});
