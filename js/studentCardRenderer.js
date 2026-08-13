@@ -25,11 +25,19 @@
 //  relative to the top-left of the 85.6 × 53.98 mm card. For the
 //  right-aligned text rows, x is the position of the row's RIGHT edge
 //  measured from the card's LEFT edge (so dragging right always raises x).
+//
+//  A4 MULTI-CARD SHEETS:
+//  Card designs are pre-printed onto A4 (210 × 297 mm). A saved SHEET
+//  LAYOUT (localStorage) defines an ordered list of card SLOTS (x/y/w/h/
+//  rotation on the A4). The data layer is printed only inside the chosen
+//  slot using the same slot-relative CAL coordinates, so the site prints
+//  ONLY the transparent data layer over the pre-printed A4. A separate
+//  test sheet prints the slot outlines for overlay verification.
 // ═══════════════════════════════════════════════════════════
 
 const StudentCardRenderer = (function () {
-  const FRONT_IMG = 'studentidcard/studentidcardfront.jpg';
-  const BACK_IMG = 'studentidcard/studentidcardback.jpg';
+  const FRONT_IMG = 'studentidcard/studentidcardfront1.jpg';
+  const BACK_IMG = 'studentidcard/studentidcardback1.jpg';
   const CARD_W = 380;          // display width  (px)
   const CARD_H = 228;          // display height (px)
   const QR_SIZE = 64;          // base QR px size
@@ -100,6 +108,77 @@ const StudentCardRenderer = (function () {
   function saveCalibration(cal) { const c = setCalibration(cal); _writeStorage(c); return c; }
   function resetCalibration() { CAL = _clone(CAL_DEFAULTS); _clearStorage(); return getCalibration(); }
   function calibrationStorageKey() { return STORE_KEY; }
+
+  // ── A4 SHEET LAYOUT (multi-card printing) ───────────────
+  // Cards are pre-printed on A4 (210 × 297 mm). A SHEET is an ordered
+  // list of SLOTS; each slot is an absolute position/size/rotation on the
+  // A4. The data layer is printed inside the chosen slot using the SAME
+  // CAL (slot-relative) coordinates, so a saved sheet + saved calibration
+  // reproduce any student on any slot of the pre-printed A4.
+  const SHEET_STORE_KEY = 'eplus-a4-layout-v1';
+  const A4_W_MM = 210;
+  const A4_H_MM = 297;
+
+  function _num(v, def, min, max) {
+    v = parseFloat(v);
+    if (!isFinite(v)) v = def;
+    return +(Math.min(Math.max(v, min), max)).toFixed(2);
+  }
+  function _readSheet() {
+    try { return JSON.parse(window.localStorage.getItem(SHEET_STORE_KEY) || 'null'); }
+    catch (e) { return null; }
+  }
+  function _writeSheet(s) {
+    try { window.localStorage.setItem(SHEET_STORE_KEY, JSON.stringify(s)); return true; }
+    catch (e) { return false; }
+  }
+  function _clearSheet() { try { window.localStorage.removeItem(SHEET_STORE_KEY); } catch (e) {} }
+
+  function _mergeSheet(s) {
+    if (!s || !Array.isArray(s.slots)) return null;
+    const slots = [];
+    s.slots.forEach(sl => {
+      if (!sl || typeof sl !== 'object') return;
+      const w = _num(sl.w, CARD_W_MM, 10, A4_W_MM);
+      const h = _num(sl.h, CARD_H_MM, 10, A4_H_MM);
+      const x = _num(sl.x, 0, 0, A4_W_MM - w);
+      const y = _num(sl.y, 0, 0, A4_H_MM - h);
+      const rot = _num(sl.rot, 0, -360, 360);
+      const label = (typeof sl.label === 'string' && sl.label.trim()) ? String(sl.label).slice(0, 40) : null;
+      const slot = { x, y, w, h, rot };
+      if (label) slot.label = label;
+      slots.push(slot);
+    });
+    return { slots };
+  }
+
+  let SHEET = _mergeSheet(_readSheet());
+
+  function getSheetLayout() { return SHEET ? _clone(SHEET) : null; }
+  function setSheetLayout(sheet) { SHEET = _mergeSheet(sheet); return getSheetLayout(); }
+  function saveSheetLayout(sheet) { const s = setSheetLayout(sheet); if (s) _writeSheet(s); return s; }
+  function resetSheetLayout() { SHEET = null; _clearSheet(); return null; }
+  function sheetStorageKey() { return SHEET_STORE_KEY; }
+
+  // Convenience default arrangement: cols×rows grid of card-sized slots
+  // evenly spaced on the A4 sheet (used by the sheet editor / first run).
+  function defaultSlotGrid(cols, rows) {
+    cols = cols || 2; rows = rows || 4;
+    const w = CARD_W_MM, h = CARD_H_MM;
+    const gapX = Math.max(5, (A4_W_MM - cols * w) / (cols + 1));
+    const gapY = Math.max(5, (A4_H_MM - rows * h) / (rows + 1));
+    const slots = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        slots.push({
+          x: +(gapX + c * (w + gapX)).toFixed(2),
+          y: +(gapY + r * (h + gapY)).toFixed(2),
+          w, h, rot: 0
+        });
+      }
+    }
+    return slots;
+  }
 
   // ── GS1 EAN-13 physical standard (the REAL barcode size) ──
   const BARCODE_STD = {
@@ -172,33 +251,36 @@ const StudentCardRenderer = (function () {
 
   // ── Data-layer CSS — same layout in px (screen) and mm (print) ──
   // Built on demand so it always reflects the CURRENT calibration.
-  function dlRules(unit, sx, sy) {
+  // scope (optional) prefixes every selector so a second data layer can
+  // coexist with the card-scale one (A4 sheet editor / admin A4 preview).
+  function dlRules(unit, sx, sy, scope) {
+    const sc = scope ? scope + ' ' : '';
     const X = v => (v * sx).toFixed(3) + unit;
     const Y = v => (v * sy).toFixed(3) + unit;
     const box = bcBox();
     return `
-.ec-dl{position:absolute;inset:0;direction:rtl;text-align:right}
-.ec-dl-row{position:absolute;text-align:right;max-width:${X(CAL.label.maxWidth)}}
-.ec-dl-label{display:block;font-weight:700;line-height:1.2;color:#0b1b3f;text-shadow:0 0 2px rgba(255,255,255,0.95),0 0 5px rgba(255,255,255,0.55)}
-.ec-dl-value{display:block;font-weight:900;line-height:1.28;color:#0b1b3f;text-shadow:0 0 2px rgba(255,255,255,0.95),0 0 5px rgba(255,255,255,0.55)}
-.ec-dl-value.id{font-family:'Courier New',monospace;font-weight:800;letter-spacing:0.5px}
-.ec-dl-r1{right:${X(CARD_W_MM - CAL.name.x)};top:${Y(CAL.name.y)}}
-.ec-dl-r2{right:${X(CARD_W_MM - CAL.id.x)};top:${Y(CAL.id.y)}}
-.ec-dl-r3{right:${X(CARD_W_MM - CAL.stream.x)};top:${Y(CAL.stream.y)}}
-.ec-dl-r4{right:${X(CARD_W_MM - CAL.date.x)};top:${Y(CAL.date.y)}}
-.ec-dl-r1 .ec-dl-label,.ec-dl-r2 .ec-dl-label,.ec-dl-r3 .ec-dl-label,.ec-dl-r4 .ec-dl-label{font-size:${X(CAL.label.fontSize)};margin-bottom:${Y(CAL.label.gap)}}
-.ec-dl-r1 .ec-dl-value{font-size:${X(CAL.name.fontSize)}}
-.ec-dl-r2 .ec-dl-value{font-size:${X(CAL.id.fontSize)}}
-.ec-dl-r3 .ec-dl-value{font-size:${X(CAL.stream.fontSize)}}
-.ec-dl-r4 .ec-dl-value{font-size:${X(CAL.date.fontSize)}}
-.ec-dl-qr{position:absolute;left:${X(CAL.qr.x)};top:${Y(CAL.qr.y)};width:${X(CAL.qr.w)};height:${Y(CAL.qr.h)};display:flex;align-items:center;justify-content:center;overflow:hidden}
-.ec-dl-qr img,.ec-dl-qr canvas{width:100%!important;height:100%!important}
-.ec-dl-bc{position:absolute;left:${X(CAL.bc.x)};top:${Y(CAL.bc.y)};width:${X(box.w)};height:${Y(box.h)};display:flex;align-items:center;justify-content:center;background:#ffffff;overflow:hidden}
+${sc}.ec-dl{position:absolute;inset:0;direction:rtl;text-align:right}
+${sc}.ec-dl-row{position:absolute;text-align:right;max-width:${X(CAL.label.maxWidth)}}
+${sc}.ec-dl-label{display:block;font-weight:700;line-height:1.2;color:#0b1b3f;text-shadow:0 0 2px rgba(255,255,255,0.95),0 0 5px rgba(255,255,255,0.55)}
+${sc}.ec-dl-value{display:block;font-weight:900;line-height:1.28;color:#0b1b3f;text-shadow:0 0 2px rgba(255,255,255,0.95),0 0 5px rgba(255,255,255,0.55)}
+${sc}.ec-dl-value.id{font-family:'Courier New',monospace;font-weight:800;letter-spacing:0.5px}
+${sc}.ec-dl-r1{right:${X(CARD_W_MM - CAL.name.x)};top:${Y(CAL.name.y)}}
+${sc}.ec-dl-r2{right:${X(CARD_W_MM - CAL.id.x)};top:${Y(CAL.id.y)}}
+${sc}.ec-dl-r3{right:${X(CARD_W_MM - CAL.stream.x)};top:${Y(CAL.stream.y)}}
+${sc}.ec-dl-r4{right:${X(CARD_W_MM - CAL.date.x)};top:${Y(CAL.date.y)}}
+${sc}.ec-dl-r1 .ec-dl-label,${sc}.ec-dl-r2 .ec-dl-label,${sc}.ec-dl-r3 .ec-dl-label,${sc}.ec-dl-r4 .ec-dl-label{font-size:${X(CAL.label.fontSize)};margin-bottom:${Y(CAL.label.gap)}}
+${sc}.ec-dl-r1 .ec-dl-value{font-size:${X(CAL.name.fontSize)}}
+${sc}.ec-dl-r2 .ec-dl-value{font-size:${X(CAL.id.fontSize)}}
+${sc}.ec-dl-r3 .ec-dl-value{font-size:${X(CAL.stream.fontSize)}}
+${sc}.ec-dl-r4 .ec-dl-value{font-size:${X(CAL.date.fontSize)}}
+${sc}.ec-dl-qr{position:absolute;left:${X(CAL.qr.x)};top:${Y(CAL.qr.y)};width:${X(CAL.qr.w)};height:${Y(CAL.qr.h)};display:flex;align-items:center;justify-content:center;overflow:hidden}
+${sc}.ec-dl-qr img,${sc}.ec-dl-qr canvas{width:100%!important;height:100%!important}
+${sc}.ec-dl-bc{position:absolute;left:${X(CAL.bc.x)};top:${Y(CAL.bc.y)};width:${X(box.w)};height:${Y(box.h)};display:flex;align-items:center;justify-content:center;background:#ffffff;overflow:hidden}
+${sc}.ec-dl-bc svg{width:${X(box.w)}!important;height:${Y(box.h)}!important;max-width:none;display:block}
 `;
   }
 
   function cardCSS() {
-    const box = bcBox();
     return `
 .ec-card{width:${CARD_W}px;height:${CARD_H}px;position:relative;overflow:hidden;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.15);flex-shrink:0;font-family:'Tajawal',Arial,sans-serif;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .ec-card img.bg{width:100%;height:100%;object-fit:cover;display:block}
@@ -206,7 +288,6 @@ const StudentCardRenderer = (function () {
 .ec-back.no-design .bg{display:none!important}
 .ec-front-fallback,.ec-back-fallback{position:absolute;inset:0;display:block;width:100%;height:100%}
 ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
-.ec-dl-bc svg{width:${(box.w * CARD_W / CARD_W_MM).toFixed(1)}px!important;height:${(box.h * CARD_H / CARD_H_MM).toFixed(1)}px!important;max-width:none;display:block}
 @media print{
   .ec-card{box-shadow:none;border-radius:0}
 }`;
@@ -368,7 +449,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=6"><\/script>
+<script src="js/studentCardRenderer.js?v=7"><\/script>
 </head><body>
 <div class="ec-data-layer">${dataLayerHTML(r)}${grid}</div>
 <script>
@@ -412,7 +493,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </head><body>
   <div class="wrap"><div class="cap">${value}</div><div id="bc"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=6"></script>
+<script src="js/studentCardRenderer.js?v=7"></script>
 <script>
   (function () {
     var value = '${value}';
@@ -426,13 +507,157 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </body></html>`;
   }
 
+  // ── A4 sheet geometry/style helpers (unit='mm' for print,
+  //    unit='px' for on-screen with a scale) ────────────────
+  function _u(su, U, v) { return (v * U).toFixed(3) + su; }
+  function a4SlotStyle(slot, unit, scale) {
+    const su = unit === 'px' ? 'px' : 'mm';
+    const U = unit === 'px' ? (scale || 1) : 1;
+    return `left:${_u(su,U,slot.x)};top:${_u(su,U,slot.y)};width:${_u(su,U,slot.w)};height:${_u(su,U,slot.h)};transform:rotate(${(slot.rot||0)}deg);transform-origin:0 0`;
+  }
+
+  const A4_GRID_CSS = `
+.ec-a4-grid{position:absolute;inset:0;pointer-events:none;direction:ltr}
+.ec-a4-grid .ag{position:absolute;display:block;background:#111}
+.ec-a4-grid .ag-v{top:0;bottom:0;width:0.2mm}
+.ec-a4-grid .ag-h{left:0;right:0;height:0.2mm}
+.ec-a4-grid .ag-min{opacity:0.05}
+.ec-a4-grid .ag-maj{opacity:0.2}
+.ec-a4-grid .ag-cen{background:#d32f2f;opacity:0.55}
+`;
+
+  function a4SheetCSS(unit, scale) {
+    const su = unit === 'px' ? 'px' : 'mm';
+    const U = unit === 'px' ? (scale || 1) : 1;
+    const L = v => _u(su, U, v);
+    return `
+.ec-a4{position:relative;width:${L(A4_W_MM)};height:${L(A4_H_MM)};overflow:hidden;background:#ffffff;direction:ltr;font-family:'Tajawal',Arial,sans-serif}
+.ec-a4-slot{position:absolute;transform-origin:0 0}
+.ec-a4-data{position:absolute}
+${A4_GRID_CSS}`;
+  }
+
+  function a4GridOverlayHTML(unit, scale) {
+    const su = unit === 'px' ? 'px' : 'mm';
+    const U = unit === 'px' ? (scale || 1) : 1;
+    const P = v => _u(su, U, v);
+    let s = '<div class="ec-a4-grid">';
+    for (let i = 1; i < Math.round(A4_W_MM); i++) {
+      if (i % 10 === 0) s += `<div class="ag ag-v ag-maj" style="left:${P(i)}"></div>`;
+      else if (i % 5 !== 0) s += `<div class="ag ag-v ag-min" style="left:${P(i)}"></div>`;
+    }
+    for (let i = 1; i < Math.round(A4_H_MM); i++) {
+      if (i % 10 === 0) s += `<div class="ag ag-h ag-maj" style="top:${P(i)}"></div>`;
+      else if (i % 5 !== 0) s += `<div class="ag ag-h ag-min" style="top:${P(i)}"></div>`;
+    }
+    s += `<div class="ag ag-v ag-cen" style="left:${P(A4_W_MM / 2)}"></div>`;
+    s += `<div class="ag ag-h ag-cen" style="top:${P(A4_H_MM / 2)}"></div>`;
+    s += '</div>';
+    return s;
+  }
+
+  // Data-box geometry inside a slot: the card (CAL coordinates) is scaled
+  // UNIFORMLY to fit while preserving aspect, then centred — so the data
+  // layer always lines up with an object-fit:contain design image.
+  function a4DataGeom(slot) {
+    const sc = Math.min(slot.w / CARD_W_MM, slot.h / CARD_H_MM);
+    const dw = CARD_W_MM * sc, dh = CARD_H_MM * sc;
+    return { sc, dw, dh, dx: (slot.w - dw) / 2, dy: (slot.h - dh) / 2 };
+  }
+  function a4DataStyle(slot, unit, scale) {
+    const su = unit === 'px' ? 'px' : 'mm';
+    const U = unit === 'px' ? (scale || 1) : 1;
+    const g = a4DataGeom(slot);
+    return `left:${_u(su,U,g.dx)};top:${_u(su,U,g.dy)};width:${_u(su,U,g.dw)};height:${_u(su,U,g.dh)}`;
+  }
+
+  // Print ONLY the transparent data layer for one student on ONE slot of a
+  // pre-printed A4 sheet. 210×297 mm page, transparent background (never
+  // prints white over the design). No slot outlines, no grid, no designs.
+  function buildA4PrintHTML(r, slotIndex, opts) {
+    const sheet = getSheetLayout();
+    if (!sheet || !sheet.slots || !sheet.slots[slotIndex]) return null;
+    const slot = sheet.slots[slotIndex];
+    const data = JSON.stringify(r).replace(/<\//g, '<\\/');
+    const sc = a4DataGeom(slot).sc;
+    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>بطاقة الطالب - ${fullName(r)}</title>
+<style>
+  @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
+  html, body { margin: 0; padding: 0; background: transparent; }
+  * { box-sizing: border-box; }
+  .ec-a4 { position: relative; width: ${A4_W_MM}mm; height: ${A4_H_MM}mm; overflow: hidden; }
+  .ec-a4-slot { position: absolute; transform-origin: 0 0; }
+  .ec-a4-data { position: absolute; }
+  ${dlRules('mm', sc, sc)}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+<script src="js/studentCardRenderer.js?v=7"><\/script>
+</head><body>
+<div class="ec-a4">
+  <div class="ec-a4-slot" style="${a4SlotStyle(slot, 'mm', 1)}">
+    <div class="ec-a4-data" style="${a4DataStyle(slot, 'mm', 1)}">${dataLayerHTML(r)}</div>
+  </div>
+</div>
+<script>
+(function () {
+  var data = ${data};
+  var tries = 0;
+  function ready() {
+    return typeof window.JsBarcode !== 'undefined' && typeof window.QRCode !== 'undefined' && typeof window.StudentCardRenderer !== 'undefined';
+  }
+  function go() {
+    if (!ready()) { if (tries++ < 40) { setTimeout(go, 250); return; } }
+    try { if (window.StudentCardRenderer) window.StudentCardRenderer.hydratePrint(window, data); } catch (e) {}
+    setTimeout(function () { try { window.focus(); window.print(); } catch (e) {} }, 350);
+  }
+  setTimeout(go, 300);
+  window.onafterprint = function () { setTimeout(function () { try { window.close(); } catch (e) {} }, 250); };
+})();
+<\/script>
+</body></html>`;
+  }
+
+  // White A4 test sheet: slot outlines + slot numbers (+ optional grid).
+  // Printed on blank paper and laid over the pre-printed A4 to verify the
+  // saved slot positions match the real card grid. No designs, no data.
+  function buildA4TestSheetHTML(opts) {
+    const sheet = getSheetLayout();
+    if (!sheet || !sheet.slots || !sheet.slots.length) return null;
+    const grid = opts && opts.grid ? a4GridOverlayHTML('mm', 1) : '';
+    const slots = sheet.slots.map((s, i) =>
+      `<div class="ec-a4-test-slot" style="${a4SlotStyle(s, 'mm', 1)}"><span class="ec-a4-num">بطاقة #${i + 1}</span></div>`
+    ).join('');
+    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>اختبار تخطيط A4</title>
+<style>
+  @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  * { box-sizing: border-box; }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .ec-a4 { position: relative; width: ${A4_W_MM}mm; height: ${A4_H_MM}mm; }
+  ${A4_GRID_CSS}
+  .ec-a4-test-slot { position: absolute; border: 0.4mm solid #d32f2f; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+  .ec-a4-num { font-family: 'Tajawal', Arial, sans-serif; font-weight: 700; font-size: 34pt; color: #d32f2f; }
+</style>
+</head><body>
+<div class="ec-a4">${slots}${grid}</div>
+<script>
+  setTimeout(function () { try { window.focus(); window.print(); } catch (e) {} }, 300);
+  window.onafterprint = function () { setTimeout(function () { try { window.close(); } catch (e) {} }, 250); };
+<\/script>
+</body></html>`;
+  }
+
   return {
-    CARD_W, CARD_H, CARD_W_MM, CARD_H_MM, QR_SIZE, CAL, CAL_DEFAULTS, BARCODE_OPTS, BARCODE_STD,
+    CARD_W, CARD_H, CARD_W_MM, CARD_H_MM, A4_W_MM, A4_H_MM, QR_SIZE, CAL, CAL_DEFAULTS, BARCODE_OPTS, BARCODE_STD,
     cardCSS, barcodeSpec, bcBox,
     getCalibration, setCalibration, saveCalibration, resetCalibration, calibrationStorageKey,
+    getSheetLayout, setSheetLayout, saveSheetLayout, resetSheetLayout, sheetStorageKey, defaultSlotGrid,
     fullName, streamOf, regDate, barcodeValue, qrUrl,
     injectCSS, renderPair, portalFaces, buildPrintHTML, hydratePrint, hydrateRoot,
-    dataLayerHTML, gridOverlayHTML, GRID_CSS,
+    dataLayerHTML, dlRules, gridOverlayHTML, GRID_CSS,
+    a4SheetCSS, a4SlotStyle, a4DataStyle, a4DataGeom, a4GridOverlayHTML, A4_GRID_CSS,
+    buildA4PrintHTML, buildA4TestSheetHTML,
     renderBarcodeSVG, buildBarcodePrintHTML
   };
 })();
