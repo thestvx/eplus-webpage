@@ -101,24 +101,120 @@ let sStudentType = null;
 let sLevel = null;
 let sInstitutionVal = null;
 let sStream = null;
-let sSubjects = [];
+let sSubjects = []; // [{ subject, teacher }] — unique Subject+Teacher pairs
 let sFormData = null;
+let sPhase = 1; // 1: شخصية، 2: مستوى، 3: مؤسسة، 4: شعبة، 5: مواد
 
 function byId(id) { return document.getElementById(id); }
+
+// ── Helpers ──
+function _pairKey(p) {
+  return ((p && p.subject) || '') + '||' + ((p && p.teacher) || '');
+}
+
+// المواد المسموح عرضها/اختيارها حالياً (مع استثناءات نموذج التسجيل)
+function currentSubjectItems() {
+  return registrationFormItems(sLevel === 'السنة الرابعة متوسط'
+    ? supportMiddleSchool()
+    : (supportStreams()[sStream] || []));
+}
+
+// توليد ID ثلاثي الأرقام (000–999)
+function _genRegId() {
+  return String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+}
+
+function sScrollTo(el, block) {
+  if (!el) return;
+  try { el.scrollIntoView({ behavior: 'smooth', block: block || 'center' }); }
+  catch (e) { el.scrollIntoView(); }
+}
+
+// شريط "تم اختيار X مادة" + قائمة "المواد المختارة" + زر الإتمام
+function updateMsUI() {
+  const lbl = byId('msLabel');
+  if (lbl) lbl.textContent = sSubjects.length ? `تم اختيار ${sSubjects.length} مادة` : 'اختر المواد';
+
+  const strip = byId('msStrip');
+  if (strip) {
+    strip.style.display = sSubjects.length ? 'flex' : 'none';
+    strip.innerHTML = sSubjects.map(p =>
+      `<span class="ms-chip"><strong>${p.subject}</strong> <span style="opacity:0.75;font-weight:400;">— ${p.teacher}</span></span>`
+    ).join('');
+  }
+
+  const sgrp = byId('s-selected-group');
+  const slist = byId('s-selected-list');
+  const scount = byId('s-selected-count');
+  if (sgrp && slist) {
+    sgrp.style.display = sSubjects.length ? 'block' : 'none';
+    if (scount) scount.textContent = `(${sSubjects.length})`;
+    slist.innerHTML = sSubjects.map((p, i) =>
+      `<div class="s-selected-item"><span>🎓 <strong>${p.subject}</strong> — <span style="opacity:0.75;font-weight:400;">${p.teacher}</span></span><button type="button" class="s-selected-rm" onclick="msRemoveIdx(${i})" title="حذف المادة">×</button></div>`
+    ).join('');
+  }
+
+  byId('s-submit-btn') && (byId('s-submit-btn').style.display = sSubjects.length ? 'block' : 'none');
+}
+
+// إعادة التحقق عند تغيير المستوى/الشعبة: تُحذف المواد غير المتاحة
+// مع الحفاظ على المواد المتاحة، ويُعاد عرض القائمة/العداد.
+function revalidateSubjects(items) {
+  const list = Array.isArray(items) ? items : currentSubjectItems();
+  const valid = new Set(list.map(_pairKey));
+  const before = sSubjects.length;
+  sSubjects = sSubjects.filter(p => valid.has(_pairKey(p)));
+  const opts = byId('ms-options');
+  if (opts) renderSubjects(); else updateMsUI();
+  if (sSubjects.length < before) {
+    regToast('تمت إزالة المواد غير المتاحة للمستوى/الشعبة الجديد وبقيت المواد المتاحة', 'warn');
+  }
+}
+
+function updateBackBtn() {
+  const b = byId('s-back-btn');
+  if (b) b.style.display = sPhase >= 2 ? 'flex' : 'none';
+}
+
+// زر "← السابق": خطوة واحدة إلى الخلف مع حفظ كل البيانات وتمرير سلس
+function sGoBack() {
+  if (sPhase <= 1) return;
+  const hide = (id) => { const el = byId(id); if (el) el.style.display = 'none'; };
+  const show = (id, disp) => { const el = byId(id); if (el) el.style.display = disp || 'block'; };
+  const isBac = sLevel === 'السنة الثالثة ثانوي (بكالوريا)';
+
+  if (sPhase === 5) {
+    hide('s-subjects-group'); hide('s-submit-btn');
+    if (isBac) { show('s-stream-group'); sPhase = 4; sScrollTo(byId('s-stream-group')); }
+    else { show('s-institution-group'); show('s-institution-input-group', sInstitutionVal === 'أخرى' ? 'block' : 'none'); sPhase = 3; sScrollTo(byId('s-institution-group')); }
+  } else if (sPhase === 4) {
+    hide('s-stream-group');
+    if (sStudentType === 'حر') { show('s-level-group'); sPhase = 2; sScrollTo(byId('s-level-group')); }
+    else { show('s-institution-group'); show('s-institution-input-group', sInstitutionVal === 'أخرى' ? 'block' : 'none'); sPhase = 3; sScrollTo(byId('s-institution-group')); }
+  } else if (sPhase === 3) {
+    hide('s-institution-group'); hide('s-institution-input-group');
+    show('s-level-group'); sPhase = 2; sScrollTo(byId('s-level-group'));
+  } else if (sPhase === 2) {
+    hide('s-level-group'); sPhase = 1; sScrollTo(byId('s-personal-group'), 'start');
+  }
+  updateBackBtn();
+}
 
 // ── Open / Close main modal ──
 function openSupportReg() {
   sStudentType = null; sLevel = null; sInstitutionVal = null; sStream = null;
-  sSubjects = []; sFormData = null;
+  sSubjects = []; sFormData = null; sPhase = 1;
   const f = byId('support-reg-form');
   if (f) f.reset();
   [byId('s-level-group'),byId('s-institution-group'),byId('s-institution-input-group'),
    byId('s-stream-group'),byId('s-subjects-group'),byId('s-submit-btn')].forEach(el=>{
     if (el) el.style.display = 'none';
   });
+  byId('s-back-btn')&&(byId('s-back-btn').style.display='none');
   document.querySelectorAll('input[name="sStdType"]').forEach(r=>r.checked=false);
   byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
-  byId('msTags')&&(byId('msTags').innerHTML='');
+  byId('msStrip')&&(byId('msStrip').style.display='none');
+  byId('s-selected-group')&&(byId('s-selected-group').style.display='none');
   byId('msDropdown')&&(byId('msDropdown').style.display='none');
   byId('ms-options')&&(byId('ms-options').innerHTML='');
   const modal = byId('support-reg-modal');
@@ -137,13 +233,14 @@ function closeSupportRegOutside(e) {
 // ── Step 1: Student Type ──
 function onStdTypeChange(type) {
   sStudentType = type;
-  sLevel = null; sInstitutionVal = null; sStream = null; sSubjects = [];
+  sLevel = null; sInstitutionVal = null; sStream = null; sSubjects = []; sPhase = 1;
   [byId('s-institution-group'),byId('s-institution-input-group'),
    byId('s-stream-group'),byId('s-subjects-group'),byId('s-submit-btn')].forEach(el=>{
     if (el) el.style.display = 'none';
   });
   byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
-  byId('msTags')&&(byId('msTags').innerHTML='');
+  byId('msStrip')&&(byId('msStrip').style.display='none');
+  byId('s-selected-group')&&(byId('s-selected-group').style.display='none');
   byId('ms-options')&&(byId('ms-options').innerHTML='');
 
   if (type === 'متمدرس') {
@@ -151,6 +248,7 @@ function onStdTypeChange(type) {
     if (lg) { lg.style.display = 'block'; }
     const sel = byId('sLevel');
     if (sel) { sel.disabled = false; sel.value = ''; }
+    sPhase = 2;
   } else if (type === 'حر') {
     sLevel = 'السنة الثالثة ثانوي (بكالوريا)';
     sInstitutionVal = 'غير محدد';
@@ -160,6 +258,7 @@ function onStdTypeChange(type) {
     if (sel) { sel.value = 'السنة الثالثة ثانوي (بكالوريا)'; sel.disabled = true; }
     showStream();
   }
+  updateBackBtn();
 }
 
 // ── Step 2: Level ──
@@ -167,12 +266,15 @@ function onLevelChange() {
   const sel = byId('sLevel');
   sLevel = sel ? sel.value : null;
   if (sLevel) {
+    sInstitutionVal = null; sStream = null;
     showInstitution();
   } else {
     [byId('s-institution-group'),byId('s-institution-input-group'),
      byId('s-stream-group'),byId('s-subjects-group'),byId('s-submit-btn')].forEach(el=>{
       if (el) el.style.display = 'none';
     });
+    sPhase = 2;
+    updateBackBtn();
   }
 }
 
@@ -185,28 +287,34 @@ function showInstitution() {
     const institutions = SUPPORT_INSTITUTIONS[sLevel] || [];
     sel.innerHTML = '<option value="">اختر المؤسسة التعليمية</option>' +
       institutions.map(inst => `<option value="${inst}">${inst}</option>`).join('');
+    if (sInstitutionVal) sel.value = sInstitutionVal;
   }
   byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='none');
   byId('s-stream-group')&&(byId('s-stream-group').style.display='none');
   byId('s-subjects-group')&&(byId('s-subjects-group').style.display='none');
   byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
+  sPhase = 3;
+  updateBackBtn();
 }
 
 function onInstitutionChange() {
   const sel = byId('sInstitution');
   sInstitutionVal = sel ? sel.value : null;
   if (!sInstitutionVal) return;
-  sStream = null; sSubjects = [];
+  sStream = null;
   byId('s-stream-group')&&(byId('s-stream-group').style.display='none');
   byId('s-subjects-group')&&(byId('s-subjects-group').style.display='none');
   byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
   byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
-  byId('msTags')&&(byId('msTags').innerHTML='');
+  byId('msStrip')&&(byId('msStrip').style.display='none');
+  byId('s-selected-group')&&(byId('s-selected-group').style.display='none');
   byId('ms-options')&&(byId('ms-options').innerHTML='');
 
   if (sInstitutionVal === 'أخرى') {
     byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='block');
     byId('sInstitutionInput')&&(byId('sInstitutionInput').value='');
+    sPhase = 3;
+    updateBackBtn();
     return;
   }
   byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='none');
@@ -229,27 +337,30 @@ function onInstitutionInputChange() {
   } else {
     byId('s-stream-group')&&(byId('s-stream-group').style.display='none');
     byId('s-subjects-group')&&(byId('s-subjects-group').style.display='none');
+    sPhase = 3;
+    updateBackBtn();
   }
 }
 
 function showMiddleSchoolSubjects() {
-  sSubjects = [];
-  byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
-  byId('msTags')&&(byId('msTags').innerHTML='');
+  revalidateSubjects();
   byId('msDropdown')&&(byId('msDropdown').style.display='none');
   const sg = byId('s-subjects-group');
   if (sg) sg.style.display = 'block';
-  byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
   renderMiddleSchoolSubjects();
+  sPhase = 5;
+  updateBackBtn();
 }
 
 function renderMiddleSchoolSubjects() {
   const opts = byId('ms-options');
   if (!opts) return;
-  opts.innerHTML = registrationFormItems(supportMiddleSchool()).map((item, i) =>
-    `<div class="ms-opt ${sSubjects.includes(i)?'selected':''}" data-idx="${i}" onclick="msSelect(${i})"><strong>${item.subject}</strong> <span style="opacity:0.6;font-weight:400;">— 🎓 ${item.teacher}</span></div>`
-  ).join('');
-  updateMsLabel();
+  const items = registrationFormItems(supportMiddleSchool());
+  opts.innerHTML = items.map((item, i) => {
+    const sel = sSubjects.some(p => p.subject === item.subject && p.teacher === item.teacher);
+    return `<div class="ms-opt ${sel?'selected':''}" data-idx="${i}" onclick="msSelect(${i})"><strong>${item.subject}</strong> <span style="opacity:0.6;font-weight:400;">— 🎓 ${item.teacher}</span></div>`;
+  }).join('');
+  updateMsUI();
 }
 
 // ── Step 4: Stream ──
@@ -260,6 +371,8 @@ function showStream() {
   byId('s-institution-group')&&(byId('s-institution-group').style.display='none');
   byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='none');
   renderStreams();
+  sPhase = 4;
+  updateBackBtn();
 }
 
 function renderStreams() {
@@ -267,7 +380,7 @@ function renderStreams() {
   if (!c) return;
   c.innerHTML = Object.keys(supportStreams()).map(s =>
     `<label class="check-option">
-      <input type="radio" name="sStream" value="${s}" onchange="onStreamChange('${s}')" />
+      <input type="radio" name="sStream" value="${s}" onchange="onStreamChange('${s}')" ${s === sStream ? 'checked' : ''} />
       <span class="check-box"></span>
       <span class="check-label">${s}</span>
     </label>`
@@ -276,25 +389,24 @@ function renderStreams() {
 
 function onStreamChange(stream) {
   sStream = stream;
-  sSubjects = [];
-  byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
-  byId('msTags')&&(byId('msTags').innerHTML='');
   byId('msDropdown')&&(byId('msDropdown').style.display='none');
   const sg = byId('s-subjects-group');
   if (sg) sg.style.display = 'block';
-  byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
-  renderSubjects();
+  revalidateSubjects();
+  sPhase = 5;
+  updateBackBtn();
 }
 
 // ── Step 5: Subjects (Multi-Select Dropdown — per stream) ──
 function renderSubjects() {
   const opts = byId('ms-options');
   if (!opts) return;
-  const items = registrationFormItems(supportStreams()[sStream] || []);
-  opts.innerHTML = items.map((item, i) =>
-    `<div class="ms-opt ${sSubjects.includes(i)?'selected':''}" data-idx="${i}" onclick="msSelect(${i})"><strong>${item.subject}</strong> <span style="opacity:0.6;font-weight:400;">— 🎓 ${item.teacher}</span></div>`
-  ).join('');
-  updateMsLabel();
+  const items = currentSubjectItems();
+  opts.innerHTML = items.map((item, i) => {
+    const sel = sSubjects.some(p => p.subject === item.subject && p.teacher === item.teacher);
+    return `<div class="ms-opt ${sel?'selected':''}" data-idx="${i}" onclick="msSelect(${i})"><strong>${item.subject}</strong> <span style="opacity:0.6;font-weight:400;">— 🎓 ${item.teacher}</span></div>`;
+  }).join('');
+  updateMsUI();
 }
 
 function msToggle() {
@@ -318,40 +430,24 @@ document.addEventListener('click', (e) => {
 });
 
 function msSelect(idx) {
-  const i = sSubjects.indexOf(idx);
-  if (i === -1) sSubjects.push(idx); else sSubjects.splice(i, 1);
-  const opts = byId('ms-options');
-  if (opts) {
-    const children = opts.children;
-    for (let c of children) {
-      if (parseInt(c.dataset.idx) === idx) c.classList.toggle('selected');
-    }
-  }
-  updateMsLabel();
-  updateMsTags();
-  if (sSubjects.length > 0) {
-    byId('s-submit-btn')&&(byId('s-submit-btn').style.display='block');
-  } else {
-    byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
-  }
+  const items = currentSubjectItems();
+  const item = items[idx];
+  if (!item) return;
+  const i = sSubjects.findIndex(p => p.subject === item.subject && p.teacher === item.teacher);
+  if (i === -1) sSubjects.push({ subject: item.subject, teacher: item.teacher });
+  else sSubjects.splice(i, 1);
+  renderSubjects();
 }
 
 function msRemove(idx) {
   msSelect(idx);
 }
 
-function updateMsLabel() {
-  const lbl = byId('msLabel');
-  if (lbl) lbl.textContent = sSubjects.length ? `تم اختيار ${sSubjects.length} مادة` : 'اختر المواد';
-}
-
-function updateMsTags() {
-  const c = byId('msTags');
-  if (!c) return;
-  const items = sLevel === 'السنة الرابعة متوسط' ? supportMiddleSchool() : (supportStreams()[sStream] || []);
-  c.innerHTML = sSubjects.map(i =>
-    `<span class="ms-tag"><strong>${items[i]?.subject || ''}</strong> <span style="opacity:0.7;">${items[i]?.teacher || ''}</span> <span class="ms-tag-rm" onclick="msRemove(${i})">×</span></span>`
-  ).join('');
+// حذف مادة من قائمة "المواد المختارة" بمعرّفها داخل sSubjects
+function msRemoveIdx(i) {
+  if (i < 0 || i >= sSubjects.length) return;
+  sSubjects.splice(i, 1);
+  renderSubjects();
 }
 
 // ── Step 6: Submit (opens laws modal) ──
@@ -383,13 +479,9 @@ function onSubmitClick() {
     ? (byId('sInstitutionInput')?.value?.trim() || '')
     : sInstitutionVal;
 
-  const isMiddleSchool = sLevel === 'السنة الرابعة متوسط';
-  const items = registrationFormItems(isMiddleSchool ? supportMiddleSchool() : (supportStreams()[sStream] || []));
-  const selectedSubjects = sSubjects.map(i => items[i]);
+  const selectedSubjects = sSubjects.map(p => ({ subject: p.subject, teacher: p.teacher }));
 
-  const year = new Date().getFullYear();
-  const rand = String(Math.floor(Math.random() * 900) + 100);
-  const id = rand;
+  const id = _genRegId();
 
   function _genToken(len) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -536,26 +628,39 @@ async function onLawsConfirm() {
   closeLawsModal();
   openLoadingModal();
   try {
-    const payload = Object.assign({}, sFormData);
-    if (typeof EAN13 !== 'undefined' && !(await _barcodeColumnAvailable())) {
-      delete payload.barcode_value;
-    }
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
+    // ID ثلاثي الأرقام (000–999): عند تصادم 23505 نعيد توليد ID جديد
+    // ونعيد المحاولة (حتى 1000 محاولة) دون تغيير الباركود نهائياً —
+    // الباركود يُشتق من الـ ID النهائي ويبقى ثابتاً للتسجيل الواحد.
+    const MAX_TRIES = 1000;
+    for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
+      if (attempt > 0) {
+        sFormData.id = _genRegId();
+        sFormData.barcode_value = (typeof EAN13 !== 'undefined' && EAN13.make(sFormData.id)) || '';
+      }
+      const payload = Object.assign({}, sFormData);
+      if (typeof EAN13 !== 'undefined' && !(await _barcodeColumnAvailable())) {
+        delete payload.barcode_value;
+      }
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        closeLoadingModal();
+        openSuccessModal(sFormData.id);
+        return;
+      }
+      if (res.status === 409) continue;
       const txt = await res.text();
       throw new Error(txt.slice(0, 200));
     }
-    closeLoadingModal();
-    openSuccessModal(sFormData.id);
+    throw new Error('لا توجد Registration IDs ثلاثية متاحة حالياً');
   } catch (e) {
     closeLoadingModal();
     openLawsModal();
