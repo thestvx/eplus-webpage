@@ -398,6 +398,54 @@ function msToggle() {
   const open = dd.style.display === 'none' || !dd.style.display;
   dd.style.display = open ? 'block' : 'none';
   if (arrow) arrow.classList.toggle('open', open);
+  if (open) {
+    _msReposition();
+    _msBindScroll();
+  } else {
+    _msUnbindScroll();
+  }
+}
+
+// وضع القائمة المنسدلة فوق أو تحت الحقل حسب المساحة المتاحة، بحيث تظهر
+// جميع المواد داخل الشاشة دون أن يضطر الموقع للنزول إلى أسفل الصفحة.
+let _msScrollTarget = null;
+function _msReposition() {
+  const dd = byId('msDropdown');
+  const trigger = byId('msTrigger');
+  if (!dd || !trigger || dd.style.display === 'none') return;
+  const container = dd.closest('.modal-overlay') || document.scrollingElement;
+  if (!container) return;
+  const cRect = container.getBoundingClientRect();
+  const tRect = trigger.getBoundingClientRect();
+  const MAX = 280, MIN = 140;
+  const spaceBelow = cRect.bottom - tRect.bottom;
+  const spaceAbove = tRect.top - cRect.top;
+  if (spaceBelow >= MIN) {
+    dd.classList.remove('open-up');
+    dd.style.top = 'calc(100% + 6px)';
+    dd.style.bottom = 'auto';
+    dd.style.maxHeight = Math.min(MAX, Math.max(MIN, spaceBelow - 8)) + 'px';
+  } else {
+    dd.classList.add('open-up');
+    dd.style.top = 'auto';
+    dd.style.bottom = 'calc(100% + 6px)';
+    dd.style.maxHeight = Math.min(MAX, Math.max(MIN, spaceAbove - 8)) + 'px';
+  }
+}
+
+function _msBindScroll() {
+  _msUnbindScroll();
+  const container = (byId('msDropdown') && byId('msDropdown').closest('.modal-overlay')) || document.scrollingElement;
+  if (!container) return;
+  _msScrollTarget = container;
+  container.addEventListener('scroll', _msReposition, { passive: true });
+  window.addEventListener('resize', _msReposition);
+}
+
+function _msUnbindScroll() {
+  if (_msScrollTarget) _msScrollTarget.removeEventListener('scroll', _msReposition);
+  window.removeEventListener('resize', _msReposition);
+  _msScrollTarget = null;
 }
 
 document.addEventListener('click', (e) => {
@@ -408,6 +456,7 @@ document.addEventListener('click', (e) => {
   if (dd.style.display !== 'none' && !dd.contains(e.target) && !trigger.contains(e.target)) {
     dd.style.display = 'none';
     if (arrow) arrow.classList.remove('open');
+    _msUnbindScroll();
   }
 });
 
