@@ -8,21 +8,39 @@
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; background: #eef2fb; color: #1a2340; font-family: 'Tajawal', Arial, sans-serif; }
-  header { background: linear-gradient(135deg, #1E3C86, #122350); color: #fff; padding: 18px 28px; display: flex; align-items: center; gap: 14px; }
+  header { background: linear-gradient(135deg, #1E3C86, #122350); color: #fff; padding: 16px 28px; }
   header h1 { font-size: 19px; margin: 0; font-weight: 900; }
   header p { margin: 2px 0 0; font-size: 12px; opacity: 0.75; }
-  .wrap { padding: 24px; max-width: 1100px; margin: 0 auto; }
-  .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; background: #fff; border: 1px solid #dbe4f5; border-radius: 14px; padding: 14px 16px; margin-bottom: 20px; }
+  .wrap { padding: 24px; max-width: 1120px; margin: 0 auto; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; background: #fff; border: 1px solid #dbe4f5; border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; }
   .toolbar label { font-size: 13px; font-weight: 700; color: #2a3a6b; }
   .toolbar select { font-family: inherit; font-size: 14px; padding: 7px 10px; border: 1px solid #c4d0ea; border-radius: 9px; background: #fff; }
-  .toolbar button { font-family: inherit; font-size: 13.5px; font-weight: 800; padding: 9px 16px; border-radius: 10px; border: 1px solid #c4d0ea; background: #fff; color: #2548A1; cursor: pointer; }
+  .toolbar button { font-family: inherit; font-size: 13px; font-weight: 800; padding: 9px 15px; border-radius: 10px; border: 1px solid #c4d0ea; background: #fff; color: #2548A1; cursor: pointer; }
   .toolbar button.on { background: #2548A1; color: #fff; border-color: #2548A1; }
-  .toolbar button.print { background: linear-gradient(135deg, #2548A1, #1E3C86); color: #fff; border-color: #2548A1; }
+  .toolbar button.save { background: linear-gradient(135deg, #2548A1, #1E3C86); color: #fff; border-color: #2548A1; }
+  .toolbar button.danger { border-color: #e2a1a1; color: #b3362f; }
   .toolbar .spacer { flex: 1; }
-  .note { font-size: 12px; color: #5b6b96; line-height: 1.7; background: #fff; border: 1px dashed #b9c6e4; border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; }
+  .note { font-size: 12.5px; color: #4b5b88; line-height: 1.8; background: #fff; border: 1px dashed #b9c6e4; border-radius: 12px; padding: 12px 16px; margin-bottom: 18px; }
   .note b { color: #b3362f; }
-  .stage-wrap { background: #fff; border: 1px solid #dbe4f5; border-radius: 14px; padding: 26px; display: flex; justify-content: center; }
+  .stage-wrap { background: #fff; border: 1px solid #dbe4f5; border-radius: 14px; padding: 22px 26px 26px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .scale-cap { font-size: 11px; color: #8494bd; }
+  .ruler-area { display: inline-flex; flex-direction: column; align-items: flex-start; }
+  .ruler { position: relative; background: #fff; }
+  .ruler-top { width: 380px; height: 16px; }
+  .ruler-left { width: 18px; height: 228px; }
+  .ruler i { position: absolute; display: block; background: #93a2c7; }
+  .ruler-top i { width: 1px; height: 5px; top: 11px; }
+  .ruler-top i.rk-maj { height: 9px; top: 7px; background: #2a3a6b; }
+  .ruler-top i.rk-lab { top: 0; height: auto; width: auto; background: none; color: #2a3a6b; font-size: 9px; font-style: normal; line-height: 1; transform: translateX(-50%); font-weight: 700; }
+  .ruler-left i { width: 5px; height: 1px; left: 13px; }
+  .ruler-left i.rk-maj { width: 9px; left: 9px; background: #2a3a6b; }
+  .ruler-left i.rk-lab { left: 0; width: auto; height: auto; background: none; color: #2a3a6b; font-size: 9px; font-style: normal; line-height: 1; transform: translateY(-50%); font-weight: 700; }
+  .card-line { display: flex; align-items: flex-start; }
+  .ruler.hidden, .ec-grid.hidden { display: none !important; }
+  /* ── preview card (px grid = calibration only, never printed) ── */
   #preview-card { position: relative; }
+  #preview-card [data-cal] { cursor: move; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #preview-card [data-cal].cal-sel { outline: 2px dashed #e53935; outline-offset: 1px; background: rgba(229,57,53,0.08); }
   .ec-grid { position: absolute; inset: 0; pointer-events: none; direction: ltr; z-index: 5; }
   .ec-grid .ec-g { position: absolute; display: block; background: #111; }
   .ec-grid .ec-g-h { width: 100%; height: 1px; }
@@ -33,7 +51,30 @@
   .ec-grid .ec-g-data.ec-g-h { height: 2px; }
   .ec-grid .ec-g-data.ec-g-v { width: 2px; }
   .ec-grid .ec-g-box { position: absolute; border: 2px solid #d32f2f; background: none; }
+  /* ── inspector ── */
+  .inspector { background: #fff; border: 1px solid #dbe4f5; border-radius: 14px; padding: 16px 18px; margin-top: 18px; }
+  .inspector h2 { font-size: 14px; margin: 0 0 10px; font-weight: 900; color: #1E3C86; }
+  .insp-name { font-size: 14px; font-weight: 900; color: #b3362f; min-height: 20px; }
+  .insp-grid { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; margin: 8px 0 6px; }
+  .insp-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; font-weight: 700; color: #5b6b96; }
+  .insp-grid input, .label-settings input { font-family: inherit; font-size: 14px; width: 96px; padding: 7px 9px; border: 1px solid #c4d0ea; border-radius: 9px; direction: ltr; text-align: center; }
+  .label-settings { border-top: 1px dashed #dbe4f5; margin-top: 10px; padding-top: 10px; display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+  .label-settings label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; font-weight: 700; color: #5b6b96; }
+  .insp-hint { font-size: 12px; color: #8494bd; margin-top: 6px; }
+  .insp-hint kbd { background: #eef2fb; border: 1px solid #d4ddf0; border-radius: 5px; padding: 1px 6px; font-family: inherit; font-size: 11px; }
+  .auto-link { border: none; background: none; color: #2548A1; font-family: inherit; font-size: 12px; font-weight: 800; cursor: pointer; padding: 0; }
   .hidden { display: none !important; }
+  /* ── custom confirm modal (no window.confirm) ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(10,18,40,0.55); display: flex; align-items: center; justify-content: center; z-index: 999; padding: 20px; }
+  .modal-box { background: #fff; border-radius: 16px; padding: 24px 26px; max-width: 400px; width: 100%; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+  .modal-box h3 { margin: 0 0 8px; font-size: 17px; color: #1a2340; }
+  .modal-box p { margin: 0 0 18px; font-size: 13.5px; color: #5b6b96; line-height: 1.7; }
+  .modal-actions { display: flex; gap: 10px; justify-content: center; }
+  .modal-actions button { font-family: inherit; font-size: 14px; font-weight: 800; padding: 10px 22px; border-radius: 10px; border: 1px solid #c4d0ea; background: #fff; color: #2548A1; cursor: pointer; }
+  .modal-actions button.confirm { background: #b3362f; border-color: #b3362f; color: #fff; }
+  /* ── toast ── */
+  #toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); background: #122350; color: #fff; padding: 12px 22px; border-radius: 12px; font-size: 14px; font-weight: 800; opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 1000; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+  #toast.show { opacity: 1; }
   footer { text-align: center; font-size: 12px; color: #8494bd; padding: 18px; }
 </style>
 </head>
@@ -41,9 +82,10 @@
 <header>
   <div>
     <h1>معايرة طباعة بطاقة الطالب</h1>
-    <p>الطباعة تتم على وجه البطاقة الخلفي المطبوع مسبقاً — طبقة البيانات شفافة فوق التصميم فقط</p>
+    <p>اسحب العناصر على البطاقة أو عدّل القيم مباشرة — ثم احفظ ليطبّق على كل الطباعات القادمة</p>
   </div>
 </header>
+
 <div class="wrap">
   <div class="toolbar">
     <label for="stream">الشعبة:</label>
@@ -52,79 +94,361 @@
       <option value="تقني رياضي">تقني رياضي</option>
       <option value="آداب وفلسفة">آداب وفلسفة</option>
     </select>
-    <button id="design-btn" class="on" onclick="toggleDesign()">🪞 إظهار التصميم المطبوع</button>
-    <button id="grid-btn" class="on" onclick="toggleGrid()">📏 شبكة المعايرة</button>
+    <button id="design-btn" class="on">🪞 إظهار التصميم المطبوع</button>
+    <button id="grid-btn" class="on">📏 شبكة المعايرة</button>
+    <button id="ruler-btn" class="on">📐 المسطرة</button>
     <span class="spacer"></span>
-    <button class="print" onclick="printCalibration()">🖨️ طباعة طبقة البيانات + الشبكة</button>
+    <button id="reset-btn" class="danger">إعادة الوضع الافتراضي</button>
+    <button id="save-btn" class="save">💾 حفظ المعايرة</button>
   </div>
+
   <div class="note">
-    <b>طريقة المعايرة:</b> ضع البطاقة المطبوعة مسبقاً (الوجه الخلفي) في الطابعة، ثم اطبع «طبقة البيانات + الشبكة» فقط.
-    الشبكة الحمراء تظهر مواضع البيانات الحالية: حواف عمود النص، أسطر الأسماء، صندوق QR وصندوق الباركود.
-    إذا انحرف شيء، أخبرني بمقدار الإزاحة (ملليمتر) وأتعدّل القيم في <b>CAL</b> (js/studentCardRenderer.js). الطباعة <b>لا</b> تتضمن أي خلفية أو تصميم أو وجه أمامي.
+    <b>طريقة المعايرة:</b> اسحب أي عنصر مباشرة على البطاقة، أو اختره ثم غيّر القيم في لوحة التحكم (الأسهم تحرّك
+    <kbd>0.1</kbd>مم، مع <kbd>Shift</kbd> <kbd>1</kbd>مم). عند الاكتمال اضغط <b>«💾 حفظ المعايرة»</b> — القيم تُحفظ في المتصفح
+    وتُطبَّق تلقائياً على <b>كل</b> طباعة بطاقات الطلاب (المعاينة والطباعة والبطاقة الرقمية). إعادة الوضع الافتراضي تمسح المعايرة المحفوظة.
   </div>
+
   <div class="stage-wrap">
-    <div id="preview-card"></div>
+    <div class="scale-cap">بطاقة ISO CR80 — 85.6 × 53.98 مم (شاشة المعاينة 380 × 228 بكسل)</div>
+    <div class="ruler-area">
+      <div class="ruler ruler-top" id="ruler-top"></div>
+      <div class="card-line">
+        <div class="ruler ruler-left" id="ruler-left"></div>
+        <div id="preview-card"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="inspector">
+    <h2>لوحة التحكم</h2>
+    <div class="insp-name" id="insp-name">لم يتم اختيار عنصر — انقر على أي عنصر في البطاقة</div>
+    <div class="insp-grid">
+      <label id="insp-x-label">X (مم) <input id="insp-x" type="number" step="0.1" min="0"></label>
+      <label id="insp-y-label">Y (مم) <input id="insp-y" type="number" step="0.1" min="0"></label>
+      <label id="insp-w-label" class="hidden">العرض (مم) <input id="insp-w" type="number" step="0.1"></label>
+      <label id="insp-h-label" class="hidden">الارتفاع (مم) <input id="insp-h" type="number" step="0.1"></label>
+      <label id="insp-fs-label" class="hidden">حجم الخط <input id="insp-fs" type="number" step="0.1"></label>
+      <button id="insp-auto" class="auto-link hidden">↺ العرض والارتفاع تلقائي (مطابقة المعيار)</button>
+    </div>
+    <div class="insp-hint">
+      مفاتيح الأسهم: تحريك <kbd>0.1</kbd>مم — <kbd>Shift</kbd> + سهم: <kbd>1</kbd>مم — <kbd>Esc</kbd>: إلغاء الاختيار
+    </div>
+    <div class="label-settings">
+      <label>حجم خط العناوين (مم) <input id="label-fs" type="number" step="0.1"></label>
+      <label>الفراغ تحت العنوان (مم) <input id="label-gap" type="number" step="0.1"></label>
+      <label>أقصى عرض للصف (مم) <input id="label-mw" type="number" step="0.1"></label>
+    </div>
   </div>
 </div>
-<footer>E-PLUS — اختبار المعايرة. لا تُستعمل هذه الصفحة في الإنتاج.</footer>
+
+<footer>E-PLUS — أداة معايرة. الشبكة والمسطرة للمعايرة فقط ولا تُطبع في الإنتاج أبداً.</footer>
+
+<!-- custom confirm modal (never window.confirm) -->
+<div class="modal-overlay hidden" id="reset-modal" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <h3>إعادة ضبط المعايرة؟</h3>
+    <p>سيتم استرجاع المواضع والأحجام الافتراضية لجميع العناصر، وسيتم حذف المعايرة المحفوظة في هذا المتصفح.</p>
+    <div class="modal-actions">
+      <button id="reset-cancel">إلغاء</button>
+      <button id="reset-confirm" class="confirm">نعم، إعادة الضبط</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=5"></script>
+<script src="js/studentCardRenderer.js?v=6"></script>
 <script>
-  var CAL_STREAM = 'علوم تجريبية';
-  var CAL_RECORD = { id: 297, first_name: 'الطالب', last_name: 'التجريبي', stream: CAL_STREAM,
+(function () {
+  var R = window.StudentCardRenderer;
+  var CARD_W = R.CARD_W, CARD_H = R.CARD_H, CARD_W_MM = R.CARD_W_MM, CARD_H_MM = R.CARD_H_MM;
+  var SX = CARD_W / CARD_W_MM, SY = CARD_H / CARD_H_MM;
+
+  var STREAM = 'علوم تجريبية';
+  var RECORD = { id: 297, first_name: 'الطالب', last_name: 'التجريبي', stream: STREAM,
     created_at: new Date().toISOString(), barcode_value: '6130274000001', student_token: 'calib-test-2026' };
 
+  var NAME_MAP = { name: 'الاسم الكامل', id: 'Student ID', stream: 'الشعبة', date: 'تاريخ التسجيل', qr: 'رمز QR', bc: 'الباركود' };
+  var ROW_KEYS = { name: true, id: true, stream: true, date: true };
+  var SELECTED = null;
+  var dragging = null;
+  var toastTimer = null;
+
+  function clamp(v, lo, hi) { return Math.min(Math.max(v, lo), hi); }
+  function keyOf(el) {
+    var k = el.getAttribute('data-cal');
+    return k === 'barcode' ? 'bc' : k;
+  }
+  function cal() { return R.getCalibration(); }
+  function applyCal(key, patch) {
+    var c = cal();
+    c[key] = Object.assign({}, c[key], patch);
+    R.setCalibration(c);
+    R.injectCSS(document, true);
+    refreshGrid();
+  }
+
+  // ── preview rendering ────────────────────────────────
   function renderPreview() {
+    R.injectCSS(document, true);
     var card = document.getElementById('preview-card');
-    StudentCardRenderer.injectCSS(document);
-    var back = StudentCardRenderer.portalFaces(CAL_RECORD).back;
-    card.innerHTML = back;
+    card.innerHTML = R.portalFaces(RECORD).back;
     var container = card.querySelector('.ec-card');
     if (container) {
       var grid = document.createElement('div');
-      grid.className = 'ec-grid';
-      grid.innerHTML = StudentCardRenderer.gridOverlayHTML('px');
+      grid.className = 'ec-grid' + (gridHidden() ? ' hidden' : '');
+      grid.innerHTML = R.gridOverlayHTML('px');
       container.appendChild(grid);
     }
-    StudentCardRenderer.hydrateRoot(card, CAL_RECORD);
+    R.hydrateRoot(card, RECORD);
     syncToggles();
+    applySelection();
+    syncLabelSettings();
+  }
+  function gridHidden() {
+    return !document.getElementById('grid-btn').classList.contains('on');
+  }
+  function refreshGrid() {
+    var card = document.getElementById('preview-card');
+    var grid = card.querySelector('.ec-grid');
+    if (grid) grid.innerHTML = R.gridOverlayHTML('px');
   }
 
-  function toggleDesign() {
-    var back = document.querySelector('#preview-card .ec-back');
-    if (back) back.classList.toggle('no-design');
-    syncToggles();
+  // ── selection + inspector ────────────────────────────
+  function selectElement(key) {
+    SELECTED = key || null;
+    applySelection();
   }
-
-  function toggleGrid() {
-    var grid = document.querySelector('#preview-card .ec-grid');
-    if (grid) grid.classList.toggle('hidden');
-    syncToggles();
+  function applySelection() {
+    var calNow = cal();
+    document.querySelectorAll('#preview-card [data-cal]').forEach(function (el) {
+      el.classList.toggle('cal-sel', keyOf(el) === SELECTED);
+    });
+    updateInspector();
   }
+  function showField(id, show) { document.getElementById(id).classList.toggle('hidden', !show); }
+  function updateInspector() {
+    var title = document.getElementById('insp-name');
+    if (!SELECTED) {
+      title.textContent = 'لم يتم اختيار عنصر — انقر على أي عنصر في البطاقة';
+      title.style.color = '';
+      showField('insp-x-label', false); showField('insp-y-label', false);
+      showField('insp-w-label', false); showField('insp-h-label', false);
+      showField('insp-fs-label', false); showField('insp-auto', false);
+      return;
+    }
+    var k = SELECTED, v = cal()[k];
+    title.textContent = NAME_MAP[k] || k;
+    title.style.color = '#b3362f';
+    var box = R.bcBox();
+    var isRow = !!ROW_KEYS[k];
+    showField('insp-x-label', true); showField('insp-y-label', true);
+    document.getElementById('insp-x').value = round2(v.x);
+    document.getElementById('insp-y').value = round2(v.y);
+    showField('insp-w-label', !isRow);
+    showField('insp-h-label', !isRow);
+    if (!isRow) {
+      var effW = k === 'bc' ? box.w : v.w;
+      var effH = k === 'bc' ? box.h : v.h;
+      document.getElementById('insp-w').value = round2(effW);
+      document.getElementById('insp-h').value = round2(effH);
+    }
+    showField('insp-fs-label', isRow);
+    if (isRow) document.getElementById('insp-fs').value = round2(v.fontSize);
+    showField('insp-auto', k === 'bc');
+  }
+  function syncLabelSettings() {
+    var l = cal().label;
+    document.getElementById('label-fs').value = round2(l.fontSize);
+    document.getElementById('label-gap').value = round2(l.gap);
+    document.getElementById('label-mw').value = round2(l.maxWidth);
+  }
+  function round2(x) { return Math.round(x * 100) / 100; }
 
+  // ── drag support ─────────────────────────────────────
+  var cardEl = document.getElementById('preview-card');
+  cardEl.addEventListener('pointerdown', function (e) {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    var t = e.target && e.target.closest ? e.target.closest('[data-cal]') : null;
+    if (!t) { selectElement(null); return; }
+    var k = keyOf(t);
+    selectElement(k);
+    var v = cal()[k];
+    dragging = { key: k, px: e.clientX, py: e.clientY, x: v.x, y: v.y };
+    try { t.setPointerCapture(e.pointerId); } catch (err) {}
+    e.preventDefault();
+  });
+  document.addEventListener('pointermove', function (e) {
+    if (!dragging) return;
+    var dx = (e.clientX - dragging.px) / SX;
+    var dy = (e.clientY - dragging.py) / SY;
+    var k = dragging.key;
+    applyCal(k, {
+      x: round2(clamp(dragging.x + dx, 0, CARD_W_MM)),
+      y: round2(clamp(dragging.y + dy, 0, CARD_H_MM))
+    });
+    updateInspector();
+  });
+  document.addEventListener('pointerup', function () { dragging = null; });
+  document.addEventListener('pointercancel', function () { dragging = null; });
+
+  // ── keyboard nudge ───────────────────────────────────
+  document.addEventListener('keydown', function (e) {
+    if (!SELECTED) return;
+    var tag = e.target && e.target.tagName;
+    if (tag && /INPUT|SELECT|TEXTAREA/.test(tag)) return;
+    var step = e.shiftKey ? 1 : 0.1;
+    var dx = 0, dy = 0;
+    if (e.key === 'ArrowUp') dy = -step;
+    else if (e.key === 'ArrowDown') dy = step;
+    else if (e.key === 'ArrowLeft') dx = -step;
+    else if (e.key === 'ArrowRight') dx = step;
+    else if (e.key === 'Escape') { selectElement(null); return; }
+    else return;
+    e.preventDefault();
+    var v = cal()[SELECTED];
+    applyCal(SELECTED, {
+      x: round2(clamp(v.x + dx, 0, CARD_W_MM)),
+      y: round2(clamp(v.y + dy, 0, CARD_H_MM))
+    });
+    updateInspector();
+  });
+
+  // ── inspector inputs (key resolved at event time from SELECTED) ──
+  ['insp-x', 'insp-y', 'insp-w', 'insp-h', 'insp-fs'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', function () {
+      if (!SELECTED) return;
+      var k = SELECTED;
+      var raw = parseFloat(this.value);
+      if (isNaN(raw)) return;
+      var patch = {};
+      if (id === 'insp-x') patch.x = clamp(raw, 0, CARD_W_MM);
+      else if (id === 'insp-y') patch.y = clamp(raw, 0, CARD_H_MM);
+      else if (id === 'insp-w') patch.w = clamp(raw, 1, CARD_W_MM);
+      else if (id === 'insp-h') patch.h = clamp(raw, 1, CARD_H_MM);
+      else if (id === 'insp-fs') patch.fontSize = clamp(raw, 1, 12);
+      if (Object.keys(patch).length) applyCal(k, patch);
+    });
+  });
+  document.getElementById('insp-auto').addEventListener('click', function () {
+    if (SELECTED !== 'bc') return;
+    applyCal('bc', { w: null, h: null });
+    updateInspector();
+  });
+  // label settings
+  function onLabelInput(id, prop, lo, hi) {
+    document.getElementById(id).addEventListener('input', function () {
+      var raw = parseFloat(this.value);
+      if (isNaN(raw)) return;
+      var patch = {}; patch[prop] = clamp(raw, lo, hi);
+      applyCal('label', patch);
+    });
+  }
+  onLabelInput('label-fs', 'fontSize', 1, 8);
+  onLabelInput('label-gap', 'gap', 0, 5);
+  onLabelInput('label-mw', 'maxWidth', 10, CARD_W_MM);
+
+  // ── toggles ──────────────────────────────────────────
   function syncToggles() {
     var back = document.querySelector('#preview-card .ec-back');
     var grid = document.querySelector('#preview-card .ec-grid');
-    var db = document.getElementById('design-btn');
-    var gb = document.getElementById('grid-btn');
+    var db = document.getElementById('design-btn'), gb = document.getElementById('grid-btn');
     if (back && db) db.classList.toggle('on', !back.classList.contains('no-design'));
     if (grid && gb) gb.classList.toggle('on', !grid.classList.contains('hidden'));
   }
-
-  function printCalibration() {
-    var r = Object.assign({}, CAL_RECORD, { stream: document.getElementById('stream').value });
-    var win = window.open('', '_blank', 'width=800,height=600');
-    if (!win) { alert('الرجاء السماح بالنوافذ المنبثقة'); return; }
-    win.document.write(StudentCardRenderer.buildPrintHTML(r, { grid: true }));
-    win.document.close();
-  }
-
+  document.getElementById('design-btn').addEventListener('click', function () {
+    var back = document.querySelector('#preview-card .ec-back');
+    if (back) { back.classList.toggle('no-design'); this.classList.toggle('on', !back.classList.contains('no-design')); }
+  });
+  document.getElementById('grid-btn').addEventListener('click', function () {
+    var grid = document.querySelector('#preview-card .ec-grid');
+    if (grid) { grid.classList.toggle('hidden'); this.classList.toggle('on', !grid.classList.contains('hidden')); }
+  });
+  document.getElementById('ruler-btn').addEventListener('click', function () {
+    document.querySelectorAll('.ruler').forEach(function (r) { r.classList.toggle('hidden'); });
+    this.classList.toggle('on', !document.querySelector('.ruler').classList.contains('hidden'));
+  });
   document.getElementById('stream').addEventListener('change', function () {
+    STREAM = this.value;
+    RECORD.stream = STREAM;
     renderPreview();
   });
+
+  // ── save / reset / toast ─────────────────────────────
+  function toast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
+  }
+  document.getElementById('save-btn').addEventListener('click', function () {
+    R.saveCalibration(cal());
+    toast('تم حفظ المعايرة — ستنطبق على كل الطباعات القادمة');
+  });
+  document.getElementById('reset-btn').addEventListener('click', function () {
+    document.getElementById('reset-modal').classList.remove('hidden');
+  });
+  document.getElementById('reset-cancel').addEventListener('click', function () {
+    document.getElementById('reset-modal').classList.add('hidden');
+  });
+  document.getElementById('reset-confirm').addEventListener('click', function () {
+    document.getElementById('reset-modal').classList.add('hidden');
+    R.resetCalibration();
+    selectElement(null);
+    renderPreview();
+    toast('تمت إعادة الوضع الافتراضي');
+  });
+  document.getElementById('reset-modal').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.add('hidden');
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !document.getElementById('reset-modal').classList.contains('hidden')) {
+      document.getElementById('reset-modal').classList.add('hidden');
+    }
+  });
+
+  // ── rulers ───────────────────────────────────────────
+  function buildRulers() {
+    var top = document.getElementById('ruler-top'), left = document.getElementById('ruler-left');
+    top.innerHTML = ''; left.innerHTML = '';
+    var i;
+    for (i = 0; i <= Math.round(CARD_W_MM); i++) {
+      var t = document.createElement('i');
+      if (i % 5 === 0) t.className = 'rk-maj';
+      if (i % 10 === 0) { t.className = (t.className ? t.className + ' ' : '') + 'rk-lab'; t.textContent = i; }
+      t.style.left = (i * SX) + 'px';
+      top.appendChild(t);
+    }
+    for (i = 0; i <= Math.round(CARD_H_MM); i++) {
+      var l = document.createElement('i');
+      if (i % 5 === 0) l.className = 'rk-maj';
+      if (i % 10 === 0) { l.className = (l.className ? l.className + ' ' : '') + 'rk-lab'; l.textContent = i; }
+      l.style.top = (i * SY) + 'px';
+      left.appendChild(l);
+    }
+  }
+
+  // print calibration layer + grid (never production)
+  window.printCalibration = function () {
+    var r = Object.assign({}, RECORD, { stream: STREAM });
+    var win = window.open('', '_blank', 'width=800,height=600');
+    if (!win) { toast('الرجاء السماح بالنوافذ المنبثقة'); return; }
+    win.document.write(R.buildPrintHTML(r, { grid: true }));
+    win.document.close();
+  };
+  var printBtn = document.createElement('button');
+  printBtn.className = 'print';
+  printBtn.textContent = '🖨️ طباعة طبقة البيانات + الشبكة';
+  printBtn.addEventListener('click', window.printCalibration);
+  var spacer = document.querySelector('.toolbar .spacer');
+  if (spacer) spacer.parentNode.insertBefore(printBtn, spacer);
+
+  buildRulers();
   renderPreview();
+})();
 </script>
 </body>
 </html>
