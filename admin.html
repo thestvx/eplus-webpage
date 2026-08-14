@@ -2986,7 +2986,7 @@
           <div class="teacher-modal-body" style="padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px">
             <div id="sr-slot-map" style="position:relative;width:210px;height:297px;background:#fff;border:2px solid var(--border);border-radius:8px;overflow:hidden;direction:ltr;box-shadow:0 4px 16px rgba(0,0,0,.08)"></div>
             <div id="sr-slot-warn" class="hidden" style="font-size:11.5px;color:#b45309;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-weight:800;text-align:center;max-width:380px">⚠️ لا توجد مواضع محفوظة لورقة A4 — تستخدم الشبكة الافتراضية (8 بطاقات). لضبط المواضع بدقة افتح <b>calibration-print.html</b> وحدد مواضع البطاقات واحفظها.</div>
-            <div style="font-size:11.5px;color:var(--text-muted);font-weight:700;text-align:center">المواضع محفوظة من صفحة معايرة A4 (calibration-print.html). اضغط على موضع البطاقة ثم اطبع.</div>
+            <div style="font-size:11.5px;color:var(--text-muted);font-weight:700;text-align:center">المواضع معروضة بإحداثيات الطباعة الفعلية على الوجه الخلفي (طريقة القلب محسوبة). اضغط على الموضع الذي تريد طباعة البيانات فوقه ثم اطبع — ستطبع البيانات على ظهر نفس البطاقة. المواضع محفوظة من صفحة معايرة A4 (calibration-print.html).</div>
           </div>
           <div style="padding:0 24px 20px;display:flex;gap:10px;justify-content:center">
             <button class="btn-sm" onclick="srCloseSlotModal()">إلغاء</button>
@@ -23473,9 +23473,10 @@ function srPrintCard() {
   }
   srSelectedSlotIndex = 0;
   const map = document.getElementById('sr-slot-map');
-  map.innerHTML = srActiveLayout.slots.map((s, i) =>
-    `<button type="button" class="sr-slot-cell${i === 0 ? ' slot-active' : ''}" data-i="${i}" onclick="srPickSlot(${i})" style="left:${s.x}px;top:${s.y}px;width:${s.w}px;height:${s.h}px;transform:rotate(${s.rot || 0}deg);transform-origin:0 0">${i + 1}</button>`
-  ).join('');
+  map.innerHTML = srActiveLayout.slots.map((s, i) => {
+    const p = srActiveLayout.flip ? StudentCardRenderer.flipSlot(s, srActiveLayout.flip) : s;
+    return `<button type="button" class="sr-slot-cell${i === 0 ? ' slot-active' : ''}" data-i="${i}" onclick="srPickSlot(${i})" style="left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px;transform:rotate(${p.rot || 0}deg);transform-origin:0 0">${i + 1}</button>`;
+  }).join('');
   document.getElementById('sr-slot-modal').classList.add('open');
 }
 

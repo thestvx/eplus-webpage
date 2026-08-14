@@ -675,24 +675,32 @@ ${A4_GRID_CSS}`;
   // Print ONLY the transparent data layer for one student on ONE slot of a
   // pre-printed A4 sheet. 210×297 mm page, transparent background (never
   // prints white over the design). No slot outlines, no grid, no designs.
-  // The back card design is shown on screen ONLY (hidden in @media print) so
-  // the print PREVIEW looks exactly like the finished sheet (design + data);
-  // the actual print emits just the transparent data layer. If the saved
-  // sheet layout (or opts.flip) has a flip method, the chosen slot is first
-  // mirrored to the back-of-sheet feed coordinates (x = 210−x−w / y = 297−y−h)
-  // so the data lands on the back of the correct card. The content is NOT
-  // mirrored: paper alignment comes from the slot position transform only,
-  // and the image/data keep their natural orientation (right stays right).
+  // Every back card design is shown on screen ONLY (hidden in @media print)
+  // so the print PREVIEW looks exactly like the finished sheet (all Back #1..#8
+  // designs + the student's data on the chosen slot only); the actual print
+  // emits just the transparent data layer for the chosen slot. If the saved
+  // sheet layout (or opts.flip) has a flip method, every slot is mirrored to
+  // the back-of-sheet feed coordinates (x = 210−x−w / y = 297−y−h) so the
+  // data lands on the back of the correct card. The content is NOT mirrored:
+  // paper alignment comes from the slot position transform only, and the
+  // image/data keep their natural orientation (right stays right).
   function buildA4PrintHTML(r, slotIndex, opts) {
     const sheet = (opts && opts.sheet) || getSheetLayout();
     if (!sheet || !sheet.slots || !sheet.slots[slotIndex]) return null;
-    let slot = sheet.slots[slotIndex];
     const flip = (opts && opts.flip) || sheet.flip || null;
-    if (flip) slot = flipSlot(slot, flip);
+    const slots = sheet.slots.map(s => (flip ? flipSlot(s, flip) : s));
+    const slot = slots[slotIndex];
     const data = JSON.stringify(r).replace(/<\//g, '<\\/');
     const g = a4DataGeom(slot);
     const sc = g.sc;
-    const ghostStyle = a4DataStyle(slot, 'mm', 1);
+    const slotsHtml = slots.map((s, i) => {
+      const gs = a4DataStyle(s, 'mm', 1);
+      const dataHtml = i === slotIndex ? `<div class="ec-a4-data" style="${gs}">${dataLayerHTML(r)}</div>` : '';
+      return `<div class="ec-a4-slot" style="${a4SlotStyle(s, 'mm', 1)}">
+    <div class="ec-a4-ghost" style="${gs}"><img src="${BACK_IMG}" alt=""></div>
+    ${dataHtml}
+  </div>`;
+    }).join('');
     return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>بطاقة الطالب - ${fullName(r)}</title>
 <style>
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
@@ -711,10 +719,7 @@ ${A4_GRID_CSS}`;
 <script src="js/studentCardRenderer.js?v=10"><\/script>
 </head><body>
 <div class="ec-a4">
-  <div class="ec-a4-slot" style="${a4SlotStyle(slot, 'mm', 1)}">
-    <div class="ec-a4-ghost" style="${ghostStyle}"><img src="${BACK_IMG}" alt=""></div>
-    <div class="ec-a4-data" style="${ghostStyle}">${dataLayerHTML(r)}</div>
-  </div>
+  ${slotsHtml}
 </div>
 <script>
 (function () {
