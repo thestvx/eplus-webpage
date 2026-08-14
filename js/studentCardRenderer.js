@@ -63,8 +63,8 @@ const StudentCardRenderer = (function () {
     // Independent background rectangles behind the QR and the barcode.
     // Calibrated in the CARD section (not per A4 slot); z-order: design →
     // rectangle → QR/barcode. mm coordinates.
-    qrBg: { x: 4.3, y: 2.8, w: 19.4, h: 19.4, color: '#ffffff', radius: 2.0, z: 0 },
-    bcBg: { x: 21.3, y: 38.6, w: 43.0, h: 15.38, color: '#ffffff', radius: 1.6, z: 0 },
+    qrBg: { x: 4.3, y: 2.8, w: 19.4, h: 19.4, color: '#ffffff', radius: 0, z: 0 },
+    bcBg: { x: 21.3, y: 38.6, w: 43.0, h: 15.38, color: '#ffffff', radius: 0, z: 0 },
     // User-added design shapes (squares/rectangles) drawn in the data layer
     // of every card. Each: { x, y, w, h, color, radius, z } in mm.
     shapes: []
@@ -359,8 +359,10 @@ ${sc}.ec-dl-r1 .ec-dl-value{font-size:${X(CAL.name.fontSize)}}
 ${sc}.ec-dl-r2 .ec-dl-value{font-size:${X(CAL.id.fontSize)}}
 ${sc}.ec-dl-r3 .ec-dl-value{font-size:${X(CAL.stream.fontSize)}}
 ${sc}.ec-dl-r4 .ec-dl-value{font-size:${X(CAL.date.fontSize)}}
-${sc}.ec-dl-qrbg{position:absolute;left:${X(CAL.qrBg.x)};top:${Y(CAL.qrBg.y)};width:${X(CAL.qrBg.w)};height:${Y(CAL.qrBg.h)};background:${CAL.qrBg.color};border-radius:${Y(CAL.qrBg.radius)};z-index:${CAL.qrBg.z}}
-${sc}.ec-dl-bcbg{position:absolute;left:${X(CAL.bcBg.x)};top:${Y(CAL.bcBg.y)};width:${X(CAL.bcBg.w)};height:${Y(CAL.bcBg.h)};background:${CAL.bcBg.color};border-radius:${Y(CAL.bcBg.radius)};z-index:${CAL.bcBg.z}}
+${sc}.ec-dl-qrbg{position:absolute;left:${X(CAL.qrBg.x)};top:${Y(CAL.qrBg.y)};width:${X(CAL.qrBg.w)};height:${Y(CAL.qrBg.h)};z-index:${CAL.qrBg.z};display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+${sc}.ec-dl-qrbg rect{width:100%;height:100%;fill:${CAL.qrBg.color};rx:${Y(CAL.qrBg.radius)};ry:${Y(CAL.qrBg.radius)};-webkit-print-color-adjust:exact;print-color-adjust:exact}
+${sc}.ec-dl-bcbg{position:absolute;left:${X(CAL.bcBg.x)};top:${Y(CAL.bcBg.y)};width:${X(CAL.bcBg.w)};height:${Y(CAL.bcBg.h)};z-index:${CAL.bcBg.z};display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+${sc}.ec-dl-bcbg rect{width:100%;height:100%;fill:${CAL.bcBg.color};rx:${Y(CAL.bcBg.radius)};ry:${Y(CAL.bcBg.radius)};-webkit-print-color-adjust:exact;print-color-adjust:exact}
 ${sc}.ec-dl-qr{position:absolute;left:${X(CAL.qr.x)};top:${Y(CAL.qr.y)};width:${X(CAL.qr.w)};height:${Y(CAL.qr.h)};display:flex;align-items:center;justify-content:center;z-index:2}
 ${sc}.ec-dl-qr img,${sc}.ec-dl-qr canvas{width:100%!important;height:100%!important;position:relative;z-index:1}
 ${sc}.ec-dl-bc{position:absolute;left:${X(CAL.bc.x)};top:${Y(CAL.bc.y)};width:${X(box.w)};height:${Y(box.h)};display:flex;align-items:center;justify-content:center;z-index:2}
@@ -411,9 +413,9 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
       <div class="ec-dl-row ec-dl-r2" data-cal="id"><span class="ec-dl-label">Student ID</span><span class="ec-dl-value id">${r.id || ''}</span></div>
       ${streamRow}
       <div class="ec-dl-row ec-dl-r4" data-cal="date"><span class="ec-dl-label">تاريخ التسجيل</span><span class="ec-dl-value date">${regDate(r)}</span></div>
-      <div class="ec-dl-qrbg" data-cal="qrbg"></div>
+      <svg class="ec-dl-qrbg" data-cal="qrbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.qrBg.radius}" ry="${CAL.qrBg.radius}" fill="${CAL.qrBg.color}"/></svg>
       <div class="ec-dl-qr" data-ec-role="qr" data-cal="qr"></div>
-      <div class="ec-dl-bcbg" data-cal="bcbg"></div>
+      <svg class="ec-dl-bcbg" data-cal="bcbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.bcBg.radius}" ry="${CAL.bcBg.radius}" fill="${CAL.bcBg.color}"/></svg>
       <div class="ec-dl-bc" data-ec-role="barcode" data-cal="barcode"></div>
       ${CAL.shapes.map((s, i) => `<div class="ec-dl-shape ec-dl-shape${i}" data-cal="shape${i}"></div>`).join('')}
     </div>`;
@@ -442,6 +444,20 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
       svg.style.setProperty('max-width', 'none');
       svg.style.setProperty('width', box.w + 'mm');
       svg.style.setProperty('height', box.h + 'mm');
+      // Bake a solid white rectangle as the FIRST painted element of the
+      // barcode SVG. It is real vector content (not CSS background), so the
+      // printer receives an actual filled white rectangle behind the black
+      // bars — even if the browser drops CSS backgrounds during printing.
+      const NS = 'http://www.w3.org/2000/svg';
+      const bg = (doc || document).createElementNS(NS, 'rect');
+      bg.setAttribute('x', '0');
+      bg.setAttribute('y', '0');
+      bg.setAttribute('width', '100%');
+      bg.setAttribute('height', '100%');
+      bg.setAttribute('fill', '#ffffff');
+      bg.setAttribute('rx', '0');
+      bg.setAttribute('ry', '0');
+      svg.insertBefore(bg, svg.firstChild);
       return svg;
     } catch (e) { console.error('[StudentCardRenderer] barcode error:', e); return null; }
   }
@@ -458,7 +474,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     el.innerHTML = '';
     if (!url || typeof QRCode === 'undefined') return;
     try {
-      new QRCode(el, { text: url, width: px, height: px, colorDark: '#0b1b3f', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+      new QRCode(el, { text: url, width: px, height: px, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
     } catch (e) { console.error('[StudentCardRenderer] QR error:', e); }
   }
 
