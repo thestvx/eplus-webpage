@@ -256,24 +256,21 @@ const StudentCardRenderer = (function () {
   // scope (optional) prefixes every selector so a second data layer can
   // coexist with the card-scale one (A4 sheet editor / admin A4 preview).
   //
-  // READABILITY PANELS (added on top of the calibration, never part of it):
-  //  • each text row gets a real dark navy chip behind label+value,
-  //  • QR + barcode each get a real white frame with padding + soft corners.
-  // They expand AROUND the calibrated boxes (negative inset on a ::before),
-  // so the calibrated element coordinates stay untouched and the panels
-  // are completely independent of the stored calibration values.
+  // WHITE FRAMES (added on top of the calibration, never part of it):
+  //  • QR and barcode each get a real white rounded rectangle with padding,
+  //    so no card design shows behind them and they scan reliably.
+  //  • The student text rows (name / Student ID / stream / date) stay PURE
+  //    TEXT — no background, no border, no card behind them.
+  // Frames expand AROUND the calibrated boxes (negative inset on a ::before),
+  // so the calibrated element coordinates stay untouched and completely
+  // independent of the stored calibration values.
   const TEXT_COLORS = {
     black: { color: '#0b1b3f', shadow: '0 0 1.5px rgba(255,255,255,0.85)' },
     white: { color: '#ffffff', shadow: '0 0 1.5px rgba(0,0,0,0.6)' }
   };
   const PANEL = {
-    rowPadX: 1.8, rowPadY: 0.5, rowR: 1.4,
     qrPad: 2.2, qrR: 2.0,
-    bcPadX: 2.2, bcPadY: 0.6, bcR: 1.6
-  };
-  const PANEL_COLORS = {
-    black: { bg: 'linear-gradient(180deg, rgba(255,255,255,0.96), rgba(237,242,251,0.97))', border: 'rgba(11,27,63,0.16)' },
-    white: { bg: 'linear-gradient(180deg, rgba(21,48,110,0.92), rgba(9,22,52,0.96))', border: 'rgba(255,255,255,0.20)' }
+    bcPadX: 2.2, bcPadY: 1.0, bcR: 1.6
   };
   function dlRules(unit, sx, sy, scope) {
     const sc = scope ? scope + ' ' : '';
@@ -281,13 +278,9 @@ const StudentCardRenderer = (function () {
     const Y = v => (v * sy).toFixed(3) + unit;
     const box = bcBox();
     const tc = TEXT_COLORS[CAL.textColor] || TEXT_COLORS.black;
-    const pc = PANEL_COLORS[CAL.textColor] || PANEL_COLORS.black;
-    const bw = unit === 'px' ? '1px' : '0.15mm';
     return `
 ${sc}.ec-dl{position:absolute;inset:0;direction:rtl;text-align:right}
 ${sc}.ec-dl-row{position:absolute;text-align:right;max-width:${X(CAL.label.maxWidth)}}
-${sc}.ec-dl-row .ec-dl-label,${sc}.ec-dl-row .ec-dl-value{position:relative;z-index:1}
-${sc}.ec-dl-row::before{content:'';position:absolute;inset:-${Y(PANEL.rowPadY)} -${X(PANEL.rowPadX)};background:${pc.bg};border-radius:${Y(PANEL.rowR)};border:${bw} solid ${pc.border};z-index:0;pointer-events:none}
 ${sc}.ec-dl-label{display:block;font-weight:700;line-height:1.2;color:${tc.color};text-shadow:${tc.shadow}}
 ${sc}.ec-dl-value{display:block;font-weight:900;line-height:1.28;color:${tc.color};text-shadow:${tc.shadow}}
 ${sc}.ec-dl-value.id{font-family:'Courier New',monospace;font-weight:800;letter-spacing:0.5px}
@@ -304,7 +297,7 @@ ${sc}.ec-dl-qr{position:absolute;left:${X(CAL.qr.x)};top:${Y(CAL.qr.y)};width:${
 ${sc}.ec-dl-qr::before{content:'';position:absolute;inset:-${Y(PANEL.qrPad)} -${X(PANEL.qrPad)};background:#ffffff;border-radius:${Y(PANEL.qrR)};z-index:0;pointer-events:none}
 ${sc}.ec-dl-qr img,${sc}.ec-dl-qr canvas{width:100%!important;height:100%!important;position:relative;z-index:1}
 ${sc}.ec-dl-bc{position:absolute;left:${X(CAL.bc.x)};top:${Y(CAL.bc.y)};width:${X(box.w)};height:${Y(box.h)};display:flex;align-items:center;justify-content:center;background:#ffffff}
-${sc}.ec-dl-bc::before{content:'';position:absolute;inset:-${Y(PANEL.bcPadY)} -${X(PANEL.bcPadX)} 0;background:#ffffff;border-radius:${Y(PANEL.bcR)};z-index:0;pointer-events:none}
+${sc}.ec-dl-bc::before{content:'';position:absolute;inset:-${Y(PANEL.bcPadY)} -${X(PANEL.bcPadX)};background:#ffffff;border-radius:${Y(PANEL.bcR)};z-index:0;pointer-events:none}
 ${sc}.ec-dl-bc svg{width:${X(box.w)}!important;height:${Y(box.h)}!important;max-width:none;display:block;position:relative;z-index:1}
 `;
   }
