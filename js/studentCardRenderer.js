@@ -126,6 +126,7 @@ const StudentCardRenderer = (function () {
     if (!isFinite(v)) v = def;
     return +(Math.min(Math.max(v, min), max)).toFixed(2);
   }
+  function _r2(v) { return Math.round(v * 100) / 100; }
   function _readSheet() {
     try { return JSON.parse(window.localStorage.getItem(SHEET_STORE_KEY) || 'null'); }
     catch (e) { return null; }
@@ -151,7 +152,9 @@ const StudentCardRenderer = (function () {
       if (label) slot.label = label;
       slots.push(slot);
     });
-    return { slots };
+    const out = { slots };
+    if (s.flip === 'long' || s.flip === 'short') out.flip = s.flip;
+    return out;
   }
 
   let SHEET = _mergeSheet(_readSheet());
@@ -180,6 +183,27 @@ const StudentCardRenderer = (function () {
       }
     }
     return slots;
+  }
+
+  // ── Back-of-sheet flip (front/back matching on the SAME A4 sheet) ──
+  // The sheet is printed FRONT first, then re-fed after a physical flip to
+  // print the BACK. The back face's feed coordinates are the mirror image of
+  // the front face, so a slot must be mirrored to land exactly BEHIND its
+  // front counterpart:
+  //   'long'  → flip around the long edge (page turn): x = W − x − w
+  //   'short' → tumble around the short edge:            y = H − y − h
+  // Rotation direction reverses under the mirror.
+  // Both faces always use the SAME source CARD_SLOTS — the back only applies
+  // this deterministic geometric transform (never its own layout).
+  function flipSlot(s, method) {
+    const x = s.x, y = s.y, w = s.w, h = s.h, rot = s.rot || 0;
+    if (method === 'long') return { x: _r2(A4_W_MM - x - w), y, w, h, rot: _r2(-rot) };
+    if (method === 'short') return { x, y: _r2(A4_H_MM - y - h), w, h, rot: _r2(-rot) };
+    return { x, y, w, h, rot };
+  }
+  function flipSlots(slots, method) {
+    if (!Array.isArray(slots)) return slots;
+    return slots.map(s => flipSlot(s, method));
   }
 
   // ── GS1 EAN-13 physical standard (the REAL barcode size) ──
@@ -265,8 +289,8 @@ const StudentCardRenderer = (function () {
   // so the calibrated element coordinates stay untouched and completely
   // independent of the stored calibration values.
   const TEXT_COLORS = {
-    black: { color: '#0b1b3f', shadow: '0 0 1.5px rgba(255,255,255,0.85)' },
-    white: { color: '#ffffff', shadow: '0 0 1.5px rgba(0,0,0,0.6)' }
+    black: { color: '#0b1b3f', shadow: '0 0 1.5px rgba(255,255,255,0.85)', stroke: 'rgba(255,255,255,0.9)' },
+    white: { color: '#ffffff', shadow: '0 0 1.5px rgba(0,0,0,0.6)', stroke: '#0b1b3f' }
   };
   const PANEL = {
     qrPad: 2.2, qrR: 2.0,
@@ -278,11 +302,12 @@ const StudentCardRenderer = (function () {
     const Y = v => (v * sy).toFixed(3) + unit;
     const box = bcBox();
     const tc = TEXT_COLORS[CAL.textColor] || TEXT_COLORS.black;
+    const sw = unit === 'px' ? '1.4px' : '0.3mm';
     return `
 ${sc}.ec-dl{position:absolute;inset:0;direction:rtl;text-align:right}
 ${sc}.ec-dl-row{position:absolute;text-align:right;max-width:${X(CAL.label.maxWidth)}}
-${sc}.ec-dl-label{display:block;font-weight:700;line-height:1.2;color:${tc.color};text-shadow:${tc.shadow}}
-${sc}.ec-dl-value{display:block;font-weight:900;line-height:1.28;color:${tc.color};text-shadow:${tc.shadow}}
+${sc}.ec-dl-label{display:block;font-weight:700;line-height:1.2;color:${tc.color};text-shadow:${tc.shadow};-webkit-text-stroke:${sw} ${tc.stroke};paint-order:stroke fill}
+${sc}.ec-dl-value{display:block;font-weight:900;line-height:1.28;color:${tc.color};text-shadow:${tc.shadow};-webkit-text-stroke:${sw} ${tc.stroke};paint-order:stroke fill}
 ${sc}.ec-dl-value.id{font-family:'Courier New',monospace;font-weight:800;letter-spacing:0.5px}
 ${sc}.ec-dl-r1{right:${X(CARD_W_MM - CAL.name.x)};top:${Y(CAL.name.y)}}
 ${sc}.ec-dl-r2{right:${X(CARD_W_MM - CAL.id.x)};top:${Y(CAL.id.y)}}
@@ -466,6 +491,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
   html, body { margin: 0; padding: 0; background: #ffffff; }
   * { box-sizing: border-box; }
   body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }
   .ec-data-layer { position: relative; width: ${CARD_W_MM}mm; height: ${CARD_H_MM}mm; overflow: hidden; font-family: 'Tajawal', Arial, sans-serif; }
   ${dlRules('mm', 1, 1)}
 </style>
@@ -508,6 +534,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 <style>
   @media print { @page { margin: 0; size: auto; } html,body { margin: 0; padding: 0; } }
   html,body { margin: 0; padding: 0; background: #ffffff; }
+  @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }
   .wrap { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
   .cap { font-family: monospace; font-size: 15px; color: #334155; letter-spacing: 2px; }
   @media print { .cap { display: none; } }
@@ -596,19 +623,36 @@ ${A4_GRID_CSS}`;
   // Print ONLY the transparent data layer for one student on ONE slot of a
   // pre-printed A4 sheet. 210×297 mm page, transparent background (never
   // prints white over the design). No slot outlines, no grid, no designs.
+  // The back card design is shown on screen ONLY (hidden in @media print) so
+  // the print PREVIEW looks exactly like the finished sheet (design + data);
+  // the actual print emits just the transparent data layer. If the saved
+  // sheet layout (or opts.flip) has a flip method, the chosen slot is first
+  // mirrored to the back-of-sheet feed coordinates so the data lands on the
+  // back of the correct card, and the content is pre-mirrored to read
+  // correctly after the physical flip.
   function buildA4PrintHTML(r, slotIndex, opts) {
     const sheet = getSheetLayout();
     if (!sheet || !sheet.slots || !sheet.slots[slotIndex]) return null;
-    const slot = sheet.slots[slotIndex];
+    let slot = sheet.slots[slotIndex];
+    const flip = (opts && opts.flip) || sheet.flip || null;
+    if (flip) slot = flipSlot(slot, flip);
     const data = JSON.stringify(r).replace(/<\//g, '<\\/');
-    const sc = a4DataGeom(slot).sc;
+    const g = a4DataGeom(slot);
+    const sc = g.sc;
+    const mirror = flip === 'long' ? 'scaleX(-1)' : flip === 'short' ? 'scaleY(-1)' : '';
+    const innerStyle = mirror ? ' style="transform:' + mirror + ';transform-origin:50% 50%"' : '';
+    const ghostStyle = a4DataStyle(slot, 'mm', 1);
     return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>بطاقة الطالب - ${fullName(r)}</title>
 <style>
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
   html, body { margin: 0; padding: 0; background: transparent; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   * { box-sizing: border-box; }
+  @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } .ec-a4-ghost { display: none !important; } }
   .ec-a4 { position: relative; width: ${A4_W_MM}mm; height: ${A4_H_MM}mm; overflow: hidden; }
   .ec-a4-slot { position: absolute; transform-origin: 0 0; }
+  .ec-a4-inner { position: absolute; inset: 0; }
+  .ec-a4-ghost { position: absolute; overflow: hidden; }
+  .ec-a4-ghost img { width: 100%; height: 100%; object-fit: contain; display: block; }
   .ec-a4-data { position: absolute; }
   ${dlRules('mm', sc, sc)}
 </style>
@@ -618,7 +662,10 @@ ${A4_GRID_CSS}`;
 </head><body>
 <div class="ec-a4">
   <div class="ec-a4-slot" style="${a4SlotStyle(slot, 'mm', 1)}">
-    <div class="ec-a4-data" style="${a4DataStyle(slot, 'mm', 1)}">${dataLayerHTML(r)}</div>
+    <div class="ec-a4-inner"${innerStyle}>
+      <div class="ec-a4-ghost" style="${ghostStyle}"><img src="${BACK_IMG}" alt=""></div>
+      <div class="ec-a4-data" style="${ghostStyle}">${dataLayerHTML(r)}</div>
+    </div>
   </div>
 </div>
 <script>
@@ -656,6 +703,7 @@ ${A4_GRID_CSS}`;
   html, body { margin: 0; padding: 0; background: #ffffff; }
   * { box-sizing: border-box; }
   body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }
   .ec-a4 { position: relative; width: ${A4_W_MM}mm; height: ${A4_H_MM}mm; }
   ${A4_GRID_CSS}
   .ec-a4-test-slot { position: absolute; border: 0.4mm solid #d32f2f; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
@@ -675,6 +723,7 @@ ${A4_GRID_CSS}`;
     cardCSS, barcodeSpec, bcBox,
     getCalibration, setCalibration, saveCalibration, resetCalibration, calibrationStorageKey,
     getSheetLayout, setSheetLayout, saveSheetLayout, resetSheetLayout, sheetStorageKey, defaultSlotGrid,
+    flipSlot, flipSlots,
     fullName, streamOf, regDate, barcodeValue, qrUrl,
     injectCSS, renderPair, portalFaces, buildPrintHTML, hydratePrint, hydrateRoot,
     dataLayerHTML, dlRules, gridOverlayHTML, GRID_CSS,

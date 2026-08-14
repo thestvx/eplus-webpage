@@ -108,6 +108,7 @@
   .dp-page { position: relative; background: #fff; border: 1px solid #c4d0ea; border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,0.14); overflow: hidden; }
   .dp-page .ds-slot { position: absolute; transform-origin: 0 0; background: #fff; }
   .dp-page .ds-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .dp-page .ds-slot .ds-num { position: absolute; top: 1px; right: 1px; background: rgba(255,255,255,0.94); color: #b3362f; font-weight: 900; font-size: 10px; padding: 1px 5px; border-radius: 5px; z-index: 3; pointer-events: none; }
   /* ── toast ── */
   #toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); background: #122350; color: #fff; padding: 12px 22px; border-radius: 12px; font-size: 14px; font-weight: 800; opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 1000; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
   #toast.show { opacity: 1; }
@@ -136,6 +137,11 @@
     <button id="a4-design-btn" class="on">🪞 إظهار التصميم</button>
     <button id="a4-grid-btn" class="on">📏 شبكة المعايرة</button>
     <button id="a4-ruler-btn" class="on">📐 المسطرة</button>
+    <label for="flip-method" style="margin-inline-start:6px">قلب الورقة للطباعة الخلفية:</label>
+    <select id="flip-method">
+      <option value="long">قلب على الحافة الطويلة</option>
+      <option value="short">قلب على الحافة القصيرة</option>
+    </select>
     <span class="spacer"></span>
     <button id="a4-test-btn">🖨️ طباعة اختبار A4</button>
     <button id="design-print-btn" class="primary">🖨️ طباعة تصاميم البطاقات</button>
@@ -145,7 +151,8 @@
 
   <div class="note">
     كل فتحة = مكان بطاقة على الورقة (85.6 × 53.98 مم). اسحبها لتحريكها، اسحب المقبض <b>◢</b> لتغيير الحجم، أو عدّل القيم في لوحة التحكم.
-    حفظ إعدادات الورقة يحفظ أيضاً مواضع بيانات البطاقة (القسم <b>ب</b>) ليطبّقا معاً على كل الطباعات.
+    حدد <b>طريقة قلب الورقة</b> (حافة طويلة/قصيرة) ثم اطبع «تصاميم البطاقات» باختيار <b>الأمامي + الخلفي</b> ليطابق الوجه الخلفي للبطاقة #N خلف وجهها الأمامي #N بالضبط بالـملمتر.
+    حفظ إعدادات الورقة يحفظ أيضاً طريقة القلب ومواضع بيانات البطاقة (القسم <b>ب</b>) ليطبّقا معاً على كل الطباعات.
   </div>
 
   <div class="stage-wrap">
@@ -263,14 +270,16 @@
 <div class="modal-overlay hidden" id="design-print-modal" role="dialog" aria-modal="true">
   <div class="modal-box wide">
     <h3>🖨️ طباعة تصاميم البطاقات على ورقة A4</h3>
-    <p>تطبع التصاميم (الأمامي / الخلفي) داخل نفس مواضع الفتحات المحفوظة — بدون أي بيانات طلاب أو QR أو باركود.</p>
+    <p>تطبع التصاميم داخل نفس مواضع الفتحات المحفوظة — بدون أي بيانات طلاب أو QR أو باركود. لتطابق الوجهين بالـملمتر، اختر «الأمامي + الخلفي» واتبع طريقة القلب أدناه.</p>
     <div class="dp-field">
       <label>نوع التصميم</label>
       <div class="dp-seg" id="dp-type">
         <button data-v="front" class="on">الوجه الأمامي</button>
         <button data-v="back">الوجه الخلفي</button>
+        <button data-v="both">الأمامي + الخلفي</button>
       </div>
     </div>
+    <div class="dp-hint">طريقة القلب تُقرأ من زر <b>«قلب الورقة للطباعة الخلفية»</b> أعلى صفحة المعايرة. للطباعة بمرحلتين: اطبع <b>صفحة 1 (الأمامي)</b>، اقلب الورقة حسب الطريقة المختارة وأعد إدخالها، ثم اطبع <b>صفحة 2 (الخلفي)</b> — يقع الوجه الخلفي للبطاقة #N خلف وجهها الأمامي #N بالضبط. أرقام البطاقات في المعاينة للتحقق البصري فقط ولا تُطبع.</div>
     <div class="dp-preview-wrap" id="design-preview"></div>
     <div class="modal-actions">
       <button id="dp-cancel">إلغاء</button>
@@ -486,9 +495,9 @@
   });
   document.getElementById('a4-save-btn').addEventListener('click', function () {
     if (!SLOTS.length) { toast('أضف فتحة بطاقة أولاً ثم احفظ'); return; }
-    var ok = R.saveSheetLayout({ slots: SLOTS });
+    var ok = R.saveSheetLayout({ slots: SLOTS, flip: document.getElementById('flip-method').value });
     R.saveCalibration(cal());
-    toast(ok ? 'تم حفظ إعدادات ورقة A4 — ستنطبق على كل الطباعات' : 'تعذّر حفظ إعدادات الورقة');
+    toast(ok ? 'تم حفظ إعدادات ورقة A4 (بما فيها طريقة القلب) — ستنطبق على كل الطباعات' : 'تعذّر حفظ إعدادات الورقة');
   });
   document.getElementById('a4-reset-btn').addEventListener('click', function () {
     document.getElementById('a4-reset-modal').classList.remove('hidden');
@@ -517,29 +526,49 @@
   });
 
   // ── Design print (front/back card designs on A4, no student data) ──
+  // BOTH faces always use the SAME saved CARD_SLOTS (front coordinates). The
+  // BACK face only applies the saved flip transform (long = x mirrored,
+  // short = y mirrored) so Back #N lands exactly BEHIND Front #N after the
+  // sheet is flipped and re-fed.
   function cloneSlots() { return SLOTS.map(function (s) { return { x: s.x, y: s.y, w: s.w, h: s.h, rot: s.rot || 0 }; }); }
   function designType() { return document.querySelector('#dp-type button.on').getAttribute('data-v'); }
+  function designFlip() { return document.getElementById('flip-method').value; }
+  function mirrorCSS() { return designFlip() === 'long' ? 'scaleX(-1)' : 'scaleY(-1)'; }
+  function slotsForSide(side) {
+    var slots = cloneSlots();
+    if (side === 'back') slots = slots.map(function (s) { return R.flipSlot(s, designFlip()); });
+    return slots;
+  }
   function dsSlotStyle(s) {
     return 'left:' + s.x + 'mm;top:' + s.y + 'mm;width:' + s.w + 'mm;height:' + s.h + 'mm;transform:rotate(' + (s.rot || 0) + 'deg);transform-origin:0 0';
   }
   function buildDesignPrintHTML(type) {
-    var img = type === 'back' ? BACK_IMG : FRONT_IMG;
-    var slotsHtml = cloneSlots().map(function (s) {
-      return '<div class="ds-slot" style="' + dsSlotStyle(s) + '"><img src="' + img + '" alt=""></div>';
-    }).join('');
+    var page = function (slots, img, mirror) {
+      return '<div class="ds-page">' + slots.map(function (s) {
+        var m = mirror ? ' style="transform:' + mirror + ';transform-origin:50% 50%"' : '';
+        return '<div class="ds-slot" style="' + dsSlotStyle(s) + '"><img src="' + img + '" alt=""' + m + '></div>';
+      }).join('') + '</div>';
+    };
+    var pages = '';
+    if (type === 'front' || type === 'both') pages += page(slotsForSide('front'), FRONT_IMG, '');
+    if (type === 'back') pages += page(slotsForSide('back'), BACK_IMG, mirrorCSS());
+    else if (type === 'both') pages += page(slotsForSide('back'), BACK_IMG, mirrorCSS());
     return '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تصاميم البطاقات - ورقة A4</title><style>' +
       '@page { size: ' + A4_W_MM + 'mm ' + A4_H_MM + 'mm; margin: 0; }' +
       'html, body { margin: 0; padding: 0; background: #fff; }' +
       '* { box-sizing: border-box; }' +
-      '.ds-page { position: relative; width: ' + A4_W_MM + 'mm; height: ' + A4_H_MM + 'mm; overflow: hidden; }' +
+      '@media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }' +
+      '.ds-page { position: relative; width: ' + A4_W_MM + 'mm; height: ' + A4_H_MM + 'mm; overflow: hidden; page-break-after: always; }' +
+      '.ds-page:last-child { page-break-after: auto; }' +
       '.ds-slot { position: absolute; transform-origin: 0 0; background: #fff; }' +
       '.ds-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }' +
-      '</style></head><body><div class="ds-page">' + slotsHtml + '</div></body></html>';
+      '</style></head><body>' + pages + '</body></html>';
   }
-  function designPagePreviewHTML(slots, img, scale, label) {
+  function designPagePreviewHTML(slots, img, scale, label, mirror) {
     var W = Math.round(A4_W_MM * scale), H = Math.round(A4_H_MM * scale);
-    var slotsHtml = slots.map(function (s) {
-      return '<div class="ds-slot" style="left:' + (s.x * scale) + 'px;top:' + (s.y * scale) + 'px;width:' + (s.w * scale) + 'px;height:' + (s.h * scale) + 'px;transform:rotate(' + (s.rot || 0) + 'deg);transform-origin:0 0"><img src="' + img + '" alt=""></div>';
+    var slotsHtml = slots.map(function (s, i) {
+      var m = mirror ? ' style="transform:' + mirror + ';transform-origin:50% 50%"' : '';
+      return '<div class="ds-slot" style="left:' + (s.x * scale) + 'px;top:' + (s.y * scale) + 'px;width:' + (s.w * scale) + 'px;height:' + (s.h * scale) + 'px;transform:rotate(' + (s.rot || 0) + 'deg);transform-origin:0 0"><img src="' + img + '" alt=""' + m + '><span class="ds-num">' + (i + 1) + '</span></div>';
     }).join('');
     return '<div class="dp-page-box"><div class="dp-page-label">' + label + '</div><div class="dp-page" style="width:' + W + 'px;height:' + H + 'px">' + slotsHtml + '</div></div>';
   }
@@ -547,9 +576,12 @@
     var type = designType();
     var box = document.getElementById('design-preview');
     var scale = 1.3;
-    var img = type === 'back' ? BACK_IMG : FRONT_IMG;
-    var label = type === 'back' ? 'الصفحة 1 — الوجه الخلفي' : 'الصفحة 1 — الوجه الأمامي';
-    box.innerHTML = designPagePreviewHTML(cloneSlots(), img, scale, label);
+    var flipLabel = designFlip() === 'long' ? 'قلب على الحافة الطويلة' : 'قلب على الحافة القصيرة';
+    var html = '';
+    if (type === 'front' || type === 'both') html += designPagePreviewHTML(slotsForSide('front'), FRONT_IMG, scale, 'الصفحة 1 — الوجه الأمامي (بطاقة ' + SLOTS.length + ' × ' + SLOTS.length + ')', '');
+    if (type === 'back') html += designPagePreviewHTML(slotsForSide('back'), BACK_IMG, scale, 'الصفحة 1 — الوجه الخلفي بعد القلب (' + flipLabel + ')', mirrorCSS());
+    else if (type === 'both') html += designPagePreviewHTML(slotsForSide('back'), BACK_IMG, scale, 'الصفحة 2 — الوجه الخلفي بعد القلب (' + flipLabel + ')', mirrorCSS());
+    box.innerHTML = html;
   }
   function printDesignSheet() {
     var type = designType();
@@ -586,6 +618,9 @@
       renderDesignPreview();
     });
   });
+  document.getElementById('flip-method').addEventListener('change', function () {
+    if (!document.getElementById('design-print-modal').classList.contains('hidden')) renderDesignPreview();
+  });
   document.getElementById('dp-cancel').addEventListener('click', function () {
     document.getElementById('design-print-modal').classList.add('hidden');
   });
@@ -596,7 +631,7 @@
   document.getElementById('design-print-modal').addEventListener('click', function (e) {
     if (e.target === this) this.classList.add('hidden');
   });
-  window.__designPrint = { cloneSlots: cloneSlots, designType: designType, buildDesignPrintHTML: buildDesignPrintHTML, printDesignSheet: printDesignSheet };
+  window.__designPrint = { cloneSlots: cloneSlots, designType: designType, designFlip: designFlip, mirrorCSS: mirrorCSS, slotsForSide: slotsForSide, buildDesignPrintHTML: buildDesignPrintHTML, printDesignSheet: printDesignSheet };
 
   // ── slot inspector inputs ─────────────────────────────
   ['slot-x', 'slot-y', 'slot-w', 'slot-h', 'slot-rot'].forEach(function (id) {
@@ -904,6 +939,7 @@
 
   var lay = R.getSheetLayout();
   if (lay && Array.isArray(lay.slots)) SLOTS = lay.slots;
+  if (lay && lay.flip) document.getElementById('flip-method').value = lay.flip;
   buildA4Rulers();
   buildRulers();
   renderA4Stage();
