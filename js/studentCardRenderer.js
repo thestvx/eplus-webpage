@@ -58,7 +58,8 @@ const StudentCardRenderer = (function () {
     date:   { x: 65.1, y: 33.2, fontSize: 2.9 },
     label:  { fontSize: 2.2, gap: 0.7, maxWidth: 42 },
     qr:     { x: 6.5, y: 5.0, w: 15, h: 15 },
-    bc:     { x: 23.5, y: 39.08, w: null, h: null }
+    bc:     { x: 23.5, y: 39.08, w: null, h: null },
+    textColor: 'black'
   };
 
   // ── Calibration storage (shared by every page of the site) ──
@@ -86,6 +87,7 @@ const StudentCardRenderer = (function () {
           });
         }
       });
+      if (saved.textColor === 'white' || saved.textColor === 'black') cal.textColor = saved.textColor;
     }
     ['name', 'id', 'stream', 'date', 'qr', 'bc'].forEach(k => {
       cal[k].x = Math.min(Math.max(0, cal[k].x), CARD_W_MM);
@@ -253,16 +255,21 @@ const StudentCardRenderer = (function () {
   // Built on demand so it always reflects the CURRENT calibration.
   // scope (optional) prefixes every selector so a second data layer can
   // coexist with the card-scale one (A4 sheet editor / admin A4 preview).
+  const TEXT_COLORS = {
+    black: { color: '#0b1b3f', shadow: '0 0 2px rgba(255,255,255,0.95),0 0 5px rgba(255,255,255,0.55)' },
+    white: { color: '#ffffff', shadow: '0 0 2px rgba(0,0,0,0.7),0 0 5px rgba(0,0,0,0.4)' }
+  };
   function dlRules(unit, sx, sy, scope) {
     const sc = scope ? scope + ' ' : '';
     const X = v => (v * sx).toFixed(3) + unit;
     const Y = v => (v * sy).toFixed(3) + unit;
     const box = bcBox();
+    const tc = TEXT_COLORS[CAL.textColor] || TEXT_COLORS.black;
     return `
 ${sc}.ec-dl{position:absolute;inset:0;direction:rtl;text-align:right}
 ${sc}.ec-dl-row{position:absolute;text-align:right;max-width:${X(CAL.label.maxWidth)}}
-${sc}.ec-dl-label{display:block;font-weight:700;line-height:1.2;color:#0b1b3f;text-shadow:0 0 2px rgba(255,255,255,0.95),0 0 5px rgba(255,255,255,0.55)}
-${sc}.ec-dl-value{display:block;font-weight:900;line-height:1.28;color:#0b1b3f;text-shadow:0 0 2px rgba(255,255,255,0.95),0 0 5px rgba(255,255,255,0.55)}
+${sc}.ec-dl-label{display:block;font-weight:700;line-height:1.2;color:${tc.color};text-shadow:${tc.shadow}}
+${sc}.ec-dl-value{display:block;font-weight:900;line-height:1.28;color:${tc.color};text-shadow:${tc.shadow}}
 ${sc}.ec-dl-value.id{font-family:'Courier New',monospace;font-weight:800;letter-spacing:0.5px}
 ${sc}.ec-dl-r1{right:${X(CARD_W_MM - CAL.name.x)};top:${Y(CAL.name.y)}}
 ${sc}.ec-dl-r2{right:${X(CARD_W_MM - CAL.id.x)};top:${Y(CAL.id.y)}}
@@ -273,7 +280,7 @@ ${sc}.ec-dl-r1 .ec-dl-value{font-size:${X(CAL.name.fontSize)}}
 ${sc}.ec-dl-r2 .ec-dl-value{font-size:${X(CAL.id.fontSize)}}
 ${sc}.ec-dl-r3 .ec-dl-value{font-size:${X(CAL.stream.fontSize)}}
 ${sc}.ec-dl-r4 .ec-dl-value{font-size:${X(CAL.date.fontSize)}}
-${sc}.ec-dl-qr{position:absolute;left:${X(CAL.qr.x)};top:${Y(CAL.qr.y)};width:${X(CAL.qr.w)};height:${Y(CAL.qr.h)};display:flex;align-items:center;justify-content:center;overflow:hidden}
+${sc}.ec-dl-qr{position:absolute;left:${X(CAL.qr.x)};top:${Y(CAL.qr.y)};width:${X(CAL.qr.w)};height:${Y(CAL.qr.h)};display:flex;align-items:center;justify-content:center;overflow:hidden;background:#ffffff}
 ${sc}.ec-dl-qr img,${sc}.ec-dl-qr canvas{width:100%!important;height:100%!important}
 ${sc}.ec-dl-bc{position:absolute;left:${X(CAL.bc.x)};top:${Y(CAL.bc.y)};width:${X(box.w)};height:${Y(box.h)};display:flex;align-items:center;justify-content:center;background:#ffffff;overflow:hidden}
 ${sc}.ec-dl-bc svg{width:${X(box.w)}!important;height:${Y(box.h)}!important;max-width:none;display:block}
@@ -449,7 +456,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=7"><\/script>
+<script src="js/studentCardRenderer.js?v=8"><\/script>
 </head><body>
 <div class="ec-data-layer">${dataLayerHTML(r)}${grid}</div>
 <script>
@@ -493,7 +500,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </head><body>
   <div class="wrap"><div class="cap">${value}</div><div id="bc"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=7"></script>
+<script src="js/studentCardRenderer.js?v=8"></script>
 <script>
   (function () {
     var value = '${value}';
@@ -592,7 +599,7 @@ ${A4_GRID_CSS}`;
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=7"><\/script>
+<script src="js/studentCardRenderer.js?v=8"><\/script>
 </head><body>
 <div class="ec-a4">
   <div class="ec-a4-slot" style="${a4SlotStyle(slot, 'mm', 1)}">

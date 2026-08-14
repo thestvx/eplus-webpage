@@ -185,6 +185,11 @@
       <option value="تقني رياضي">تقني رياضي</option>
       <option value="آداب وفلسفة">آداب وفلسفة</option>
     </select>
+    <label for="text-color">لون نص المعلومات:</label>
+    <select id="text-color">
+      <option value="black">أسود</option>
+      <option value="white">أبيض</option>
+    </select>
     <button id="design-btn" class="on">🪞 إظهار التصميم المطبوع</button>
     <button id="grid-btn" class="on">📏 شبكة المعايرة</button>
     <button id="ruler-btn" class="on">📐 المسطرة</button>
@@ -264,16 +269,7 @@
       <div class="dp-seg" id="dp-type">
         <button data-v="front" class="on">الوجه الأمامي</button>
         <button data-v="back">الوجه الخلفي</button>
-        <button data-v="both">الأمامي + الخلفي</button>
       </div>
-    </div>
-    <div class="dp-field hidden" id="dp-flip-field">
-      <label>طريقة قلب الورقة للطباعة الخلفية</label>
-      <div class="dp-seg" id="dp-flip">
-        <button data-v="long" class="on">قلب على الحافة الطويلة</button>
-        <button data-v="short">قلب على الحافة القصيرة</button>
-      </div>
-      <div class="dp-hint">تُقلب الصفحة الثانية (الوجه الخلفي) تلقائياً لتنطبق تماماً على الوجه الخلفي من نفس الورقة. للطباعة اليدوية بمرحلتين: اطبع <b>الصفحة 1</b>، اقلب الورقة حسب الطريقة المختارة، ثم اطبع <b>الصفحة 2</b> فقط على ظهرها.</div>
     </div>
     <div class="dp-preview-wrap" id="design-preview"></div>
     <div class="modal-actions">
@@ -287,7 +283,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=7"></script>
+<script src="js/studentCardRenderer.js?v=8"></script>
 <script>
 (function () {
   var R = window.StudentCardRenderer;
@@ -522,45 +518,23 @@
 
   // ── Design print (front/back card designs on A4, no student data) ──
   function cloneSlots() { return SLOTS.map(function (s) { return { x: s.x, y: s.y, w: s.w, h: s.h, rot: s.rot || 0 }; }); }
-  // Mirror a slot onto the back of the same sheet after a physical flip, so
-  // the back design lands exactly behind the front design. Long edge = flip
-  // around the vertical axis (x mirrored), short edge = around horizontal
-  // axis (y mirrored). Rotation direction reverses under a mirror.
-  function flipSlot(s, method) {
-    var x = s.x, y = s.y, rot = s.rot || 0;
-    if (method === 'long') x = round2(A4_W_MM - s.x - s.w);
-    else y = round2(A4_H_MM - s.y - s.h);
-    return { x: x, y: y, w: s.w, h: s.h, rot: round2(-rot) };
-  }
   function designType() { return document.querySelector('#dp-type button.on').getAttribute('data-v'); }
-  function designFlip() { return document.querySelector('#dp-flip button.on').getAttribute('data-v'); }
-  function designSlotsForSide(side, backFlipped) {
-    var slots = cloneSlots();
-    if (side === 'back' && backFlipped) slots = slots.map(function (s) { return flipSlot(s, designFlip()); });
-    return slots;
-  }
   function dsSlotStyle(s) {
     return 'left:' + s.x + 'mm;top:' + s.y + 'mm;width:' + s.w + 'mm;height:' + s.h + 'mm;transform:rotate(' + (s.rot || 0) + 'deg);transform-origin:0 0';
   }
   function buildDesignPrintHTML(type) {
-    var page = function (slots, img) {
-      return '<div class="ds-page">' + slots.map(function (s) {
-        return '<div class="ds-slot" style="' + dsSlotStyle(s) + '"><img src="' + img + '" alt=""></div>';
-      }).join('') + '</div>';
-    };
-    var pages = '';
-    if (type === 'front' || type === 'both') pages += page(designSlotsForSide('front', false), FRONT_IMG);
-    if (type === 'back') pages += page(designSlotsForSide('back', false), BACK_IMG);
-    else if (type === 'both') pages += page(designSlotsForSide('back', true), BACK_IMG);
+    var img = type === 'back' ? BACK_IMG : FRONT_IMG;
+    var slotsHtml = cloneSlots().map(function (s) {
+      return '<div class="ds-slot" style="' + dsSlotStyle(s) + '"><img src="' + img + '" alt=""></div>';
+    }).join('');
     return '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تصاميم البطاقات - ورقة A4</title><style>' +
       '@page { size: ' + A4_W_MM + 'mm ' + A4_H_MM + 'mm; margin: 0; }' +
       'html, body { margin: 0; padding: 0; background: #fff; }' +
       '* { box-sizing: border-box; }' +
-      '.ds-page { position: relative; width: ' + A4_W_MM + 'mm; height: ' + A4_H_MM + 'mm; overflow: hidden; page-break-after: always; }' +
-      '.ds-page:last-child { page-break-after: auto; }' +
+      '.ds-page { position: relative; width: ' + A4_W_MM + 'mm; height: ' + A4_H_MM + 'mm; overflow: hidden; }' +
       '.ds-slot { position: absolute; transform-origin: 0 0; background: #fff; }' +
       '.ds-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }' +
-      '</style></head><body>' + pages + '</body></html>';
+      '</style></head><body><div class="ds-page">' + slotsHtml + '</div></body></html>';
   }
   function designPagePreviewHTML(slots, img, scale, label) {
     var W = Math.round(A4_W_MM * scale), H = Math.round(A4_H_MM * scale);
@@ -573,11 +547,9 @@
     var type = designType();
     var box = document.getElementById('design-preview');
     var scale = 1.3;
-    var html = '';
-    if (type === 'front' || type === 'both') html += designPagePreviewHTML(designSlotsForSide('front', false), FRONT_IMG, scale, 'الصفحة 1 — الوجه الأمامي');
-    if (type === 'back') html += designPagePreviewHTML(designSlotsForSide('back', false), BACK_IMG, scale, 'الصفحة 1 — الوجه الخلفي');
-    else if (type === 'both') html += designPagePreviewHTML(designSlotsForSide('back', true), BACK_IMG, scale, 'الصفحة 2 — الوجه الخلفي (مقلوب: ' + (designFlip() === 'long' ? 'قلب على الحافة الطويلة' : 'قلب على الحافة القصيرة') + ')');
-    box.innerHTML = html;
+    var img = type === 'back' ? BACK_IMG : FRONT_IMG;
+    var label = type === 'back' ? 'الصفحة 1 — الوجه الخلفي' : 'الصفحة 1 — الوجه الأمامي';
+    box.innerHTML = designPagePreviewHTML(cloneSlots(), img, scale, label);
   }
   function printDesignSheet() {
     var type = designType();
@@ -605,20 +577,11 @@
   document.getElementById('design-print-btn').addEventListener('click', function () {
     if (!SLOTS.length) { toast('أضف فتحة بطاقة أولاً ثم اطبع التصاميم'); return; }
     document.getElementById('design-print-modal').classList.remove('hidden');
-    document.getElementById('dp-flip-field').classList.toggle('hidden', designType() !== 'both');
     renderDesignPreview();
   });
   document.querySelectorAll('#dp-type button').forEach(function (b) {
     b.addEventListener('click', function () {
       document.querySelectorAll('#dp-type button').forEach(function (x) { x.classList.remove('on'); });
-      b.classList.add('on');
-      document.getElementById('dp-flip-field').classList.toggle('hidden', designType() !== 'both');
-      renderDesignPreview();
-    });
-  });
-  document.querySelectorAll('#dp-flip button').forEach(function (b) {
-    b.addEventListener('click', function () {
-      document.querySelectorAll('#dp-flip button').forEach(function (x) { x.classList.remove('on'); });
       b.classList.add('on');
       renderDesignPreview();
     });
@@ -633,7 +596,7 @@
   document.getElementById('design-print-modal').addEventListener('click', function (e) {
     if (e.target === this) this.classList.add('hidden');
   });
-  window.__designPrint = { cloneSlots: cloneSlots, flipSlot: flipSlot, designType: designType, designFlip: designFlip, designSlotsForSide: designSlotsForSide, buildDesignPrintHTML: buildDesignPrintHTML, printDesignSheet: printDesignSheet };
+  window.__designPrint = { cloneSlots: cloneSlots, designType: designType, buildDesignPrintHTML: buildDesignPrintHTML, printDesignSheet: printDesignSheet };
 
   // ── slot inspector inputs ─────────────────────────────
   ['slot-x', 'slot-y', 'slot-w', 'slot-h', 'slot-rot'].forEach(function (id) {
@@ -873,6 +836,17 @@
     renderPreview();
     renderA4Stage();
   });
+  function syncTextColorSelect() {
+    document.getElementById('text-color').value = cal().textColor === 'white' ? 'white' : 'black';
+  }
+  document.getElementById('text-color').addEventListener('change', function () {
+    var c = cal();
+    c.textColor = this.value;
+    R.setCalibration(c);
+    R.injectCSS(document, true);
+    renderPreview();
+    renderA4Stage();
+  });
 
   // ── Mode B save / reset / print ───────────────────────
   document.getElementById('save-btn').addEventListener('click', function () {
@@ -889,6 +863,7 @@
     document.getElementById('reset-modal').classList.add('hidden');
     R.resetCalibration();
     selectElement(null);
+    syncTextColorSelect();
     renderPreview();
     renderA4Stage();
     toast('تمت إعادة الوضع الافتراضي');
@@ -932,6 +907,7 @@
   buildA4Rulers();
   buildRulers();
   renderA4Stage();
+  syncTextColorSelect();
   renderPreview();
 })();
 </script>
