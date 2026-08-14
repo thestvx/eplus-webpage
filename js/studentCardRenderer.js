@@ -59,7 +59,12 @@ const StudentCardRenderer = (function () {
     label:  { fontSize: 2.2, gap: 0.7, maxWidth: 42 },
     qr:     { x: 6.5, y: 5.0, w: 15, h: 15 },
     bc:     { x: 23.5, y: 39.08, w: null, h: null },
-    textColor: 'black'
+    textColor: 'black',
+    // Independent background rectangles behind the QR and the barcode.
+    // Calibrated in the CARD section (not per A4 slot); z-order: design →
+    // rectangle → QR/barcode. mm coordinates.
+    qrBg: { x: 4.3, y: 2.8, w: 19.4, h: 19.4, color: '#ffffff', radius: 2.0, z: 0 },
+    bcBg: { x: 21.3, y: 38.6, w: 43.0, h: 15.38, color: '#ffffff', radius: 1.6, z: 0 }
   };
 
   // ── Calibration storage (shared by every page of the site) ──
@@ -79,22 +84,25 @@ const StudentCardRenderer = (function () {
   function _merge(saved) {
     const cal = _clone(CAL_DEFAULTS);
     if (saved && typeof saved === 'object') {
-      ['name', 'id', 'stream', 'date', 'label', 'qr', 'bc'].forEach(k => {
+      ['name', 'id', 'stream', 'date', 'label', 'qr', 'bc', 'qrBg', 'bcBg'].forEach(k => {
         const v = saved[k];
         if (v && typeof v === 'object') {
-          ['x', 'y', 'w', 'h', 'fontSize', 'gap', 'maxWidth'].forEach(p => {
+          ['x', 'y', 'w', 'h', 'fontSize', 'gap', 'maxWidth', 'radius', 'z'].forEach(p => {
             if (typeof v[p] === 'number' && isFinite(v[p])) cal[k][p] = v[p];
           });
+          if (typeof v.color === 'string' && /^#([0-9a-fA-F]{3,8})$/.test(v.color)) cal[k].color = v.color;
         }
       });
       if (saved.textColor === 'white' || saved.textColor === 'black') cal.textColor = saved.textColor;
     }
-    ['name', 'id', 'stream', 'date', 'qr', 'bc'].forEach(k => {
+    ['name', 'id', 'stream', 'date', 'qr', 'bc', 'qrBg', 'bcBg'].forEach(k => {
       cal[k].x = Math.min(Math.max(0, cal[k].x), CARD_W_MM);
       cal[k].y = Math.min(Math.max(0, cal[k].y), CARD_H_MM);
       if (cal[k].w !== null && cal[k].w !== undefined) cal[k].w = Math.min(Math.max(1, cal[k].w), CARD_W_MM);
       if (cal[k].h !== null && cal[k].h !== undefined) cal[k].h = Math.min(Math.max(1, cal[k].h), CARD_H_MM);
       if (cal[k].fontSize !== undefined) cal[k].fontSize = Math.min(Math.max(1, cal[k].fontSize), 12);
+      if (cal[k].radius !== undefined) cal[k].radius = Math.min(Math.max(0, cal[k].radius), 20);
+      if (cal[k].z !== undefined) cal[k].z = Math.min(Math.max(-10, cal[k].z), 10);
     });
     cal.label.fontSize = Math.min(Math.max(1, cal.label.fontSize), 8);
     cal.label.gap = Math.min(Math.max(0, cal.label.gap), 5);
@@ -280,21 +288,15 @@ const StudentCardRenderer = (function () {
   // scope (optional) prefixes every selector so a second data layer can
   // coexist with the card-scale one (A4 sheet editor / admin A4 preview).
   //
-  // WHITE FRAMES (added on top of the calibration, never part of it):
-  //  • QR and barcode each get a real white rounded rectangle with padding,
-  //    so no card design shows behind them and they scan reliably.
+  // WHITE FRAMES (replaced by the calibratable background rectangles below):
+  //  • QR and barcode each get a real coloured rectangle (default white) with
+  //    configurable x/y/w/h/color/radius/z, calibrated in the CARD section.
+  //    They sit BEHIND the QR/barcode only — never behind the student text.
   //  • The student text rows (name / Student ID / stream / date) stay PURE
   //    TEXT — no background, no border, no card behind them.
-  // Frames expand AROUND the calibrated boxes (negative inset on a ::before),
-  // so the calibrated element coordinates stay untouched and completely
-  // independent of the stored calibration values.
   const TEXT_COLORS = {
     black: { color: '#0b1b3f', shadow: '0 0 1.5px rgba(255,255,255,0.85)', stroke: 'rgba(255,255,255,0.9)' },
     white: { color: '#ffffff', shadow: '0 0 1.5px rgba(0,0,0,0.6)', stroke: '#0b1b3f' }
-  };
-  const PANEL = {
-    qrPad: 2.2, qrR: 2.0,
-    bcPadX: 2.2, bcPadY: 1.0, bcR: 1.6
   };
   function dlRules(unit, sx, sy, scope) {
     const sc = scope ? scope + ' ' : '';
@@ -305,7 +307,7 @@ const StudentCardRenderer = (function () {
     const sw = unit === 'px' ? '1.4px' : '0.3mm';
     return `
 ${sc}.ec-dl{position:absolute;inset:0;direction:rtl;text-align:right}
-${sc}.ec-dl-row{position:absolute;text-align:right;max-width:${X(CAL.label.maxWidth)}}
+${sc}.ec-dl-row{position:absolute;text-align:right;max-width:${X(CAL.label.maxWidth)};z-index:1}
 ${sc}.ec-dl-label{display:block;font-weight:700;line-height:1.2;color:${tc.color};text-shadow:${tc.shadow};-webkit-text-stroke:${sw} ${tc.stroke};paint-order:stroke fill}
 ${sc}.ec-dl-value{display:block;font-weight:900;line-height:1.28;color:${tc.color};text-shadow:${tc.shadow};-webkit-text-stroke:${sw} ${tc.stroke};paint-order:stroke fill}
 ${sc}.ec-dl-value.id{font-family:'Courier New',monospace;font-weight:800;letter-spacing:0.5px}
@@ -318,11 +320,11 @@ ${sc}.ec-dl-r1 .ec-dl-value{font-size:${X(CAL.name.fontSize)}}
 ${sc}.ec-dl-r2 .ec-dl-value{font-size:${X(CAL.id.fontSize)}}
 ${sc}.ec-dl-r3 .ec-dl-value{font-size:${X(CAL.stream.fontSize)}}
 ${sc}.ec-dl-r4 .ec-dl-value{font-size:${X(CAL.date.fontSize)}}
-${sc}.ec-dl-qr{position:absolute;left:${X(CAL.qr.x)};top:${Y(CAL.qr.y)};width:${X(CAL.qr.w)};height:${Y(CAL.qr.h)};display:flex;align-items:center;justify-content:center;background:#ffffff}
-${sc}.ec-dl-qr::before{content:'';position:absolute;inset:-${Y(PANEL.qrPad)} -${X(PANEL.qrPad)};background:#ffffff;border-radius:${Y(PANEL.qrR)};z-index:0;pointer-events:none}
+${sc}.ec-dl-qrbg{position:absolute;left:${X(CAL.qrBg.x)};top:${Y(CAL.qrBg.y)};width:${X(CAL.qrBg.w)};height:${Y(CAL.qrBg.h)};background:${CAL.qrBg.color};border-radius:${Y(CAL.qrBg.radius)};z-index:${CAL.qrBg.z}}
+${sc}.ec-dl-bcbg{position:absolute;left:${X(CAL.bcBg.x)};top:${Y(CAL.bcBg.y)};width:${X(CAL.bcBg.w)};height:${Y(CAL.bcBg.h)};background:${CAL.bcBg.color};border-radius:${Y(CAL.bcBg.radius)};z-index:${CAL.bcBg.z}}
+${sc}.ec-dl-qr{position:absolute;left:${X(CAL.qr.x)};top:${Y(CAL.qr.y)};width:${X(CAL.qr.w)};height:${Y(CAL.qr.h)};display:flex;align-items:center;justify-content:center;z-index:2}
 ${sc}.ec-dl-qr img,${sc}.ec-dl-qr canvas{width:100%!important;height:100%!important;position:relative;z-index:1}
-${sc}.ec-dl-bc{position:absolute;left:${X(CAL.bc.x)};top:${Y(CAL.bc.y)};width:${X(box.w)};height:${Y(box.h)};display:flex;align-items:center;justify-content:center;background:#ffffff}
-${sc}.ec-dl-bc::before{content:'';position:absolute;inset:-${Y(PANEL.bcPadY)} -${X(PANEL.bcPadX)};background:#ffffff;border-radius:${Y(PANEL.bcR)};z-index:0;pointer-events:none}
+${sc}.ec-dl-bc{position:absolute;left:${X(CAL.bc.x)};top:${Y(CAL.bc.y)};width:${X(box.w)};height:${Y(box.h)};display:flex;align-items:center;justify-content:center;z-index:2}
 ${sc}.ec-dl-bc svg{width:${X(box.w)}!important;height:${Y(box.h)}!important;max-width:none;display:block;position:relative;z-index:1}
 `;
   }
@@ -368,7 +370,9 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
       <div class="ec-dl-row ec-dl-r2" data-cal="id"><span class="ec-dl-label">Student ID</span><span class="ec-dl-value id">${r.id || ''}</span></div>
       ${streamRow}
       <div class="ec-dl-row ec-dl-r4" data-cal="date"><span class="ec-dl-label">تاريخ التسجيل</span><span class="ec-dl-value date">${regDate(r)}</span></div>
+      <div class="ec-dl-qrbg" data-cal="qrbg"></div>
       <div class="ec-dl-qr" data-ec-role="qr" data-cal="qr"></div>
+      <div class="ec-dl-bcbg" data-cal="bcbg"></div>
       <div class="ec-dl-bc" data-ec-role="barcode" data-cal="barcode"></div>
     </div>`;
   }
@@ -451,6 +455,8 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     });
     s += `<div class="ec-g-box" style="left:${P(CAL.qr.x)};top:${P(CAL.qr.y)};width:${P(CAL.qr.w)};height:${P(CAL.qr.h)}"></div>`;
     s += `<div class="ec-g-box" style="left:${P(CAL.bc.x)};top:${P(CAL.bc.y)};width:${P(box.w)};height:${P(box.h)}"></div>`;
+    s += `<div class="ec-g-rect" style="left:${P(CAL.qrBg.x)};top:${P(CAL.qrBg.y)};width:${P(CAL.qrBg.w)};height:${P(CAL.qrBg.h)};background:${CAL.qrBg.color}"></div>`;
+    s += `<div class="ec-g-rect" style="left:${P(CAL.bcBg.x)};top:${P(CAL.bcBg.y)};width:${P(CAL.bcBg.w)};height:${P(CAL.bcBg.h)};background:${CAL.bcBg.color}"></div>`;
     s += '</div>';
     return s;
   }
@@ -464,6 +470,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 .ec-grid .ec-g-maj{opacity:0.35}
 .ec-grid .ec-g-data{background:#d32f2f;opacity:0.95;height:0.3mm;width:0.3mm}
 .ec-grid .ec-g-box{position:absolute;border:0.2mm solid #d32f2f;background:none}
+.ec-grid .ec-g-rect{position:absolute;opacity:0.40;border:0.2mm solid #d32f2f;box-sizing:border-box}
 `;
 
   // ── Public API ─────────────────────────────────────────
@@ -497,7 +504,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=8"><\/script>
+<script src="js/studentCardRenderer.js?v=9"><\/script>
 </head><body>
 <div class="ec-data-layer">${dataLayerHTML(r)}${grid}</div>
 <script>
@@ -542,7 +549,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </head><body>
   <div class="wrap"><div class="cap">${value}</div><div id="bc"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=8"></script>
+<script src="js/studentCardRenderer.js?v=9"></script>
 <script>
   (function () {
     var value = '${value}';
@@ -627,11 +634,12 @@ ${A4_GRID_CSS}`;
   // the print PREVIEW looks exactly like the finished sheet (design + data);
   // the actual print emits just the transparent data layer. If the saved
   // sheet layout (or opts.flip) has a flip method, the chosen slot is first
-  // mirrored to the back-of-sheet feed coordinates so the data lands on the
-  // back of the correct card, and the content is pre-mirrored to read
-  // correctly after the physical flip.
+  // mirrored to the back-of-sheet feed coordinates (x = 210−x−w / y = 297−y−h)
+  // so the data lands on the back of the correct card. The content is NOT
+  // mirrored: paper alignment comes from the slot position transform only,
+  // and the image/data keep their natural orientation (right stays right).
   function buildA4PrintHTML(r, slotIndex, opts) {
-    const sheet = getSheetLayout();
+    const sheet = (opts && opts.sheet) || getSheetLayout();
     if (!sheet || !sheet.slots || !sheet.slots[slotIndex]) return null;
     let slot = sheet.slots[slotIndex];
     const flip = (opts && opts.flip) || sheet.flip || null;
@@ -639,8 +647,6 @@ ${A4_GRID_CSS}`;
     const data = JSON.stringify(r).replace(/<\//g, '<\\/');
     const g = a4DataGeom(slot);
     const sc = g.sc;
-    const mirror = flip === 'long' ? 'scaleX(-1)' : flip === 'short' ? 'scaleY(-1)' : '';
-    const innerStyle = mirror ? ' style="transform:' + mirror + ';transform-origin:50% 50%"' : '';
     const ghostStyle = a4DataStyle(slot, 'mm', 1);
     return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>بطاقة الطالب - ${fullName(r)}</title>
 <style>
@@ -650,7 +656,6 @@ ${A4_GRID_CSS}`;
   @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } .ec-a4-ghost { display: none !important; } }
   .ec-a4 { position: relative; width: ${A4_W_MM}mm; height: ${A4_H_MM}mm; overflow: hidden; }
   .ec-a4-slot { position: absolute; transform-origin: 0 0; }
-  .ec-a4-inner { position: absolute; inset: 0; }
   .ec-a4-ghost { position: absolute; overflow: hidden; }
   .ec-a4-ghost img { width: 100%; height: 100%; object-fit: contain; display: block; }
   .ec-a4-data { position: absolute; }
@@ -658,14 +663,12 @@ ${A4_GRID_CSS}`;
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=8"><\/script>
+<script src="js/studentCardRenderer.js?v=9"><\/script>
 </head><body>
 <div class="ec-a4">
   <div class="ec-a4-slot" style="${a4SlotStyle(slot, 'mm', 1)}">
-    <div class="ec-a4-inner"${innerStyle}>
-      <div class="ec-a4-ghost" style="${ghostStyle}"><img src="${BACK_IMG}" alt=""></div>
-      <div class="ec-a4-data" style="${ghostStyle}">${dataLayerHTML(r)}</div>
-    </div>
+    <div class="ec-a4-ghost" style="${ghostStyle}"><img src="${BACK_IMG}" alt=""></div>
+    <div class="ec-a4-data" style="${ghostStyle}">${dataLayerHTML(r)}</div>
   </div>
 </div>
 <script>

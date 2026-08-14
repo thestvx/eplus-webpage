@@ -54,6 +54,7 @@
   .ec-grid .ec-g-data.ec-g-h { height: 2px; }
   .ec-grid .ec-g-data.ec-g-v { width: 2px; }
   .ec-grid .ec-g-box { position: absolute; border: 2px solid #d32f2f; background: none; }
+  .ec-grid .ec-g-rect { position: absolute; opacity: 0.40; border: 2px solid #d32f2f; box-sizing: border-box; }
   /* ── A4 stage + slots ── */
   .a4-ruler-area { display: inline-flex; flex-direction: column; align-items: flex-start; }
   .a4-ruler { position: relative; background: #fff; }
@@ -231,9 +232,13 @@
       <label id="insp-w-label" class="hidden">العرض (مم) <input id="insp-w" type="number" step="0.1"></label>
       <label id="insp-h-label" class="hidden">الارتفاع (مم) <input id="insp-h" type="number" step="0.1"></label>
       <label id="insp-fs-label" class="hidden">حجم الخط <input id="insp-fs" type="number" step="0.1"></label>
+      <label id="insp-color-label" class="hidden">اللون <input id="insp-color" type="color" value="#ffffff"></label>
+      <label id="insp-r-label" class="hidden">نصف قطر الزوايا (مم) <input id="insp-r" type="number" step="0.1" min="0"></label>
+      <label id="insp-z-label" class="hidden">الطبقة Z (من -10 إلى 10) <input id="insp-z" type="number" step="1" min="-10" max="10"></label>
       <button id="insp-auto" class="auto-link hidden">↺ العرض والارتفاع تلقائي (مطابقة المعيار)</button>
     </div>
     <div class="insp-hint">
+      مستطيلات <b>خلفية رمز QR</b> و <b>خلفية الباركود</b>: تُضبط هنا (الموضع/الحجم/اللون/الزوايا/الطبقة Z) وتُطبع خلف الرمز فقط داخل كل بطاقة — لا تُطبع فوق نص الطالب أبداً.
       مفاتيح الأسهم: تحريك <kbd>0.1</kbd>مم — <kbd>Shift</kbd> + سهم: <kbd>1</kbd>مم — <kbd>Esc</kbd>: إلغاء الاختيار
     </div>
     <div class="label-settings">
@@ -292,7 +297,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=8"></script>
+<script src="js/studentCardRenderer.js?v=9"></script>
 <script>
 (function () {
   var R = window.StudentCardRenderer;
@@ -307,7 +312,7 @@
   var RECORD = { id: 297, first_name: 'الطالب', last_name: 'التجريبي', stream: STREAM,
     created_at: new Date().toISOString(), barcode_value: '6130274000001', student_token: 'calib-test-2026' };
 
-  var NAME_MAP = { name: 'الاسم الكامل', id: 'Student ID', stream: 'الشعبة', date: 'تاريخ التسجيل', qr: 'رمز QR', bc: 'الباركود' };
+  var NAME_MAP = { name: 'الاسم الكامل', id: 'Student ID', stream: 'الشعبة', date: 'تاريخ التسجيل', qr: 'رمز QR', bc: 'الباركود', qrBg: 'خلفية رمز QR (المستطيل)', bcBg: 'خلفية الباركود (المستطيل)' };
   var ROW_KEYS = { name: true, id: true, stream: true, date: true };
   var SELECTED = null;      // Mode B data element
   var SEL_SLOT = null;      // Mode A slot index
@@ -319,7 +324,13 @@
 
   function clamp(v, lo, hi) { return Math.min(Math.max(v, lo), hi); }
   function round2(x) { return Math.round(x * 100) / 100; }
-  function keyOf(el) { var k = el.getAttribute('data-cal'); return k === 'barcode' ? 'bc' : k; }
+  function keyOf(el) {
+    var k = el.getAttribute('data-cal');
+    if (k === 'barcode') return 'bc';
+    if (k === 'qrbg') return 'qrBg';
+    if (k === 'bcbg') return 'bcBg';
+    return k;
+  }
   function cal() { return R.getCalibration(); }
   function showField(id, show) { var el = document.getElementById(id); if (el) el.classList.toggle('hidden', !show); }
   function toast(msg) {
@@ -529,11 +540,12 @@
   // BOTH faces always use the SAME saved CARD_SLOTS (front coordinates). The
   // BACK face only applies the saved flip transform (long = x mirrored,
   // short = y mirrored) so Back #N lands exactly BEHIND Front #N after the
-  // sheet is flipped and re-fed.
+  // sheet is flipped and re-fed. The image/content is NOT mirrored — paper
+  // alignment comes from the slot position transform only, and the design
+  // keeps its natural orientation (right stays right).
   function cloneSlots() { return SLOTS.map(function (s) { return { x: s.x, y: s.y, w: s.w, h: s.h, rot: s.rot || 0 }; }); }
   function designType() { return document.querySelector('#dp-type button.on').getAttribute('data-v'); }
   function designFlip() { return document.getElementById('flip-method').value; }
-  function mirrorCSS() { return designFlip() === 'long' ? 'scaleX(-1)' : 'scaleY(-1)'; }
   function slotsForSide(side) {
     var slots = cloneSlots();
     if (side === 'back') slots = slots.map(function (s) { return R.flipSlot(s, designFlip()); });
@@ -543,16 +555,15 @@
     return 'left:' + s.x + 'mm;top:' + s.y + 'mm;width:' + s.w + 'mm;height:' + s.h + 'mm;transform:rotate(' + (s.rot || 0) + 'deg);transform-origin:0 0';
   }
   function buildDesignPrintHTML(type) {
-    var page = function (slots, img, mirror) {
+    var page = function (slots, img) {
       return '<div class="ds-page">' + slots.map(function (s) {
-        var m = mirror ? ' style="transform:' + mirror + ';transform-origin:50% 50%"' : '';
-        return '<div class="ds-slot" style="' + dsSlotStyle(s) + '"><img src="' + img + '" alt=""' + m + '></div>';
+        return '<div class="ds-slot" style="' + dsSlotStyle(s) + '"><img src="' + img + '" alt=""></div>';
       }).join('') + '</div>';
     };
     var pages = '';
-    if (type === 'front' || type === 'both') pages += page(slotsForSide('front'), FRONT_IMG, '');
-    if (type === 'back') pages += page(slotsForSide('back'), BACK_IMG, mirrorCSS());
-    else if (type === 'both') pages += page(slotsForSide('back'), BACK_IMG, mirrorCSS());
+    if (type === 'front' || type === 'both') pages += page(slotsForSide('front'), FRONT_IMG);
+    if (type === 'back') pages += page(slotsForSide('back'), BACK_IMG);
+    else if (type === 'both') pages += page(slotsForSide('back'), BACK_IMG);
     return '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تصاميم البطاقات - ورقة A4</title><style>' +
       '@page { size: ' + A4_W_MM + 'mm ' + A4_H_MM + 'mm; margin: 0; }' +
       'html, body { margin: 0; padding: 0; background: #fff; }' +
@@ -564,11 +575,10 @@
       '.ds-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }' +
       '</style></head><body>' + pages + '</body></html>';
   }
-  function designPagePreviewHTML(slots, img, scale, label, mirror) {
+  function designPagePreviewHTML(slots, img, scale, label) {
     var W = Math.round(A4_W_MM * scale), H = Math.round(A4_H_MM * scale);
     var slotsHtml = slots.map(function (s, i) {
-      var m = mirror ? ' style="transform:' + mirror + ';transform-origin:50% 50%"' : '';
-      return '<div class="ds-slot" style="left:' + (s.x * scale) + 'px;top:' + (s.y * scale) + 'px;width:' + (s.w * scale) + 'px;height:' + (s.h * scale) + 'px;transform:rotate(' + (s.rot || 0) + 'deg);transform-origin:0 0"><img src="' + img + '" alt=""' + m + '><span class="ds-num">' + (i + 1) + '</span></div>';
+      return '<div class="ds-slot" style="left:' + (s.x * scale) + 'px;top:' + (s.y * scale) + 'px;width:' + (s.w * scale) + 'px;height:' + (s.h * scale) + 'px;transform:rotate(' + (s.rot || 0) + 'deg);transform-origin:0 0"><img src="' + img + '" alt=""><span class="ds-num">' + (i + 1) + '</span></div>';
     }).join('');
     return '<div class="dp-page-box"><div class="dp-page-label">' + label + '</div><div class="dp-page" style="width:' + W + 'px;height:' + H + 'px">' + slotsHtml + '</div></div>';
   }
@@ -578,9 +588,9 @@
     var scale = 1.3;
     var flipLabel = designFlip() === 'long' ? 'قلب على الحافة الطويلة' : 'قلب على الحافة القصيرة';
     var html = '';
-    if (type === 'front' || type === 'both') html += designPagePreviewHTML(slotsForSide('front'), FRONT_IMG, scale, 'الصفحة 1 — الوجه الأمامي (بطاقة ' + SLOTS.length + ' × ' + SLOTS.length + ')', '');
-    if (type === 'back') html += designPagePreviewHTML(slotsForSide('back'), BACK_IMG, scale, 'الصفحة 1 — الوجه الخلفي بعد القلب (' + flipLabel + ')', mirrorCSS());
-    else if (type === 'both') html += designPagePreviewHTML(slotsForSide('back'), BACK_IMG, scale, 'الصفحة 2 — الوجه الخلفي بعد القلب (' + flipLabel + ')', mirrorCSS());
+    if (type === 'front' || type === 'both') html += designPagePreviewHTML(slotsForSide('front'), FRONT_IMG, scale, 'الصفحة 1 — الوجه الأمامي (بطاقة ' + SLOTS.length + ' × ' + SLOTS.length + ')');
+    if (type === 'back') html += designPagePreviewHTML(slotsForSide('back'), BACK_IMG, scale, 'الصفحة 1 — الوجه الخلفي بعد القلب (' + flipLabel + ')');
+    else if (type === 'both') html += designPagePreviewHTML(slotsForSide('back'), BACK_IMG, scale, 'الصفحة 2 — الوجه الخلفي بعد القلب (' + flipLabel + ')');
     box.innerHTML = html;
   }
   function printDesignSheet() {
@@ -631,7 +641,7 @@
   document.getElementById('design-print-modal').addEventListener('click', function (e) {
     if (e.target === this) this.classList.add('hidden');
   });
-  window.__designPrint = { cloneSlots: cloneSlots, designType: designType, designFlip: designFlip, mirrorCSS: mirrorCSS, slotsForSide: slotsForSide, buildDesignPrintHTML: buildDesignPrintHTML, printDesignSheet: printDesignSheet };
+  window.__designPrint = { cloneSlots: cloneSlots, designType: designType, designFlip: designFlip, slotsForSide: slotsForSide, buildDesignPrintHTML: buildDesignPrintHTML, printDesignSheet: printDesignSheet };
 
   // ── slot inspector inputs ─────────────────────────────
   ['slot-x', 'slot-y', 'slot-w', 'slot-h', 'slot-rot'].forEach(function (id) {
@@ -721,6 +731,7 @@
       showField('insp-x-label', false); showField('insp-y-label', false);
       showField('insp-w-label', false); showField('insp-h-label', false);
       showField('insp-fs-label', false); showField('insp-auto', false);
+      showField('insp-color-label', false); showField('insp-r-label', false); showField('insp-z-label', false);
       return;
     }
     var k = SELECTED, v = cal()[k];
@@ -728,6 +739,7 @@
     title.style.color = '#b3362f';
     var box = R.bcBox();
     var isRow = !!ROW_KEYS[k];
+    var isRect = k === 'qrBg' || k === 'bcBg';
     showField('insp-x-label', true); showField('insp-y-label', true);
     document.getElementById('insp-x').value = round2(v.x);
     document.getElementById('insp-y').value = round2(v.y);
@@ -742,6 +754,14 @@
     showField('insp-fs-label', isRow);
     if (isRow) document.getElementById('insp-fs').value = round2(v.fontSize);
     showField('insp-auto', k === 'bc');
+    showField('insp-color-label', isRect);
+    showField('insp-r-label', isRect);
+    showField('insp-z-label', isRect);
+    if (isRect) {
+      document.getElementById('insp-color').value = v.color;
+      document.getElementById('insp-r').value = round2(v.radius);
+      document.getElementById('insp-z').value = Math.round(v.z);
+    }
   }
   function syncLabelSettings() {
     var l = cal().label;
@@ -813,7 +833,7 @@
   });
 
   // ── Mode B inspector inputs ───────────────────────────
-  ['insp-x', 'insp-y', 'insp-w', 'insp-h', 'insp-fs'].forEach(function (id) {
+  ['insp-x', 'insp-y', 'insp-w', 'insp-h', 'insp-fs', 'insp-r', 'insp-z'].forEach(function (id) {
     document.getElementById(id).addEventListener('input', function () {
       if (!SELECTED) return;
       var k = SELECTED;
@@ -825,8 +845,17 @@
       else if (id === 'insp-w') patch.w = clamp(raw, 1, CARD_W_MM);
       else if (id === 'insp-h') patch.h = clamp(raw, 1, CARD_H_MM);
       else if (id === 'insp-fs') patch.fontSize = clamp(raw, 1, 12);
+      else if (id === 'insp-r') patch.radius = clamp(raw, 0, 20);
+      else if (id === 'insp-z') patch.z = clamp(Math.round(raw), -10, 10);
       if (Object.keys(patch).length) applyCal(k, patch);
     });
+  });
+  document.getElementById('insp-color').addEventListener('input', function () {
+    if (!SELECTED) return;
+    var k = SELECTED;
+    if (k !== 'qrBg' && k !== 'bcBg') return;
+    if (!/^#[0-9a-fA-F]{6}$/.test(this.value)) return;
+    applyCal(k, { color: this.value });
   });
   document.getElementById('insp-auto').addEventListener('click', function () {
     if (SELECTED !== 'bc') return;

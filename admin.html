@@ -11,7 +11,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
   <script src="js/ean13.js"></script>
-  <script src="js/studentCardRenderer.js?v=8"></script>
+  <script src="js/studentCardRenderer.js?v=9"></script>
   <script src="js/registrationService.js?v=4"></script>
   <script src="js/subjectService.js?v=4"></script>
   <script src="js/attendanceService.js?v=2"></script>
@@ -2985,6 +2985,7 @@
           </div>
           <div class="teacher-modal-body" style="padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px">
             <div id="sr-slot-map" style="position:relative;width:210px;height:297px;background:#fff;border:2px solid var(--border);border-radius:8px;overflow:hidden;direction:ltr;box-shadow:0 4px 16px rgba(0,0,0,.08)"></div>
+            <div id="sr-slot-warn" class="hidden" style="font-size:11.5px;color:#b45309;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-weight:800;text-align:center;max-width:380px">⚠️ لا توجد مواضع محفوظة لورقة A4 — تستخدم الشبكة الافتراضية (8 بطاقات). لضبط المواضع بدقة افتح <b>calibration-print.html</b> وحدد مواضع البطاقات واحفظها.</div>
             <div style="font-size:11.5px;color:var(--text-muted);font-weight:700;text-align:center">المواضع محفوظة من صفحة معايرة A4 (calibration-print.html). اضغط على موضع البطاقة ثم اطبع.</div>
           </div>
           <div style="padding:0 24px 20px;display:flex;gap:10px;justify-content:center">
@@ -23078,6 +23079,7 @@ let srSortDir = 'asc';
 let srConfirmTarget = null;
 let srCurrentCard = null;
 let srSelectedSlotIndex = 0;
+let srActiveLayout = null;
 
 async function srFetch(url, options) {
   return fetch(url, {
@@ -23461,13 +23463,17 @@ function srPrintCard() {
   const r = srCurrentCard;
   if (!r) return;
   const layout = StudentCardRenderer.getSheetLayout();
+  const warn = document.getElementById('sr-slot-warn');
   if (!layout || !layout.slots || !layout.slots.length) {
-    srLegacyPrintCard(r);
-    return;
+    srActiveLayout = { slots: StudentCardRenderer.defaultSlotGrid(2, 4), flip: null };
+    if (warn) warn.classList.remove('hidden');
+  } else {
+    srActiveLayout = layout;
+    if (warn) warn.classList.add('hidden');
   }
   srSelectedSlotIndex = 0;
   const map = document.getElementById('sr-slot-map');
-  map.innerHTML = layout.slots.map((s, i) =>
+  map.innerHTML = srActiveLayout.slots.map((s, i) =>
     `<button type="button" class="sr-slot-cell${i === 0 ? ' slot-active' : ''}" data-i="${i}" onclick="srPickSlot(${i})" style="left:${s.x}px;top:${s.y}px;width:${s.w}px;height:${s.h}px;transform:rotate(${s.rot || 0}deg);transform-origin:0 0">${i + 1}</button>`
   ).join('');
   document.getElementById('sr-slot-modal').classList.add('open');
@@ -23490,7 +23496,7 @@ function srPrintSelectedSlot() {
 }
 
 function srPrintToSlot(r, slotIndex) {
-  const html = StudentCardRenderer.buildA4PrintHTML(r, slotIndex);
+  const html = StudentCardRenderer.buildA4PrintHTML(r, slotIndex, { sheet: srActiveLayout });
   if (!html) { srShowToast('تعذر تجهيز طباعة A4، تأكد من المواضع المحفوظة', 'error'); return; }
   const win = window.open('', '_blank', 'width=900,height=650');
   if (!win) { srShowToast('الرجاء السماح بالنوافذ المنبثقة لطباعة البطاقة', 'error'); return; }
