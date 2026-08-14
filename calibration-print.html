@@ -201,6 +201,7 @@
     <button id="design-btn" class="on">🪞 إظهار التصميم المطبوع</button>
     <button id="grid-btn" class="on">📏 شبكة المعايرة</button>
     <button id="ruler-btn" class="on">📐 المسطرة</button>
+    <button id="add-shape-btn">➕ إضافة شكل (مربع/مستطيل)</button>
     <span class="spacer"></span>
     <button id="print-cal-btn">🖨️ طباعة طبقة البيانات + الشبكة</button>
     <button id="reset-btn" class="danger">إعادة الوضع الافتراضي</button>
@@ -236,6 +237,7 @@
       <label id="insp-r-label" class="hidden">نصف قطر الزوايا (مم) <input id="insp-r" type="number" step="0.1" min="0"></label>
       <label id="insp-z-label" class="hidden">الطبقة Z (من -10 إلى 10) <input id="insp-z" type="number" step="1" min="-10" max="10"></label>
       <button id="insp-auto" class="auto-link hidden">↺ العرض والارتفاع تلقائي (مطابقة المعيار)</button>
+      <button id="insp-del-shape" class="auto-link danger hidden">✕ حذف الشكل</button>
     </div>
     <div class="insp-hint">
       مستطيلات <b>خلفية رمز QR</b> و <b>خلفية الباركود</b>: تُضبط هنا (الموضع/الحجم/اللون/الزوايا/الطبقة Z) وتُطبع خلف الرمز فقط داخل كل بطاقة — لا تُطبع فوق نص الطالب أبداً.
@@ -297,7 +299,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=9"></script>
+<script src="js/studentCardRenderer.js?v=10"></script>
 <script>
 (function () {
   var R = window.StudentCardRenderer;
@@ -330,6 +332,14 @@
     if (k === 'qrbg') return 'qrBg';
     if (k === 'bcbg') return 'bcBg';
     return k;
+  }
+  function isShapeKey(k) { return typeof k === 'string' && /^shape\d+$/.test(k); }
+  function shapeIndex(k) { return isShapeKey(k) ? parseInt(k.slice(5), 10) : -1; }
+  function selectedValue(k) {
+    k = k || SELECTED;
+    if (!k) return null;
+    if (isShapeKey(k)) return cal().shapes[shapeIndex(k)] || null;
+    return cal()[k];
   }
   function cal() { return R.getCalibration(); }
   function showField(id, show) { var el = document.getElementById(id); if (el) el.classList.toggle('hidden', !show); }
@@ -689,7 +699,13 @@
   // ── Mode B: preview card (data elements) ──────────────
   function applyCal(key, patch) {
     var c = cal();
-    c[key] = Object.assign({}, c[key], patch);
+    if (isShapeKey(key)) {
+      var i = shapeIndex(key);
+      if (!c.shapes[i]) return;
+      c.shapes[i] = Object.assign({}, c.shapes[i], patch);
+    } else {
+      c[key] = Object.assign({}, c[key], patch);
+    }
     R.setCalibration(c);
     R.injectCSS(document, true);
     refreshGrid();
@@ -732,14 +748,16 @@
       showField('insp-w-label', false); showField('insp-h-label', false);
       showField('insp-fs-label', false); showField('insp-auto', false);
       showField('insp-color-label', false); showField('insp-r-label', false); showField('insp-z-label', false);
+      showField('insp-del-shape', false);
       return;
     }
-    var k = SELECTED, v = cal()[k];
-    title.textContent = NAME_MAP[k] || k;
+    var k = SELECTED, v = selectedValue(k);
+    if (!v) return;
+    title.textContent = isShapeKey(k) ? 'شكل (مربع/مستطيل) #' + (shapeIndex(k) + 1) : (NAME_MAP[k] || k);
     title.style.color = '#b3362f';
     var box = R.bcBox();
     var isRow = !!ROW_KEYS[k];
-    var isRect = k === 'qrBg' || k === 'bcBg';
+    var isRect = k === 'qrBg' || k === 'bcBg' || isShapeKey(k);
     showField('insp-x-label', true); showField('insp-y-label', true);
     document.getElementById('insp-x').value = round2(v.x);
     document.getElementById('insp-y').value = round2(v.y);
@@ -762,6 +780,7 @@
       document.getElementById('insp-r').value = round2(v.radius);
       document.getElementById('insp-z').value = Math.round(v.z);
     }
+    showField('insp-del-shape', isShapeKey(k));
   }
   function syncLabelSettings() {
     var l = cal().label;
@@ -777,7 +796,8 @@
     if (!t) { selectElement(null); return; }
     var k = keyOf(t);
     selectElement(k);
-    var v = cal()[k];
+    var v = selectedValue(k);
+    if (!v) return;
     dragging = { key: k, px: e.clientX, py: e.clientY, x: v.x, y: v.y };
     try { t.setPointerCapture(e.pointerId); } catch (err) {}
     e.preventDefault();
@@ -823,7 +843,8 @@
       applySlotEl(SEL_SLOT);
       updateSlotInspector();
     } else if (SELECTED) {
-      var v = cal()[SELECTED];
+      var v = selectedValue(SELECTED);
+      if (!v) return;
       applyCal(SELECTED, {
         x: round2(clamp(v.x + dx, 0, CARD_W_MM)),
         y: round2(clamp(v.y + dy, 0, CARD_H_MM))
@@ -853,7 +874,7 @@
   document.getElementById('insp-color').addEventListener('input', function () {
     if (!SELECTED) return;
     var k = SELECTED;
-    if (k !== 'qrBg' && k !== 'bcBg') return;
+    if (k !== 'qrBg' && k !== 'bcBg' && !isShapeKey(k)) return;
     if (!/^#[0-9a-fA-F]{6}$/.test(this.value)) return;
     applyCal(k, { color: this.value });
   });
@@ -862,6 +883,22 @@
     applyCal('bc', { w: null, h: null });
     updateInspector();
   });
+  function addShape() {
+    R.addShape();
+    renderPreview();
+    var c = R.getCalibration();
+    selectElement('shape' + (c.shapes.length - 1));
+    toast('تمت إضافة شكل جديد — اسحبه لتحريكه وعدّل اللون/الحجم/الزوايا/الطبقة Z من لوحة التحكم');
+  }
+  function deleteShape() {
+    if (SELECTED === null || !isShapeKey(SELECTED)) return;
+    R.removeShape(shapeIndex(SELECTED));
+    selectElement(null);
+    renderPreview();
+    toast('تم حذف الشكل');
+  }
+  document.getElementById('add-shape-btn').addEventListener('click', addShape);
+  document.getElementById('insp-del-shape').addEventListener('click', deleteShape);
   function onLabelInput(id, prop, lo, hi) {
     document.getElementById(id).addEventListener('input', function () {
       var raw = parseFloat(this.value);

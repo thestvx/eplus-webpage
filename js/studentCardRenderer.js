@@ -64,7 +64,10 @@ const StudentCardRenderer = (function () {
     // Calibrated in the CARD section (not per A4 slot); z-order: design →
     // rectangle → QR/barcode. mm coordinates.
     qrBg: { x: 4.3, y: 2.8, w: 19.4, h: 19.4, color: '#ffffff', radius: 2.0, z: 0 },
-    bcBg: { x: 21.3, y: 38.6, w: 43.0, h: 15.38, color: '#ffffff', radius: 1.6, z: 0 }
+    bcBg: { x: 21.3, y: 38.6, w: 43.0, h: 15.38, color: '#ffffff', radius: 1.6, z: 0 },
+    // User-added design shapes (squares/rectangles) drawn in the data layer
+    // of every card. Each: { x, y, w, h, color, radius, z } in mm.
+    shapes: []
   };
 
   // ── Calibration storage (shared by every page of the site) ──
@@ -94,6 +97,19 @@ const StudentCardRenderer = (function () {
         }
       });
       if (saved.textColor === 'white' || saved.textColor === 'black') cal.textColor = saved.textColor;
+      if (Array.isArray(saved.shapes)) {
+        cal.shapes = saved.shapes
+          .map(s => s && typeof s === 'object' ? {
+            x: isFinite(s.x) ? s.x : 0,
+            y: isFinite(s.y) ? s.y : 0,
+            w: isFinite(s.w) ? s.w : 10,
+            h: isFinite(s.h) ? s.h : 10,
+            color: typeof s.color === 'string' && /^#([0-9a-fA-F]{3,8})$/.test(s.color) ? s.color : '#e2e8f0',
+            radius: isFinite(s.radius) ? s.radius : 0,
+            z: isFinite(s.z) ? s.z : 0
+          } : null)
+          .filter(Boolean);
+      }
     }
     ['name', 'id', 'stream', 'date', 'qr', 'bc', 'qrBg', 'bcBg'].forEach(k => {
       cal[k].x = Math.min(Math.max(0, cal[k].x), CARD_W_MM);
@@ -103,6 +119,14 @@ const StudentCardRenderer = (function () {
       if (cal[k].fontSize !== undefined) cal[k].fontSize = Math.min(Math.max(1, cal[k].fontSize), 12);
       if (cal[k].radius !== undefined) cal[k].radius = Math.min(Math.max(0, cal[k].radius), 20);
       if (cal[k].z !== undefined) cal[k].z = Math.min(Math.max(-10, cal[k].z), 10);
+    });
+    cal.shapes.forEach(s => {
+      s.x = Math.min(Math.max(0, s.x), CARD_W_MM);
+      s.y = Math.min(Math.max(0, s.y), CARD_H_MM);
+      s.w = Math.min(Math.max(1, s.w), CARD_W_MM);
+      s.h = Math.min(Math.max(1, s.h), CARD_H_MM);
+      s.radius = Math.min(Math.max(0, s.radius), 20);
+      s.z = Math.min(Math.max(-10, s.z), 10);
     });
     cal.label.fontSize = Math.min(Math.max(1, cal.label.fontSize), 8);
     cal.label.gap = Math.min(Math.max(0, cal.label.gap), 5);
@@ -118,6 +142,21 @@ const StudentCardRenderer = (function () {
   function saveCalibration(cal) { const c = setCalibration(cal); _writeStorage(c); return c; }
   function resetCalibration() { CAL = _clone(CAL_DEFAULTS); _clearStorage(); return getCalibration(); }
   function calibrationStorageKey() { return STORE_KEY; }
+  // User-added design shapes (squares/rectangles). addShape appends a new
+  // default shape and persists the whole calibration in one source, so it
+  // shows up in every print stage.
+  function addShape(partial) {
+    const s = Object.assign({ x: 5, y: 5, w: 30, h: 20, color: '#e2e8f0', radius: 2, z: 0 }, partial || {});
+    const c = _clone(CAL);
+    c.shapes.push(s);
+    return saveCalibration(c);
+  }
+  function removeShape(index) {
+    const c = _clone(CAL);
+    if (!c.shapes[index]) return getCalibration();
+    c.shapes.splice(index, 1);
+    return saveCalibration(c);
+  }
 
   // ── A4 SHEET LAYOUT (multi-card printing) ───────────────
   // Cards are pre-printed on A4 (210 × 297 mm). A SHEET is an ordered
@@ -326,6 +365,8 @@ ${sc}.ec-dl-qr{position:absolute;left:${X(CAL.qr.x)};top:${Y(CAL.qr.y)};width:${
 ${sc}.ec-dl-qr img,${sc}.ec-dl-qr canvas{width:100%!important;height:100%!important;position:relative;z-index:1}
 ${sc}.ec-dl-bc{position:absolute;left:${X(CAL.bc.x)};top:${Y(CAL.bc.y)};width:${X(box.w)};height:${Y(box.h)};display:flex;align-items:center;justify-content:center;z-index:2}
 ${sc}.ec-dl-bc svg{width:${X(box.w)}!important;height:${Y(box.h)}!important;max-width:none;display:block;position:relative;z-index:1}
+${sc}.ec-dl-shape{position:absolute;box-sizing:border-box}
+${CAL.shapes.map((s, i) => `${sc}.ec-dl-shape${i}{left:${X(s.x)};top:${Y(s.y)};width:${X(s.w)};height:${Y(s.h)};background:${s.color};border-radius:${Y(s.radius)};z-index:${s.z}}`).join('')}
 `;
   }
 
@@ -374,6 +415,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
       <div class="ec-dl-qr" data-ec-role="qr" data-cal="qr"></div>
       <div class="ec-dl-bcbg" data-cal="bcbg"></div>
       <div class="ec-dl-bc" data-ec-role="barcode" data-cal="barcode"></div>
+      ${CAL.shapes.map((s, i) => `<div class="ec-dl-shape ec-dl-shape${i}" data-cal="shape${i}"></div>`).join('')}
     </div>`;
   }
 
@@ -457,6 +499,9 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     s += `<div class="ec-g-box" style="left:${P(CAL.bc.x)};top:${P(CAL.bc.y)};width:${P(box.w)};height:${P(box.h)}"></div>`;
     s += `<div class="ec-g-rect" style="left:${P(CAL.qrBg.x)};top:${P(CAL.qrBg.y)};width:${P(CAL.qrBg.w)};height:${P(CAL.qrBg.h)};background:${CAL.qrBg.color}"></div>`;
     s += `<div class="ec-g-rect" style="left:${P(CAL.bcBg.x)};top:${P(CAL.bcBg.y)};width:${P(CAL.bcBg.w)};height:${P(CAL.bcBg.h)};background:${CAL.bcBg.color}"></div>`;
+    CAL.shapes.forEach(sh => {
+      s += `<div class="ec-g-rect" style="left:${P(sh.x)};top:${P(sh.y)};width:${P(sh.w)};height:${P(sh.h)};background:${sh.color}"></div>`;
+    });
     s += '</div>';
     return s;
   }
@@ -504,7 +549,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=9"><\/script>
+<script src="js/studentCardRenderer.js?v=10"><\/script>
 </head><body>
 <div class="ec-data-layer">${dataLayerHTML(r)}${grid}</div>
 <script>
@@ -549,7 +594,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </head><body>
   <div class="wrap"><div class="cap">${value}</div><div id="bc"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=9"></script>
+<script src="js/studentCardRenderer.js?v=10"></script>
 <script>
   (function () {
     var value = '${value}';
@@ -663,7 +708,7 @@ ${A4_GRID_CSS}`;
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=9"><\/script>
+<script src="js/studentCardRenderer.js?v=10"><\/script>
 </head><body>
 <div class="ec-a4">
   <div class="ec-a4-slot" style="${a4SlotStyle(slot, 'mm', 1)}">
@@ -725,6 +770,7 @@ ${A4_GRID_CSS}`;
     CARD_W, CARD_H, CARD_W_MM, CARD_H_MM, A4_W_MM, A4_H_MM, QR_SIZE, CAL, CAL_DEFAULTS, BARCODE_OPTS, BARCODE_STD,
     cardCSS, barcodeSpec, bcBox,
     getCalibration, setCalibration, saveCalibration, resetCalibration, calibrationStorageKey,
+    addShape, removeShape,
     getSheetLayout, setSheetLayout, saveSheetLayout, resetSheetLayout, sheetStorageKey, defaultSlotGrid,
     flipSlot, flipSlots,
     fullName, streamOf, regDate, barcodeValue, qrUrl,
