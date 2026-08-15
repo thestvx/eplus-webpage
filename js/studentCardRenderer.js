@@ -572,7 +572,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=11"><\/script>
+<script src="js/studentCardRenderer.js?v=12"><\/script>
 </head><body>
 <div class="ec-data-layer">${dataLayerHTML(r)}${grid}</div>
 <script>
@@ -617,7 +617,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </head><body>
   <div class="wrap"><div class="cap">${value}</div><div id="bc"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=11"></script>
+<script src="js/studentCardRenderer.js?v=12"></script>
 <script>
   (function () {
     var value = '${value}';
@@ -707,14 +707,14 @@ ${A4_GRID_CSS}`;
   // data lands on the back of the correct card. The content is NOT mirrored:
   // paper alignment comes from the slot position transform only, and the
   // image/data keep their natural orientation (right stays right).
-  // opts.printDesign=true keeps the design image IN the print output, so the
-  // whole card (design + data) prints in a single run. This is the ONLY way a
-  // normal printer can show white text: the white letters print as a knockout
-  // (no ink) and appear as paper-white over the printed design underneath.
+  // Transparent print OVERLAY only. The A4 sheet is already pre-printed with
+  // the card designs, so this layer sends ONLY the student data (text + QR +
+  // barcode) to the printer. The on-screen design ghost (.ec-a4-ghost) is a
+  // preview helper only and is always hidden in @media print — the design
+  // image never reaches the print output.
   function buildA4PrintHTML(r, slotIndex, opts) {
     const sheet = (opts && opts.sheet) || getSheetLayout();
     if (!sheet || !sheet.slots || !sheet.slots[slotIndex]) return null;
-    const printDesign = !!(opts && opts.printDesign);
     const flip = (opts && opts.flip) || sheet.flip || null;
     const slots = sheet.slots.map(s => (flip ? flipSlot(s, flip) : s));
     const slot = slots[slotIndex];
@@ -734,7 +734,7 @@ ${A4_GRID_CSS}`;
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
   html, body { margin: 0; padding: 0; background: transparent; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   * { box-sizing: border-box; }
-  @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } ${printDesign ? '.ec-a4-ghost { display: block !important; }' : '.ec-a4-ghost { display: none !important; }'} }
+  @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } .ec-a4-ghost { display: none !important; } }
   .ec-a4 { position: relative; width: ${A4_W_MM}mm; height: ${A4_H_MM}mm; overflow: hidden; }
   .ec-a4-slot { position: absolute; transform-origin: 0 0; }
   .ec-a4-ghost { position: absolute; overflow: hidden; }
@@ -744,7 +744,7 @@ ${A4_GRID_CSS}`;
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=11"><\/script>
+<script src="js/studentCardRenderer.js?v=12"><\/script>
 </head><body>
 <div class="ec-a4">
   ${slotsHtml}
