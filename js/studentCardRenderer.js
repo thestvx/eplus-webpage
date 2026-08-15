@@ -344,12 +344,12 @@ const StudentCardRenderer = (function () {
     white: { color: '#ffffff', shadow: 'none', stroke: '#0b1b3f', strokeW: '0px', strokeWmm: '0mm' }
   };
 
-  function dlRules(unit, sx, sy, scope) {
+  function dlRules(unit, sx, sy, scope, textColor) {
     const sc = scope ? scope + ' ' : '';
     const X = v => (v * sx).toFixed(3) + unit;
     const Y = v => (v * sy).toFixed(3) + unit;
     const box = bcBox();
-    const tc = TEXT_COLORS[CAL.textColor] || TEXT_COLORS.black;
+    const tc = TEXT_COLORS[textColor] || TEXT_COLORS[CAL.textColor] || TEXT_COLORS.black;
     const sw = unit === 'px' ? tc.strokeW : tc.strokeWmm;
     return `
 ${sc}.ec-dl{position:absolute;inset:0;direction:rtl;text-align:right}
@@ -568,11 +568,11 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
   body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }
   .ec-data-layer { position: relative; width: ${CARD_W_MM}mm; height: ${CARD_H_MM}mm; overflow: hidden; font-family: 'Tajawal', Arial, sans-serif; }
-  ${dlRules('mm', 1, 1)}
+  ${dlRules('mm', 1, 1, '', opts && opts.textColor)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=12"><\/script>
+<script src="js/studentCardRenderer.js?v=13"><\/script>
 </head><body>
 <div class="ec-data-layer">${dataLayerHTML(r)}${grid}</div>
 <script>
@@ -617,7 +617,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </head><body>
   <div class="wrap"><div class="cap">${value}</div><div id="bc"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=12"></script>
+<script src="js/studentCardRenderer.js?v=13"></script>
 <script>
   (function () {
     var value = '${value}';
@@ -740,11 +740,11 @@ ${A4_GRID_CSS}`;
   .ec-a4-ghost { position: absolute; overflow: hidden; }
   .ec-a4-ghost img { width: 100%; height: 100%; object-fit: contain; display: block; }
   .ec-a4-data { position: absolute; }
-  ${dlRules('mm', sc, sc)}
+  ${dlRules('mm', sc, sc, '', opts && opts.textColor)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=12"><\/script>
+<script src="js/studentCardRenderer.js?v=13"><\/script>
 </head><body>
 <div class="ec-a4">
   ${slotsHtml}
