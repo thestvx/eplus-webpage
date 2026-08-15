@@ -1,18 +1,18 @@
-// ═══════════════════════════════════════════════════════════
-//  StudentCardRenderer — SINGLE source of truth for the student
+﻿// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  StudentCardRenderer â€” SINGLE source of truth for the student
 //  ID card (front + back). Used identically by:
-//    • admin.html  → preview modal (srShowCard)
-//    • admin.html  → print / reprint (srPrintCard)
-//    • student.html → portal 3D flip card (renderCardPage)
-//    • calibration-print.html → live position calibration
+//    â€¢ admin.html  â†’ preview modal (srShowCard)
+//    â€¢ admin.html  â†’ print / reprint (srPrintCard)
+//    â€¢ student.html â†’ portal 3D flip card (renderCardPage)
+//    â€¢ calibration-print.html â†’ live position calibration
 //  Guarantees identical design, dims, fonts, QR and barcode
-//  everywhere. Deterministic generation ⇒ reprint always matches.
+//  everywhere. Deterministic generation â‡’ reprint always matches.
 //
 //  PRINT MODEL:
 //  The physical card/paper is ALREADY printed with the back-face
 //  design (background + logo + graphics). The site therefore only
 //  ever prints a TRANSPARENT DATA LAYER on top: name, Student ID,
-//  stream, registration date, QR + barcode — at FIXED mm positions
+//  stream, registration date, QR + barcode â€” at FIXED mm positions
 //  (see CAL below) that must line up with the pre-printed design.
 //  No background image, logo or design is ever printed by the site.
 //
@@ -22,18 +22,18 @@
 //  save them. A saved calibration is stored in localStorage and is
 //  picked up automatically by every future print (admin print/reprint,
 //  student portal preview, the print window). All coordinates are
-//  relative to the top-left of the 85.6 × 53.98 mm card. For the
+//  relative to the top-left of the 85.6 Ã— 53.98 mm card. For the
 //  right-aligned text rows, x is the position of the row's RIGHT edge
 //  measured from the card's LEFT edge (so dragging right always raises x).
 //
 //  A4 MULTI-CARD SHEETS:
-//  Card designs are pre-printed onto A4 (210 × 297 mm). A saved SHEET
+//  Card designs are pre-printed onto A4 (210 Ã— 297 mm). A saved SHEET
 //  LAYOUT (localStorage) defines an ordered list of card SLOTS (x/y/w/h/
 //  rotation on the A4). The data layer is printed only inside the chosen
 //  slot using the same slot-relative CAL coordinates, so the site prints
 //  ONLY the transparent data layer over the pre-printed A4. A separate
 //  test sheet prints the slot outlines for overlay verification.
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 const StudentCardRenderer = (function () {
   const FRONT_IMG = 'studentidcard/studentidcardfront1.jpg';
@@ -46,11 +46,11 @@ const StudentCardRenderer = (function () {
 
   const STORE_KEY = 'eplus-card-calibration-v1';
 
-  // ── DEFAULT CALIBRATION (millimetres) ──
+  // â”€â”€ DEFAULT CALIBRATION (millimetres) â”€â”€
   // name/id/stream/date are right-aligned text rows; x = RIGHT edge from the
-  // card's LEFT edge (default 85.6 − 20.5 = 65.1 mm), y = row top.
+  // card's LEFT edge (default 85.6 âˆ’ 20.5 = 65.1 mm), y = row top.
   // qr/barcode are left-aligned boxes; x = left edge, y = top.
-  // barcode w/h = null ⇒ the EAN-13 physical size from barcodeSpec() is used.
+  // barcode w/h = null â‡’ the EAN-13 physical size from barcodeSpec() is used.
   const CAL_DEFAULTS = {
     name:   { x: 65.1, y: 14.0, fontSize: 3.4 },
     id:     { x: 65.1, y: 20.4, fontSize: 3.0 },
@@ -59,10 +59,18 @@ const StudentCardRenderer = (function () {
     label:  { fontSize: 2.2, gap: 0.7, maxWidth: 42 },
     qr:     { x: 6.5, y: 5.0, w: 15, h: 15 },
     bc:     { x: 23.5, y: 39.08, w: null, h: null },
-    textColor: 'black',
+    // Colors of the printed data layer (saved in the SAME calibration store,
+    // so admin/portal prints pick them up automatically). Text accepts any
+    // hex; 'white'/'black' legacy keys are normalized on load.
+    textColor: '#0b1b3f',
+    qrColor: '#000000',
+    bcColor: '#000000',
+    // Optional solid fill BEHIND the student text rows only (element-scoped,
+    // never the whole card). 'transparent' = no background painted.
+    textBgColor: 'transparent',
     // Independent background rectangles behind the QR and the barcode.
-    // Calibrated in the CARD section (not per A4 slot); z-order: design →
-    // rectangle → QR/barcode. mm coordinates.
+    // Calibrated in the CARD section (not per A4 slot); z-order: design â†’
+    // rectangle â†’ QR/barcode. mm coordinates.
     qrBg: { x: 4.3, y: 2.8, w: 19.4, h: 19.4, color: '#ffffff', radius: 0, z: 0 },
     bcBg: { x: 21.3, y: 38.6, w: 43.0, h: 15.38, color: '#ffffff', radius: 0, z: 0 },
     // User-added design shapes (squares/rectangles) drawn in the data layer
@@ -70,11 +78,27 @@ const StudentCardRenderer = (function () {
     shapes: []
   };
 
-  // ── Calibration storage (shared by every page of the site) ──
+  // â”€â”€ Calibration storage (shared by every page of the site) â”€â”€
   function _clone(o) { return JSON.parse(JSON.stringify(o)); }
   function _readStorage() {
     try { return JSON.parse(window.localStorage.getItem(STORE_KEY) || 'null'); }
     catch (e) { return null; }
+  }
+  // Normalize a color value: accept '#rgb'/'#rrggbb'/'#rrggbbaa' hex and the
+  // literal 'transparent'. Anything else falls back to `def`.
+  function _normColor(v, def) {
+    if (typeof v !== 'string') return def;
+    v = v.trim().toLowerCase();
+    if (v === 'transparent') return 'transparent';
+    if (v.charAt(0) === '#') {
+      const hex = v.slice(1);
+      if (hex.length === 3 || hex.length === 4) {
+        v = '#' + hex.split('').map(c => c + c).join('');
+        return /^#([0-9a-f]{6}|[0-9a-f]{8})$/.test(v) ? v : def;
+      }
+      return /^#[0-9a-f]{6}$|^#[0-9a-f]{8}$/.test(v) ? v : def;
+    }
+    return def;
   }
   function _writeStorage(cal) {
     try { window.localStorage.setItem(STORE_KEY, JSON.stringify(cal)); return true; }
@@ -93,10 +117,18 @@ const StudentCardRenderer = (function () {
           ['x', 'y', 'w', 'h', 'fontSize', 'gap', 'maxWidth', 'radius', 'z'].forEach(p => {
             if (typeof v[p] === 'number' && isFinite(v[p])) cal[k][p] = v[p];
           });
-          if (typeof v.color === 'string' && /^#([0-9a-fA-F]{3,8})$/.test(v.color)) cal[k].color = v.color;
+          if (typeof v.color === 'string') cal[k].color = _normColor(v.color, cal[k].color);
         }
       });
-      if (saved.textColor === 'white' || saved.textColor === 'black') cal.textColor = saved.textColor;
+      if (saved.textColor !== undefined) {
+        const t = saved.textColor;
+        if (t === 'white') cal.textColor = '#ffffff';
+        else if (t === 'black') cal.textColor = '#0b1b3f';
+        else cal.textColor = _normColor(t, cal.textColor);
+      }
+      if (saved.qrColor !== undefined) cal.qrColor = _normColor(saved.qrColor, cal.qrColor);
+      if (saved.bcColor !== undefined) cal.bcColor = _normColor(saved.bcColor, cal.bcColor);
+      if (saved.textBgColor !== undefined) cal.textBgColor = _normColor(saved.textBgColor, cal.textBgColor);
       if (Array.isArray(saved.shapes)) {
         cal.shapes = saved.shapes
           .map(s => s && typeof s === 'object' ? {
@@ -136,7 +168,7 @@ const StudentCardRenderer = (function () {
 
   let CAL = _merge(_readStorage());
 
-  // ── Calibration public API ──────────────────────────────
+  // â”€â”€ Calibration public API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function getCalibration() { return _clone(CAL); }
   function setCalibration(cal) { CAL = _merge(cal); return getCalibration(); }
   function saveCalibration(cal) { const c = setCalibration(cal); _writeStorage(c); return c; }
@@ -158,8 +190,8 @@ const StudentCardRenderer = (function () {
     return saveCalibration(c);
   }
 
-  // ── A4 SHEET LAYOUT (multi-card printing) ───────────────
-  // Cards are pre-printed on A4 (210 × 297 mm). A SHEET is an ordered
+  // â”€â”€ A4 SHEET LAYOUT (multi-card printing) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Cards are pre-printed on A4 (210 Ã— 297 mm). A SHEET is an ordered
   // list of SLOTS; each slot is an absolute position/size/rotation on the
   // A4. The data layer is printed inside the chosen slot using the SAME
   // CAL (slot-relative) coordinates, so a saved sheet + saved calibration
@@ -212,7 +244,7 @@ const StudentCardRenderer = (function () {
   function resetSheetLayout() { SHEET = null; _clearSheet(); return null; }
   function sheetStorageKey() { return SHEET_STORE_KEY; }
 
-  // Convenience default arrangement: cols×rows grid of card-sized slots
+  // Convenience default arrangement: colsÃ—rows grid of card-sized slots
   // evenly spaced on the A4 sheet (used by the sheet editor / first run).
   function defaultSlotGrid(cols, rows) {
     cols = cols || 2; rows = rows || 4;
@@ -232,15 +264,15 @@ const StudentCardRenderer = (function () {
     return slots;
   }
 
-  // ── Back-of-sheet flip (front/back matching on the SAME A4 sheet) ──
+  // â”€â”€ Back-of-sheet flip (front/back matching on the SAME A4 sheet) â”€â”€
   // The sheet is printed FRONT first, then re-fed after a physical flip to
   // print the BACK. The back face's feed coordinates are the mirror image of
   // the front face, so a slot must be mirrored to land exactly BEHIND its
   // front counterpart:
-  //   'long'  → flip around the long edge (page turn): x = W − x − w
-  //   'short' → tumble around the short edge:            y = H − y − h
+  //   'long'  â†’ flip around the long edge (page turn): x = W âˆ’ x âˆ’ w
+  //   'short' â†’ tumble around the short edge:            y = H âˆ’ y âˆ’ h
   // Rotation direction reverses under the mirror.
-  // Both faces always use the SAME source CARD_SLOTS — the back only applies
+  // Both faces always use the SAME source CARD_SLOTS â€” the back only applies
   // this deterministic geometric transform (never its own layout).
   function flipSlot(s, method) {
     const x = s.x, y = s.y, w = s.w, h = s.h, rot = s.rot || 0;
@@ -253,7 +285,7 @@ const StudentCardRenderer = (function () {
     return slots.map(s => flipSlot(s, method));
   }
 
-  // ── GS1 EAN-13 physical standard (the REAL barcode size) ──
+  // â”€â”€ GS1 EAN-13 physical standard (the REAL barcode size) â”€â”€
   const BARCODE_STD = {
     Xmm: 0.33,
     quietModules: 11,
@@ -301,7 +333,7 @@ const StudentCardRenderer = (function () {
     };
   }
 
-  // ── Data helpers ───────────────────────────────────────
+  // â”€â”€ Data helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fullName = r => `${r.first_name || ''} ${r.last_name || ''}`.trim();
   const streamOf = r => (r && (r.stream || r.stream_name || '')) || '';
   const regDate = r => {
@@ -322,38 +354,52 @@ const StudentCardRenderer = (function () {
   };
   const qrUrl = r => (r && r.student_token ? 'https://epluscenter.com/s/' + r.student_token : '');
 
-  // ── Data-layer CSS — same layout in px (screen) and mm (print) ──
+  // â”€â”€ Data-layer CSS â€” same layout in px (screen) and mm (print) â”€â”€
   // Built on demand so it always reflects the CURRENT calibration.
   // scope (optional) prefixes every selector so a second data layer can
   // coexist with the card-scale one (A4 sheet editor / admin A4 preview).
   //
   // WHITE FRAMES (replaced by the calibratable background rectangles below):
-  //  • QR and barcode each get a real coloured rectangle (default white) with
+  //  â€¢ QR and barcode each get a real coloured rectangle (default white) with
   //    configurable x/y/w/h/color/radius/z, calibrated in the CARD section.
-  //    They sit BEHIND the QR/barcode only — never behind the student text.
-  //  • The student text rows (name / Student ID / stream / date) stay PURE
-  //    TEXT — no background, no border, no card behind them.
+  //    They sit BEHIND the QR/barcode only â€” never behind the student text.
+  //  â€¢ The student text rows (name / Student ID / stream / date) stay PURE
+  //    TEXT â€” no background, no border, no card behind them.
   // Text colours. The `color` is the REAL FILL that must reach the printer.
   // The `stroke`/`strokeW` are only a design accent and must NEVER replace the
   // fill. White text is rendered with a ZERO-width stroke (no shadow): the
   // solid #ffffff fill is the only thing painted, so it prints as SOLID WHITE
   // (a rim would dominate the thin Arabic glyphs and read as an outline).
-  // Black text keeps its stronger white stroke (confirmed working).
+  // Other colours keep the stronger white stroke for contrast (confirmed working).
   const TEXT_COLORS = {
     black: { color: '#0b1b3f', shadow: '0 0 1.5px rgba(255,255,255,0.85)', stroke: 'rgba(255,255,255,0.9)', strokeW: '1.4px', strokeWmm: '0.3mm' },
     white: { color: '#ffffff', shadow: 'none', stroke: '#0b1b3f', strokeW: '0px', strokeWmm: '0mm' }
   };
+
+  // Resolve a text color to its full style. `c` may be a key ('white'/'black')
+  // or an arbitrary hex (e.g. '#2548a1'). Any non-white hex gets the white
+  // stroke accent so it stays legible on the pre-printed blue design.
+  function textColorStyle(c) {
+    if (c === 'white' || c === '#ffffff' || c === '#FFF') return TEXT_COLORS.white;
+    if (c === 'black' || c === '#0b1b3f') return TEXT_COLORS.black;
+    return { color: c, shadow: TEXT_COLORS.black.shadow, stroke: TEXT_COLORS.black.stroke, strokeW: TEXT_COLORS.black.strokeW, strokeWmm: TEXT_COLORS.black.strokeWmm };
+  }
 
   function dlRules(unit, sx, sy, scope, textColor) {
     const sc = scope ? scope + ' ' : '';
     const X = v => (v * sx).toFixed(3) + unit;
     const Y = v => (v * sy).toFixed(3) + unit;
     const box = bcBox();
-    const tc = TEXT_COLORS[textColor] || TEXT_COLORS[CAL.textColor] || TEXT_COLORS.black;
+    const tc = textColorStyle(textColor || CAL.textColor);
     const sw = unit === 'px' ? tc.strokeW : tc.strokeWmm;
+    const textBg = CAL.textBgColor && CAL.textBgColor !== 'transparent'
+      ? `background:${CAL.textBgColor};-webkit-print-color-adjust:exact;print-color-adjust:exact`
+      : '';
+    const qrBgFill = CAL.qrBg.color === 'transparent' ? 'none' : CAL.qrBg.color;
+    const bcBgFill = CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color;
     return `
 ${sc}.ec-dl{position:absolute;inset:0;direction:rtl;text-align:right}
-${sc}.ec-dl-row{position:absolute;text-align:right;max-width:${X(CAL.label.maxWidth)};z-index:1}
+${sc}.ec-dl-row{position:absolute;text-align:right;max-width:${X(CAL.label.maxWidth)};z-index:1;${textBg}}
 ${sc}.ec-dl-label{display:block;font-weight:700;line-height:1.2;color:${tc.color};text-shadow:${tc.shadow};-webkit-text-stroke:${sw} ${tc.stroke};paint-order:stroke fill}
 ${sc}.ec-dl-value{display:block;font-weight:900;line-height:1.28;color:${tc.color};text-shadow:${tc.shadow};-webkit-text-stroke:${sw} ${tc.stroke};paint-order:stroke fill}
 ${sc}.ec-dl-value.id{font-family:'Courier New',monospace;font-weight:800;letter-spacing:0.5px}
@@ -367,9 +413,9 @@ ${sc}.ec-dl-r2 .ec-dl-value{font-size:${X(CAL.id.fontSize)}}
 ${sc}.ec-dl-r3 .ec-dl-value{font-size:${X(CAL.stream.fontSize)}}
 ${sc}.ec-dl-r4 .ec-dl-value{font-size:${X(CAL.date.fontSize)}}
 ${sc}.ec-dl-qrbg{position:absolute;left:${X(CAL.qrBg.x)};top:${Y(CAL.qrBg.y)};width:${X(CAL.qrBg.w)};height:${Y(CAL.qrBg.h)};z-index:${CAL.qrBg.z};display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-${sc}.ec-dl-qrbg rect{width:100%;height:100%;fill:${CAL.qrBg.color};rx:${Y(CAL.qrBg.radius)};ry:${Y(CAL.qrBg.radius)};-webkit-print-color-adjust:exact;print-color-adjust:exact}
+${sc}.ec-dl-qrbg rect{width:100%;height:100%;fill:${qrBgFill};rx:${Y(CAL.qrBg.radius)};ry:${Y(CAL.qrBg.radius)};-webkit-print-color-adjust:exact;print-color-adjust:exact}
 ${sc}.ec-dl-bcbg{position:absolute;left:${X(CAL.bcBg.x)};top:${Y(CAL.bcBg.y)};width:${X(CAL.bcBg.w)};height:${Y(CAL.bcBg.h)};z-index:${CAL.bcBg.z};display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-${sc}.ec-dl-bcbg rect{width:100%;height:100%;fill:${CAL.bcBg.color};rx:${Y(CAL.bcBg.radius)};ry:${Y(CAL.bcBg.radius)};-webkit-print-color-adjust:exact;print-color-adjust:exact}
+${sc}.ec-dl-bcbg rect{width:100%;height:100%;fill:${bcBgFill};rx:${Y(CAL.bcBg.radius)};ry:${Y(CAL.bcBg.radius)};-webkit-print-color-adjust:exact;print-color-adjust:exact}
 ${sc}.ec-dl-qr{position:absolute;left:${X(CAL.qr.x)};top:${Y(CAL.qr.y)};width:${X(CAL.qr.w)};height:${Y(CAL.qr.h)};display:flex;align-items:center;justify-content:center;z-index:2}
 ${sc}.ec-dl-qr img,${sc}.ec-dl-qr canvas{width:100%!important;height:100%!important;position:relative;z-index:1}
 ${sc}.ec-dl-bc{position:absolute;left:${X(CAL.bc.x)};top:${Y(CAL.bc.y)};width:${X(box.w)};height:${Y(box.h)};display:flex;align-items:center;justify-content:center;z-index:2}
@@ -402,7 +448,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     st.textContent = cardCSS();
   }
 
-  // ── Markup builders (pure HTML, data-ec-role / data-cal hooks) ───
+  // â”€â”€ Markup builders (pure HTML, data-ec-role / data-cal hooks) â”€â”€â”€
   function frontHTML() {
     return `<div class="ec-card ec-front">
       <img class="bg ec-front-fallback" src="${FRONT_IMG}" onerror="this.style.background='linear-gradient(135deg,#6366f1,#8b5cf6)'" alt="">
@@ -413,16 +459,16 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     const n = fullName(r);
     const st = streamOf(r);
     const streamRow = st
-      ? `<div class="ec-dl-row ec-dl-r3" data-cal="stream"><span class="ec-dl-label">الشعبة</span><span class="ec-dl-value">${st}</span></div>`
+      ? `<div class="ec-dl-row ec-dl-r3" data-cal="stream"><span class="ec-dl-label">Ø§Ù„Ø´Ø¹Ø¨Ø©</span><span class="ec-dl-value">${st}</span></div>`
       : '';
     return `<div class="ec-dl">
-      <div class="ec-dl-row ec-dl-r1" data-cal="name"><span class="ec-dl-label">الاسم الكامل</span><span class="ec-dl-value">${n}</span></div>
+      <div class="ec-dl-row ec-dl-r1" data-cal="name"><span class="ec-dl-label">Ø§Ù„Ø§Ø³Ù… Ø§Ù„ÙƒØ§Ù…Ù„</span><span class="ec-dl-value">${n}</span></div>
       <div class="ec-dl-row ec-dl-r2" data-cal="id"><span class="ec-dl-label">Student ID</span><span class="ec-dl-value id">${r.id || ''}</span></div>
       ${streamRow}
-      <div class="ec-dl-row ec-dl-r4" data-cal="date"><span class="ec-dl-label">تاريخ التسجيل</span><span class="ec-dl-value date">${regDate(r)}</span></div>
-      <svg class="ec-dl-qrbg" data-cal="qrbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.qrBg.radius}" ry="${CAL.qrBg.radius}" fill="${CAL.qrBg.color}"/></svg>
+      <div class="ec-dl-row ec-dl-r4" data-cal="date"><span class="ec-dl-label">ØªØ§Ø±ÙŠØ® Ø§Ù„ØªØ³Ø¬ÙŠÙ„</span><span class="ec-dl-value date">${regDate(r)}</span></div>
+      <svg class="ec-dl-qrbg" data-cal="qrbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.qrBg.radius}" ry="${CAL.qrBg.radius}" fill="${CAL.qrBg.color === 'transparent' ? 'none' : CAL.qrBg.color}"/></svg>
       <div class="ec-dl-qr" data-ec-role="qr" data-cal="qr"></div>
-      <svg class="ec-dl-bcbg" data-cal="bcbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.bcBg.radius}" ry="${CAL.bcBg.radius}" fill="${CAL.bcBg.color}"/></svg>
+      <svg class="ec-dl-bcbg" data-cal="bcbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.bcBg.radius}" ry="${CAL.bcBg.radius}" fill="${CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color}"/></svg>
       <div class="ec-dl-bc" data-ec-role="barcode" data-cal="barcode"></div>
       ${CAL.shapes.map((s, i) => `<div class="ec-dl-shape ec-dl-shape${i}" data-cal="shape${i}"></div>`).join('')}
     </div>`;
@@ -439,11 +485,16 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     return frontHTML() + backHTML(r);
   }
 
-  // ── Barcode / QR rendering ─────────────────────────────
+  // â”€â”€ Barcode / QR rendering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function renderBarcodeSVG(svg, value, doc) {
     if (!svg || typeof JsBarcode === 'undefined') return null;
     try {
-      JsBarcode(svg, value, Object.assign({}, BARCODE_OPTS, { xmlDocument: doc || document }));
+      const bgFill = CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color;
+      JsBarcode(svg, value, Object.assign({}, BARCODE_OPTS, {
+        lineColor: CAL.bcColor,
+        background: bgFill,
+        xmlDocument: doc || document
+      }));
       svg.setAttribute('viewBox', '0 ' + SVG_MARGIN_PX + ' ' + SVG_WIDTH_PX + ' ' + SVG_CROP_HEIGHT_PX);
       const box = bcBox();
       svg.setAttribute('width', box.w + 'mm');
@@ -451,17 +502,18 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
       svg.style.setProperty('max-width', 'none');
       svg.style.setProperty('width', box.w + 'mm');
       svg.style.setProperty('height', box.h + 'mm');
-      // Bake a solid white rectangle as the FIRST painted element of the
+      // Bake the background rectangle as the FIRST painted element of the
       // barcode SVG. It is real vector content (not CSS background), so the
-      // printer receives an actual filled white rectangle behind the black
-      // bars — even if the browser drops CSS backgrounds during printing.
+      // printer receives an actual filled rectangle behind the bars â€” even if
+      // the browser drops CSS backgrounds during printing. Transparent mode
+      // uses fill="none" (nothing painted).
       const NS = 'http://www.w3.org/2000/svg';
       const bg = (doc || document).createElementNS(NS, 'rect');
       bg.setAttribute('x', '0');
       bg.setAttribute('y', '0');
       bg.setAttribute('width', '100%');
       bg.setAttribute('height', '100%');
-      bg.setAttribute('fill', '#ffffff');
+      bg.setAttribute('fill', bgFill);
       bg.setAttribute('rx', '0');
       bg.setAttribute('ry', '0');
       svg.insertBefore(bg, svg.firstChild);
@@ -481,7 +533,14 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     el.innerHTML = '';
     if (!url || typeof QRCode === 'undefined') return;
     try {
-      new QRCode(el, { text: url, width: px, height: px, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+      new QRCode(el, {
+        text: url,
+        width: px,
+        height: px,
+        colorDark: CAL.qrColor,
+        colorLight: CAL.qrBg.color === 'transparent' ? 'rgba(255,255,255,0)' : CAL.qrBg.color,
+        correctLevel: QRCode.CorrectLevel.M
+      });
     } catch (e) { console.error('[StudentCardRenderer] QR error:', e); }
   }
 
@@ -494,7 +553,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     if (qrSlot) renderQR(qrSlot, qrUrl(r), (opts && opts.qrPx) || QR_SIZE * 2, doc);
   }
 
-  // ── Calibration grid (never printed in production; used by the
+  // â”€â”€ Calibration grid (never printed in production; used by the
   //    calibration page / print test to check alignment vs the
   //    pre-printed card). Fixed mm coordinates from CAL.
   function gridOverlayHTML(unit) {
@@ -520,8 +579,8 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     });
     s += `<div class="ec-g-box" style="left:${P(CAL.qr.x)};top:${P(CAL.qr.y)};width:${P(CAL.qr.w)};height:${P(CAL.qr.h)}"></div>`;
     s += `<div class="ec-g-box" style="left:${P(CAL.bc.x)};top:${P(CAL.bc.y)};width:${P(box.w)};height:${P(box.h)}"></div>`;
-    s += `<div class="ec-g-rect" style="left:${P(CAL.qrBg.x)};top:${P(CAL.qrBg.y)};width:${P(CAL.qrBg.w)};height:${P(CAL.qrBg.h)};background:${CAL.qrBg.color}"></div>`;
-    s += `<div class="ec-g-rect" style="left:${P(CAL.bcBg.x)};top:${P(CAL.bcBg.y)};width:${P(CAL.bcBg.w)};height:${P(CAL.bcBg.h)};background:${CAL.bcBg.color}"></div>`;
+    s += `<div class="ec-g-rect" style="left:${P(CAL.qrBg.x)};top:${P(CAL.qrBg.y)};width:${P(CAL.qrBg.w)};height:${P(CAL.qrBg.h)};background:${CAL.qrBg.color === 'transparent' ? 'none' : CAL.qrBg.color}"></div>`;
+    s += `<div class="ec-g-rect" style="left:${P(CAL.bcBg.x)};top:${P(CAL.bcBg.y)};width:${P(CAL.bcBg.w)};height:${P(CAL.bcBg.h)};background:${CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color}"></div>`;
     CAL.shapes.forEach(sh => {
       s += `<div class="ec-g-rect" style="left:${P(sh.x)};top:${P(sh.y)};width:${P(sh.w)};height:${P(sh.h)};background:${sh.color}"></div>`;
     });
@@ -541,7 +600,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 .ec-grid .ec-g-rect{position:absolute;opacity:0.40;border:0.2mm solid #d32f2f;box-sizing:border-box}
 `;
 
-  // ── Public API ─────────────────────────────────────────
+  // â”€â”€ Public API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function renderPair(container, r) {
     if (!container) return;
     container.innerHTML = pairHTML(r);
@@ -554,13 +613,13 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     return { front: frontHTML(), back: backHTML(r) };
   }
 
-  // Back-FACE DATA LAYER ONLY — transparent over the pre-printed card.
+  // Back-FACE DATA LAYER ONLY â€” transparent over the pre-printed card.
   // No front face, no background image, no logo, no design. Fixed mm.
   // opts.grid=true adds a calibration grid (only for the calibration print test).
   function buildPrintHTML(r, opts) {
     const data = JSON.stringify(r).replace(/<\//g, '<\\/');
     const grid = opts && opts.grid ? GRID_CSS + gridOverlayHTML('mm') : '';
-    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>بطاقة الطالب - ${fullName(r)}</title>
+    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>Ø¨Ø·Ø§Ù‚Ø© Ø§Ù„Ø·Ø§Ù„Ø¨ - ${fullName(r)}</title>
 <style>
   @page { size: ${CARD_W_MM}mm ${CARD_H_MM}mm; margin: 0; }
   html, body { margin: 0; padding: 0; background: #ffffff; }
@@ -572,7 +631,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=13"><\/script>
+<script src="js/studentCardRenderer.js?v=14"><\/script>
 </head><body>
 <div class="ec-data-layer">${dataLayerHTML(r)}${grid}</div>
 <script>
@@ -617,7 +676,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </head><body>
   <div class="wrap"><div class="cap">${value}</div><div id="bc"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=13"></script>
+<script src="js/studentCardRenderer.js?v=14"></script>
 <script>
   (function () {
     var value = '${value}';
@@ -631,8 +690,8 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </body></html>`;
   }
 
-  // ── A4 sheet geometry/style helpers (unit='mm' for print,
-  //    unit='px' for on-screen with a scale) ────────────────
+  // â”€â”€ A4 sheet geometry/style helpers (unit='mm' for print,
+  //    unit='px' for on-screen with a scale) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function _u(su, U, v) { return (v * U).toFixed(3) + su; }
   function a4SlotStyle(slot, unit, scale) {
     const su = unit === 'px' ? 'px' : 'mm';
@@ -681,7 +740,7 @@ ${A4_GRID_CSS}`;
   }
 
   // Data-box geometry inside a slot: the card (CAL coordinates) is scaled
-  // UNIFORMLY to fit while preserving aspect, then centred — so the data
+  // UNIFORMLY to fit while preserving aspect, then centred â€” so the data
   // layer always lines up with an object-fit:contain design image.
   function a4DataGeom(slot) {
     const sc = Math.min(slot.w / CARD_W_MM, slot.h / CARD_H_MM);
@@ -696,21 +755,21 @@ ${A4_GRID_CSS}`;
   }
 
   // Print ONLY the transparent data layer for one student on ONE slot of a
-  // pre-printed A4 sheet. 210×297 mm page, transparent background (never
+  // pre-printed A4 sheet. 210Ã—297 mm page, transparent background (never
   // prints white over the design). No slot outlines, no grid, no designs.
   // Every back card design is shown on screen ONLY (hidden in @media print)
   // so the print PREVIEW looks exactly like the finished sheet (all Back #1..#8
   // designs + the student's data on the chosen slot only); the actual print
   // emits just the transparent data layer for the chosen slot. If the saved
   // sheet layout (or opts.flip) has a flip method, every slot is mirrored to
-  // the back-of-sheet feed coordinates (x = 210−x−w / y = 297−y−h) so the
+  // the back-of-sheet feed coordinates (x = 210âˆ’xâˆ’w / y = 297âˆ’yâˆ’h) so the
   // data lands on the back of the correct card. The content is NOT mirrored:
   // paper alignment comes from the slot position transform only, and the
   // image/data keep their natural orientation (right stays right).
   // Transparent print OVERLAY only. The A4 sheet is already pre-printed with
   // the card designs, so this layer sends ONLY the student data (text + QR +
   // barcode) to the printer. The on-screen design ghost (.ec-a4-ghost) is a
-  // preview helper only and is always hidden in @media print — the design
+  // preview helper only and is always hidden in @media print â€” the design
   // image never reaches the print output.
   function buildA4PrintHTML(r, slotIndex, opts) {
     const sheet = (opts && opts.sheet) || getSheetLayout();
@@ -729,7 +788,7 @@ ${A4_GRID_CSS}`;
     ${dataHtml}
   </div>`;
     }).join('');
-    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>بطاقة الطالب - ${fullName(r)}</title>
+    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>Ø¨Ø·Ø§Ù‚Ø© Ø§Ù„Ø·Ø§Ù„Ø¨ - ${fullName(r)}</title>
 <style>
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
   html, body { margin: 0; padding: 0; background: transparent; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -744,7 +803,7 @@ ${A4_GRID_CSS}`;
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=13"><\/script>
+<script src="js/studentCardRenderer.js?v=14"><\/script>
 </head><body>
 <div class="ec-a4">
   ${slotsHtml}
@@ -776,9 +835,9 @@ ${A4_GRID_CSS}`;
     if (!sheet || !sheet.slots || !sheet.slots.length) return null;
     const grid = opts && opts.grid ? a4GridOverlayHTML('mm', 1) : '';
     const slots = sheet.slots.map((s, i) =>
-      `<div class="ec-a4-test-slot" style="${a4SlotStyle(s, 'mm', 1)}"><span class="ec-a4-num">بطاقة #${i + 1}</span></div>`
+      `<div class="ec-a4-test-slot" style="${a4SlotStyle(s, 'mm', 1)}"><span class="ec-a4-num">Ø¨Ø·Ø§Ù‚Ø© #${i + 1}</span></div>`
     ).join('');
-    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>اختبار تخطيط A4</title>
+    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>Ø§Ø®ØªØ¨Ø§Ø± ØªØ®Ø·ÙŠØ· A4</title>
 <style>
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
   html, body { margin: 0; padding: 0; background: #ffffff; }
