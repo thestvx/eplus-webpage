@@ -483,6 +483,7 @@
     var slotsHtml = SLOTS.map(function (s, i) {
       return '<div class="a4-slot' + (SEL_SLOT === i ? ' a4-sel' : '') + '" data-idx="' + i + '" style="' + R.a4SlotStyle(s, 'px', A4S) + '">' +
         '<img class="a4-slot-img" src="' + BACK_IMG + '" onerror="this.style.background=\'linear-gradient(135deg,#1E3C86,#2548A1)\'" alt="">' +
+        R.a4BackDecorHTML(s, 'px', A4S) +
         '<div class="ec-a4-data" style="' + R.a4DataStyle(s, 'px', A4S) + '">' + R.dataLayerHTML(RECORD) + '</div>' +
         '<span class="a4-slot-num">بطاقة #' + (i + 1) + '</span>' +
         '<span class="a4-slot-handle" data-idx="' + i + '" title="تغيير حجم البطاقات الأربع معاً"></span>' +
@@ -508,18 +509,19 @@
   function duplexLabel(m) {
     return m === 'long' ? 'قلب على الحافة الطويلة' : m === 'short' ? 'قلب على الحافة القصيرة' : 'قلب تلقائي (الطابعة)';
   }
-  function duplexLayerHTML(slots, img, cls, usePhysical) {
-    var conf = duplexConf();
+  // Front and BACK overlays sit at the SAME raw CARD_SLOTS, so the four pairs
+  // (Front #1/Back #1 … #4) are perfectly coincident in the overlay — zero
+  // horizontal/vertical deviation by construction.
+  function duplexLayerHTML(slots, img, cls) {
     return '<div class="duplex-layer duplex-' + cls + '">' + slots.map(function (s, i) {
-      var p = usePhysical ? R.physicalBackSlot(s, conf.mode, conf.dx, conf.dy) : s;
-      return '<div class="duplex-card ' + cls + '" style="left:' + (p.x * DUP_SCALE) + 'px;top:' + (p.y * DUP_SCALE) + 'px;width:' + (p.w * DUP_SCALE) + 'px;height:' + (p.h * DUP_SCALE) + 'px;transform:rotate(' + (p.rot || 0) + 'deg);transform-origin:0 0">' +
+      return '<div class="duplex-card ' + cls + '" style="left:' + (s.x * DUP_SCALE) + 'px;top:' + (s.y * DUP_SCALE) + 'px;width:' + (s.w * DUP_SCALE) + 'px;height:' + (s.h * DUP_SCALE) + 'px;transform:rotate(' + (s.rot || 0) + 'deg);transform-origin:0 0">' +
         '<img src="' + img + '" alt=""><span>' + (i + 1) + '</span></div>';
     }).join('') + '</div>';
   }
   function renderDuplexPreview() {
     var stage = document.getElementById('duplex-stage');
     if (!stage) return;
-    stage.innerHTML = duplexLayerHTML(SLOTS, FRONT_IMG, 'front', false) + duplexLayerHTML(SLOTS, BACK_IMG, 'back', true);
+    stage.innerHTML = duplexLayerHTML(SLOTS, FRONT_IMG, 'front') + duplexLayerHTML(SLOTS, BACK_IMG, 'back');
     duplexOpa();
     applyDuplexView();
     updateDuplexHint();
@@ -531,7 +533,7 @@
     b.style.display = (duplexView === 'front') ? 'none' : 'block';
     var btn = document.getElementById('duplex-view-btn');
     if (!btn) return;
-    btn.textContent = duplexView === 'overlay' ? '◑ معاينة: الأمامي + الخلفي (Overlay)' : duplexView === 'front' ? '◐ معاينة: الأمامي فقط' : '◒ معاينة: الخلفي فقط (موضع الطباعة)';
+    btn.textContent = duplexView === 'overlay' ? '◑ معاينة: الأمامي + الخلفي (Overlay)' : duplexView === 'front' ? '◐ معاينة: الأمامي فقط' : '◒ معاينة: الخلفي فقط';
     btn.title = 'وضع Duplex: ' + duplexLabel(duplexConf().mode);
   }
   function duplexOpa() {
@@ -550,8 +552,8 @@
     var el = document.getElementById('duplex-hint');
     if (!el) return;
     var conf = duplexConf();
-    el.innerHTML = 'وضع Duplex: <b>' + duplexLabel(conf.mode) + '</b> — الإزاحة العامة: <b>' + conf.dx.toFixed(2) + ' / ' + conf.dy.toFixed(2) + ' مم</b> (تُطبَّق على البطاقات الأربع معاً).<br>' +
-      'الوجه الخلفي يُطبع على <b>نفس CARD_SLOTS</b>، يُحسب الموضع فقط حسب طريقة القلب والصورة تبقى طبيعية. لضبط الإزاحة: اطبع ورقة الاختبار، قِس الانحراف الفعلي وأدخله بالاتجاه الصحيح حتى يختفي في الطبعة التالية.';
+    el.innerHTML = 'الوجه الأمامي والخلفي يُطبعان على <b>نفس CARD_SLOTS</b> تماماً (نفس X/Y/W/H لكل بطاقة) — في المعاينة تظهر البطاقات الأربعة فوق بعضها البعض تماماً بدون أي انحراف أفقي أو عمودي، والصورة تبقى طبيعية (لا انعكاس).<br>' +
+      'زر <b>ورقة الاختبار</b> يطبع حدوداً مرقّمة للتحقق من إزاحة تغذية الطابعة الفعلية؛ وضع Duplex الحالي: <b>' + duplexLabel(conf.mode) + '</b> — إزاحة عامة: <b>' + conf.dx.toFixed(2) + ' / ' + conf.dy.toFixed(2) + ' مم</b>.';
   }
   function selectSlot(idx) {
     SEL_SLOT = (typeof idx === 'number' && SLOTS[idx] !== undefined) ? idx : null;
@@ -707,19 +709,15 @@
   });
 
   // ── Design print (front/back card designs on A4, no student data) ──
-  // BOTH faces always use the SAME saved CARD_SLOTS (front coordinates). The
-  // BACK face only applies the saved flip transform (long = x mirrored,
-  // short = y mirrored) so Back #N lands exactly BEHIND Front #N after the
-  // sheet is flipped and re-fed. The image/content is NOT mirrored — paper
-  // alignment comes from the slot position transform only, and the design
-  // keeps its natural orientation (right stays right).
+  // BOTH faces ALWAYS use the SAME saved CARD_SLOTS — Front #N and Back #N
+  // are geometrically identical (same X/Y/W/H, same centred column). The
+  // back sheet carries the back design + SOLID white QR/barcode placeholders
+  // and prints at the same positions as the front sheet (preview == print).
+  // No flip, no mirror: the design keeps its natural orientation.
   function cloneSlots() { return SLOTS.map(function (s) { return { x: s.x, y: s.y, w: s.w, h: s.h, rot: s.rot || 0 }; }); }
   function designType() { return document.querySelector('#dp-type button.on').getAttribute('data-v'); }
-  function designFlip() { return duplexConf().mode; }
   function slotsForSide(side) {
-    var slots = cloneSlots();
-    if (side === 'back') slots = slots.map(function (s) { return R.flipSlot(s, designFlip()); });
-    return slots;
+    return cloneSlots();
   }
   function designSheet() {
     return { params: JSON.parse(JSON.stringify(PARAMS)), slots: cloneSlots(), duplex: duplexConf() };
@@ -728,8 +726,8 @@
   // The design sheets are built by the RENDERER (single source of truth), so
   // the calibration print == the real front/back sheet used by admin. The
   // BACK sheet carries the back design + SOLID white QR/barcode placeholders
-  // and re-positions each slot to its duplex feed position inside @media
-  // print (position only — the image is never mirrored).
+  // and prints at the SAME CARD_SLOTS as the front sheet (preview == print,
+  // no flip, no mirror).
   function buildDesignPrintHTML(type) {
     var front = stripScripts(R.buildA4FrontSheetHTML({ sheet: designSheet() }));
     var back = stripScripts(R.buildA4BackSheetHTML({ sheet: designSheet() }));
@@ -762,10 +760,9 @@
     var type = designType();
     var box = document.getElementById('design-preview');
     var scale = 1.3;
-    var flipLabel = designFlip() === 'long' ? 'قلب على الحافة الطويلة' : 'قلب على الحافة القصيرة';
     var html = '';
     var frontLabel = 'الصفحة 1 — الوجه الأمامي: 4 بطاقات في منتصف A4 (نفس CARD_SLOTS)';
-    var backLabel = 'ورقة الوجه الخلفي: التصميم + المربع الأبيض للـQR + مستطيل الباركود لكل بطاقة (' + flipLabel + ')';
+    var backLabel = 'ورقة الوجه الخلفي: التصميم + المربع الأبيض للـQR + مستطيل الباركود لكل بطاقة — نفس مواضع الوجه الأمامي بالضبط (بدون قلب/انعكاس)';
     if (type === 'front' || type === 'both') html += designPagePreviewHTML(slotsForSide('front'), FRONT_IMG, scale, frontLabel, false);
     if (type === 'back') html += designPagePreviewHTML(slotsForSide('back'), BACK_IMG, scale, backLabel, true);
     else if (type === 'both') html += designPagePreviewHTML(slotsForSide('back'), BACK_IMG, scale, backLabel, true);
@@ -837,7 +834,7 @@
   document.getElementById('design-print-modal').addEventListener('click', function (e) {
     if (e.target === this) this.classList.add('hidden');
   });
-  window.__designPrint = { cloneSlots: cloneSlots, designType: designType, designFlip: designFlip, slotsForSide: slotsForSide, designSheet: designSheet, buildDesignPrintHTML: buildDesignPrintHTML, printDesignSheet: printDesignSheet };
+  window.__designPrint = { cloneSlots: cloneSlots, designType: designType, slotsForSide: slotsForSide, designSheet: designSheet, buildDesignPrintHTML: buildDesignPrintHTML, printDesignSheet: printDesignSheet };
 
   // ── slot inspector inputs (X/Y are derived; W/H/rot are shared params) ──
   ['slot-w', 'slot-h', 'slot-rot'].forEach(function (id) {
