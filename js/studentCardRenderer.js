@@ -234,6 +234,18 @@ const StudentCardRenderer = (function () {
     });
     const out = { slots };
     if (s.flip === 'long' || s.flip === 'short') out.flip = s.flip;
+    // Duplex paper mode + ONE global back-face offset (mm), applied to ALL
+    // cards once. 'long'/'short' mirror the back POSITION (never the image)
+    // to match a manual paper flip; 'none' = the printer flips automatically.
+    // Legacy sheets that only saved `flip` derive their duplex mode from it.
+    let dMode = (s.duplex && s.duplex.mode === 'long') ? 'long'
+      : (s.duplex && s.duplex.mode === 'short') ? 'short' : null;
+    if (!dMode && (s.flip === 'long' || s.flip === 'short')) dMode = s.flip;
+    out.duplex = {
+      mode: dMode || 'none',
+      dx: _num(s.duplex && s.duplex.dx, 0, -50, 50),
+      dy: _num(s.duplex && s.duplex.dy, 0, -50, 50)
+    };
     return out;
   }
 
@@ -284,6 +296,42 @@ const StudentCardRenderer = (function () {
   function flipSlots(slots, method) {
     if (!Array.isArray(slots)) return slots;
     return slots.map(s => flipSlot(s, method));
+  }
+
+  // ── A4 Duplex paper mode ────────────────────────────────────────────
+  // The FRONT face prints at the raw CARD_SLOTS (the master grid — the single
+  // reference). For the BACK face the SAME paper is physically flipped before
+  // re-feeding, so the back content must be placed at the mirrored FEED
+  // position to land exactly behind its front counterpart. This is a
+  // POSITION-ONLY transform — the back image is NEVER mirrored (no scaleX(-1),
+  // no rotateY(180°)); the design keeps its natural orientation. Only the
+  // (x, y) is recomputed; width/height stay identical to the front slot.
+  //   'long'  → flip around the long edge (page turn):  x' = W − x − w
+  //   'short' → tumble around the short edge:          y' = H − y − h
+  //   'none'  → the printer duplexes automatically (driver flips the sheet).
+  // (dx, dy) is ONE global back-face offset (mm) that compensates the paper
+  // feed tolerance of the printer and is applied to ALL 8 cards together —
+  // it is never a per-card coordinate. Its sign is "observed deviation on the
+  // duplex test sheet", i.e. entering +0.5 moves the printed back by −0.5 mm
+  // physically so the total lands exactly on the front.
+  function duplexFromSheet(sheet) {
+    const d = (sheet && sheet.duplex) || {};
+    const mode = (d.mode === 'long' || d.mode === 'short') ? d.mode
+      : (sheet && (sheet.flip === 'long' || sheet.flip === 'short')) ? sheet.flip : 'none';
+    return { mode, dx: _num(d.dx, 0, -50, 50), dy: _num(d.dy, 0, -50, 50) };
+  }
+  function duplexBackSlot(raw, mode, dx, dy) {
+    // Feed position of a card's BACK content in the back print page.
+    const shifted = { x: _r2(raw.x - (dx || 0)), y: _r2(raw.y - (dy || 0)), w: raw.w, h: raw.h, rot: raw.rot || 0 };
+    const f = (mode === 'long' || mode === 'short') ? flipSlot(shifted, mode) : shifted;
+    return { x: f.x, y: f.y, w: f.w, h: f.h, rot: f.rot };
+  }
+  function physicalBackSlot(raw, mode, dx, dy) {
+    // Where the printed back content lands on the sheet in PHYSICAL
+    // coordinates (used by the duplex overlay preview). flipSlot is an
+    // involution, so this always equals raw − (dx, dy): with dx=dy=0 the back
+    // lands exactly on the front slot.
+    return flipSlot(duplexBackSlot(raw, mode, dx, dy), mode);
   }
 
   // ── GS1 EAN-13 physical standard (the REAL barcode size) ──
@@ -647,7 +695,7 @@ ${TAJWAL_FACES}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=16"><\/script>
+<script src="js/studentCardRenderer.js?v=17"><\/script>
 </head><body>
 <div class="ec-data-layer">${dataLayerHTML(r)}${grid}</div>
 <script>
@@ -701,7 +749,7 @@ ${TAJWAL_FACES}
 </head><body>
   <div class="wrap"><div class="cap">${value}</div><div id="bc"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=16"></script>
+<script src="js/studentCardRenderer.js?v=17"></script>
 <script>
   (function () {
     var value = '${value}';
@@ -781,57 +829,75 @@ ${A4_GRID_CSS}`;
 
   // ── A4 two-pass workflow (print this page in step 2) ─────────────────
   // Step 1 (buildA4FrontSheetHTML): print the FRONT sheet — 8 front designs
-  // at the saved CARD_SLOTS, no data. Step 2 (this function): re-feed the
-  // SAME paper and print the BACK for ONE chosen card in its slot.
+  // at the saved CARD_SLOTS (the MASTER grid — the single reference), no data.
+  // Step 2 (this function): re-feed the SAME paper and print the BACK for ONE
+  // chosen card. The back design + student overlay are placed in the print
+  // page at the DUPLEX position (mirrored FEED coordinates per the saved
+  // duplex mode, plus the ONE global offset) so that, after the physical
+  // paper flip, Back #N lands EXACTLY behind Front #N — same X/Y/W/H, same
+  // cut boundaries.
   //   opts.mode = 'info' (default): transparent data layer ONLY (name, ID,
   //     stream, date, QR, barcode, QR/barcode background rectangles) inside
   //     the chosen slot — for back cards that were already printed.
   //   opts.mode = 'back': the BACK design (studentidcardback1.jpg) PLUS the
   //     student data together inside the chosen slot only; all other slots
   //     stay empty in the print output.
-  // BOTH faces use the SAME saved CARD_SLOTS at the SAME X/Y/W/H — NO mirror,
-  // NO scaleX(-1), NO flip. The back design keeps its natural orientation;
-  // perfect Front #N / Back #N alignment comes from the identical geometry.
-  // PREVIEW vs PRINT: every back design is drawn on screen on all 8 slots so
-  // the print PREVIEW looks exactly like the finished sheet; the ghosts are
-  // hidden in @media print, and only the chosen slot's content reaches the
-  // printer (info layer only — or the real .ec-a4-back design + info).
-  // opts.flip may still force a legacy back-of-sheet geometric transform
-  // ('long'/'short'), but the new admin workflow never passes it.
+  // THE IMAGE IS NEVER MIRRORED (no scaleX(-1), no rotateY(180°)) — only the
+  // POSITION is recomputed by duplexBackSlot(); the design keeps its natural
+  // orientation. The student overlay uses the SAME slot as the back design.
+  // PREVIEW vs PRINT: on screen the chosen card's back+data sit at the RAW
+  // slot (the finished sheet: Front #N + Back #N over it) while a dashed
+  // marker shows the ACTUAL print feed position; in @media print the chosen
+  // slot is re-positioned to that duplex feed position and everything else
+  // (ghosts, marker, instructions) is hidden. A screen-only bar states the
+  // print settings (A4, Portrait, Scale 100%, Margins None).
   function buildA4PrintHTML(r, slotIndex, opts) {
     const sheet = (opts && opts.sheet) || getSheetLayout();
     if (!sheet || !sheet.slots || !sheet.slots[slotIndex]) return null;
-    const flip = opts && (opts.flip === 'long' || opts.flip === 'short') ? opts.flip : null;
-    const slots = sheet.slots.map(s => (flip ? flipSlot(s, flip) : s));
-    const slot = slots[slotIndex];
-    const data = JSON.stringify(r).replace(/<\//g, '<\\/');
-    const g = a4DataGeom(slot);
-    const sc = g.sc;
+    const rawSlot = sheet.slots[slotIndex];
+    const duplex = opts && opts.duplex ? duplexFromSheet({ duplex: opts.duplex }) : duplexFromSheet(sheet);
     const mode = (opts && opts.mode === 'back') ? 'back' : 'info';
-    const slotsHtml = slots.map((s, i) => {
+    const backDocSlot = duplexBackSlot(rawSlot, duplex.mode, duplex.dx, duplex.dy);
+    const data = JSON.stringify(r).replace(/<\//g, '<\\/');
+    const g = a4DataGeom(rawSlot);
+    const sc = g.sc;
+    const slotsHtml = sheet.slots.map((s, i) => {
       const gs = a4DataStyle(s, 'mm', 1);
       const isSel = i === slotIndex;
-      let backHtml = '';
+      let inner = '';
       if (mode === 'back') {
-        backHtml = isSel
+        inner += isSel
           ? `<div class="ec-a4-back" style="${gs}"><img src="${BACK_IMG}" alt=""></div>`
           : `<div class="ec-a4-ghost" style="${gs}"><img src="${BACK_IMG}" alt=""></div>`;
       } else {
-        backHtml = `<div class="ec-a4-ghost" style="${gs}"><img src="${BACK_IMG}" alt=""></div>`;
+        inner += `<div class="ec-a4-ghost" style="${gs}"><img src="${BACK_IMG}" alt=""></div>`;
       }
-      const dataHtml = isSel ? `<div class="ec-a4-data" style="${gs}">${dataLayerHTML(r)}</div>` : '';
-      return `<div class="ec-a4-slot" style="${a4SlotStyle(s, 'mm', 1)}">
-    ${backHtml}
-    ${dataHtml}
+      if (isSel) inner += `<div class="ec-a4-data" style="${gs}">${dataLayerHTML(r)}</div>`;
+      return `<div class="ec-a4-slot${isSel ? ' ec-sel-slot' : ''}" data-i="${i}" style="${a4SlotStyle(s, 'mm', 1)}">
+    ${inner}
   </div>`;
     }).join('');
+    const marker = `<div class="ec-a4-print-pos" style="${a4SlotStyle(backDocSlot, 'mm', 1)}"><span>موضع طباعة الوجه الخلفي (يُطبع هنا على الورقة المقلوبة)</span></div>`;
+    const duplexLabel = duplex.mode === 'long' ? 'قلب الحافة الطويلة'
+      : duplex.mode === 'short' ? 'قلب الحافة القصيرة' : 'قلب تلقائي (الطابعة)';
+    const info = `<div class="ec-a4-info"><b>طباعة الوجه الخلفي — البطاقة #${slotIndex + 1}</b> ·
+  وضع Duplex: ${duplexLabel} · إزاحة عامة X/Y: ${duplex.dx.toFixed(2)} / ${duplex.dy.toFixed(2)} مم ·
+  <span class="hi">إعدادات الطباعة: A4 · Portrait · Scale 100% · Margins None (بدون تصغير/توسيع)</span>
+  <div class="sub">المعاينة تُظهر النتيجة النهائية (الوجه الأمامي + الخلفي المطابق). الصورة لا تُعكس — يُقلب الموضع فقط حسب وضع Duplex.</div></div>`;
     return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>بطاقة الطالب - ${fullName(r)}</title>
 ${TAJWAL_FACES}
 <style>
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
   html, body { margin: 0; padding: 0; background: transparent; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   * { box-sizing: border-box; }
-  @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } .ec-a4-ghost { display: none !important; } }
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .ec-a4-ghost, .ec-a4-info, .ec-a4-print-pos { display: none !important; }
+    .ec-sel-slot { left: ${backDocSlot.x}mm !important; top: ${backDocSlot.y}mm !important; transform: rotate(${backDocSlot.rot}deg) !important; }
+  }
+  .ec-a4-info { font-family: 'Tajawal', Arial, sans-serif; font-size: 3.4mm; line-height: 1.5; color: #0f172a; background: #f8fafc; border: 0.3mm solid #cbd5e1; border-radius: 1.5mm; padding: 2.5mm 4mm; margin: 3mm 3mm 4mm; }
+  .ec-a4-info .hi { color: #059669; font-weight: 800; }
+  .ec-a4-info .sub { font-size: 2.9mm; color: #475569; margin-top: 1mm; }
   .ec-a4 { position: relative; width: ${A4_W_MM}mm; height: ${A4_H_MM}mm; overflow: hidden; }
   .ec-a4-slot { position: absolute; transform-origin: 0 0; }
   .ec-a4-ghost { position: absolute; overflow: hidden; }
@@ -839,14 +905,18 @@ ${TAJWAL_FACES}
   .ec-a4-back { position: absolute; overflow: hidden; }
   .ec-a4-back img { width: 100%; height: 100%; object-fit: contain; display: block; }
   .ec-a4-data { position: absolute; }
+  .ec-a4-print-pos { position: absolute; border: 0.3mm dashed #e11d48; box-sizing: border-box; background: rgba(225, 29, 72, 0.06); }
+  .ec-a4-print-pos span { position: absolute; left: 0; top: -6mm; font-family: 'Tajawal', Arial, sans-serif; font-weight: 700; font-size: 2.6mm; color: #e11d48; background: #ffffff; border: 0.2mm solid #e11d48; border-radius: 1mm; padding: 0.5mm 1.5mm; white-space: nowrap; }
   ${dlRules('mm', sc, sc, '', opts && opts.textColor)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=16"><\/script>
+<script src="js/studentCardRenderer.js?v=17"><\/script>
 </head><body>
+${info}
 <div class="ec-a4">
   ${slotsHtml}
+  ${marker}
 </div>
 <script>
 (function () {
@@ -878,27 +948,35 @@ ${TAJWAL_FACES}
 
   // ── A4 two-pass workflow (print this page in step 1) ─────────────────
   // FRONT sheet: the 8 front designs (studentidcardfront1.jpg) at the saved
-  // CARD_SLOTS — same X/Y/W/H used later for the back, no flip, no mirror,
-  // no student data. This is the pre-printed base sheet; the site NEVER
-  // reprints these designs when printing student info (see buildA4PrintHTML).
-  // Uses the saved sheet layout, or the default 2×4 grid when none exists.
+  // CARD_SLOTS — the MASTER grid. The back (buildA4PrintHTML) and the student
+  // overlay use the SAME slots, so Front #N / Back #N cut boundaries coincide
+  // exactly. No flip, no mirror, no student data on this sheet. Optional cut
+  // lines (thin rectangles around each slot, outside the card boundary) help
+  // cutting. Uses the saved sheet layout, or the default 2×4 grid.
   function buildA4FrontSheetHTML(opts) {
     const sheet = (opts && opts.sheet) || getSheetLayout();
     const slots = (sheet && sheet.slots && sheet.slots.length) ? sheet.slots : defaultSlotGrid(2, 4);
+    const cut = !opts || opts.cutLines !== false;
+    const CUT_GAP = 2;
     const slotsHtml = slots.map(s =>
-      `<div class="ec-a4-front-slot" style="${a4SlotStyle(s, 'mm', 1)}"><img src="${FRONT_IMG}" alt=""></div>`
+      `<div class="ec-a4-front-slot" style="${a4SlotStyle(s, 'mm', 1)}">${cut ? `<i class="ec-a4-cut" style="left:-${CUT_GAP}mm;top:-${CUT_GAP}mm;width:${s.w + 2 * CUT_GAP}mm;height:${s.h + 2 * CUT_GAP}mm"></i>` : ''}<img src="${FRONT_IMG}" alt=""></div>`
     ).join('');
+    const info = `<div class="ec-a4-info">طباعة الوجه الأمامي (الخطوة 1) — ورقة A4 · Portrait · Scale 100% · Margins None ·
+  هذه الورقة هي المرجع: الوجه الخلفي يُطبع على نفس المواضع (CARD_SLOTS) بنفس حدود القص.</div>`;
     return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>الوجه الأمامي — ورقة A4 (بطاقات)</title>
 <style>
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
   html, body { margin: 0; padding: 0; background: #ffffff; }
   * { box-sizing: border-box; }
-  @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }
+  @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } .ec-a4-info { display: none !important; } }
+  .ec-a4-info { font-family: 'Tajawal', Arial, sans-serif; font-size: 3.4mm; line-height: 1.5; color: #0f172a; background: #f8fafc; border: 0.3mm solid #cbd5e1; border-radius: 1.5mm; padding: 2.5mm 4mm; margin: 3mm 3mm 4mm; }
   .ec-a4 { position: relative; width: ${A4_W_MM}mm; height: ${A4_H_MM}mm; overflow: hidden; }
   .ec-a4-front-slot { position: absolute; transform-origin: 0 0; background: #ffffff; }
   .ec-a4-front-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .ec-a4-cut { position: absolute; border: 0.3mm solid #888888; box-sizing: border-box; }
 </style>
 </head><body>
+${info}
 <div class="ec-a4">${slotsHtml}</div>
 <script>
 (function () {
@@ -951,6 +1029,61 @@ ${TAJWAL_FACES}
 </body></html>`;
   }
 
+  // ── Duplex alignment TEST sheet (2 pages) ───────────────────────────
+  // Page 1: FRONT cut borders (solid) at the raw CARD_SLOTS.
+  // Page 2: BACK cut borders (dashed) at the duplex feed positions
+  //         (duplexBackSlot: mirrored per mode + the ONE global offset).
+  // Workflow: print page 1, physically flip the paper per the duplex mode,
+  // re-feed it, then print ONLY page 2. Hold the sheet to light: when the
+  // mode + offset are correct, every dashed Back #N border sits EXACTLY
+  // inside the solid Front #N border — any mm deviation is directly visible.
+  function buildDuplexTestSheetHTML(opts) {
+    const sheet = (opts && opts.sheet) || getSheetLayout();
+    if (!sheet || !sheet.slots || !sheet.slots.length) return null;
+    const duplex = opts && opts.duplex ? duplexFromSheet({ duplex: opts.duplex }) : duplexFromSheet(sheet);
+    const backSlots = sheet.slots.map(s => duplexBackSlot(s, duplex.mode, duplex.dx, duplex.dy));
+    const page = (slots, label, cls) => `<div class="ts-page">${slots.map((s, i) =>
+      `<div class="ts-slot ${cls}" style="${a4SlotStyle(s, 'mm', 1)}"><span class="ts-num">${label} #${i + 1}</span></div>`
+    ).join('')}</div>`;
+    const duplexLabel = duplex.mode === 'long' ? 'قلب الحافة الطويلة'
+      : duplex.mode === 'short' ? 'قلب الحافة القصيرة' : 'قلب تلقائي (الطابعة)';
+    const info = `<div class="ts-info">
+  <b>اختبار تطابق الوجهين (Front/Back)</b> ·
+  وضع Duplex: ${duplexLabel} · الإزاحة العامة X/Y: ${duplex.dx.toFixed(2)} / ${duplex.dy.toFixed(2)} مم ·
+  <span class="hi">إعدادات الطباعة: A4 · Portrait · Scale 100% · Margins None</span><br>
+  1) اطبع <b>الصفحة 1</b> (حدود أمامية صُلبة). 2) أقلب الورقة حسب طريقة القلب المختارة وأعد إدخالها.
+  3) اطبع <b>الصفحة 2 فقط</b> (حدود خلفية متقطعة). 4) ارفع الورقة للنور: يجب أن تقع حدود الخلف #N داخل حدود الأمام #N تماماً — أي انحراف بالملمتر يظهر فوراً.
+</div>`;
+    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>اختبار تطابق Front / Back (Duplex)</title>
+<style>
+  @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  * { box-sizing: border-box; }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } .ts-info { display: none !important; } }
+  .ts-info { font-family: 'Tajawal', Arial, sans-serif; font-size: 3.4mm; line-height: 1.6; color: #0f172a; background: #f8fafc; border: 0.3mm solid #cbd5e1; border-radius: 1.5mm; padding: 2.5mm 4mm; margin: 3mm 3mm 4mm; }
+  .ts-info .hi { color: #059669; font-weight: 800; }
+  .ts-page { position: relative; width: ${A4_W_MM}mm; height: ${A4_H_MM}mm; overflow: hidden; page-break-after: always; }
+  .ts-page:last-child { page-break-after: auto; }
+  .ts-slot { position: absolute; box-sizing: border-box; display: flex; align-items: center; justify-content: center; transform-origin: 0 0; }
+  .ts-slot.ts-front { border: 0.35mm solid #d32f2f; }
+  .ts-slot.ts-back { border: 0.35mm dashed #1d4ed8; }
+  .ts-num { font-family: 'Tajawal', Arial, sans-serif; font-weight: 700; font-size: 30pt; }
+  .ts-front .ts-num { color: #d32f2f; }
+  .ts-back .ts-num { color: #1d4ed8; }
+</style>
+</head><body>
+${info}
+${page(sheet.slots, 'الأمامي', 'ts-front')}
+${page(backSlots, 'الخلفي', 'ts-back')}
+<script>
+  setTimeout(function () { try { window.focus(); window.print(); } catch (e) {} }, 350);
+  window.onafterprint = function () { setTimeout(function () { try { window.close(); } catch (e) {} }, 250); };
+  setTimeout(function () { try { window.close(); } catch (e) {} }, 120000);
+<\/script>
+</body></html>`;
+  }
+
   return {
     CARD_W, CARD_H, CARD_W_MM, CARD_H_MM, A4_W_MM, A4_H_MM, QR_SIZE, CAL, CAL_DEFAULTS, BARCODE_OPTS, BARCODE_STD,
     cardCSS, barcodeSpec, bcBox,
@@ -958,13 +1091,15 @@ ${TAJWAL_FACES}
     addShape, removeShape,
     getSheetLayout, setSheetLayout, saveSheetLayout, resetSheetLayout, sheetStorageKey, defaultSlotGrid,
     flipSlot, flipSlots,
+    duplexFromSheet, duplexBackSlot, physicalBackSlot,
     fullName, streamOf, regDate, barcodeValue, qrUrl,
     injectCSS, renderPair, portalFaces, buildPrintHTML, hydratePrint, hydrateRoot,
     dataLayerHTML, dlRules, gridOverlayHTML, GRID_CSS,
     a4SheetCSS, a4SlotStyle, a4DataStyle, a4DataGeom, a4GridOverlayHTML, A4_GRID_CSS,
-    buildA4PrintHTML, buildA4TestSheetHTML, buildA4FrontSheetHTML,
+    buildA4PrintHTML, buildA4TestSheetHTML, buildA4FrontSheetHTML, buildDuplexTestSheetHTML,
     renderBarcodeSVG, buildBarcodePrintHTML
   };
 })();
 
 window.StudentCardRenderer = StudentCardRenderer;
+

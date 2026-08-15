@@ -155,11 +155,6 @@
     <button id="a4-design-btn" class="on">🪞 إظهار التصميم</button>
     <button id="a4-grid-btn" class="on">📏 شبكة المعايرة</button>
     <button id="a4-ruler-btn" class="on">📐 المسطرة</button>
-    <label for="flip-method" style="margin-inline-start:6px">قلب الورقة للطباعة الخلفية:</label>
-    <select id="flip-method">
-      <option value="long">قلب على الحافة الطويلة</option>
-      <option value="short">قلب على الحافة القصيرة</option>
-    </select>
     <span class="spacer"></span>
     <button id="a4-test-btn">🖨️ طباعة اختبار A4</button>
     <button id="design-print-btn" class="primary">🖨️ طباعة تصاميم البطاقات</button>
@@ -169,9 +164,8 @@
 
   <div class="note">
     كل فتحة = مكان بطاقة على الورقة (85.6 × 53.98 مم). اسحبها لتحريكها، اسحب المقبض <b>◢</b> لتغيير الحجم، أو عدّل القيم في لوحة التحكم.
-    الوجهان الأمامي والخلفي يستخدمان <b>نفس الفتحات بنفس الإحداثيات</b> (بدون قلب أو انعكاس) — المطابقة الكاملة بين الأمامي #N والخلفي #N تأتي من التطابق في X/Y/العرض/الارتفاع.
-    طريقة القلب («حافة طويلة/قصيرة») تبقى متاحة فقط لزر «طباعة تصاميم البطاقات» خيار <b>الأمامي + الخلفي</b> عند الطباعة بوجهاً واحداً في مرورين.
-    حفظ إعدادات الورقة يحفظ أيضاً مواضع بيانات البطاقة (القسم <b>ب</b>) ليطبّقا معاً على كل الطباعات.
+    الوجهان الأمامي والخلفي يستخدمان <b>نفس الفتحات بنفس الإحداثيات</b> — المطابقة الكاملة بين الأمامي #N والخلفي #N تأتي من التطابق في X/Y/العرض/الارتفاع، ويُحسب الموضع الخلفي عند الطباعة من وضع Duplex المختار في قسم <b>أ·1</b> (قلب الموضع فقط، بدون عكس الصورة).
+    حفظ إعدادات الورقة يحفظ أيضاً مواضع بيانات البطاقة (القسم <b>ب</b>) ووضع Duplex ليطبّقا معاً على كل الطباعات.
   </div>
 
   <div class="stage-wrap">
@@ -202,6 +196,52 @@
       مفاتيح الأسهم: تحريك <kbd>0.1</kbd>مم — <kbd>Shift</kbd> + سهم: <kbd>1</kbd>مم — <kbd>Esc</kbd>: إلغاء الاختيار
     </div>
   </div>
+
+  <h2 class="sec-title"><span class="step">أ·1</span> إعداد محاذاة الطباعة المزدوجة (Duplex — Front / Back)</h2>
+  <div class="note">
+    <b>الوجه الأمامي هو المرجع:</b> فتحات البطاقات (CARD_SLOTS) تُعرَّف مرة واحدة في القسم <b>أ</b>، والوجه الأمامي والخلفي
+    وطبقة بيانات الطالب يستخدمون <b>نفس الفتحات</b>. عند الطباعة الخلفية يُعاد إدخال نفس الورقة بعد قلبها، فيحسب النظام
+    موضع كل بطاقة خلفية <b>رياضياً</b> من الفتحة الأمامية وفق طريقة القلب المختارة.
+    <b>الصورة لا تُعكس أبداً</b> (لا scaleX(-1) ولا rotateY) — يُقلب الموضع فقط.
+    <b>إزاحة X/Y</b> إزاحة عامة واحدة تُطبَّق على البطاقات الثمانية معاً لتعويض انحراف تغذية الطابعة، وليست إحداثيات لكل بطاقة.
+  </div>
+  <div class="toolbar">
+    <label for="duplex-mode">وضع الطباعة المزدوجة (طريقة قلب الورقة عند إعادة إدخالها):</label>
+    <select id="duplex-mode">
+      <option value="none">قلب تلقائي — الطابعة تقلب الورقة (Duplex مدمج)</option>
+      <option value="long">A4 Duplex — قلب على الحافة الطويلة</option>
+      <option value="short">A4 Duplex — قلب على الحافة القصيرة</option>
+    </select>
+    <label style="margin-inline-start:10px">إزاحة الوجه الخلفي X (مم): <input id="duplex-dx" type="number" step="0.1" value="0" style="width:70px"></label>
+    <label>Y (مم): <input id="duplex-dy" type="number" step="0.1" value="0" style="width:70px"></label>
+    <span class="spacer"></span>
+    <button id="duplex-view-btn">◑ معاينة: الأمامي + الخلفي (Overlay)</button>
+    <button id="duplex-test-btn" class="primary">🧪 اختبار تطابق Front / Back</button>
+  </div>
+  <div class="note" id="duplex-hint"></div>
+  <div class="duplex-box">
+    <div class="duplex-cap">أمامي وخلفي فوق بعضهما — البطاقة الخلفية #N تقع فوق الأمامية #N (نفس CARD_SLOTS)</div>
+    <div class="duplex-stage" id="duplex-stage"></div>
+    <div class="duplex-sliders">
+      <label>شفافية الوجه الأمامي: <input id="duplex-fo" type="range" min="0" max="100" value="50"> <span id="duplex-fo-v">50%</span></label>
+      <label>شفافية الوجه الخلفي: <input id="duplex-bo" type="range" min="0" max="100" value="50"> <span id="duplex-bo-v">50%</span></label>
+    </div>
+  </div>
+  <style>
+    .duplex-box { background: #fff; border: 1px solid #dbe4f5; border-radius: 14px; padding: 16px 18px; margin-top: 18px; }
+    .duplex-cap { font-size: 12.5px; font-weight: 800; color: #1E3C86; margin-bottom: 10px; }
+    .duplex-stage { position: relative; width: 273px; height: 386px; background: #fff; border: 1px solid #c4d0ea; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 16px rgba(30,60,134,.08); direction: ltr; }
+    .duplex-layer { position: absolute; inset: 0; }
+    .duplex-card { position: absolute; box-sizing: border-box; transform-origin: 0 0; }
+    .duplex-card img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+    .duplex-card span { position: absolute; top: 1px; right: 1px; background: rgba(255,255,255,0.92); font-family: 'Tajawal', Arial, sans-serif; font-weight: 900; font-size: 9px; color: #b3362f; padding: 1px 4px; border-radius: 4px; z-index: 2; }
+    .duplex-card.front { border: 0.6px solid #d32f2f; }
+    .duplex-card.back { border: 0.6px dashed #1d4ed8; }
+    .duplex-card.back span { color: #1d4ed8; }
+    .duplex-sliders { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 12px; align-items: center; }
+    .duplex-sliders label { font-size: 12px; font-weight: 700; color: #5b6b96; display: flex; align-items: center; gap: 8px; }
+    .duplex-sliders input[type=range] { width: 130px; }
+  </style>
 
   <h2 class="sec-title"><span class="step">ب</span> بيانات البطاقة — العناصر داخل كل فتحة</h2>
   <div class="toolbar">
@@ -330,7 +370,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-  <script src="js/studentCardRenderer.js?v=16"></script>
+  <script src="js/studentCardRenderer.js?v=17"></script>
 <script>
 (function () {
   var R = window.StudentCardRenderer;
@@ -407,6 +447,66 @@
     stage.innerHTML = slotsHtml + gridHtml;
     stage.classList.toggle('a4-no-design', a4DesignHidden());
     R.hydrateRoot(stage, RECORD);
+    renderDuplexPreview();
+  }
+
+  // ── duplex (front/back alignment) preview ────────────────────────────
+  var duplexView = 'overlay';
+  var DUP_SCALE = 1.3; // px per mm on the duplex preview
+  function duplexConf() {
+    return {
+      mode: document.getElementById('duplex-mode').value,
+      dx: parseFloat(document.getElementById('duplex-dx').value) || 0,
+      dy: parseFloat(document.getElementById('duplex-dy').value) || 0
+    };
+  }
+  function duplexLabel(m) {
+    return m === 'long' ? 'قلب على الحافة الطويلة' : m === 'short' ? 'قلب على الحافة القصيرة' : 'قلب تلقائي (الطابعة)';
+  }
+  function duplexLayerHTML(slots, img, cls, usePhysical) {
+    var conf = duplexConf();
+    return '<div class="duplex-layer duplex-' + cls + '">' + slots.map(function (s, i) {
+      var p = usePhysical ? R.physicalBackSlot(s, conf.mode, conf.dx, conf.dy) : s;
+      return '<div class="duplex-card ' + cls + '" style="left:' + (p.x * DUP_SCALE) + 'px;top:' + (p.y * DUP_SCALE) + 'px;width:' + (p.w * DUP_SCALE) + 'px;height:' + (p.h * DUP_SCALE) + 'px;transform:rotate(' + (p.rot || 0) + 'deg);transform-origin:0 0">' +
+        '<img src="' + img + '" alt=""><span>' + (i + 1) + '</span></div>';
+    }).join('') + '</div>';
+  }
+  function renderDuplexPreview() {
+    var stage = document.getElementById('duplex-stage');
+    if (!stage) return;
+    stage.innerHTML = duplexLayerHTML(SLOTS, FRONT_IMG, 'front', false) + duplexLayerHTML(SLOTS, BACK_IMG, 'back', true);
+    duplexOpa();
+    applyDuplexView();
+    updateDuplexHint();
+  }
+  function applyDuplexView() {
+    var f = document.querySelector('.duplex-front'), b = document.querySelector('.duplex-back');
+    if (!f || !b) return;
+    f.style.display = (duplexView === 'back') ? 'none' : 'block';
+    b.style.display = (duplexView === 'front') ? 'none' : 'block';
+    var btn = document.getElementById('duplex-view-btn');
+    if (!btn) return;
+    btn.textContent = duplexView === 'overlay' ? '◑ معاينة: الأمامي + الخلفي (Overlay)' : duplexView === 'front' ? '◐ معاينة: الأمامي فقط' : '◒ معاينة: الخلفي فقط (موضع الطباعة)';
+    btn.title = 'وضع Duplex: ' + duplexLabel(duplexConf().mode);
+  }
+  function duplexOpa() {
+    var fo = parseFloat(document.getElementById('duplex-fo').value) || 0;
+    var bo = parseFloat(document.getElementById('duplex-bo').value) || 0;
+    var f = document.querySelector('.duplex-front');
+    var b = document.querySelector('.duplex-back');
+    if (f) f.style.opacity = fo / 100;
+    if (b) b.style.opacity = bo / 100;
+    var fv = document.getElementById('duplex-fo-v');
+    var bv = document.getElementById('duplex-bo-v');
+    if (fv) fv.textContent = fo + '%';
+    if (bv) bv.textContent = bo + '%';
+  }
+  function updateDuplexHint() {
+    var el = document.getElementById('duplex-hint');
+    if (!el) return;
+    var conf = duplexConf();
+    el.innerHTML = 'وضع Duplex: <b>' + duplexLabel(conf.mode) + '</b> — الإزاحة العامة: <b>' + conf.dx.toFixed(2) + ' / ' + conf.dy.toFixed(2) + ' مم</b> (تُطبَّق على البطاقات الثمانية معاً).<br>' +
+      'الوجه الخلفي يُطبع على <b>نفس CARD_SLOTS</b>، يُحسب الموضع فقط حسب طريقة القلب والصورة تبقى طبيعية. لضبط الإزاحة: اطبع ورقة الاختبار، قِس الانحراف الفعلي وأدخله بالاتجاه الصحيح حتى يختفي في الطبعة التالية.';
   }
   function applySlotEl(idx) {
     var s = SLOTS[idx];
@@ -547,9 +647,11 @@
   });
   document.getElementById('a4-save-btn').addEventListener('click', function () {
     if (!SLOTS.length) { toast('أضف فتحة بطاقة أولاً ثم احفظ'); return; }
-    var ok = R.saveSheetLayout({ slots: SLOTS, flip: document.getElementById('flip-method').value });
+    var save = { slots: SLOTS.slice(), duplex: duplexConf() };
+    if (save.duplex.mode === 'long' || save.duplex.mode === 'short') save.flip = save.duplex.mode;
+    var ok = R.saveSheetLayout(save);
     R.saveCalibration(cal());
-    toast(ok ? 'تم حفظ إعدادات ورقة A4 (بما فيها طريقة القلب) — ستنطبق على كل الطباعات' : 'تعذّر حفظ إعدادات الورقة');
+    toast(ok ? 'تم حفظ إعدادات ورقة A4 (المواضع + وضع Duplex) — ستنطبق على كل الطباعات' : 'تعذّر حفظ إعدادات الورقة');
   });
   document.getElementById('a4-reset-btn').addEventListener('click', function () {
     document.getElementById('a4-reset-modal').classList.remove('hidden');
@@ -586,7 +688,7 @@
   // keeps its natural orientation (right stays right).
   function cloneSlots() { return SLOTS.map(function (s) { return { x: s.x, y: s.y, w: s.w, h: s.h, rot: s.rot || 0 }; }); }
   function designType() { return document.querySelector('#dp-type button.on').getAttribute('data-v'); }
-  function designFlip() { return document.getElementById('flip-method').value; }
+  function designFlip() { return duplexConf().mode; }
   function slotsForSide(side) {
     var slots = cloneSlots();
     if (side === 'back') slots = slots.map(function (s) { return R.flipSlot(s, designFlip()); });
@@ -669,8 +771,25 @@
       renderDesignPreview();
     });
   });
-  document.getElementById('flip-method').addEventListener('change', function () {
-    if (!document.getElementById('design-print-modal').classList.contains('hidden')) renderDesignPreview();
+  ['duplex-mode', 'duplex-dx', 'duplex-dy'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', function () {
+      renderDuplexPreview();
+      if (!document.getElementById('design-print-modal').classList.contains('hidden')) renderDesignPreview();
+    });
+  });
+  document.getElementById('duplex-view-btn').addEventListener('click', function () {
+    duplexView = duplexView === 'overlay' ? 'front' : duplexView === 'front' ? 'back' : 'overlay';
+    applyDuplexView();
+  });
+  ['duplex-fo', 'duplex-bo'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', duplexOpa);
+  });
+  document.getElementById('duplex-test-btn').addEventListener('click', function () {
+    if (!SLOTS.length) { toast('أضف فتحة بطاقة أولاً ثم اختبر تطابق الوجهين'); return; }
+    var win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) { toast('الرجاء السماح بالنوافذ المنبثقة'); return; }
+    win.document.write(R.buildDuplexTestSheetHTML());
+    win.document.close();
   });
   document.getElementById('dp-cancel').addEventListener('click', function () {
     document.getElementById('design-print-modal').classList.add('hidden');
@@ -1149,7 +1268,12 @@
 
   var lay = R.getSheetLayout();
   if (lay && Array.isArray(lay.slots)) SLOTS = lay.slots;
-  if (lay && lay.flip) document.getElementById('flip-method').value = lay.flip;
+  if (lay) {
+    var dm = (lay.duplex && lay.duplex.mode) || lay.flip || 'long';
+    document.getElementById('duplex-mode').value = (dm === 'long' || dm === 'short' || dm === 'none') ? dm : 'long';
+    if (lay.duplex && typeof lay.duplex.dx === 'number') document.getElementById('duplex-dx').value = lay.duplex.dx;
+    if (lay.duplex && typeof lay.duplex.dy === 'number') document.getElementById('duplex-dy').value = lay.duplex.dy;
+  }
   buildA4Rulers();
   buildRulers();
   renderA4Stage();
@@ -1161,3 +1285,4 @@
 </script>
 </body>
 </html>
+
