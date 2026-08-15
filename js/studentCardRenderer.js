@@ -26,13 +26,14 @@
 //  right-aligned text rows, x is the position of the row's RIGHT edge
 //  measured from the card's LEFT edge (so dragging right always raises x).
 //
-//  A4 MULTI-CARD SHEETS:
-//  Card designs are pre-printed onto A4 (210 × 297 mm). A saved SHEET
-//  LAYOUT (localStorage) defines an ordered list of card SLOTS (x/y/w/h/
-//  rotation on the A4). The data layer is printed only inside the chosen
-//  slot using the same slot-relative CAL coordinates, so the site prints
-//  ONLY the transparent data layer over the pre-printed A4. A separate
-//  test sheet prints the slot outlines for overlay verification.
+//  A4 MULTI-CARD SHEETS (two-pass workflow):
+//  Step 1 — buildA4FrontSheetHTML(): prints the FRONT sheet with the 8 card
+//  designs (studentidcardfront1.jpg) at the saved CARD_SLOTS (x/y/w/h/rotation
+//  on the A4). Step 2 — buildA4PrintHTML(): after re-feeding the same paper,
+//  prints the BACK for ONE chosen card inside its slot — either the transparent
+//  data layer only ('info') or the back design + data ('back'). BOTH faces use
+//  the SAME CARD_SLOTS at the SAME X/Y/W/H — no mirror, no flip — so Back #N
+//  lands exactly behind Front #N. The front sheet is never reprinted with data.
 // ═══════════════════════════════════════════════════════════
 
 const StudentCardRenderer = (function () {
@@ -646,7 +647,7 @@ ${TAJWAL_FACES}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=15"><\/script>
+<script src="js/studentCardRenderer.js?v=16"><\/script>
 </head><body>
 <div class="ec-data-layer">${dataLayerHTML(r)}${grid}</div>
 <script>
@@ -700,7 +701,7 @@ ${TAJWAL_FACES}
 </head><body>
   <div class="wrap"><div class="cap">${value}</div><div id="bc"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=15"></script>
+<script src="js/studentCardRenderer.js?v=16"></script>
 <script>
   (function () {
     var value = '${value}';
@@ -778,37 +779,49 @@ ${A4_GRID_CSS}`;
     return `left:${_u(su,U,g.dx)};top:${_u(su,U,g.dy)};width:${_u(su,U,g.dw)};height:${_u(su,U,g.dh)}`;
   }
 
-  // Print ONLY the transparent data layer for one student on ONE slot of a
-  // pre-printed A4 sheet. 210×297 mm page, transparent background (never
-  // prints white over the design). No slot outlines, no grid, no designs.
-  // Every back card design is shown on screen ONLY (hidden in @media print)
-  // so the print PREVIEW looks exactly like the finished sheet (all Back #1..#8
-  // designs + the student's data on the chosen slot only); the actual print
-  // emits just the transparent data layer for the chosen slot. If the saved
-  // sheet layout (or opts.flip) has a flip method, every slot is mirrored to
-  // the back-of-sheet feed coordinates (x = 210−x−w / y = 297−y−h) so the
-  // data lands on the back of the correct card. The content is NOT mirrored:
-  // paper alignment comes from the slot position transform only, and the
-  // image/data keep their natural orientation (right stays right).
-  // Transparent print OVERLAY only. The A4 sheet is already pre-printed with
-  // the card designs, so this layer sends ONLY the student data (text + QR +
-  // barcode) to the printer. The on-screen design ghost (.ec-a4-ghost) is a
-  // preview helper only and is always hidden in @media print — the design
-  // image never reaches the print output.
+  // ── A4 two-pass workflow (print this page in step 2) ─────────────────
+  // Step 1 (buildA4FrontSheetHTML): print the FRONT sheet — 8 front designs
+  // at the saved CARD_SLOTS, no data. Step 2 (this function): re-feed the
+  // SAME paper and print the BACK for ONE chosen card in its slot.
+  //   opts.mode = 'info' (default): transparent data layer ONLY (name, ID,
+  //     stream, date, QR, barcode, QR/barcode background rectangles) inside
+  //     the chosen slot — for back cards that were already printed.
+  //   opts.mode = 'back': the BACK design (studentidcardback1.jpg) PLUS the
+  //     student data together inside the chosen slot only; all other slots
+  //     stay empty in the print output.
+  // BOTH faces use the SAME saved CARD_SLOTS at the SAME X/Y/W/H — NO mirror,
+  // NO scaleX(-1), NO flip. The back design keeps its natural orientation;
+  // perfect Front #N / Back #N alignment comes from the identical geometry.
+  // PREVIEW vs PRINT: every back design is drawn on screen on all 8 slots so
+  // the print PREVIEW looks exactly like the finished sheet; the ghosts are
+  // hidden in @media print, and only the chosen slot's content reaches the
+  // printer (info layer only — or the real .ec-a4-back design + info).
+  // opts.flip may still force a legacy back-of-sheet geometric transform
+  // ('long'/'short'), but the new admin workflow never passes it.
   function buildA4PrintHTML(r, slotIndex, opts) {
     const sheet = (opts && opts.sheet) || getSheetLayout();
     if (!sheet || !sheet.slots || !sheet.slots[slotIndex]) return null;
-    const flip = (opts && opts.flip) || sheet.flip || null;
+    const flip = opts && (opts.flip === 'long' || opts.flip === 'short') ? opts.flip : null;
     const slots = sheet.slots.map(s => (flip ? flipSlot(s, flip) : s));
     const slot = slots[slotIndex];
     const data = JSON.stringify(r).replace(/<\//g, '<\\/');
     const g = a4DataGeom(slot);
     const sc = g.sc;
+    const mode = (opts && opts.mode === 'back') ? 'back' : 'info';
     const slotsHtml = slots.map((s, i) => {
       const gs = a4DataStyle(s, 'mm', 1);
-      const dataHtml = i === slotIndex ? `<div class="ec-a4-data" style="${gs}">${dataLayerHTML(r)}</div>` : '';
+      const isSel = i === slotIndex;
+      let backHtml = '';
+      if (mode === 'back') {
+        backHtml = isSel
+          ? `<div class="ec-a4-back" style="${gs}"><img src="${BACK_IMG}" alt=""></div>`
+          : `<div class="ec-a4-ghost" style="${gs}"><img src="${BACK_IMG}" alt=""></div>`;
+      } else {
+        backHtml = `<div class="ec-a4-ghost" style="${gs}"><img src="${BACK_IMG}" alt=""></div>`;
+      }
+      const dataHtml = isSel ? `<div class="ec-a4-data" style="${gs}">${dataLayerHTML(r)}</div>` : '';
       return `<div class="ec-a4-slot" style="${a4SlotStyle(s, 'mm', 1)}">
-    <div class="ec-a4-ghost" style="${gs}"><img src="${BACK_IMG}" alt=""></div>
+    ${backHtml}
     ${dataHtml}
   </div>`;
     }).join('');
@@ -823,12 +836,14 @@ ${TAJWAL_FACES}
   .ec-a4-slot { position: absolute; transform-origin: 0 0; }
   .ec-a4-ghost { position: absolute; overflow: hidden; }
   .ec-a4-ghost img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .ec-a4-back { position: absolute; overflow: hidden; }
+  .ec-a4-back img { width: 100%; height: 100%; object-fit: contain; display: block; }
   .ec-a4-data { position: absolute; }
   ${dlRules('mm', sc, sc, '', opts && opts.textColor)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=15"><\/script>
+<script src="js/studentCardRenderer.js?v=16"><\/script>
 </head><body>
 <div class="ec-a4">
   ${slotsHtml}
@@ -856,6 +871,50 @@ ${TAJWAL_FACES}
   }
   setTimeout(go, 300);
   window.onafterprint = function () { setTimeout(function () { try { window.close(); } catch (e) {} }, 250); };
+})();
+<\/script>
+</body></html>`;
+  }
+
+  // ── A4 two-pass workflow (print this page in step 1) ─────────────────
+  // FRONT sheet: the 8 front designs (studentidcardfront1.jpg) at the saved
+  // CARD_SLOTS — same X/Y/W/H used later for the back, no flip, no mirror,
+  // no student data. This is the pre-printed base sheet; the site NEVER
+  // reprints these designs when printing student info (see buildA4PrintHTML).
+  // Uses the saved sheet layout, or the default 2×4 grid when none exists.
+  function buildA4FrontSheetHTML(opts) {
+    const sheet = (opts && opts.sheet) || getSheetLayout();
+    const slots = (sheet && sheet.slots && sheet.slots.length) ? sheet.slots : defaultSlotGrid(2, 4);
+    const slotsHtml = slots.map(s =>
+      `<div class="ec-a4-front-slot" style="${a4SlotStyle(s, 'mm', 1)}"><img src="${FRONT_IMG}" alt=""></div>`
+    ).join('');
+    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>الوجه الأمامي — ورقة A4 (بطاقات)</title>
+<style>
+  @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  * { box-sizing: border-box; }
+  @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }
+  .ec-a4 { position: relative; width: ${A4_W_MM}mm; height: ${A4_H_MM}mm; overflow: hidden; }
+  .ec-a4-front-slot { position: absolute; transform-origin: 0 0; background: #ffffff; }
+  .ec-a4-front-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
+</style>
+</head><body>
+<div class="ec-a4">${slotsHtml}</div>
+<script>
+(function () {
+  var tries = 0;
+  function go() {
+    var imgs = document.querySelectorAll('.ec-a4-front-slot img');
+    var ready = true;
+    for (var i = 0; i < imgs.length; i++) {
+      if (!imgs[i].complete || imgs[i].naturalWidth === 0) { ready = false; break; }
+    }
+    if (ready || tries++ > 40) { try { window.focus(); window.print(); } catch (e) {} }
+    else { setTimeout(go, 250); }
+  }
+  setTimeout(go, 300);
+  window.onafterprint = function () { setTimeout(function () { try { window.close(); } catch (e) {} }, 250); };
+  setTimeout(function () { try { window.close(); } catch (e) {} }, 120000);
 })();
 <\/script>
 </body></html>`;
@@ -903,7 +962,7 @@ ${TAJWAL_FACES}
     injectCSS, renderPair, portalFaces, buildPrintHTML, hydratePrint, hydrateRoot,
     dataLayerHTML, dlRules, gridOverlayHTML, GRID_CSS,
     a4SheetCSS, a4SlotStyle, a4DataStyle, a4DataGeom, a4GridOverlayHTML, A4_GRID_CSS,
-    buildA4PrintHTML, buildA4TestSheetHTML,
+    buildA4PrintHTML, buildA4TestSheetHTML, buildA4FrontSheetHTML,
     renderBarcodeSVG, buildBarcodePrintHTML
   };
 })();
