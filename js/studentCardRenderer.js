@@ -707,9 +707,14 @@ ${A4_GRID_CSS}`;
   // data lands on the back of the correct card. The content is NOT mirrored:
   // paper alignment comes from the slot position transform only, and the
   // image/data keep their natural orientation (right stays right).
+  // opts.printDesign=true keeps the design image IN the print output, so the
+  // whole card (design + data) prints in a single run. This is the ONLY way a
+  // normal printer can show white text: the white letters print as a knockout
+  // (no ink) and appear as paper-white over the printed design underneath.
   function buildA4PrintHTML(r, slotIndex, opts) {
     const sheet = (opts && opts.sheet) || getSheetLayout();
     if (!sheet || !sheet.slots || !sheet.slots[slotIndex]) return null;
+    const printDesign = !!(opts && opts.printDesign);
     const flip = (opts && opts.flip) || sheet.flip || null;
     const slots = sheet.slots.map(s => (flip ? flipSlot(s, flip) : s));
     const slot = slots[slotIndex];
@@ -729,7 +734,7 @@ ${A4_GRID_CSS}`;
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
   html, body { margin: 0; padding: 0; background: transparent; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   * { box-sizing: border-box; }
-  @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } .ec-a4-ghost { display: none !important; } }
+  @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } ${printDesign ? '.ec-a4-ghost { display: block !important; }' : '.ec-a4-ghost { display: none !important; }'} }
   .ec-a4 { position: relative; width: ${A4_W_MM}mm; height: ${A4_H_MM}mm; overflow: hidden; }
   .ec-a4-slot { position: absolute; transform-origin: 0 0; }
   .ec-a4-ghost { position: absolute; overflow: hidden; }
