@@ -613,14 +613,15 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
       : '';
     const bgEls = omitBg ? '' : `
       <svg class="ec-dl-qrbg" data-cal="qrbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.qrBg.radius}" ry="${CAL.qrBg.radius}" fill="${CAL.qrBg.color === 'transparent' ? 'none' : CAL.qrBg.color}"/></svg>
+      <svg class="ec-dl-bcbg" data-cal="bcbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.bcBg.radius}" ry="${CAL.bcBg.radius}" fill="${CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color}"/></svg>`;
+    const codeEls = `
       <div class="ec-dl-qr" data-ec-role="qr" data-cal="qr"></div>
-      <svg class="ec-dl-bcbg" data-cal="bcbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.bcBg.radius}" ry="${CAL.bcBg.radius}" fill="${CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color}"/></svg>
       <div class="ec-dl-bc" data-ec-role="barcode" data-cal="barcode"></div>`;
     return `<div class="ec-dl">
       <div class="ec-dl-row ec-dl-r1" data-cal="name"><span class="ec-dl-label">الاسم الكامل</span><span class="ec-dl-value">${n}</span></div>
       <div class="ec-dl-row ec-dl-r2" data-cal="id"><span class="ec-dl-label">Student ID</span><span class="ec-dl-value id">${r.id || ''}</span></div>
       ${streamRow}
-      <div class="ec-dl-row ec-dl-r4" data-cal="date"><span class="ec-dl-label">تاريخ التسجيل</span><span class="ec-dl-value date">${regDate(r)}</span></div>${bgEls}
+      <div class="ec-dl-row ec-dl-r4" data-cal="date"><span class="ec-dl-label">تاريخ التسجيل</span><span class="ec-dl-value date">${regDate(r)}</span></div>${bgEls}${codeEls}
       ${CAL.shapes.map((s, i) => `<div class="ec-dl-shape ec-dl-shape${i}" data-cal="shape${i}"></div>`).join('')}
     </div>`;
   }
@@ -998,7 +999,7 @@ ${A4_GRID_CSS}`;
     const info = `<div class="ec-a4-info"><b>طباعة بطاقة الطالب — البطاقة #${slotIndex + 1} من ${sheet.slots.length}</b> ·
   نوع الطباعة: ${modeLabel} ·
   <span class="hi">إعدادات الطباعة: A4 · Portrait · Scale 100% · Margins None (بدون تصغير/توسيع)</span>
-  <div class="sub">المعاينة تُظهر النتيجة النهائية: تُطبع بيانات البطاقة #${slotIndex + 1} فوق الوجه الخلفي المُطابق — نفس CARD_SLOTS ونفس موضع Front #${slotIndex + 1} بالضبط. الصورة لا تُعكس.</div></div>`;
+  <div class="sub">تُطبع بيانات البطاقة #${slotIndex + 1} (الاسم الكامل، Student ID، الشعبة، تاريخ التسجيل، QR والباركود) فوق الوجه الخلفي المُطابق — نفس CARD_SLOTS ونفس موضع Front #${slotIndex + 1} بالضبط. الصورة لا تُعكس.</div></div>`;
     return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>بطاقة الطالب - ${fullName(r)}</title>
 ${TAJWAL_FACES}
 <style>
