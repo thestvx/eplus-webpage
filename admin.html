@@ -2976,6 +2976,9 @@
         .sr-slot-cell{position:absolute;border:1.5px solid #cbd5e1;background:rgba(15,23,42,0.03);color:#64748b;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;transition:all .15s;box-sizing:border-box;font-family:'Tajawal',sans-serif}
         .sr-slot-cell:hover{border-color:var(--primary);color:var(--primary)}
         .sr-slot-cell.slot-active{border:2px solid #059669;background:rgba(16,185,129,0.12);color:#059669;box-shadow:0 0 0 2px rgba(16,185,129,.25)}
+        .sr-view-btn{border:1.5px solid #cbd5e1;background:#fff;color:#64748b;font-weight:800;font-size:11.5px;padding:5px 12px;border-radius:8px;cursor:pointer;transition:all .15s;font-family:'Tajawal',sans-serif}
+        .sr-view-btn:hover{border-color:var(--primary);color:var(--primary)}
+        .sr-view-btn.active{border-color:var(--primary);background:var(--primary);color:#fff}
       </style>
       <div class="teacher-modal-bg" id="sr-slot-modal">
         <div class="teacher-modal" style="max-width:460px">
@@ -2986,8 +2989,13 @@
           </div>
           <div class="teacher-modal-body" style="padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px">
             <div id="sr-slot-map" style="position:relative;width:210px;height:297px;background:#fff;border:2px solid var(--border);border-radius:8px;overflow:hidden;direction:ltr;box-shadow:0 4px 16px rgba(0,0,0,.08)"></div>
+            <div style="display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap">
+              <span style="font-size:12px;color:var(--text-muted);font-weight:700">عرض:</span>
+              <button type="button" class="sr-view-btn active" data-v="back" onclick="srSetSlotView('back')">🖨️ ورقة الخلف (المطبوع)</button>
+              <button type="button" class="sr-view-btn" data-v="front" onclick="srSetSlotView('front')">📄 الوجه الأمامي (المرجع)</button>
+            </div>
             <div id="sr-slot-warn" class="hidden" style="font-size:11.5px;color:#b45309;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-weight:800;text-align:center;max-width:380px">⚠️ لا توجد مواضع محفوظة لورقة A4 — تستخدم الشبكة الافتراضية (8 بطاقات). لضبط المواضع بدقة افتح <b>calibration-print.html</b> وحدد مواضع البطاقات واحفظها.</div>
-            <div style="font-size:11.5px;color:var(--text-muted);font-weight:700;text-align:center">المواضع هنا مطابقة تماماً لمواضع ورقة A4 الأمامية المطبوعة (بطاقة #N = الفتحة رقم N — نفس X/Y/العرض/الارتفاع من CARD_SLOTS). عند الطباعة الخلفية يُحسب الموضع رياضياً حسب وضع Duplex المحفوظ (قلب الموضع فقط، الصورة لا تُعكس أبداً). اختر رقم البطاقة، ثم حدد نوع الطباعة واضغط «طباعة» — تُطبع البطاقة #N فقط على الوجه الخلفي.</div>
+            <div style="font-size:11.5px;color:var(--text-muted);font-weight:700;text-align:center">الخريطة تعرض مواضع الطباعة الفعلية على ورقة A4 حسب وضع Duplex المحفوظ: في عرض «ورقة الخلف» تظهر البطاقة #N في الموضع الذي سيُطبع عليه محتواها فعلاً (لا الصورة تُعكس — فقط الموضع يُحسب بقلب الإحداثيات). اختر رقم البطاقة، ثم حدد نوع الطباعة واضغط «طباعة» — يخرج المحتوى في نفس الموضع الذي تراه، وبعد قلب الورقة يقع خلف البطاقة #N الأمامية.</div>
             <div id="sr-duplex-warn" class="hidden" style="font-size:11.5px;color:#b45309;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-weight:800;text-align:center;max-width:380px">⚠️ وضع Duplex مضبوط على «قلب تلقائي (الطابعة)». إن كانت طابعتك تُقلب الورقة تلقائياً فلا حاجة لأي شيء. وإن كنت تقلب الورقة يدوياً فحدد وضع القلب (طويلة/قصيرة) في <b>calibration-print.html</b> ثم احفظ.</div>
           </div>
           <div style="padding:0 24px 6px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:12.5px;color:var(--text-muted);font-weight:700">
@@ -23095,6 +23103,7 @@ let srConfirmTarget = null;
 let srCurrentCard = null;
 let srSelectedSlotIndex = 0;
 let srActiveLayout = null;
+let srSlotView = 'back';
 
 async function srFetch(url, options) {
   return fetch(url, {
@@ -23487,14 +23496,35 @@ function srPrintCard() {
     if (warn) warn.classList.add('hidden');
   }
   const dwarn = document.getElementById('sr-duplex-warn');
-  const dmode = srActiveLayout && srActiveLayout.duplex && srActiveLayout.duplex.mode;
+  const dmode = StudentCardRenderer.duplexFromSheet(srActiveLayout).mode;
   if (dwarn) dwarn.classList.toggle('hidden', dmode !== 'none');
   srSelectedSlotIndex = 0;
-  const map = document.getElementById('sr-slot-map');
-  map.innerHTML = srActiveLayout.slots.map((s, i) => {
-    return `<button type="button" class="sr-slot-cell${i === 0 ? ' slot-active' : ''}" data-i="${i}" onclick="srPickSlot(${i})" style="left:${s.x}px;top:${s.y}px;width:${s.w}px;height:${s.h}px;transform:rotate(${s.rot || 0}deg);transform-origin:0 0">${i + 1}</button>`;
-  }).join('');
+  srSlotView = 'back';
+  document.querySelectorAll('.sr-view-btn').forEach(b => b.classList.toggle('active', b.dataset.v === 'back'));
+  srRenderSlotMap();
   document.getElementById('sr-slot-modal').classList.add('open');
+}
+
+function srSlotDisp(i) {
+  const s = srActiveLayout.slots[i];
+  if (srSlotView === 'front') return s;
+  const d = StudentCardRenderer.duplexFromSheet(srActiveLayout);
+  if (d.mode === 'none') return s;
+  return StudentCardRenderer.duplexBackSlot(s, d.mode, d.dx, d.dy);
+}
+
+function srRenderSlotMap() {
+  const map = document.getElementById('sr-slot-map');
+  map.innerHTML = srActiveLayout.slots.map((_, i) => {
+    const s = srSlotDisp(i);
+    return `<button type="button" class="sr-slot-cell${i === srSelectedSlotIndex ? ' slot-active' : ''}" data-i="${i}" onclick="srPickSlot(${i})" style="left:${s.x}px;top:${s.y}px;width:${s.w}px;height:${s.h}px;transform:rotate(${s.rot || 0}deg);transform-origin:0 0">${i + 1}</button>`;
+  }).join('');
+}
+
+function srSetSlotView(v) {
+  srSlotView = v === 'front' ? 'front' : 'back';
+  document.querySelectorAll('.sr-view-btn').forEach(b => b.classList.toggle('active', b.dataset.v === srSlotView));
+  srRenderSlotMap();
 }
 
 function srCloseSlotModal() {
