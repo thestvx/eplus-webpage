@@ -1,18 +1,18 @@
-﻿// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-//  StudentCardRenderer â€” SINGLE source of truth for the student
+// ═══════════════════════════════════════════════════════════
+//  StudentCardRenderer — SINGLE source of truth for the student
 //  ID card (front + back). Used identically by:
-//    â€¢ admin.html  â†’ preview modal (srShowCard)
-//    â€¢ admin.html  â†’ print / reprint (srPrintCard)
-//    â€¢ student.html â†’ portal 3D flip card (renderCardPage)
-//    â€¢ calibration-print.html â†’ live position calibration
+//    • admin.html  → preview modal (srShowCard)
+//    • admin.html  → print / reprint (srPrintCard)
+//    • student.html → portal 3D flip card (renderCardPage)
+//    • calibration-print.html → live position calibration
 //  Guarantees identical design, dims, fonts, QR and barcode
-//  everywhere. Deterministic generation â‡’ reprint always matches.
+//  everywhere. Deterministic generation ⇒ reprint always matches.
 //
 //  PRINT MODEL:
 //  The physical card/paper is ALREADY printed with the back-face
 //  design (background + logo + graphics). The site therefore only
 //  ever prints a TRANSPARENT DATA LAYER on top: name, Student ID,
-//  stream, registration date, QR + barcode â€” at FIXED mm positions
+//  stream, registration date, QR + barcode — at FIXED mm positions
 //  (see CAL below) that must line up with the pre-printed design.
 //  No background image, logo or design is ever printed by the site.
 //
@@ -22,18 +22,18 @@
 //  save them. A saved calibration is stored in localStorage and is
 //  picked up automatically by every future print (admin print/reprint,
 //  student portal preview, the print window). All coordinates are
-//  relative to the top-left of the 85.6 Ã— 53.98 mm card. For the
+//  relative to the top-left of the 85.6 × 53.98 mm card. For the
 //  right-aligned text rows, x is the position of the row's RIGHT edge
 //  measured from the card's LEFT edge (so dragging right always raises x).
 //
 //  A4 MULTI-CARD SHEETS:
-//  Card designs are pre-printed onto A4 (210 Ã— 297 mm). A saved SHEET
+//  Card designs are pre-printed onto A4 (210 × 297 mm). A saved SHEET
 //  LAYOUT (localStorage) defines an ordered list of card SLOTS (x/y/w/h/
 //  rotation on the A4). The data layer is printed only inside the chosen
 //  slot using the same slot-relative CAL coordinates, so the site prints
 //  ONLY the transparent data layer over the pre-printed A4. A separate
 //  test sheet prints the slot outlines for overlay verification.
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════
 
 const StudentCardRenderer = (function () {
   const FRONT_IMG = 'studentidcard/studentidcardfront1.jpg';
@@ -46,11 +46,11 @@ const StudentCardRenderer = (function () {
 
   const STORE_KEY = 'eplus-card-calibration-v1';
 
-  // â”€â”€ DEFAULT CALIBRATION (millimetres) â”€â”€
+  // ── DEFAULT CALIBRATION (millimetres) ──
   // name/id/stream/date are right-aligned text rows; x = RIGHT edge from the
-  // card's LEFT edge (default 85.6 âˆ’ 20.5 = 65.1 mm), y = row top.
+  // card's LEFT edge (default 85.6 − 20.5 = 65.1 mm), y = row top.
   // qr/barcode are left-aligned boxes; x = left edge, y = top.
-  // barcode w/h = null â‡’ the EAN-13 physical size from barcodeSpec() is used.
+  // barcode w/h = null ⇒ the EAN-13 physical size from barcodeSpec() is used.
   const CAL_DEFAULTS = {
     name:   { x: 65.1, y: 14.0, fontSize: 3.4 },
     id:     { x: 65.1, y: 20.4, fontSize: 3.0 },
@@ -69,8 +69,8 @@ const StudentCardRenderer = (function () {
     // never the whole card). 'transparent' = no background painted.
     textBgColor: 'transparent',
     // Independent background rectangles behind the QR and the barcode.
-    // Calibrated in the CARD section (not per A4 slot); z-order: design â†’
-    // rectangle â†’ QR/barcode. mm coordinates.
+    // Calibrated in the CARD section (not per A4 slot); z-order: design →
+    // rectangle → QR/barcode. mm coordinates.
     qrBg: { x: 4.3, y: 2.8, w: 19.4, h: 19.4, color: '#ffffff', radius: 0, z: 0 },
     bcBg: { x: 21.3, y: 38.6, w: 43.0, h: 15.38, color: '#ffffff', radius: 0, z: 0 },
     // User-added design shapes (squares/rectangles) drawn in the data layer
@@ -78,7 +78,7 @@ const StudentCardRenderer = (function () {
     shapes: []
   };
 
-  // â”€â”€ Calibration storage (shared by every page of the site) â”€â”€
+  // ── Calibration storage (shared by every page of the site) ──
   function _clone(o) { return JSON.parse(JSON.stringify(o)); }
   function _readStorage() {
     try { return JSON.parse(window.localStorage.getItem(STORE_KEY) || 'null'); }
@@ -168,7 +168,7 @@ const StudentCardRenderer = (function () {
 
   let CAL = _merge(_readStorage());
 
-  // â”€â”€ Calibration public API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Calibration public API ──────────────────────────────
   function getCalibration() { return _clone(CAL); }
   function setCalibration(cal) { CAL = _merge(cal); return getCalibration(); }
   function saveCalibration(cal) { const c = setCalibration(cal); _writeStorage(c); return c; }
@@ -190,8 +190,8 @@ const StudentCardRenderer = (function () {
     return saveCalibration(c);
   }
 
-  // â”€â”€ A4 SHEET LAYOUT (multi-card printing) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Cards are pre-printed on A4 (210 Ã— 297 mm). A SHEET is an ordered
+  // ── A4 SHEET LAYOUT (multi-card printing) ──────────────â”€
+  // Cards are pre-printed on A4 (210 × 297 mm). A SHEET is an ordered
   // list of SLOTS; each slot is an absolute position/size/rotation on the
   // A4. The data layer is printed inside the chosen slot using the SAME
   // CAL (slot-relative) coordinates, so a saved sheet + saved calibration
@@ -244,7 +244,7 @@ const StudentCardRenderer = (function () {
   function resetSheetLayout() { SHEET = null; _clearSheet(); return null; }
   function sheetStorageKey() { return SHEET_STORE_KEY; }
 
-  // Convenience default arrangement: colsÃ—rows grid of card-sized slots
+  // Convenience default arrangement: cols×rows grid of card-sized slots
   // evenly spaced on the A4 sheet (used by the sheet editor / first run).
   function defaultSlotGrid(cols, rows) {
     cols = cols || 2; rows = rows || 4;
@@ -264,15 +264,15 @@ const StudentCardRenderer = (function () {
     return slots;
   }
 
-  // â”€â”€ Back-of-sheet flip (front/back matching on the SAME A4 sheet) â”€â”€
+  // ── Back-of-sheet flip (front/back matching on the SAME A4 sheet) ──
   // The sheet is printed FRONT first, then re-fed after a physical flip to
   // print the BACK. The back face's feed coordinates are the mirror image of
   // the front face, so a slot must be mirrored to land exactly BEHIND its
   // front counterpart:
-  //   'long'  â†’ flip around the long edge (page turn): x = W âˆ’ x âˆ’ w
-  //   'short' â†’ tumble around the short edge:            y = H âˆ’ y âˆ’ h
+  //   'long'  → flip around the long edge (page turn): x = W − x − w
+  //   'short' → tumble around the short edge:            y = H − y − h
   // Rotation direction reverses under the mirror.
-  // Both faces always use the SAME source CARD_SLOTS â€” the back only applies
+  // Both faces always use the SAME source CARD_SLOTS — the back only applies
   // this deterministic geometric transform (never its own layout).
   function flipSlot(s, method) {
     const x = s.x, y = s.y, w = s.w, h = s.h, rot = s.rot || 0;
@@ -285,7 +285,7 @@ const StudentCardRenderer = (function () {
     return slots.map(s => flipSlot(s, method));
   }
 
-  // â”€â”€ GS1 EAN-13 physical standard (the REAL barcode size) â”€â”€
+  // ── GS1 EAN-13 physical standard (the REAL barcode size) ──
   const BARCODE_STD = {
     Xmm: 0.33,
     quietModules: 11,
@@ -333,7 +333,7 @@ const StudentCardRenderer = (function () {
     };
   }
 
-  // â”€â”€ Data helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Data helpers ──────────────────────────────────────â”€
   const fullName = r => `${r.first_name || ''} ${r.last_name || ''}`.trim();
   const streamOf = r => (r && (r.stream || r.stream_name || '')) || '';
   const regDate = r => {
@@ -354,17 +354,17 @@ const StudentCardRenderer = (function () {
   };
   const qrUrl = r => (r && r.student_token ? 'https://epluscenter.com/s/' + r.student_token : '');
 
-  // â”€â”€ Data-layer CSS â€” same layout in px (screen) and mm (print) â”€â”€
+  // ── Data-layer CSS — same layout in px (screen) and mm (print) ──
   // Built on demand so it always reflects the CURRENT calibration.
   // scope (optional) prefixes every selector so a second data layer can
   // coexist with the card-scale one (A4 sheet editor / admin A4 preview).
   //
   // WHITE FRAMES (replaced by the calibratable background rectangles below):
-  //  â€¢ QR and barcode each get a real coloured rectangle (default white) with
+  //  • QR and barcode each get a real coloured rectangle (default white) with
   //    configurable x/y/w/h/color/radius/z, calibrated in the CARD section.
-  //    They sit BEHIND the QR/barcode only â€” never behind the student text.
-  //  â€¢ The student text rows (name / Student ID / stream / date) stay PURE
-  //    TEXT â€” no background, no border, no card behind them.
+  //    They sit BEHIND the QR/barcode only — never behind the student text.
+  //  • The student text rows (name / Student ID / stream / date) stay PURE
+  //    TEXT — no background, no border, no card behind them.
   // Text colours. The `color` is the REAL FILL that must reach the printer.
   // The `stroke`/`strokeW` are only a design accent and must NEVER replace the
   // fill. White text is rendered with a ZERO-width stroke (no shadow): the
@@ -398,7 +398,7 @@ const StudentCardRenderer = (function () {
     const qrBgFill = CAL.qrBg.color === 'transparent' ? 'none' : CAL.qrBg.color;
     const bcBgFill = CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color;
     return `
-${sc}.ec-dl{position:absolute;inset:0;direction:rtl;text-align:right}
+${sc}.ec-dl{position:absolute;inset:0;direction:rtl;unicode-bidi:plaintext;text-align:right;font-family:'Tajawal',Arial,sans-serif}
 ${sc}.ec-dl-row{position:absolute;text-align:right;max-width:${X(CAL.label.maxWidth)};z-index:1;${textBg}}
 ${sc}.ec-dl-label{display:block;font-weight:700;line-height:1.2;color:${tc.color};text-shadow:${tc.shadow};-webkit-text-stroke:${sw} ${tc.stroke};paint-order:stroke fill}
 ${sc}.ec-dl-value{display:block;font-weight:900;line-height:1.28;color:${tc.color};text-shadow:${tc.shadow};-webkit-text-stroke:${sw} ${tc.stroke};paint-order:stroke fill}
@@ -448,7 +448,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     st.textContent = cardCSS();
   }
 
-  // â”€â”€ Markup builders (pure HTML, data-ec-role / data-cal hooks) â”€â”€â”€
+  // ── Markup builders (pure HTML, data-ec-role / data-cal hooks) ──â”€
   function frontHTML() {
     return `<div class="ec-card ec-front">
       <img class="bg ec-front-fallback" src="${FRONT_IMG}" onerror="this.style.background='linear-gradient(135deg,#6366f1,#8b5cf6)'" alt="">
@@ -459,13 +459,13 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     const n = fullName(r);
     const st = streamOf(r);
     const streamRow = st
-      ? `<div class="ec-dl-row ec-dl-r3" data-cal="stream"><span class="ec-dl-label">Ø§Ù„Ø´Ø¹Ø¨Ø©</span><span class="ec-dl-value">${st}</span></div>`
+      ? `<div class="ec-dl-row ec-dl-r3" data-cal="stream"><span class="ec-dl-label">الشعبة</span><span class="ec-dl-value">${st}</span></div>`
       : '';
     return `<div class="ec-dl">
-      <div class="ec-dl-row ec-dl-r1" data-cal="name"><span class="ec-dl-label">Ø§Ù„Ø§Ø³Ù… Ø§Ù„ÙƒØ§Ù…Ù„</span><span class="ec-dl-value">${n}</span></div>
+      <div class="ec-dl-row ec-dl-r1" data-cal="name"><span class="ec-dl-label">الاسم الكامل</span><span class="ec-dl-value">${n}</span></div>
       <div class="ec-dl-row ec-dl-r2" data-cal="id"><span class="ec-dl-label">Student ID</span><span class="ec-dl-value id">${r.id || ''}</span></div>
       ${streamRow}
-      <div class="ec-dl-row ec-dl-r4" data-cal="date"><span class="ec-dl-label">ØªØ§Ø±ÙŠØ® Ø§Ù„ØªØ³Ø¬ÙŠÙ„</span><span class="ec-dl-value date">${regDate(r)}</span></div>
+      <div class="ec-dl-row ec-dl-r4" data-cal="date"><span class="ec-dl-label">تاريخ التسجيل</span><span class="ec-dl-value date">${regDate(r)}</span></div>
       <svg class="ec-dl-qrbg" data-cal="qrbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.qrBg.radius}" ry="${CAL.qrBg.radius}" fill="${CAL.qrBg.color === 'transparent' ? 'none' : CAL.qrBg.color}"/></svg>
       <div class="ec-dl-qr" data-ec-role="qr" data-cal="qr"></div>
       <svg class="ec-dl-bcbg" data-cal="bcbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.bcBg.radius}" ry="${CAL.bcBg.radius}" fill="${CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color}"/></svg>
@@ -485,7 +485,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     return frontHTML() + backHTML(r);
   }
 
-  // â”€â”€ Barcode / QR rendering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Barcode / QR rendering ────────────────────────────â”€
   function renderBarcodeSVG(svg, value, doc) {
     if (!svg || typeof JsBarcode === 'undefined') return null;
     try {
@@ -504,7 +504,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
       svg.style.setProperty('height', box.h + 'mm');
       // Bake the background rectangle as the FIRST painted element of the
       // barcode SVG. It is real vector content (not CSS background), so the
-      // printer receives an actual filled rectangle behind the bars â€” even if
+      // printer receives an actual filled rectangle behind the bars — even if
       // the browser drops CSS backgrounds during printing. Transparent mode
       // uses fill="none" (nothing painted).
       const NS = 'http://www.w3.org/2000/svg';
@@ -553,7 +553,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     if (qrSlot) renderQR(qrSlot, qrUrl(r), (opts && opts.qrPx) || QR_SIZE * 2, doc);
   }
 
-  // â”€â”€ Calibration grid (never printed in production; used by the
+  // ── Calibration grid (never printed in production; used by the
   //    calibration page / print test to check alignment vs the
   //    pre-printed card). Fixed mm coordinates from CAL.
   function gridOverlayHTML(unit) {
@@ -600,7 +600,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 .ec-grid .ec-g-rect{position:absolute;opacity:0.40;border:0.2mm solid #d32f2f;box-sizing:border-box}
 `;
 
-  // â”€â”€ Public API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Public API ────────────────────────────────────────â”€
   function renderPair(container, r) {
     if (!container) return;
     container.innerHTML = pairHTML(r);
@@ -613,13 +613,28 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     return { front: frontHTML(), back: backHTML(r) };
   }
 
-  // Back-FACE DATA LAYER ONLY â€” transparent over the pre-printed card.
+  // Back-FACE DATA LAYER ONLY — transparent over the pre-printed card.
   // No front face, no background image, no logo, no design. Fixed mm.
   // opts.grid=true adds a calibration grid (only for the calibration print test).
+  //
+  // Local Tajawal @font-face (fonts/tajawal.css equivalents) so the printed
+  // card renders REAL Arabic shaping even though the print window is a fresh
+  // document.write page that does NOT inherit the site's Google Fonts link.
+  const TAJWAL_FACES = `<style>
+@font-face{font-family:'Tajawal';font-style:normal;font-weight:400;font-display:swap;src:url('fonts/Tajawal-Regular.woff2') format('woff2');unicode-range:U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC4,U+10EFC-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1}
+@font-face{font-family:'Tajawal';font-style:normal;font-weight:400;font-display:swap;src:url('fonts/Tajawal-Regular-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Tajawal';font-style:normal;font-weight:700;font-display:swap;src:url('fonts/Tajawal-Bold.woff2') format('woff2');unicode-range:U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC4,U+10EFC-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1}
+@font-face{font-family:'Tajawal';font-style:normal;font-weight:700;font-display:swap;src:url('fonts/Tajawal-Bold-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Tajawal';font-style:normal;font-weight:800;font-display:swap;src:url('fonts/Tajawal-ExtraBold.woff2') format('woff2');unicode-range:U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC4,U+10EFC-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1}
+@font-face{font-family:'Tajawal';font-style:normal;font-weight:800;font-display:swap;src:url('fonts/Tajawal-ExtraBold-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Tajawal';font-style:normal;font-weight:900;font-display:swap;src:url('fonts/Tajawal-Black.woff2') format('woff2');unicode-range:U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC4,U+10EFC-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1}
+@font-face{font-family:'Tajawal';font-style:normal;font-weight:900;font-display:swap;src:url('fonts/Tajawal-Black-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+</style>`;
   function buildPrintHTML(r, opts) {
     const data = JSON.stringify(r).replace(/<\//g, '<\\/');
     const grid = opts && opts.grid ? GRID_CSS + gridOverlayHTML('mm') : '';
-    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>Ø¨Ø·Ø§Ù‚Ø© Ø§Ù„Ø·Ø§Ù„Ø¨ - ${fullName(r)}</title>
+    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>بطاقة الطالب - ${fullName(r)}</title>
+${TAJWAL_FACES}
 <style>
   @page { size: ${CARD_W_MM}mm ${CARD_H_MM}mm; margin: 0; }
   html, body { margin: 0; padding: 0; background: #ffffff; }
@@ -631,7 +646,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=14"><\/script>
+<script src="js/studentCardRenderer.js?v=15"><\/script>
 </head><body>
 <div class="ec-data-layer">${dataLayerHTML(r)}${grid}</div>
 <script>
@@ -641,10 +656,19 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
   function ready() {
     return typeof window.JsBarcode !== 'undefined' && typeof window.QRCode !== 'undefined' && typeof window.StudentCardRenderer !== 'undefined';
   }
+  function fontsReady() {
+    var d = window.document;
+    if (!d.fonts) return true;
+    var p = d.fonts.load('700 16px Tajawal', '\u0627\u0644\u0639\u0631\u0628\u064a\u0629').then(function () { return true; }, function () { return true; });
+    return d.fonts.ready ? Promise.all([d.fonts.ready, p]).then(function () { return true; }) : p;
+  }
+  function doPrint() {
+    try { window.focus(); window.print(); } catch (e) {}
+  }
   function go() {
     if (!ready()) { if (tries++ < 40) { setTimeout(go, 250); return; } }
     try { if (window.StudentCardRenderer) window.StudentCardRenderer.hydratePrint(window, data); } catch (e) {}
-    setTimeout(function () { try { window.focus(); window.print(); } catch (e) {} }, 350);
+    Promise.resolve(fontsReady()).then(function () { setTimeout(doPrint, 350); });
   }
   setTimeout(go, 300);
   window.onafterprint = function () { setTimeout(function () { try { window.close(); } catch (e) {} }, 250); };
@@ -676,7 +700,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </head><body>
   <div class="wrap"><div class="cap">${value}</div><div id="bc"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=14"></script>
+<script src="js/studentCardRenderer.js?v=15"></script>
 <script>
   (function () {
     var value = '${value}';
@@ -690,8 +714,8 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
 </body></html>`;
   }
 
-  // â”€â”€ A4 sheet geometry/style helpers (unit='mm' for print,
-  //    unit='px' for on-screen with a scale) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── A4 sheet geometry/style helpers (unit='mm' for print,
+  //    unit='px' for on-screen with a scale) ────────────────
   function _u(su, U, v) { return (v * U).toFixed(3) + su; }
   function a4SlotStyle(slot, unit, scale) {
     const su = unit === 'px' ? 'px' : 'mm';
@@ -740,7 +764,7 @@ ${A4_GRID_CSS}`;
   }
 
   // Data-box geometry inside a slot: the card (CAL coordinates) is scaled
-  // UNIFORMLY to fit while preserving aspect, then centred â€” so the data
+  // UNIFORMLY to fit while preserving aspect, then centred — so the data
   // layer always lines up with an object-fit:contain design image.
   function a4DataGeom(slot) {
     const sc = Math.min(slot.w / CARD_W_MM, slot.h / CARD_H_MM);
@@ -755,21 +779,21 @@ ${A4_GRID_CSS}`;
   }
 
   // Print ONLY the transparent data layer for one student on ONE slot of a
-  // pre-printed A4 sheet. 210Ã—297 mm page, transparent background (never
+  // pre-printed A4 sheet. 210×297 mm page, transparent background (never
   // prints white over the design). No slot outlines, no grid, no designs.
   // Every back card design is shown on screen ONLY (hidden in @media print)
   // so the print PREVIEW looks exactly like the finished sheet (all Back #1..#8
   // designs + the student's data on the chosen slot only); the actual print
   // emits just the transparent data layer for the chosen slot. If the saved
   // sheet layout (or opts.flip) has a flip method, every slot is mirrored to
-  // the back-of-sheet feed coordinates (x = 210âˆ’xâˆ’w / y = 297âˆ’yâˆ’h) so the
+  // the back-of-sheet feed coordinates (x = 210−x−w / y = 297−y−h) so the
   // data lands on the back of the correct card. The content is NOT mirrored:
   // paper alignment comes from the slot position transform only, and the
   // image/data keep their natural orientation (right stays right).
   // Transparent print OVERLAY only. The A4 sheet is already pre-printed with
   // the card designs, so this layer sends ONLY the student data (text + QR +
   // barcode) to the printer. The on-screen design ghost (.ec-a4-ghost) is a
-  // preview helper only and is always hidden in @media print â€” the design
+  // preview helper only and is always hidden in @media print — the design
   // image never reaches the print output.
   function buildA4PrintHTML(r, slotIndex, opts) {
     const sheet = (opts && opts.sheet) || getSheetLayout();
@@ -788,7 +812,8 @@ ${A4_GRID_CSS}`;
     ${dataHtml}
   </div>`;
     }).join('');
-    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>Ø¨Ø·Ø§Ù‚Ø© Ø§Ù„Ø·Ø§Ù„Ø¨ - ${fullName(r)}</title>
+    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>بطاقة الطالب - ${fullName(r)}</title>
+${TAJWAL_FACES}
 <style>
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
   html, body { margin: 0; padding: 0; background: transparent; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -803,7 +828,7 @@ ${A4_GRID_CSS}`;
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=14"><\/script>
+<script src="js/studentCardRenderer.js?v=15"><\/script>
 </head><body>
 <div class="ec-a4">
   ${slotsHtml}
@@ -815,10 +840,19 @@ ${A4_GRID_CSS}`;
   function ready() {
     return typeof window.JsBarcode !== 'undefined' && typeof window.QRCode !== 'undefined' && typeof window.StudentCardRenderer !== 'undefined';
   }
+  function fontsReady() {
+    var d = window.document;
+    if (!d.fonts) return true;
+    var p = d.fonts.load('700 16px Tajawal', '\u0627\u0644\u0639\u0631\u0628\u064a\u0629').then(function () { return true; }, function () { return true; });
+    return d.fonts.ready ? Promise.all([d.fonts.ready, p]).then(function () { return true; }) : p;
+  }
+  function doPrint() {
+    try { window.focus(); window.print(); } catch (e) {}
+  }
   function go() {
     if (!ready()) { if (tries++ < 40) { setTimeout(go, 250); return; } }
     try { if (window.StudentCardRenderer) window.StudentCardRenderer.hydratePrint(window, data); } catch (e) {}
-    setTimeout(function () { try { window.focus(); window.print(); } catch (e) {} }, 350);
+    Promise.resolve(fontsReady()).then(function () { setTimeout(doPrint, 350); });
   }
   setTimeout(go, 300);
   window.onafterprint = function () { setTimeout(function () { try { window.close(); } catch (e) {} }, 250); };
@@ -835,9 +869,9 @@ ${A4_GRID_CSS}`;
     if (!sheet || !sheet.slots || !sheet.slots.length) return null;
     const grid = opts && opts.grid ? a4GridOverlayHTML('mm', 1) : '';
     const slots = sheet.slots.map((s, i) =>
-      `<div class="ec-a4-test-slot" style="${a4SlotStyle(s, 'mm', 1)}"><span class="ec-a4-num">Ø¨Ø·Ø§Ù‚Ø© #${i + 1}</span></div>`
+      `<div class="ec-a4-test-slot" style="${a4SlotStyle(s, 'mm', 1)}"><span class="ec-a4-num">بطاقة #${i + 1}</span></div>`
     ).join('');
-    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>Ø§Ø®ØªØ¨Ø§Ø± ØªØ®Ø·ÙŠØ· A4</title>
+    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>اختبار تخطيط A4</title>
 <style>
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
   html, body { margin: 0; padding: 0; background: #ffffff; }
