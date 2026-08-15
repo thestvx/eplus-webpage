@@ -333,17 +333,24 @@ const StudentCardRenderer = (function () {
   //    They sit BEHIND the QR/barcode only — never behind the student text.
   //  • The student text rows (name / Student ID / stream / date) stay PURE
   //    TEXT — no background, no border, no card behind them.
+  // Text colours. The `color` is the REAL FILL that must reach the printer.
+  // The `stroke`/`strokeW` are only a design accent and must NEVER replace the
+  // fill. White text is rendered with a ZERO-width stroke (no shadow): the
+  // solid #ffffff fill is the only thing painted, so it prints as SOLID WHITE
+  // (a rim would dominate the thin Arabic glyphs and read as an outline).
+  // Black text keeps its stronger white stroke (confirmed working).
   const TEXT_COLORS = {
-    black: { color: '#0b1b3f', shadow: '0 0 1.5px rgba(255,255,255,0.85)', stroke: 'rgba(255,255,255,0.9)' },
-    white: { color: '#ffffff', shadow: '0 0 1.5px rgba(0,0,0,0.6)', stroke: '#0b1b3f' }
+    black: { color: '#0b1b3f', shadow: '0 0 1.5px rgba(255,255,255,0.85)', stroke: 'rgba(255,255,255,0.9)', strokeW: '1.4px', strokeWmm: '0.3mm' },
+    white: { color: '#ffffff', shadow: 'none', stroke: '#0b1b3f', strokeW: '0px', strokeWmm: '0mm' }
   };
+
   function dlRules(unit, sx, sy, scope) {
     const sc = scope ? scope + ' ' : '';
     const X = v => (v * sx).toFixed(3) + unit;
     const Y = v => (v * sy).toFixed(3) + unit;
     const box = bcBox();
     const tc = TEXT_COLORS[CAL.textColor] || TEXT_COLORS.black;
-    const sw = unit === 'px' ? '1.4px' : '0.3mm';
+    const sw = unit === 'px' ? tc.strokeW : tc.strokeWmm;
     return `
 ${sc}.ec-dl{position:absolute;inset:0;direction:rtl;text-align:right}
 ${sc}.ec-dl-row{position:absolute;text-align:right;max-width:${X(CAL.label.maxWidth)};z-index:1}
