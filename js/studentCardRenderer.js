@@ -76,11 +76,14 @@ const StudentCardRenderer = (function () {
     // Optional solid fill BEHIND the student text rows only (element-scoped,
     // never the whole card). 'transparent' = no background painted.
     textBgColor: 'transparent',
-    // Independent background rectangles behind the QR and the barcode.
-    // Calibrated in the CARD section (not per A4 slot); z-order: design →
-    // rectangle → QR/barcode. mm coordinates.
-    qrBg: { x: 4.3, y: 2.8, w: 19.4, h: 19.4, color: '#ffffff', radius: 0, z: 0 },
-    bcBg: { x: 21.3, y: 38.6, w: 43.0, h: 15.38, color: '#ffffff', radius: 0, z: 0 },
+    // Background fill behind the QR and the barcode (white by default so the
+    // QR/barcode stay readable on the pre-printed design). Their POSITION and
+    // SIZE are DERIVED from the QR/barcode data boxes (qrBgGeom/bcBgGeom) so
+    // the white area is exactly the size of the printed QR/barcode; only the
+    // color / radius / z below are calibrated. z-order: design → white rect →
+    // QR/barcode.
+    qrBg: { color: '#ffffff', radius: 0, z: 0 },
+    bcBg: { color: '#ffffff', radius: 0, z: 0 },
     // User-added design shapes (squares/rectangles) drawn in the data layer
     // of every card. Each: { x, y, w, h, color, radius, z } in mm.
     shapes: []
@@ -119,12 +122,20 @@ const StudentCardRenderer = (function () {
   function _merge(saved) {
     const cal = _clone(CAL_DEFAULTS);
     if (saved && typeof saved === 'object') {
-      ['name', 'id', 'stream', 'date', 'label', 'qr', 'bc', 'qrBg', 'bcBg'].forEach(k => {
+      ['name', 'id', 'stream', 'date', 'label', 'qr', 'bc'].forEach(k => {
         const v = saved[k];
         if (v && typeof v === 'object') {
           ['x', 'y', 'w', 'h', 'fontSize', 'gap', 'maxWidth', 'radius', 'z'].forEach(p => {
             if (typeof v[p] === 'number' && isFinite(v[p])) cal[k][p] = v[p];
           });
+          if (typeof v.color === 'string') cal[k].color = _normColor(v.color, cal[k].color);
+        }
+      });
+      ['qrBg', 'bcBg'].forEach(k => {
+        const v = saved[k];
+        if (v && typeof v === 'object') {
+          if (typeof v.radius === 'number' && isFinite(v.radius)) cal[k].radius = v.radius;
+          if (typeof v.z === 'number' && isFinite(v.z)) cal[k].z = v.z;
           if (typeof v.color === 'string') cal[k].color = _normColor(v.color, cal[k].color);
         }
       });
@@ -151,14 +162,16 @@ const StudentCardRenderer = (function () {
           .filter(Boolean);
       }
     }
-    ['name', 'id', 'stream', 'date', 'qr', 'bc', 'qrBg', 'bcBg'].forEach(k => {
+    ['name', 'id', 'stream', 'date', 'label', 'qr', 'bc', 'qrBg', 'bcBg'].forEach(k => {
+      if (cal[k].fontSize !== undefined) cal[k].fontSize = Math.min(Math.max(1, cal[k].fontSize), 12);
+      if (cal[k].radius !== undefined) cal[k].radius = Math.min(Math.max(0, cal[k].radius), 20);
+      if (cal[k].z !== undefined) cal[k].z = Math.min(Math.max(-10, cal[k].z), 10);
+    });
+    ['name', 'id', 'stream', 'date', 'qr', 'bc'].forEach(k => {
       cal[k].x = Math.min(Math.max(0, cal[k].x), CARD_W_MM);
       cal[k].y = Math.min(Math.max(0, cal[k].y), CARD_H_MM);
       if (cal[k].w !== null && cal[k].w !== undefined) cal[k].w = Math.min(Math.max(1, cal[k].w), CARD_W_MM);
       if (cal[k].h !== null && cal[k].h !== undefined) cal[k].h = Math.min(Math.max(1, cal[k].h), CARD_H_MM);
-      if (cal[k].fontSize !== undefined) cal[k].fontSize = Math.min(Math.max(1, cal[k].fontSize), 12);
-      if (cal[k].radius !== undefined) cal[k].radius = Math.min(Math.max(0, cal[k].radius), 20);
-      if (cal[k].z !== undefined) cal[k].z = Math.min(Math.max(-10, cal[k].z), 10);
     });
     cal.shapes.forEach(s => {
       s.x = Math.min(Math.max(0, s.x), CARD_W_MM);
@@ -477,6 +490,24 @@ const StudentCardRenderer = (function () {
     };
   }
 
+  // The white QR/barcode background rectangles are DERIVED from the QR/barcode
+  // DATA boxes (same position, same size), so the printed white area is exactly
+  // the size/position of the printed QR and barcode — no margin around them.
+  // Only color / radius / z stay independently calibrated (CAL.qrBg / CAL.bcBg).
+  function qrBgGeom() {
+    return {
+      x: CAL.qr.x, y: CAL.qr.y, w: CAL.qr.w, h: CAL.qr.h,
+      color: CAL.qrBg.color, radius: CAL.qrBg.radius, z: CAL.qrBg.z
+    };
+  }
+  function bcBgGeom() {
+    const box = bcBox();
+    return {
+      x: CAL.bc.x, y: CAL.bc.y, w: box.w, h: box.h,
+      color: CAL.bcBg.color, radius: CAL.bcBg.radius, z: CAL.bcBg.z
+    };
+  }
+
   // ── Data helpers ──────────────────────────────────────â”€
   const fullName = r => `${r.first_name || ''} ${r.last_name || ''}`.trim();
   const streamOf = r => (r && (r.stream || r.stream_name || '')) || '';
@@ -544,8 +575,8 @@ const StudentCardRenderer = (function () {
     // pre-printed A4 back sheet, so they are NOT drawn here (avoids any
     // position/size mismatch). The back sheet itself draws them (solid fills).
     const omitBg = !!(opts && opts.omitBg);
-    const qrBgFill = omitBg ? 'none' : (CAL.qrBg.color === 'transparent' ? 'none' : CAL.qrBg.color);
-    const bcBgFill = omitBg ? 'none' : (CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color);
+    const GQ = qrBgGeom();
+    const GB = bcBgGeom();
     return `
 ${sc}.ec-dl{position:absolute;inset:0;direction:rtl;unicode-bidi:plaintext;text-align:right;font-family:'Tajawal',Arial,sans-serif}
 ${sc}.ec-dl-row{position:absolute;text-align:right;max-width:${X(CAL.label.maxWidth)};z-index:1;${textBg}}
@@ -561,10 +592,10 @@ ${sc}.ec-dl-r1 .ec-dl-value{font-size:${X(CAL.name.fontSize)}}
 ${sc}.ec-dl-r2 .ec-dl-value{font-size:${X(CAL.id.fontSize)}}
 ${sc}.ec-dl-r3 .ec-dl-value{font-size:${X(CAL.stream.fontSize)}}
 ${sc}.ec-dl-r4 .ec-dl-value{font-size:${X(CAL.date.fontSize)}}
-${omitBg ? '' : `${sc}.ec-dl-qrbg{position:absolute;left:${X(CAL.qrBg.x)};top:${Y(CAL.qrBg.y)};width:${X(CAL.qrBg.w)};height:${Y(CAL.qrBg.h)};z-index:${CAL.qrBg.z};display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-${sc}.ec-dl-qrbg rect{width:100%;height:100%;fill:${qrBgFill};rx:${Y(CAL.qrBg.radius)};ry:${Y(CAL.qrBg.radius)};-webkit-print-color-adjust:exact;print-color-adjust:exact}
-${sc}.ec-dl-bcbg{position:absolute;left:${X(CAL.bcBg.x)};top:${Y(CAL.bcBg.y)};width:${X(CAL.bcBg.w)};height:${Y(CAL.bcBg.h)};z-index:${CAL.bcBg.z};display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-${sc}.ec-dl-bcbg rect{width:100%;height:100%;fill:${bcBgFill};rx:${Y(CAL.bcBg.radius)};ry:${Y(CAL.bcBg.radius)};-webkit-print-color-adjust:exact;print-color-adjust:exact}`}
+${omitBg ? '' : `${sc}.ec-dl-qrbg{position:absolute;left:${X(GQ.x)};top:${Y(GQ.y)};width:${X(GQ.w)};height:${Y(GQ.h)};z-index:${GQ.z};display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+${sc}.ec-dl-qrbg rect{width:100%;height:100%;fill:${GQ.color === 'transparent' ? 'none' : GQ.color};rx:${Y(GQ.radius)};ry:${Y(GQ.radius)};-webkit-print-color-adjust:exact;print-color-adjust:exact}
+${sc}.ec-dl-bcbg{position:absolute;left:${X(GB.x)};top:${Y(GB.y)};width:${X(GB.w)};height:${Y(GB.h)};z-index:${GB.z};display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+${sc}.ec-dl-bcbg rect{width:100%;height:100%;fill:${GB.color === 'transparent' ? 'none' : GB.color};rx:${Y(GB.radius)};ry:${Y(GB.radius)};-webkit-print-color-adjust:exact;print-color-adjust:exact}`}
 ${sc}.ec-dl-qr{position:absolute;left:${X(CAL.qr.x)};top:${Y(CAL.qr.y)};width:${X(CAL.qr.w)};height:${Y(CAL.qr.h)};display:flex;align-items:center;justify-content:center;z-index:2}
 ${sc}.ec-dl-qr img,${sc}.ec-dl-qr canvas{width:100%!important;height:100%!important;position:relative;z-index:1}
 ${sc}.ec-dl-bc{position:absolute;left:${X(CAL.bc.x)};top:${Y(CAL.bc.y)};width:${X(box.w)};height:${Y(box.h)};display:flex;align-items:center;justify-content:center;z-index:2}
@@ -608,12 +639,14 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     const n = fullName(r);
     const st = streamOf(r);
     const omitBg = !!(opts && opts.omitBg);
+    const GQ = qrBgGeom();
+    const GB = bcBgGeom();
     const streamRow = st
       ? `<div class="ec-dl-row ec-dl-r3" data-cal="stream"><span class="ec-dl-label">الشعبة</span><span class="ec-dl-value">${st}</span></div>`
       : '';
     const bgEls = omitBg ? '' : `
-      <svg class="ec-dl-qrbg" data-cal="qrbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.qrBg.radius}" ry="${CAL.qrBg.radius}" fill="${CAL.qrBg.color === 'transparent' ? 'none' : CAL.qrBg.color}"/></svg>
-      <svg class="ec-dl-bcbg" data-cal="bcbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.bcBg.radius}" ry="${CAL.bcBg.radius}" fill="${CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color}"/></svg>`;
+      <svg class="ec-dl-qrbg" data-cal="qrbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${GQ.radius}" ry="${GQ.radius}" fill="${GQ.color === 'transparent' ? 'none' : GQ.color}"/></svg>
+      <svg class="ec-dl-bcbg" data-cal="bcbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${GB.radius}" ry="${GB.radius}" fill="${GB.color === 'transparent' ? 'none' : GB.color}"/></svg>`;
     const codeEls = `
       <div class="ec-dl-qr" data-ec-role="qr" data-cal="qr"></div>
       <div class="ec-dl-bc" data-ec-role="barcode" data-cal="barcode"></div>`;
@@ -716,6 +749,7 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     const H = v => `<div class="ec-g ec-g-h ec-g-min" style="top:${P(v)}"></div>`;
     const V = v => `<div class="ec-g ec-g-v ec-g-min" style="left:${P(v)}"></div>`;
     const box = bcBox();
+    const GQ = qrBgGeom(), GB = bcBgGeom();
     let s = '<div class="ec-grid">';
     for (let i = 1; i < Math.round(CARD_W_MM); i += 1) {
       if (i % 5 === 0) continue;
@@ -731,8 +765,8 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     });
     s += `<div class="ec-g-box" style="left:${P(CAL.qr.x)};top:${P(CAL.qr.y)};width:${P(CAL.qr.w)};height:${P(CAL.qr.h)}"></div>`;
     s += `<div class="ec-g-box" style="left:${P(CAL.bc.x)};top:${P(CAL.bc.y)};width:${P(box.w)};height:${P(box.h)}"></div>`;
-    s += `<div class="ec-g-rect" style="left:${P(CAL.qrBg.x)};top:${P(CAL.qrBg.y)};width:${P(CAL.qrBg.w)};height:${P(CAL.qrBg.h)};background:${CAL.qrBg.color === 'transparent' ? 'none' : CAL.qrBg.color}"></div>`;
-    s += `<div class="ec-g-rect" style="left:${P(CAL.bcBg.x)};top:${P(CAL.bcBg.y)};width:${P(CAL.bcBg.w)};height:${P(CAL.bcBg.h)};background:${CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color}"></div>`;
+    s += `<div class="ec-g-rect" style="left:${P(GQ.x)};top:${P(GQ.y)};width:${P(GQ.w)};height:${P(GQ.h)};background:${GQ.color === 'transparent' ? 'none' : GQ.color}"></div>`;
+    s += `<div class="ec-g-rect" style="left:${P(GB.x)};top:${P(GB.y)};width:${P(GB.w)};height:${P(GB.h)};background:${GB.color === 'transparent' ? 'none' : GB.color}"></div>`;
     CAL.shapes.forEach(sh => {
       s += `<div class="ec-g-rect" style="left:${P(sh.x)};top:${P(sh.y)};width:${P(sh.w)};height:${P(sh.h)};background:${sh.color}"></div>`;
     });
@@ -945,7 +979,8 @@ ${A4_GRID_CSS}`;
     const g = a4DataGeom(slot);
     const P = (x, y, w, h) => `left:${_u(su,U,g.dx + x * g.sc)};top:${_u(su,U,g.dy + y * g.sc)};width:${_u(su,U,w * g.sc)};height:${_u(su,U,h * g.sc)}`;
     const rect = (geom, rx) => `<svg class="ec-a4-decor" style="${P(geom.x, geom.y, geom.w, geom.h)}" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${rx}" ry="${rx}" fill="#ffffff" style="-webkit-print-color-adjust:exact;print-color-adjust:exact"/></svg>`;
-    return rect(CAL.qrBg, CAL.qrBg.radius) + rect(CAL.bcBg, CAL.bcBg.radius);
+    const GQ = qrBgGeom(), GB = bcBgGeom();
+    return rect(GQ, GQ.radius) + rect(GB, GB.radius);
   }
 
   // ── A4 two-pass workflow (print this page in step 3) ─────────────────
@@ -1077,7 +1112,8 @@ ${info}
       `<div class="ec-a4-front-slot" style="${a4SlotStyle(s, 'mm', 1)}">${cut ? `<i class="ec-a4-cut" style="left:-${CUT_GAP}mm;top:-${CUT_GAP}mm;width:${s.w + 2 * CUT_GAP}mm;height:${s.h + 2 * CUT_GAP}mm"></i>` : ''}<img src="${FRONT_IMG}" alt=""></div>`
     ).join('');
     const info = `<div class="ec-a4-info">طباعة الوجه الأمامي (الخطوة 1) — ورقة A4 · Portrait · Scale 100% · Margins None ·
-  ${slots.length} بطاقات في منتصف الصفحة. هذه الورقة هي المرجع: الوجه الخلفي يُطبع على نفس المواضع (CARD_SLOTS) بنفس حدود القص.</div>`;
+  ${slots.length} بطاقات في منتصف الصفحة. هذه الورقة هي المرجع: الوجه الخلفي يُطبع على نفس المواضع (CARD_SLOTS) بنفس حدود القص —
+  <div class="sub">الخطوط المتقطعة حول كل بطاقة هي دليل القص: اقصّ عليها بالضبط لتظل البطاقة مقصوصة على نفس حدود الأمام/الخلف وتقع جميع المعلومات في مكانها تماماً.</div></div>`;
     return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>الوجه الأمامي — ورقة A4 (بطاقات)</title>
 <style>
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
@@ -1088,7 +1124,7 @@ ${info}
   .ec-a4 { position: relative; width: ${A4_W_MM}mm; height: ${A4_H_MM}mm; overflow: hidden; }
   .ec-a4-front-slot { position: absolute; transform-origin: 0 0; background: #ffffff; }
   .ec-a4-front-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
-  .ec-a4-cut { position: absolute; border: 0.3mm solid #888888; box-sizing: border-box; }
+  .ec-a4-cut { position: absolute; border: 0.3mm dashed #555555; box-sizing: border-box; }
 </style>
 </head><body>
 ${info}
@@ -1132,7 +1168,8 @@ ${info}
     ).join('');
     const info = `<div class="ec-a4-info"><b>طباعة الوجه الخلفي (الخطوة 2)</b> — ورقة A4 · Portrait · Scale 100% · Margins None ·
   ${slots.length} بطاقات في <b>نفس مواضع الوجه الأمامي بالضبط</b> (نفس CARD_SLOTS · Front #N == Back #N) —
-  <div class="sub">التصميم الخلفي + المربع الأبيض للـQR + المستطيل الأبيض للباركود تُطبع معاً على كل بطاقة في نفس موضع البطاقة الأمامية المقابلة (بدون أي بيانات طالب) — الورقة تصبح جاهزة لطبقة معلومات الطالب لاحقاً. الصورة لا تُعكس.</div></div>`;
+  <div class="sub">التصميم الخلفي + المربع الأبيض للـQR + المستطيل الأبيض للباركود تُطبع معاً على كل بطاقة في نفس موضع البطاقة الأمامية المقابلة (بدون أي بيانات طالب) — الورقة تصبح جاهزة لطبقة معلومات الطالب لاحقاً. الصورة لا تُعكس.</div>
+  <div class="sub">الخطوط المتقطعة حول كل بطاقة هي دليل القص: اقصّ عليها بالضبط بنفس حدود ورقة الأمام لتطابق حدود البطاقتين.</div></div>`;
     return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>الوجه الخلفي — ورقة A4 (تصميم + مربع QR + مستطيل باركود)</title>
 <style>
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
@@ -1149,7 +1186,7 @@ ${info}
   .ec-a4-back-slot { position: absolute; transform-origin: 0 0; background: #ffffff; }
   .ec-a4-back-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
   .ec-a4-decor { position: absolute; display: block; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .ec-a4-cut { position: absolute; border: 0.3mm solid #888888; box-sizing: border-box; }
+  .ec-a4-cut { position: absolute; border: 0.3mm dashed #555555; box-sizing: border-box; }
 </style>
 </head><body>
 ${info}
@@ -1262,7 +1299,7 @@ ${page(backSlots, 'الخلفي', 'ts-back')}
 
   return {
     CARD_W, CARD_H, CARD_W_MM, CARD_H_MM, A4_W_MM, A4_H_MM, QR_SIZE, CAL, CAL_DEFAULTS, BARCODE_OPTS, BARCODE_STD,
-    cardCSS, barcodeSpec, bcBox,
+    cardCSS, barcodeSpec, bcBox, qrBgGeom, bcBgGeom,
     getCalibration, setCalibration, saveCalibration, resetCalibration, calibrationStorageKey,
     addShape, removeShape,
     getSheetLayout, setSheetLayout, saveSheetLayout, resetSheetLayout, sheetStorageKey, defaultSlotGrid,

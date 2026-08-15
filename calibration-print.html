@@ -879,6 +879,13 @@
   // ── Mode B: preview card (data elements) ──────────────
   function applyCal(key, patch) {
     var c = cal();
+    if ((key === 'qrBg' || key === 'bcBg') && (patch.x !== undefined || patch.y !== undefined || patch.w !== undefined || patch.h !== undefined)) {
+      var filtered = {};
+      if (patch.color !== undefined) filtered.color = patch.color;
+      if (patch.radius !== undefined) filtered.radius = patch.radius;
+      if (patch.z !== undefined) filtered.z = patch.z;
+      patch = filtered;
+    }
     if (isShapeKey(key)) {
       var i = shapeIndex(key);
       if (!c.shapes[i]) return;
@@ -937,17 +944,23 @@
     title.style.color = '#b3362f';
     var box = R.bcBox();
     var isRow = !!ROW_KEYS[k];
-    var isRect = k === 'qrBg' || k === 'bcBg' || isShapeKey(k);
+    var isBg = k === 'qrBg' || k === 'bcBg';
+    var isRect = isBg || isShapeKey(k);
+    var g = isBg ? (k === 'qrBg' ? R.qrBgGeom() : R.bcBgGeom()) : null;
     showField('insp-x-label', true); showField('insp-y-label', true);
-    document.getElementById('insp-x').value = round2(v.x);
-    document.getElementById('insp-y').value = round2(v.y);
+    document.getElementById('insp-x').value = round2(g ? g.x : v.x);
+    document.getElementById('insp-y').value = round2(g ? g.y : v.y);
+    document.getElementById('insp-x').readOnly = !!g;
+    document.getElementById('insp-y').readOnly = !!g;
     showField('insp-w-label', !isRow);
     showField('insp-h-label', !isRow);
     if (!isRow) {
-      var effW = k === 'bc' ? box.w : v.w;
-      var effH = k === 'bc' ? box.h : v.h;
+      var effW = k === 'bc' ? box.w : (g ? g.w : v.w);
+      var effH = k === 'bc' ? box.h : (g ? g.h : v.h);
       document.getElementById('insp-w').value = round2(effW);
       document.getElementById('insp-h').value = round2(effH);
+      document.getElementById('insp-w').readOnly = !!g;
+      document.getElementById('insp-h').readOnly = !!g;
     }
     showField('insp-fs-label', isRow);
     if (isRow) document.getElementById('insp-fs').value = round2(v.fontSize);
@@ -978,7 +991,10 @@
     selectElement(k);
     var v = selectedValue(k);
     if (!v) return;
-    dragging = { key: k, px: e.clientX, py: e.clientY, x: v.x, y: v.y };
+    // The white qrBg/bcBg rects are DERIVED from the QR/barcode data boxes:
+    // dragging them moves the QR/barcode itself (dragging base = derived geom).
+    var g = k === 'qrBg' ? R.qrBgGeom() : k === 'bcBg' ? R.bcBgGeom() : null;
+    dragging = { key: k, px: e.clientX, py: e.clientY, x: g ? g.x : v.x, y: g ? g.y : v.y };
     try { t.setPointerCapture(e.pointerId); } catch (err) {}
     e.preventDefault();
   });
@@ -987,7 +1003,8 @@
     var dx = (e.clientX - dragging.px) / SX;
     var dy = (e.clientY - dragging.py) / SY;
     var k = dragging.key;
-    applyCal(k, {
+    var tk = k === 'qrBg' ? 'qr' : k === 'bcBg' ? 'bc' : k;
+    applyCal(tk, {
       x: round2(clamp(dragging.x + dx, 0, CARD_W_MM)),
       y: round2(clamp(dragging.y + dy, 0, CARD_H_MM))
     });
@@ -1028,9 +1045,12 @@
     } else if (SELECTED) {
       var v = selectedValue(SELECTED);
       if (!v) return;
-      applyCal(SELECTED, {
-        x: round2(clamp(v.x + dx, 0, CARD_W_MM)),
-        y: round2(clamp(v.y + dy, 0, CARD_H_MM))
+      var sk = SELECTED;
+      var sg = sk === 'qrBg' ? R.qrBgGeom() : sk === 'bcBg' ? R.bcBgGeom() : null;
+      var tk = sk === 'qrBg' ? 'qr' : sk === 'bcBg' ? 'bc' : sk;
+      applyCal(tk, {
+        x: round2(clamp((sg ? sg.x : v.x) + dx, 0, CARD_W_MM)),
+        y: round2(clamp((sg ? sg.y : v.y) + dy, 0, CARD_H_MM))
       });
       updateInspector();
     }
@@ -1041,6 +1061,7 @@
     document.getElementById(id).addEventListener('input', function () {
       if (!SELECTED) return;
       var k = SELECTED;
+      if ((k === 'qrBg' || k === 'bcBg') && (id === 'insp-x' || id === 'insp-y' || id === 'insp-w' || id === 'insp-h')) return;
       var raw = parseFloat(this.value);
       if (isNaN(raw)) return;
       var patch = {};
