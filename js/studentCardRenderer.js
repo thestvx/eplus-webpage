@@ -1100,20 +1100,26 @@ ${info}
   // with equal gaps). The back sheet (buildA4BackSheetHTML) and the student
   // overlay (buildA4PrintHTML) use the SAME slots, so Front #N / Back #N cut
   // boundaries coincide exactly. No flip, no mirror, no student data on this
-  // sheet. Optional cut lines (thin rectangles around each slot, outside the
-  // card boundary) help cutting. Uses the saved sheet layout, or the default
-  // 4-card centred column.
+  // sheet. Optional cut lines (full-width dashed horizontal guides spanning
+  // the whole sheet at the TOP and BOTTOM edge of every card) show exactly
+  // where to cut so every face stays aligned with the info overlay. Uses the
+  // saved sheet layout, or the default 4-card centred column.
   function buildA4FrontSheetHTML(opts) {
     const sheet = (opts && opts.sheet) || getSheetLayout();
     const slots = (sheet && sheet.slots && sheet.slots.length) ? sheet.slots : defaultCardSlots();
     const cut = !opts || opts.cutLines !== false;
-    const CUT_GAP = 2;
+    // Full-width dashed horizontal guides at the TOP and BOTTOM edge of every
+    // card, spanning the whole sheet (left edge → right edge), so the user can
+    // cut along them to separate the cards exactly at the card boundaries.
+    const cutLinesHtml = cut ? slots.map(s =>
+      `<i class="ec-a4-cut" style="top:${s.y.toFixed(2)}mm"></i><i class="ec-a4-cut" style="top:${(s.y + s.h).toFixed(2)}mm"></i>`
+    ).join('') : '';
     const slotsHtml = slots.map(s =>
-      `<div class="ec-a4-front-slot" style="${a4SlotStyle(s, 'mm', 1)}">${cut ? `<i class="ec-a4-cut" style="left:-${CUT_GAP}mm;top:-${CUT_GAP}mm;width:${s.w + 2 * CUT_GAP}mm;height:${s.h + 2 * CUT_GAP}mm"></i>` : ''}<img src="${FRONT_IMG}" alt=""></div>`
+      `<div class="ec-a4-front-slot" style="${a4SlotStyle(s, 'mm', 1)}"><img src="${FRONT_IMG}" alt=""></div>`
     ).join('');
     const info = `<div class="ec-a4-info">طباعة الوجه الأمامي (الخطوة 1) — ورقة A4 · Portrait · Scale 100% · Margins None ·
   ${slots.length} بطاقات في منتصف الصفحة. هذه الورقة هي المرجع: الوجه الخلفي يُطبع على نفس المواضع (CARD_SLOTS) بنفس حدود القص —
-  <div class="sub">الخطوط المتقطعة حول كل بطاقة هي دليل القص: اقصّ عليها بالضبط لتظل البطاقة مقصوصة على نفس حدود الأمام/الخلف وتقع جميع المعلومات في مكانها تماماً.</div></div>`;
+  <div class="sub">الخطوط المتقطعة (بعرض الورقة كاملاً) عند الحافة العلوية والسفلية لكل بطاقة هي دليل القص: اقصّ على طول الخط بالضبط لتظل البطاقة مقصوصة على نفس حدود الأمام/الخلف وتقع جميع المعلومات في مكانها تماماً.</div></div>`;
     return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>الوجه الأمامي — ورقة A4 (بطاقات)</title>
 <style>
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
@@ -1124,11 +1130,11 @@ ${info}
   .ec-a4 { position: relative; width: ${A4_W_MM}mm; height: ${A4_H_MM}mm; overflow: hidden; }
   .ec-a4-front-slot { position: absolute; transform-origin: 0 0; background: #ffffff; }
   .ec-a4-front-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
-  .ec-a4-cut { position: absolute; border: 0.3mm dashed #555555; box-sizing: border-box; }
+  .ec-a4-cut { position: absolute; left: 0; width: 100%; border-top: 0.3mm dashed #555555; pointer-events: none; }
 </style>
 </head><body>
 ${info}
-<div class="ec-a4">${slotsHtml}</div>
+<div class="ec-a4">${cutLinesHtml}${slotsHtml}</div>
 <script>
 (function () {
   var tries = 0;
@@ -1157,19 +1163,23 @@ ${info}
   // SAME coordinates as the front sheet — in BOTH the screen preview and the
   // print output, so Front #N == Back #N (same X/Y/W/H, same centred column,
   // same cut boundaries). No feed shift, no flip, no mirror: the back image
-  // keeps its natural orientation.
+  // keeps its natural orientation. Optional cut lines are full-width dashed
+  // horizontal guides spanning the whole sheet at the TOP and BOTTOM edge of
+  // every card (same as the front sheet).
   function buildA4BackSheetHTML(opts) {
     const sheet = (opts && opts.sheet) || getSheetLayout();
     const slots = (sheet && sheet.slots && sheet.slots.length) ? sheet.slots : defaultCardSlots();
     const cut = !opts || opts.cutLines !== false;
-    const CUT_GAP = 2;
+    const cutLinesHtml = cut ? slots.map(s =>
+      `<i class="ec-a4-cut" style="top:${s.y.toFixed(2)}mm"></i><i class="ec-a4-cut" style="top:${(s.y + s.h).toFixed(2)}mm"></i>`
+    ).join('') : '';
     const slotsHtml = slots.map((s, i) =>
-      `<div class="ec-a4-back-slot" data-i="${i}" style="${a4SlotStyle(s, 'mm', 1)}">${cut ? `<i class="ec-a4-cut" style="left:-${CUT_GAP}mm;top:-${CUT_GAP}mm;width:${s.w + 2 * CUT_GAP}mm;height:${s.h + 2 * CUT_GAP}mm"></i>` : ''}<img src="${BACK_IMG}" alt="">${a4BackDecorHTML(s, 'mm', 1)}</div>`
+      `<div class="ec-a4-back-slot" data-i="${i}" style="${a4SlotStyle(s, 'mm', 1)}"><img src="${BACK_IMG}" alt="">${a4BackDecorHTML(s, 'mm', 1)}</div>`
     ).join('');
     const info = `<div class="ec-a4-info"><b>طباعة الوجه الخلفي (الخطوة 2)</b> — ورقة A4 · Portrait · Scale 100% · Margins None ·
   ${slots.length} بطاقات في <b>نفس مواضع الوجه الأمامي بالضبط</b> (نفس CARD_SLOTS · Front #N == Back #N) —
   <div class="sub">التصميم الخلفي + المربع الأبيض للـQR + المستطيل الأبيض للباركود تُطبع معاً على كل بطاقة في نفس موضع البطاقة الأمامية المقابلة (بدون أي بيانات طالب) — الورقة تصبح جاهزة لطبقة معلومات الطالب لاحقاً. الصورة لا تُعكس.</div>
-  <div class="sub">الخطوط المتقطعة حول كل بطاقة هي دليل القص: اقصّ عليها بالضبط بنفس حدود ورقة الأمام لتطابق حدود البطاقتين.</div></div>`;
+  <div class="sub">الخطوط المتقطعة (بعرض الورقة كاملاً) عند الحافة العلوية والسفلية لكل بطاقة هي دليل القص: اقصّ على طول الخط بالضبط بنفس حدود ورقة الأمام لتطابق حدود البطاقتين.</div></div>`;
     return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>الوجه الخلفي — ورقة A4 (تصميم + مربع QR + مستطيل باركود)</title>
 <style>
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
@@ -1186,11 +1196,11 @@ ${info}
   .ec-a4-back-slot { position: absolute; transform-origin: 0 0; background: #ffffff; }
   .ec-a4-back-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
   .ec-a4-decor { position: absolute; display: block; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .ec-a4-cut { position: absolute; border: 0.3mm dashed #555555; box-sizing: border-box; }
+  .ec-a4-cut { position: absolute; left: 0; width: 100%; border-top: 0.3mm dashed #555555; pointer-events: none; }
 </style>
 </head><body>
 ${info}
-<div class="ec-a4">${slotsHtml}</div>
+<div class="ec-a4">${cutLinesHtml}${slotsHtml}</div>
 <script>
 (function () {
   var tries = 0;

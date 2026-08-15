@@ -124,7 +124,7 @@
   .dp-page { position: relative; background: #fff; border: 1px solid #c4d0ea; border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,0.14); overflow: hidden; }
   .dp-page .ds-slot { position: absolute; transform-origin: 0 0; background: #fff; }
   .dp-page .ds-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
-  .dp-page .ds-cut { position: absolute; border: 1px dashed #b3362f; pointer-events: none; }
+  .dp-page .ds-cut { position: absolute; left: 0; width: 100%; border-top: 1px dashed #b3362f; pointer-events: none; }
   .dp-page .ds-slot .ds-num { position: absolute; top: 1px; right: 1px; background: rgba(255,255,255,0.94); color: #b3362f; font-weight: 900; font-size: 10px; padding: 1px 5px; border-radius: 5px; z-index: 3; pointer-events: none; }
   /* ── toast ── */
   #toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); background: #122350; color: #fff; padding: 12px 22px; border-radius: 12px; font-size: 14px; font-weight: 800; opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 1000; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
@@ -751,14 +751,15 @@
   }
   function designPagePreviewHTML(slots, img, scale, label, isBack) {
     var W = Math.round(A4_W_MM * scale), H = Math.round(A4_H_MM * scale);
-    var CUT_GAP = 2;
+    var cutLines = slots.map(function (s) {
+      return '<i class="ds-cut" style="top:' + (s.y * scale) + 'px"></i><i class="ds-cut" style="top:' + ((s.y + s.h) * scale) + 'px"></i>';
+    }).join('');
     var slotsHtml = slots.map(function (s, i) {
       var decor = isBack ? R.a4BackDecorHTML(s, 'px', scale) : '';
       return '<div class="ds-slot" style="left:' + (s.x * scale) + 'px;top:' + (s.y * scale) + 'px;width:' + (s.w * scale) + 'px;height:' + (s.h * scale) + 'px;transform:rotate(' + (s.rot || 0) + 'deg);transform-origin:0 0">' +
-        '<i class="ds-cut" style="left:' + (-CUT_GAP * scale) + 'px;top:' + (-CUT_GAP * scale) + 'px;width:' + ((s.w + 2 * CUT_GAP) * scale) + 'px;height:' + ((s.h + 2 * CUT_GAP) * scale) + 'px"></i>' +
         '<img src="' + img + '" alt="">' + decor + '<span class="ds-num">' + (i + 1) + '</span></div>';
     }).join('');
-    return '<div class="dp-page-box"><div class="dp-page-label">' + label + '</div><div class="dp-page" style="width:' + W + 'px;height:' + H + 'px">' + slotsHtml + '</div></div>';
+    return '<div class="dp-page-box"><div class="dp-page-label">' + label + '</div><div class="dp-page" style="width:' + W + 'px;height:' + H + 'px">' + cutLines + slotsHtml + '</div></div>';
   }
   function renderDesignPreview() {
     var type = designType();
