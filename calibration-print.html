@@ -1041,8 +1041,8 @@
       else { sel.value = '__custom__'; row.classList.remove('hidden'); var custom = document.getElementById('clr-' + f.key + '-custom'); var hex = document.getElementById('clr-' + f.key + '-hex'); if (custom) custom.value = v; if (hex) hex.value = v; }
     });
   }
-  function applyColorLive() {
-    R.setCalibration(cal());
+  function applyColorLive(c) {
+    R.setCalibration(c || cal());
     R.injectCSS(document, true);
     renderPreview();
     renderA4Stage();
@@ -1062,15 +1062,15 @@
           custom.value = /^#[0-9a-fA-F]{6}$/.test(cur) ? cur : '#000000';
           hex.value = custom.value;
         }
-        else { row.classList.add('hidden'); var c = cal(); f.set(c, v); applyColorLive(); }
+        else { row.classList.add('hidden'); var c = cal(); f.set(c, v); applyColorLive(c); }
       });
       custom.addEventListener('input', function () {
-        if (/^#[0-9a-fA-F]{6}$/.test(custom.value)) { hex.value = custom.value; var c = cal(); f.set(c, custom.value); applyColorLive(); }
+        if (/^#[0-9a-fA-F]{6}$/.test(custom.value)) { hex.value = custom.value; var c = cal(); f.set(c, custom.value); applyColorLive(c); }
       });
       hex.addEventListener('change', function () {
         var v = hex.value.trim();
         if (/^[0-9a-fA-F]{3}$/.test(v)) v = '#' + v.split('').map(function (ch) { return ch + ch; }).join('');
-        if (/^#[0-9a-fA-F]{6}$/.test(v)) { custom.value = v; hex.value = v; var c = cal(); f.set(c, v); applyColorLive(); }
+        if (/^#[0-9a-fA-F]{6}$/.test(v)) { custom.value = v; hex.value = v; var c = cal(); f.set(c, v); applyColorLive(c); }
       });
     });
     Object.keys(COLOR_PRESETS).forEach(function (name) {
@@ -1081,7 +1081,7 @@
           var f = COLOR_FIELDS.find(function (x) { return x.key === k; });
           if (f) f.set(c, p[k]);
         });
-        applyColorLive();
+        applyColorLive(c);
         toast('تم تطبيق القالب: ' + COLOR_PRESET_LABELS[name]);
       });
     });
