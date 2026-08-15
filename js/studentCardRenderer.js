@@ -27,13 +27,20 @@
 //  measured from the card's LEFT edge (so dragging right always raises x).
 //
 //  A4 MULTI-CARD SHEETS (two-pass workflow):
-//  Step 1 — buildA4FrontSheetHTML(): prints the FRONT sheet with the 8 card
-//  designs (studentidcardfront1.jpg) at the saved CARD_SLOTS (x/y/w/h/rotation
-//  on the A4). Step 2 — buildA4PrintHTML(): after re-feeding the same paper,
-//  prints the BACK for ONE chosen card inside its slot — either the transparent
-//  data layer only ('info') or the back design + data ('back'). BOTH faces use
-//  the SAME CARD_SLOTS at the SAME X/Y/W/H — no mirror, no flip — so Back #N
-//  lands exactly behind Front #N. The front sheet is never reprinted with data.
+//  Step 1 — buildA4FrontSheetHTML(): prints the FRONT sheet with the 4 card
+//  designs (studentidcardfront1.jpg) at the saved CARD_SLOTS — the master
+//  grid: all cards centred on A4 (same X), stacked vertically with EQUAL gaps.
+//  Step 2 — buildA4BackSheetHTML(): prints the BACK sheet — the back design
+//  (studentidcardback1.jpg) plus a SOLID WHITE QR square and a SOLID WHITE
+//  barcode rectangle on EVERY card (no student data), so the sheet is ready
+//  to receive the data layer later.
+//  Step 3 — buildA4PrintHTML(): after re-feeding the same paper, prints the
+//  student data for ONE chosen card inside its slot — the transparent data
+//  layer only ('info', the daily workflow) or the back design + data ('back').
+//  ALL faces use the SAME CARD_SLOTS at the SAME X/Y/W/H — no mirror, no
+//  scaleX(-1), no rotateY, no per-card offsets — so Front #N == Back #N ==
+//  the data of card #N. The ONLY back-face adjustment is the ONE global
+//  duplex offset (dx,dy) applied to all cards together.
 // ═══════════════════════════════════════════════════════════
 
 const StudentCardRenderer = (function () {
@@ -218,21 +225,47 @@ const StudentCardRenderer = (function () {
   function _clearSheet() { try { window.localStorage.removeItem(SHEET_STORE_KEY); } catch (e) {} }
 
   function _mergeSheet(s) {
-    if (!s || !Array.isArray(s.slots)) return null;
-    const slots = [];
-    s.slots.forEach(sl => {
-      if (!sl || typeof sl !== 'object') return;
-      const w = _num(sl.w, CARD_W_MM, 10, A4_W_MM);
-      const h = _num(sl.h, CARD_H_MM, 10, A4_H_MM);
-      const x = _num(sl.x, 0, 0, A4_W_MM - w);
-      const y = _num(sl.y, 0, 0, A4_H_MM - h);
-      const rot = _num(sl.rot, 0, -360, 360);
-      const label = (typeof sl.label === 'string' && sl.label.trim()) ? String(sl.label).slice(0, 40) : null;
-      const slot = { x, y, w, h, rot };
-      if (label) slot.label = label;
-      slots.push(slot);
-    });
-    const out = { slots };
+    if (!s || typeof s !== 'object') return null;
+    let params = null;
+    let slots = null;
+    if (s.params && typeof s.params === 'object') {
+      // New layout: 4 cards derived from cardW/cardH/centerX/startY/gapY.
+      params = _mergeParams(s.params);
+      slots = slotsFromParams(params);
+    } else if (Array.isArray(s.slots) && s.slots.length) {
+      // Legacy sheet (per-card slots, typically an 8-card grid). Migrate to
+      // the param model: keep the first card's size/rotation and its Y column,
+      // and derive the vertical gap from the same-column next card.
+      const raw = [];
+      s.slots.forEach(sl => {
+        if (!sl || typeof sl !== 'object') return;
+        const w = _num(sl.w, CARD_W_MM, 10, A4_W_MM);
+        const h = _num(sl.h, CARD_H_MM, 10, A4_H_MM);
+        raw.push({
+          x: _num(sl.x, 0, 0, A4_W_MM - w),
+          y: _num(sl.y, 0, 0, A4_H_MM - h),
+          w,
+          h,
+          rot: _num(sl.rot, 0, -360, 360)
+        });
+      });
+      if (!raw.length) return null;
+      const first = raw[0];
+      const next = raw[2] || raw[1];
+      const gapY = next ? Math.max(0, +(next.y - first.y - first.h).toFixed(2)) : CARD_PARAMS_DEFAULTS.gapY;
+      params = {
+        cards: 4,
+        cardW: first.w,
+        cardH: first.h,
+        centerX: +(first.x + first.w / 2).toFixed(2),
+        startY: first.y,
+        gapY,
+        rot: first.rot || 0
+      };
+      slots = slotsFromParams(params);
+    }
+    if (!params || !slots) return null;
+    const out = { params, slots };
     if (s.flip === 'long' || s.flip === 'short') out.flip = s.flip;
     // Duplex paper mode + ONE global back-face offset (mm), applied to ALL
     // cards once. 'long'/'short' mirror the back POSITION (never the image)
@@ -248,8 +281,6 @@ const StudentCardRenderer = (function () {
     };
     return out;
   }
-
-  let SHEET = _mergeSheet(_readSheet());
 
   function getSheetLayout() { return SHEET ? _clone(SHEET) : null; }
   function setSheetLayout(sheet) { SHEET = _mergeSheet(sheet); return getSheetLayout(); }
@@ -276,6 +307,70 @@ const StudentCardRenderer = (function () {
     }
     return slots;
   }
+
+  // ── CARD_SLOTS (4 cards, single source of truth) ──────────────────────
+  // The A4 sheet is defined by PARAMS (never per-card coordinates):
+  //   cardW / cardH — the size of every card (mm)
+  //   centerX       — the horizontal CENTER shared by all 4 cards (default 105)
+  //   startY        — top of card #1 (the topmost, centred card)
+  //   gapY          — equal vertical gap between cards (also the default top/bottom margin)
+  //   rot           — rotation applied to every card (default 0)
+  // Cards #1..#4 are DERIVED from these params, so the layout stays perfectly
+  // centred and evenly spaced by construction. Everything (front sheet, back
+  // sheet, data layer, preview, calibration) reads the same derived slots.
+  const CARD_PARAMS_DEFAULTS = {
+    cards: 4,
+    cardW: CARD_W_MM,
+    cardH: CARD_H_MM,
+    centerX: +(A4_W_MM / 2).toFixed(2),
+    startY: +((A4_H_MM - 4 * CARD_H_MM) / 5).toFixed(2),
+    gapY: +((A4_H_MM - 4 * CARD_H_MM) / 5).toFixed(2),
+    rot: 0
+  };
+
+  function _mergeParams(p) {
+    const d = CARD_PARAMS_DEFAULTS;
+    const w = _num(p.cardW, d.cardW, 10, A4_W_MM);
+    const h = _num(p.cardH, d.cardH, 10, A4_H_MM);
+    const gap = _num(p.gapY, +((A4_H_MM - 4 * h) / 5).toFixed(2), 0, A4_H_MM);
+    return {
+      cards: 4,
+      cardW: w,
+      cardH: h,
+      centerX: _num(p.centerX, A4_W_MM / 2, 0, A4_W_MM),
+      startY: _num(p.startY, +( (A4_H_MM - 4 * h) / 5 ).toFixed(2), 0, A4_H_MM - h),
+      gapY: gap,
+      rot: _num(p.rot, 0, -360, 360)
+    };
+  }
+
+  // Derive the 4 card slots from a params object (single geometry source).
+  function slotsFromParams(p) {
+    const par = _mergeParams(p || {});
+    const x = +Math.min(Math.max(par.centerX - par.cardW / 2, 0), A4_W_MM - par.cardW).toFixed(2);
+    const slots = [];
+    for (let i = 0; i < par.cards; i++) {
+      slots.push({
+        x,
+        y: +(par.startY + i * (par.cardH + par.gapY)).toFixed(2),
+        w: par.cardW,
+        h: par.cardH,
+        rot: par.rot
+      });
+    }
+    return slots;
+  }
+
+  function defaultCardSlots() { return slotsFromParams(CARD_PARAMS_DEFAULTS); }
+  function defaultSheetLayout() {
+    return { params: _clone(CARD_PARAMS_DEFAULTS), slots: defaultCardSlots(), duplex: { mode: 'none', dx: 0, dy: 0 } };
+  }
+  function sheetParams() { return SHEET ? _clone(SHEET.params) : _clone(CARD_PARAMS_DEFAULTS); }
+
+  // SHEET must be initialised AFTER CARD_PARAMS_DEFAULTS (line ~323) and the
+  // params helpers, because _mergeSheet/_mergeParams read it while building
+  // the merged layout — referencing a const during its TDZ throws.
+  let SHEET = _mergeSheet(_readSheet());
 
   // ── Back-of-sheet flip (front/back matching on the SAME A4 sheet) ──
   // The sheet is printed FRONT first, then re-fed after a physical flip to
@@ -434,7 +529,7 @@ const StudentCardRenderer = (function () {
     return { color: c, shadow: TEXT_COLORS.black.shadow, stroke: TEXT_COLORS.black.stroke, strokeW: TEXT_COLORS.black.strokeW, strokeWmm: TEXT_COLORS.black.strokeWmm };
   }
 
-  function dlRules(unit, sx, sy, scope, textColor) {
+  function dlRules(unit, sx, sy, scope, textColor, opts) {
     const sc = scope ? scope + ' ' : '';
     const X = v => (v * sx).toFixed(3) + unit;
     const Y = v => (v * sy).toFixed(3) + unit;
@@ -444,8 +539,13 @@ const StudentCardRenderer = (function () {
     const textBg = CAL.textBgColor && CAL.textBgColor !== 'transparent'
       ? `background:${CAL.textBgColor};-webkit-print-color-adjust:exact;print-color-adjust:exact`
       : '';
-    const qrBgFill = CAL.qrBg.color === 'transparent' ? 'none' : CAL.qrBg.color;
-    const bcBgFill = CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color;
+    // omitBg: the info-only data layer adds ONLY the student text + QR +
+    // barcode — the white QR/barcode backgrounds already live on the
+    // pre-printed A4 back sheet, so they are NOT drawn here (avoids any
+    // position/size mismatch). The back sheet itself draws them (solid fills).
+    const omitBg = !!(opts && opts.omitBg);
+    const qrBgFill = omitBg ? 'none' : (CAL.qrBg.color === 'transparent' ? 'none' : CAL.qrBg.color);
+    const bcBgFill = omitBg ? 'none' : (CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color);
     return `
 ${sc}.ec-dl{position:absolute;inset:0;direction:rtl;unicode-bidi:plaintext;text-align:right;font-family:'Tajawal',Arial,sans-serif}
 ${sc}.ec-dl-row{position:absolute;text-align:right;max-width:${X(CAL.label.maxWidth)};z-index:1;${textBg}}
@@ -461,10 +561,10 @@ ${sc}.ec-dl-r1 .ec-dl-value{font-size:${X(CAL.name.fontSize)}}
 ${sc}.ec-dl-r2 .ec-dl-value{font-size:${X(CAL.id.fontSize)}}
 ${sc}.ec-dl-r3 .ec-dl-value{font-size:${X(CAL.stream.fontSize)}}
 ${sc}.ec-dl-r4 .ec-dl-value{font-size:${X(CAL.date.fontSize)}}
-${sc}.ec-dl-qrbg{position:absolute;left:${X(CAL.qrBg.x)};top:${Y(CAL.qrBg.y)};width:${X(CAL.qrBg.w)};height:${Y(CAL.qrBg.h)};z-index:${CAL.qrBg.z};display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+${omitBg ? '' : `${sc}.ec-dl-qrbg{position:absolute;left:${X(CAL.qrBg.x)};top:${Y(CAL.qrBg.y)};width:${X(CAL.qrBg.w)};height:${Y(CAL.qrBg.h)};z-index:${CAL.qrBg.z};display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 ${sc}.ec-dl-qrbg rect{width:100%;height:100%;fill:${qrBgFill};rx:${Y(CAL.qrBg.radius)};ry:${Y(CAL.qrBg.radius)};-webkit-print-color-adjust:exact;print-color-adjust:exact}
 ${sc}.ec-dl-bcbg{position:absolute;left:${X(CAL.bcBg.x)};top:${Y(CAL.bcBg.y)};width:${X(CAL.bcBg.w)};height:${Y(CAL.bcBg.h)};z-index:${CAL.bcBg.z};display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-${sc}.ec-dl-bcbg rect{width:100%;height:100%;fill:${bcBgFill};rx:${Y(CAL.bcBg.radius)};ry:${Y(CAL.bcBg.radius)};-webkit-print-color-adjust:exact;print-color-adjust:exact}
+${sc}.ec-dl-bcbg rect{width:100%;height:100%;fill:${bcBgFill};rx:${Y(CAL.bcBg.radius)};ry:${Y(CAL.bcBg.radius)};-webkit-print-color-adjust:exact;print-color-adjust:exact}`}
 ${sc}.ec-dl-qr{position:absolute;left:${X(CAL.qr.x)};top:${Y(CAL.qr.y)};width:${X(CAL.qr.w)};height:${Y(CAL.qr.h)};display:flex;align-items:center;justify-content:center;z-index:2}
 ${sc}.ec-dl-qr img,${sc}.ec-dl-qr canvas{width:100%!important;height:100%!important;position:relative;z-index:1}
 ${sc}.ec-dl-bc{position:absolute;left:${X(CAL.bc.x)};top:${Y(CAL.bc.y)};width:${X(box.w)};height:${Y(box.h)};display:flex;align-items:center;justify-content:center;z-index:2}
@@ -504,21 +604,23 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
     </div>`;
   }
 
-  function dataLayerHTML(r) {
+  function dataLayerHTML(r, opts) {
     const n = fullName(r);
     const st = streamOf(r);
+    const omitBg = !!(opts && opts.omitBg);
     const streamRow = st
       ? `<div class="ec-dl-row ec-dl-r3" data-cal="stream"><span class="ec-dl-label">الشعبة</span><span class="ec-dl-value">${st}</span></div>`
       : '';
+    const bgEls = omitBg ? '' : `
+      <svg class="ec-dl-qrbg" data-cal="qrbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.qrBg.radius}" ry="${CAL.qrBg.radius}" fill="${CAL.qrBg.color === 'transparent' ? 'none' : CAL.qrBg.color}"/></svg>
+      <div class="ec-dl-qr" data-ec-role="qr" data-cal="qr"></div>
+      <svg class="ec-dl-bcbg" data-cal="bcbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.bcBg.radius}" ry="${CAL.bcBg.radius}" fill="${CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color}"/></svg>
+      <div class="ec-dl-bc" data-ec-role="barcode" data-cal="barcode"></div>`;
     return `<div class="ec-dl">
       <div class="ec-dl-row ec-dl-r1" data-cal="name"><span class="ec-dl-label">الاسم الكامل</span><span class="ec-dl-value">${n}</span></div>
       <div class="ec-dl-row ec-dl-r2" data-cal="id"><span class="ec-dl-label">Student ID</span><span class="ec-dl-value id">${r.id || ''}</span></div>
       ${streamRow}
-      <div class="ec-dl-row ec-dl-r4" data-cal="date"><span class="ec-dl-label">تاريخ التسجيل</span><span class="ec-dl-value date">${regDate(r)}</span></div>
-      <svg class="ec-dl-qrbg" data-cal="qrbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.qrBg.radius}" ry="${CAL.qrBg.radius}" fill="${CAL.qrBg.color === 'transparent' ? 'none' : CAL.qrBg.color}"/></svg>
-      <div class="ec-dl-qr" data-ec-role="qr" data-cal="qr"></div>
-      <svg class="ec-dl-bcbg" data-cal="bcbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.bcBg.radius}" ry="${CAL.bcBg.radius}" fill="${CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color}"/></svg>
-      <div class="ec-dl-bc" data-ec-role="barcode" data-cal="barcode"></div>
+      <div class="ec-dl-row ec-dl-r4" data-cal="date"><span class="ec-dl-label">تاريخ التسجيل</span><span class="ec-dl-value date">${regDate(r)}</span></div>${bgEls}
       ${CAL.shapes.map((s, i) => `<div class="ec-dl-shape ec-dl-shape${i}" data-cal="shape${i}"></div>`).join('')}
     </div>`;
   }
@@ -827,21 +929,46 @@ ${A4_GRID_CSS}`;
     return `left:${_u(su,U,g.dx)};top:${_u(su,U,g.dy)};width:${_u(su,U,g.dw)};height:${_u(su,U,g.dh)}`;
   }
 
-  // ── A4 two-pass workflow (print this page in step 2) ─────────────────
-  // Step 1 (buildA4FrontSheetHTML): print the FRONT sheet — 8 front designs
+  // SOLID white QR square + SOLID white barcode rectangle, drawn inside a card
+  // slot of the A4 BACK sheet (data-layer geometry, so they align perfectly
+  // with the later data layer). Real filled SVG rects (never borders/outlines)
+  // with exact print-color-adjust so they print as opaque white, forming the
+  // ready-made placeholders that receive the student QR/barcode later.
+  function a4BackDecorHTML(slot, unit, scale) {
+    const su = unit === 'px' ? 'px' : 'mm';
+    const U = unit === 'px' ? (scale || 1) : 1;
+    const g = a4DataGeom(slot);
+    const P = (x, y, w, h) => `left:${_u(su,U,g.dx + x * g.sc)};top:${_u(su,U,g.dy + y * g.sc)};width:${_u(su,U,w * g.sc)};height:${_u(su,U,h * g.sc)}`;
+    let s = '';
+    const qrFill = CAL.qrBg.color === 'transparent' ? 'none' : CAL.qrBg.color;
+    const bcFill = CAL.bcBg.color === 'transparent' ? 'none' : CAL.bcBg.color;
+    if (qrFill !== 'none') {
+      s += `<svg class="ec-a4-decor" style="${P(CAL.qrBg.x, CAL.qrBg.y, CAL.qrBg.w, CAL.qrBg.h)}" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.qrBg.radius}" ry="${CAL.qrBg.radius}" fill="${qrFill}" style="-webkit-print-color-adjust:exact;print-color-adjust:exact"/></svg>`;
+    }
+    if (bcFill !== 'none') {
+      s += `<svg class="ec-a4-decor" style="${P(CAL.bcBg.x, CAL.bcBg.y, CAL.bcBg.w, CAL.bcBg.h)}" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${CAL.bcBg.radius}" ry="${CAL.bcBg.radius}" fill="${bcFill}" style="-webkit-print-color-adjust:exact;print-color-adjust:exact"/></svg>`;
+    }
+    return s;
+  }
+
+  // ── A4 two-pass workflow (print this page in step 3) ─────────────────
+  // Step 1 (buildA4FrontSheetHTML): print the FRONT sheet — 4 front designs
   // at the saved CARD_SLOTS (the MASTER grid — the single reference), no data.
-  // Step 2 (this function): re-feed the SAME paper and print the BACK for ONE
-  // chosen card. The back design + student overlay are placed in the print
+  // Step 2 (buildA4BackSheetHTML): print the BACK sheet — the 4 back designs
+  // plus the SOLID white QR/barcode placeholders (no student data), ready for
+  // the data layer. Step 3 (this function): re-feed the SAME paper and print
+  // the student data for ONE chosen card. The overlay is placed in the print
   // page at the DUPLEX position (mirrored FEED coordinates per the saved
   // duplex mode, plus the ONE global offset) so that, after the physical
-  // paper flip, Back #N lands EXACTLY behind Front #N — same X/Y/W/H, same
+  // paper flip, card #N data lands EXACTLY over Back #N — same X/Y/W/H, same
   // cut boundaries.
   //   opts.mode = 'info' (default): transparent data layer ONLY (name, ID,
-  //     stream, date, QR, barcode, QR/barcode background rectangles) inside
-  //     the chosen slot — for back cards that were already printed.
+  //     stream, date, QR, barcode) inside the chosen slot — for back sheets
+  //     that were already printed. The white QR/barcode backgrounds are NOT
+  //     drawn here (they are part of the pre-printed back sheet).
   //   opts.mode = 'back': the BACK design (studentidcardback1.jpg) PLUS the
-  //     student data together inside the chosen slot only; all other slots
-  //     stay empty in the print output.
+  //     white placeholders PLUS the student data together inside the chosen
+  //     slot only; all other slots stay empty in the print output.
   // THE IMAGE IS NEVER MIRRORED (no scaleX(-1), no rotateY(180°)) — only the
   // POSITION is recomputed by duplexBackSlot(); the design keeps its natural
   // orientation. The student overlay uses the SAME slot as the back design.
@@ -867,12 +994,12 @@ ${A4_GRID_CSS}`;
       let inner = '';
       if (mode === 'back') {
         inner += isSel
-          ? `<div class="ec-a4-back" style="${gs}"><img src="${BACK_IMG}" alt=""></div>`
+          ? `<div class="ec-a4-back" style="${gs}"><img src="${BACK_IMG}" alt="">${a4BackDecorHTML(s, 'mm', 1)}</div>`
           : `<div class="ec-a4-ghost" style="${gs}"><img src="${BACK_IMG}" alt=""></div>`;
       } else {
         inner += `<div class="ec-a4-ghost" style="${gs}"><img src="${BACK_IMG}" alt=""></div>`;
       }
-      if (isSel) inner += `<div class="ec-a4-data" style="${gs}">${dataLayerHTML(r)}</div>`;
+      if (isSel) inner += `<div class="ec-a4-data" style="${gs}">${dataLayerHTML(r, { omitBg: mode === 'info' })}</div>`;
       return `<div class="ec-a4-slot${isSel ? ' ec-sel-slot' : ''}" data-i="${i}" style="${a4SlotStyle(s, 'mm', 1)}">
     ${inner}
   </div>`;
@@ -880,10 +1007,12 @@ ${A4_GRID_CSS}`;
     const marker = `<div class="ec-a4-print-pos" style="${a4SlotStyle(backDocSlot, 'mm', 1)}"><span>موضع طباعة الوجه الخلفي (يُطبع هنا على الورقة المقلوبة)</span></div>`;
     const duplexLabel = duplex.mode === 'long' ? 'قلب الحافة الطويلة'
       : duplex.mode === 'short' ? 'قلب الحافة القصيرة' : 'قلب تلقائي (الطابعة)';
-    const info = `<div class="ec-a4-info"><b>طباعة الوجه الخلفي — البطاقة #${slotIndex + 1}</b> ·
+    const modeLabel = mode === 'back' ? 'المعلومات + تصميم الوجه الخلفي' : 'طباعة المعلومات فقط';
+    const info = `<div class="ec-a4-info"><b>طباعة بطاقة الطالب — البطاقة #${slotIndex + 1} من ${sheet.slots.length}</b> ·
+  نوع الطباعة: ${modeLabel} ·
   وضع Duplex: ${duplexLabel} · إزاحة عامة X/Y: ${duplex.dx.toFixed(2)} / ${duplex.dy.toFixed(2)} مم ·
   <span class="hi">إعدادات الطباعة: A4 · Portrait · Scale 100% · Margins None (بدون تصغير/توسيع)</span>
-  <div class="sub">المعاينة تُظهر النتيجة النهائية (الوجه الأمامي + الخلفي المطابق). الصورة لا تُعكس — يُقلب الموضع فقط حسب وضع Duplex.</div></div>`;
+  <div class="sub">المعاينة تُظهر النتيجة النهائية (الوجه الأمامي + الخلفي المطابق). الصورة لا تُعكس — يُقلب الموضع فقط حسب وضع Duplex. البطاقة #1 هي الأعلى في منتصف الصفحة.</div></div>`;
     return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>بطاقة الطالب - ${fullName(r)}</title>
 ${TAJWAL_FACES}
 <style>
@@ -904,10 +1033,11 @@ ${TAJWAL_FACES}
   .ec-a4-ghost img { width: 100%; height: 100%; object-fit: contain; display: block; }
   .ec-a4-back { position: absolute; overflow: hidden; }
   .ec-a4-back img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .ec-a4-decor { position: absolute; display: block; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .ec-a4-data { position: absolute; }
   .ec-a4-print-pos { position: absolute; border: 0.3mm dashed #e11d48; box-sizing: border-box; background: rgba(225, 29, 72, 0.06); }
   .ec-a4-print-pos span { position: absolute; left: 0; top: -6mm; font-family: 'Tajawal', Arial, sans-serif; font-weight: 700; font-size: 2.6mm; color: #e11d48; background: #ffffff; border: 0.2mm solid #e11d48; border-radius: 1mm; padding: 0.5mm 1.5mm; white-space: nowrap; }
-  ${dlRules('mm', sc, sc, '', opts && opts.textColor)}
+  ${dlRules('mm', sc, sc, '', opts && opts.textColor, Object.assign({}, opts, { omitBg: mode === 'info' }))}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
@@ -947,22 +1077,24 @@ ${info}
   }
 
   // ── A4 two-pass workflow (print this page in step 1) ─────────────────
-  // FRONT sheet: the 8 front designs (studentidcardfront1.jpg) at the saved
-  // CARD_SLOTS — the MASTER grid. The back (buildA4PrintHTML) and the student
-  // overlay use the SAME slots, so Front #N / Back #N cut boundaries coincide
-  // exactly. No flip, no mirror, no student data on this sheet. Optional cut
-  // lines (thin rectangles around each slot, outside the card boundary) help
-  // cutting. Uses the saved sheet layout, or the default 2×4 grid.
+  // FRONT sheet: the 4 front designs (studentidcardfront1.jpg) at the saved
+  // CARD_SLOTS — the MASTER grid (all cards centred on A4, stacked vertically
+  // with equal gaps). The back sheet (buildA4BackSheetHTML) and the student
+  // overlay (buildA4PrintHTML) use the SAME slots, so Front #N / Back #N cut
+  // boundaries coincide exactly. No flip, no mirror, no student data on this
+  // sheet. Optional cut lines (thin rectangles around each slot, outside the
+  // card boundary) help cutting. Uses the saved sheet layout, or the default
+  // 4-card centred column.
   function buildA4FrontSheetHTML(opts) {
     const sheet = (opts && opts.sheet) || getSheetLayout();
-    const slots = (sheet && sheet.slots && sheet.slots.length) ? sheet.slots : defaultSlotGrid(2, 4);
+    const slots = (sheet && sheet.slots && sheet.slots.length) ? sheet.slots : defaultCardSlots();
     const cut = !opts || opts.cutLines !== false;
     const CUT_GAP = 2;
     const slotsHtml = slots.map(s =>
       `<div class="ec-a4-front-slot" style="${a4SlotStyle(s, 'mm', 1)}">${cut ? `<i class="ec-a4-cut" style="left:-${CUT_GAP}mm;top:-${CUT_GAP}mm;width:${s.w + 2 * CUT_GAP}mm;height:${s.h + 2 * CUT_GAP}mm"></i>` : ''}<img src="${FRONT_IMG}" alt=""></div>`
     ).join('');
     const info = `<div class="ec-a4-info">طباعة الوجه الأمامي (الخطوة 1) — ورقة A4 · Portrait · Scale 100% · Margins None ·
-  هذه الورقة هي المرجع: الوجه الخلفي يُطبع على نفس المواضع (CARD_SLOTS) بنفس حدود القص.</div>`;
+  ${slots.length} بطاقات في منتصف الصفحة. هذه الورقة هي المرجع: الوجه الخلفي يُطبع على نفس المواضع (CARD_SLOTS) بنفس حدود القص.</div>`;
     return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>الوجه الأمامي — ورقة A4 (بطاقات)</title>
 <style>
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
@@ -992,6 +1124,76 @@ ${info}
   }
   setTimeout(go, 300);
   window.onafterprint = function () { setTimeout(function () { try { window.close(); } catch (e) {} }, 250); };
+    setTimeout(function () { try { window.close(); } catch (e) {} }, 120000);
+})();
+<\/script>
+</body></html>`;
+  }
+
+  // ── A4 two-pass workflow (print this page in step 2) ─────────────────
+  // BACK sheet: the 4 back designs (studentidcardback1.jpg) PLUS the SOLID
+  // white QR square and SOLID white barcode rectangle on EVERY card — the
+  // ready-made placeholders that receive the student QR/barcode later. NO
+  // student data on this sheet. The screen preview shows the cards at the raw
+  // CARD_SLOTS (identical to the front sheet, so Front #N == Back #N in the
+  // preview); in @media print each slot is re-positioned to its duplexBackSlot
+  // feed position (mirrored POSITION per the saved duplex mode + the ONE
+  // global offset) so the back lands exactly behind its front counterpart
+  // after the physical paper flip. The image is NEVER mirrored.
+  function buildA4BackSheetHTML(opts) {
+    const sheet = (opts && opts.sheet) || getSheetLayout();
+    const slots = (sheet && sheet.slots && sheet.slots.length) ? sheet.slots : defaultCardSlots();
+    const duplex = duplexFromSheet(sheet || defaultSheetLayout());
+    const cut = !opts || opts.cutLines !== false;
+    const CUT_GAP = 2;
+    const printRules = slots.map((s, i) => {
+      const db = duplexBackSlot(s, duplex.mode, duplex.dx, duplex.dy);
+      return `.ec-a4-back-slot[data-i="${i}"] { left: ${db.x}mm !important; top: ${db.y}mm !important; transform: rotate(${db.rot}deg) !important; }`;
+    }).join('\n');
+    const slotsHtml = slots.map((s, i) =>
+      `<div class="ec-a4-back-slot" data-i="${i}" style="${a4SlotStyle(s, 'mm', 1)}">${cut ? `<i class="ec-a4-cut" style="left:-${CUT_GAP}mm;top:-${CUT_GAP}mm;width:${s.w + 2 * CUT_GAP}mm;height:${s.h + 2 * CUT_GAP}mm"></i>` : ''}<img src="${BACK_IMG}" alt="">${a4BackDecorHTML(s, 'mm', 1)}</div>`
+    ).join('');
+    const duplexLabel = duplex.mode === 'long' ? 'قلب الحافة الطويلة'
+      : duplex.mode === 'short' ? 'قلب الحافة القصيرة' : 'قلب تلقائي (الطابعة)';
+    const info = `<div class="ec-a4-info"><b>طباعة الوجه الخلفي (الخطوة 2)</b> — ورقة A4 · Portrait · Scale 100% · Margins None ·
+  ${slots.length} بطاقات في نفس مواضع الوجه الأمامي · وضع Duplex: ${duplexLabel} · إزاحة عامة X/Y: ${duplex.dx.toFixed(2)} / ${duplex.dy.toFixed(2)} مم ·
+  <div class="sub">التصميم الخلفي + المربع الأبيض للـQR + المستطيل الأبيض للباركود تُطبع معاً على كل بطاقة (بدون أي بيانات طالب) — الورقة تصبح جاهزة لطبقة معلومات الطالب لاحقاً. الصورة لا تُعكس.</div></div>`;
+    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>الوجه الخلفي — ورقة A4 (تصميم + مربع QR + مستطيل باركود)</title>
+<style>
+  @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  * { box-sizing: border-box; }
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .ec-a4-info { display: none !important; }
+    ${printRules}
+  }
+  .ec-a4-info { font-family: 'Tajawal', Arial, sans-serif; font-size: 3.4mm; line-height: 1.5; color: #0f172a; background: #f8fafc; border: 0.3mm solid #cbd5e1; border-radius: 1.5mm; padding: 2.5mm 4mm; margin: 3mm 3mm 4mm; }
+  .ec-a4-info .hi { color: #059669; font-weight: 800; }
+  .ec-a4-info .sub { font-size: 2.9mm; color: #475569; margin-top: 1mm; }
+  .ec-a4 { position: relative; width: ${A4_W_MM}mm; height: ${A4_H_MM}mm; overflow: hidden; }
+  .ec-a4-back-slot { position: absolute; transform-origin: 0 0; background: #ffffff; }
+  .ec-a4-back-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .ec-a4-decor { position: absolute; display: block; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .ec-a4-cut { position: absolute; border: 0.3mm solid #888888; box-sizing: border-box; }
+</style>
+</head><body>
+${info}
+<div class="ec-a4">${slotsHtml}</div>
+<script>
+(function () {
+  var tries = 0;
+  function go() {
+    var imgs = document.querySelectorAll('.ec-a4-back-slot img');
+    var ready = true;
+    for (var i = 0; i < imgs.length; i++) {
+      if (!imgs[i].complete || imgs[i].naturalWidth === 0) { ready = false; break; }
+    }
+    if (ready || tries++ > 40) { try { window.focus(); window.print(); } catch (e) {} }
+    else { setTimeout(go, 250); }
+  }
+  setTimeout(go, 300);
+  window.onafterprint = function () { setTimeout(function () { try { window.close(); } catch (e) {} }, 250); };
   setTimeout(function () { try { window.close(); } catch (e) {} }, 120000);
 })();
 <\/script>
@@ -1002,7 +1204,7 @@ ${info}
   // Printed on blank paper and laid over the pre-printed A4 to verify the
   // saved slot positions match the real card grid. No designs, no data.
   function buildA4TestSheetHTML(opts) {
-    const sheet = getSheetLayout();
+    const sheet = (opts && opts.sheet) || getSheetLayout();
     if (!sheet || !sheet.slots || !sheet.slots.length) return null;
     const grid = opts && opts.grid ? a4GridOverlayHTML('mm', 1) : '';
     const slots = sheet.slots.map((s, i) =>
@@ -1090,13 +1292,14 @@ ${page(backSlots, 'الخلفي', 'ts-back')}
     getCalibration, setCalibration, saveCalibration, resetCalibration, calibrationStorageKey,
     addShape, removeShape,
     getSheetLayout, setSheetLayout, saveSheetLayout, resetSheetLayout, sheetStorageKey, defaultSlotGrid,
+    slotsFromParams, defaultCardSlots, defaultSheetLayout, sheetParams, CARD_PARAMS_DEFAULTS,
     flipSlot, flipSlots,
     duplexFromSheet, duplexBackSlot, physicalBackSlot,
     fullName, streamOf, regDate, barcodeValue, qrUrl,
     injectCSS, renderPair, portalFaces, buildPrintHTML, hydratePrint, hydrateRoot,
     dataLayerHTML, dlRules, gridOverlayHTML, GRID_CSS,
-    a4SheetCSS, a4SlotStyle, a4DataStyle, a4DataGeom, a4GridOverlayHTML, A4_GRID_CSS,
-    buildA4PrintHTML, buildA4TestSheetHTML, buildA4FrontSheetHTML, buildDuplexTestSheetHTML,
+    a4SheetCSS, a4SlotStyle, a4DataStyle, a4DataGeom, a4BackDecorHTML, a4GridOverlayHTML, A4_GRID_CSS,
+    buildA4PrintHTML, buildA4TestSheetHTML, buildA4FrontSheetHTML, buildA4BackSheetHTML, buildDuplexTestSheetHTML,
     renderBarcodeSVG, buildBarcodePrintHTML
   };
 })();

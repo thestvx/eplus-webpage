@@ -3110,7 +3110,8 @@
           </div>
           <div style="padding:0 24px 6px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:12.5px;color:var(--text-muted);font-weight:700">
             <span>نوع الطباعة:</span>
-            <label style="display:flex;align-items:center;gap:5px;cursor:default;color:var(--text)"><input type="radio" name="sr-print-mode" value="back" checked disabled> المعلومات + تصميم الوجه الخلفي</label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--text)"><input type="radio" name="sr-print-mode" value="info" checked> طباعة المعلومات فقط (الورقة مطبوعة مسبقاً بالخلف)</label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--text)"><input type="radio" name="sr-print-mode" value="back"> المعلومات + تصميم الوجه الخلفي</label>
           </div>
           <div style="padding:0 24px 6px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:12.5px;color:var(--text-muted);font-weight:700">
             <span>لون طبقة المعلومات:</span>
@@ -23974,7 +23975,7 @@ function srPrintCard() {
   const r = srCurrentCard;
   if (!r) return;
   const layout = StudentCardRenderer.getSheetLayout();
-  srActiveLayout = (layout && layout.slots && layout.slots.length) ? layout : { slots: StudentCardRenderer.defaultSlotGrid(2, 4), flip: null };
+  srActiveLayout = (layout && layout.slots && layout.slots.length) ? layout : StudentCardRenderer.defaultSheetLayout();
   srSelectedSlotIndex = 0;
   srSlotView = 'back';
   document.querySelectorAll('.sr-view-btn').forEach(b => b.classList.toggle('active', b.dataset.v === 'back'));
@@ -23982,12 +23983,13 @@ function srPrintCard() {
   document.getElementById('sr-slot-modal').classList.add('open');
 }
 
+// The map always shows the RAW CARD_SLOTS (the single geometry source), so
+// card #1 sits top-centre on the A4 outline — identical to the front sheet,
+// the back sheet, the calibration preview and the printed result. Duplex only
+// moves the PRINT feed position inside @media print; it never changes what
+// the user picks here.
 function srSlotDisp(i) {
-  const s = srActiveLayout.slots[i];
-  if (srSlotView === 'front') return s;
-  const d = StudentCardRenderer.duplexFromSheet(srActiveLayout);
-  if (d.mode === 'none') return s;
-  return StudentCardRenderer.duplexBackSlot(s, d.mode, d.dx, d.dy);
+  return srActiveLayout.slots[i];
 }
 
 function srRenderSlotMap() {
