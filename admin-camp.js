@@ -124,10 +124,7 @@
         if (!has) return false;
       }
       if (q) {
-        const hay = [
-          r.first_name, r.last_name, fullName(r),
-          r.guardian_name, r.guardian_phone,
-        ].join(' ').toLowerCase();
+        const hay = (fullName(r) + ' ' + (r.id || '')).toLowerCase();
         if (hay.indexOf(q) === -1) return false;
       }
       return true;
@@ -192,6 +189,8 @@
   }
 
   const campMoneyHidden = () => !!(window._employeeRestrictions && window._employeeRestrictions.camp2HideMoney);
+
+  const camp2CanManage = () => !window._employeeRestrictions;
 
   function camp2Csv(rows) {
     const hide = campMoneyHidden();
@@ -312,12 +311,12 @@
     const page = rows.slice(start, start + PAGE_SIZE);
 
     if (!page.length) {
-      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text-muted)">لا توجد تسجيلات</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-muted)">لا توجد تسجيلات</td></tr>';
     } else {
       tbody.innerHTML = page.map((r, i) => {
         const progs = normalizePrograms(r);
         const progsText = progs.map(p => (p.icon || '') + ' ' + (p.name || p.id)).join(' • ') || '—';
-        return `<tr>
+        return `<tr ondblclick="camp2OpenDetails('${esc(r.id)}')" style="cursor:pointer" title="اضغط مرتين لعرض التفاصيل">
           <td>${start + i + 1}</td>
           <td dir="ltr" style="font-weight:700;color:var(--summer)">${esc(r.id)}</td>
           <td>${esc(r.last_name || '—')}</td>
@@ -329,7 +328,6 @@
           <td style="font-size:12px;max-width:230px">${esc(progsText)}</td>
           <td class="camp2-money-td" style="font-weight:800">${formatMoney(r.total_amount)}</td>
           <td style="font-size:11.5px">${formatDate(r.created_at)}</td>
-          <td><button class="tbl-action view" onclick="camp2OpenDetails('${esc(r.id)}')" title="تفاصيل">👁</button></td>
         </tr>`;
       }).join('');
     }
@@ -362,7 +360,7 @@
   async function camp2LoadData() {
     populateFilters();
     const tbody = $('camp2-tbody');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text-muted)">⏳ جاري تحميل البيانات...</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-muted)">⏳ جاري تحميل البيانات...</td></tr>';
     try {
       const { url } = supabaseConfig();
       const res = await supabaseFetch(`${url}/rest/v1/${CAMP_TABLE}?select=*&order=created_at.desc`);
@@ -373,7 +371,7 @@
       camp2ApplyFilters();
     } catch (e) {
       console.error('Camp2 load error:', e);
-      if (tbody) tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--danger)">❌ فشل تحميل البيانات</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--danger)">❌ فشل تحميل البيانات</td></tr>';
     }
   }
 
@@ -398,7 +396,16 @@
     const r = allRows.find(x => x.id === id);
     if (!r) return;
     const c = $('camp2-detail-content');
-    if (c) c.innerHTML = camp2RowDetailHtml(r);
+    if (c) {
+      let html = camp2RowDetailHtml(r);
+      if (camp2CanManage()) {
+        html += `<div class="camp2-detail-block" style="display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:14px">
+          <button class="tbl-action" onclick="camp2EditRow('${esc(r.id)}')" style="font-size:12.5px">✏️ تعديل معلومات الطالب</button>
+          <button class="tbl-action del" onclick="camp2DeleteRow('${esc(r.id)}')" style="font-size:12.5px">🗑️ حذف التسجيل</button>
+        </div>`;
+      }
+      c.innerHTML = html;
+    }
     const m = $('camp2-detail-modal');
     if (m) m.classList.add('open');
   }
@@ -406,6 +413,117 @@
   function camp2CloseDetails() {
     const m = $('camp2-detail-modal');
     if (m) m.classList.remove('open');
+  }
+
+  // ═══════ تعديل معلومات الطالب ═══════
+  function camp2EditRow(id) {
+    const r = allRows.find(x => x.id === id);
+    if (!r) return;
+    if (!camp2CanManage()) { showToast('⛔ ليس لديك صلاحية تعديل تسجيلات المخيم', true); return; }
+    $('camp2-edit-id') && ($('camp2-edit-id').value = r.id);
+    $('camp2-edit-first-name') && ($('camp2-edit-first-name').value = r.first_name || '');
+    $('camp2-edit-last-name') && ($('camp2-edit-last-name').value = r.last_name || '');
+    $('camp2-edit-birth-date') && ($('camp2-edit-birth-date').value = r.birth_date || '');
+    $('camp2-edit-guardian-name') && ($('camp2-edit-guardian-name').value = r.guardian_name || '');
+    $('camp2-edit-guardian-phone') && ($('camp2-edit-guardian-phone').value = r.guardian_phone || '');
+    const lv = $('camp2-edit-level');
+    if (lv) {
+      if (!lv.dataset.populated) {
+        CAMP_LEVELS.forEach(l => {
+          const o = document.createElement('option');
+          o.value = l.value;
+          o.textContent = l.emoji + ' ' + l.label;
+          lv.appendChild(o);
+        });
+        lv.dataset.populated = '1';
+      }
+      lv.value = r.education_level || '';
+    }
+    const pr = $('camp2-edit-programs');
+    if (pr) {
+      pr.innerHTML = normalizePrograms(r)
+        .map(p => (p.icon || '') + ' ' + (p.name || (programById(p.id) ? programById(p.id).name : p.id)) + ' — ' + formatMoney(p.price != null ? p.price : (programById(p.id) ? programById(p.id).price : 0)))
+        .join(' • ') || '—';
+    }
+    const m = $('camp2-edit-modal');
+    if (m) m.classList.add('open');
+  }
+
+  function camp2CloseEdit() {
+    const m = $('camp2-edit-modal');
+    if (m) m.classList.remove('open');
+  }
+
+  async function camp2SaveEdit() {
+    if (!camp2CanManage()) { showToast('⛔ ليس لديك صلاحية تعديل تسجيلات المخيم', true); return; }
+    const id = $('camp2-edit-id') ? $('camp2-edit-id').value : '';
+    if (!id) return;
+    const payload = {
+      first_name: ($('camp2-edit-first-name') ? $('camp2-edit-first-name').value : '').trim(),
+      last_name: ($('camp2-edit-last-name') ? $('camp2-edit-last-name').value : '').trim(),
+      birth_date: $('camp2-edit-birth-date') ? $('camp2-edit-birth-date').value : '',
+      guardian_name: ($('camp2-edit-guardian-name') ? $('camp2-edit-guardian-name').value : '').trim(),
+      guardian_phone: ($('camp2-edit-guardian-phone') ? $('camp2-edit-guardian-phone').value : '').trim(),
+      education_level: $('camp2-edit-level') ? $('camp2-edit-level').value : '',
+    };
+    if (!payload.first_name || !payload.last_name || !payload.education_level) {
+      showToast('⚠️ الاسم واللقب والمستوى الدراسي إلزامية', true);
+      return;
+    }
+    const btn = $('camp2-edit-save');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
+    try {
+      const { url } = supabaseConfig();
+      const res = await supabaseFetch(`${url}/rest/v1/${CAMP_TABLE}?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const row = allRows.find(x => x.id === id);
+      if (row) Object.assign(row, payload);
+      camp2CloseEdit();
+      renderTable();
+      renderStats(allRows);
+      showToast('✅ تم تحديث معلومات الطالب');
+    } catch (e) {
+      console.error('Camp2 edit error:', e);
+      showToast('❌ فشل تحديث البيانات: ' + (e.message || ''), true);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '💾 حفظ التعديلات'; }
+    }
+  }
+
+  // ═══════ حذف تسجيل ═══════
+  async function camp2DeleteRow(id) {
+    const r = allRows.find(x => x.id === id);
+    if (!r) return;
+    if (!camp2CanManage()) { showToast('⛔ ليس لديك صلاحية حذف تسجيلات المخيم', true); return; }
+    const name = fullName(r) || r.id;
+    let ok = false;
+    if (typeof cmConfirm === 'function') {
+      ok = await cmConfirm('حذف تسجيل المخيم', `هل أنت متأكد من حذف تسجيل <strong>${esc(name)}</strong> (${esc(r.id)})؟\n\nلا يمكن التراجع عن هذا الإجراء.`, '🗑️', { danger: true, confirmText: 'حذف' });
+    } else {
+      ok = window.confirm('حذف تسجيل المخيم: ' + name + '؟');
+    }
+    if (!ok) return;
+    try {
+      const { url } = supabaseConfig();
+      const res = await supabaseFetch(`${url}/rest/v1/${CAMP_TABLE}?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const chk = await supabaseFetch(`${url}/rest/v1/${CAMP_TABLE}?id=eq.${encodeURIComponent(id)}&select=id`);
+      const still = chk.ok ? await chk.json() : [];
+      if (Array.isArray(still) && still.length) {
+        throw new Error('قاعدة البيانات تمنع الحذف — يلزم إضافة سياسة DELETE في Supabase');
+      }
+      allRows = allRows.filter(x => x.id !== id);
+      camp2CloseDetails();
+      camp2ApplyFilters();
+      renderStats(allRows);
+      showToast('✅ تم حذف تسجيل: ' + name);
+    } catch (e) {
+      console.error('Camp2 delete error:', e);
+      showToast('❌ فشل الحذف: ' + (e.message || ''), true);
+    }
   }
 
   // ═══════ الطباعة ═══════
@@ -524,6 +642,10 @@
   window.camp2GoPage = camp2GoPage;
   window.camp2OpenDetails = camp2OpenDetails;
   window.camp2CloseDetails = camp2CloseDetails;
+  window.camp2EditRow = camp2EditRow;
+  window.camp2CloseEdit = camp2CloseEdit;
+  window.camp2SaveEdit = camp2SaveEdit;
+  window.camp2DeleteRow = camp2DeleteRow;
   window.camp2Print = camp2Print;
   window.camp2ExportCSV = camp2ExportCSV;
 
@@ -533,4 +655,6 @@
   window.camp2GroupByLevel = camp2GroupByLevel;
   window.camp2GroupByProgram = camp2GroupByProgram;
   window.camp2Csv = camp2Csv;
+  window.camp2CanManage = camp2CanManage;
+  window.camp2RowDetailHtml = camp2RowDetailHtml;
 })();

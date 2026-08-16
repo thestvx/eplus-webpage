@@ -177,6 +177,8 @@ DROP POLICY IF EXISTS "anon_select_summer_camp_registrations" ON summer_camp_reg
 CREATE POLICY "anon_select_summer_camp_registrations" ON summer_camp_registrations FOR SELECT TO anon USING (true);
 DROP POLICY IF EXISTS "anon_update_summer_camp_registrations" ON summer_camp_registrations;
 CREATE POLICY "anon_update_summer_camp_registrations" ON summer_camp_registrations FOR UPDATE TO anon USING (true);
+DROP POLICY IF EXISTS "anon_delete_summer_camp_registrations" ON summer_camp_registrations;
+CREATE POLICY "anon_delete_summer_camp_registrations" ON summer_camp_registrations FOR DELETE TO anon USING (true);
 
 -- 7c. CALIBRATION SETTINGS (إعدادات المعايرة المركزية — مصدر واحد مشترك)
 -- صف واحد واحد id='global' يضم معايرة البطاقة + تخطيط ورقة A4 معاً، يُقرأ

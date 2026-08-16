@@ -353,9 +353,9 @@ function showStream() {
   const sg = byId('s-stream-group');
   if (!sg) return;
   sg.style.display = 'block';
-  byId('s-institution-group')&&(byId('s-institution-group').style.display='none');
-  // لا نخفي حقل إدخال اسم المؤسسة هنا: يُستدعى showStream تلقائياً عند كتابة
-  // حرفين في خيار "أخرى"، وإخفاؤه هنا كان يتسبب باختفاء الحقل أثناء الكتابة.
+  // لا نخفي لا شريط المؤسسات ولا حقل إدخال اسم المؤسسة هنا:
+  // يُستدعى showStream تلقائياً عند كتابة حرفين في خيار "أخرى"،
+  // وإخفاؤهما هنا كان يتسبب باختفائهما أثناء الكتابة.
   renderStreams();
 }
 
