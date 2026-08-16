@@ -39,6 +39,7 @@ const SUPPORT_INSTITUTIONS = {
     'متقنة عبدالقادر الياجوري بقمار',
     'ثانوية العلامة أبو القاسم سعد الله بقمار',
     'ثانوية بوضياف بوضياف بتغزوت',
+    'ثانوية الشهيد علية محمد بغمرة',
     'أخرى',
   ],
   'السنة الرابعة متوسط': [
@@ -353,7 +354,8 @@ function showStream() {
   if (!sg) return;
   sg.style.display = 'block';
   byId('s-institution-group')&&(byId('s-institution-group').style.display='none');
-  byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='none');
+  // لا نخفي حقل إدخال اسم المؤسسة هنا: يُستدعى showStream تلقائياً عند كتابة
+  // حرفين في خيار "أخرى"، وإخفاؤه هنا كان يتسبب باختفاء الحقل أثناء الكتابة.
   renderStreams();
 }
 
