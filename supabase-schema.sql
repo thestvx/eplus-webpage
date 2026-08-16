@@ -151,6 +151,33 @@ CREATE POLICY "anon_select_registrations" ON registrations FOR SELECT TO anon US
 DROP POLICY IF EXISTS "anon_update_registrations" ON registrations;
 CREATE POLICY "anon_update_registrations" ON registrations FOR UPDATE TO anon USING (true);
 
+-- 7b. SUMMER CAMP REGISTRATIONS (تسجيلات المخيم الصيفي — النسخة الثانية)
+-- جدول مستقل تماماً عن تسجيلات الدعم المدرسي (لا يؤثر عليه).
+CREATE TABLE IF NOT EXISTS summer_camp_registrations (
+  id TEXT PRIMARY KEY,
+  first_name TEXT NOT NULL DEFAULT '',
+  last_name TEXT NOT NULL DEFAULT '',
+  birth_date TEXT DEFAULT '',
+  guardian_name TEXT DEFAULT '',
+  guardian_phone TEXT DEFAULT '',
+  education_level TEXT DEFAULT '',
+  programs JSONB DEFAULT '[]',
+  total_amount INTEGER DEFAULT 0,
+  terms_accepted BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_summer_camp_created_at ON summer_camp_registrations(created_at);
+
+-- RLS (نفس نمط registrations)
+ALTER TABLE summer_camp_registrations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_insert_summer_camp_registrations" ON summer_camp_registrations;
+CREATE POLICY "anon_insert_summer_camp_registrations" ON summer_camp_registrations FOR INSERT TO anon WITH CHECK (true);
+DROP POLICY IF EXISTS "anon_select_summer_camp_registrations" ON summer_camp_registrations;
+CREATE POLICY "anon_select_summer_camp_registrations" ON summer_camp_registrations FOR SELECT TO anon USING (true);
+DROP POLICY IF EXISTS "anon_update_summer_camp_registrations" ON summer_camp_registrations;
+CREATE POLICY "anon_update_summer_camp_registrations" ON summer_camp_registrations FOR UPDATE TO anon USING (true);
+
 -- 8. TEACHER BALANCES (توازن مستحقات الأساتذة — مستمد من دفتر المعاملات)
 CREATE TABLE IF NOT EXISTS teacher_balances (
   teacher_id TEXT PRIMARY KEY,
