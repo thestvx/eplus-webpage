@@ -1,12 +1,13 @@
 // ═══════════════════════════════════════════════════════════
 //  تسجيل برنامج المخيم الصيفي — النسخة الثانية
-//  Multi-Step Registration: المعلومات الأساسية ← المستوى الدراسي
-//  ← البرامج المطلوبة ← ملخص التسجيل ← القوانين ← تم التسجيل
+//  نموذج موحّد في نافذة واحدة قابلة للتمرير:
+//  المعلومات الأساسية ← المستوى الدراسي ← البرامج المطلوبة ← القوانين ← تم التسجيل
 //
 //  ⚠️ مصدر قوانين المركز: يُقرأ من SUPPORT_LAWS المُعرّف في
 //  register-support.js (نفس المصدر تماماً — أي تعديل مستقبلي على
-//  القوانين يظهر هنا تلقائياً، دون نسخة منفصلة). لذلك يجب تحميل
-//  هذا الملف بعد register-support.js.
+//  القوانين يظهر هنا تلقائياً، دون نسخة منفصلة). قوانين المخيم
+//  الصيفي تستثني فقط القوانين المتعلقة بدفع الرسوم/حقوق التسجيل.
+//  لذلك يجب تحميل هذا الملف بعد register-support.js.
 //
 //  ⚠️ مصدر البرامج والأسعار والمدة: يُقرأ من window.CAMP_PROGRAMS
 //  و window.CAMP_LEVELS المُعرّفان في js/camp-programs.js
@@ -47,8 +48,12 @@ let cCampFormData = null;
 function cById(id) { return document.getElementById(id); }
 
 // ── قوانين المركز — نفس المصدر تماماً (register-support.js) ──
+// قوانين المخيم الصيفي تستثني القوانين المتعلقة بدفع الرسوم/حقوق
+// التسجيل (رسوم التسجيل، الأقساط الشهرية، تسديد الحقوق...) لأن
+// التسجيل في المخيم يتم بمبلغ واحد يُدفع في المركز ولا توجد أقساط.
 function campLaws() {
-  return (typeof SUPPORT_LAWS !== 'undefined' && Array.isArray(SUPPORT_LAWS)) ? SUPPORT_LAWS : [];
+  if (typeof SUPPORT_LAWS === 'undefined' || !Array.isArray(SUPPORT_LAWS)) return [];
+  return SUPPORT_LAWS.filter(l => !/رسوم التسجيل|حقوق التسجيل|الرسوم|الأقساط|تسديد/.test(l));
 }
 
 // ── إعدادات Supabase — نفس مشروع الدعم المدرسي (جدول منفصل) ──
@@ -63,33 +68,6 @@ function campSupabase() {
 function campAlert(message, title) {
   if (typeof regAlert === 'function') { regAlert(message, title || 'تنبيه'); return; }
   alert(message);
-}
-
-// ── Smooth scroll بين المراحل (نفس أسلوب نظام الدعم المدرسي) ──
-function campSmoothScrollTo(container, targetTop, duration) {
-  if (!container) return;
-  const start = container.scrollTop;
-  const maxScroll = container.scrollHeight - container.clientHeight;
-  const target = Math.max(0, Math.min(targetTop, maxScroll));
-  if (Math.abs(target - start) < 1) return;
-  const t0 = performance.now();
-  function step(now) {
-    const t = Math.min(1, (now - t0) / (duration || 550));
-    const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    container.scrollTop = start + (target - start) * eased;
-    if (t < 1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
-}
-
-function campScrollToPhase(el, opts) {
-  if (!el) return;
-  const o = opts || {};
-  const container = el.closest('.modal-overlay') || document.scrollingElement;
-  if (!container) return;
-  const headerOffset = (o.offset != null) ? o.offset : 24;
-  const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - headerOffset;
-  campSmoothScrollTo(container, top, o.duration || 550);
 }
 
 // ── ID فريد لطالب المخيم الصيفي (SC-XXXX مع إعادة المحاولة عند التصادم) ──
@@ -110,18 +88,10 @@ function openCampReg() {
   cCampLevel = null; cCampPrograms = []; cCampFormData = null;
   const f = cById('camp-reg-form');
   if (f) f.reset();
-  ['camp-level-group', 'camp-programs-group', 'camp-review-group'].forEach(id => {
-    const el = cById(id); if (el) el.style.display = 'none';
-  });
-  ['campNext1Btn', 'campNext2Btn', 'campNext3Btn'].forEach(id => {
-    const el = cById(id); if (el) { el.style.display = ''; }
-  });
-  const b2 = cById('campNext2Btn'); if (b2) b2.disabled = true;
-  const b3 = cById('campNext3Btn'); if (b3) b3.disabled = true;
   renderCampLevels();
   renderCampPrograms();
   updateCampSummary();
-  renderCampReview();
+  campUpdateNextBtn();
   const modal = cById('camp-reg-modal');
   if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); modal.scrollTop = 0; }
 }
@@ -135,28 +105,28 @@ function closeCampRegOutside(e) {
   if (e.target === cById('camp-reg-modal')) closeCampReg();
 }
 
-// ── المرحلة 1: المعلومات الأساسية ──
-function campNextFromInfo() {
-  const firstName = cById('cFirstName')?.value?.trim();
-  const lastName = cById('cLastName')?.value?.trim();
-  const birthDate = cById('cBirthDate')?.value;
-  const parentName = cById('cParentName')?.value?.trim();
-  const parentPhone = cById('cParentPhone')?.value?.trim();
-
-  if (!firstName) { campAlert('الرجاء إدخال الاسم.'); cById('cFirstName')?.focus(); return; }
-  if (!lastName) { campAlert('الرجاء إدخال اللقب.'); cById('cLastName')?.focus(); return; }
-  if (!birthDate) { campAlert('الرجاء إدخال تاريخ الميلاد.'); cById('cBirthDate')?.focus(); return; }
-  if (!parentName) { campAlert('الرجاء إدخال اسم ولي الأمر.'); cById('cParentName')?.focus(); return; }
-  if (!parentPhone) { campAlert('الرجاء إدخال هاتف ولي الأمر.'); cById('cParentPhone')?.focus(); return; }
-
-  cById('campNext1Btn') && (cById('campNext1Btn').style.display = 'none');
-  const lg = cById('camp-level-group');
-  if (lg) { lg.style.display = 'block'; }
-  const b2 = cById('campNext2Btn'); if (b2) b2.disabled = !cCampLevel;
-  campScrollToPhase(lg, { offset: 24 });
+// ── اكتمال الحقول الإلزامية وتفعيل زر المتابعة ──
+function campRequiredReady() {
+  const hasInfo = !!(
+    cById('cFirstName')?.value?.trim()
+    && cById('cLastName')?.value?.trim()
+    && cById('cBirthDate')?.value
+    && cById('cParentName')?.value?.trim()
+    && cById('cParentPhone')?.value?.trim()
+  );
+  return hasInfo && !!cCampLevel && cCampPrograms.length > 0;
 }
 
-// ── المرحلة 2: المستوى الدراسي (اختيار واحد) ──
+function campOnFieldChange() {
+  campUpdateNextBtn();
+}
+
+function campUpdateNextBtn() {
+  const btn = cById('campGotoLawsBtn');
+  if (btn) btn.disabled = !campRequiredReady();
+}
+
+// ── المستوى الدراسي (اختيار واحد) ──
 function renderCampLevels() {
   const c = cById('camp-level-options');
   if (!c) return;
@@ -172,19 +142,10 @@ function renderCampLevels() {
 function campOnLevelChange() {
   const checked = document.querySelector('input[name="cCampLevel"]:checked');
   cCampLevel = checked ? checked.value : null;
-  const b2 = cById('campNext2Btn'); if (b2) b2.disabled = !cCampLevel;
+  campUpdateNextBtn();
 }
 
-function campNextFromLevel() {
-  if (!cCampLevel) { campAlert('الرجاء اختيار المستوى الدراسي.'); return; }
-  cById('campNext2Btn') && (cById('campNext2Btn').style.display = 'none');
-  const pg = cById('camp-programs-group');
-  if (pg) { pg.style.display = 'block'; }
-  const b3 = cById('campNext3Btn'); if (b3) b3.disabled = cCampPrograms.length === 0;
-  campScrollToPhase(pg, { offset: 24 });
-}
-
-// ── المرحلة 3: البرامج المطلوبة (اختيار متعدد) ──
+// ── البرامج المطلوبة (اختيار متعدد) ──
 function renderCampPrograms() {
   const g = cById('camp-prog-grid');
   if (!g) return;
@@ -206,7 +167,7 @@ function campToggleProgram(id) {
   else cCampPrograms.splice(i, 1);
   renderCampPrograms();
   updateCampSummary();
-  const b3 = cById('campNext3Btn'); if (b3) b3.disabled = cCampPrograms.length === 0;
+  campUpdateNextBtn();
 }
 
 function campRemoveProgram(id) {
@@ -235,50 +196,13 @@ function updateCampSummary() {
   if (totalEl) totalEl.textContent = campTotal().toLocaleString('fr-DZ') + ' دج';
 }
 
-function campNextFromPrograms() {
-  if (cCampPrograms.length === 0) { campAlert('الرجاء اختيار برنامج واحد على الأقل.'); return; }
-  cById('campNext3Btn') && (cById('campNext3Btn').style.display = 'none');
-  renderCampReview();
-  const rg = cById('camp-review-group');
-  if (rg) { rg.style.display = 'block'; }
-  campScrollToPhase(rg, { offset: 24 });
-}
-
-// ── المرحلة 4: ملخص التسجيل ──
+// ── المستوى الدراسي (تسمية للعرض في شاشة النجاح) ──
 function campLevelLabel() {
   const l = CAMP_LEVELS.find(x => x.value === cCampLevel);
   return l ? `${l.emoji} ${l.label}` : '—';
 }
 
-function renderCampReview() {
-  const c = cById('camp-review-content');
-  if (!c) return;
-  const firstName = cById('cFirstName')?.value?.trim() || '—';
-  const lastName = cById('cLastName')?.value?.trim() || '—';
-  const birthDate = cById('cBirthDate')?.value || '';
-  const parentName = cById('cParentName')?.value?.trim() || '—';
-  const parentPhone = cById('cParentPhone')?.value?.trim() || '—';
-  const birthFmt = birthDate ? new Date(birthDate + 'T00:00:00').toLocaleDateString('ar-DZ') : '—';
-
-  const programsHtml = cCampPrograms.length
-    ? cCampPrograms.map(id => {
-        const p = CAMP_PROGRAMS.find(x => x.id === id);
-        if (!p) return '';
-        return `<div class="camp-review-prog"><span>${p.icon} <strong>${p.name}</strong></span><span>${p.price} دج</span><span class="camp-review-dur">${p.duration}</span></div>`;
-      }).join('')
-    : '<div style="font-size:12.5px;color:rgba(255,255,255,0.5);">لا توجد برامج</div>';
-
-  c.innerHTML =
-    `<div class="camp-review-row"><span class="camp-review-label">👤 الطالب</span><span class="camp-review-val">${firstName} ${lastName}</span></div>` +
-    `<div class="camp-review-row"><span class="camp-review-label">🎂 تاريخ الميلاد</span><span class="camp-review-val">${birthFmt}</span></div>` +
-    `<div class="camp-review-row"><span class="camp-review-label">👪 ولي الأمر</span><span class="camp-review-val">${parentName}</span></div>` +
-    `<div class="camp-review-row"><span class="camp-review-label">📞 الهاتف</span><span class="camp-review-val" dir="ltr">${parentPhone}</span></div>` +
-    `<div class="camp-review-row"><span class="camp-review-label">🎓 المستوى الدراسي</span><span class="camp-review-val">${campLevelLabel()}</span></div>` +
-    `<div class="camp-review-progs"><span class="camp-review-label">📚 البرامج المطلوبة</span>${programsHtml}</div>` +
-    `<div class="camp-review-total"><span>الإجمالي</span><strong>${campTotal().toLocaleString('fr-DZ')} دج</strong></div>`;
-}
-
-// ── الانتقال إلى القوانين (إعادة تحقق كاملة من كل المراحل) ──
+// ── الانتقال إلى القوانين (إعادة تحقق كاملة من كل البيانات) ──
 function campGotoLaws() {
   const firstName = cById('cFirstName')?.value?.trim();
   const lastName = cById('cLastName')?.value?.trim();
@@ -294,7 +218,6 @@ function campGotoLaws() {
   if (!cCampLevel) { campAlert('الرجاء اختيار المستوى الدراسي.'); return; }
   if (cCampPrograms.length === 0) { campAlert('الرجاء اختيار برنامج واحد على الأقل.'); return; }
 
-  renderCampReview();
   campOpenLawsModal();
 }
 
@@ -322,7 +245,7 @@ function campLawsBackToForm() {
   if (formModal) {
     formModal.style.display = 'flex';
     formModal.classList.add('active');
-    campScrollToPhase(cById('camp-review-group') || formModal, { offset: 20 });
+    formModal.scrollTop = 0;
   }
 }
 

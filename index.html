@@ -201,7 +201,20 @@
       border:1px solid rgba(14,165,233,0.28); color:#7DD3FC;
       font-size:11.5px; font-weight:800; letter-spacing:0.3px;
     }
+    .camp-section-title {
+      display:flex; align-items:center; gap:8px; margin-bottom:14px; padding-bottom:9px;
+      border-bottom:1px solid rgba(56,189,248,0.18);
+      font-size:14.5px; font-weight:900; color:#7DD3FC; letter-spacing:0.2px;
+    }
+    .camp-section-title::before {
+      content:''; width:4px; height:16px; border-radius:99px;
+      background:linear-gradient(180deg,#38BDF8,#0EA5E9);
+    }
     .camp-next-btn { margin-top:16px; width:100%; }
+    .camp-next-btn:disabled {
+      opacity:0.45; cursor:not-allowed;
+      transform:none !important; box-shadow:none !important;
+    }
     .camp-prog-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
     .camp-prog-card {
       position:relative; display:flex; flex-direction:column; align-items:center; gap:4px;
@@ -274,6 +287,7 @@
     .camp-review-total strong { color:#38BDF8; font-size:16px; }
     #camp-laws-modal .modal-title { font-size:19px; }
     html.light-mode .camp-step-label { background:rgba(14,165,233,0.08); border-color:rgba(14,165,233,0.25); color:#0369A1; }
+    html.light-mode .camp-section-title { color:#0369A1; border-bottom-color:rgba(14,165,233,0.25); }
     html.light-mode .camp-prog-card { background:rgba(0,0,0,0.02); border-color:rgba(0,0,0,0.08); }
     html.light-mode .camp-prog-card .camp-prog-name { color:#1a1a2e; }
     html.light-mode .camp-prog-card.selected { background:rgba(14,165,233,0.08); }
@@ -2076,70 +2090,63 @@
   <div class="modal-box" id="camp-modal-box" style="margin:auto;max-width:560px;">
     <div id="camp-form-view">
       <div class="modal-header">
-        <h3 class="modal-title">سجّل في برنامج المخيم الصيفي ☀</h3>
+        <h3 class="modal-title">تسجيل في برنامج المخيم الصيفي ☀</h3>
         <button class="close-btn" onclick="closeCampReg()" type="button">✕</button>
       </div>
 
       <form id="camp-reg-form" class="camp-reg-form" novalidate>
 
-        <!-- ═══ المرحلة 1: المعلومات الأساسية (تظهر فوراً) ═══ -->
+        <!-- ═══ المعلومات الأساسية ═══ -->
         <div id="camp-personal-group">
-          <div class="camp-step-label">المرحلة 1 · المعلومات الأساسية</div>
+          <div class="camp-section-title">المعلومات الأساسية</div>
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">الاسم <span>*</span></label>
-              <input class="form-input" id="cFirstName" type="text" required />
+              <input class="form-input" id="cFirstName" type="text" required oninput="campOnFieldChange()" />
             </div>
             <div class="form-group">
               <label class="form-label">اللقب <span>*</span></label>
-              <input class="form-input" id="cLastName" type="text" required />
+              <input class="form-input" id="cLastName" type="text" required oninput="campOnFieldChange()" />
             </div>
           </div>
           <div class="form-group">
             <label class="form-label">تاريخ الميلاد <span>*</span></label>
-            <input class="form-input" id="cBirthDate" type="date" required />
+            <input class="form-input" id="cBirthDate" type="date" required oninput="campOnFieldChange()" />
           </div>
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">اسم ولي الأمر <span>*</span></label>
-              <input class="form-input" id="cParentName" type="text" required />
+              <input class="form-input" id="cParentName" type="text" required oninput="campOnFieldChange()" />
             </div>
             <div class="form-group">
               <label class="form-label">هاتف ولي الأمر <span>*</span></label>
-              <input class="form-input" id="cParentPhone" type="tel" placeholder="05XX XX XX XX" required />
+              <input class="form-input" id="cParentPhone" type="tel" placeholder="05XX XX XX XX" required oninput="campOnFieldChange()" />
             </div>
           </div>
-          <button class="ep-btn-primary camp-next-btn" type="button" id="campNext1Btn" onclick="campNextFromInfo()">الانتقال إلى المستوى الدراسي ←</button>
         </div>
 
-        <!-- ═══ المرحلة 2: المستوى الدراسي (اختيار واحد) ═══ -->
-        <div class="form-group" id="camp-level-group" style="display:none;">
-          <div class="camp-step-label">المرحلة 2 · المستوى الدراسي</div>
+        <!-- ═══ المستوى الدراسي (اختيار واحد) ═══ -->
+        <div class="form-group" id="camp-level-group">
+          <div class="camp-section-title">المستوى الدراسي</div>
           <label class="form-label">اختر المستوى الدراسي <span>*</span></label>
           <div class="check-options" id="camp-level-options"></div>
-          <button class="ep-btn-primary camp-next-btn" type="button" id="campNext2Btn" onclick="campNextFromLevel()" disabled>الانتقال إلى البرامج ←</button>
         </div>
 
-        <!-- ═══ المرحلة 3: البرامج المطلوبة (اختيار متعدد) ═══ -->
-        <div class="form-group" id="camp-programs-group" style="display:none;">
-          <div class="camp-step-label">المرحلة 3 · البرامج المطلوبة</div>
+        <!-- ═══ البرامج المطلوبة (اختيار متعدد) ═══ -->
+        <div class="form-group" id="camp-programs-group">
+          <div class="camp-section-title">البرامج المطلوبة</div>
           <label class="form-label">اختر البرنامج أو البرامج <span>*</span></label>
           <div style="font-size:12px;color:#94a3b8;margin:-4px 0 10px;line-height:1.5;">يمكنك اختيار أكثر من برنامج واحد، ويتحدّث الإجمالي تلقائياً.</div>
           <div class="camp-prog-grid" id="camp-prog-grid"></div>
           <div class="camp-summary-box" id="camp-summary-box" style="display:none;">
             <div class="camp-summary-title">البرامج المختارة</div>
             <div id="camp-selected-list"></div>
-            <div class="camp-total-row"><span>إجمالي التسجيل</span><strong id="camp-total-amount">0 دج</strong></div>
+            <div class="camp-total-row"><span>إجمالي المبلغ</span><strong id="camp-total-amount">0 دج</strong></div>
           </div>
-          <button class="ep-btn-primary camp-next-btn" type="button" id="campNext3Btn" onclick="campNextFromPrograms()" disabled>الانتقال إلى ملخص التسجيل ←</button>
         </div>
 
-        <!-- ═══ المرحلة 4: ملخص التسجيل ═══ -->
-        <div class="form-group" id="camp-review-group" style="display:none;">
-          <div class="camp-step-label">المرحلة 4 · ملخص التسجيل</div>
-          <div class="camp-review-card" id="camp-review-content"></div>
-          <button class="ep-btn-primary submit-btn" type="button" onclick="campGotoLaws()" style="margin-top:14px;width:100%;">الانتقال إلى القوانين ←</button>
-        </div>
+        <!-- ═══ زر المتابعة الوحيد ═══ -->
+        <button class="ep-btn-primary camp-next-btn" type="button" id="campGotoLawsBtn" onclick="campGotoLaws()" disabled>متابعة إلى القوانين ←</button>
 
       </form>
     </div>
@@ -2424,6 +2431,6 @@
   <script src="js/subjectService.js?v=4"></script>
   <script src="register-support.js?v=20"></script>
   <script src="js/camp-programs.js?v=1"></script>
-  <script src="register-camp.js?v=2"></script>
+  <script src="register-camp.js?v=3"></script>
 </body>
 </html>
