@@ -866,9 +866,9 @@ ${TAJWAL_FACES}
   .ec-data-layer { position: relative; width: ${CARD_W_MM}mm; height: ${CARD_H_MM}mm; overflow: hidden; font-family: 'Tajawal', Arial, sans-serif; }
   ${dlRules('mm', 1, 1, '', opts && opts.textColor)}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=18"><\/script>
+<script src="js/qrcode.min.js?v=1"><\/script>
+<script src="js/JsBarcode.all.min.js?v=1"><\/script>
+<script src="js/studentCardRenderer.js?v=20"><\/script>
 </head><body>
 <div class="ec-data-layer">${dataLayerHTML(r)}${grid}</div>
 <script>
@@ -921,8 +921,8 @@ ${TAJWAL_FACES}
 </style>
 </head><body>
   <div class="wrap"><div class="cap">${value}</div><div id="bc"></div></div>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=18"></script>
+<script src="js/JsBarcode.all.min.js?v=1"></script>
+<script src="js/studentCardRenderer.js?v=20"></script>
 <script>
   (function () {
     var value = '${value}';
@@ -1106,9 +1106,9 @@ ${TAJWAL_FACES}
   .ec-a4-data { position: absolute; }
   ${dlRules('mm', sc, sc, '', opts && opts.textColor, Object.assign({}, opts, { omitBg: mode === 'info' }))}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=18"><\/script>
+<script src="js/qrcode.min.js?v=1"><\/script>
+<script src="js/JsBarcode.all.min.js?v=1"><\/script>
+<script src="js/studentCardRenderer.js?v=20"><\/script>
 </head><body>
 ${info}
 <div class="ec-a4">
@@ -1401,6 +1401,10 @@ ${page(backSlots, 'الخلفي', 'ts-back')}
     const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
     const timer = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch (e) {} }, 12000) : null;
     const headers = { 'Content-Type': 'application/json', apikey: ep.key, Authorization: 'Bearer ' + ep.key };
+    // POST against a keyed row is an upsert — without this header PostgREST
+    // returns 409 "duplicate key" and the save silently fails. This is what
+    // stopped every calibration save from ever reaching the central row.
+    if (method === 'POST' || method === 'PATCH') headers.Prefer = 'resolution=merge-duplicates';
     const opts = { method, headers };
     if (ctrl) opts.signal = ctrl.signal;
     if (body !== undefined) opts.body = JSON.stringify(body);
@@ -1413,7 +1417,11 @@ ${page(backSlots, 'الخلفي', 'ts-back')}
     if (!_central.ready) return Promise.resolve(false);
     if (cal === undefined) cal = _readStorage() || _clone(CAL);
     if (sheet === undefined) sheet = (_readSheet() !== null) ? _readSheet() : (SHEET ? _clone(SHEET) : null);
-    const payload = { id: CENTRAL_ROW_ID, calibration: cal, sheet, updated_at: new Date().toISOString() };
+    // Upsert (merge-duplicates) preserves columns we omit: a page that has no
+    // sheet yet must NEVER erase the shared sheet with null — only send it when
+    // there is an actual sheet to store.
+    const payload = { id: CENTRAL_ROW_ID, calibration: cal, updated_at: new Date().toISOString() };
+    if (sheet) payload.sheet = sheet;
     const url = _central.url + '/rest/v1/' + CENTRAL_TABLE + '?id=eq.' + CENTRAL_ROW_ID;
     _centralPush = (_centralPush || Promise.resolve()).then(() =>
       _centralFetch('POST', url, payload)
@@ -1453,7 +1461,11 @@ ${page(backSlots, 'الخلفي', 'ts-back')}
         CAL = _merge(initCal); _writeStorage(CAL);
         if (initSheet) { const s = _mergeSheet(initSheet); if (s) { SHEET = s; _writeSheet(s); } }
         _central.ready = true; _central.mode = 'local';
-        const payload = { id: CENTRAL_ROW_ID, calibration: initCal, sheet: initSheet, updated_at: new Date().toISOString() };
+        // Only send the sheet if there actually is one — seeding from a page
+        // without a sheet must not create a central row whose sheet is null
+        // (that would wipe the shared A4 layout for every other device).
+        const payload = { id: CENTRAL_ROW_ID, calibration: initCal, updated_at: new Date().toISOString() };
+        if (initSheet) payload.sheet = initSheet;
         const url = _central.url + '/rest/v1/' + CENTRAL_TABLE + '?id=eq.' + CENTRAL_ROW_ID;
         return _centralFetch('POST', url, payload).then(r2 => {
           if (r2.ok) { _central.mode = 'central'; _central.updatedAt = payload.updated_at; _centralDoc = payload; }
