@@ -203,8 +203,8 @@ const StudentCardRenderer = (function () {
   // ── Calibration public API ──────────────────────────────
   function getCalibration() { return _clone(CAL); }
   function setCalibration(cal) { CAL = _merge(cal); return getCalibration(); }
-  function saveCalibration(cal) { const c = setCalibration(cal); _writeStorage(c); return c; }
-  function resetCalibration() { CAL = _clone(CAL_DEFAULTS); _clearStorage(); return getCalibration(); }
+  function saveCalibration(cal) { const c = setCalibration(cal); _writeStorage(c); _pushCentral(); return c; }
+  function resetCalibration() { CAL = _clone(CAL_DEFAULTS); _clearStorage(); _writeStorage(CAL); _pushCentral(_clone(CAL)); return getCalibration(); }
   function calibrationStorageKey() { return STORE_KEY; }
   // User-added design shapes (squares/rectangles). addShape appends a new
   // default shape and persists the whole calibration in one source, so it
@@ -308,8 +308,8 @@ const StudentCardRenderer = (function () {
 
   function getSheetLayout() { return SHEET ? _clone(SHEET) : null; }
   function setSheetLayout(sheet) { SHEET = _mergeSheet(sheet); return getSheetLayout(); }
-  function saveSheetLayout(sheet) { const s = setSheetLayout(sheet); if (s) _writeSheet(s); return s; }
-  function resetSheetLayout() { SHEET = null; _clearSheet(); return null; }
+  function saveSheetLayout(sheet) { const s = setSheetLayout(sheet); if (s) _writeSheet(s); if (s) _pushCentral(); return s; }
+  function resetSheetLayout() { SHEET = null; _clearSheet(); _pushCentral(undefined, null); return null; }
   function sheetStorageKey() { return SHEET_STORE_KEY; }
 
   // Convenience default arrangement: cols×rows grid of card-sized slots
@@ -868,7 +868,7 @@ ${TAJWAL_FACES}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=17"><\/script>
+<script src="js/studentCardRenderer.js?v=18"><\/script>
 </head><body>
 <div class="ec-data-layer">${dataLayerHTML(r)}${grid}</div>
 <script>
@@ -922,7 +922,7 @@ ${TAJWAL_FACES}
 </head><body>
   <div class="wrap"><div class="cap">${value}</div><div id="bc"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="js/studentCardRenderer.js?v=17"></script>
+<script src="js/studentCardRenderer.js?v=18"></script>
 <script>
   (function () {
     var value = '${value}';
@@ -1108,7 +1108,7 @@ ${TAJWAL_FACES}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<script src="js/studentCardRenderer.js?v=17"><\/script>
+<script src="js/studentCardRenderer.js?v=18"><\/script>
 </head><body>
 ${info}
 <div class="ec-a4">
@@ -1363,6 +1363,127 @@ ${page(backSlots, 'الخلفي', 'ts-back')}
 </body></html>`;
   }
 
+  // ═══ CENTRAL SETTINGS (Supabase — one shared source across ALL devices) ═══
+  // The card calibration + A4 sheet layout live together in a SINGLE row of
+  // the calibration_settings table (id='global'), read/written by every
+  // device. Browser localStorage is only a fast cache/mirror so printing still
+  // works offline; the central row is the source of truth. Every page
+  // (calibration, admin, student portal) loads it on open, and every save
+  // pushes it back. On the very first run, if central has no row yet, the
+  // current local values (or the defaults) are pushed up EXACTLY as they are —
+  // the already-tuned settings become the central baseline, never reset.
+  const CENTRAL_TABLE = 'calibration_settings';
+  const CENTRAL_ROW_ID = 'global';
+  let _central = { url: null, key: null, ready: false, mode: 'local', updatedAt: null };
+  let _centralDoc = null;
+  let _centralPush = null; // serialized push chain (last write wins)
+
+  // Endpoint comes from the same constants the rest of the site uses
+  // (admin.html SR_SUPABASE_URL/SR_ANON_KEY, else SUPABASE_URL/SUPABASE_ANON_KEY).
+  function _centralEndpoint() {
+    if (_central.url && _central.key) return _central;
+    let u = null, k = null;
+    try {
+      if (typeof SR_SUPABASE_URL !== 'undefined' && SR_SUPABASE_URL) u = SR_SUPABASE_URL;
+      else if (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) u = SUPABASE_URL;
+      if (typeof SR_ANON_KEY !== 'undefined' && SR_ANON_KEY) k = SR_ANON_KEY;
+      else if (typeof SUPABASE_ANON_KEY !== 'undefined' && SUPABASE_ANON_KEY) k = SUPABASE_ANON_KEY;
+    } catch (e) {}
+    if (!u || !k) return null;
+    _central.url = String(u).replace(/\/+$/, '');
+    _central.key = k;
+    return _central;
+  }
+
+  function _centralFetch(method, url, body) {
+    const ep = _centralEndpoint();
+    if (!ep) return Promise.reject(new Error('no central endpoint'));
+    const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch (e) {} }, 12000) : null;
+    const headers = { 'Content-Type': 'application/json', apikey: ep.key, Authorization: 'Bearer ' + ep.key };
+    const opts = { method, headers };
+    if (ctrl) opts.signal = ctrl.signal;
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    return fetch(url, opts).then(res => { if (timer) clearTimeout(timer); return res; },
+      err => { if (timer) clearTimeout(timer); throw err; });
+  }
+
+  // Push the current calibration + sheet to the central row (last write wins).
+  function _pushCentral(cal, sheet) {
+    if (!_central.ready) return Promise.resolve(false);
+    if (cal === undefined) cal = _readStorage() || _clone(CAL);
+    if (sheet === undefined) sheet = (_readSheet() !== null) ? _readSheet() : (SHEET ? _clone(SHEET) : null);
+    const payload = { id: CENTRAL_ROW_ID, calibration: cal, sheet, updated_at: new Date().toISOString() };
+    const url = _central.url + '/rest/v1/' + CENTRAL_TABLE + '?id=eq.' + CENTRAL_ROW_ID;
+    _centralPush = (_centralPush || Promise.resolve()).then(() =>
+      _centralFetch('POST', url, payload)
+        .then(r => { if (r.ok) { _central.updatedAt = payload.updated_at; _central.mode = 'central'; return true; } return false; })
+        .catch(() => false)
+    );
+    return _centralPush;
+  }
+
+  // Load central first: if a central row exists it wins (applied to CAL/SHEET
+  // and cached to localStorage for every print window); otherwise seed the
+  // central row from the existing local settings exactly as they are.
+  function initCentral(opts) {
+    opts = opts || {};
+    if (opts.url) { _central.url = String(opts.url).replace(/\/+$/, ''); _central.key = opts.key || _central.key; }
+    if (!_centralEndpoint()) return Promise.resolve(false);
+    const q = CENTRAL_TABLE + '?id=eq.' + CENTRAL_ROW_ID + '&select=id,calibration,sheet,updated_at';
+    return _centralFetch('GET', _central.url + '/rest/v1/' + q)
+      .then(res => {
+        if (!res.ok) throw new Error('central GET HTTP ' + res.status);
+        return res.json().then(rows => (Array.isArray(rows) ? rows : []));
+      })
+      .then(rows => {
+        const doc = rows && rows.length ? rows[0] : null;
+        if (doc && doc.calibration) {
+          CAL = _merge(doc.calibration);
+          _writeStorage(CAL);
+          if (doc.sheet) { const s = _mergeSheet(doc.sheet); if (s) { SHEET = s; _writeSheet(s); } }
+          _central.ready = true; _central.mode = 'central';
+          _central.updatedAt = doc.updated_at || null;
+          _centralDoc = doc;
+          if (opts.onSynced) try { opts.onSynced({ ready: true, mode: 'central' }); } catch (e) {}
+          return true;
+        }
+        const initCal = _readStorage() || _clone(CAL);
+        const initSheet = (_readSheet() !== null) ? _readSheet() : (SHEET ? _clone(SHEET) : null);
+        CAL = _merge(initCal); _writeStorage(CAL);
+        if (initSheet) { const s = _mergeSheet(initSheet); if (s) { SHEET = s; _writeSheet(s); } }
+        _central.ready = true; _central.mode = 'local';
+        const payload = { id: CENTRAL_ROW_ID, calibration: initCal, sheet: initSheet, updated_at: new Date().toISOString() };
+        const url = _central.url + '/rest/v1/' + CENTRAL_TABLE + '?id=eq.' + CENTRAL_ROW_ID;
+        return _centralFetch('POST', url, payload).then(r2 => {
+          if (r2.ok) { _central.mode = 'central'; _central.updatedAt = payload.updated_at; _centralDoc = payload; }
+          if (opts.onSynced) try { opts.onSynced({ ready: _central.ready, mode: _central.mode }); } catch (e) {}
+          return true;
+        }, () => {
+          if (opts.onSynced) try { opts.onSynced({ ready: _central.ready, mode: _central.mode }); } catch (e) {}
+          return true;
+        });
+      })
+      .catch(() => {
+        _central.ready = false; // central unreachable → keep the local cache
+        if (opts.onSynced) try { opts.onSynced({ ready: false, mode: 'local' }); } catch (e) {}
+        return false;
+      });
+  }
+
+  // Save calibration + sheet together to the central row (used by the main
+  // "💾 حفظ الإعدادات" button). Resolves true when the central row was written.
+  function centralSave(cal, sheet) {
+    if (cal) { CAL = _merge(cal); _writeStorage(CAL); }
+    if (sheet) { const s = _mergeSheet(sheet); if (s) { SHEET = s; _writeSheet(s); } }
+    if (!_central.ready) return initCentral().then(ok => (ok ? _pushCentral() : false));
+    return _pushCentral(_readStorage() || _clone(CAL), (_readSheet() !== null) ? _readSheet() : (SHEET ? _clone(SHEET) : null));
+  }
+
+  function centralStatus() {
+    return { ready: _central.ready, mode: _central.mode, updatedAt: _central.updatedAt, hasDoc: !!_centralDoc };
+  }
+
   return {
     CARD_W, CARD_H, CARD_W_MM, CARD_H_MM, A4_W_MM, A4_H_MM, QR_SIZE, CAL, CAL_DEFAULTS, BARCODE_OPTS, BARCODE_STD,
     cardCSS, barcodeSpec, bcBox, qrBgGeom, bcBgGeom,
@@ -1377,7 +1498,8 @@ ${page(backSlots, 'الخلفي', 'ts-back')}
     dataLayerHTML, dlRules, gridOverlayHTML, GRID_CSS,
     a4SheetCSS, a4SlotStyle, a4DataStyle, a4DataGeom, a4BackDecorHTML, a4GridOverlayHTML, A4_GRID_CSS,
     buildA4PrintHTML, buildA4TestSheetHTML, buildA4FrontSheetHTML, buildA4BackSheetHTML, buildDuplexTestSheetHTML,
-    renderBarcodeSVG, buildBarcodePrintHTML
+    renderBarcodeSVG, buildBarcodePrintHTML,
+    initCentral, centralSave, centralStatus
   };
 })();
 

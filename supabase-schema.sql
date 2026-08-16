@@ -178,6 +178,25 @@ CREATE POLICY "anon_select_summer_camp_registrations" ON summer_camp_registratio
 DROP POLICY IF EXISTS "anon_update_summer_camp_registrations" ON summer_camp_registrations;
 CREATE POLICY "anon_update_summer_camp_registrations" ON summer_camp_registrations FOR UPDATE TO anon USING (true);
 
+-- 7c. CALIBRATION SETTINGS (إعدادات المعايرة المركزية — مصدر واحد مشترك)
+-- صف واحد واحد id='global' يضم معايرة البطاقة + تخطيط ورقة A4 معاً، يُقرأ
+-- ويُكتب من كل الأجهزة (صفحة المعايرة، لوحة الإدارة، بوابة الطالب) بحيث يظهر
+-- نفس الإعداد على كل جهاز وكل طباعة. localStorage يبقى مجرد ذاكرة تخزين مؤقتة.
+CREATE TABLE IF NOT EXISTS calibration_settings (
+  id TEXT PRIMARY KEY,
+  calibration JSONB,
+  sheet JSONB,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE calibration_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_select_calibration_settings" ON calibration_settings;
+CREATE POLICY "anon_select_calibration_settings" ON calibration_settings FOR SELECT TO anon USING (true);
+DROP POLICY IF EXISTS "anon_insert_calibration_settings" ON calibration_settings;
+CREATE POLICY "anon_insert_calibration_settings" ON calibration_settings FOR INSERT TO anon WITH CHECK (true);
+DROP POLICY IF EXISTS "anon_update_calibration_settings" ON calibration_settings;
+CREATE POLICY "anon_update_calibration_settings" ON calibration_settings FOR UPDATE TO anon USING (true);
+
 -- 8. TEACHER BALANCES (توازن مستحقات الأساتذة — مستمد من دفتر المعاملات)
 CREATE TABLE IF NOT EXISTS teacher_balances (
   teacher_id TEXT PRIMARY KEY,

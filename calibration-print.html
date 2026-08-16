@@ -8,9 +8,13 @@
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; background: #eef2fb; color: #1a2340; font-family: 'Tajawal', Arial, sans-serif; }
-  header { background: linear-gradient(135deg, #1E3C86, #122350); color: #fff; padding: 16px 28px; }
+  header { background: linear-gradient(135deg, #1E3C86, #122350); color: #fff; padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   header h1 { font-size: 19px; margin: 0; font-weight: 900; }
   header p { margin: 2px 0 0; font-size: 12px; opacity: 0.75; }
+  #central-save-btn { font-family: inherit; font-size: 14px; font-weight: 900; padding: 10px 22px; border: none; border-radius: 12px; background: linear-gradient(135deg, #2dd4bf, #0d9488); color: #fff; cursor: pointer; box-shadow: 0 6px 18px rgba(13,148,136,0.35); white-space: nowrap; }
+  #central-save-btn:hover { filter: brightness(1.08); }
+  #central-save-btn:disabled { opacity: 0.6; cursor: wait; }
+  #central-status { font-size: 11px; opacity: 0.85; margin-top: 2px; }
   .wrap { padding: 24px; max-width: 1160px; margin: 0 auto; }
   .sec-title { font-size: 16px; font-weight: 900; color: #1E3C86; margin: 30px 0 12px; display: flex; align-items: center; gap: 8px; }
   .sec-title .step { background: #2548A1; color: #fff; border-radius: 8px; padding: 2px 9px; font-size: 12px; }
@@ -137,7 +141,9 @@
   <div>
     <h1>معايرة طباعة بطاقات الطلاب على ورقة A4</h1>
     <p>هنا تحدد مواضع فتحات البطاقات (الوجه الأمامي والخلفي بنفس المواضع تماماً) ومواضع البيانات — والنظام يطبع الطبقة الثانية فقط فوق ورقة A4</p>
+    <p id="central-status"></p>
   </div>
+  <button id="central-save-btn" type="button">💾 حفظ الإعدادات</button>
 </header>
 
 <div class="wrap">
@@ -387,10 +393,21 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-  <script src="js/studentCardRenderer.js?v=17"></script>
+  <script src="js/studentCardRenderer.js?v=18"></script>
+<script>
+  // ═══ مصدر واحد مركزي لإعدادات المعايرة ═══
+  // نفس حساب Supabase المستخدم في لوحة الإدارة — تُحفظ المعايرة وتُقرأ من
+  // جدول calibration_settings (صف واحد id='global') فيظهر نفس الإعداد على
+  // كل جهاز وكل طباعة تلقائياً.
+  const SR_SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
+  const SR_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
+</script>
 <script>
 (function () {
   var R = window.StudentCardRenderer;
+  // تحميل الإعدادات المركزية أولاً: يُفعّل الواجهة فقط بعد جلب إعدادات
+  // الخادم المركزي (أو الرجوع للقيم المحلية عند تعذر الاتصال).
+  var centralReady = (typeof R.initCentral === 'function') ? R.initCentral() : Promise.resolve(false);
   var CARD_W = R.CARD_W, CARD_H = R.CARD_H, CARD_W_MM = R.CARD_W_MM, CARD_H_MM = R.CARD_H_MM;
   var A4_W_MM = R.A4_W_MM, A4_H_MM = R.A4_H_MM;
   var SX = CARD_W / CARD_W_MM, SY = CARD_H / CARD_H_MM;
@@ -1345,24 +1362,49 @@
     }
   }
 
-  var lay = R.getSheetLayout();
-  if (lay && lay.params) PARAMS = JSON.parse(JSON.stringify(lay.params));
-  if (lay && Array.isArray(lay.slots) && lay.slots.length) SLOTS = lay.slots;
-  if (lay) {
-    var dm = (lay.duplex && lay.duplex.mode) || lay.flip || 'long';
-    document.getElementById('duplex-mode').value = (dm === 'long' || dm === 'short' || dm === 'none') ? dm : 'long';
-    if (lay.duplex && typeof lay.duplex.dx === 'number') document.getElementById('duplex-dx').value = lay.duplex.dx;
-    if (lay.duplex && typeof lay.duplex.dy === 'number') document.getElementById('duplex-dy').value = lay.duplex.dy;
-  }
-  if (!SLOTS.length) { balanceParams(); rebuildSlots(); }
-  applyParamsToFields();
-  buildA4Rulers();
-  buildRulers();
-  renderA4Stage();
-  buildColorSection();
-  syncColorSection();
-  bindColorSection();
-  renderPreview();
+  centralReady.then(function () {
+    var lay = R.getSheetLayout();
+    if (lay && lay.params) PARAMS = JSON.parse(JSON.stringify(lay.params));
+    if (lay && Array.isArray(lay.slots) && lay.slots.length) SLOTS = lay.slots;
+    if (lay) {
+      var dm = (lay.duplex && lay.duplex.mode) || lay.flip || 'long';
+      document.getElementById('duplex-mode').value = (dm === 'long' || dm === 'short' || dm === 'none') ? dm : 'long';
+      if (lay.duplex && typeof lay.duplex.dx === 'number') document.getElementById('duplex-dx').value = lay.duplex.dx;
+      if (lay.duplex && typeof lay.duplex.dy === 'number') document.getElementById('duplex-dy').value = lay.duplex.dy;
+    }
+    if (!SLOTS.length) { balanceParams(); rebuildSlots(); }
+    applyParamsToFields();
+    buildA4Rulers();
+    buildRulers();
+    renderA4Stage();
+    buildColorSection();
+    syncColorSection();
+    bindColorSection();
+    renderPreview();
+
+    // ── المصدر المركزي: حالة المزامنة + زر الحفظ الموحّد ──
+    function renderCentralStatus() {
+      var st = R.centralStatus();
+      var el = document.getElementById('central-status');
+      if (!el) return;
+      if (!st.ready) el.textContent = '⚡ المزامنة مع الخادم المركزي غير متاحة — تُستخدم الإعدادات المحلية لهذا الجهاز';
+      else if (st.mode === 'central') el.textContent = '☁️ الإعدادات محمّلة من المصدر المركزي المشترك (متطابقة على كل الأجهزة)';
+      else el.textContent = '☁️ تم رفع الإعدادات المحلية إلى المصدر المركزي المشترك';
+    }
+    renderCentralStatus();
+    var saveBtn = document.getElementById('central-save-btn');
+    saveBtn.addEventListener('click', function () {
+      if (!SLOTS.length) { toast('أعد ضبط التخطيط أولاً ثم احفظ'); return; }
+      var save = { params: JSON.parse(JSON.stringify(PARAMS)), slots: SLOTS.slice(), duplex: duplexConf() };
+      if (save.duplex.mode === 'long' || save.duplex.mode === 'short') save.flip = save.duplex.mode;
+      saveBtn.disabled = true;
+      Promise.resolve(R.centralSave(cal(), save)).then(function (ok) {
+        saveBtn.disabled = false;
+        renderCentralStatus();
+        toast(ok ? 'تم حفظ إعدادات المعايرة بنجاح' : 'تم الحفظ محلياً — تعذّر الاتصال بالخادم المركزي');
+      });
+    });
+  });
 })();
 </script>
 </body>
