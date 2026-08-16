@@ -33,14 +33,25 @@
 //  Step 2 — buildA4BackSheetHTML(): prints the BACK sheet — the back design
 //  (studentidcardback1.jpg) plus a SOLID WHITE QR square and a SOLID WHITE
 //  barcode rectangle on EVERY card (no student data), so the sheet is ready
-//  to receive the data layer later. It prints at the SAME CARD_SLOTS as the
-//  front sheet (preview == print, no flip).
+//  to receive the data layer later.
 //  Step 3 — buildA4PrintHTML(): after re-feeding the same paper, prints the
 //  student data for ONE chosen card inside its slot — the transparent data
 //  layer only ('info', the daily workflow) or the back design + data ('back').
-//  ALL faces use the SAME CARD_SLOTS at the SAME X/Y/W/H — no mirror, no
-//  scaleX(-1), no rotateY, no feed shift — so Front #N == Back #N ==
-//  the data of card #N at the same coordinates.
+//  FRONT always prints at the RAW CARD_SLOTS (the reference). When the saved
+//  layout has duplex.mode 'long'/'short' (the double-sided workflow: print the
+//  front, physically flip the SAME paper, then print the back), the back sheet
+//  AND the info overlay print at the mirrored DUPLEX feed positions
+//  (duplexBackSlot: flip + the one global dx/dy offset) so that after the flip
+//  Back #N lands EXACTLY behind Front #N and the data lands exactly on
+//  Back #N's white placeholders. With duplex.mode 'none' both print at the raw
+//  slots (two-sheet flow / driver duplex). The design is never mirrored — the
+//  transform is position-only (X/Y/W/H), the image keeps its orientation.
+//  WHITE PLACEHOLDERS vs CODES: the white QR square and the white barcode
+//  rectangle are EXACTLY the size/position of the QR and barcode boxes (no
+//  margin around the white). The QR pattern and the barcode bars carry their
+//  own quiet zone INSIDE the box (the pattern is inset, the bars keep a small
+//  white margin above/below), so no dark pixel ever touches the white edge —
+//  nothing "sticks out" even with a small paper re-feed error.
 // ═══════════════════════════════════════════════════════════
 
 const StudentCardRenderer = (function () {
@@ -470,6 +481,29 @@ const StudentCardRenderer = (function () {
   const SVG_HEIGHT_PX = BARCODE_OPTS.height + 2 * SVG_MARGIN_PX + BARCODE_OPTS.fontSize + BARCODE_OPTS.textMargin;
   const SVG_CROP_HEIGHT_PX = SVG_HEIGHT_PX - 2 * SVG_MARGIN_PX;
 
+  // Printed quiet zone for the barcode INSIDE its white placeholder: a small
+  // white margin above the bars and below the text (in SVG user units, ≈0.79mm
+  // at X=0.33mm) so no dark bar ever touches the placeholder edge — nothing
+  // "sticks out" even with a small paper re-feed error. The X-dimension (module
+  // width) is untouched; only the bars' vertical share of the box shrinks.
+  const BC_QUIET_PX = 24;
+  const BC_VIEW_Y0 = SVG_MARGIN_PX - BC_QUIET_PX;
+  const BC_VIEW_HEIGHT_PX =
+    (SVG_MARGIN_PX + BARCODE_OPTS.height + BARCODE_OPTS.textMargin + BARCODE_OPTS.fontSize + BC_QUIET_PX) - BC_VIEW_Y0;
+  // Horizontal quiet zone: JsBarcode draws the 95 EAN-13 bars over exactly 950
+  // user units, but leaves the leading digit in the left margin and pads the
+  // right margin wider (bars actually span 230..1180 of its 1290-wide canvas).
+  // A plain viewBox x=0 then shoves the bars against the placeholder's right
+  // edge (the end guard is even clipped). BC_VIEW_X0 re-frames the viewBox so
+  // the 950-unit bar block is centered: canvas 120..1290 is shown, which gives
+  // a symmetric 110-unit quiet zone (~11 modules ≈ 3.63mm) on both sides while
+  // keeping the module width (X-dim) at the spec 0.33mm.
+  const BC_VIEW_X0 = SVG_MARGIN_PX + 10;
+  // QR quiet zone: fraction of the QR box kept as white padding around the
+  // pattern (≈ the standard QR quiet zone of ~4 modules), so the pattern never
+  // touches the white placeholder edge either.
+  const QR_QUIET_RATIO = 0.10;
+
   // Physical size of the printed EAN-13, in mm.
   function barcodeSpec() {
     const { Xmm, quietModules, modulePx } = BARCODE_STD;
@@ -596,7 +630,8 @@ ${omitBg ? '' : `${sc}.ec-dl-qrbg{position:absolute;left:${X(GQ.x)};top:${Y(GQ.y
 ${sc}.ec-dl-qrbg rect{width:100%;height:100%;fill:${GQ.color === 'transparent' ? 'none' : GQ.color};rx:${Y(GQ.radius)};ry:${Y(GQ.radius)};-webkit-print-color-adjust:exact;print-color-adjust:exact}
 ${sc}.ec-dl-bcbg{position:absolute;left:${X(GB.x)};top:${Y(GB.y)};width:${X(GB.w)};height:${Y(GB.h)};z-index:${GB.z};display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 ${sc}.ec-dl-bcbg rect{width:100%;height:100%;fill:${GB.color === 'transparent' ? 'none' : GB.color};rx:${Y(GB.radius)};ry:${Y(GB.radius)};-webkit-print-color-adjust:exact;print-color-adjust:exact}`}
-${sc}.ec-dl-qr{position:absolute;left:${X(CAL.qr.x)};top:${Y(CAL.qr.y)};width:${X(CAL.qr.w)};height:${Y(CAL.qr.h)};display:flex;align-items:center;justify-content:center;z-index:2}
+${sc}.ec-dl-qr{position:absolute;left:${X(CAL.qr.x)};top:${Y(CAL.qr.y)};width:${X(CAL.qr.w)};height:${Y(CAL.qr.h)};display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:${X(CAL.qr.w * QR_QUIET_RATIO)};z-index:2}
+${sc}.ec-dl-qr>*{width:100%!important;height:100%!important;display:block;box-sizing:border-box}
 ${sc}.ec-dl-qr img,${sc}.ec-dl-qr canvas{width:100%!important;height:100%!important;position:relative;z-index:1}
 ${sc}.ec-dl-bc{position:absolute;left:${X(CAL.bc.x)};top:${Y(CAL.bc.y)};width:${X(box.w)};height:${Y(box.h)};display:flex;align-items:center;justify-content:center;z-index:2}
 ${sc}.ec-dl-bc svg{width:${X(box.w)}!important;height:${Y(box.h)}!important;max-width:none;display:block;position:relative;z-index:1}
@@ -680,7 +715,8 @@ ${dlRules('px', CARD_W / CARD_W_MM, CARD_H / CARD_H_MM)}
         background: bgFill,
         xmlDocument: doc || document
       }));
-      svg.setAttribute('viewBox', '0 ' + SVG_MARGIN_PX + ' ' + SVG_WIDTH_PX + ' ' + SVG_CROP_HEIGHT_PX);
+      svg.setAttribute('viewBox', BC_VIEW_X0 + ' ' + BC_VIEW_Y0 + ' ' + SVG_WIDTH_PX + ' ' + BC_VIEW_HEIGHT_PX);
+      svg.setAttribute('preserveAspectRatio', 'none');
       const box = bcBox();
       svg.setAttribute('width', box.w + 'mm');
       svg.setAttribute('height', box.h + 'mm');
@@ -1009,12 +1045,21 @@ ${A4_GRID_CSS}`;
   function buildA4PrintHTML(r, slotIndex, opts) {
     const sheet = (opts && opts.sheet) || getSheetLayout();
     if (!sheet || !sheet.slots || !sheet.slots[slotIndex]) return null;
-    const rawSlot = sheet.slots[slotIndex];
+    // Double-sided (same paper) workflow: this overlay is printed on the BACK
+    // side of the paper in the SAME feed orientation as the back sheet, so the
+    // data box (and the ghost back designs) sit at the mirrored DUPLEX feed
+    // position — exactly where Back #N was printed, i.e. exactly over its
+    // white QR/barcode placeholders and, after the flip, over Front #N. With
+    // duplex.mode 'none' everything stays at the RAW CARD_SLOTS.
+    const duplex = duplexFromSheet(sheet);
+    const mirrored = duplex.mode === 'long' || duplex.mode === 'short';
+    const slots = mirrored ? sheet.slots.map(s => duplexBackSlot(s, duplex.mode, duplex.dx, duplex.dy)) : sheet.slots;
+    const rawSlot = slots[slotIndex];
     const mode = (opts && opts.mode === 'back') ? 'back' : 'info';
     const data = JSON.stringify(r).replace(/<\//g, '<\\/');
     const g = a4DataGeom(rawSlot);
     const sc = g.sc;
-    const slotsHtml = sheet.slots.map((s, i) => {
+    const slotsHtml = slots.map((s, i) => {
       const gs = a4DataStyle(s, 'mm', 1);
       const isSel = i === slotIndex;
       let inner = '';
@@ -1031,10 +1076,13 @@ ${A4_GRID_CSS}`;
   </div>`;
     }).join('');
     const modeLabel = mode === 'back' ? 'المعلومات + تصميم الوجه الخلفي' : 'طباعة المعلومات فقط';
+    const dupSub = mirrored
+      ? `موضع القلب/الإزاحة لوضع الطباعة المزدوجة (${duplex.mode === 'long' ? 'قلب الحافة الطويلة' : 'قلب الحافة القصيرة'} · X/Y ${duplex.dx.toFixed(2)}/${duplex.dy.toFixed(2)} مم) — بعد قلب الورقة يقع فوق Front #${slotIndex + 1} تماماً.`
+      : `نفس CARD_SLOTS ونفس موضع Front #${slotIndex + 1} بالضبط.`;
     const info = `<div class="ec-a4-info"><b>طباعة بطاقة الطالب — البطاقة #${slotIndex + 1} من ${sheet.slots.length}</b> ·
   نوع الطباعة: ${modeLabel} ·
   <span class="hi">إعدادات الطباعة: A4 · Portrait · Scale 100% · Margins None (بدون تصغير/توسيع)</span>
-  <div class="sub">تُطبع بيانات البطاقة #${slotIndex + 1} (الاسم الكامل، Student ID، الشعبة، تاريخ التسجيل، QR والباركود) فوق الوجه الخلفي المُطابق — نفس CARD_SLOTS ونفس موضع Front #${slotIndex + 1} بالضبط. الصورة لا تُعكس.</div></div>`;
+  <div class="sub">تُطبع بيانات البطاقة #${slotIndex + 1} (الاسم الكامل، Student ID، الشعبة، تاريخ التسجيل، QR والباركود) فوق الوجه الخلفي المُطابق — ${dupSub} الصورة لا تُعكس.</div></div>`;
     return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>بطاقة الطالب - ${fullName(r)}</title>
 ${TAJWAL_FACES}
 <style>
@@ -1159,16 +1207,21 @@ ${info}
   // BACK sheet: the 4 back designs (studentidcardback1.jpg) PLUS the SOLID
   // white QR square and SOLID white barcode rectangle on EVERY card — the
   // ready-made placeholders that receive the student QR/barcode later. NO
-  // student data on this sheet. The cards sit at the RAW CARD_SLOTS — the
-  // SAME coordinates as the front sheet — in BOTH the screen preview and the
-  // print output, so Front #N == Back #N (same X/Y/W/H, same centred column,
-  // same cut boundaries). No feed shift, no flip, no mirror: the back image
-  // keeps its natural orientation. Optional cut lines are full-width dashed
-  // horizontal guides spanning the whole sheet at the TOP and BOTTOM edge of
-  // every card (same as the front sheet).
+  // student data on this sheet. The FRONT sheet is the reference (raw slots).
+  // For the double-sided workflow (duplex.mode 'long'/'short' in the saved
+  // layout) this sheet prints at the mirrored DUPLEX feed positions — flip +
+  // the one global dx/dy offset — so that after physically flipping the paper
+  // Back #N lands EXACTLY behind Front #N. With duplex.mode 'none' it prints
+  // at the raw slots (two-sheet flow / driver duplex). The design is never
+  // mirrored (position-only transform). Cut lines are full-width dashed
+  // horizontal guides at the TOP and BOTTOM edge of every card (same as the
+  // front sheet, and they follow the feed positions).
   function buildA4BackSheetHTML(opts) {
     const sheet = (opts && opts.sheet) || getSheetLayout();
-    const slots = (sheet && sheet.slots && sheet.slots.length) ? sheet.slots : defaultCardSlots();
+    const rawSlots = (sheet && sheet.slots && sheet.slots.length) ? sheet.slots : defaultCardSlots();
+    const duplex = duplexFromSheet(sheet);
+    const mirrored = duplex.mode === 'long' || duplex.mode === 'short';
+    const slots = mirrored ? rawSlots.map(s => duplexBackSlot(s, duplex.mode, duplex.dx, duplex.dy)) : rawSlots;
     const cut = !opts || opts.cutLines !== false;
     const cutLinesHtml = cut ? slots.map(s =>
       `<i class="ec-a4-cut" style="top:${s.y.toFixed(2)}mm"></i><i class="ec-a4-cut" style="top:${(s.y + s.h).toFixed(2)}mm"></i>`
@@ -1176,9 +1229,12 @@ ${info}
     const slotsHtml = slots.map((s, i) =>
       `<div class="ec-a4-back-slot" data-i="${i}" style="${a4SlotStyle(s, 'mm', 1)}"><img src="${BACK_IMG}" alt="">${a4BackDecorHTML(s, 'mm', 1)}</div>`
     ).join('');
+    const dupText = mirrored
+      ? `تُطبع البطاقات الخلفية بمواضع القلب/الإزاحة المحسوبة لوضع الطباعة المزدوجة (${duplex.mode === 'long' ? 'قلب الحافة الطويلة' : 'قلب الحافة القصيرة'} · X/Y ${duplex.dx.toFixed(2)}/${duplex.dy.toFixed(2)} مم) — بعد قلب الورقة وإعادة إدخالها يقع كل خلف خلف وجهه الأمامي بالضبط.`
+      : `البطاقات تُطبع في نفس مواضع الوجه الأمامي تماماً (بدون قلب/إزاحة).`;
     const info = `<div class="ec-a4-info"><b>طباعة الوجه الخلفي (الخطوة 2)</b> — ورقة A4 · Portrait · Scale 100% · Margins None ·
   ${slots.length} بطاقات في <b>نفس مواضع الوجه الأمامي بالضبط</b> (نفس CARD_SLOTS · Front #N == Back #N) —
-  <div class="sub">التصميم الخلفي + المربع الأبيض للـQR + المستطيل الأبيض للباركود تُطبع معاً على كل بطاقة في نفس موضع البطاقة الأمامية المقابلة (بدون أي بيانات طالب) — الورقة تصبح جاهزة لطبقة معلومات الطالب لاحقاً. الصورة لا تُعكس.</div>
+  <div class="sub">التصميم الخلفي + المربع الأبيض للـQR + المستطيل الأبيض للباركود تُطبع معاً على كل بطاقة في نفس موضع البطاقة الأمامية المقابلة (بدون أي بيانات طالب) — الورقة تصبح جاهزة لطبقة معلومات الطالب لاحقاً. الصورة لا تُعكس. ${dupText}</div>
   <div class="sub">الخطوط المتقطعة (بعرض الورقة كاملاً) عند الحافة العلوية والسفلية لكل بطاقة هي دليل القص: اقصّ على طول الخط بالضبط بنفس حدود ورقة الأمام لتطابق حدود البطاقتين.</div></div>`;
     return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>الوجه الخلفي — ورقة A4 (تصميم + مربع QR + مستطيل باركود)</title>
 <style>

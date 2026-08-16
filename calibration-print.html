@@ -522,7 +522,12 @@
   function renderDuplexPreview() {
     var stage = document.getElementById('duplex-stage');
     if (!stage) return;
-    stage.innerHTML = duplexLayerHTML(SLOTS, FRONT_IMG, 'front') + duplexLayerHTML(SLOTS, BACK_IMG, 'back');
+    // The BACK layer shows its PHYSICAL LANDING position (flip + the global
+    // dx/dy offset), so any front/back deviation is directly visible in the
+    // overlay preview — converging to zero as the offset is calibrated.
+    var conf = duplexConf();
+    var backSlots = SLOTS.map(function (s) { return R.physicalBackSlot(s, conf.mode, conf.dx, conf.dy); });
+    stage.innerHTML = duplexLayerHTML(SLOTS, FRONT_IMG, 'front') + duplexLayerHTML(backSlots, BACK_IMG, 'back');
     duplexOpa();
     applyDuplexView();
     updateDuplexHint();
@@ -553,7 +558,7 @@
     var el = document.getElementById('duplex-hint');
     if (!el) return;
     var conf = duplexConf();
-    el.innerHTML = 'الوجه الأمامي والخلفي يُطبعان على <b>نفس CARD_SLOTS</b> تماماً (نفس X/Y/W/H لكل بطاقة) — في المعاينة تظهر البطاقات الأربعة فوق بعضها البعض تماماً بدون أي انحراف أفقي أو عمودي، والصورة تبقى طبيعية (لا انعكاس).<br>' +
+    el.innerHTML = 'الوجه الخلفي يُعرض في <b>موضع هبوطه الفعلي</b> فوق موضع الوجه الأمامي (قلب + الإزاحة العامة X/Y) — أي انحراف بين حدود الأمام والخلف يظهر مباشرة في المعاينة ويُعاير حتى يتطابق.<br>' +
       'زر <b>ورقة الاختبار</b> يطبع حدوداً مرقّمة للتحقق من إزاحة تغذية الطابعة الفعلية؛ وضع Duplex الحالي: <b>' + duplexLabel(conf.mode) + '</b> — إزاحة عامة: <b>' + conf.dx.toFixed(2) + ' / ' + conf.dy.toFixed(2) + ' مم</b>.';
   }
   function selectSlot(idx) {
@@ -718,7 +723,17 @@
   function cloneSlots() { return SLOTS.map(function (s) { return { x: s.x, y: s.y, w: s.w, h: s.h, rot: s.rot || 0 }; }); }
   function designType() { return document.querySelector('#dp-type button.on').getAttribute('data-v'); }
   function slotsForSide(side) {
-    return cloneSlots();
+    var s = cloneSlots();
+    if (side === 'back') {
+      // Double-sided workflow: the back sheet prints at the mirrored DUPLEX
+      // feed positions (flip + the one global dx/dy offset), so after the
+      // paper flip Back #N lands exactly behind Front #N. Preview == print.
+      var c = duplexConf();
+      if (c.mode === 'long' || c.mode === 'short') {
+        s = s.map(function (x) { return R.duplexBackSlot(x, c.mode, c.dx, c.dy); });
+      }
+    }
+    return s;
   }
   function designSheet() {
     return { params: JSON.parse(JSON.stringify(PARAMS)), slots: cloneSlots(), duplex: duplexConf() };
@@ -767,7 +782,12 @@
     var scale = 1.3;
     var html = '';
     var frontLabel = 'الصفحة 1 — الوجه الأمامي: 4 بطاقات في منتصف A4 (نفس CARD_SLOTS) — الخطوط المتقطعة الحمراء حول كل بطاقة هي دليل القص';
-    var backLabel = 'ورقة الوجه الخلفي: التصميم + المربع الأبيض للـQR + مستطيل الباركود لكل بطاقة — نفس مواضع الوجه الأمامي بالضبط (بدون قلب/انعكاس) — الخطوط المتقطعة الحمراء هي دليل القص';
+    var dc = duplexConf();
+    var backLabel = 'ورقة الوجه الخلفي: التصميم + المربع الأبيض للـQR + مستطيل الباركود لكل بطاقة — ' +
+      ((dc.mode === 'long' || dc.mode === 'short')
+        ? 'بمواضع القلب/الإزاحة لوضع الطباعة المزدوجة (' + duplexLabel(dc.mode) + ' · X/Y ' + round2(dc.dx) + '/' + round2(dc.dy) + ' مم) لتقع بعد قلب الورقة خلف الوجه الأمامي بالضبط'
+        : 'نفس مواضع الوجه الأمامي بالضبط (بدون قلب/إزاحة)') +
+      ' — الخطوط المتقطعة الحمراء هي دليل القص';
     if (type === 'front' || type === 'both') html += designPagePreviewHTML(slotsForSide('front'), FRONT_IMG, scale, frontLabel, false);
     if (type === 'back') html += designPagePreviewHTML(slotsForSide('back'), BACK_IMG, scale, backLabel, true);
     else if (type === 'both') html += designPagePreviewHTML(slotsForSide('back'), BACK_IMG, scale, backLabel, true);
