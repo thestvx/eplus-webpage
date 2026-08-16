@@ -604,10 +604,12 @@ const StudentCardRenderer = (function () {
     const textBg = CAL.textBgColor && CAL.textBgColor !== 'transparent'
       ? `background:${CAL.textBgColor};-webkit-print-color-adjust:exact;print-color-adjust:exact`
       : '';
-    // omitBg: the info-only data layer adds ONLY the student text + QR +
-    // barcode — the white QR/barcode backgrounds already live on the
-    // pre-printed A4 back sheet, so they are NOT drawn here (avoids any
-    // position/size mismatch). The back sheet itself draws them (solid fills).
+    // The white QR/barcode rectangles are drawn in the SAME data layer as the
+    // QR/barcode (default), at the exact derived geometry (qrBgGeom/bcBgGeom),
+    // so the rectangle is always printed exactly behind its code and nothing
+    // can stick out of it — regardless of any pre-printed back sheet or a
+    // calibration change between print passes. omitBg is an opt-in escape
+    // hatch for callers that guarantee their own pre-printed placeholders.
     const omitBg = !!(opts && opts.omitBg);
     const GQ = qrBgGeom();
     const GB = bcBgGeom();
@@ -868,7 +870,7 @@ ${TAJWAL_FACES}
 </style>
 <script src="js/qrcode.min.js?v=1"><\/script>
 <script src="js/JsBarcode.all.min.js?v=1"><\/script>
-<script src="js/studentCardRenderer.js?v=20"><\/script>
+<script src="js/studentCardRenderer.js?v=21"><\/script>
 </head><body>
 <div class="ec-data-layer">${dataLayerHTML(r)}${grid}</div>
 <script>
@@ -922,7 +924,7 @@ ${TAJWAL_FACES}
 </head><body>
   <div class="wrap"><div class="cap">${value}</div><div id="bc"></div></div>
 <script src="js/JsBarcode.all.min.js?v=1"></script>
-<script src="js/studentCardRenderer.js?v=20"></script>
+<script src="js/studentCardRenderer.js?v=21"></script>
 <script>
   (function () {
     var value = '${value}';
@@ -1032,8 +1034,12 @@ ${A4_GRID_CSS}`;
   // no mirror: the design keeps its natural orientation.
   //   opts.mode = 'info' (default): transparent data layer ONLY (name, ID,
   //     stream, date, QR, barcode) inside the chosen slot — for back sheets
-  //     that were already printed. The white QR/barcode backgrounds are NOT
-  //     drawn here (they are part of the pre-printed back sheet).
+  //     that were already printed. The white QR/barcode rectangles ARE drawn
+  //     here too, in the SAME pass as the QR/barcode, at the EXACT same
+  //     position/size as the codes (qrBgGeom/bcBgGeom) — so the rectangle is
+  //     ALWAYS exactly behind its code, even if the pre-printed placeholders
+  //     drifted or the calibration changed between passes. Nothing can stick
+  //     out of the rectangle.
   //   opts.mode = 'back': the BACK design (studentidcardback1.jpg) PLUS the
   //     white placeholders PLUS the student data together inside the chosen
   //     slot only; all other slots stay empty in the print output.
@@ -1070,7 +1076,7 @@ ${A4_GRID_CSS}`;
       } else {
         inner += `<div class="ec-a4-ghost" style="${gs}"><img src="${BACK_IMG}" alt=""></div>`;
       }
-      if (isSel) inner += `<div class="ec-a4-data" style="${gs}">${dataLayerHTML(r, { omitBg: mode === 'info' })}</div>`;
+      if (isSel) inner += `<div class="ec-a4-data" style="${gs}">${dataLayerHTML(r)}</div>`;
       return `<div class="ec-a4-slot${isSel ? ' ec-sel-slot' : ''}" data-i="${i}" style="${a4SlotStyle(s, 'mm', 1)}">
     ${inner}
   </div>`;
@@ -1104,11 +1110,11 @@ ${TAJWAL_FACES}
   .ec-a4-back img { width: 100%; height: 100%; object-fit: contain; display: block; }
   .ec-a4-decor { position: absolute; display: block; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .ec-a4-data { position: absolute; }
-  ${dlRules('mm', sc, sc, '', opts && opts.textColor, Object.assign({}, opts, { omitBg: mode === 'info' }))}
+  ${dlRules('mm', sc, sc, '', opts && opts.textColor, opts)}
 </style>
 <script src="js/qrcode.min.js?v=1"><\/script>
 <script src="js/JsBarcode.all.min.js?v=1"><\/script>
-<script src="js/studentCardRenderer.js?v=20"><\/script>
+<script src="js/studentCardRenderer.js?v=21"><\/script>
 </head><body>
 ${info}
 <div class="ec-a4">
