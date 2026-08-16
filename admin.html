@@ -4322,6 +4322,26 @@ const EMPLOYEES = {
   }
 };
 
+// حساب "مشرف" مقيد — يرى الأقسام المحددة فقط، وبلا أي صلاحيات إدارية:
+// • تسجيلات الدعم المدرسي: عرض فقط (لا تأكيد/إلغاء/تعديل/حذف/إدارة مواد)
+// • أساتذة الدعم المدرسي: عرض فقط (كل الأزرار الإدارية مخفية)
+// التطبيق يحدث على مستوى الدوال (window.*) وليس إخفاء الأزرار فقط.
+const SUPPORT_ACCOUNTS = {
+  'support@epluscenter.com': {
+    uid: '',
+    name: 'مشرف الدعم',
+    role: 'مشرف',
+    allowedSections: ['home', 'camp-v2', 'support-registrations', 'support-teachers', 'subscriptions', 'msgs'],
+    showWebsite: false,
+    restrictions: {
+      noActivityLog: true,
+      noMaintenanceToggle: true,
+      srReadOnly: true,
+      srtReadOnly: true,
+    }
+  }
+};
+
 function applyEmployeeMode(cfg) {
   window._employeeRestrictions = cfg.restrictions;
 
@@ -4370,7 +4390,8 @@ function applyEmployeeMode(cfg) {
   }
 
   // ── تعطيل تعديل وحذف الأساتذة من جدول الأساتذة ──
-  if (cfg.restrictions.noEditTeacher || cfg.restrictions.noDeleteTeacher) {
+  if (cfg.restrictions.noEditTeacher || cfg.restrictions.noDeleteTeacher ||
+      cfg.restrictions.srReadOnly || cfg.restrictions.srtReadOnly) {
     // نراقب تحديثات DOM في قسم الأساتذة
     const observer = new MutationObserver(() => {
       if (cfg.restrictions.noDeleteTeacher)
@@ -4381,6 +4402,10 @@ function applyEmployeeMode(cfg) {
         document.querySelectorAll('.tbl-action.del').forEach(b => b.style.display = 'none');
       if (cfg.restrictions.noDeleteMsg || cfg.restrictions.noClearMsg)
         document.querySelectorAll('button[onclick*="_deleteMsg"], .msg-clear-btn, button[onclick*="clearRoom"]').forEach(b => b.style.display = 'none');
+      if (cfg.restrictions.srReadOnly)
+        document.querySelectorAll('button[onclick*="srShowConfirm"], button[onclick*="srConfirmFree"], button[onclick*="srUnregister"], button[onclick*="srDelete"], button[onclick*="srEdit"], button[onclick*="srSaveEdit"], button[onclick*="srAddSubjectToRegistration"], button[onclick*="srRemoveSubject"]').forEach(b => b.style.display = 'none');
+      if (cfg.restrictions.srtReadOnly)
+        document.querySelectorAll('button[onclick*="srtOpenAddModal"], button[onclick*="srtOpenEditModal"], button[onclick*="srtResetPassword"], button[onclick*="srtConfirmResetPassword"], button[onclick*="srtToggleStatus"], button[onclick*="srtDelete"], button[onclick*="srtOpenFinance"], button[onclick*="srtFinanceAddPayment"], button[onclick*="srtFinanceDeleteTx"], button[onclick*="srtFinanceComputeDues"], button[onclick*="srtTreasuryAdjust"], button[onclick*="srtFinanceSaveRate"], button[onclick*="srtAddSubjectRow"]').forEach(b => b.style.display = 'none');
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }
@@ -4404,6 +4429,41 @@ function applyEmployeeMode(cfg) {
   if (cfg.restrictions.noDeleteMsg || cfg.restrictions.noClearMsg) {
     window._deleteMsg  = () => showToast('⛔ ليس لديك صلاحية حذف الرسائل', true);
     window.clearRoom   = () => showToast('⛔ ليس لديك صلاحية مسح المحادثة', true);
+  }
+
+  // ── تسجيلات الدعم المدرسي: عرض فقط (منع الدوال مباشرة) ──
+  if (cfg.restrictions.srReadOnly) {
+    const blockSr = () => showToast('⛔ ليس لديك صلاحية هذا الإجراء على التسجيلات', true);
+    window.srShowConfirm = blockSr;
+    window.srDoConfirm = blockSr;
+    window.srConfirmFree = blockSr;
+    window.srUnregister = blockSr;
+    window.srDelete = blockSr;
+    window.srEdit = blockSr;
+    window.srSaveEdit = blockSr;
+    window.srAddSubjectToRegistration = blockSr;
+    window.srRemoveSubject = blockSr;
+  }
+
+  // ── أساتذة الدعم المدرسي: عرض فقط (منع كل الإجراءات الإدارية) ──
+  if (cfg.restrictions.srtReadOnly) {
+    const blockSrt = () => showToast('⛔ ليس لديك صلاحية هذا الإجراء على الأساتذة', true);
+    window.srtOpenAddModal = blockSrt;
+    window.srtOpenEditModal = blockSrt;
+    window.srtSave = blockSrt;
+    window.srtResetPassword = blockSrt;
+    window.srtConfirmResetPassword = blockSrt;
+    window.srtToggleStatus = blockSrt;
+    window.srtToggleStatusFromDetail = blockSrt;
+    window.srtDelete = blockSrt;
+    window.srtDeleteFromDetail = blockSrt;
+    window.srtOpenFinance = blockSrt;
+    window.srtFinanceAddPayment = blockSrt;
+    window.srtFinanceDeleteTx = blockSrt;
+    window.srtFinanceComputeDues = blockSrt;
+    window.srtTreasuryAdjust = blockSrt;
+    window.srtFinanceSaveRate = blockSrt;
+    window.srtAddSubjectRow = blockSrt;
   }
 
   // ── الانتقال للقسم الأول المتاح ──
@@ -4533,8 +4593,8 @@ onAuthStateChanged(auth, async user => {
         return;
       }
     } catch(e) { console.warn('Teacher check error:', e); }
-    // ── فحص هل هو موظف ──
-    const empCfg = EMPLOYEES[user.email];
+    // ── فحص هل هو موظف أو مشرف (مقيد) ──
+    const empCfg = EMPLOYEES[user.email] || SUPPORT_ACCOUNTS[user.email];
     isTeacherMode = false;
     window._isTeacherAttendanceView = false;
     // إعادة تعيين تأثيرات جلسة الأستاذ السابقة على DOM
