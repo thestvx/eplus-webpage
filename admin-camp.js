@@ -191,13 +191,18 @@
     })).filter(g => g.rows.length > 0);
   }
 
+  const campMoneyHidden = () => !!(window._employeeRestrictions && window._employeeRestrictions.camp2HideMoney);
+
   function camp2Csv(rows) {
-    const header = ['رقم التسجيل', 'الاسم', 'اللقب', 'تاريخ الميلاد', 'اسم ولي الأمر', 'هاتف ولي الأمر', 'المستوى', 'البرامج', 'الإجمالي (دج)', 'تاريخ التسجيل'];
+    const hide = campMoneyHidden();
+    const header = hide
+      ? ['رقم التسجيل', 'الاسم', 'اللقب', 'تاريخ الميلاد', 'اسم ولي الأمر', 'هاتف ولي الأمر', 'المستوى', 'البرامج', 'تاريخ التسجيل']
+      : ['رقم التسجيل', 'الاسم', 'اللقب', 'تاريخ الميلاد', 'اسم ولي الأمر', 'هاتف ولي الأمر', 'المستوى', 'البرامج', 'الإجمالي (دج)', 'تاريخ التسجيل'];
     const lines = [header.join(',')];
     (rows || []).forEach(r => {
       const progs = normalizePrograms(r).map(p => p.name).join(' + ');
       const escCsv = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-      lines.push([
+      const row = [
         escCsv(r.id),
         escCsv(r.first_name),
         escCsv(r.last_name),
@@ -206,9 +211,10 @@
         escCsv(r.guardian_phone),
         escCsv(levelShort(r.education_level)),
         escCsv(progs),
-        escCsv(Number(r.total_amount) || 0),
-        escCsv(formatDateShort(r.created_at)),
-      ].join(','));
+      ];
+      if (!hide) row.push(escCsv(Number(r.total_amount) || 0));
+      row.push(escCsv(formatDateShort(r.created_at)));
+      lines.push(row.join(','));
     });
     return lines.join('\n');
   }
@@ -221,7 +227,7 @@
       return `<div class="camp2-detail-prog">
         <span>${esc(p.icon || '')} <strong>${esc(name)}</strong></span>
         <span>${esc(dur)}</span>
-        <span>${formatMoney(price)}</span>
+        <span class="camp2-detail-price">${formatMoney(price)}</span>
       </div>`;
     }).join('');
     return `
@@ -321,7 +327,7 @@
           <td dir="ltr">${esc(r.guardian_phone || '—')}</td>
           <td>${levelShort(r.education_level)}</td>
           <td style="font-size:12px;max-width:230px">${esc(progsText)}</td>
-          <td style="font-weight:800">${formatMoney(r.total_amount)}</td>
+          <td class="camp2-money-td" style="font-weight:800">${formatMoney(r.total_amount)}</td>
           <td style="font-size:11.5px">${formatDate(r.created_at)}</td>
           <td><button class="tbl-action view" onclick="camp2OpenDetails('${esc(r.id)}')" title="تفاصيل">👁</button></td>
         </tr>`;
@@ -404,10 +410,13 @@
 
   // ═══════ الطباعة ═══════
   function printTableHtml(title, rows, extraTitle) {
-    const head = ['رقم التسجيل', 'اللقب', 'الاسم', 'تاريخ الميلاد', 'ولي الأمر', 'الهاتف', 'المستوى', 'البرامج', 'الإجمالي', 'تاريخ التسجيل'];
+    const hide = campMoneyHidden();
+    const head = hide
+      ? ['رقم التسجيل', 'اللقب', 'الاسم', 'تاريخ الميلاد', 'ولي الأمر', 'الهاتف', 'المستوى', 'البرامج', 'تاريخ التسجيل']
+      : ['رقم التسجيل', 'اللقب', 'الاسم', 'تاريخ الميلاد', 'ولي الأمر', 'الهاتف', 'المستوى', 'البرامج', 'الإجمالي', 'تاريخ التسجيل'];
     const body = rows.map(r => {
       const progs = normalizePrograms(r).map(p => p.name || p.id).join(' + ');
-      return `<tr>
+      let html = `<tr>
         <td>${esc(r.id)}</td>
         <td>${esc(r.last_name)}</td>
         <td>${esc(r.first_name)}</td>
@@ -415,10 +424,11 @@
         <td>${esc(r.guardian_name || '—')}</td>
         <td dir="ltr">${esc(r.guardian_phone || '—')}</td>
         <td>${levelShort(r.education_level)}</td>
-        <td>${esc(progs)}</td>
-        <td>${formatMoney(r.total_amount)}</td>
-        <td>${formatDateShort(r.created_at)}</td>
+        <td>${esc(progs)}</td>`;
+      if (!hide) html += `<td>${formatMoney(r.total_amount)}</td>`;
+      html += `<td>${formatDateShort(r.created_at)}</td>
       </tr>`;
+      return html;
     }).join('');
     const sub = extraTitle ? `<div class="pt-sub">${esc(extraTitle)}</div>` : '';
     return `
@@ -427,7 +437,7 @@
         ${sub}
         <table>
           <thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>
-          <tbody>${body || '<tr><td colspan="10" style="text-align:center;color:#888">لا توجد تسجيلات</td></tr>'}</tbody>
+          <tbody>${body || '<tr><td colspan="' + (hide ? 9 : 10) + '" style="text-align:center;color:#888">لا توجد تسجيلات</td></tr>'}</tbody>
         </table>
       </div>`;
   }

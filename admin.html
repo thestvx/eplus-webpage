@@ -411,6 +411,15 @@
     .stat-trend{font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;background:var(--success-soft);color:var(--success)}
     .stat-num{font-size:34px;font-weight:900;color:var(--text);line-height:1}
     .stat-label{font-size:13px;color:var(--text-muted);font-weight:600;margin-top:4px}
+    body.emp-hide-money .camp2-money-card,
+    body.emp-hide-money .camp2-money-th,
+    body.emp-hide-money .camp2-money-td,
+    body.emp-hide-money .camp2-detail-total,
+    body.emp-hide-money .camp2-detail-price,
+    body.emp-hide-money .srt-money-card,
+    body.emp-hide-money .srt-money-cell,
+    body.emp-hide-money .srt-money-box,
+    body.emp-hide-money .sr-fee-box { display:none !important; }
 
     .visitor-card{background:var(--card-bg);border-radius:var(--radius);padding:22px 20px;box-shadow:var(--shadow);border:1px solid var(--border);position:relative;overflow:hidden;transition:all 0.3s cubic-bezier(0.2,0.8,0.2,1)}
     .visitor-card:hover{transform:translateY(-5px);box-shadow:var(--shadow-lg)}
@@ -3182,7 +3191,7 @@
             <div class="stat-num" id="camp2-stat-total" style="color:var(--summer)">0</div>
             <div class="stat-label">إجمالي التسجيلات</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card camp2-money-card">
             <div class="stat-card-glow"></div>
             <div class="stat-top">
               <div class="stat-icon-wrap" style="background:rgba(16,185,129,0.12)">💰</div>
@@ -3296,7 +3305,7 @@
                   <th>الهاتف</th>
                   <th>المستوى</th>
                   <th>البرامج</th>
-                  <th>الإجمالي</th>
+                  <th class="camp2-money-th">الإجمالي</th>
                   <th onclick="camp2Sort('created_at')" style="cursor:pointer">تاريخ التسجيل ↕</th>
                   <th style="width:70px">تفاصيل</th>
                 </tr>
@@ -3483,7 +3492,7 @@
           <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(16,185,129,0.1)">✅</div></div><div class="stat-num" id="srt-active">0</div><div class="stat-label">أساتذة مفعلين</div></div>
           <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(200,168,75,0.1)">📚</div></div><div class="stat-num" id="srt-subjects">0</div><div class="stat-label">مادة مُدرَّسة</div></div>
           <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(220,38,38,0.08)">🚫</div></div><div class="stat-num" id="srt-disabled">0</div><div class="stat-label">معطّل</div></div>
-          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(16,185,129,0.1)">💰</div></div><div class="stat-num" id="srt-treasury-total" style="direction:ltr">0 دج</div><div class="stat-label">إجمالي الخزينة</div></div>
+          <div class="stat-card srt-money-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(16,185,129,0.1)">💰</div></div><div class="stat-num" id="srt-treasury-total" style="direction:ltr">0 دج</div><div class="stat-label">إجمالي الخزينة</div></div>
         </div>
 
         <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center">
@@ -4322,28 +4331,40 @@ const EMPLOYEES = {
   }
 };
 
-// حساب "مشرف" مقيد — يرى الأقسام المحددة فقط، وبلا أي صلاحيات إدارية:
-// • تسجيلات الدعم المدرسي: عرض فقط (لا تأكيد/إلغاء/تعديل/حذف/إدارة مواد)
+// حساب "مشرف المركز التعليمي" مقيد — يرى الأقسام المحددة فقط:
+// • تسجيلات الدعم المدرسي: تأكيد نهائي + طباعة بطاقة، إضافة/حذف مادة، تعديل بيانات التلميذ
+//   (ممنوع: الحذف، إلغاء التأكيد، التأكيد بدون قبض الرسوم)
 // • أساتذة الدعم المدرسي: عرض فقط (كل الأزرار الإدارية مخفية)
+// • كل المبالغ المالية مخفية (الرسوم، الخزينة، المستحقات، الإجمالي في المخيم)
+// • قسم الاشتراكات الشهرية مخفي بالكامل
 // التطبيق يحدث على مستوى الدوال (window.*) وليس إخفاء الأزرار فقط.
 const SUPPORT_ACCOUNTS = {
   'support@epluscenter.com': {
     uid: '',
-    name: 'مشرف الدعم',
-    role: 'مشرف',
-    allowedSections: ['home', 'camp-v2', 'support-registrations', 'support-teachers', 'subscriptions', 'msgs'],
+    name: 'مشرف المركز التعليمي',
+    role: 'مشرف المركز التعليمي',
+    allowedSections: ['home', 'camp-v2', 'support-registrations', 'support-teachers', 'msgs'],
     showWebsite: false,
     restrictions: {
       noActivityLog: true,
       noMaintenanceToggle: true,
-      srReadOnly: true,
+      srNoDelete: true,
+      srNoUnregister: true,
+      srNoConfirmFree: true,
+      srHideMoney: true,
       srtReadOnly: true,
+      srtHideMoney: true,
+      camp2HideMoney: true,
     }
   }
 };
 
 function applyEmployeeMode(cfg) {
   window._employeeRestrictions = cfg.restrictions;
+
+  if (cfg.restrictions.srHideMoney || cfg.restrictions.srtHideMoney || cfg.restrictions.camp2HideMoney) {
+    document.body.classList.add('emp-hide-money');
+  }
 
   // ── الـ sidebar: إظهار الأقسام المسموحة فقط ──
   // (يعتمد على data-nav بدلاً من الترتيب الموضعي ليكون آمناً مع إعادة ترتيب الأقسام)
@@ -4391,7 +4412,8 @@ function applyEmployeeMode(cfg) {
 
   // ── تعطيل تعديل وحذف الأساتذة من جدول الأساتذة ──
   if (cfg.restrictions.noEditTeacher || cfg.restrictions.noDeleteTeacher ||
-      cfg.restrictions.srReadOnly || cfg.restrictions.srtReadOnly) {
+      cfg.restrictions.srReadOnly || cfg.restrictions.srtReadOnly ||
+      cfg.restrictions.srNoDelete || cfg.restrictions.srNoUnregister || cfg.restrictions.srNoConfirmFree) {
     // نراقب تحديثات DOM في قسم الأساتذة
     const observer = new MutationObserver(() => {
       if (cfg.restrictions.noDeleteTeacher)
@@ -4403,7 +4425,13 @@ function applyEmployeeMode(cfg) {
       if (cfg.restrictions.noDeleteMsg || cfg.restrictions.noClearMsg)
         document.querySelectorAll('button[onclick*="_deleteMsg"], .msg-clear-btn, button[onclick*="clearRoom"]').forEach(b => b.style.display = 'none');
       if (cfg.restrictions.srReadOnly)
-        document.querySelectorAll('button[onclick*="srShowConfirm"], button[onclick*="srConfirmFree"], button[onclick*="srUnregister"], button[onclick*="srDelete"], button[onclick*="srEdit"], button[onclick*="srSaveEdit"], button[onclick*="srAddSubjectToRegistration"], button[onclick*="srRemoveSubject"]').forEach(b => b.style.display = 'none');
+        document.querySelectorAll('button[onclick*="srShowConfirm"], button[onclick*="srDoConfirm"], button[onclick*="srConfirmFree"], button[onclick*="srUnregister"], button[onclick*="srDelete"], button[onclick*="srEdit"], button[onclick*="srSaveEdit"], button[onclick*="srAddSubjectToRegistration"], button[onclick*="srRemoveSubject"]').forEach(b => b.style.display = 'none');
+      if (cfg.restrictions.srNoConfirmFree)
+        document.querySelectorAll('button[onclick*="srConfirmFree"]').forEach(b => b.style.display = 'none');
+      if (cfg.restrictions.srNoUnregister)
+        document.querySelectorAll('button[onclick*="srUnregister"]').forEach(b => b.style.display = 'none');
+      if (cfg.restrictions.srNoDelete)
+        document.querySelectorAll('button[onclick*="srDelete"]').forEach(b => b.style.display = 'none');
       if (cfg.restrictions.srtReadOnly)
         document.querySelectorAll('button[onclick*="srtOpenAddModal"], button[onclick*="srtOpenEditModal"], button[onclick*="srtResetPassword"], button[onclick*="srtConfirmResetPassword"], button[onclick*="srtToggleStatus"], button[onclick*="srtDelete"], button[onclick*="srtOpenFinance"], button[onclick*="srtFinanceAddPayment"], button[onclick*="srtFinanceDeleteTx"], button[onclick*="srtFinanceComputeDues"], button[onclick*="srtTreasuryAdjust"], button[onclick*="srtFinanceSaveRate"], button[onclick*="srtAddSubjectRow"]').forEach(b => b.style.display = 'none');
     });
@@ -4431,7 +4459,7 @@ function applyEmployeeMode(cfg) {
     window.clearRoom   = () => showToast('⛔ ليس لديك صلاحية مسح المحادثة', true);
   }
 
-  // ── تسجيلات الدعم المدرسي: عرض فقط (منع الدوال مباشرة) ──
+  // ── تسجيلات الدعم المدرسي: منع الإجراءات المقيدة فقط (الباقي متاح حسب الصلاحيات) ──
   if (cfg.restrictions.srReadOnly) {
     const blockSr = () => showToast('⛔ ليس لديك صلاحية هذا الإجراء على التسجيلات', true);
     window.srShowConfirm = blockSr;
@@ -4443,6 +4471,15 @@ function applyEmployeeMode(cfg) {
     window.srSaveEdit = blockSr;
     window.srAddSubjectToRegistration = blockSr;
     window.srRemoveSubject = blockSr;
+  }
+  if (cfg.restrictions.srNoDelete) {
+    window.srDelete = () => showToast('⛔ ليس لديك صلاحية حذف التسجيل', true);
+  }
+  if (cfg.restrictions.srNoUnregister) {
+    window.srUnregister = () => showToast('⛔ ليس لديك صلاحية إلغاء تأكيد التسجيل', true);
+  }
+  if (cfg.restrictions.srNoConfirmFree) {
+    window.srConfirmFree = () => showToast('⛔ ليس لديك صلاحية التأكيد بدون قبض الرسوم', true);
   }
 
   // ── أساتذة الدعم المدرسي: عرض فقط (منع كل الإجراءات الإدارية) ──
@@ -24056,7 +24093,7 @@ function srShowDetail(id) {
       <div><strong style="color:var(--text-muted);font-size:11px">الشعبة</strong><div style="font-weight:700;margin-top:2px">${r.stream || '—'}</div></div>
       <div style="grid-column:1/-1"><strong style="color:var(--text-muted);font-size:11px">المواد المطلوبة</strong><div id="sr-detail-subjects-wrap" style="display:flex;flex-direction:column;gap:6px;margin-top:8px">${subjects}</div><div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap" id="sr-subject-add-area"><select id="sr-subject-add-select" class="inp" style="flex:1;min-width:200px;padding:8px 12px;font-size:12px"><option value="">اختر مادة لإضافتها...</option></select><button class="tbl-action" onclick="srAddSubjectToRegistration('${r.id}')" style="border-color:rgba(16,185,129,0.3);color:#059669;font-weight:800;padding:8px 14px;font-size:12px">➕ إضافة</button></div></div>
       <div><strong style="color:var(--text-muted);font-size:11px">تاريخ التسجيل</strong><div style="font-weight:700;margin-top:2px">${srFormatDateTime(r.created_at)}</div></div>
-      <div><strong style="color:var(--text-muted);font-size:11px">رسوم التسجيل</strong><div style="font-weight:700;margin-top:2px">${r.fee_amount || 500} دج</div></div>
+      <div class="sr-fee-box"><strong style="color:var(--text-muted);font-size:11px">رسوم التسجيل</strong><div style="font-weight:700;margin-top:2px">${r.fee_amount || 500} دج</div></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:16px">
       ${actionsHtml}
@@ -24865,7 +24902,7 @@ function srtRenderTable(data) {
       <td style="font-size:12px;max-width:160px">${levels}</td>
       <td>${statusBadge}</td>
       <td style="font-size:12px">${created}</td>
-      <td style="font-weight:700;font-size:13px;direction:ltr;text-align:center;color:${(t.pending || 0) > 0 ? '#d97706' : '#059669'}">${(t.pending || 0).toLocaleString('ar-DZ')} دج</td>
+      <td class="srt-money-cell" style="font-weight:700;font-size:13px;direction:ltr;text-align:center;color:${(t.pending || 0) > 0 ? '#d97706' : '#059669'}">${(t.pending || 0).toLocaleString('ar-DZ')} دج</td>
       <td style="font-size:11px;color:var(--text-muted);font-style:italic">انقر مرتين</td>
     </tr>`;
   }).join('');
@@ -24927,7 +24964,7 @@ function srtShowDetail(id) {
       <div><strong style="color:var(--text-muted);font-size:11px">تاريخ إنشاء الحساب</strong><div style="font-weight:700;margin-top:2px">${created}</div></div>
       <div><strong style="color:var(--text-muted);font-size:11px">آخر تسجيل دخول</strong><div style="font-weight:700;margin-top:2px">${t.lastLogin ? new Date(t.lastLogin.seconds ? t.lastLogin.seconds * 1000 : t.lastLogin).toLocaleString('ar-DZ') : 'لم يسجل دخول بعد'}</div></div>
       <div><strong style="color:var(--text-muted);font-size:11px">الملاحظات</strong><div style="font-weight:700;margin-top:2px">${t.notes || '—'}</div></div>
-      <div style="background:linear-gradient(135deg,rgba(5,150,105,0.08),rgba(16,185,129,0.12));border-radius:10px;padding:12px 14px"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">💰 المتبقي (مستحق الدفع)</div><div style="font-weight:900;font-size:18px;color:${(t.pending || 0) > 0 ? '#d97706' : '#059669'}">${(t.pending || 0).toLocaleString('ar-DZ')} دج</div><div style="font-size:10px;color:var(--text-muted);margin-top:3px">سعر الحصة: ${(t.rate || 0).toLocaleString('ar-DZ')} دج</div></div>
+      <div class="srt-money-box" style="background:linear-gradient(135deg,rgba(5,150,105,0.08),rgba(16,185,129,0.12));border-radius:10px;padding:12px 14px"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">💰 المتبقي (مستحق الدفع)</div><div style="font-weight:900;font-size:18px;color:${(t.pending || 0) > 0 ? '#d97706' : '#059669'}">${(t.pending || 0).toLocaleString('ar-DZ')} دج</div><div style="font-size:10px;color:var(--text-muted);margin-top:3px">سعر الحصة: ${(t.rate || 0).toLocaleString('ar-DZ')} دج</div></div>
       <div style="grid-column:1/-1"><strong style="color:var(--text-muted);font-size:11px">المواد التي يدرسها</strong><div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">${subjects}</div></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:16px">
