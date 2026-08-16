@@ -219,36 +219,59 @@
   }
 
   function camp2RowDetailHtml(r) {
-    const progs = normalizePrograms(r).map(p => {
-      const name = p.name || (programById(p.id) ? programById(p.id).name : p.id);
-      const price = p.price != null ? p.price : (programById(p.id) ? programById(p.id).price : 0);
-      const dur = p.duration || (programById(p.id) ? programById(p.id).duration : '');
-      return `<div class="camp2-detail-prog">
-        <span>${esc(p.icon || '')} <strong>${esc(name)}</strong></span>
-        <span>${esc(dur)}</span>
-        <span class="camp2-detail-price">${formatMoney(price)}</span>
-      </div>`;
-    }).join('');
+    const progs = normalizePrograms(r);
+    const progsHtml = progs.length
+      ? progs.map(p => {
+          const name = p.name || (programById(p.id) ? programById(p.id).name : p.id);
+          const price = p.price != null ? p.price : (programById(p.id) ? programById(p.id).price : 0);
+          const dur = p.duration || (programById(p.id) ? programById(p.id).duration : '');
+          return `<div class="camp2-detail-prog">
+            <span class="camp2-prog-icon">${esc(p.icon || '📘')}</span>
+            <span class="camp2-prog-name">${esc(name)}</span>
+            <span class="camp2-prog-dur">${esc(dur)}</span>
+            <span class="camp2-detail-price">${formatMoney(price)}</span>
+          </div>`;
+        }).join('')
+      : '<div class="camp2-detail-empty">لا توجد برامج</div>';
+    const initial = String((r.first_name || '؟').trim().charAt(0) || '؟');
     return `
-      <div class="camp2-detail-block">
-        <div class="camp2-detail-row"><span class="camp2-detail-label">رقم التسجيل</span><span class="camp2-detail-val" dir="ltr">${esc(r.id)}</span></div>
-        <div class="camp2-detail-row"><span class="camp2-detail-label">الاسم الكامل</span><span class="camp2-detail-val">${esc(r.first_name)} ${esc(r.last_name)}</span></div>
-        <div class="camp2-detail-row"><span class="camp2-detail-label">تاريخ الميلاد</span><span class="camp2-detail-val">${esc(r.birth_date || '—')}</span></div>
-        <div class="camp2-detail-row"><span class="camp2-detail-label">ولي الأمر</span><span class="camp2-detail-val">${esc(r.guardian_name || '—')}</span></div>
-        <div class="camp2-detail-row"><span class="camp2-detail-label">الهاتف</span><span class="camp2-detail-val" dir="ltr">${esc(r.guardian_phone || '—')}</span></div>
-        <div class="camp2-detail-row"><span class="camp2-detail-label">المستوى الدراسي</span><span class="camp2-detail-val">${levelLabel(r.education_level)}</span></div>
+      <div class="camp2-detail-hero">
+        <div class="camp2-detail-avatar">${esc(initial)}</div>
+        <div style="min-width:0">
+          <div class="camp2-detail-hero-name">${esc(fullName(r) || '—')}</div>
+          <div class="camp2-detail-hero-id" dir="ltr">${esc(r.id)}</div>
+        </div>
+        <span class="camp2-detail-level-badge">${levelShort(r.education_level)}</span>
       </div>
-      <div class="camp2-detail-block">
-        <div class="camp2-detail-label" style="margin-bottom:8px">البرامج المطلوبة</div>
-        ${progs || '<div style="font-size:13px;color:var(--text-muted)">لا توجد برامج</div>'}
+      <div class="camp2-detail-grid">
+        <div class="camp2-detail-cell">
+          <span class="camp2-detail-label">تاريخ الميلاد</span>
+          <span class="camp2-detail-val">${esc(r.birth_date || '—')}</span>
+        </div>
+        <div class="camp2-detail-cell">
+          <span class="camp2-detail-label">ولي الأمر</span>
+          <span class="camp2-detail-val">${esc(r.guardian_name || '—')}</span>
+        </div>
+        <div class="camp2-detail-cell">
+          <span class="camp2-detail-label">الهاتف</span>
+          <span class="camp2-detail-val" dir="ltr">${esc(r.guardian_phone || '—')}</span>
+        </div>
+        <div class="camp2-detail-cell">
+          <span class="camp2-detail-label">المستوى الدراسي</span>
+          <span class="camp2-detail-val">${levelLabel(r.education_level)}</span>
+        </div>
+        <div class="camp2-detail-cell">
+          <span class="camp2-detail-label">تاريخ التسجيل</span>
+          <span class="camp2-detail-val">${formatDate(r.created_at)}</span>
+        </div>
+        <div class="camp2-detail-cell">
+          <span class="camp2-detail-label">قبول القوانين</span>
+          <span class="camp2-detail-val">${r.terms_accepted ? '✅ نعم' : '—'}</span>
+        </div>
       </div>
-      <div class="camp2-detail-block">
-        <div class="camp2-detail-total"><span>الإجمالي</span><strong>${formatMoney(r.total_amount)}</strong></div>
-      </div>
-      <div class="camp2-detail-block">
-        <div class="camp2-detail-row"><span class="camp2-detail-label">تاريخ التسجيل</span><span class="camp2-detail-val">${formatDate(r.created_at)}</span></div>
-        <div class="camp2-detail-row"><span class="camp2-detail-label">قبول القوانين</span><span class="camp2-detail-val">${r.terms_accepted ? 'نعم' : '—'}</span></div>
-      </div>`;
+      <div class="camp2-detail-block-title">البرامج المطلوبة</div>
+      ${progsHtml}
+      <div class="camp2-detail-total"><span>الإجمالي</span><strong>${formatMoney(r.total_amount)}</strong></div>`;
   }
 
   // ═══════ واجهة المستخدم ═══════
