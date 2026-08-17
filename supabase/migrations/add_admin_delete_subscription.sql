@@ -15,7 +15,7 @@ BEGIN
     RAISE EXCEPTION 'forbidden';
   END IF;
 
-  DELETE FROM subscription_periods WHERE subscription_id = p_subscription_id;
-  DELETE FROM subscriptions WHERE id = p_subscription_id;
+  DELETE FROM subscription_periods WHERE subscription_id::text = p_subscription_id;
+  DELETE FROM subscriptions WHERE id::text = p_subscription_id;
 END;
 $$;
