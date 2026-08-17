@@ -90,11 +90,12 @@ const StudentCardRenderer = (function () {
     // Background fill behind the QR and the barcode (white by default so the
     // QR/barcode stay readable on the pre-printed design). Their POSITION and
     // SIZE are DERIVED from the QR/barcode data boxes (qrBgGeom/bcBgGeom) so
-    // the white area is exactly the size of the printed QR/barcode; only the
-    // color / radius / z below are calibrated. z-order: design → white rect →
-    // QR/barcode.
-    qrBg: { color: '#ffffff', radius: 0, z: 0 },
-    bcBg: { color: '#ffffff', radius: 0, z: 0 },
+    // White background behind QR/barcode: color, corner radius, z-order, and
+    // padding (mm) — the bg rect is derived from the element's position/size
+    // PLUS padding on all four sides, so the white area is always slightly
+    // larger than the code and moves with it automatically.
+    qrBg: { color: '#ffffff', radius: 0, z: 0, padding: 0.8 },
+    bcBg: { color: '#ffffff', radius: 0, z: 0, padding: 0.8 },
     // User-added design shapes (squares/rectangles) drawn in the data layer
     // of every card. Each: { x, y, w, h, color, radius, z } in mm.
     shapes: []
@@ -147,6 +148,7 @@ const StudentCardRenderer = (function () {
         if (v && typeof v === 'object') {
           if (typeof v.radius === 'number' && isFinite(v.radius)) cal[k].radius = v.radius;
           if (typeof v.z === 'number' && isFinite(v.z)) cal[k].z = v.z;
+          if (typeof v.padding === 'number' && isFinite(v.padding)) cal[k].padding = v.padding;
           if (typeof v.color === 'string') cal[k].color = _normColor(v.color, cal[k].color);
         }
       });
@@ -177,6 +179,7 @@ const StudentCardRenderer = (function () {
       if (cal[k].fontSize !== undefined) cal[k].fontSize = Math.min(Math.max(1, cal[k].fontSize), 12);
       if (cal[k].radius !== undefined) cal[k].radius = Math.min(Math.max(0, cal[k].radius), 20);
       if (cal[k].z !== undefined) cal[k].z = Math.min(Math.max(-10, cal[k].z), 10);
+      if (cal[k].padding !== undefined) cal[k].padding = Math.min(Math.max(0, cal[k].padding), 10);
     });
     ['name', 'id', 'stream', 'date', 'qr', 'bc'].forEach(k => {
       cal[k].x = Math.min(Math.max(0, cal[k].x), CARD_W_MM);
@@ -526,18 +529,22 @@ const StudentCardRenderer = (function () {
 
   // The white QR/barcode background rectangles are DERIVED from the QR/barcode
   // DATA boxes (same position, same size), so the printed white area is exactly
-  // the size/position of the printed QR and barcode — no margin around them.
-  // Only color / radius / z stay independently calibrated (CAL.qrBg / CAL.bcBg).
+  // Background geometry: the white rect is the element's position/size PLUS
+  // uniform padding on all four sides, so it always tightly wraps the code.
   function qrBgGeom() {
+    const p = CAL.qrBg.padding || 0;
     return {
-      x: CAL.qr.x, y: CAL.qr.y, w: CAL.qr.w, h: CAL.qr.h,
+      x: CAL.qr.x - p, y: CAL.qr.y - p,
+      w: CAL.qr.w + 2 * p, h: CAL.qr.h + 2 * p,
       color: CAL.qrBg.color, radius: CAL.qrBg.radius, z: CAL.qrBg.z
     };
   }
   function bcBgGeom() {
     const box = bcBox();
+    const p = CAL.bcBg.padding || 0;
     return {
-      x: CAL.bc.x, y: CAL.bc.y, w: box.w, h: box.h,
+      x: CAL.bc.x - p, y: CAL.bc.y - p,
+      w: box.w + 2 * p, h: box.h + 2 * p,
       color: CAL.bcBg.color, radius: CAL.bcBg.radius, z: CAL.bcBg.z
     };
   }
