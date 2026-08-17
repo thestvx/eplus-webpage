@@ -303,6 +303,10 @@ const SubscriptionService = (function () {
     });
   }
 
+  async function adminDeleteSubscription(subscriptionId) {
+    return await _adminCall('delete-subscription', { subscriptionId: subscriptionId });
+  }
+
   // يبحث عن اشتراك فعّال متداخل مع النافذة المطلوبة [start, end]
   // للنفس الطالب + نفس المادة + نفس الأستاذ (لا يمنع مواد أخرى متوازية)
   async function findOverlapping(studentId, start, months, subjectId, teacherId) {
@@ -405,6 +409,7 @@ const SubscriptionService = (function () {
     adminListSubscriptions,
     adminSubscriptionDetail,
     adminSetSubscriptionPaused,
+    adminDeleteSubscription,
     findOverlapping,
     subscriptionStatus,
     subscriptionStatusLabel,
