@@ -88,7 +88,7 @@
     .sidebar::-webkit-scrollbar{width:0}
     .sidebar-brand{padding:28px 24px 20px;border-bottom:1px solid rgba(255,255,255,0.08)}
     .sidebar-brand-row{display:flex;align-items:center;gap:14px}
-    .sidebar-logo{width:48px;height:48px;background:linear-gradient(135deg,var(--gold),#e2c46a);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;box-shadow:0 4px 16px rgba(200,168,75,0.3)}
+    .sidebar-logo{width:48px;height:48px;background:linear-gradient(135deg,var(--gold),#e2c46a);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;box-shadow:0 4px 16px rgba(200,168,75,0.3);overflow:hidden}
     .sidebar-brand-text{flex:1;min-width:0}
     .sidebar-brand-name{font-size:18px;font-weight:900;letter-spacing:0.5px}
     .sidebar-brand-sub{font-size:11px;color:rgba(255,255,255,0.5);font-weight:600;margin-top:2px}
@@ -414,18 +414,14 @@
         '<div class="sub-month-grid">'+monthsHTML+'</div>';
     }
 
-    async function loadStudentContentPreview(studentSubjects,studentTeachers){
+    async function loadStudentContentPreview(studentSubjects){
       var el=document.getElementById('stu-content-preview');
       if(!el)return;
       try{
         var snap=await window._fdb.collection('teacher_content').get();
         var items=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
-        if(Array.isArray(studentSubjects)&&studentSubjects.length>0&&Array.isArray(studentTeachers)&&studentTeachers.length>0){
-          items=items.filter(function(c){
-            var matchSubject=studentSubjects.indexOf(c.subject)>=0;
-            var matchTeacher=studentTeachers.indexOf(c.teacherName)>=0;
-            return matchSubject&&matchTeacher;
-          });
+        if(Array.isArray(studentSubjects)&&studentSubjects.length>0){
+          items=items.filter(function(c){return studentSubjects.indexOf(c.subject)>=0;});
         }
         items=items.sort(function(a,b){return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0);}).slice(0,3);
         if(items.length===0){el.innerHTML='';return;}
@@ -526,7 +522,7 @@
       const fullName=(r.first_name||'')+' '+(r.last_name||'');
       const initials=(r.first_name?r.first_name[0]:'')+(r.last_name?r.last_name[0]:'');
       return `
-        <div class="sidebar-brand"><div class="sidebar-brand-row"><div class="sidebar-logo">🎓</div><div class="sidebar-brand-text"><div class="sidebar-brand-name">E-PLUS</div><div class="sidebar-brand-sub">Student Portal</div></div></div></div>
+        <div class="sidebar-brand"><div class="sidebar-brand-row"><div class="sidebar-logo"><img src="icons/logospiring.png" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:8px"></div><div class="sidebar-brand-text"><div class="sidebar-brand-name">E-PLUS</div><div class="sidebar-brand-sub">Student Portal</div></div></div></div>
         <div class="sidebar-student"><div class="sidebar-student-avatar">${initials}</div><div class="sidebar-student-name">${fullName}</div><div class="sidebar-student-id">ID: ${r.id||''}</div></div>
         <div class="sidebar-nav">
           <div class="sidebar-link ${currentPage==='home'?'active':''}" onclick="navigateTo('home')"><span class="sidebar-link-icon">🏠</span>الرئيسية</div>
@@ -579,9 +575,9 @@
         <div class="portal-layout">
           <aside class="sidebar">${renderSidebar(r)}</aside>
           <div class="main-content">
-            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">🎓</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
+            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo"><img src="icons/logospiring.png" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:8px"></div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
             <div class="main-body">
-              <div class="hero-card"><div class="hero-row"><div class="hero-avatar">${initials}</div><div class="hero-info"><div class="hero-greeting">مرحباً بك 👋</div><div class="hero-name">${fullName}</div><div class="hero-id">Student ID: ${r.id||''}</div></div></div><div class="hero-badges"><span class="hero-badge level">📚 ${r.level||''}</span><span class="hero-badge type">${typeLabel}</span><span class="hero-badge status">✅ مسجل نهائياً</span>${r.institution?`<span class="hero-badge inst">🏫 ${r.institution}</span>`:''}${streamText?`<span class="hero-badge stream">${streamText}</span>`:''}</div></div>
+              <div class="hero-card"><div class="hero-row"><div class="hero-avatar"><img src="icons/student.png" alt="${fullName}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit"></div><div class="hero-info"><div class="hero-greeting">مرحباً بك 👋</div><div class="hero-name">${fullName}</div><div class="hero-id">Student ID: ${r.id||''}</div></div></div><div class="hero-badges"><span class="hero-badge level">📚 ${r.level||''}</span><span class="hero-badge type">${typeLabel}</span><span class="hero-badge status">✅ مسجل نهائياً</span>${r.institution?`<span class="hero-badge inst">🏫 ${r.institution}</span>`:''}${streamText?`<span class="hero-badge stream">${streamText}</span>`:''}</div></div>
               <div class="stats-grid">
                 <div class="stat-card c-purple" style="animation:fadeSlideUp 0.5s ease both 0.1s"><div class="stat-icon i-purple">📚</div><div class="stat-value">${subjects.length}</div><div class="stat-label">مادة مسجلة</div></div>
                 <div class="stat-card c-gold" style="animation:fadeSlideUp 0.5s ease both 0.15s"><div class="stat-icon i-gold">📖</div><div class="stat-value">—</div><div class="stat-label">عدد الدروس</div></div>
@@ -603,8 +599,7 @@
       updateSidebarActive();document.body.style.overflow='auto';
       loadStudentSubscription(r.id);
       var subNames=subjects.map(function(s){return s.subject||'';}).filter(Boolean);
-      var tchNames=subjects.map(function(s){return s.teacher||'';}).filter(Boolean);
-      loadStudentContentPreview(subNames,tchNames);
+      loadStudentContentPreview(subNames);
     }
 
     /* ═══ CARD PAGE (3D FLIP) ═══ */
@@ -616,7 +611,7 @@
         <div class="portal-layout">
           <aside class="sidebar">${renderSidebar(r)}</aside>
           <div class="main-content">
-            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">🎓</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
+            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo"><img src="icons/logospiring.png" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:8px"></div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
             <div class="main-body">
               <div class="card-page-wrap">
                 <div class="section-title" style="margin-bottom:24px">🪪 بطاقة التسجيل</div>
@@ -679,12 +674,11 @@
       currentStudent=r;currentPage='content';
       var stuSubjects=Array.isArray(r.subjects)?r.subjects:[];
       var subjectNames=stuSubjects.map(function(s){return typeof s==='string'?s:(s.subject||'');}).filter(Boolean);
-      var teacherNames=stuSubjects.map(function(s){return typeof s==='string'?'':(s.teacher||s.teacherName||'');}).filter(Boolean);
       document.getElementById('app').innerHTML=`
         <div class="portal-layout">
           <aside class="sidebar">${renderSidebar(r)}</aside>
           <div class="main-content">
-            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">🎓</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
+            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo"><img src="icons/logospiring.png" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:8px"></div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
             <div class="main-body">
               <div class="section-header"><div class="section-title">📚 المحتوى التعليمي</div><div class="section-count" id="stu-content-count">...</div></div>
               <div id="stu-content-list"><div class="loading-page" style="min-height:200px"><div class="spinner"></div></div></div>
@@ -696,11 +690,9 @@
       try{
         var snap=await window._fdb.collection('teacher_content').get();
         var items=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
-        items=items.filter(function(c){
-          var matchSubject=subjectNames.length===0||subjectNames.indexOf(c.subject)>=0;
-          var matchTeacher=teacherNames.length===0||teacherNames.indexOf(c.teacherName)>=0;
-          return matchSubject&&matchTeacher;
-        });
+        if(subjectNames.length>0){
+          items=items.filter(function(c){return subjectNames.indexOf(c.subject)>=0;});
+        }
         items=items.sort(function(a,b){return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0);});
         var countEl=document.getElementById('stu-content-count');
         if(countEl)countEl.textContent=items.length+' محتوى';
