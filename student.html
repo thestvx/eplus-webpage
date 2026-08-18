@@ -252,6 +252,27 @@
     .sub-sum-card .v.u{color:var(--success)}
     .sub-sum-card .v.r{color:var(--primary)}
 
+    /* ═══ CONTENT PAGE ═══ */
+    .stu-content-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px;margin-bottom:28px}
+    .stu-content-card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);overflow:hidden;transition:var(--transition);animation:fadeSlideUp 0.5s ease both}
+    .stu-content-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:rgba(99,102,241,0.15)}
+    .stu-content-card-header{padding:20px 20px 14px;display:flex;align-items:flex-start;gap:14px}
+    .stu-content-card-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+    .stu-content-card-icon.lesson{background:var(--blue-light);color:var(--blue)}
+    .stu-content-card-icon.exercise{background:var(--success-light);color:var(--success)}
+    .stu-content-card-icon.homework{background:var(--gold-light);color:var(--gold)}
+    .stu-content-card-icon.announcement{background:rgba(124,58,237,0.08);color:#7c3aed}
+    .stu-content-card-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px;line-height:1.5}
+    .stu-content-card-meta{font-size:12px;color:var(--text-muted);font-weight:600;display:flex;align-items:center;gap:6px}
+    .stu-content-card-body{padding:0 20px 16px;font-size:13px;color:var(--text-secondary);line-height:1.8}
+    .stu-content-card-footer{padding:14px 20px;border-top:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .stu-content-tag{padding:4px 10px;border-radius:14px;font-size:10.5px;font-weight:700;white-space:nowrap}
+    .stu-content-attach{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:var(--radius-xs);background:var(--success-light);color:var(--success);font-size:11px;font-weight:700;text-decoration:none;transition:var(--transition)}
+    .stu-content-attach:hover{background:var(--success);color:#fff}
+    .stu-content-url{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:var(--radius-xs);background:var(--blue-light);color:var(--blue);font-size:11px;font-weight:700;text-decoration:none;transition:var(--transition)}
+    .stu-content-url:hover{background:var(--blue);color:#fff}
+    .stu-content-type-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:800}
+
     /* ═══ RESPONSIVE ═══ */
     @media(max-width:1024px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:768px){
@@ -260,6 +281,7 @@
       .hero-badges{gap:6px}.hero-badge{padding:5px 10px;font-size:11px}
       .stats-grid{grid-template-columns:repeat(2,1fr);gap:12px}.stat-card{padding:16px}.stat-value{font-size:22px}
       .subjects-grid{grid-template-columns:1fr;gap:12px}.subject-card-top{padding:16px 16px 0}.subject-progress-wrap{padding:12px 16px 0}.subject-stats{margin:12px 0 0}.subject-card-footer{padding:10px 16px 14px}
+      .stu-content-grid{grid-template-columns:1fr}
       .card-scene{width:min(440px,calc(100vw - 40px));height:auto;aspect-ratio:440/262}
     }
     @media(max-width:480px){.hero-row{gap:14px}.hero-name{font-size:18px}.card-flip-option{padding:8px 16px;font-size:12px}}
@@ -392,6 +414,36 @@
         '<div class="sub-month-grid">'+monthsHTML+'</div>';
     }
 
+    async function loadStudentContentPreview(studentSubjects){
+      const el=document.getElementById('stu-content-preview');
+      if(!el)return;
+      try{
+        const snap=await window._fdb.collection('teacher_content').get();
+        let items=snap.docs.map(d=>({id:d.id,...d.data()}));
+        if(Array.isArray(studentSubjects)&&studentSubjects.length>0){
+          items=items.filter(c=>studentSubjects.includes(c.subject));
+        }
+        items.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)).slice(0,3);
+        if(items.length===0){el.innerHTML='';return;}
+        const TL={lesson:'📚 درس',exercise:'📝 تمارين',homework:'📋 واجبات',announcement:'📢 إعلان'};
+        const TC={lesson:'blue',exercise:'green',homework:'gold',announcement:'purple'};
+        el.innerHTML=`<div class="section-header" style="margin-bottom:14px"><div class="section-title">📖 آخر المحتوى المضاف</div><div style="cursor:pointer;font-size:12px;font-weight:700;color:var(--primary);background:var(--primary-light);padding:6px 14px;border-radius:20px" onclick="navigateTo('content')">عرض الكل ←</div></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">${items.map(c=>{
+            const tc=TC[c.type]||'blue',tl=TL[c.type]||c.type;
+            const createdAt=c.createdAt?(c.createdAt.seconds?new Date(c.createdAt.seconds*1000):new Date(c.createdAt)):null;
+            const dateStr=createdAt?createdAt.toLocaleDateString('ar-DZ',{month:'short',day:'numeric'}):'';
+            return `<div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);padding:16px;cursor:pointer;transition:var(--transition)" onclick="navigateTo('content')" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <span style="padding:3px 8px;border-radius:8px;font-size:10px;font-weight:800;background:var(--${tc}-light);color:var(--${tc})">${tl}</span>
+                <span style="font-size:10px;color:var(--text-muted);font-weight:600">${dateStr}</span>
+              </div>
+              <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:4px;line-height:1.4">${c.title||'بدون عنوان'}</div>
+              <div style="font-size:11px;color:var(--text-muted);font-weight:600">${c.subject||''}${c.level?' — '+c.level:''}</div>
+            </div>`;
+          }).join('')}</div>`;
+      }catch(e){console.warn('Content preview load failed:',e);el.innerHTML='';}
+    }
+
     const SUBJECT_ICONS={'الرياضيات':'📐','الفيزياء':'⚡','علوم الطبيعة والحياة':'🌿','العلوم التجريبية':'🔬','التقني رياضي':'💻','تسيير واقتصاد':'📊','آداب ولغات':'📖','اللغة العربية':'🕌','اللغة الفرنسية':'🇫🇷','اللغة الإنجليزية':'🇬🇧','التاريخ والجغرافيا':'🌍','الفلسفة':'🧠','الدين الإسلامي':'📖','الموسيقى':'🎵'};
     const SUBJECT_COLORS=['rgba(99,102,241,0.1)','rgba(16,185,129,0.1)','rgba(200,168,75,0.1)','rgba(239,68,68,0.1)','rgba(168,85,247,0.1)','rgba(14,165,233,0.1)','rgba(236,72,153,0.1)','rgba(34,197,94,0.1)'];
 
@@ -473,6 +525,7 @@
         <div class="sidebar-student"><div class="sidebar-student-avatar">${initials}</div><div class="sidebar-student-name">${fullName}</div><div class="sidebar-student-id">ID: ${r.id||''}</div></div>
         <div class="sidebar-nav">
           <div class="sidebar-link ${currentPage==='home'?'active':''}" onclick="navigateTo('home')"><span class="sidebar-link-icon">🏠</span>الرئيسية</div>
+          <div class="sidebar-link ${currentPage==='content'?'active':''}" onclick="navigateTo('content')"><span class="sidebar-link-icon">📚</span>المحتوى التعليمي</div>
           <div class="sidebar-link ${currentPage==='card'?'active':''}" onclick="navigateTo('card')"><span class="sidebar-link-icon">💳</span>بطاقتي</div>
         </div>
         <div class="sidebar-footer">
@@ -487,7 +540,9 @@
     }
     function renderCurrentPage(){
       if(!currentStudent)return;
-      if(currentPage==='card')renderCardPage(currentStudent);else renderDashboard(currentStudent);
+      if(currentPage==='card')renderCardPage(currentStudent);
+      else if(currentPage==='content')renderStudentContentPage(currentStudent);
+      else renderDashboard(currentStudent);
     }
 
     /* ═══ MOBILE DRAWER ═══ */
@@ -513,7 +568,7 @@
       const streamText=r.stream?' | '+r.stream:'';
 
       let subjectsHTML=subjects.length===0?'<div style="text-align:center;padding:48px 20px;color:var(--text-muted);font-size:14px;grid-column:1/-1"><div style="font-size:48px;margin-bottom:12px">📭</div><div style="font-weight:700">لم تسجل في أي مادة بعد</div></div>':
-        subjects.map((s,i)=>{const icon=SUBJECT_ICONS[s.subject]||'📘';const color=SUBJECT_COLORS[i%SUBJECT_COLORS.length];return `<div class="subject-card" style="animation-delay:${i*0.08}s"><div class="subject-card-top"><div class="subject-icon" style="background:${color}">${icon}</div><div class="subject-info"><div class="subject-name">${s.subject||''}</div><div class="subject-teacher">👨‍🏫 ${s.teacher||''}</div></div></div><div class="subject-progress-wrap"><div class="subject-progress-bar"><div class="subject-progress-fill" style="width:0%"></div></div><div class="subject-progress-text"><span>تقدمك</span><span>قريباً</span></div></div><div class="subject-stats"><div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">الدروس</div></div><div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">التمارين</div></div><div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">آخر تحديث</div></div></div><div class="subject-card-footer"><button class="subject-btn disabled" disabled>📚 الدروس <span style="font-size:9px;color:var(--text-muted);margin-right:2px">قريباً</span></button><button class="subject-btn disabled" disabled>📝 التمارين <span style="font-size:9px;color:var(--text-muted);margin-right:2px">قريباً</span></button></div></div>`;}).join('');
+        subjects.map((s,i)=>{const icon=SUBJECT_ICONS[s.subject]||'📘';const color=SUBJECT_COLORS[i%SUBJECT_COLORS.length];return `<div class="subject-card" style="animation-delay:${i*0.08}s"><div class="subject-card-top"><div class="subject-icon" style="background:${color}">${icon}</div><div class="subject-info"><div class="subject-name">${s.subject||''}</div><div class="subject-teacher">👨‍🏫 ${s.teacher||''}</div></div></div><div class="subject-progress-wrap"><div class="subject-progress-bar"><div class="subject-progress-fill" style="width:0%"></div></div><div class="subject-progress-text"><span>تقدمك</span><span>قريباً</span></div></div><div class="subject-stats"><div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">الدروس</div></div><div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">التمارين</div></div><div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">آخر تحديث</div></div></div><div class="subject-card-footer"><button class="subject-btn" onclick="navigateTo('content')" style="cursor:pointer">📚 عرض المحتوى</button><button class="subject-btn disabled" disabled>📝 التمارين <span style="font-size:9px;color:var(--text-muted);margin-right:2px">قريباً</span></button></div></div>`;}).join('');
 
       document.getElementById('app').innerHTML=`
         <div class="portal-layout">
@@ -533,6 +588,7 @@
                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="sub-badge-st" id="student-sub-badge">—</span></div>
                 <div id="student-sub-content"><div class="sub-status-line">جاري تحميل الاشتراك…</div></div>
               </div>
+              <div id="stu-content-preview" style="margin-bottom:28px"></div>
               <div class="section-header"><div class="section-title">📚 موادك المسجلة</div><div class="section-count">${subjects.length} مادة</div></div>
               <div class="subjects-grid">${subjectsHTML}</div>
               <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
@@ -541,6 +597,7 @@
         </div>`;
       updateSidebarActive();document.body.style.overflow='auto';
       loadStudentSubscription(r.id);
+      loadStudentContentPreview(subjects.map(s=>s.subject||s));
     }
 
     /* ═══ CARD PAGE (3D FLIP) ═══ */
@@ -603,7 +660,73 @@
         l.classList.remove('active');
         if(currentPage==='home'&&l.textContent.includes('الرئيسية'))l.classList.add('active');
         if(currentPage==='card'&&l.textContent.includes('بطاقتي'))l.classList.add('active');
+        if(currentPage==='content'&&l.textContent.includes('المحتوى'))l.classList.add('active');
       });
+    }
+
+    /* ═══ CONTENT PAGE ═══ */
+    const STU_TYPE_LABELS={lesson:'📚 درس',exercise:'📝 تمارين',homework:'📋 واجبات',announcement:'📢 إعلان'};
+    const STU_TYPE_COLORS={lesson:'blue',exercise:'green',homework:'gold',announcement:'purple'};
+
+    async function renderStudentContentPage(r){
+      currentStudent=r;currentPage='content';
+      const subjects=Array.isArray(r.subjects)?r.subjects.map(s=>s.subject||s):[];
+      document.getElementById('app').innerHTML=`
+        <div class="portal-layout">
+          <aside class="sidebar">${renderSidebar(r)}</aside>
+          <div class="main-content">
+            <div class="main-topbar"><button class="topbar-toggle" onclick="openDrawer()">☰</button><div class="topbar-brand"><div class="topbar-logo">🎓</div><div class="topbar-title">E-PLUS</div></div><button class="topbar-logout" onclick="handleLogout()">🚪 خروج</button></div>
+            <div class="main-body">
+              <div class="section-header"><div class="section-title">📚 المحتوى التعليمي</div><div class="section-count" id="stu-content-count">...</div></div>
+              <div id="stu-content-list"><div class="loading-page" style="min-height:200px"><div class="spinner"></div></div></div>
+              <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
+            </div>
+          </div>
+        </div>`;
+      updateSidebarActive();
+      try{
+        const snap=await window._fdb.collection('teacher_content').get();
+        let items=snap.docs.map(d=>({id:d.id,...d.data()}));
+        if(subjects.length>0){
+          items=items.filter(c=>subjects.includes(c.subject));
+        }
+        items=items.filter(c=>c.type!=='announcement'||true).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+        const countEl=document.getElementById('stu-content-count');
+        if(countEl)countEl.textContent=items.length+' محتوى';
+        const listEl=document.getElementById('stu-content-list');
+        if(items.length===0){
+          listEl.innerHTML='<div style="text-align:center;padding:48px 20px;color:var(--text-muted)"><div style="font-size:56px;margin-bottom:16px;opacity:.3">📭</div><div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:8px">لا يوجد محتوى بعد</div><div style="font-size:13px;max-width:320px;margin:0 auto;line-height:1.7">لم يُضف أي محتوى تعليمي بعد — سيتم عرض الدروس والتمارين هنا فور نشرها</div></div>';
+          return;
+        }
+        listEl.innerHTML='<div class="stu-content-grid">'+items.map((c,i)=>{
+          const tc=STU_TYPE_COLORS[c.type]||'blue',tl=STU_TYPE_LABELS[c.type]||c.type;
+          const hasFiles=c.attachments&&c.attachments.length>0;
+          const hasUrl=c.url&&c.url.trim();
+          const createdAt=c.createdAt?(c.createdAt.seconds?new Date(c.createdAt.seconds*1000):new Date(c.createdAt)):null;
+          const dateStr=createdAt?createdAt.toLocaleDateString('ar-DZ',{year:'numeric',month:'short',day:'numeric'}):'';
+          return `<div class="stu-content-card" style="animation-delay:${i*0.06}s">
+            <div class="stu-content-card-header">
+              <div class="stu-content-card-icon ${c.type}">${tl.split(' ')[0]}</div>
+              <div style="flex:1;min-width:0">
+                <div class="stu-content-card-title">${c.title||'بدون عنوان'}</div>
+                <div class="stu-content-card-meta"><span>${c.subject||''}</span>${c.level?'<span>— '+c.level+'</span>':''}<span style="opacity:.5">·</span><span>${dateStr}</span></div>
+              </div>
+            </div>
+            ${c.description?'<div class="stu-content-card-body">'+c.description+'</div>':''}
+            <div class="stu-content-card-footer">
+              <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
+                <span class="stu-content-tag" style="background:var(--${tc}-light);color:var(--${tc})">${tl}</span>
+                ${hasFiles?'<a class="stu-content-attach" href="'+(c.attachments[0].url||'#')+'" target="_blank" rel="noopener">📎 '+c.attachments.length+' مرفق</a>':''}
+                ${hasUrl?'<a class="stu-content-url" href="'+c.url+'" target="_blank" rel="noopener">🔗 رابط</a>':''}
+              </div>
+              ${hasFiles&&c.attachments.length>1?'<div style="font-size:10px;color:var(--text-muted);font-weight:600">'+c.attachments.length+' ملفات</div>':''}
+            </div>
+          </div>`;
+        }).join('')+'</div>';
+      }catch(e){
+        console.error('Student content load error:',e);
+        document.getElementById('stu-content-list').innerHTML='<div style="text-align:center;padding:40px 20px"><div style="font-size:40px;margin-bottom:12px">⚠️</div><div style="font-size:14px;font-weight:800;color:var(--text)">حدث خطأ أثناء تحميل المحتوى</div></div>';
+      }
     }
 
     function handleLogout(){clearSession();window.location.href='/student.html';}
