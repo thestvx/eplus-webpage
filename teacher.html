@@ -34,6 +34,10 @@
     body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
 
     @keyframes fadeSlideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes fadeOut{from{opacity:1}to{opacity:0}}
+    @keyframes pageIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pageOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-8px)}}
     @keyframes spin{to{transform:rotate(360deg)}}
     @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
     @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(5,150,105,0.15)}50%{box-shadow:0 0 0 12px rgba(5,150,105,0)}}
@@ -415,11 +419,11 @@
 
     /* ===== SIDEBAR ===== */
     function renderSidebar(t){
-      const name=t.name||'الأستاذ',initials=name.split(' ').map(w=>w[0]).join('').substring(0,2)||'م';
+      const name=t.name||'الأستاذ';
       return `
         <div class="sidebar-brand"><div class="sidebar-brand-row"><div class="sidebar-logo">EP</div><div><div class="sidebar-brand-name">E-PLUS</div><div class="sidebar-brand-sub">TEACHER PORTAL</div></div></div></div>
         <div class="sidebar-teacher">
-          <div class="sidebar-teacher-avatar">${initials}</div>
+          <div class="sidebar-teacher-avatar" style="background:none;overflow:hidden"><img src="icons/teacher.png" alt="${name}" style="width:100%;height:100%;object-fit:cover;border-radius:var(--radius-sm)"></div>
           <div><div class="sidebar-teacher-name">${name}</div><div class="sidebar-teacher-id">${t.teacherId||''}</div></div>
         </div>
         <div class="sidebar-nav">
@@ -435,7 +439,7 @@
 
     /* ===== HEADER ===== */
     function renderHeader(t){
-      const name=t.name||'الأستاذ',initials=name.split(' ').map(w=>w[0]).join('').substring(0,2)||'م';
+      const name=t.name||'الأستاذ';
       return `
         <button class="header-toggle" onclick="openMobileSidebar()">☰</button>
         <div class="header-title">لوحة الأستاذ</div>
@@ -443,12 +447,12 @@
         <div class="header-search"><span class="header-search-icon">🔍</span><input type="text" placeholder="بحث..." id="header-search-input" onkeyup="handleGlobalSearch(this.value)"></div>
         <a href="index.html" class="header-home">🏠 <span>الرئيسية</span></a>
         <button class="header-notify" onclick="showToast('لا توجد إشعارات جديدة','info')"><span>🔔</span><span class="header-notify-dot"></span></button>
-        <div class="header-avatar" title="${name}">${initials}</div>
+        <div class="header-avatar" title="${name}" style="background:none;overflow:hidden;padding:0"><img src="icons/teacher.png" alt="${name}" style="width:100%;height:100%;object-fit:cover;border-radius:var(--radius-sm)"></div>
         <button class="header-logout" onclick="handleLogout()">🚪 <span>خروج</span></button>`;
     }
 
     /* ===== NAVIGATION ===== */
-    function navigateTo(p){currentPage=p;closeMobileSidebar();renderCurrentPage();}
+    function navigateTo(p){currentPage=p;closeMobileSidebar();const scroll=document.querySelector('.main-scroll');if(scroll){scroll.style.animation='fadeOut .15s ease forwards';setTimeout(()=>{scroll.style.animation='pageIn .35s cubic-bezier(.22,1,.36,1) both';renderCurrentPage();},150);}else{renderCurrentPage();}}
     function renderCurrentPage(){if(!currentTeacher)return;if(currentPage==='content')renderContentPage();else if(currentPage==='students')renderStudentsPage();else if(currentPage==='finance')renderFinancePage();else renderDashboard(currentTeacher);}
 
     function openMobileSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebar-overlay').classList.add('open');}
@@ -472,7 +476,7 @@
             <div class="main-scroll">
               <div class="content-inner">
 
-                <div class="welcome-section">
+                <div class="welcome-section" style="animation:pageIn .5s cubic-bezier(.22,1,.36,1) both">
                   <div class="welcome-greeting">مرحباً بك ${name} 👋</div>
                   <div class="welcome-sub">إليك ملخص نشاطك اليوم — تفّعّل لإدارة حسابك بسهولة</div>
                   <div class="welcome-meta">
@@ -482,19 +486,19 @@
                 </div>
 
                 <div class="stats-grid">
-                  <div class="stat-card c-green"><div class="stat-icon">👨‍🎓</div><div class="stat-value" id="stat-students">...</div><div class="stat-label">طالب مسجل</div></div>
-                  <div class="stat-card c-blue"><div class="stat-icon">📚</div><div class="stat-value" id="stat-lessons">...</div><div class="stat-label">درس</div></div>
-                  <div class="stat-card c-purple"><div class="stat-icon">📝</div><div class="stat-value" id="stat-exercises">...</div><div class="stat-label">تمرين / سلسلة</div></div>
-                  <div class="stat-card c-gold"><div class="stat-icon">📢</div><div class="stat-value" id="stat-announcements">...</div><div class="stat-label">إعلان</div></div>
+                  <div class="stat-card c-green" style="animation:pageIn .5s cubic-bezier(.22,1,.36,1) both .08s"><div class="stat-icon">👨‍🎓</div><div class="stat-value" id="stat-students">...</div><div class="stat-label">طالب مسجل</div></div>
+                  <div class="stat-card c-blue" style="animation:pageIn .5s cubic-bezier(.22,1,.36,1) both .14s"><div class="stat-icon">📚</div><div class="stat-value" id="stat-lessons">...</div><div class="stat-label">درس</div></div>
+                  <div class="stat-card c-purple" style="animation:pageIn .5s cubic-bezier(.22,1,.36,1) both .2s"><div class="stat-icon">📝</div><div class="stat-value" id="stat-exercises">...</div><div class="stat-label">تمرين / سلسلة</div></div>
+                  <div class="stat-card c-gold" style="animation:pageIn .5s cubic-bezier(.22,1,.36,1) both .26s"><div class="stat-icon">📢</div><div class="stat-value" id="stat-announcements">...</div><div class="stat-label">إعلان</div></div>
                 </div>
 
                 <div class="quick-actions">
-                  <div class="quick-action" onclick="navigateTo('content')"><div class="quick-action-icon" style="background:var(--blue-light);color:var(--blue)">📚</div><div><div class="quick-action-text">إضافة محتوى</div><div class="quick-action-desc">درس أو تمرين جديد</div></div></div>
-                  <div class="quick-action" onclick="navigateTo('students')"><div class="quick-action-icon" style="background:var(--purple-light);color:var(--purple)">👥</div><div><div class="quick-action-text">الطلاب</div><div class="quick-action-desc">عرض القائمة</div></div></div>
-                  <div class="quick-action" onclick="navigateTo('finance')"><div class="quick-action-icon" style="background:var(--green-light);color:var(--green)">💰</div><div><div class="quick-action-text">الموارد المالية</div><div class="quick-action-desc">عرض رصيدك</div></div></div>
+                  <div class="quick-action" style="animation:pageIn .5s cubic-bezier(.22,1,.36,1) both .3s" onclick="navigateTo('content')"><div class="quick-action-icon" style="background:var(--blue-light);color:var(--blue)">📚</div><div><div class="quick-action-text">إضافة محتوى</div><div class="quick-action-desc">درس أو تمرين جديد</div></div></div>
+                  <div class="quick-action" style="animation:pageIn .5s cubic-bezier(.22,1,.36,1) both .36s" onclick="navigateTo('students')"><div class="quick-action-icon" style="background:var(--purple-light);color:var(--purple)">👥</div><div><div class="quick-action-text">الطلاب</div><div class="quick-action-desc">عرض القائمة</div></div></div>
+                  <div class="quick-action" style="animation:pageIn .5s cubic-bezier(.22,1,.36,1) both .42s" onclick="navigateTo('finance')"><div class="quick-action-icon" style="background:var(--green-light);color:var(--green)">💰</div><div><div class="quick-action-text">الموارد المالية</div><div class="quick-action-desc">عرض رصيدك</div></div></div>
                 </div>
 
-                <div class="dash-columns">
+                <div class="dash-columns" style="animation:pageIn .5s cubic-bezier(.22,1,.36,1) both .48s">
                   <div>
                     <div class="section-card">
                       <div class="section-card-header"><div class="section-title"><span class="section-title-icon">📚</span>آخر الدروس المضافة</div><button class="section-more" onclick="navigateTo('content')">عرض الكل ←</button></div>
@@ -550,16 +554,19 @@
 
     async function loadDashboardStats(teacherId,subjects){
       try{
-        const[contentSnap,regSnap,finSnap]=await Promise.all([
+        const[contentSnap,finSnap,supabaseRegCount]=await Promise.all([
           db.collection(CONTENT_COLLECTION).where('teacherId','==',teacherId).get().catch(()=>({docs:[]})),
-          db.collection(REG_COLLECTION).where('status','==','مسجل نهائياً').get().catch(()=>({docs:[]})),
           db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(()=>({docs:[]})),
+          fetch(SUPABASE_URL+'/rest/v1/registrations?select=id,subjects&status=eq.%D9%85%D8%B3%D8%AC%D9%84%20%D9%86%D9%87%D8%A7%D8%A6%D9%8A%D8%A7%D9%8B&deleted_at=is.null',{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}}).then(r=>r.json()).catch(()=>[]),
         ]);
         const allContent=contentSnap.docs.map(d=>({id:d.id,...d.data()}));
         const lessons=allContent.filter(c=>c.type==='lesson');
         const exercises=allContent.filter(c=>c.type==='exercise'||c.type==='homework');
         const announcements=allContent.filter(c=>c.type==='announcement');
-        const studentCount=regSnap.docs.filter(d=>{const data=d.data();if(!Array.isArray(data.subjects))return false;return data.subjects.some(s=>{const sn=s.subject||s;return subjects.some(ts=>ts===sn);});}).length;
+        const studentCount=(Array.isArray(supabaseRegCount)?supabaseRegCount:[]).filter(d=>{
+          if(!Array.isArray(d.subjects))return false;
+          return d.subjects.some(s=>{const sn=s.subject||s;return subjects.some(ts=>ts===sn);});
+        }).length;
         const balance=finSnap.docs.length>0?(finSnap.docs[0].data().balance||0):0;
 
         document.getElementById('stat-students').textContent=fmtNum(studentCount);
@@ -665,10 +672,12 @@
     }
     function handleFiles(fileList){
       for(const file of fileList){
-        if(!ALLOWED_TYPES.includes(file.type)){showToast('نوع الملف غير مدعوم: '+file.name,'error');continue;}
+        let fileType=file.type;
+        if(!fileType||fileType==='application/octet-stream'){fileType=guessMimeType(file.name);}
+        if(!ALLOWED_TYPES.includes(fileType)){showToast('نوع الملف غير مدعوم: '+file.name,'error');continue;}
         if(file.size>MAX_FILE_SIZE){showToast('الملف كبير جداً: '+file.name+' (حد أقصى 50MB)','error');continue;}
         if(pendingFiles.length>=10){showToast('حد أقصى 10 ملفات','error');break;}
-        pendingFiles.push({file,name:file.name,size:file.size,type:file.type,progress:0,uploaded:false,url:''});
+        pendingFiles.push({file,name:file.name,size:file.size,type:fileType,progress:0,uploaded:false,url:''});
       }
       renderFileList();
     }
@@ -678,6 +687,11 @@
       container.innerHTML=pendingFiles.map((f,i)=>{const icon=f.type.startsWith('image/')?'🖼️':f.type==='application/pdf'?'📄':f.type.includes('video')?'🎬':'📎';const size=f.size>1024*1024?(f.size/(1024*1024)).toFixed(1)+'MB':(f.size/1024).toFixed(0)+'KB';return '<div class="file-item"><span class="file-item-icon">'+icon+'</span><div class="file-item-info"><div class="file-item-name">'+f.name+'</div><div class="file-item-size">'+size+'</div>'+(f.progress>0&&f.progress<100?'<div class="file-progress"><div class="file-progress-bar" style="width:'+f.progress+'%"></div></div>':'')+(f.uploaded?'<div style="color:var(--green);font-size:11px;font-weight:700">✅ تم الرفع</div>':'')+'</div><button class="file-item-remove" onclick="removeFile('+i+')">✕</button></div>';}).join('');
     }
     function removeFile(i){pendingFiles.splice(i,1);renderFileList();}
+    function guessMimeType(filename){
+      const ext=(filename||'').split('.').pop().toLowerCase();
+      const map={pdf:'application/pdf',jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',mp4:'video/mp4',zip:'application/zip'};
+      return map[ext]||'application/octet-stream';
+    }
     let _uploadTokenPromise=null;
     function uploadToken(){
       if(!_uploadTokenPromise){
@@ -803,11 +817,23 @@
           </div>
         </div>`;
       try{
-        const snap=await db.collection(REG_COLLECTION).where('status','==','مسجل نهائياً').get();
-        _allStudentsData=snap.docs.filter(d=>{const data=d.data();if(!Array.isArray(data.subjects))return false;return data.subjects.some(s=>{const sn=s.subject||s;return subjects.some(ts=>ts===sn);});}).map(d=>{const data=d.data();return{id:d.id,...data,matchedSubjects:(data.subjects||[]).filter(s=>{const sn=s.subject||s;return subjects.includes(sn);}).map(s=>s.subject||s)};});
+        const res=await fetch(SUPABASE_URL+'/rest/v1/registrations?select=*&status=eq.%D9%85%D8%B3%D8%AC%D9%84%20%D9%86%D9%87%D8%A7%D8%A6%D9%8A%D8%A7%D9%8B&deleted_at=is.null',{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});
+        if(!res.ok)throw new Error('HTTP '+res.status);
+        const rows=await res.json();
+        _allStudentsData=rows.filter(d=>{
+          if(!Array.isArray(d.subjects))return false;
+          return d.subjects.some(s=>{const sn=s.subject||s;return subjects.some(ts=>ts===sn);});
+        }).map(d=>({
+          id:d.id,first_name:d.first_name,last_name:d.last_name,level:d.level,stream:d.stream,
+          status:d.status,timestamp:d.timestamp||d.createdAt,
+          matchedSubjects:(d.subjects||[]).filter(s=>{const sn=s.subject||s;return subjects.includes(sn);}).map(s=>s.subject||s)
+        }));
         document.getElementById('students-count').textContent=_allStudentsData.length+' طالب';
         renderStudentsTable(_allStudentsData);
-      }catch(e){console.error('Students error:',e);document.getElementById('students-table-wrap').innerHTML='<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">حدث خطأ أثناء تحميل بيانات الطلاب</div></div>';}
+      }catch(e){
+        console.error('Students error:',e);
+        document.getElementById('students-table-wrap').innerHTML='<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">حدث خطأ أثناء تحميل بيانات الطلاب</div><div class="empty-state-sub">'+e.message+'</div></div>';
+      }
     }
     function filterStudents(q){
       q=(q||'').trim().toLowerCase();
