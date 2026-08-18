@@ -37,8 +37,10 @@ Deno.serve(async (req) => {
     { auth: { persistSession: false } }
   );
 
-  const blob = await new Response(req.body).blob();
-  if (blob.size === 0) return json({ error: 'empty file' }, 400);
+  const rawBlob = await new Response(req.body).blob();
+  if (rawBlob.size === 0) return json({ error: 'empty file' }, 400);
+  const buffer = await rawBlob.arrayBuffer();
+  const blob = new Blob([buffer], { type: finalContentType });
 
   const { data, error } = await supabase.storage
     .from(BUCKET)
