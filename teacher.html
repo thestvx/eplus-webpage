@@ -827,24 +827,34 @@
         const text=await res.text();
         console.log('[Students] Response status:',res.status,'body:',text.substring(0,500));
         if(!res.ok)throw new Error('HTTP '+res.status+': '+text.substring(0,200));
-        let rows=[];
-        try{rows=JSON.parse(text);}catch(e){throw new Error('Invalid JSON response');}
+        var rows=[];
+        try{rows=JSON.parse(text);}catch(parseErr){throw new Error('Invalid JSON response');}
         if(!Array.isArray(rows))throw new Error('Expected array, got: '+typeof rows);
         console.log('[Students] Got',rows.length,'rows. First:',rows[0]);
-        const active=rows.filter(d=>!d.deleted_at);
+        var active=rows.filter(function(d){return !d.deleted_at;});
         console.log('[Students] After deleted_at filter:',active.length);
-        _allStudentsData=active.filter(d=>{
-          const subjArr=typeof d.subjects==='string'?(()=>{try{return JSON.parse(d.subjects);}catch(e){return[];}}()):d.subjects;
-          if(!Array.isArray(subjArr)||subjArr.length===0)return false;
-          return subjArr.some(s=>{const sn=typeof s==='string'?s:(s.subject||s.name||'');return subjects.some(ts=>ts===sn);});
-        }).map(d=>{
-          const subjArr=typeof d.subjects==='string'?(()=>{try{return JSON.parse(d.subjects);}catch(e){return[];}}()):d.subjects;
-          return{
-            id:d.id,first_name:d.first_name,last_name:d.last_name,level:d.level,stream:d.stream,
-            status:d.status,timestamp:d.timestamp||d.createdAt,
-            matchedSubjects:(subjArr||[]).filter(s=>{const sn=typeof s==='string'?s:(s.subject||s.name||'');return subjects.includes(sn);}).map(s=>typeof s==='string'?s:(s.subject||s.name||''))
-          };
-        });
+        _allStudentsData=[];
+        for(var ai=0;ai<active.length;ai++){
+          var d=active[ai];
+          var subjArr=d.subjects;
+          if(typeof subjArr==='string'){try{subjArr=JSON.parse(subjArr);}catch(pe){subjArr=[];}}
+          if(!Array.isArray(subjArr)||subjArr.length===0)continue;
+          var matched=[];
+          for(var si=0;si<subjArr.length;si++){
+            var s=subjArr[si];
+            var sn=typeof s==='string'?s:(s.subject||s.name||'');
+            for(var ti=0;ti<subjects.length;ti++){
+              if(subjects[ti]===sn){matched.push(sn);break;}
+            }
+          }
+          if(matched.length>0){
+            _allStudentsData.push({
+              id:d.id,first_name:d.first_name,last_name:d.last_name,level:d.level,stream:d.stream,
+              status:d.status,timestamp:d.timestamp||d.createdAt,
+              matchedSubjects:matched
+            });
+          }
+        }
         console.log('[Students] Matched:',_allStudentsData.length,'of teacher subjects:',subjects);
         document.getElementById('students-count').textContent=_allStudentsData.length+' طالب';
         renderStudentsTable(_allStudentsData);
