@@ -15,7 +15,6 @@ Deno.serve(async (req) => {
   const params = new URL(req.url).searchParams;
   const teacherId = String(params.get('teacherId') || user.uid || '');
   const rawName = String(params.get('filename') || 'file');
-  const contentType = req.headers.get('Content-Type') || 'application/octet-stream';
   const safeName = rawName.replace(/[^\w.\- (){}\[\],@&!+=]/g, '_').slice(0, 120);
 
   function guessMime(name: string): string {
@@ -29,7 +28,7 @@ Deno.serve(async (req) => {
     };
     return map[ext] || 'application/octet-stream';
   }
-  const finalContentType = (!contentType || contentType === 'application/octet-stream') ? guessMime(safeName) : contentType;
+  const finalContentType = guessMime(safeName);
   const path = teacherId + '/' + Date.now() + '_' + safeName;
 
   const supabase = createClient(

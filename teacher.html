@@ -707,29 +707,28 @@
       return _uploadTokenPromise;
     }
     async function uploadFileToStorage(fileObj,teacherId){
-      const path=teacherId+'/'+Date.now()+'_'+fileObj.name;
       const url=CONTENT_UPLOAD_URL+'?teacherId='+encodeURIComponent(teacherId)+'&filename='+encodeURIComponent(fileObj.name);
+      const token=await uploadToken();
+      if(!token)throw new Error('تعذر التحقق من الجلسة — حاول مرة أخرى');
+      const buffer=await fileObj.file.arrayBuffer();
+      const uploadBlob=new Blob([buffer],{type:fileObj.type});
       return new Promise((resolve,reject)=>{
-        uploadToken().then(function(token){
-          if(!token){reject(new Error('تعذر التحقق من الجلسة — حاول مرة أخرى'));return;}
-          const xhr=new XMLHttpRequest();
-          xhr.upload.addEventListener('progress',e=>{if(e.lengthComputable){fileObj.progress=Math.round((e.loaded/e.total)*100);renderFileList();}});
-          xhr.addEventListener('load',()=>{
-            if(xhr.status>=200&&xhr.status<300){
-              let r=null;try{r=JSON.parse(xhr.responseText);}catch(e){}
-              if(r&&r.ok&&r.url){
-                fileObj.uploaded=true;fileObj.url=r.url;fileObj.storagePath=r.path;fileObj.progress=100;renderFileList();
-                resolve({name:fileObj.name,size:fileObj.size,type:fileObj.type,url:r.url,storagePath:r.path});
-              }else{reject(new Error((r&&r.error)||('Upload failed: '+xhr.status)));}
-            }else{reject(new Error('Upload failed: '+xhr.status+' '+xhr.responseText));}
-          });
-          xhr.addEventListener('error',()=>reject(new Error('Network error during upload')));
-          xhr.open('POST',url);
-          xhr.setRequestHeader('Authorization','Bearer '+token);
-          const uploadBlob=new Blob([fileObj.file],{type:fileObj.type});
-          xhr.setRequestHeader('Content-Type',fileObj.type);
-          xhr.send(uploadBlob);
-        }).catch(function(e){reject(e);});
+        const xhr=new XMLHttpRequest();
+        xhr.upload.addEventListener('progress',e=>{if(e.lengthComputable){fileObj.progress=Math.round((e.loaded/e.total)*100);renderFileList();}});
+        xhr.addEventListener('load',()=>{
+          if(xhr.status>=200&&xhr.status<300){
+            let r=null;try{r=JSON.parse(xhr.responseText);}catch(e){}
+            if(r&&r.ok&&r.url){
+              fileObj.uploaded=true;fileObj.url=r.url;fileObj.storagePath=r.path;fileObj.progress=100;renderFileList();
+              resolve({name:fileObj.name,size:fileObj.size,type:fileObj.type,url:r.url,storagePath:r.path});
+            }else{reject(new Error((r&&r.error)||('Upload failed: '+xhr.status)));}
+          }else{reject(new Error('Upload failed: '+xhr.status+' '+xhr.responseText));}
+        });
+        xhr.addEventListener('error',()=>reject(new Error('Network error during upload')));
+        xhr.open('POST',url);
+        xhr.setRequestHeader('Authorization','Bearer '+token);
+        xhr.setRequestHeader('Content-Type',fileObj.type);
+        xhr.send(uploadBlob);
       });
     }
     async function saveContent(){
@@ -822,17 +821,31 @@
         </div>`;
       try{
         const statusParam=encodeURIComponent('مسجل نهائياً');
-        const res=await fetch(SUPABASE_URL+'/rest/v1/registrations?select=*&status=eq.'+statusParam+'&deleted_at=is.null',{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});
-        if(!res.ok)throw new Error('HTTP '+res.status);
-        const rows=await res.json();
-        _allStudentsData=rows.filter(d=>{
-          if(!Array.isArray(d.subjects))return false;
-          return d.subjects.some(s=>{const sn=s.subject||s;return subjects.some(ts=>ts===sn);});
-        }).map(d=>({
-          id:d.id,first_name:d.first_name,last_name:d.last_name,level:d.level,stream:d.stream,
-          status:d.status,timestamp:d.timestamp||d.createdAt,
-          matchedSubjects:(d.subjects||[]).filter(s=>{const sn=s.subject||s;return subjects.includes(sn);}).map(s=>s.subject||s)
-        }));
+        const url=SUPABASE_URL+'/rest/v1/registrations?select=id,first_name,last_name,status,level,stream,subjects,timestamp,createdAt,deleted_at&status=eq.'+statusParam;
+        console.log('[Students] Fetching:',url);
+        const res=await fetch(url,{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});
+        const text=await res.text();
+        console.log('[Students] Response status:',res.status,'body:',text.substring(0,500));
+        if(!res.ok)throw new Error('HTTP '+res.status+': '+text.substring(0,200));
+        let rows=[];
+        try{rows=JSON.parse(text);}catch(e){throw new Error('Invalid JSON response');}
+        if(!Array.isArray(rows))throw new Error('Expected array, got: '+typeof rows);
+        console.log('[Students] Got',rows.length,'rows. First:',rows[0]);
+        const active=rows.filter(d=>!d.deleted_at);
+        console.log('[Students] After deleted_at filter:',active.length);
+        _allStudentsData=active.filter(d=>{
+          const subjArr=typeof d.subjects==='string'?(()=>{try{return JSON.parse(d.subjects);}catch(e){return[];}}()):d.subjects;
+          if(!Array.isArray(subjArr)||subjArr.length===0)return false;
+          return subjArr.some(s=>{const sn=typeof s==='string'?s:(s.subject||s.name||'');return subjects.some(ts=>ts===sn);});
+        }).map(d=>{
+          const subjArr=typeof d.subjects==='string'?(()=>{try{return JSON.parse(d.subjects);}catch(e){return[];}}()):d.subjects;
+          return{
+            id:d.id,first_name:d.first_name,last_name:d.last_name,level:d.level,stream:d.stream,
+            status:d.status,timestamp:d.timestamp||d.createdAt,
+            matchedSubjects:(subjArr||[]).filter(s=>{const sn=typeof s==='string'?s:(s.subject||s.name||'');return subjects.includes(sn);}).map(s=>typeof s==='string'?s:(s.subject||s.name||''))
+          };
+        });
+        console.log('[Students] Matched:',_allStudentsData.length,'of teacher subjects:',subjects);
         document.getElementById('students-count').textContent=_allStudentsData.length+' طالب';
         renderStudentsTable(_allStudentsData);
       }catch(e){
