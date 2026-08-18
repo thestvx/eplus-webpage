@@ -537,7 +537,7 @@
           </div>
         </div>`;
 
-      loadDashboardStats(teacherId,subjects);
+      loadDashboardStats(teacherId,t.name||t.teacherName||'');
     }
 
     function renderContentSection(items,type,emptyMsg){
@@ -555,21 +555,30 @@
       }).join('');
     }
 
-    async function loadDashboardStats(teacherId,subjects){
+    async function loadDashboardStats(teacherId,teacherName){
       try{
-        const[contentSnap,finSnap,supabaseRegCount]=await Promise.all([
-          db.collection(CONTENT_COLLECTION).where('teacherId','==',teacherId).get().catch(()=>({docs:[]})),
-          db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(()=>({docs:[]})),
+        var teacherNameLC=teacherName.toLowerCase();
+        var[contentSnap,finSnap,supabaseRegCount]=await Promise.all([
+          db.collection(CONTENT_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
+          db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(function(){return {docs:[]};}),
           fetch(SUPABASE_URL+'/rest/v1/registrations?select=id,subjects,status&status=eq.'+encodeURIComponent('مسجل نهائياً'),{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}).then(function(data){return Array.isArray(data)?data.filter(function(d){return !d.deleted_at;}):[];}).catch(function(){return [];}),
         ]);
-        const allContent=contentSnap.docs.map(d=>({id:d.id,...d.data()}));
-        const lessons=allContent.filter(c=>c.type==='lesson');
-        const exercises=allContent.filter(c=>c.type==='exercise'||c.type==='homework');
-        const announcements=allContent.filter(c=>c.type==='announcement');
-        const studentCount=(Array.isArray(supabaseRegCount)?supabaseRegCount:[]).filter(d=>{
-          if(!Array.isArray(d.subjects))return false;
-          return d.subjects.some(s=>{const sn=s.subject||s;return subjects.some(ts=>ts===sn);});
-        }).length;
+        var allContent=contentSnap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+        var lessons=allContent.filter(function(c){return c.type==='lesson';});
+        var exercises=allContent.filter(function(c){return c.type==='exercise'||c.type==='homework';});
+        var announcements=allContent.filter(function(c){return c.type==='announcement';});
+        var studentCount=0;
+        if(Array.isArray(supabaseRegCount)){
+          for(var i=0;i<supabaseRegCount.length;i++){
+            var reg=supabaseRegCount[i];
+            if(!Array.isArray(reg.subjects))continue;
+            for(var j=0;j<reg.subjects.length;j++){
+              var sj=reg.subjects[j];
+              var regTeacher=(typeof sj==='string')?'':(sj.teacher||sj.teacherName||'');
+              if(regTeacher&&teacherNameLC&&regTeacher.toLowerCase()===teacherNameLC){studentCount++;break;}
+            }
+          }
+        }
         const balance=finSnap.docs.length>0?(finSnap.docs[0].data().balance||0):0;
 
         document.getElementById('stat-students').textContent=fmtNum(studentCount);
@@ -794,8 +803,7 @@
     /* ===== STUDENTS PAGE ===== */
     let _allStudentsData=[];
     async function renderStudentsPage(){
-      currentTeacher=currentTeacher||{};const t=currentTeacher,teacherId=t.teacherId||t.id;
-      const subjects=Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s):[];
+      currentTeacher=currentTeacher||{};var t=currentTeacher,teacherName=t.name||t.teacherName||'';
       document.getElementById('app').innerHTML=`
         <div class="app-layout">
           <aside class="sidebar" id="sidebar">${renderSidebar(t)}</aside>
@@ -820,32 +828,25 @@
           </div>
         </div>`;
       try{
-        const statusParam=encodeURIComponent('مسجل نهائياً');
-        const url=SUPABASE_URL+'/rest/v1/registrations?select=*&status=eq.'+statusParam;
-        console.log('[Students] Fetching:',url);
-        const res=await fetch(url,{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});
-        const text=await res.text();
-        console.log('[Students] Response status:',res.status,'body:',text.substring(0,500));
-        if(!res.ok)throw new Error('HTTP '+res.status+': '+text.substring(0,200));
-        var rows=[];
-        try{rows=JSON.parse(text);}catch(parseErr){throw new Error('Invalid JSON response');}
-        if(!Array.isArray(rows))throw new Error('Expected array, got: '+typeof rows);
-        console.log('[Students] Got',rows.length,'rows. First:',rows[0]);
-        var active=rows.filter(function(d){return !d.deleted_at;});
-        console.log('[Students] After deleted_at filter:',active.length);
+        var statusParam=encodeURIComponent('مسجل نهائياً');
+        var url=SUPABASE_URL+'/rest/v1/registrations?select=*&status=eq.'+statusParam;
+        var res=await fetch(url,{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});
+        if(!res.ok){var errText=await res.text();throw new Error('HTTP '+res.status+': '+errText.substring(0,200));}
+        var rows=await res.json();
+        if(!Array.isArray(rows))throw new Error('Expected array');
         _allStudentsData=[];
-        for(var ai=0;ai<active.length;ai++){
-          var d=active[ai];
+        for(var ai=0;ai<rows.length;ai++){
+          var d=rows[ai];
+          if(d.deleted_at)continue;
           var subjArr=d.subjects;
           if(typeof subjArr==='string'){try{subjArr=JSON.parse(subjArr);}catch(pe){subjArr=[];}}
           if(!Array.isArray(subjArr)||subjArr.length===0)continue;
           var matched=[];
           for(var si=0;si<subjArr.length;si++){
             var s=subjArr[si];
-            var sn=typeof s==='string'?s:(s.subject||s.name||'');
-            for(var ti=0;ti<subjects.length;ti++){
-              if(subjects[ti]===sn){matched.push(sn);break;}
-            }
+            var regTeacher=(typeof s==='string')?'':(s.teacher||s.teacherName||'');
+            var regSubject=(typeof s==='string')?s:(s.subject||s.name||'');
+            if(regTeacher&&teacherName&&regTeacher===teacherName){matched.push(regSubject);}
           }
           if(matched.length>0){
             _allStudentsData.push({
@@ -855,7 +856,6 @@
             });
           }
         }
-        console.log('[Students] Matched:',_allStudentsData.length,'of teacher subjects:',subjects);
         document.getElementById('students-count').textContent=_allStudentsData.length+' طالب';
         renderStudentsTable(_allStudentsData);
       }catch(e){

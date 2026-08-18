@@ -414,40 +414,38 @@
         '<div class="sub-month-grid">'+monthsHTML+'</div>';
     }
 
-    async function loadStudentContentPreview(studentSubjects){
-      const el=document.getElementById('stu-content-preview');
+    async function loadStudentContentPreview(studentSubjects,studentTeachers){
+      var el=document.getElementById('stu-content-preview');
       if(!el)return;
       try{
-        console.log('[StudentPreview] studentSubjects:',studentSubjects);
-        const snap=await window._fdb.collection('teacher_content').get();
-        console.log('[StudentPreview] Got',snap.docs.length,'docs from teacher_content');
-        let items=snap.docs.map(d=>({id:d.id,...d.data()}));
-        if(items.length>0){
-          console.log('[StudentPreview] First doc subject:',items[0].subject,'type:',items[0].type);
-          console.log('[StudentPreview] All subjects in DB:',items.map(c=>c.subject));
+        var snap=await window._fdb.collection('teacher_content').get();
+        var items=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+        if(Array.isArray(studentSubjects)&&studentSubjects.length>0&&Array.isArray(studentTeachers)&&studentTeachers.length>0){
+          items=items.filter(function(c){
+            var matchSubject=studentSubjects.indexOf(c.subject)>=0;
+            var matchTeacher=studentTeachers.indexOf(c.teacherName)>=0;
+            return matchSubject&&matchTeacher;
+          });
         }
-        if(Array.isArray(studentSubjects)&&studentSubjects.length>0){
-          items=items.filter(c=>studentSubjects.includes(c.subject));
-          console.log('[StudentPreview] After filter:',items.length);
-        }
-        items.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)).slice(0,3);
+        items=items.sort(function(a,b){return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0);}).slice(0,3);
         if(items.length===0){el.innerHTML='';return;}
-        const TL={lesson:'📚 درس',exercise:'📝 تمارين',homework:'📋 واجبات',announcement:'📢 إعلان'};
-        const TC={lesson:'blue',exercise:'green',homework:'gold',announcement:'purple'};
-        el.innerHTML=`<div class="section-header" style="margin-bottom:14px"><div class="section-title">📖 آخر المحتوى المضاف</div><div style="cursor:pointer;font-size:12px;font-weight:700;color:var(--primary);background:var(--primary-light);padding:6px 14px;border-radius:20px" onclick="navigateTo('content')">عرض الكل ←</div></div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">${items.map(c=>{
-            const tc=TC[c.type]||'blue',tl=TL[c.type]||c.type;
-            const createdAt=c.createdAt?(c.createdAt.seconds?new Date(c.createdAt.seconds*1000):new Date(c.createdAt)):null;
-            const dateStr=createdAt?createdAt.toLocaleDateString('ar-DZ',{month:'short',day:'numeric'}):'';
-            return `<div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);padding:16px;cursor:pointer;transition:var(--transition)" onclick="navigateTo('content')" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-                <span style="padding:3px 8px;border-radius:8px;font-size:10px;font-weight:800;background:var(--${tc}-light);color:var(--${tc})">${tl}</span>
-                <span style="font-size:10px;color:var(--text-muted);font-weight:600">${dateStr}</span>
-              </div>
-              <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:4px;line-height:1.4">${c.title||'بدون عنوان'}</div>
-              <div style="font-size:11px;color:var(--text-muted);font-weight:600">${c.subject||''}${c.level?' — '+c.level:''}</div>
-            </div>`;
-          }).join('')}</div>`;
+        var TL={lesson:'📚 درس',exercise:'📝 تمارين',homework:'📋 واجبات',announcement:'📢 إعلان'};
+        var TC={lesson:'blue',exercise:'green',homework:'gold',announcement:'purple'};
+        el.innerHTML='<div class="section-header" style="margin-bottom:14px"><div class="section-title">📖 آخر المحتوى المضاف</div><div style="cursor:pointer;font-size:12px;font-weight:700;color:var(--primary);background:var(--primary-light);padding:6px 14px;border-radius:20px" onclick="navigateTo(\'content\')">عرض الكل ←</div></div>'+
+          '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">'+items.map(function(c){
+            var tc=TC[c.type]||'blue',tl=TL[c.type]||c.type;
+            var createdAt=c.createdAt?(c.createdAt.seconds?new Date(c.createdAt.seconds*1000):new Date(c.createdAt)):null;
+            var dateStr=createdAt?createdAt.toLocaleDateString('ar-DZ',{month:'short',day:'numeric'}):'';
+            return '<div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);padding:16px;cursor:pointer;transition:var(--transition)" onclick="navigateTo(\'content\')" onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'var(--shadow-md)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'\'">'+
+              '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'+
+                '<span style="padding:3px 8px;border-radius:8px;font-size:10px;font-weight:800;background:var(--'+tc+'-light);color:var(--'+tc+')">'+tl+'</span>'+
+                '<span style="font-size:10px;color:var(--text-muted);font-weight:600">'+dateStr+'</span>'+
+              '</div>'+
+              '<div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:4px;line-height:1.4">'+(c.title||'بدون عنوان')+'</div>'+
+              '<div style="font-size:11px;color:var(--text-muted);font-weight:600">'+(c.subject||'')+(c.level?' — '+c.level:'')+'</div>'+
+              (c.teacherName?'<div style="font-size:10px;color:var(--primary);font-weight:700;margin-top:4px">👨‍🏫 '+c.teacherName+'</div>':'')+
+            '</div>';
+          }).join('')+'</div>';
       }catch(e){console.warn('Content preview load failed:',e);el.innerHTML='';}
     }
 
@@ -604,7 +602,9 @@
         </div>`;
       updateSidebarActive();document.body.style.overflow='auto';
       loadStudentSubscription(r.id);
-      loadStudentContentPreview(subjects.map(s=>s.subject||s));
+      var subNames=subjects.map(function(s){return s.subject||'';}).filter(Boolean);
+      var tchNames=subjects.map(function(s){return s.teacher||'';}).filter(Boolean);
+      loadStudentContentPreview(subNames,tchNames);
     }
 
     /* ═══ CARD PAGE (3D FLIP) ═══ */
@@ -677,8 +677,9 @@
 
     async function renderStudentContentPage(r){
       currentStudent=r;currentPage='content';
-      const subjects=Array.isArray(r.subjects)?r.subjects.map(s=>s.subject||s):[];
-      console.log('[StudentContent] Student subjects:',subjects,'Raw:',r.subjects);
+      var stuSubjects=Array.isArray(r.subjects)?r.subjects:[];
+      var subjectNames=stuSubjects.map(function(s){return typeof s==='string'?s:(s.subject||'');}).filter(Boolean);
+      var teacherNames=stuSubjects.map(function(s){return typeof s==='string'?'':(s.teacher||s.teacherName||'');}).filter(Boolean);
       document.getElementById('app').innerHTML=`
         <div class="portal-layout">
           <aside class="sidebar">${renderSidebar(r)}</aside>
@@ -693,48 +694,62 @@
         </div>`;
       updateSidebarActive();
       try{
-        console.log('[StudentContent] Fetching from Firestore...');
-        const snap=await window._fdb.collection('teacher_content').get();
-        console.log('[StudentContent] Got',snap.docs.length,'docs');
-        let items=snap.docs.map(d=>({id:d.id,...d.data()}));
-        if(items.length>0)console.log('[StudentContent] First item subject:',items[0].subject,'teacherId:',items[0].teacherId);
-        if(subjects.length>0){
-          items=items.filter(c=>subjects.includes(c.subject));
-          console.log('[StudentContent] After subject filter:',items.length);
-        }
-        items=items.filter(c=>c.type!=='announcement'||true).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-        const countEl=document.getElementById('stu-content-count');
+        var snap=await window._fdb.collection('teacher_content').get();
+        var items=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+        items=items.filter(function(c){
+          var matchSubject=subjectNames.length===0||subjectNames.indexOf(c.subject)>=0;
+          var matchTeacher=teacherNames.length===0||teacherNames.indexOf(c.teacherName)>=0;
+          return matchSubject&&matchTeacher;
+        });
+        items=items.sort(function(a,b){return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0);});
+        var countEl=document.getElementById('stu-content-count');
         if(countEl)countEl.textContent=items.length+' محتوى';
-        const listEl=document.getElementById('stu-content-list');
+        var listEl=document.getElementById('stu-content-list');
         if(items.length===0){
           listEl.innerHTML='<div style="text-align:center;padding:48px 20px;color:var(--text-muted)"><div style="font-size:56px;margin-bottom:16px;opacity:.3">📭</div><div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:8px">لا يوجد محتوى بعد</div><div style="font-size:13px;max-width:320px;margin:0 auto;line-height:1.7">لم يُضف أي محتوى تعليمي بعد — سيتم عرض الدروس والتمارين هنا فور نشرها</div></div>';
           return;
         }
-        listEl.innerHTML='<div class="stu-content-grid">'+items.map((c,i)=>{
-          const tc=STU_TYPE_COLORS[c.type]||'blue',tl=STU_TYPE_LABELS[c.type]||c.type;
-          const hasFiles=c.attachments&&c.attachments.length>0;
-          const hasUrl=c.url&&c.url.trim();
-          const createdAt=c.createdAt?(c.createdAt.seconds?new Date(c.createdAt.seconds*1000):new Date(c.createdAt)):null;
-          const dateStr=createdAt?createdAt.toLocaleDateString('ar-DZ',{year:'numeric',month:'short',day:'numeric'}):'';
-          return `<div class="stu-content-card" style="animation-delay:${i*0.06}s">
-            <div class="stu-content-card-header">
-              <div class="stu-content-card-icon ${c.type}">${tl.split(' ')[0]}</div>
-              <div style="flex:1;min-width:0">
-                <div class="stu-content-card-title">${c.title||'بدون عنوان'}</div>
-                <div class="stu-content-card-meta"><span>${c.subject||''}</span>${c.level?'<span>— '+c.level+'</span>':''}<span style="opacity:.5">·</span><span>${dateStr}</span></div>
+        var grouped={};
+        var teacherOrder=[];
+        items.forEach(function(c){
+          var tn=c.teacherName||'غير محدد';
+          if(!grouped[tn]){grouped[tn]=[];teacherOrder.push(tn);}
+          grouped[tn].push(c);
+        });
+        var html='';
+        teacherOrder.forEach(function(tn){
+          var tItems=grouped[tn];
+          html+='<div style="margin-bottom:28px">';
+          html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--border)"><div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-dark));display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;font-weight:900">'+tn.charAt(0)+'</div><div><div style="font-size:14px;font-weight:900;color:var(--text)">الأستاذ: '+tn+'</div><div style="font-size:11px;color:var(--text-muted);font-weight:600">'+tItems.length+' محتوى</div></div></div>';
+          html+='<div class="stu-content-grid">';
+          tItems.forEach(function(c,i){
+            var tc=STU_TYPE_COLORS[c.type]||'blue',tl=STU_TYPE_LABELS[c.type]||c.type;
+            var hasFiles=c.attachments&&c.attachments.length>0;
+            var hasUrl=c.url&&c.url.trim();
+            var createdAt=c.createdAt?(c.createdAt.seconds?new Date(c.createdAt.seconds*1000):new Date(c.createdAt)):null;
+            var dateStr=createdAt?createdAt.toLocaleDateString('ar-DZ',{year:'numeric',month:'short',day:'numeric'}):'';
+            html+=`<div class="stu-content-card" style="animation-delay:${i*0.06}s">
+              <div class="stu-content-card-header">
+                <div class="stu-content-card-icon ${c.type}">${tl.split(' ')[0]}</div>
+                <div style="flex:1;min-width:0">
+                  <div class="stu-content-card-title">${c.title||'بدون عنوان'}</div>
+                  <div class="stu-content-card-meta"><span>${c.subject||''}</span>${c.level?'<span>— '+c.level+'</span>':''}<span style="opacity:.5">·</span><span>${dateStr}</span></div>
+                </div>
               </div>
-            </div>
-            ${c.description?'<div class="stu-content-card-body">'+c.description+'</div>':''}
-            <div class="stu-content-card-footer">
-              <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
-                <span class="stu-content-tag" style="background:var(--${tc}-light);color:var(--${tc})">${tl}</span>
-                ${hasFiles?'<a class="stu-content-attach" href="'+(c.attachments[0].url||'#')+'" target="_blank" rel="noopener">📎 '+c.attachments.length+' مرفق</a>':''}
-                ${hasUrl?'<a class="stu-content-url" href="'+c.url+'" target="_blank" rel="noopener">🔗 رابط</a>':''}
+              ${c.description?'<div class="stu-content-card-body">'+c.description+'</div>':''}
+              <div class="stu-content-card-footer">
+                <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
+                  <span class="stu-content-tag" style="background:var(--${tc}-light);color:var(--${tc})">${tl}</span>
+                  ${hasFiles?'<a class="stu-content-attach" href="'+(c.attachments[0].url||'#')+'" target="_blank" rel="noopener">📎 '+c.attachments.length+' مرفق</a>':''}
+                  ${hasUrl?'<a class="stu-content-url" href="'+c.url+'" target="_blank" rel="noopener">🔗 رابط</a>':''}
+                </div>
+                ${hasFiles&&c.attachments.length>1?'<div style="font-size:10px;color:var(--text-muted);font-weight:600">'+c.attachments.length+' ملفات</div>':''}
               </div>
-              ${hasFiles&&c.attachments.length>1?'<div style="font-size:10px;color:var(--text-muted);font-weight:600">'+c.attachments.length+' ملفات</div>':''}
-            </div>
-          </div>`;
-        }).join('')+'</div>';
+            </div>`;
+          });
+          html+='</div></div>';
+        });
+        listEl.innerHTML=html;
       }catch(e){
         console.error('[StudentContent] Error:',e);
         document.getElementById('stu-content-list').innerHTML='<div style="text-align:center;padding:40px 20px"><div style="font-size:40px;margin-bottom:12px">⚠️</div><div style="font-size:14px;font-weight:800;color:var(--text)">حدث خطأ أثناء تحميل المحتوى</div><div style="font-size:12px;color:var(--text-muted);margin-top:8px">'+e.message+'</div></div>';
