@@ -17,6 +17,19 @@ Deno.serve(async (req) => {
   const rawName = String(params.get('filename') || 'file');
   const contentType = req.headers.get('Content-Type') || 'application/octet-stream';
   const safeName = rawName.replace(/[^\w.\- (){}\[\],@&!+=]/g, '_').slice(0, 120);
+
+  function guessMime(name: string): string {
+    const ext = name.split('.').pop()?.toLowerCase() || '';
+    const map: Record<string, string> = {
+      pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+      webp: 'image/webp', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      mp4: 'video/mp4', zip: 'application/zip',
+    };
+    return map[ext] || 'application/octet-stream';
+  }
+  const finalContentType = (!contentType || contentType === 'application/octet-stream') ? guessMime(safeName) : contentType;
   const path = teacherId + '/' + Date.now() + '_' + safeName;
 
   const supabase = createClient(
@@ -30,7 +43,7 @@ Deno.serve(async (req) => {
 
   const { data, error } = await supabase.storage
     .from(BUCKET)
-    .upload(path, blob, { contentType, upsert: false, cacheControl: '3600' });
+    .upload(path, blob, { contentType: finalContentType, upsert: false, cacheControl: '3600' });
 
   if (error) return json({ error: error.message }, 400);
 
