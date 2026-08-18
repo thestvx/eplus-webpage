@@ -3414,6 +3414,29 @@
               <option value="black">داكن — للبطاقة المطبوعة مسبقاً</option>
             </select>
           </div>
+          <div style="padding:0 24px 6px;font-size:12.5px;color:var(--text-muted);font-weight:700">
+            <div style="text-align:center;margin-bottom:6px">🔄 طباعة مزدوجة (القلب):</div>
+            <div style="display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap">
+              <select id="sr-slot-duplex-mode" onchange="srDuplexModeChanged()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-weight:800;font-size:12.5px">
+                <option value="none">بدون قلب (ورقتان منفصلتان)</option>
+                <option value="long">قلب على الحافة الطويلة 📖</option>
+                <option value="short">قلب على الحافة القصيرة 📄</option>
+              </select>
+            </div>
+            <div id="sr-duplex-offsets" style="display:none;margin-top:8px;gap:8px;align-items:center;justify-content:center">
+              <div style="display:flex;align-items:center;gap:4px;font-size:11.5px">
+                <span>X:</span><input id="sr-slot-dx" type="number" step="0.1" value="0" style="width:60px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-weight:700;font-size:12px;text-align:center">
+                <span style="color:var(--text-muted)">مم</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:4px;font-size:11.5px">
+                <span>Y:</span><input id="sr-slot-dy" type="number" step="0.1" value="0" style="width:60px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-weight:700;font-size:12px;text-align:center">
+                <span style="color:var(--text-muted)">مم</span>
+              </div>
+            </div>
+            <div id="sr-duplex-hint" style="display:none;text-align:center;font-size:11px;color:var(--text-muted);margin-top:4px">
+              الإزاحة تُعوّض فرق الطابعة عند القلب — أدخل القيمة الملاحظة من ورقة الاختبار
+            </div>
+          </div>
           <div style="padding:6px 24px 20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
             <button class="btn-sm" onclick="srCloseSlotModal()">إلغاء</button>
             <button class="tbl-action" id="sr-slot-print-btn" onclick="srPrintSelectedSlot()" style="border-color:rgba(16,185,129,0.3);color:#059669;font-weight:800">🖨️ طباعة البطاقة على الوجه الخلفي</button>
@@ -24660,7 +24683,28 @@ function srPrintCard() {
   srActiveLayout = (layout && layout.slots && layout.slots.length) ? layout : StudentCardRenderer.defaultSheetLayout();
   srSelectedSlotIndex = 0;
   srRenderSlotMap();
+  var dup = (srActiveLayout && srActiveLayout.duplex) || {};
+  var modeSel = document.getElementById('sr-slot-duplex-mode');
+  if (modeSel) {
+    var dm = dup.mode || 'none';
+    modeSel.value = dm;
+    srDuplexModeChanged();
+  }
+  var dxIn = document.getElementById('sr-slot-dx');
+  var dyIn = document.getElementById('sr-slot-dy');
+  if (dxIn) dxIn.value = dup.dx || 0;
+  if (dyIn) dyIn.value = dup.dy || 0;
   document.getElementById('sr-slot-modal').classList.add('open');
+}
+
+function srDuplexModeChanged() {
+  var sel = document.getElementById('sr-slot-duplex-mode');
+  var offsets = document.getElementById('sr-duplex-offsets');
+  var hint = document.getElementById('sr-duplex-hint');
+  if (!sel) return;
+  var active = sel.value === 'long' || sel.value === 'short';
+  if (offsets) offsets.style.display = active ? 'flex' : 'none';
+  if (hint) hint.style.display = active ? 'block' : 'none';
 }
 
 // The map always shows the RAW CARD_SLOTS (the single geometry source), so
@@ -24693,13 +24737,22 @@ function srPickSlot(i) {
 }
 
 function srPrintSelectedSlot() {
-  const r = srCurrentCard;
+  var r = srCurrentCard;
   if (!r) return;
   srCloseSlotModal();
-  const sel = document.getElementById('sr-slot-textcolor');
-  const textColor = sel && sel.value !== 'auto' ? sel.value : '';
-  const opts = {};
+  var sel = document.getElementById('sr-slot-textcolor');
+  var textColor = sel && sel.value !== 'auto' ? sel.value : '';
+  var opts = {};
   if (textColor) opts.textColor = textColor;
+  var dupModeEl = document.getElementById('sr-slot-duplex-mode');
+  var dxEl = document.getElementById('sr-slot-dx');
+  var dyEl = document.getElementById('sr-slot-dy');
+  if (dupModeEl) {
+    var dm = dupModeEl.value || 'none';
+    var dx = dxEl ? parseFloat(dxEl.value) || 0 : 0;
+    var dy = dyEl ? parseFloat(dyEl.value) || 0 : 0;
+    srActiveLayout.duplex = { mode: dm, dx: dx, dy: dy };
+  }
   srPrintToSlot(r, srSelectedSlotIndex, opts);
 }
 
