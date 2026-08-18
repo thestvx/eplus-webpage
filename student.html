@@ -11,6 +11,7 @@
   <script src="js/JsBarcode.all.min.js?v=1" defer></script>
   <script src="js/qrcode.min.js?v=1" defer></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="js/ean13.js"></script>
   <script src="js/studentCardRenderer.js?v=21"></script>
@@ -301,10 +302,11 @@
 
     /* Firestore for real attendance + subscriptions */
     let _fbReady=false;
+    let _fbAuthPromise=Promise.resolve();
     try{
       firebase.initializeApp({apiKey:"AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",authDomain:"eplus-center-39.firebaseapp.com",projectId:"eplus-center-39",storageBucket:"eplus-center-39.firebasestorage.app",messagingSenderId:"191532732034",appId:"1:191532732034:web:b11449a2f0595db5d02e9b"});
       window._fdb=firebase.firestore();
-      _fbReady=true;
+      _fbAuthPromise=firebase.auth().signInAnonymously().then(function(){_fbReady=true;}).catch(function(e){console.error('Anonymous auth error:',e);_fbReady=true;});
     }catch(e){console.error('Firestore init error:',e);}
     SubscriptionService.init(SP_URL,SP_KEY);
 
@@ -418,6 +420,8 @@
       var el=document.getElementById('stu-content-preview');
       if(!el)return;
       try{
+        if(typeof _fbAuthPromise!=='undefined')await _fbAuthPromise.catch(function(){});
+        if(!window._fdb)return;
         var snap=await window._fdb.collection('teacher_content').get();
         var items=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
         if(Array.isArray(studentSubjects)&&studentSubjects.length>0){
@@ -522,8 +526,7 @@
       const fullName=(r.first_name||'')+' '+(r.last_name||'');
       const initials=(r.first_name?r.first_name[0]:'')+(r.last_name?r.last_name[0]:'');
       return `
-        <div class="sidebar-brand"><div class="sidebar-brand-row"><div class="sidebar-logo"><img src="icons/logospiring.png" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:8px"></div><div class="sidebar-brand-text"><div class="sidebar-brand-name">E-PLUS</div><div class="sidebar-brand-sub">Student Portal</div></div></div></div>
-        <div class="sidebar-student"><div class="sidebar-student-avatar">${initials}</div><div class="sidebar-student-name">${fullName}</div><div class="sidebar-student-id">ID: ${r.id||''}</div></div>
+        <div class="sidebar-brand"><div class="sidebar-brand-row" style="justify-content:center"><img src="schoollogo/schoollogowhite.PNG" alt="E-PLUS" style="height:40px;object-fit:contain"></div></div>
         <div class="sidebar-nav">
           <div class="sidebar-link ${currentPage==='home'?'active':''}" onclick="navigateTo('home')"><span class="sidebar-link-icon">🏠</span>الرئيسية</div>
           <div class="sidebar-link ${currentPage==='content'?'active':''}" onclick="navigateTo('content')"><span class="sidebar-link-icon">📚</span>المحتوى التعليمي</div>
@@ -688,6 +691,8 @@
         </div>`;
       updateSidebarActive();
       try{
+        if(typeof _fbAuthPromise!=='undefined')await _fbAuthPromise.catch(function(){});
+        if(!window._fdb){document.getElementById('stu-content-list').innerHTML='<div style="text-align:center;padding:40px"><div style="font-size:14px;color:var(--text-muted)">Firestore غير متاح</div></div>';return;}
         var snap=await window._fdb.collection('teacher_content').get();
         var items=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
         if(subjectNames.length>0){
