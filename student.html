@@ -418,10 +418,17 @@
       const el=document.getElementById('stu-content-preview');
       if(!el)return;
       try{
+        console.log('[StudentPreview] studentSubjects:',studentSubjects);
         const snap=await window._fdb.collection('teacher_content').get();
+        console.log('[StudentPreview] Got',snap.docs.length,'docs from teacher_content');
         let items=snap.docs.map(d=>({id:d.id,...d.data()}));
+        if(items.length>0){
+          console.log('[StudentPreview] First doc subject:',items[0].subject,'type:',items[0].type);
+          console.log('[StudentPreview] All subjects in DB:',items.map(c=>c.subject));
+        }
         if(Array.isArray(studentSubjects)&&studentSubjects.length>0){
           items=items.filter(c=>studentSubjects.includes(c.subject));
+          console.log('[StudentPreview] After filter:',items.length);
         }
         items.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)).slice(0,3);
         if(items.length===0){el.innerHTML='';return;}
@@ -671,6 +678,7 @@
     async function renderStudentContentPage(r){
       currentStudent=r;currentPage='content';
       const subjects=Array.isArray(r.subjects)?r.subjects.map(s=>s.subject||s):[];
+      console.log('[StudentContent] Student subjects:',subjects,'Raw:',r.subjects);
       document.getElementById('app').innerHTML=`
         <div class="portal-layout">
           <aside class="sidebar">${renderSidebar(r)}</aside>
@@ -685,10 +693,14 @@
         </div>`;
       updateSidebarActive();
       try{
+        console.log('[StudentContent] Fetching from Firestore...');
         const snap=await window._fdb.collection('teacher_content').get();
+        console.log('[StudentContent] Got',snap.docs.length,'docs');
         let items=snap.docs.map(d=>({id:d.id,...d.data()}));
+        if(items.length>0)console.log('[StudentContent] First item subject:',items[0].subject,'teacherId:',items[0].teacherId);
         if(subjects.length>0){
           items=items.filter(c=>subjects.includes(c.subject));
+          console.log('[StudentContent] After subject filter:',items.length);
         }
         items=items.filter(c=>c.type!=='announcement'||true).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
         const countEl=document.getElementById('stu-content-count');
@@ -724,8 +736,8 @@
           </div>`;
         }).join('')+'</div>';
       }catch(e){
-        console.error('Student content load error:',e);
-        document.getElementById('stu-content-list').innerHTML='<div style="text-align:center;padding:40px 20px"><div style="font-size:40px;margin-bottom:12px">⚠️</div><div style="font-size:14px;font-weight:800;color:var(--text)">حدث خطأ أثناء تحميل المحتوى</div></div>';
+        console.error('[StudentContent] Error:',e);
+        document.getElementById('stu-content-list').innerHTML='<div style="text-align:center;padding:40px 20px"><div style="font-size:40px;margin-bottom:12px">⚠️</div><div style="font-size:14px;font-weight:800;color:var(--text)">حدث خطأ أثناء تحميل المحتوى</div><div style="font-size:12px;color:var(--text-muted);margin-top:8px">'+e.message+'</div></div>';
       }
     }
 
