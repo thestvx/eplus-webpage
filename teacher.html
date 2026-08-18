@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>لوحة الأستاذ — E-PLUS Academy</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <link rel="icon" type="image/x-icon" href="images/eplus-icon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -557,7 +560,7 @@
         const[contentSnap,finSnap,supabaseRegCount]=await Promise.all([
           db.collection(CONTENT_COLLECTION).where('teacherId','==',teacherId).get().catch(()=>({docs:[]})),
           db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(()=>({docs:[]})),
-          fetch(SUPABASE_URL+'/rest/v1/registrations?select=id,subjects&status=eq.%D9%85%D8%B3%D8%AC%D9%84%20%D9%86%D9%87%D8%A7%D8%A6%D9%8A%D8%A7%D9%8B&deleted_at=is.null',{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}}).then(r=>r.json()).catch(()=>[]),
+          fetch(SUPABASE_URL+'/rest/v1/registrations?select=id,subjects&status=eq.'+encodeURIComponent('مسجل نهائياً')+'&deleted_at=is.null',{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}}).then(r=>r.json()).catch(()=>[]),
         ]);
         const allContent=contentSnap.docs.map(d=>({id:d.id,...d.data()}));
         const lessons=allContent.filter(c=>c.type==='lesson');
@@ -723,8 +726,9 @@
           xhr.addEventListener('error',()=>reject(new Error('Network error during upload')));
           xhr.open('POST',url);
           xhr.setRequestHeader('Authorization','Bearer '+token);
-          const blob=new Blob([fileObj.file],{type:fileObj.type});
-          xhr.send(blob);
+          const uploadBlob=new Blob([fileObj.file],{type:fileObj.type});
+          xhr.setRequestHeader('Content-Type',fileObj.type);
+          xhr.send(uploadBlob);
         }).catch(function(e){reject(e);});
       });
     }
@@ -817,7 +821,8 @@
           </div>
         </div>`;
       try{
-        const res=await fetch(SUPABASE_URL+'/rest/v1/registrations?select=*&status=eq.%D9%85%D8%B3%D8%AC%D9%84%20%D9%86%D9%87%D8%A7%D8%A6%D9%8A%D8%A7%D9%8B&deleted_at=is.null',{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});
+        const statusParam=encodeURIComponent('مسجل نهائياً');
+        const res=await fetch(SUPABASE_URL+'/rest/v1/registrations?select=*&status=eq.'+statusParam+'&deleted_at=is.null',{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});
         if(!res.ok)throw new Error('HTTP '+res.status);
         const rows=await res.json();
         _allStudentsData=rows.filter(d=>{
