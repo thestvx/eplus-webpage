@@ -307,6 +307,10 @@ const SubscriptionService = (function () {
     return await _adminCall('delete-subscription', { subscriptionId: subscriptionId });
   }
 
+  async function adminSetPeriodSessions(periodId, usedSessions) {
+    return await _adminCall('set-period-sessions', { periodId: periodId, usedSessions: usedSessions });
+  }
+
   // يبحث عن اشتراك فعّال متداخل مع النافذة المطلوبة [start, end]
   // للنفس الطالب + نفس المادة + نفس الأستاذ (لا يمنع مواد أخرى متوازية)
   async function findOverlapping(studentId, start, months, subjectId, teacherId) {
@@ -410,6 +414,7 @@ const SubscriptionService = (function () {
     adminSubscriptionDetail,
     adminSetSubscriptionPaused,
     adminDeleteSubscription,
+    adminSetPeriodSessions,
     findOverlapping,
     subscriptionStatus,
     subscriptionStatusLabel,

@@ -23834,9 +23834,11 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           '</div>' +
           '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:0 14px 8px;font-size:11px;font-weight:800">' +
             '<div class="subx-detail-month-stat">الحصص<b style="color:var(--text)">' + t + '</b></div>' +
-            '<div class="subx-detail-month-stat">حضر<b style="color:#2563eb">' + u + '</b></div>' +
-            '<div class="subx-detail-month-stat">متبقي<b style="color:#059669">' + rem + '</b></div>' +
+            '<div class="subx-detail-month-stat">حضر<b style="color:#2563eb" id="subx-used-' + (p.period_id || p.id || '') + '">' + u + '</b>' +
+            '<button onclick="subxEditSessions(\'' + escX(p.period_id || p.id || '') + '\',' + t + ',' + u + ')" style="background:none;border:none;cursor:pointer;font-size:11px;margin-inline-start:4px;vertical-align:middle;opacity:.6" title="تعديل عدد الحصص">✏️</button></div>' +
+            '<div class="subx-detail-month-stat">متبقي<b style="color:#059669" id="subx-rem-' + (p.period_id || p.id || '') + '">' + rem + '</b></div>' +
           '</div>' +
+          '<div id="subx-edit-row-' + (p.period_id || p.id || '') + '" style="display:none;margin:0 14px 8px"></div>' +
           '<div class="subx-detail-progress" style="margin:0 14px 12px"><div class="subx-detail-progress-bar" style="width:' + pct + '%"></div></div>';
         });
       } else {
@@ -23878,6 +23880,45 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     } catch (e) {
       console.error('[SUBSCRIPTIONS] pause toggle failed', e);
       showToast('❌ ' + ((e && e.message) || 'تعذر تنفيذ العملية'), true);
+    }
+  };
+
+  window.subxEditSessions = function (periodId, total, current) {
+    const row = document.getElementById('subx-edit-row-' + periodId);
+    if (!row) return;
+    if (row.style.display !== 'none') { row.style.display = 'none'; row.innerHTML = ''; return; }
+    row.style.display = 'block';
+    row.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:8px 12px">' +
+        '<span style="font-size:11px;font-weight:800;color:var(--text-muted);white-space:nowrap">عدد الحصص الحضر:</span>' +
+        '<input type="number" id="subx-edit-input-' + periodId + '" min="0" max="' + total + '" value="' + current + '" style="width:60px;padding:5px 8px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;font-weight:800;text-align:center;font-family:inherit;outline:none">' +
+        '<span style="font-size:11px;color:var(--text-muted)">/ ' + total + '</span>' +
+        '<button onclick="subxSaveSessions(\'' + escX(periodId) + '\',' + total + ')" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:800;font-family:inherit;cursor:pointer">💾 حفظ</button>' +
+        '<button onclick="document.getElementById(\'subx-edit-row-' + escX(periodId) + '\').style.display=\'none\'" style="background:var(--border);color:var(--text-muted);border:none;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:800;font-family:inherit;cursor:pointer">✕</button>' +
+      '</div>';
+    const inp = document.getElementById('subx-edit-input-' + periodId);
+    if (inp) { inp.focus(); inp.select(); inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); subxSaveSessions(periodId, total); } }); }
+  };
+
+  window.subxSaveSessions = async function (periodId, total) {
+    const inp = document.getElementById('subx-edit-input-' + periodId);
+    if (!inp) return;
+    const val = parseInt(inp.value, 10);
+    if (isNaN(val) || val < 0 || val > total) { showToast('⚠️ أدخل عدداً صحيحاً بين 0 و ' + total, true); return; }
+    try {
+      inp.disabled = true;
+      await SubscriptionService.adminSetPeriodSessions(periodId, val);
+      const usedEl = document.getElementById('subx-used-' + periodId);
+      const remEl = document.getElementById('subx-rem-' + periodId);
+      if (usedEl) usedEl.textContent = val;
+      if (remEl) remEl.textContent = Math.max(0, total - val);
+      document.getElementById('subx-edit-row-' + periodId).style.display = 'none';
+      showToast('✔️ تم تعديل عدد الحصص إلى ' + val + ' / ' + total);
+      subxLoadAll();
+    } catch (e) {
+      console.error('[SUBSCRIPTIONS] set sessions failed', e);
+      showToast('❌ ' + ((e && e.message) || 'تعذر حفظ العدد'), true);
+      inp.disabled = false;
     }
   };
 

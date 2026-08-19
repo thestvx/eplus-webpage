@@ -99,6 +99,12 @@ Deno.serve(async (req) => {
         p_subscription_id: String(body.subscriptionId || ''),
       });
 
+    case 'set-period-sessions':
+      return rpc('set_period_usage', {
+        p_period_id: String(body.periodId || ''),
+        p_used: Number(body.usedSessions) || 0,
+      });
+
     case 'get-balance':
       return rpc('admin_get_teacher_balance', {
         p_admin_uid: uid,
