@@ -172,6 +172,16 @@ main{flex:1;position:relative;overflow:hidden}
 .modal .m-msg b{color:var(--ink)}
 .modal-close{font-family:inherit;font-size:12px;font-weight:900;color:#fff;background:linear-gradient(135deg,#6366f1,#4338ca);border:none;border-radius:10px;padding:9px 26px;cursor:pointer;transition:.2s}
 .modal-close:hover{filter:brightness(1.08)}
+.scan-overlay{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;animation:fadeIn .25s ease both}
+.scan-overlay.green{background:rgba(5,150,105,0.88);backdrop-filter:blur(6px)}
+.scan-overlay.orange{background:rgba(180,83,9,0.88);backdrop-filter:blur(6px)}
+.scan-overlay.red{background:rgba(220,38,38,0.88);backdrop-filter:blur(6px)}
+.scan-overlay.show{display:flex}
+.scan-overlay .so-inner{text-align:center;color:#fff;animation:cardPop .3s ease both}
+.scan-overlay .so-icon{font-size:64px;margin-bottom:12px}
+.scan-overlay .so-title{font-size:26px;font-weight:900;margin-bottom:6px}
+.scan-overlay .so-name{font-size:18px;font-weight:700;opacity:.9;margin-bottom:4px}
+.scan-overlay .so-sub{font-size:13px;font-weight:600;opacity:.75;line-height:1.7}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
 @keyframes cardPop{0%{opacity:0;transform:scale(.9)}70%{transform:scale(1.03)}100%{opacity:1;transform:scale(1)}}
@@ -298,6 +308,16 @@ main{flex:1;position:relative;overflow:hidden}
     <button class="modal-close" id="m-close" type="button">إغلاق</button>
   </div>
 </div>
+<div class="scan-overlay" id="scan-overlay">
+  <div class="so-inner">
+    <div class="so-icon" id="so-icon"></div>
+    <div class="so-title" id="so-title"></div>
+    <div class="so-name" id="so-name"></div>
+    <div class="so-sub" id="so-sub"></div>
+  </div>
+</div>
+<audio id="snd-correct" src="sounds/correct.mp3" preload="auto"></audio>
+<audio id="snd-incorrect" src="sounds/incorrect.mp3" preload="auto"></audio>
 <script>
 (function () {
   'use strict';
@@ -456,10 +476,77 @@ main{flex:1;position:relative;overflow:hidden}
       osc.start(); osc.stop(ctx.currentTime + durationMs / 1000);
     } catch (e) {}
   }
-  function soundSuccess() { playTone(880, 100); vibrate(100); }
-  function soundWarn() { playTone(440, 150); vibrate([80, 40, 80]); }
-  function soundError() { playTone(220, 200); vibrate([100, 50, 100, 50, 100]); }
   function vibrate(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+  function playSoundCorrect() {
+    try { var a = $('snd-correct'); a.currentTime = 0; a.play(); } catch (e) {}
+    vibrate(100);
+  }
+  function playSoundIncorrect() {
+    try { var a = $('snd-incorrect'); a.currentTime = 0; a.play(); } catch (e) {}
+    vibrate([100, 50, 100, 50, 100]);
+  }
+
+  // ── Scan overlay (auto-dismiss) ──
+  var overlayTimer = null;
+  function showScanOverlay(color, icon, title, name, sub, dismissMs) {
+    if (overlayTimer) clearTimeout(overlayTimer);
+    var el = $('scan-overlay');
+    el.className = 'scan-overlay show ' + color;
+    $('so-icon').textContent = icon;
+    $('so-title').textContent = title;
+    $('so-name').textContent = name || '';
+    $('so-sub').textContent = sub || '';
+    overlayTimer = setTimeout(function () { el.className = 'scan-overlay'; }, dismissMs || 2500);
+  }
+
+  // ── Grace tracking (Firestore) ──
+  async function hasGraceUsed(studentId) {
+    if (!fbReady) return false;
+    var ym = AttendanceService.today().slice(0, 7);
+    var docId = 'grace_' + studentId + '_' + ym;
+    try {
+      var doc = await window.db.collection('support_attendance').doc(docId).get();
+      return doc.exists;
+    } catch (e) { return false; }
+  }
+  async function writeGraceRecord(studentId, studentName) {
+    if (!fbReady) return;
+    var ym = AttendanceService.today().slice(0, 7);
+    var docId = 'grace_' + studentId + '_' + ym;
+    try {
+      await window.db.collection('support_attendance').doc(docId).set({
+        studentId: studentId,
+        studentName: studentName || '',
+        type: 'grace',
+        yearMonth: ym,
+        date: AttendanceService.today(),
+        createdAt: new Date().toISOString()
+      });
+    } catch (e) { console.warn('[GRACE WRITE]', e); }
+  }
+
+  // ── Subscription check (broad — any subject) ──
+  async function checkStudentSubscription(studentId) {
+    var todayStr = AttendanceService.today();
+    try {
+      var rows = await SubscriptionService.getSubscriptions(studentId);
+      if (!Array.isArray(rows) || !rows.length) return { hasActive: false, latestExpired: null };
+      for (var i = 0; i < rows.length; i++) {
+        var s = rows[i].subscription || {};
+        if (s.status === 'cancelled' || s.status === 'paused') continue;
+        if (todayStr >= s.start_date && todayStr <= s.end_date) {
+          return { hasActive: true, subscription: s, periods: rows[i].periods || [] };
+        }
+      }
+      var latest = null;
+      for (var j = 0; j < rows.length; j++) {
+        var sx = rows[j].subscription || {};
+        if (sx.status === 'cancelled') continue;
+        if (!latest || (sx.end_date || '') > (latest.end_date || '')) latest = sx;
+      }
+      return { hasActive: false, latestExpired: latest };
+    } catch (e) { console.warn('[SUB CHECK]', e); return { hasActive: false, latestExpired: null }; }
+  }
 
   // ── Modal / Feedback ──
   function showModal(type, icon, title, html) {
@@ -521,66 +608,117 @@ main{flex:1;position:relative;overflow:hidden}
     scanner.setBusy(true);
     $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>جاري التحقق...';
     var raw = String(val || '').trim();
-    var studentId = '';
-    try { studentId = AttendanceService.resolveStudentFromScan(raw); } catch (e) { logScanner('resolveStudentFromScan error: ' + e.message); }
+
+    // 1. Resolve student ID from barcode
+    var scanResult = null;
+    try { scanResult = await AttendanceService.resolveStudentFromScan(raw); } catch (e) { logScanner('resolveStudentFromScan error: ' + e.message); }
+    var studentId = scanResult && scanResult.student ? scanResult.student.id : null;
     if (!studentId) {
       $('k-last-read').textContent = raw;
       $('k-status-pill').innerHTML = '<span class="dot" style="background:#ef4444"></span>بطاقة غير معروفة';
       logScanner('REJECT unknown card: ' + raw);
-      showFeedback('error', '❌', 'بطاقة غير معروفة', raw, 'لا يوجد طالب مرتبط بهذه البطاقة', fmtTime());
-      soundError();
+      showScanOverlay('red', '❌', 'بطاقة غير معروفة', raw, 'لا يوجد طالب مرتبط بهذه البطاقة', 2500);
+      playSoundIncorrect();
       processing = false; scanner.setBusy(false);
-      setTimeout(renderReady, 2200);
+      setTimeout(renderReady, 1800);
       return;
     }
     logScanner('resolveStudent: id=' + studentId + ' raw=' + raw);
+
+    // 2. Fetch registration
     var reg = null;
     try { reg = await RegistrationService.getById(studentId); } catch (e) { logScanner('getById error: ' + e.message); }
     if (!reg) {
       $('k-last-read').textContent = studentId;
       $('k-status-pill').innerHTML = '<span class="dot" style="background:#ef4444"></span>طالب غير موجود';
       logScanner('REJECT student not found: ' + studentId);
-      showFeedback('error', '❌', 'طالب غير موجود', studentId, 'لم يتم العثور على بيانات الطالب', fmtTime());
-      soundError();
+      showScanOverlay('red', '❌', 'طالب غير موجود', studentId, 'لم يتم العثور على بيانات الطالب', 2500);
+      playSoundIncorrect();
       processing = false; scanner.setBusy(false);
-      setTimeout(renderReady, 2200);
+      setTimeout(renderReady, 1800);
       return;
     }
     var name = studentFullName(reg);
     $('k-last-read').textContent = studentId + ' — ' + name;
     logScanner('student: ' + name + ' (id=' + studentId + ', status=' + reg.status + ')');
+
+    // 3. Check registration status
     if (reg.status !== 'مسجل نهائياً') {
       $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>حالة غير مقبولة — ' + name;
       logScanner('REJECT status: ' + reg.status);
-      showFeedback('warn', '⚠️', name, 'الحالة: ' + reg.status, 'الطالب غير مسجل نهائياً', fmtTime());
-      soundWarn();
+      showScanOverlay('red', '⚠️', 'الحالة: ' + reg.status, name, 'الطالب غير مسجل نهائياً', 3000);
+      playSoundIncorrect();
       processing = false; scanner.setBusy(false);
-      setTimeout(renderReady, 2500);
+      setTimeout(renderReady, 2000);
       return;
     }
-    logScanner('student OK — recording attendance');
-    if (fbReady && authState.signedIn) {
-      var mirrorRec = {
-        studentId: studentId,
-        studentName: name,
-        studentType: reg.student_type || '',
-        sessionNumber: 1,
-        date: AttendanceService.today(),
-        checkInTime: AttendanceService.nowTime(),
-        barcodeValue: raw,
-        source: 'eplus-attendance',
-        createdAt: AttendanceService.nowTime()
-      };
-      try { await AttendanceService.writeMirror(mirrorRec); logScanner('mirror write OK'); } catch (e) { logScanner('mirror write error: ' + e.message); }
+
+    // 4. Check subscription
+    var subCheck = await checkStudentSubscription(studentId);
+    logScanner('subCheck: hasActive=' + subCheck.hasActive);
+
+    if (subCheck.hasActive) {
+      // GREEN — active subscription
+      logScanner('GREEN: active subscription');
+      if (fbReady && authState.signedIn) {
+        try {
+          await AttendanceService.writeMirror({
+            studentId: studentId, studentName: name, studentType: reg.student_type || '',
+            sessionNumber: 1, date: AttendanceService.today(), checkInTime: AttendanceService.nowTime(),
+            barcodeValue: raw, source: 'eplus-attendance', createdAt: AttendanceService.nowTime()
+          });
+          logScanner('mirror write OK');
+        } catch (e) { logScanner('mirror write error: ' + e.message); }
+      }
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#22c55e"></span>تم التسجيل — ' + name;
+      logScanner('SUCCESS GREEN: ' + name);
+      showScanOverlay('green', '✅', 'تم تسجيل الحضور', name, 'الاشتراك ساري', 2200);
+      playSoundCorrect();
+      attendedCount++; updateCounter();
+      addRecent(name, fmtTime(), 'green');
+      processing = false; scanner.setBusy(false);
+      setTimeout(renderReady, 1600);
+      return;
     }
-    $('k-status-pill').innerHTML = '<span class="dot" style="background:#22c55e"></span>تم التسجيل — ' + name;
-    logScanner('SUCCESS: ' + name);
-    showFeedback('success', '✅', name, 'تم تسجيل الحضور بنجاح', fmtTime(), fmtTime());
-    soundSuccess();
-    attendedCount++; updateCounter();
-    addRecent(name, fmtTime(), 'green');
+
+    // 5. No active subscription — check grace
+    var graceUsed = false;
+    try { graceUsed = await hasGraceUsed(studentId); } catch (e) { logScanner('grace check error: ' + e.message); }
+    logScanner('graceUsed=' + graceUsed);
+
+    if (!graceUsed) {
+      // ORANGE — first session grace
+      logScanner('ORANGE: grace session allowed');
+      if (fbReady && authState.signedIn) {
+        try {
+          await AttendanceService.writeMirror({
+            studentId: studentId, studentName: name, studentType: reg.student_type || '',
+            sessionNumber: 1, date: AttendanceService.today(), checkInTime: AttendanceService.nowTime(),
+            barcodeValue: raw, source: 'eplus-attendance', type: 'grace_session',
+            createdAt: AttendanceService.nowTime()
+          });
+          await writeGraceRecord(studentId, name);
+          logScanner('grace record + mirror write OK');
+        } catch (e) { logScanner('grace write error: ' + e.message); }
+      }
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>تم السماح — ' + name;
+      logScanner('SUCCESS ORANGE: ' + name);
+      showScanOverlay('orange', '⚠️', 'تم السماح بحضور هذه الحصة', name, 'الاشتراك الشهري غير مجدد — يرجى تجديد الاشتراك قبل الحصة القادمة', 3000);
+      playSoundCorrect();
+      attendedCount++; updateCounter();
+      addRecent(name, fmtTime(), 'orange');
+      processing = false; scanner.setBusy(false);
+      setTimeout(renderReady, 2200);
+      return;
+    }
+
+    // 6. RED — grace used, no subscription
+    logScanner('RED: no subscription, grace used');
+    $('k-status-pill').innerHTML = '<span class="dot" style="background:#ef4444"></span>ممنوع — ' + name;
+    showScanOverlay('red', '🚫', 'لا يمكن تسجيل الحضور', name, 'انتهى الاشتراك الشهري — تم استخدام الحصة المسموح بها — يرجى تجديد الاشتراك', 3500);
+    playSoundIncorrect();
     processing = false; scanner.setBusy(false);
-    setTimeout(renderReady, 1800);
+    setTimeout(renderReady, 2500);
   }
 
   // ── Scanner ──
