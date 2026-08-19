@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
@@ -22,382 +22,188 @@
   } catch (e) { console.error('Firebase init error:', e); }
 </script>
 <script src="js/ean13.js"></script>
-  <script src="js/barcodeScanner.js?v=1"></script>
-  <script src="js/registrationService.js?v=4"></script>
+<script src="js/barcodeScanner.js?v=1"></script>
+<script src="js/registrationService.js?v=4"></script>
 <script src="js/subjectService.js?v=4"></script>
 <script src="js/attendanceService.js?v=4"></script>
-<script src="js/subscriptionService.js?v=1"></script>
-<style>
-  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-  :root{
-    --primary:#6366f1;--primary-dark:#4f46e5;--primary-soft:rgba(99,102,241,0.10);
-    --gold:#c8a84b;--gold-dark:#8a6d1f;--gold-light:rgba(200,168,75,0.14);
-    --navy:#141a4d;--ink:#221e52;--muted:#5b6483;--soft:#9aa3c4;
-    --card:#ffffff;--glass-dark:rgba(18,22,54,0.55);
-    --border:#e4e7f2;--border-light:#eef0f7;
-    --green:#059669;--green-light:rgba(5,150,105,0.12);
-    --red:#dc2626;--red-light:rgba(220,38,38,0.12);
-    --amber:#b45309;--amber-light:rgba(180,83,9,0.12);
-    --radius:20px;--radius-sm:13px;
-    --shadow-lg:0 22px 55px rgba(15,20,60,0.22);
-    --shadow-sm:0 8px 22px rgba(15,20,60,0.12);
-  }
-  html,body{height:100%}
-  body{
-    font-family:'Tajawal',system-ui,sans-serif;
-    background:linear-gradient(150deg,#151a46 0%,#2a2f77 48%,#3f3aa0 100%);
-    color:var(--ink);line-height:1.6;overflow:hidden;
-    -webkit-font-smoothing:antialiased;
-  }
-
-  /* ═══ VIDEO BACKGROUND ═══ */
-  .bg-video{position:fixed;inset:0;z-index:0;overflow:hidden;background:#101538}
-  .bg-video video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1.01)}
-  .bg-shade{position:absolute;inset:0;background:
-      linear-gradient(180deg,rgba(14,18,52,0.55) 0%,rgba(14,18,52,0.42) 45%,rgba(12,15,44,0.82) 100%)}
-  .bg-glow{position:absolute;inset:0;pointer-events:none;background:
-      radial-gradient(62% 48% at 50% 0%,rgba(200,168,75,0.18),transparent 70%),
-      radial-gradient(45% 40% at 85% 100%,rgba(99,102,241,0.20),transparent 70%)}
-
-  .view{display:none}
-  .view.active{display:flex}
-
-  /* ═══ PIN SCREEN ═══ */
-  #view-pin{
-    position:fixed;inset:0;z-index:60;align-items:center;justify-content:center;
-    padding:22px;animation:fadeIn .4s ease both;
-  }
-  .pin-card{
-    width:100%;max-width:400px;border-radius:26px;padding:40px 34px 34px;text-align:center;
-    background:rgba(20,24,58,0.62);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
-    border:1px solid rgba(255,255,255,0.16);box-shadow:0 30px 70px rgba(8,10,34,0.5);
-    animation:cardPop .45s ease both;
-  }
-  .pin-logo{
-    width:180px;margin:0 auto 18px;line-height:0;
-    filter:drop-shadow(0 16px 34px rgba(200,168,75,0.28));
-    animation:logoIn .7s ease both;
-  }
-  .pin-logo img{
-    width:100%;height:auto;object-fit:contain;display:block;
-  }
-  .pin-brand-en{font-size:15px;font-weight:900;letter-spacing:2px;color:#fff}
-  .pin-brand-ar{font-size:12px;color:#c7d2fe;font-weight:700;margin-bottom:22px}
-  .pin-lock{font-size:30px;margin-bottom:10px}
-  .pin-title{font-size:19px;font-weight:900;color:#fff;margin-bottom:4px}
-  .pin-sub{font-size:13px;color:#c7d2fe;font-weight:600;margin-bottom:24px}
-  .pin-input{
-    width:100%;font-family:'Tajawal',sans-serif;font-size:22px;font-weight:900;letter-spacing:10px;
-    text-align:center;direction:ltr;padding:13px 14px;border-radius:14px;outline:none;
-    border:1.5px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.08);color:#fff;
-    caret-color:#c8a84b;transition:.2s;
-  }
-  .pin-input:focus{border-color:#c8a84b;background:rgba(255,255,255,0.12);box-shadow:0 0 0 4px rgba(200,168,75,0.18)}
-  .pin-btn{
-    width:100%;margin-top:16px;font-family:'Tajawal',sans-serif;font-size:16px;font-weight:900;color:#fff;
-    background:linear-gradient(135deg,#6366f1,#4338ca);border:none;border-radius:14px;padding:14px;
-    cursor:pointer;transition:.2s;box-shadow:0 10px 24px rgba(99,102,241,0.4);
-  }
-  .pin-btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
-  .pin-btn:active{transform:translateY(0)}
-  .pin-error{
-    min-height:20px;margin-top:14px;font-size:13px;font-weight:800;color:#fca5a5;
-    opacity:0;transform:translateY(-4px);transition:.25s;visibility:hidden;
-  }
-  .pin-error.show{opacity:1;transform:translateY(0);visibility:visible;animation:shake .4s ease}
-  .pin-foot{margin-top:26px;font-size:11px;color:#94a3b8;font-weight:600}
-
-  /* ═══ APP ═══ */
-  #app{position:fixed;inset:0;z-index:2;display:flex;flex-direction:column}
-  #app.locked{display:none}
-
-  /* ── HEADER ── */
-  header.topbar{
-    display:flex;align-items:center;justify-content:space-between;gap:14px;
-    padding:12px 24px;background:rgba(15,19,48,0.5);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-    border-bottom:1px solid rgba(255,255,255,0.12);
-  }
-  .brand{display:flex;align-items:center;gap:14px;min-width:0}
-  .brand .logo{
-    height:46px;width:auto;max-width:180px;object-fit:contain;flex-shrink:0;
-    border-radius:8px;filter:drop-shadow(0 4px 14px rgba(0,0,0,0.35));
-    background:rgba(255,255,255,0.94);padding:5px 10px;
-  }
-  .brand .title{color:#fff;min-width:0}
-  .brand .title .en{font-size:15px;font-weight:900;letter-spacing:1px;white-space:nowrap}
-  .brand .title .ar{font-size:12px;color:#c7d2fe;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .live-badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;color:#86efac;background:rgba(5,150,105,0.16);border:1px solid rgba(5,150,105,0.4);border-radius:99px;padding:2px 10px;margin-inline-start:8px;vertical-align:middle}
-  .live-badge .dot{width:7px;height:7px;border-radius:50%;background:#22c55e;animation:blink 1.4s infinite}
-  .top-actions{display:flex;align-items:center;gap:16px}
-  .clock{text-align:left;color:#fff}
-  .clock .time{font-size:23px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:1px;line-height:1.1}
-  .clock .date{font-size:12px;color:#c7d2fe}
-  .admin-chip{display:flex;align-items:center;gap:8px}
-  .admin-chip img{width:34px;height:34px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.28);background:#fff;padding:4px}
-  .admin-chip .lbl{font-size:11px;font-weight:800;color:#c7d2fe;line-height:1.2;text-align:right}
-  .lock-btn{
-    font-family:'Tajawal',sans-serif;font-size:12px;font-weight:800;color:#fecaca;
-    background:rgba(220,38,38,0.16);border:1px solid rgba(220,38,38,0.4);border-radius:99px;
-    padding:8px 16px;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:6px;
-  }
-  .lock-btn:hover{background:rgba(220,38,38,0.28);color:#fff}
-
-  /* ── MAIN ── */
-  main{flex:1;position:relative;overflow:hidden}
-  .view-screen{position:absolute;inset:0;flex-direction:column;align-items:center;justify-content:center;padding:22px;overflow-y:auto}
-  .view-screen.active{animation:fadeIn .35s ease both}
-
-  /* ── READY ── */
-  .ready-inner{max-width:660px;width:100%;text-align:center}
-  .scan-stage{position:relative;width:250px;height:250px;margin:0 auto 28px}
-  .scan-stage .ring{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(255,255,255,0.18)}
-  .scan-stage .ring.r1{animation:ringPulse 2.6s infinite}
-  .scan-stage .ring.r2{animation:ringPulse 2.6s .85s infinite}
-  .scan-stage .ring.r3{animation:ringPulse 2.6s 1.7s infinite}
-  .scan-card{
-    position:absolute;inset:36px;border-radius:22px;overflow:hidden;
-    background:linear-gradient(150deg,#ffffff,#eef0ff);box-shadow:0 22px 55px rgba(0,0,0,0.4);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
-    border:2px solid rgba(200,168,75,0.55);
-  }
-  .scan-card .bars{display:flex;align-items:flex-end;gap:4px;height:56px}
-  .scan-card .bars i{background:#221e52;border-radius:2px;display:block}
-  .scan-card .code-num{font-family:monospace;font-size:11px;color:#4338ca;letter-spacing:3px;font-weight:700;direction:ltr}
-  .scan-card .chip{font-size:9px;font-weight:900;color:#fff;background:#6366f1;border-radius:6px;padding:2px 10px;letter-spacing:1px}
-  .scan-card .scanline{
-    position:absolute;left:8px;right:8px;height:2px;border-radius:2px;top:10%;
-    background:linear-gradient(90deg,transparent,#4ade80,transparent);
-    box-shadow:0 0 12px rgba(74,222,128,0.85);opacity:0;animation:scanSweep 2.4s ease-in-out infinite;
-  }
-  .scan-card.verified{animation:cardPop .5s ease}
-  .scan-card.verified .chip{background:var(--green)}
-  .scan-card.rejected{animation:shake .4s ease}
-  .scan-card.rejected .chip{background:var(--red)}
-  h1.ready-title{color:#fff;font-size:30px;font-weight:900;margin-bottom:6px}
-  p.ready-sub{color:#c7d2fe;font-size:15px;margin-bottom:28px}
-  .status-pill{
-    display:inline-flex;align-items:center;gap:9px;font-size:14px;font-weight:800;color:#fff;
-    background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.20);border-radius:99px;padding:11px 24px;
-  }
-  .status-pill .dot{width:10px;height:10px;border-radius:50%;background:#22c55e;animation:blink 1.4s infinite}
-  .last-read{font-family:monospace;font-size:13px;color:#a5b4fc;margin-top:16px;min-height:20px;letter-spacing:2px;direction:ltr}
-  .manual-toggle{color:#a5b4fc;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;font-family:inherit;margin-top:12px;text-decoration:underline}
-  .manual-row{display:none;margin-top:16px;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
-  .manual-row.show{display:flex}
-  .manual-row input{font-family:monospace;font-size:16px;padding:10px 14px;border-radius:10px;border:2px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.08);color:#fff;width:220px;text-align:center;direction:ltr;outline:none}
-  .manual-row input:focus{border-color:var(--primary)}
-  .manual-row button{font-family:inherit;font-size:13px;font-weight:800;color:#fff;background:var(--primary);border:none;border-radius:10px;padding:10px 18px;cursor:pointer}
-  .manual-row button:hover{background:var(--primary-dark)}
-
-  /* ── STUDENT VIEW ── */
-  .student-inner{max-width:700px;width:100%}
-  .back-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:10px}
-  .back-btn{
-    display:inline-flex;align-items:center;gap:8px;font-family:inherit;font-size:13px;font-weight:800;
-    color:#e0e7ff;background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.20);
-    border-radius:99px;padding:10px 18px;cursor:pointer;transition:.2s;
-  }
-  .back-btn:hover{background:rgba(255,255,255,0.20);color:#fff}
-  .scan-hint-chip{font-size:12px;color:#c7d2fe;font-weight:700;display:inline-flex;align-items:center;gap:8px}
-  .scan-hint-chip .dot{width:8px;height:8px;border-radius:50%;background:#22c55e;animation:blink 1.4s infinite}
-
-  .student-card{
-    background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow-lg);
-    padding:22px 24px;margin-bottom:18px;animation:slideUp .35s ease both;
-  }
-  .sc-head{display:flex;align-items:center;gap:16px}
-  .st-avatar{
-    width:76px;height:76px;border-radius:50%;object-fit:cover;flex-shrink:0;
-    border:3px solid #e6ddc0;background:#f3f0ff;padding:6px;
-    box-shadow:0 8px 20px rgba(0,0,0,0.14);
-  }
-  .sc-info{flex:1;min-width:0}
-  .sc-name{font-size:21px;font-weight:900;color:var(--ink);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .sc-id{font-size:12px;color:var(--muted);font-weight:700;margin-top:2px;font-family:monospace}
-  .sc-tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-  .tag{font-size:12px;font-weight:800;border-radius:8px;padding:4px 12px;background:var(--primary-soft);color:var(--primary-dark)}
-  .tag.gold{background:var(--gold-light);color:var(--gold-dark)}
-  .tag.green{background:var(--green-light);color:var(--green)}
-  .sc-divider{height:1px;background:var(--border-light);margin:18px 0 14px}
-  .sc-note{font-size:13px;color:var(--muted);font-weight:600}
-  .sc-note b{color:var(--ink)}
-
-  .subjects-title{display:flex;align-items:center;gap:10px;color:#fff;font-size:17px;font-weight:900;margin-bottom:12px}
-  .subjects-title .count{background:var(--gold);color:#fff;border-radius:99px;font-size:12px;padding:1px 11px;font-weight:900}
-  .subject-list{display:flex;flex-direction:column;gap:11px;margin-bottom:20px}
-  .subject-card{
-    background:var(--card);border-radius:15px;padding:14px 16px;display:flex;align-items:center;gap:14px;
-    box-shadow:var(--shadow-sm);animation:slideUp .35s ease both;
-    transition:transform .15s,box-shadow .15s,opacity .25s;
-  }
-  .subject-card:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(15,20,60,0.18)}
-  .subject-card.recorded{opacity:.55}
-  .subject-tile{width:48px;height:48px;border-radius:13px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
-  .subject-info{flex:1;min-width:0}
-  .subject-name{font-size:16px;font-weight:900;color:var(--ink)}
-  .subject-teacher{font-size:13px;color:var(--muted);font-weight:700;margin-top:2px;display:flex;align-items:center;gap:8px}
-  .subject-teacher b{color:#4338ca}
-  .t-avatar{width:26px;height:26px;border-radius:50%;object-fit:cover;background:#eef0ff;padding:3px;flex-shrink:0;border:1px solid var(--border)}
-  .record-btn{
-    font-family:inherit;font-size:14px;font-weight:900;color:#fff;background:linear-gradient(135deg,#10b981,#059669);
-    border:none;border-radius:12px;padding:12px 20px;cursor:pointer;white-space:nowrap;transition:.2s;
-    box-shadow:0 6px 16px rgba(5,150,105,0.35);
-  }
-  .record-btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
-  .record-btn:active{transform:translateY(0)}
-  .record-btn:disabled{background:#cbd5e1;box-shadow:none;cursor:not-allowed;filter:none}
-  .record-btn.busy{background:var(--primary);animation:blink 1s infinite}
-  .record-btn.recorded{background:#e2e8f0;color:#64748b;box-shadow:none;cursor:not-allowed}
-  .empty-subjects{background:rgba(255,255,255,0.08);border:1px dashed rgba(255,255,255,0.28);border-radius:14px;color:#e0e7ff;padding:24px;text-align:center;font-weight:700}
-
-  /* ── SUBSCRIPTION PANEL (transparency) ── */
-  .subscription-panel{
-    background:var(--card);border-radius:16px;padding:16px 18px;margin-top:6px;box-shadow:var(--shadow-sm);
-    border:1px solid var(--border-light);animation:slideUp .35s ease both;
-  }
-  .sub-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
-  .sub-title{font-size:15px;font-weight:900;color:var(--ink);display:flex;align-items:center;gap:8px}
-  .sub-badge{font-size:11px;font-weight:900;border-radius:99px;padding:3px 12px;white-space:nowrap}
-  .sub-badge.ok{background:var(--green-light);color:var(--green)}
-  .sub-badge.no{background:var(--amber-light, rgba(245,158,11,0.12));color:var(--amber, #b45309)}
-  .sub-badge.full{background:var(--red-light, rgba(239,68,68,0.12));color:#dc2626}
-  .sub-status{font-size:12px;color:var(--muted);font-weight:700;margin-bottom:12px}
-  .sub-status b{color:var(--ink)}
-  .month-cards{display:flex;flex-direction:column;gap:9px;margin-bottom:14px}
-  .month-card{
-    background:var(--primary-soft);border-radius:12px;padding:10px 13px;
-    display:flex;align-items:center;gap:12px;border:1px solid var(--border-light);
-  }
-  .month-card .m-idx{width:34px;height:34px;border-radius:9px;background:#4338ca;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-  .month-card .m-main{flex:1;min-width:0}
-  .month-card .m-name{font-size:13px;font-weight:900;color:var(--ink)}
-  .month-card .m-range{font-size:11px;color:var(--muted);font-weight:700;margin-top:1px}
-  .month-card .m-usage{font-size:11px;font-weight:900;color:var(--ink);white-space:nowrap}
-  .month-card .m-usage .u{color:var(--green)}
-  .month-card .m-progress{width:110px;height:7px;border-radius:99px;background:var(--border-light);overflow:hidden;flex-shrink:0}
-  .month-card .m-progress > i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#10b981,#059669)}
-  .month-card.full{opacity:.6}
-  .month-card.full .m-idx{background:var(--border-light);color:var(--muted)}
-  .month-card.active{border-color:#4338ca}
-  .month-card.active .m-idx{background:linear-gradient(135deg,#6366f1,#4338ca)}
-  .sub-counters{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
-  .sub-counter{background:var(--primary-soft);border-radius:12px;padding:11px 8px;text-align:center;border:1px solid var(--border-light)}
-  .sub-counter .k{font-size:11px;color:var(--muted);font-weight:700;display:block}
-  .sub-counter .v{font-size:19px;font-weight:900;color:var(--ink);display:block;margin-top:2px}
-  .sub-counter .v.u{color:var(--green)}
-  .sub-counter .v.r{color:#4338ca}
-  .sub-section-title{font-size:12px;font-weight:900;color:var(--ink);margin:4px 0 8px;display:flex;align-items:center;gap:8px}
-  .sub-section-title::before{content:'';width:3px;height:13px;border-radius:2px;background:#4338ca}
-  .sub-teachers{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
-  .sub-teacher{display:flex;align-items:center;gap:10px;background:var(--primary-soft);border-radius:11px;padding:9px 12px;border:1px solid var(--border-light)}
-  .sub-teacher .t-name{flex:1;font-size:13px;font-weight:900;color:var(--ink);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .sub-teacher .t-bar{width:90px;height:6px;border-radius:99px;background:var(--border-light);overflow:hidden;flex-shrink:0}
-  .sub-teacher .t-bar > i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#6366f1,#4338ca)}
-  .sub-teacher .t-count{font-size:12px;font-weight:900;color:var(--ink);white-space:nowrap}
-  .sub-teacher .t-count .u{color:#4338ca}
-  .sub-timeline{display:flex;flex-direction:column;gap:7px}
-  .sub-event{display:flex;align-items:center;gap:10px;background:var(--primary-soft);border-radius:11px;padding:9px 12px;border:1px solid var(--border-light)}
-  .sub-event .e-dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;box-shadow:0 0 0 3px var(--green-light)}
-  .sub-event .e-main{flex:1;min-width:0}
-  .sub-event .e-subject{font-size:13px;font-weight:900;color:var(--ink)}
-  .sub-event .e-teacher{font-size:11px;color:var(--muted);font-weight:700}
-  .sub-event .e-time{font-size:11px;font-weight:900;color:#4338ca;white-space:nowrap;font-family:monospace}
-  .sub-empty{font-size:12px;color:var(--muted);font-weight:700;text-align:center;padding:10px 0}
-
-  /* ── SUCCESS VIEW ── */
-  .success-card{
-    background:var(--card);border-radius:26px;box-shadow:var(--shadow-lg);
-    padding:42px 44px;text-align:center;max-width:480px;width:100%;animation:cardPop .5s ease both;
-    border-top:6px solid var(--green);
-  }
-  .check-circle{width:96px;height:96px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:0 0 0 8px rgba(5,150,105,0.06)}
-  .check-circle svg{width:54px;height:54px;stroke:var(--green);fill:none;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
-  .check-circle svg path{stroke-dasharray:48;stroke-dashoffset:48;animation:drawCheck .6s .2s ease forwards}
-  .succ-title{font-size:24px;font-weight:900;color:var(--green);margin-bottom:4px}
-  .succ-student{font-size:19px;font-weight:900;color:var(--ink);margin-bottom:2px}
-  .succ-id{font-size:12px;color:var(--muted);font-family:monospace;margin-bottom:20px}
-  .succ-facts{display:flex;flex-direction:column;gap:10px;background:var(--primary-soft);border-radius:14px;padding:16px;margin-bottom:22px}
-  .fact{display:flex;align-items:center;justify-content:space-between;font-size:14px;gap:12px}
-  .fact .k{color:var(--muted);font-weight:700}
-  .fact .v{color:var(--ink);font-weight:900}
-  .fact .v.time-chip{background:var(--green-light);color:var(--green);border-radius:8px;padding:2px 12px;font-family:monospace}
-  .reset-btn{
-    font-family:inherit;font-size:15px;font-weight:900;color:#fff;background:linear-gradient(135deg,#6366f1,#4338ca);
-    border:none;border-radius:12px;padding:14px 28px;cursor:pointer;transition:.2s;
-    box-shadow:0 8px 20px rgba(99,102,241,0.4);
-  }
-  .reset-btn:hover{filter:brightness(1.08)}
-  .succ-hint{font-size:12px;color:var(--soft);margin-top:14px;font-weight:700}
-
-  /* ── MODAL ── */
-  .overlay{
-    position:fixed;inset:0;background:rgba(10,12,34,0.6);backdrop-filter:blur(4px);
-    display:none;align-items:center;justify-content:center;z-index:100;padding:20px;
-  }
-  .overlay.show{display:flex;animation:fadeIn .25s ease both}
-  .modal{
-    background:var(--card);border-radius:22px;box-shadow:var(--shadow-lg);max-width:460px;width:100%;
-    padding:30px;text-align:center;animation:cardPop .35s ease both;
-  }
-  .modal .m-icon{width:66px;height:66px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:30px}
-  .modal.info .m-icon{background:var(--blue-light, rgba(37,99,235,0.10))}
-  .modal.warn .m-icon{background:var(--amber-light)}
-  .modal.error .m-icon{background:var(--red-light)}
-  .modal h3{font-size:19px;font-weight:900;color:var(--ink);margin-bottom:8px}
-  .modal .m-msg{font-size:14px;color:var(--muted);font-weight:600;line-height:1.8;margin-bottom:20px}
-  .modal .m-msg b{color:var(--ink)}
-  .modal .m-msg .modal-name{color:var(--primary-dark);font-weight:900}
-  .modal .m-msg .time-chip{background:var(--primary-soft);color:var(--primary-dark);border-radius:8px;padding:2px 10px;font-family:monospace}
-  .modal-close{
-    font-family:inherit;font-size:14px;font-weight:900;color:#fff;background:linear-gradient(135deg,#6366f1,#4338ca);
-    border:none;border-radius:11px;padding:11px 30px;cursor:pointer;transition:.2s;
-  }
-  .modal-close:hover{filter:brightness(1.08)}
-
-  /* ── ANIMATIONS ── */
-  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-  @keyframes slideUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
-  @keyframes cardPop{0%{opacity:0;transform:scale(.9)}70%{transform:scale(1.03)}100%{opacity:1;transform:scale(1)}}
-  @keyframes ringPulse{0%{transform:scale(.85);opacity:.8}100%{transform:scale(1.28);opacity:0}}
-  @keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
-  @keyframes drawCheck{to{stroke-dashoffset:0}}
-  @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
-  @keyframes scanSweep{0%{top:8%;opacity:0}14%{opacity:1}86%{opacity:1}100%{top:86%;opacity:0}}
-  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
-  @keyframes logoIn{from{opacity:0;transform:translateY(10px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
-
-  /* ── SCANNER DEBUG PANEL ── */
-  .debug-toggle{
-    font-family:inherit;font-size:12px;font-weight:800;color:#c7d2fe;background:rgba(255,255,255,0.06);
-    border:1px solid rgba(255,255,255,0.16);border-radius:99px;padding:6px 14px;cursor:pointer;margin-top:10px;transition:.2s;
-  }
-  .debug-toggle:hover{background:rgba(255,255,255,0.14);color:#fff}
-  .debug-panel{
-    display:none;margin-top:14px;background:rgba(2,6,23,0.9);border:1px solid #334155;border-radius:12px;
-    padding:14px;text-align:right;direction:rtl;max-width:520px;width:100%;margin-left:auto;margin-right:auto;
-  }
-  .debug-panel.show{display:block;animation:fadeIn .25s ease both}
-  .debug-panel h4{color:#e2e8f0;font-size:13px;font-weight:900;margin-bottom:10px;font-family:monospace}
-  .debug-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-family:monospace;font-size:12px;color:#cbd5e1}
-  .debug-grid .d{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed #1e293b;padding:3px 0}
-  .debug-grid .d .k{color:#64748b;white-space:nowrap}
-  .debug-grid .d .v{color:#7dd3fc;word-break:break-all;direction:ltr;text-align:left;max-width:62%}
-  .debug-grid .d .v.good{color:#4ade80}
-  .debug-grid .d .v.bad{color:#f87171}
-  .debug-log{background:#0f172a;border-radius:8px;padding:8px;margin-top:10px;max-height:120px;overflow-y:auto;font-family:monospace;font-size:11px;color:#67e8f9;text-align:left;direction:ltr;line-height:1.7}
-
-  @media (max-width:768px){
-    .clock .date{display:none}
-    .admin-chip .lbl{display:none}
-  }
-  @media (max-width:640px){
-    h1.ready-title{font-size:23px}
-    .clock .time{font-size:18px}
-    .subject-card{flex-wrap:wrap}
-    .record-btn{width:100%}
-    .success-card{padding:26px 20px}
-    .top-actions{gap:8px}
-  }
+<script src="js/subscriptionService.js?v=1"></script><style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --primary:#6366f1;--primary-dark:#4f46e5;--primary-soft:rgba(99,102,241,0.10);
+  --gold:#c8a84b;--gold-dark:#8a6d1f;--gold-light:rgba(200,168,75,0.14);
+  --navy:#141a4d;--ink:#221e52;--muted:#5b6483;--soft:#9aa3c4;
+  --card:#ffffff;--glass-dark:rgba(18,22,54,0.55);
+  --border:#e4e7f2;--border-light:#eef0f7;
+  --green:#059669;--green-light:rgba(5,150,105,0.12);
+  --red:#dc2626;--red-light:rgba(220,38,38,0.12);
+  --amber:#b45309;--amber-light:rgba(180,83,9,0.12);
+  --radius:20px;--radius-sm:13px;
+  --shadow-lg:0 22px 55px rgba(15,20,60,0.22);
+  --shadow-sm:0 8px 22px rgba(15,20,60,0.12);
+}
+html,body{height:100%}
+body{font-family:'Tajawal',system-ui,sans-serif;background:linear-gradient(150deg,#151a46 0%,#2a2f77 48%,#3f3aa0 100%);color:var(--ink);line-height:1.6;overflow:hidden;-webkit-font-smoothing:antialiased}
+.bg-video{position:fixed;inset:0;z-index:0;overflow:hidden;background:#101538}
+.bg-video video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1.01)}
+.bg-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(14,18,52,0.55) 0%,rgba(14,18,52,0.42) 45%,rgba(12,15,44,0.82) 100%)}
+.bg-glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(62% 48% at 50% 0%,rgba(200,168,75,0.18),transparent 70%),radial-gradient(45% 40% at 85% 100%,rgba(99,102,241,0.20),transparent 70%)}
+.view{display:none}.view.active{display:flex}
+#view-pin{position:fixed;inset:0;z-index:60;align-items:center;justify-content:center;padding:22px;animation:fadeIn .4s ease both}
+.pin-card{width:100%;max-width:400px;border-radius:26px;padding:40px 34px 34px;text-align:center;background:rgba(20,24,58,0.62);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,0.16);box-shadow:0 30px 70px rgba(8,10,34,0.5);animation:cardPop .45s ease both}
+.pin-logo{width:180px;margin:0 auto 18px;line-height:0;filter:drop-shadow(0 16px 34px rgba(200,168,75,0.28));animation:logoIn .7s ease both}
+.pin-logo img{width:100%;height:auto;object-fit:contain;display:block}
+.pin-brand-en{font-size:15px;font-weight:900;letter-spacing:2px;color:#fff}
+.pin-brand-ar{font-size:12px;color:#c7d2fe;font-weight:700;margin-bottom:22px}
+.pin-lock{font-size:30px;margin-bottom:10px}
+.pin-title{font-size:19px;font-weight:900;color:#fff;margin-bottom:4px}
+.pin-sub{font-size:13px;color:#c7d2fe;font-weight:600;margin-bottom:24px}
+.pin-input{width:100%;font-family:'Tajawal',sans-serif;font-size:22px;font-weight:900;letter-spacing:10px;text-align:center;direction:ltr;padding:13px 14px;border-radius:14px;outline:none;border:1.5px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.08);color:#fff;caret-color:#c8a84b;transition:.2s}
+.pin-input:focus{border-color:#c8a84b;background:rgba(255,255,255,0.12);box-shadow:0 0 0 4px rgba(200,168,75,0.18)}
+.pin-btn{width:100%;margin-top:16px;font-family:'Tajawal',sans-serif;font-size:16px;font-weight:900;color:#fff;background:linear-gradient(135deg,#6366f1,#4338ca);border:none;border-radius:14px;padding:14px;cursor:pointer;transition:.2s;box-shadow:0 10px 24px rgba(99,102,241,0.4)}
+.pin-btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.pin-btn:active{transform:translateY(0)}
+.pin-error{min-height:20px;margin-top:14px;font-size:13px;font-weight:800;color:#fca5a5;opacity:0;transform:translateY(-4px);transition:.25s;visibility:hidden}
+.pin-error.show{opacity:1;transform:translateY(0);visibility:visible;animation:shake .4s ease}
+.pin-foot{margin-top:26px;font-size:11px;color:#94a3b8;font-weight:600}
+#app{position:fixed;inset:0;z-index:2;display:flex;flex-direction:column}
+#app.locked{display:none}
+header.topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 20px;background:rgba(15,19,48,0.5);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.12)}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand .logo{height:42px;width:auto;max-width:160px;object-fit:contain;flex-shrink:0;border-radius:8px;filter:drop-shadow(0 4px 14px rgba(0,0,0,0.35));background:rgba(255,255,255,0.94);padding:4px 8px}
+.brand .title{color:#fff;min-width:0}
+.brand .title .en{font-size:14px;font-weight:900;letter-spacing:1px;white-space:nowrap}
+.brand .title .ar{font-size:11px;color:#c7d2fe;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.live-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;color:#86efac;background:rgba(5,150,105,0.16);border:1px solid rgba(5,150,105,0.4);border-radius:99px;padding:2px 8px;margin-inline-start:6px}
+.live-badge .dot{width:6px;height:6px;border-radius:50%;background:#22c55e;animation:blink 1.4s infinite}
+.session-chips{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.session-chip{font-size:10px;font-weight:800;color:#fff;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:99px;padding:3px 10px;display:inline-flex;align-items:center;gap:4px}
+.session-chip .cd{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.session-chip .cd.g{background:#22c55e}.session-chip .cd.a{background:#f59e0b}
+.offline-badge{font-size:10px;font-weight:800;color:#fca5a5;background:rgba(220,38,38,0.18);border:1px solid rgba(220,38,38,0.4);border-radius:99px;padding:2px 10px;display:none}
+.offline-badge.show{display:inline-flex;animation:blink 1.4s infinite}
+.top-actions{display:flex;align-items:center;gap:10px}
+.clock{text-align:left;color:#fff}
+.clock .time{font-size:20px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:1px;line-height:1.1}
+.clock .date{font-size:11px;color:#c7d2fe}
+.lock-btn{font-family:'Tajawal',sans-serif;font-size:11px;font-weight:800;color:#fecaca;background:rgba(220,38,38,0.16);border:1px solid rgba(220,38,38,0.4);border-radius:99px;padding:6px 14px;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:5px}
+.lock-btn:hover{background:rgba(220,38,38,0.28);color:#fff}
+main{flex:1;position:relative;overflow:hidden}
+.view-screen{position:absolute;inset:0;flex-direction:column;align-items:center;justify-content:center;padding:16px;overflow-y:auto}
+.view-screen.active{animation:fadeIn .35s ease both}
+.setup-card{width:100%;max-width:460px;border-radius:26px;padding:34px 28px 28px;text-align:center;background:rgba(20,24,58,0.62);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,0.16);box-shadow:0 30px 70px rgba(8,10,34,0.5);animation:cardPop .45s ease both}
+.setup-icon{font-size:44px;margin-bottom:10px;animation:float 3s ease-in-out infinite}
+.setup-title{font-size:21px;font-weight:900;color:#fff;margin-bottom:4px}
+.setup-sub{font-size:12px;color:#c7d2fe;font-weight:600;margin-bottom:22px}
+.setup-field{margin-bottom:14px;text-align:right}
+.setup-label{font-size:11px;font-weight:800;color:#c7d2fe;margin-bottom:5px;display:block}
+.setup-select{width:100%;font-family:'Tajawal',sans-serif;font-size:14px;font-weight:700;padding:11px 14px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.08);color:#fff;appearance:none;outline:none;cursor:pointer;transition:.2s;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='%23c7d2fe'%3E%3Cpath d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:left 14px center}
+.setup-select option{background:#1e2250;color:#fff;font-weight:700}
+.setup-select:focus{border-color:#c8a84b;box-shadow:0 0 0 3px rgba(200,168,75,0.18)}
+.setup-start{width:100%;margin-top:6px;font-family:'Tajawal',sans-serif;font-size:15px;font-weight:900;color:#fff;background:linear-gradient(135deg,#10b981,#059669);border:none;border-radius:14px;padding:13px;cursor:pointer;transition:.2s;box-shadow:0 10px 24px rgba(5,150,105,0.4)}
+.setup-start:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.setup-start:active{transform:translateY(0)}
+.setup-start:disabled{opacity:.4;cursor:not-allowed;filter:none;transform:none}
+.setup-foot{margin-top:18px;font-size:11px;color:#94a3b8;font-weight:600}
+.kiosk-layout{display:flex;gap:14px;width:100%;max-width:1060px;height:100%;align-items:center;justify-content:center;padding:8px}
+.kiosk-sidebar{width:200px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
+.k-counter{background:rgba(20,24,58,0.55);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.14);border-radius:16px;padding:16px 14px;text-align:center}
+.k-counter-label{font-size:10px;font-weight:800;color:#c7d2fe;margin-bottom:2px}
+.k-counter-num{font-size:40px;font-weight:900;color:#fff;line-height:1;font-variant-numeric:tabular-nums}
+.k-counter-num .sep{font-size:26px;color:#c7d2fe;margin:0 2px}
+.k-progress{width:100%;height:7px;border-radius:99px;background:rgba(255,255,255,0.12);margin-top:10px;overflow:hidden}
+.k-progress>i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#10b981,#22c55e);transition:width .4s ease}
+.k-session-info{background:rgba(20,24,58,0.55);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.14);border-radius:16px;padding:12px 14px}
+.k-session-row{display:flex;align-items:center;gap:6px;font-size:11px;color:#c7d2fe;font-weight:700;padding:3px 0}
+.k-session-row .kl{color:#94a3b8;min-width:44px}
+.k-session-row .kv{color:#fff;font-weight:800}
+.k-end-btn{width:100%;margin-top:8px;font-family:'Tajawal',sans-serif;font-size:11px;font-weight:800;color:#fecaca;background:rgba(220,38,38,0.14);border:1px solid rgba(220,38,38,0.3);border-radius:10px;padding:7px;cursor:pointer;transition:.2s}
+.k-end-btn:hover{background:rgba(220,38,38,0.28);color:#fff}
+.kiosk-main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;min-width:0}
+.scan-stage{position:relative;width:210px;height:210px;margin:0 auto 14px}
+.scan-stage .ring{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(255,255,255,0.18)}
+.scan-stage .ring.r1{animation:ringPulse 2.6s infinite}
+.scan-stage .ring.r2{animation:ringPulse 2.6s .85s infinite}
+.scan-stage .ring.r3{animation:ringPulse 2.6s 1.7s infinite}
+.scan-card{position:absolute;inset:28px;border-radius:20px;overflow:hidden;background:linear-gradient(150deg,#ffffff,#eef0ff);box-shadow:0 22px 55px rgba(0,0,0,0.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px solid rgba(200,168,75,0.55);transition:border-color .3s,box-shadow .3s}
+.scan-card .bars{display:flex;align-items:flex-end;gap:3px;height:44px}
+.scan-card .bars i{background:#221e52;border-radius:2px;display:block}
+.scan-card .code-num{font-family:monospace;font-size:10px;color:#4338ca;letter-spacing:2px;font-weight:700;direction:ltr}
+.scan-card .chip{font-size:8px;font-weight:900;color:#fff;background:#6366f1;border-radius:6px;padding:2px 8px;letter-spacing:1px}
+.scan-card .scanline{position:absolute;left:8px;right:8px;height:2px;border-radius:2px;top:10%;background:linear-gradient(90deg,transparent,#4ade80,transparent);box-shadow:0 0 12px rgba(74,222,128,0.85);opacity:0;animation:scanSweep 2.4s ease-in-out infinite}
+.k-ready-text{color:#fff;font-size:17px;font-weight:900;margin-bottom:3px;text-align:center}
+.k-ready-sub{color:#c7d2fe;font-size:12px;font-weight:600;margin-bottom:12px;text-align:center}
+.k-status-pill{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:#fff;background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.20);border-radius:99px;padding:7px 16px}
+.k-status-pill .dot{width:7px;height:7px;border-radius:50%;background:#22c55e;animation:blink 1.4s infinite}
+.k-last-read{font-family:monospace;font-size:11px;color:#a5b4fc;margin-top:8px;min-height:16px;letter-spacing:2px;direction:ltr}
+.feedback-container{position:relative;width:100%;max-width:380px;min-height:120px;display:none;align-items:center;justify-content:center;z-index:5}
+.feedback-container.show{display:flex}
+.feedback-card{width:100%;border-radius:18px;padding:24px 20px;text-align:center;box-shadow:0 16px 40px rgba(0,0,0,0.35);animation:cardPop .3s ease both;backdrop-filter:blur(10px)}
+.feedback-card.green{background:rgba(5,150,105,0.93);color:#fff;border:2px solid rgba(255,255,255,0.3)}
+.feedback-card.orange{background:rgba(180,83,9,0.93);color:#fff;border:2px solid rgba(255,255,255,0.3)}
+.feedback-card.red{background:rgba(220,38,38,0.93);color:#fff;border:2px solid rgba(255,255,255,0.3)}
+.fb-icon{font-size:38px;margin-bottom:6px}
+.fb-name{font-size:19px;font-weight:900;margin-bottom:3px}
+.fb-detail{font-size:12px;font-weight:700;opacity:.9;margin-bottom:3px}
+.fb-sub{font-size:11px;font-weight:700;opacity:.75}
+.fb-time{font-size:10px;font-weight:800;margin-top:6px;opacity:.7;font-family:monospace}
+.k-recent{width:100%;max-width:1060px;margin-top:6px}
+.k-recent-title{font-size:11px;font-weight:800;color:#c7d2fe;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.k-recent-title::before{content:'';width:3px;height:11px;border-radius:2px;background:var(--gold)}
+.k-recent-list{display:flex;gap:7px;overflow-x:auto;padding-bottom:3px}
+.k-recent-list::-webkit-scrollbar{height:3px}
+.k-recent-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.2);border-radius:99px}
+.k-recent-item{flex-shrink:0;background:rgba(20,24,58,0.55);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.12);border-radius:11px;padding:9px 12px;min-width:150px;animation:slideUp .3s ease both}
+.k-recent-name{font-size:12px;font-weight:900;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
+.k-recent-time{font-size:9px;font-weight:700;color:#c7d2fe;margin-top:2px;font-family:monospace}
+.k-recent-status{font-size:9px;font-weight:800;margin-top:2px;display:inline-flex;align-items:center;gap:3px;border-radius:99px;padding:1px 7px}
+.k-recent-status.green{background:rgba(5,150,105,0.25);color:#86efac}
+.k-recent-status.orange{background:rgba(245,158,11,0.25);color:#fcd34d}
+.manual-toggle{color:#a5b4fc;font-size:11px;font-weight:700;cursor:pointer;border:none;background:none;font-family:inherit;margin-top:6px;text-decoration:underline}
+.manual-row{display:none;margin-top:8px;gap:7px;align-items:center;justify-content:center}
+.manual-row.show{display:flex}
+.manual-row input{font-family:monospace;font-size:13px;padding:7px 10px;border-radius:9px;border:2px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.08);color:#fff;width:180px;text-align:center;direction:ltr;outline:none}
+.manual-row input:focus{border-color:var(--primary)}
+.manual-row button{font-family:inherit;font-size:11px;font-weight:800;color:#fff;background:var(--primary);border:none;border-radius:9px;padding:7px 14px;cursor:pointer}
+.manual-row button:hover{background:var(--primary-dark)}
+.debug-toggle{font-family:inherit;font-size:10px;font-weight:800;color:#c7d2fe;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.16);border-radius:99px;padding:4px 10px;cursor:pointer;margin-top:6px;transition:.2s}
+.debug-toggle:hover{background:rgba(255,255,255,0.14);color:#fff}
+.debug-panel{display:none;margin-top:8px;background:rgba(2,6,23,0.9);border:1px solid #334155;border-radius:11px;padding:10px;text-align:right;direction:rtl;max-width:480px;width:100%}
+.debug-panel.show{display:block;animation:fadeIn .25s ease both}
+.debug-panel h4{color:#e2e8f0;font-size:11px;font-weight:900;margin-bottom:6px;font-family:monospace}
+.debug-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-family:monospace;font-size:10px;color:#cbd5e1}
+.debug-grid .d{display:flex;justify-content:space-between;gap:6px;border-bottom:1px dashed #1e293b;padding:2px 0}
+.debug-grid .d .k{color:#64748b;white-space:nowrap}
+.debug-grid .d .v{color:#7dd3fc;word-break:break-all;direction:ltr;text-align:left;max-width:62%}
+.debug-grid .d .v.good{color:#4ade80}
+.debug-log{background:#0f172a;border-radius:7px;padding:5px;margin-top:6px;max-height:90px;overflow-y:auto;font-family:monospace;font-size:9px;color:#67e8f9;text-align:left;direction:ltr;line-height:1.7}
+.ended-card{width:100%;max-width:400px;border-radius:26px;padding:32px 26px;text-align:center;background:rgba(20,24,58,0.62);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,0.16);box-shadow:0 30px 70px rgba(8,10,34,0.5);animation:cardPop .45s ease both}
+.ended-icon{font-size:48px;margin-bottom:10px}
+.ended-title{font-size:20px;font-weight:900;color:#fff;margin-bottom:6px}
+.ended-stats{font-size:13px;color:#c7d2fe;font-weight:700;margin-bottom:18px}
+.ended-restart{font-family:'Tajawal',sans-serif;font-size:14px;font-weight:900;color:#fff;background:linear-gradient(135deg,#6366f1,#4338ca);border:none;border-radius:12px;padding:12px 26px;cursor:pointer;transition:.2s;box-shadow:0 8px 20px rgba(99,102,241,0.4)}
+.ended-restart:hover{filter:brightness(1.1)}
+.overlay{position:fixed;inset:0;background:rgba(10,12,34,0.6);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.overlay.show{display:flex;animation:fadeIn .25s ease both}
+.modal{background:var(--card);border-radius:22px;box-shadow:var(--shadow-lg);max-width:420px;width:100%;padding:26px;text-align:center;animation:cardPop .35s ease both}
+.modal .m-icon{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:26px}
+.modal.warn .m-icon{background:var(--amber-light)}
+.modal.error .m-icon{background:var(--red-light)}
+.modal h3{font-size:17px;font-weight:900;color:var(--ink);margin-bottom:6px}
+.modal .m-msg{font-size:12px;color:var(--muted);font-weight:600;line-height:1.8;margin-bottom:16px}
+.modal .m-msg b{color:var(--ink)}
+.modal-close{font-family:inherit;font-size:12px;font-weight:900;color:#fff;background:linear-gradient(135deg,#6366f1,#4338ca);border:none;border-radius:10px;padding:9px 26px;cursor:pointer;transition:.2s}
+.modal-close:hover{filter:brightness(1.08)}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes cardPop{0%{opacity:0;transform:scale(.9)}70%{transform:scale(1.03)}100%{opacity:1;transform:scale(1)}}
+@keyframes ringPulse{0%{transform:scale(.85);opacity:.8}100%{transform:scale(1.28);opacity:0}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+@keyframes scanSweep{0%{top:8%;opacity:0}14%{opacity:1}86%{opacity:1}100%{top:86%;opacity:0}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes logoIn{from{opacity:0;transform:translateY(10px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:768px){.clock .date{display:none}.session-chips{display:none}}
+@media(max-width:640px){.kiosk-layout{flex-direction:column;gap:8px}.kiosk-sidebar{width:100%;flex-direction:row;gap:6px}.k-counter{flex:1;padding:10px 8px}.k-counter-num{font-size:26px}.k-session-info{display:none}.clock .time{font-size:16px}}
 </style>
 </head>
 <body>
@@ -409,8 +215,6 @@
   <div class="bg-shade"></div>
   <div class="bg-glow"></div>
 </div>
-
-<!-- ===== PIN SCREEN ===== -->
 <section class="view" id="view-pin">
   <div class="pin-card">
     <div class="pin-logo"><img src="images/eplus-logo.png" alt="E-PLUS" draggable="false"></div>
@@ -425,252 +229,173 @@
     <div class="pin-foot">E-PLUS Education Center — نظام تسجيل حضور الطلاب</div>
   </div>
 </section>
-
 <div id="app" class="locked">
   <header class="topbar">
     <div class="brand">
       <img class="logo" src="images/education-plus-center-logo.png" alt="Education Plus Center" draggable="false">
       <div class="title">
         <div class="en">E-PLUS <span class="live-badge"><span class="dot"></span>نظام الحضور</span></div>
-        <div class="ar">نقطة تسجيل حضور الطلاب — الاستقبال</div>
+        <div class="ar" id="header-sub">نقطة تسجيل حضور الطلاب — الاستقبال</div>
       </div>
     </div>
+    <div class="session-chips" id="session-chips"></div>
+    <span class="offline-badge" id="offline-badge">⏳ 0 معلّق</span>
     <div class="top-actions">
-      <div class="admin-chip">
-        <img src="icons/admin.png" alt="" onerror="this.onerror=null;this.src=window.__svgIcon('admin')">
-        <span class="lbl">جلسة الإدارة<br>محمية</span>
-      </div>
       <div class="clock">
         <div class="time" id="clock-time">--:--:--</div>
         <div class="date" id="clock-date"></div>
       </div>
-      <button type="button" class="lock-btn" id="lock-btn">🔒 قفل النظام</button>
+      <button type="button" class="lock-btn" id="lock-btn">🔒 قفل</button>
     </div>
   </header>
-
   <main>
-    <!-- ===== READY ===== -->
-    <section class="view view-screen active" id="view-ready">
-      <div class="ready-inner">
-        <div class="scan-stage">
-          <div class="ring r1"></div>
-          <div class="ring r2"></div>
-          <div class="ring r3"></div>
-          <div class="scan-card" id="scan-card">
-            <div class="scanline"></div>
-            <div class="bars" id="scan-bars"></div>
-            <div class="code-num" id="scan-code">•••••••••••••</div>
-            <div class="chip">SP-1160</div>
-          </div>
+    <section class="view view-screen active" id="view-setup">
+      <div class="setup-card">
+        <div class="setup-icon">📋</div>
+        <div class="setup-title">إعداد جلسة الحضور</div>
+        <div class="setup-sub">اختر المادة والأستاذ والمجموعة لبدء التسجيل</div>
+        <div class="setup-field">
+          <label class="setup-label">المجموعة</label>
+          <select class="setup-select" id="setup-group"><option value="">— اختر المجموعة —</option></select>
         </div>
-        <h1 class="ready-title">مرر بطاقة الطالب أمام جهاز الماسح</h1>
-        <p class="ready-sub">بعد المسح يتم عرض الأساتذة المسجل عندهم الطالب لاختيار الأستاذ وتثبيت الحضور</p>
-        <div class="status-pill" id="ready-pill"><span class="dot"></span>جهاز الماسح جاهز</div>
-        <div class="last-read" id="last-read"></div>
-        <button class="manual-toggle" id="manual-toggle" type="button">⌨️ إدخال يدوي</button>
-        <div class="manual-row" id="manual-row">
-          <input type="text" id="manual-input" autocomplete="off" placeholder="رقم الطالب أو الباركود">
-          <button type="button" id="manual-submit">تسجيل</button>
+        <div class="setup-field">
+          <label class="setup-label">المادة</label>
+          <select class="setup-select" id="setup-subject" disabled><option value="">— اختر المادة أولاً —</option></select>
         </div>
-        <br>
-        <button class="debug-toggle" id="debug-toggle" type="button">🔧 Scanner Debug</button>
-        <div class="debug-panel" id="debug-panel">
-          <h4>SCANNER DEBUG — SP-1160</h4>
-          <div class="debug-grid">
-            <div class="d"><span class="k">Raw Keyboard Input</span><span class="v" id="db-buffer">—</span></div>
-            <div class="d"><span class="k">event.key</span><span class="v" id="db-key">—</span></div>
-            <div class="d"><span class="k">event.code</span><span class="v" id="db-code">—</span></div>
-            <div class="d"><span class="k">event.keyCode</span><span class="v" id="db-keycode">—</span></div>
-            <div class="d"><span class="k">event.which</span><span class="v" id="db-which">—</span></div>
-            <div class="d"><span class="k">Length</span><span class="v" id="db-len">0</span></div>
-            <div class="d"><span class="k">Timing</span><span class="v" id="db-timing">—</span></div>
-            <div class="d"><span class="k">Enter received</span><span class="v" id="db-enter">—</span></div>
-            <div class="d"><span class="k">Layout</span><span class="v" id="db-layout">—</span></div>
-          </div>
-          <div class="debug-log" id="db-log"></div>
+        <div class="setup-field">
+          <label class="setup-label">الأستاذ</label>
+          <select class="setup-select" id="setup-teacher" disabled><option value="">— اختر المادة أولاً —</option></select>
         </div>
+        <button class="setup-start" id="setup-start" disabled>بدء الجلسة</button>
+        <div class="setup-foot">بعد البدء، مرّر بطاقات الطلاب أمام جهاز الماسح للتسجيل السريع</div>
       </div>
     </section>
-
-    <!-- ===== STUDENT ===== -->
-    <section class="view view-screen" id="view-student">
-      <div class="student-inner">
-        <div class="back-row">
-          <button class="back-btn" id="back-ready" type="button">↩️ مسح بطاقة أخرى</button>
-          <span class="scan-hint-chip"><span class="dot"></span>يمكنك مسح بطاقة جديدة الآن</span>
+    <section class="view view-screen" id="view-kiosk">
+      <div class="kiosk-layout">
+        <div class="kiosk-sidebar">
+          <div class="k-counter">
+            <div class="k-counter-label">الحضور اليوم</div>
+            <div class="k-counter-num"><span id="k-attended">0</span><span class="sep">/</span><span id="k-total">—</span></div>
+            <div class="k-progress"><i id="k-progress-bar" style="width:0%"></i></div>
+          </div>
+          <div class="k-session-info">
+            <div class="k-session-row"><span class="kl">المادة</span><span class="kv" id="k-subject">—</span></div>
+            <div class="k-session-row"><span class="kl">الأستاذ</span><span class="kv" id="k-teacher">—</span></div>
+            <div class="k-session-row"><span class="kl">المجموعة</span><span class="kv" id="k-group">—</span></div>
+            <button class="k-end-btn" id="k-end-btn">إنهاء الجلسة</button>
+          </div>
         </div>
-        <div class="student-card">
-          <div class="sc-head">
-            <img class="st-avatar" id="st-avatar" src="icons/student.png" alt="" onerror="this.onerror=null;this.src=window.__svgIcon('student')">
-            <div class="sc-info">
-              <div class="sc-name">
-                <span id="st-name">—</span>
-                <span class="tag green" id="st-status">مسجل نهائياً</span>
-              </div>
-              <div class="sc-id">رقم التسجيل: <span id="st-id">—</span></div>
-              <div class="sc-tags" id="st-tags"></div>
+        <div class="kiosk-main">
+          <div class="scan-stage">
+            <div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div>
+            <div class="scan-card" id="scan-card">
+              <div class="scanline"></div>
+              <div class="bars" id="scan-bars"></div>
+              <div class="code-num" id="scan-code">•••••••••••••</div>
+              <div class="chip">SP-1160</div>
             </div>
           </div>
-          <div class="sc-divider"></div>
-          <div class="sc-note" id="st-note">المواد التالية هي المواد المسجلة لهذا الطالب فقط.</div>
-        </div>
-        <div class="subjects-title">الأساتذة المسجل عندهم الطالب <span class="count" id="subj-count">0</span></div>
-        <div class="subject-list" id="subject-list"></div>
-        <div class="subscription-panel" id="subscription-panel">
-          <div class="sub-head">
-            <div class="sub-title">📅 الاشتراك الشهري</div>
-            <span class="sub-badge" id="sub-badge">—</span>
+          <div class="feedback-container" id="feedback-container"></div>
+          <div id="kiosk-ready-msg">
+            <div class="k-ready-text">مرر بطاقة الطالب أمام جهاز الماسح</div>
+            <div class="k-ready-sub">التسجيل تلقائي — لا حاجة للضغط على أي زر</div>
           </div>
-          <div class="sub-status" id="sub-status">جارٍ تحميل الاشتراك…</div>
-          <div class="month-cards" id="month-cards"></div>
-          <div class="sub-counters">
-            <div class="sub-counter"><span class="k">حصص الشهر الحالي</span><span class="v" id="subc-total">—</span></div>
-            <div class="sub-counter"><span class="k">حضور مسجل</span><span class="v u" id="subc-used">—</span></div>
-            <div class="sub-counter"><span class="k">حصص متبقية</span><span class="v r" id="subc-remaining">—</span></div>
+          <div class="k-status-pill" id="k-status-pill"><span class="dot"></span>الماسح جاهز — امسح البطاقة</div>
+          <div class="k-last-read" id="k-last-read"></div>
+          <button class="manual-toggle" id="manual-toggle" type="button">⌨️ إدخال يدوي</button>
+          <div class="manual-row" id="manual-row">
+            <input type="text" id="manual-input" autocomplete="off" placeholder="رقم الطالب أو الباركود">
+            <button type="button" id="manual-submit">تسجيل</button>
           </div>
-          <div class="sub-section-title">حصص الأساتذة — الشهر الحالي</div>
-          <div class="sub-teachers" id="sub-teachers"></div>
-          <div class="sub-section-title">سجل حضور هذا الشهر</div>
-          <div class="sub-timeline" id="sub-timeline"></div>
+          <button class="debug-toggle" id="debug-toggle" type="button">🔧 Debug</button>
+          <div class="debug-panel" id="debug-panel">
+            <h4>SCANNER DEBUG — SP-1160</h4>
+            <div class="debug-grid">
+              <div class="d"><span class="k">Raw Input</span><span class="v" id="db-buffer">—</span></div>
+              <div class="d"><span class="k">event.key</span><span class="v" id="db-key">—</span></div>
+              <div class="d"><span class="k">event.code</span><span class="v" id="db-code">—</span></div>
+              <div class="d"><span class="k">keyCode</span><span class="v" id="db-keycode">—</span></div>
+              <div class="d"><span class="k">Length</span><span class="v" id="db-len">0</span></div>
+              <div class="d"><span class="k">Timing</span><span class="v" id="db-timing">—</span></div>
+              <div class="d"><span class="k">Enter</span><span class="v" id="db-enter">—</span></div>
+              <div class="d"><span class="k">Layout</span><span class="v" id="db-layout">—</span></div>
+            </div>
+            <div class="debug-log" id="db-log"></div>
+          </div>
         </div>
       </div>
+      <div class="k-recent" id="k-recent-section" style="display:none">
+        <div class="k-recent-title">آخر التسجيلات</div>
+        <div class="k-recent-list" id="k-recent-list"></div>
+      </div>
     </section>
-
-    <!-- ===== SUCCESS ===== -->
-    <section class="view view-screen" id="view-success">
-      <div class="success-card">
-        <div class="check-circle">
-          <svg viewBox="0 0 52 52"><path d="M14 27l8 8 16-16"></path></svg>
-        </div>
-        <div class="succ-title">تم تسجيل الحضور بنجاح</div>
-        <div class="succ-student" id="sv-name">—</div>
-        <div class="succ-id" id="sv-id"></div>
-        <div class="succ-facts">
-          <div class="fact"><span class="k">المادة</span><span class="v" id="sv-subject">—</span></div>
-          <div class="fact"><span class="k">الأستاذ</span><span class="v" id="sv-teacher">—</span></div>
-          <div class="fact"><span class="k">التاريخ والوقت</span><span class="v time-chip" id="sv-datetime">—</span></div>
-        </div>
-        <button class="reset-btn" id="sv-reset" type="button">↩️ مسح بطاقة أخرى</button>
-        <div class="succ-hint">سيتم العودة تلقائياً إلى بطاقة الطالب لتسجيل مواد أخرى</div>
+    <section class="view view-screen" id="view-ended">
+      <div class="ended-card">
+        <div class="ended-icon">✅</div>
+        <div class="ended-title">تم إنهاء الجلسة</div>
+        <div class="ended-stats" id="ended-stats"></div>
+        <button class="ended-restart" id="ended-restart">جلسة جديدة</button>
       </div>
     </section>
   </main>
 </div>
-
-<!-- ===== MODAL ===== -->
 <div class="overlay" id="overlay">
   <div class="modal" id="modal">
-    <div class="m-icon" id="m-icon">ℹ️</div>
+    <div class="m-icon" id="m-icon">⚠️</div>
     <h3 id="m-title"></h3>
     <div class="m-msg" id="m-msg"></div>
     <button class="modal-close" id="m-close" type="button">إغلاق</button>
   </div>
 </div>
-
 <script>
 (function () {
   'use strict';
-
   var $ = function (id) { return document.getElementById(id); };
-
   SubscriptionService.init(SUPABASE_URL, SUPABASE_KEY);
-
-  // ── Constants ──────────────────────────────────────────
   var ALGERIA_TZ = 'Africa/Algiers';
   var PIN_SESSION_KEY = 'eplus_att_pin';
   var PIN_HASH = '023e33504ab909cf87a6f4e4e545090e40bdc0a2153e5b68b19f7fad2b737904';
-  // Obfuscated fallback (non-secure-context environments without crypto.subtle).
-  // The PIN is an access gate for the UI; real security = Firebase auth + rules.
   var PIN_FALLBACK = String.fromCharCode(50, 48, 49, 57);
-
-  // ── Escape (XSS-safe rendering) ────────────────────────
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
-
-  function studentFullName(s) {
-    return ((s && (s.first_name || '') + ' ' + (s.last_name || '')) || '').trim();
-  }
-
-  // ── User-type icons (image files with inline-SVG fallback) ──
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function studentFullName(s) { return ((s && (s.first_name || '') + ' ' + (s.last_name || '')) || '').trim(); }
   var ICONS_SVG = {
     student: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='#6366f1' d='M12 3L1 9l11 6 9-4.91V17h2V9L12 3z'/><path fill='#6366f1' d='M5 13.18V17c0 1.66 3.13 3 7 3s7-1.34 7-3v-3.82l-7 3.82-7-3.82z'/></svg>",
     teacher: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='#059669'/><path d='M4 21c0-4 3.58-6.5 8-6.5s8 2.5 8 6.5' fill='#059669'/></svg>",
     admin: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 2l8 3v6c0 5.25-3.4 9.6-8 11-4.6-1.4-8-5.75-8-11V5l8-3z' fill='#b45309'/><circle cx='12' cy='10' r='2.6' fill='#fff'/><path d='M9.3 15h5.4v1.6a2.7 2.7 0 0 1-5.4 0V15z' fill='#fff'/></svg>"
   };
-  function svgIcon(kind) {
-    return 'data:image/svg+xml;utf8,' + encodeURIComponent(ICONS_SVG[kind] || ICONS_SVG.student);
-  }
+  function svgIcon(k) { return 'data:image/svg+xml;utf8,' + encodeURIComponent(ICONS_SVG[k] || ICONS_SVG.student); }
   window.__svgIcon = svgIcon;
 
-  // ── State ──────────────────────────────────────────────
-  var appUnlocked = false;
-  var processing = false;
-  var attending = false;
-  var currentStudent = null;
-  var currentScanValue = '';
-  var subjectPairs = [];
-  var teacherMap = null;
-  var successTimer = null;
-  var authState = { signedIn: false, tried: false, reason: '' };
-  var currentSub = null;
-  var subState = { active: false, reason: '', period: null, today: '' };
-  var subEvents = [];
-  var attendedToday = {};
-  // حالة اشتراك كل مادة+أستاذ: {active, remaining, total, used, reason, subscription, period}
-  var subjectSubState = {};
+  var appUnlocked = false, processing = false, authState = { signedIn: false, reason: '' };
+  var layoutInfo = '—', dbOpen = false;
+  var session = null, teacherMap = null, totalConfirmed = 0, attendedCount = 0;
+  var recentList = [], offlineQueue = [];
+  if (!fbReady) console.error('[ATTENDANCE] Firebase init failed');
 
-  // ── Firebase init flag check ───────────────────────────
-  if (!fbReady) {
-    console.error('[ATTENDANCE] Firebase init failed — attendance write will not work.');
-    openModal('error', 'فشل الاتصال بقاعدة البيانات', 'تعذر تحميل نظام البيانات. أعد تشغيل الصفحة أو تأكد من الاتصال بالإنترنت.');
-  }
-
-  // ── Algeria timezone (Africa/Algiers) ──────────────────
   function tick() {
     var now = new Date();
     $('clock-time').textContent = new Intl.DateTimeFormat('ar-DZ', { timeZone: ALGERIA_TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now);
     $('clock-date').textContent = new Intl.DateTimeFormat('ar-DZ', { timeZone: ALGERIA_TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now);
   }
-  tick();
-  setInterval(tick, 1000);
+  tick(); setInterval(tick, 1000);
+  function fmtTime(d) { return new Intl.DateTimeFormat('ar-DZ', { timeZone: ALGERIA_TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(d || new Date()); }
+  function fmtDate(d) { return new Intl.DateTimeFormat('ar-DZ', { timeZone: ALGERIA_TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(d || new Date()); }
 
-  function fmtAlgeriaTime(d) {
-    return new Intl.DateTimeFormat('ar-DZ', { timeZone: ALGERIA_TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(d || new Date());
-  }
-  function fmtAlgeriaDate(d) {
-    return new Intl.DateTimeFormat('ar-DZ', { timeZone: ALGERIA_TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(d || new Date());
-  }
-
-  // ── Decorative barcode bars on ready screen ────────────
   (function buildBars() {
-    var widths = [3,1,2,1,1,3,1,2,1,1,3,2,1,1,2,3,1,1,1,2,1,3,2,1,1,1,2,3];
-    var heights = [34,50,42,50,50,34,50,42,50,50,34,42,50,50,42,34,50,50,50,42,50,34,42,50,50,50,42,34];
-    var bars = '';
-    for (var i = 0; i < widths.length; i++) {
-      bars += '<i style="width:' + widths[i] + 'px;height:' + heights[i] + 'px"></i>';
-    }
-    $('scan-bars').innerHTML = bars;
+    var w = [3,1,2,1,1,3,1,2,1,1,3,2,1,1,2,3,1,1,1,2,1,3,2,1,1,1,2,3];
+    var h = [34,50,42,50,50,34,50,42,50,50,34,42,50,50,42,34,50,50,50,42,50,34,42,50,50,50,42,34];
+    var b = ''; for (var i = 0; i < w.length; i++) b += '<i style="width:'+w[i]+'px;height:'+h[i]+'px"></i>';
+    $('scan-bars').innerHTML = b;
   })();
 
-  // ── PIN gate (session-based, no prompt) ─────────────────
-  function isUnlocked() {
-    try { return sessionStorage.getItem(PIN_SESSION_KEY) === '1'; } catch (e) { return false; }
-  }
-  function setUnlocked(v) {
-    try {
-      if (v) sessionStorage.setItem(PIN_SESSION_KEY, '1');
-      else sessionStorage.removeItem(PIN_SESSION_KEY);
-    } catch (e) {}
-  }
+  // ── PIN gate ──
+  function isUnlocked() { try { return sessionStorage.getItem(PIN_SESSION_KEY) === '1'; } catch (e) { return false; } }
+  function setUnlocked(v) { try { if (v) sessionStorage.setItem(PIN_SESSION_KEY, '1'); else sessionStorage.removeItem(PIN_SESSION_KEY); } catch (e) {} }
   function checkPin(pin) {
     try {
       if (typeof crypto !== 'undefined' && crypto.subtle && typeof TextEncoder !== 'undefined') {
         return crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(pin))).then(function (buf) {
-          var h = '';
-          var a = new Uint8Array(buf);
+          var h = '', a = new Uint8Array(buf);
           for (var i = 0; i < a.length; i++) h += (a[i] < 16 ? '0' : '') + a[i].toString(16);
           return h === PIN_HASH;
         });
@@ -678,654 +403,472 @@
     } catch (e) {}
     return Promise.resolve(String(pin) === PIN_FALLBACK);
   }
-  function showPinError() {
-    var el = $('pin-error');
-    if (el) { el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
-  }
-  function clearPinError() {
-    var el = $('pin-error');
-    if (el) el.classList.remove('show');
-  }
+  function showPinError() { var el = $('pin-error'); if (el) { el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); } }
+  function clearPinError() { var el = $('pin-error'); if (el) el.classList.remove('show'); }
   function showPin() {
-    setUnlocked(false);
-    appUnlocked = false;
-    $('view-pin').classList.add('active');
-    $('app').classList.add('locked');
-    try { if ($('pin-input').focus) $('pin-input').focus(); } catch (e) {}
+    setUnlocked(false); appUnlocked = false; session = null; updateSessionChips();
+    $('view-pin').classList.add('active'); $('app').classList.add('locked');
+    try { $('pin-input').focus(); } catch (e) {}
   }
-  function showApp() {
-    appUnlocked = true;
-    $('view-pin').classList.remove('active');
-    $('app').classList.remove('locked');
-    goReady();
-  }
+  function showApp() { appUnlocked = true; $('view-pin').classList.remove('active'); $('app').classList.remove('locked'); switchView('setup'); }
   function unlockApp(pin) {
     return checkPin(pin).then(function (ok) {
-      if (ok) {
-        clearPinError();
-        showApp();
-        logScanner('PIN OK — system unlocked');
-        ensureAttendanceAuth();
-      } else {
-        showPinError();
-        logScanner('PIN rejected');
-      }
+      if (ok) { clearPinError(); showApp(); logScanner('PIN OK'); ensureAttendanceAuth(); }
+      else { showPinError(); logScanner('PIN rejected'); }
       return ok;
     });
   }
-  function lockApp() {
-    resetAttendanceSession();
-    showPin();
-    logScanner('System locked');
-  }
-  function submitPin() {
-    var v = $('pin-input').value;
-    unlockApp(v).then(function (ok) { if (ok) $('pin-input').value = ''; });
-  }
+  function lockApp() { endSession(); showPin(); logScanner('System locked'); }
+  function submitPin() { var v = $('pin-input').value; unlockApp(v).then(function (ok) { if (ok) $('pin-input').value = ''; }); }
   $('pin-btn').addEventListener('click', submitPin);
-  $('pin-input').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); submitPin(); }
-  });
+  $('pin-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); submitPin(); } });
   $('lock-btn').addEventListener('click', lockApp);
-  window.__attUnlock = unlockApp;
-  window.__attLock = lockApp;
+  window.__attUnlock = unlockApp; window.__attLock = lockApp;
 
-  // ── Firebase anonymous auth (write protection layer) ───
-  // Retried on every call until a signed-in session exists, so a
-  // transient network failure can never permanently block writes.
+  // ── Firebase anonymous auth ──
   function ensureAttendanceAuth() {
     return new Promise(function (resolve) {
       if (authState.signedIn) { resolve(authState); return; }
       try {
-        if (typeof firebase === 'undefined' || !firebase.auth || typeof firebase.auth !== 'function') {
-          authState.reason = 'firebase-auth SDK missing';
-          resolve(authState);
-          return;
-        }
-        firebase.app('kiosk').auth().signInAnonymously().then(function () {
-          authState.signedIn = true;
-          authState.reason = '';
-          console.log('[ATTENDANCE AUTH] anonymous signed in');
-          resolve(authState);
-        }).catch(function (e) {
-          authState.reason = (e && e.code) || (e && e.message) || 'unknown';
-          console.warn('[ATTENDANCE AUTH] anonymous sign-in failed (' + authState.reason + '). Enable Anonymous sign-in in Firebase Console → Authentication → Sign-in method, then deploy firestore.rules.');
-          resolve(authState);
-        });
-      } catch (e) {
-        authState.reason = (e && e.message) || 'unknown';
-        resolve(authState);
-      }
+        if (typeof firebase === 'undefined' || !firebase.auth || typeof firebase.auth !== 'function') { authState.reason = 'firebase-auth SDK missing'; resolve(authState); return; }
+        firebase.app('kiosk').auth().signInAnonymously().then(function () { authState.signedIn = true; authState.reason = ''; console.log('[ATTENDANCE AUTH] signed in'); resolve(authState); })
+        .catch(function (e) { authState.reason = (e && e.code) || 'unknown'; console.warn('[ATTENDANCE AUTH] failed:', authState.reason); resolve(authState); });
+      } catch (e) { authState.reason = (e && e.message) || 'unknown'; resolve(authState); }
     });
   }
 
-  // ── Scanner (shared BarcodeScanner utility — event.code based) ──
-  // SP-1160 works as a USB HID keyboard. We rebuild the value ONLY from
-  // event.code (physical key = layout-independent). event.key is
-  // layout-dependent (Arabic/French layouts garble digits into é/à/&)
-  // and is kept ONLY for diagnostics — never used to build the value.
-  var layoutInfo = '—';
-  var dbOpen = false;
-
-  function logScanner() {
+  function switchView(n) { var vs = document.querySelectorAll('.view'); for (var i = 0; i < vs.length; i++) vs[i].classList.remove('active'); var v = $('view-' + n); if (v) v.classList.add('active'); }
+  function updateSessionChips() {
+    var el = $('session-chips');
+    if (!session) { el.innerHTML = ''; return; }
+    el.innerHTML = '<span class="session-chip"><span class="cd g"></span>' + esc(session.subject) + '</span><span class="session-chip"><span class="cd a"></span>' + esc(session.teacherName) + '</span>';
+  }
+  function updateOfflineBadge() { var el = $('offline-badge'); if (offlineQueue.length > 0) { el.textContent = '⏳ ' + offlineQueue.length + ' معلّق'; el.classList.add('show'); } else el.classList.remove('show'); }
+  function updateCounter() {
+    $('k-attended').textContent = attendedCount;
+    $('k-total').textContent = totalConfirmed || '—';
+    var pct = totalConfirmed ? Math.min(100, Math.round((attendedCount / totalConfirmed) * 100)) : 0;
+    $('k-progress-bar').style.width = pct + '%';
+  }
+  // ── Setup: load teachers + populate dropdowns ──
+  async function loadTeachersMap() {
+    var map = {};
     try {
-      console.log.apply(console, ['[ATTENDANCE SCANNER]'].concat([].slice.call(arguments)));
-    } catch (e) {}
-  }
-
-  function dbAppend(line) {
-    var logEl = $('db-log');
-    if (!logEl) return;
-    var div = document.createElement('div');
-    div.textContent = line;
-    logEl.appendChild(div);
-    while (logEl.childNodes.length > 60) logEl.removeChild(logEl.firstChild);
-    logEl.scrollTop = logEl.scrollHeight;
-  }
-
-  function updateDebugLive(info) {
-    $('db-key').textContent = info.key;
-    $('db-code').textContent = info.code || '';
-    $('db-keycode').textContent = (info.evt && (info.evt.keyCode || info.evt.which)) || '';
-    $('db-which').textContent = (info.evt && info.evt.which) || '';
-    var joined = info.buffer.join('');
-    $('db-buffer').textContent = joined || '—';
-    $('db-buffer').className = 'v' + (/^\d+$/.test(joined) && joined ? ' good' : '');
-    $('db-len').textContent = info.buffer.length;
-    $('db-timing').textContent = (info.startTs ? (Date.now() - info.startTs) : 0) + ' ms';
-    if (info.digit != null && layoutInfo === '—') {
-      layoutInfo = (typeof info.key === 'string' && info.key === info.digit)
-        ? 'EN/US ✓'
-        : 'غير EN/US ⚠ (Digit' + info.digit + ' → "' + info.key + '")';
-      $('db-layout').textContent = layoutInfo;
-    }
-  }
-
-  // ── Global scanner capture (capture phase — works with no focus) ──
-  // The SP-1160 is a USB HID keyboard. We rebuild the barcode value ONLY
-  // from event.code (physical key = layout-independent). event.key is
-  // layout-dependent (Arabic/French layouts garble digits into é/à/&) and
-  // is kept ONLY for diagnostics — never used to build the value.
-  var scanner = new window.BarcodeScanner.Scanner({
-    logPrefix: '[ATTENDANCE SCANNER]',
-    shouldIgnoreKey: function (e) {
-      // Manual entry + PIN inputs are the only elements that let typed keys
-      // pass through. The SP-1160 scanner does NOT need focus.
-      return !!(e.target && (e.target.id === 'manual-input' || e.target.id === 'pin-input'));
-    },
-    onState: function (name, data) {
-      if (name === 'start') {
-        logScanner('Scan started');
-      } else if (name === 'key') {
-        dbAppend('code=' + data.code + ' mapped=' + data.mapped + ' key=' + JSON.stringify(data.key) + ' buf=' + data.buffer.join(''));
-        updateDebugLive(data);
-      } else if (name === 'nondigit') {
-        logScanner('Non-digit key: code=' + data.code + ' key=' + JSON.stringify(data.key) + ' (ignored)');
-      }
-    },
-    onScan: function (codeVal, meta) {
-      $('db-enter').textContent = meta.enter ? 'YES' : 'NO';
-      $('db-timing').textContent = meta.duration + ' ms';
-      dbAppend('done: code="' + codeVal + '" enter=' + (meta.enter ? 'Y' : 'N'));
-      logScanner('Scan complete');
-      logScanner('rawCodeValue=' + codeVal);
-      logScanner('length=' + codeVal.length);
-      if (codeVal.length === 13) logScanner('Valid EAN-13: ' + EAN13.isValid(codeVal));
-      logScanner('Looking up student...');
-      handleScan(codeVal);
-    },
-    onInvalid: function (codeVal, meta) {
-      showInvalidScan(codeVal, meta.keyVal || '', meta.duration, meta.sawNonDigit);
-    }
-  });
-  scanner.start();
-
-  // Keep keyboard focus on the page: the SP-1160 types into whatever has
-  // focus, so after any click on the page we drop focus onto a neutral
-  // element (never the manual-entry / PIN inputs). If focus sits in the
-  // DevTools console instead, the scanned text would be typed there and
-  // evaluated as JS on Enter — click the page before scanning to avoid that.
-  function grabScanFocus() {
-    try {
-      var t = document.activeElement;
-      if (t && (t.id === 'manual-input' || t.id === 'pin-input' || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-      if (!document.body.hasAttribute('tabindex')) document.body.setAttribute('tabindex', '-1');
-      if (t === document.body || t === document.documentElement || t === null) {
-        document.body.focus({ preventScroll: true });
-      }
-    } catch (e) {}
-  }
-  document.addEventListener('pointerdown', function () { setTimeout(grabScanFocus, 0); }, true);
-  if (typeof window !== 'undefined' && window.addEventListener) {
-    window.addEventListener('focus', grabScanFocus);
-  }
-
-  function showInvalidScan(codeVal, keyVal, duration, sawNonDigit) {
-    animateCard('rejected');
-    setPill('قيمة Barcode غير صالحة', false);
-    openModal('warn', 'تم اكتشاف Scan لكن قيمة Barcode غير صالحة',
-      'لم تُرسل القيمة إلى قاعدة البيانات.<br>' +
-      'القيمة الخام (event.code): <span class="time-chip">' + esc(codeVal) + '</span><br>' +
-      'القيمة (event.key): <span class="time-chip">' + esc(keyVal) + '</span><br>' +
-      'الطول: <b>' + codeVal.length + '</b> — المدة: <b>' + duration + 'ms</b>' +
-      (sawNonDigit ? '<br><b>تم استقبال مفاتيح غير رقمية.</b>' : '') +
-      '<br><br><small>إن ظهرت أحرف مثل é/à/& فسببها تخطيط لوحة المفاتيح — النظام يعتمد event.code الذي لا يتأثر بالتخطيط، فيبقى الشرط أن الباركود نفسه يحتوي أرقاماً فقط.</small>');
-  }
-
-  // ── View switching ─────────────────────────────────────
-  function switchView(name) {
-    var views = document.querySelectorAll('.view');
-    for (var i = 0; i < views.length; i++) views[i].classList.remove('active');
-    var v = $('view-' + name);
-    if (v) v.classList.add('active');
-  }
-
-  // ── Full session reset (used on Lock / stale-state cleanup) ──
-  // Wipes ALL student/scan state and returns to the ready view so
-  // nothing (student, subjects, scan value, success overlay) survives
-  // a Lock. No student data is ever persisted to storage.
-  function resetAttendanceSession() {
-    clearTimeout(successTimer);
-    successTimer = null;
-    currentStudent = null;
-    currentScanValue = '';
-    subjectPairs = [];
-    attending = false;
-    subjectBusyIdx = -1;
-
-    // scanner HID buffer
-    if (scanner && scanner.reset) scanner.reset();
-
-    // status pill / last-read
-    $('last-read').textContent = '';
-    setPill('جهاز الماسح جاهز', true);
-
-    // student panel
-    $('st-name').textContent = '—';
-    $('st-id').textContent = '—';
-    $('st-status').textContent = 'مسجل نهائياً';
-    $('st-status').className = 'tag green';
-    $('st-tags').innerHTML = '';
-    $('st-note').textContent = 'المواد التالية هي المواد المسجلة لهذا الطالب فقط.';
-    $('subj-count').textContent = '0';
-    $('subject-list').innerHTML = '';
-    $('st-avatar').src = 'icons/student.png';
-
-    // subscription panel
-    currentSub = null;
-    subState = { active: false, reason: '', period: null, today: '' };
-    subEvents = [];
-    attendedToday = {};
-    $('sub-badge').textContent = '—';
-    $('sub-badge').className = 'sub-badge';
-    $('sub-status').textContent = 'جارٍ تحميل الاشتراك…';
-    $('month-cards').innerHTML = '';
-    $('subc-total').textContent = '—';
-    $('subc-used').textContent = '—';
-    $('subc-remaining').textContent = '—';
-    $('sub-teachers').innerHTML = '';
-    $('sub-timeline').innerHTML = '';
-
-    // scan card state + any open modal
-    var card = $('scan-card');
-    if (card) card.classList.remove('verified', 'rejected');
-    $('overlay').classList.remove('show');
-
-    switchView('ready');
-  }
-
-  function goReady() {
-    clearTimeout(successTimer);
-    currentStudent = null;
-    currentScanValue = '';
-    subjectPairs = [];
-    attending = false;
-    currentSub = null;
-    subState = { active: false, reason: '', period: null, today: '' };
-    subEvents = [];
-    attendedToday = {};
-    $('last-read').textContent = '';
-    setPill('جهاز الماسح جاهز', true);
-    switchView('ready');
-  }
-
-  function setPill(text, active) {
-    var pill = $('ready-pill');
-    pill.innerHTML = '<span class="dot"></span>' + esc(text);
-  }
-
-  // ── Teacher map (support_teachers by normalized name) ──
-  function normName(name) { return String(name || '').replace(/\s+/g, '').toLowerCase(); }
-
-  async function loadTeacherMap() {
-    if (teacherMap) return teacherMap;
-    var map = new Map();
-    try {
-      var snap = await db.collection('support_teachers').get();
-      snap.forEach(function (d) {
-        var t = d.data() || {};
-        var key = normName(t.name);
-        if (!key) return;
-        if (!map.has(key)) map.set(key, { teacherId: t.teacherId || t.id || d.id, name: t.name || '' });
-      });
-    } catch (e) { console.warn('loadTeacherMap failed', e); }
-    teacherMap = map;
+      var snap = await window.db.collection('support_teachers').where('status', '==', 'active').get();
+      snap.forEach(function (d) { var dt = d.data(); if (dt && dt.name) map[dt.name] = d.id; });
+    } catch (e) { console.warn('[TEACHER MAP]', e); }
     return map;
   }
-
-  // ── Resolve the student's registered subjects ──────────
-  async function resolveSubjects(student) {
-    var map = await loadTeacherMap();
-    var arr = Array.isArray(student.subjects) ? student.subjects : [];
-    var pairs = [];
-    for (var i = 0; i < arr.length; i++) {
-      var s = arr[i];
-      var subjectName = typeof s === 'string' ? s : (s.subject || s.subjectName || '');
-      var teacherName = typeof s === 'string' ? '' : (s.teacher || s.teacherName || '');
-      var t = teacherName ? map.get(normName(teacherName)) : null;
-      pairs.push({
-        idx: i,
-        subjectName: subjectName,
-        subjectId: (s && s.subjectId) || SubjectService.getSubjectId(subjectName) || '',
-        teacherName: teacherName,
-        teacherId: (s && s.teacherId) || (t ? t.teacherId : '') || '',
-        icon: SubjectService.getSubjectIcon(subjectName) || '📘',
-        recording: false
-      });
-    }
-    return pairs;
-  }
-
-  // ── Render student view ────────────────────────────────
-  async function showStudent(student) {
-    var name = studentFullName(student);
-    $('st-name').textContent = name || '—';
-    $('st-id').textContent = student.id || '—';
-    $('st-status').textContent = student.status || 'مسجل نهائياً';
-    $('st-status').className = 'tag green';
-
-    var tags = [];
-    if (student.level) tags.push('<span class="tag">' + esc(student.level) + '</span>');
-    if (student.stream) tags.push('<span class="tag gold">' + esc(student.stream) + '</span>');
-    if (student.institution) tags.push('<span class="tag">' + esc(student.institution) + '</span>');
-    $('st-tags').innerHTML = tags.join('');
-
-    // real attendance recorded today (to mark already-recorded subjects)
-    // المصدر الموثوق: قاعدة البيانات (attendance_sessions) عبر RPC مقصور بالطالب
-    attendedToday = {};
+  function getStreamGroups() {
+    var groups = {};
     try {
-      var todayEvents = await SubscriptionService.getStudentEvents(student.id);
-      todayEvents.filter(function (ev) { return ev.date === AttendanceService.today(); })
-        .forEach(function (ev) {
-          if (ev.subjectId && ev.teacherId) attendedToday[ev.subjectId + '|' + ev.teacherId] = true;
+      var s = SubjectService.SUPPORT_STREAMS;
+      Object.keys(s).forEach(function (k) { groups[k] = Object.keys(s[k]); });
+    } catch (e) {}
+    groups['السنة الرابعة متوسط'] = ['science', 'islamic'];
+    return groups;
+  }
+  function getSubjectsForGroup(groupKey) {
+    var out = [];
+    try {
+      var s = SubjectService.SUPPORT_STREAMS;
+      if (s[groupKey]) {
+        Object.keys(s[groupKey]).forEach(function (subKey) {
+          var sub = s[groupKey][subKey];
+          var teachers = Array.isArray(sub.teachers) ? sub.teachers.map(function (t) { return typeof t === 'string' ? t : t.name || ''; }).filter(Boolean) : [];
+          if (teachers.length) out.push({ key: subKey, name: sub.name || subKey, teachers: teachers });
         });
-    } catch (e) { console.warn('[ATTENDANCE] load today attendance failed', e); }
-
-    await loadSubscription(student);
-
-    subjectPairs = await resolveSubjects(student);
-    $('subj-count').textContent = subjectPairs.length;
-
-    if (subjectPairs.length === 0) {
-      $('subject-list').innerHTML = '<div class="empty-subjects">لم يسجل هذا الطالب في أي مادة بعد</div>';
-      $('st-note').textContent = 'المواد التالية هي المواد المسجلة لهذا الطالب فقط.';
-    } else {
-      $('st-note').textContent = 'المواد التالية هي المواد المسجلة لهذا الطالب فقط — اختر الأستاذ لتسجيل الحضور:';
-      await loadSubjectSubStates();
-      renderSubjects();
-      showPausedNotice();
-    }
-    switchView('student');
+      } else if (groupKey === 'السنة الرابعة متوسط') {
+        var ms = SubjectService.SUPPORT_MIDDLE_SCHOOL;
+        Object.keys(ms).forEach(function (subKey) {
+          var sub = ms[subKey];
+          var teachers = Array.isArray(sub.teachers) ? sub.teachers.map(function (t) { return typeof t === 'string' ? t : t.name || ''; }).filter(Boolean) : [];
+          if (teachers.length) out.push({ key: subKey, name: sub.name || subKey, teachers: teachers });
+        });
+      }
+    } catch (e) {}
+    return out;
   }
-
-  // ── Per-subject/teacher subscription state ─────────────
-  // كل مادة + أستاذ له اشتراكه المستقل: لا يوجد اشتراك → رسالة محددة؛
-  // اكتملت حصص الشهر → رسالة محددة؛ نشط + متبقية → يُسمح بالتسجيل.
-  async function loadSubjectSubStates() {
-    subjectSubState = {};
-    if (!currentStudent) return;
-    var today = SubscriptionService.today();
-    for (var i = 0; i < subjectPairs.length; i++) {
-      var p = subjectPairs[i];
-      var key = (p.subjectId || '') + '|' + (p.teacherId || '');
-      var data = null;
-      try {
-        data = await SubscriptionService.getActiveSubscriptionForSubject(currentStudent.id, p.subjectId, p.teacherId, today);
-      } catch (e) { console.warn('[ATTENDANCE] subject sub state failed', e); }
-      if (!data || !data.subscription) {
-        subjectSubState[key] = { active: false, reason: 'no_subscription', remaining: 0, total: 0, used: 0, subscription: null, period: null };
-        continue;
-      }
-      if (data.subscription.status === 'paused') {
-        subjectSubState[key] = { active: false, reason: 'paused', remaining: 0, total: 0, used: 0, subscription: data.subscription, period: null };
-        continue;
-      }
-      var period = SubscriptionService.activePeriod(data.periods, today);
-      if (!period) {
-        subjectSubState[key] = { active: false, reason: 'expired', remaining: 0, total: 0, used: 0, subscription: data.subscription, period: null };
-        continue;
-      }
-      var used = period.used_sessions || 0;
-      var total = period.total_sessions || SubscriptionService.SESSIONS_PER_MONTH;
-      var remaining = Math.max(0, total - used);
-      subjectSubState[key] = {
-        active: remaining > 0,
-        reason: remaining > 0 ? '' : 'full',
-        remaining: remaining, total: total, used: used,
-        subscription: data.subscription, period: period
-      };
-    }
-  }
-
-  function subjectSubKey(pair) { return (pair.subjectId || '') + '|' + (pair.teacherId || ''); }
-
-  // عند المسح: تنبيه فوري يوضح الاشتراكات الموقوفة مؤقتاً (المادة + الأستاذ)
-  function showPausedNotice() {
-    var items = [];
-    Object.keys(subjectSubState).forEach(function (k) {
-      var st = subjectSubState[k];
-      if (st && st.reason === 'paused' && st.subscription) items.push(st.subscription);
+  function populateGroupDropdown() {
+    var sel = $('setup-group');
+    var groups = getStreamGroups();
+    sel.innerHTML = '<option value="">— اختر المجموعة —</option>';
+    Object.keys(groups).forEach(function (k) {
+      sel.innerHTML += '<option value="' + esc(k) + '">' + esc(k) + ' (' + groups[k].length + ' أقسام)</option>';
     });
-    if (!items.length) return;
-    var html = 'الاشتراك التالي <b>متوقف مؤقتاً</b> من الإدارة:<br><br>';
-    items.forEach(function (s) {
-      html += '• مادة <b>' + esc(s.subject_name || '—') + '</b> عند الأستاذ <b>' + esc(s.teacher_name || '—') + '</b><br>';
+    sel.disabled = false;
+  }
+  function onGroupChange() {
+    var groupKey = $('setup-group').value;
+    var subjSel = $('setup-subject');
+    var teachSel = $('setup-teacher');
+    subjSel.innerHTML = '<option value="">— اختر المادة —</option>';
+    teachSel.innerHTML = '<option value="">— اختر المادة أولاً —</option>';
+    subjSel.disabled = true;
+    teachSel.disabled = true;
+    $('setup-start').disabled = true;
+    if (!groupKey) return;
+    var subjects = getSubjectsForGroup(groupKey);
+    subjects.forEach(function (s) {
+      subjSel.innerHTML += '<option value="' + esc(s.key) + '" data-teachers="' + esc(s.teachers.join('|')) + '">' + esc(s.name) + ' (' + s.teachers.length + ' أستاذ)</option>';
     });
-    html += '<br><span style="opacity:.75">لن يُسجَّل الحضور حتى يستأنف الإدارة الاشتراك.</span>';
-    openModal('warn', '⏸️ اشتراك متوقف مؤقتاً', html);
+    subjSel.disabled = false;
   }
-
-  // الرسالة الدقيقة لكل حالة (نص ثابت موحّد)
-  function subjectSubMessage(st) {
-    if (st && st.active) return '';
-    if (st && st.reason === 'paused') return 'الاشتراك متوقف مؤقتاً — راجع الإدارة.';
-    if (st && st.reason === 'full') return 'انتهت حصص هذا الشهر لهذه المادة.';
-    return 'لا يوجد اشتراك نشط لهذه المادة عند هذا الأستاذ.';
+  function onSubjectChange() {
+    var opt = $('setup-subject').selectedOptions[0];
+    var teachSel = $('setup-teacher');
+    teachSel.innerHTML = '<option value="">— اختر الأستاذ —</option>';
+    $('setup-start').disabled = true;
+    if (!opt) return;
+    var tStr = opt.getAttribute('data-teachers') || '';
+    var teachers = tStr.split('|').filter(Boolean);
+    if (!teachers.length) { teachSel.disabled = true; return; }
+    teachers.forEach(function (t) {
+      teachSel.innerHTML += '<option value="' + esc(t) + '">' + esc(t) + '</option>';
+    });
+    teachSel.disabled = false;
   }
-
-  function subGateFor(pair) {
-    var st = subjectSubState[subjectSubKey(pair)];
-    var msg = subjectSubMessage(st);
-    if (!msg) return null;
-    return { title: 'تسجيل غير مسموح', msg: msg };
+  function onTeacherChange() {
+    $('setup-start').disabled = !$('setup-teacher').value;
   }
+  $('setup-group').addEventListener('change', onGroupChange);
+  $('setup-subject').addEventListener('change', onSubjectChange);
+  $('setup-teacher').addEventListener('change', onTeacherChange);
 
-  function renderSubjects() {
-    var html = '';
-    for (var i = 0; i < subjectPairs.length; i++) {
-      var p = subjectPairs[i];
-      var teacherLine = p.teacherName
-        ? 'الأستاذ: <b>' + esc(p.teacherName) + '</b>'
-        : 'لا يتوفر أستاذ مسجل لهذه المادة';
-      var done = p.subjectId && p.teacherId ? !!attendedToday[p.subjectId + '|' + p.teacherId] : false;
-      var st = subjectSubState[subjectSubKey(p)];
-      var gateMsg = subjectSubMessage(st);
-      var btn;
-      if (done) {
-        btn = '<button class="record-btn recorded" type="button" disabled>✓ تم التسجيل</button>';
-      } else if (gateMsg) {
-        var pausedBtn = st && st.reason === 'paused';
-        btn = '<button class="record-btn no-sub" type="button" disabled>' + esc(pausedBtn ? 'موقوف مؤقتاً' : 'غير متاح') + '</button>';
-      } else {
-        btn = '<button class="record-btn" id="rec-btn-' + i + '" type="button" onclick="window.__mark(' + i + ')">تسجيل الحضور</button>';
-      }
-      html +=
-        '<div class="subject-card' + (done ? ' recorded' : '') + '" id="subj-card-' + i + '">' +
-          '<div class="subject-tile">' + esc(p.icon) + '</div>' +
-          '<div class="subject-info">' +
-            '<div class="subject-name">' + esc(p.subjectName || '—') + '</div>' +
-            '<div class="subject-teacher">' +
-              '<img class="t-avatar" src="icons/teacher.png" alt="" onerror="this.onerror=null;this.src=window.__svgIcon(\'teacher\')">' +
-              '<span>' + teacherLine + '</span>' +
-            '</div>' +
-            (gateMsg ? '<div class="subject-submsg">' + esc(gateMsg) + '</div>' : '') +
-          '</div>' +
-          btn +
-        '</div>';
-    }
-    $('subject-list').innerHTML = html;
-  }
-
-  // ── Subscription transparency panel ────────────────────
-  async function loadSubscription(student) {
-    var today = SubscriptionService.today();
-    subState.today = today;
-    currentSub = null;
-    subEvents = [];
-
-    var rows = [];
+  async function startSession() {
+    var groupKey = $('setup-group').value;
+    var subjectKey = $('setup-subject').value;
+    var teacherName = $('setup-teacher').value;
+    if (!groupKey || !subjectKey || !teacherName) return;
+    $('setup-start').disabled = true;
+    $('setup-start').textContent = 'جاري التحميل...';
     try {
-      rows = await SubscriptionService.getSubscriptions(student.id);
-    } catch (e) { console.warn('[ATTENDANCE] loadSubscription failed', e); }
+      var subjects = getSubjectsForGroup(groupKey);
+      var sub = subjects.find(function (s) { return s.key === subjectKey; });
+      var subjectName = sub ? sub.name : subjectKey;
+      var subjectId = SubjectService.getSubjectId(subjectName);
+      teacherMap = await loadTeachersMap();
+      var teacherId = teacherMap[teacherName] || '';
+      totalConfirmed = 0;
+      try {
+        var confirmed = await RegistrationService.getConfirmed();
+        if (confirmed) totalConfirmed = confirmed.length;
+      } catch (e) { console.warn('[COUNTER]', e); }
+      attendedCount = 0; recentList = []; offlineQueue = [];
+      session = { group: groupKey, subject: subjectName, subjectId: subjectId, subjectKey: subjectKey, teacherName: teacherName, teacherId: teacherId, startDate: new Date() };
+      updateSessionChips(); updateCounter(); updateOfflineBadge();
+      $('k-subject').textContent = subjectName;
+      $('k-teacher').textContent = teacherName;
+      $('k-group').textContent = groupKey;
+      $('k-recent-list').innerHTML = '';
+      $('k-recent-section').style.display = 'none';
+      $('header-sub').textContent = 'جلسة نشطة — ' + subjectName + ' — ' + teacherName;
+      switchView('kiosk'); renderReady();
+      logScanner('SESSION START: ' + subjectName + ' / ' + teacherName + ' / ' + groupKey);
+    } catch (e) { console.error('[SESSION]', e); $('setup-start').disabled = false; $('setup-start').textContent = 'بدء الجلسة'; }
+  }
+  $('setup-start').addEventListener('click', startSession);
+  function endSession() {
+    if (!session) return;
+    var endedAt = new Date();
+    var durationMin = Math.round((endedAt - session.startDate) / 60000);
+    session = null; teacherMap = null;
+    updateSessionChips();
+    $('ended-stats').textContent = 'تم تسجيل ' + attendedCount + ' حضور من أصل ' + totalConfirmed + ' طالب — المدة: ' + durationMin + ' دقيقة';
+    switchView('ended');
+    $('header-sub').textContent = 'نقطة تسجيل حضور الطلاب — الاستقبال';
+    logScanner('SESSION END: ' + attendedCount + ' attendances in ' + durationMin + ' min');
+  }
+  $('k-end-btn').addEventListener('click', function () { if (confirm('هل تريد إنهاء الجلسة؟')) endSession(); });
+  $('ended-restart').addEventListener('click', function () { switchView('setup'); populateGroupDropdown(); $('setup-subject').innerHTML = '<option value="">— اختر المادة —</option>'; $('setup-teacher').innerHTML = '<option value="">— اختر المادة أولاً —</option>'; $('setup-subject').disabled = true; $('setup-teacher').disabled = true; $('setup-start').disabled = true; });
+  // ── Scanner debug ──
+  function logScanner(text) {
+    var log = $('db-log'); if (!log) return;
+    var line = document.createElement('div');
+    line.textContent = new Date().toLocaleTimeString('ar-DZ') + ' | ' + text;
+    log.insertBefore(line, log.firstChild);
+    while (log.children.length > 60) log.removeChild(log.lastChild);
+  }
+  function updateDebug(payload) {
+    if (!dbOpen) return;
+    var i = payload.input || '—', k = payload.key || '—', c = payload.code || '—', kc = payload.keyCode || '—', l = payload.len || 0, t = payload.timing || '—', en = payload.enter ? 'YES' : 'NO', ly = payload.layout || '—';
+    $('db-buffer').textContent = i; $('db-key').textContent = k; $('db-code').textContent = c; $('db-keycode').textContent = kc; $('db-len').textContent = l; $('db-timing').textContent = t; $('db-enter').textContent = en; $('db-layout').textContent = ly;
+    if (payload.enter) { $('db-enter').classList.add('good'); setTimeout(function () { if ($('db-enter')) $('db-enter').classList.remove('good'); }, 1500); }
+    if (payload.layout) { layoutInfo = payload.layout; }
+  }
+  function resetDebug() { $('db-buffer').textContent = '—'; $('db-key').textContent = '—'; $('db-code').textContent = '—'; $('db-keycode').textContent = '—'; $('db-len').textContent = '0'; $('db-timing').textContent = '—'; $('db-enter').textContent = '—'; }
+  $('debug-toggle').addEventListener('click', function () {
+    dbOpen = !dbOpen; $('debug-panel').classList.toggle('show', dbOpen);
+    logScanner('Debug ' + (dbOpen ? 'opened' : 'closed'));
+  });
 
-    var subs = [];
-    (Array.isArray(rows) ? rows : []).forEach(function (row) {
-      var s = row.subscription || {};
-      if (s.status === 'cancelled') return;
-      subs.push({ subscription: s, periods: row.periods || [] });
+  // ── Sound + vibration ──
+  var audioCtx = null;
+  function getAudioCtx() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; }
+  function playTone(freq, durationMs) {
+    try {
+      var ctx = getAudioCtx(), osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = 'sine'; osc.frequency.value = freq;
+      gain.gain.value = 0.15;
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + durationMs / 1000);
+    } catch (e) {}
+  }
+  function soundSuccess() { playTone(880, 100); vibrate(100); }
+  function soundWarn() { playTone(440, 150); vibrate([80, 40, 80]); }
+  function soundError() { playTone(220, 200); vibrate([100, 50, 100, 50, 100]); }
+  function vibrate(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+
+  // ── Modal / Feedback ──
+  function showModal(type, icon, title, html) {
+    var overlay = $('overlay'), modal = $('modal');
+    modal.className = 'modal ' + type;
+    $('m-icon').innerHTML = icon;
+    $('m-title').textContent = title;
+    $('m-msg').innerHTML = html;
+    overlay.classList.add('show');
+  }
+  $('m-close').addEventListener('click', function () { $('overlay').classList.remove('show'); });
+  $('overlay').addEventListener('click', function (e) { if (e.target === $('overlay')) $('overlay').classList.remove('show'); });
+
+  function showFeedback(type, icon, name, detail, sub, time) {
+    var box = $('feedback-container');
+    var cls = type === 'success' ? 'green' : type === 'warn' ? 'orange' : 'red';
+    var html = '<div class="feedback-card ' + cls + '">'
+      + '<div class="fb-icon">' + icon + '</div>'
+      + '<div class="fb-name">' + esc(name) + '</div>'
+      + (detail ? '<div class="fb-detail">' + esc(detail) + '</div>' : '')
+      + (sub ? '<div class="fb-sub">' + esc(sub) + '</div>' : '')
+      + (time ? '<div class="fb-time">' + esc(time) + '</div>' : '')
+      + '</div>';
+    box.innerHTML = html;
+    box.classList.add('show');
+    var dismissMs = type === 'success' ? 2500 : type === 'warn' ? 3500 : 4000;
+    setTimeout(function () { box.classList.remove('show'); box.innerHTML = ''; }, dismissMs);
+  }
+
+  function addRecent(name, time, color) {
+    recentList.unshift({ name: name, time: time, color: color });
+    if (recentList.length > 8) recentList.pop();
+    renderRecent();
+  }
+  function renderRecent() {
+    var el = $('k-recent-list');
+    $('k-recent-section').style.display = recentList.length ? 'block' : 'none';
+    el.innerHTML = '';
+    recentList.forEach(function (r) {
+      el.innerHTML += '<div class="k-recent-item">'
+        + '<div class="k-recent-name">' + esc(r.name) + '</div>'
+        + '<div class="k-recent-time">' + esc(r.time) + '</div>'
+        + '<div class="k-recent-status ' + r.color + '">' + (r.color === 'green' ? 'تم التسجيل' : r.color === 'orange' ? 'تنبيه' : 'خطأ') + '</div>'
+        + '</div>';
     });
+  }
 
-    if (!subs.length) {
-      currentSub = null;
-      subState = { active: false, reason: 'no_subscription', period: null, today: today, used: 0, total: 0, remaining: 0 };
-      $('sub-badge').textContent = 'لا يوجد اشتراك';
-      $('sub-badge').className = 'sub-badge no';
-      $('sub-status').textContent = 'هذا الطالب لا يملك اشتراكاً نشطاً — يرجى مراجعة الإدارة لتفعيل الاشتراك قبل تسجيل الحضور.';
-      $('month-cards').innerHTML = '';
-      $('subc-total').textContent = '—';
-      $('subc-used').textContent = '—';
-      $('subc-remaining').textContent = '—';
-      $('sub-teachers').innerHTML = '<div class="sub-empty">لا يوجد اشتراك لحساب حصص الأساتذة</div>';
-      $('sub-timeline').innerHTML = '<div class="sub-empty">لا توجد حصص مسجلة</div>';
+  // ── Ready state ──
+  function renderReady() {
+    $('k-status-pill').innerHTML = '<span class="dot"></span>الماسح جاهز — امسح البطاقة';
+    $('k-last-read').textContent = '';
+    scanner.start();
+    grabScanFocus();
+  }
+  // ── Scan handler ──
+  async function handleScan(val) {
+    if (processing || !session) return;
+    processing = true;
+    scanner.setBusy(true);
+    $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>جاري التحقق...';
+    var raw = String(val || '').trim();
+    var studentId = '';
+    try { studentId = AttendanceService.resolveStudentFromScan(raw); } catch (e) { logScanner('resolveStudentFromScan error: ' + e.message); }
+    if (!studentId) {
+      $('k-last-read').textContent = raw;
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#ef4444"></span>بطاقة غير معروفة';
+      logScanner('REJECT unknown card: ' + raw);
+      showFeedback('error', '❌', 'بطاقة غير معروفة', raw, 'لا يوجد طالب مرتبط بهذه البطاقة', fmtTime());
+      soundError();
+      processing = false; scanner.setBusy(false);
+      setTimeout(renderReady, 2200);
       return;
     }
-
-    // كل اشتراك = مادة + أستاذ مستقلان؛ نعرض كل الأشهر عبر الاشتراكات
-    var cardsHtml = '';
-    var activePeriodIds = [];
-    var activeUsed = 0, activeTotal = 0, activeRemaining = 0;
-    var anyActive = false;
-    for (var si = 0; si < subs.length; si++) {
-      var sub = subs[si].subscription;
-      var periods = subs[si].periods;
-      var subLabel = (sub.subject_name || '') + (sub.teacher_name ? ' — ' + sub.teacher_name : '');
-      for (var pi = 0; pi < periods.length; pi++) {
-        var p = periods[pi];
-        var isActive = today >= (p.start_date || '') && today <= (p.end_date || '');
-        var full = (p.used_sessions || 0) >= (p.total_sessions || 0);
-        var pct = p.total_sessions ? Math.round(((p.used_sessions || 0) / p.total_sessions) * 100) : 0;
-        if (isActive) {
-          activePeriodIds.push(p.id);
-          anyActive = true;
-          activeUsed += (p.used_sessions || 0);
-          activeTotal += (p.total_sessions || SubscriptionService.SESSIONS_PER_MONTH);
-          activeRemaining += Math.max(0, (p.total_sessions || SubscriptionService.SESSIONS_PER_MONTH) - (p.used_sessions || 0));
+    logScanner('resolveStudent: id=' + studentId + ' raw=' + raw);
+    var reg = null;
+    try { reg = await RegistrationService.getById(studentId); } catch (e) { logScanner('getById error: ' + e.message); }
+    if (!reg) {
+      $('k-last-read').textContent = studentId;
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#ef4444"></span>طالب غير موجود';
+      logScanner('REJECT student not found: ' + studentId);
+      showFeedback('error', '❌', 'طالب غير موجود', studentId, 'لم يتم العثور على بيانات الطالب', fmtTime());
+      soundError();
+      processing = false; scanner.setBusy(false);
+      setTimeout(renderReady, 2200);
+      return;
+    }
+    var name = studentFullName(reg);
+    $('k-last-read').textContent = studentId + ' — ' + name;
+    logScanner('student: ' + name + ' (id=' + studentId + ', status=' + reg.status + ')');
+    if (reg.status !== 'مسجل نهائياً') {
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>حالة غير مقبولة — ' + name;
+      logScanner('REJECT status: ' + reg.status);
+      showFeedback('warn', '⚠️', name, 'الحالة: ' + reg.status, 'الطالب غير مسجل نهائياً', fmtTime());
+      soundWarn();
+      processing = false; scanner.setBusy(false);
+      setTimeout(renderReady, 2500);
+      return;
+    }
+    var subjectMatch = null;
+    var studs = Array.isArray(reg.subjects) ? reg.subjects : [];
+    for (var i = 0; i < studs.length; i++) {
+      if (studs[i].subject === session.subject && studs[i].teacher === session.teacherName) {
+        subjectMatch = studs[i]; break;
+      }
+    }
+    if (!subjectMatch) {
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>المادة غير مطابقة — ' + name;
+      logScanner('REJECT subject mismatch: expected=' + session.subject + ' teacher=' + session.teacherName + ' student_subjects=' + JSON.stringify(studs));
+      var studentSubjects = studs.map(function (s) { return s.subject + ' — ' + s.teacher; }).join(' | ');
+      showFeedback('warn', '⚠️', name, 'ليس مسجلاً في: ' + session.subject + ' — ' + session.teacherName, 'مواد الطالب: ' + (studentSubjects || 'لا توجد'), fmtTime());
+      soundWarn();
+      processing = false; scanner.setBusy(false);
+      setTimeout(renderReady, 2800);
+      return;
+    }
+    logScanner('subject match OK: ' + subjectMatch.subject + ' — ' + subjectMatch.teacher);
+    var mirrorId = (studentId + '_' + (session.teacherId || '') + '_' + (session.subjectId || '') + '_' + AttendanceService.today() + '_1').replace(/[^A-Za-z0-9_.\-]/g, '_');
+    logScanner('mirrorId: ' + mirrorId);
+    var alreadyRecorded = false;
+    try { alreadyRecorded = await AttendanceService.isDuplicate(studentId, session.subjectId, AttendanceService.today(), 1, session.teacherId); } catch (e) { logScanner('isDuplicate error: ' + e.message); }
+    if (alreadyRecorded) {
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>تم التسجيل مسبقاً — ' + name;
+      logScanner('REJECT duplicate');
+      showFeedback('warn', '🔁', name, 'تم تسجيل الحضور مسبقاً لهذا اليوم', fmtTime(), fmtTime());
+      soundWarn();
+      processing = false; scanner.setBusy(false);
+      setTimeout(renderReady, 2200);
+      return;
+    }
+    logScanner('no duplicate — proceed to record');
+    var subKey = session.subjectKey || SubjectService.getSubjectId ? SubjectService.getSubjectId(session.subject) : '';
+    var subscriptionId = null, periodId = null, monthNumber = null, hasActiveSubscription = false, subStatus = '';
+    try {
+      if (fbReady) {
+        var subDoc = await SubscriptionService.getActiveSubscriptionForSubject(studentId, session.subjectId, session.teacherId, AttendanceService.today());
+        if (subDoc) {
+          hasActiveSubscription = true;
+          subscriptionId = subDoc.subscriptionId || subDoc.id || null;
+          periodId = subDoc.periodId || null;
+          monthNumber = subDoc.monthNumber != null ? subDoc.monthNumber : null;
+          logScanner('subscription OK: id=' + subscriptionId);
+        } else {
+          subStatus = 'no_active_subscription';
+          logScanner('no active subscription');
         }
-        cardsHtml +=
-          '<div class="month-card' + (isActive ? ' active' : '') + (full ? ' full' : '') + '">' +
-            '<div class="m-idx">' + (p.month_number || pi + 1) + '</div>' +
-            '<div class="m-main">' +
-              '<div class="m-name">' + esc(subLabel || '') + (subLabel ? ' — ' : '') + 'الشهر ' + (p.month_number || pi + 1) + (isActive ? ' — الحالي' : '') + '</div>' +
-              '<div class="m-range">' + esc(SubscriptionService.fmtAr(p.start_date)) + ' → ' + esc(SubscriptionService.fmtAr(p.end_date, true)) + '</div>' +
-            '</div>' +
-            '<div class="m-usage"><span class="u">' + (p.used_sessions || 0) + '</span> / ' + (p.total_sessions || 0) + '</div>' +
-            '<div class="m-progress"><i style="width:' + pct + '%"></i></div>' +
-          '</div>';
       }
+    } catch (e) { console.warn('[SUBSCRIPTION]', e); subStatus = 'error: ' + (e && e.message); logScanner('subscription check error: ' + e.message); }
+    if (!hasActiveSubscription) {
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>اشتراك غير نشط — ' + name;
+      logScanner('REJECT no subscription');
+      showFeedback('warn', '⚠️', name, 'لا يوجد اشتراك نشط لهذه المادة', subStatus || 'غير مسجل في ANY subscription مع ANY نشط', fmtTime());
+      soundWarn();
+      processing = false; scanner.setBusy(false);
+      setTimeout(renderReady, 2800);
+      return;
     }
-    $('month-cards').innerHTML = cardsHtml || '<div class="sub-empty">لا توجد أشهر محددة للاشتراك</div>';
-
-    var recs = [];
+    logScanner('subscribeId=' + subscriptionId + ' periodId=' + periodId + ' month=' + monthNumber);
+    var payload = {
+      action: 'record',
+      studentId: studentId,
+      teacherId: session.teacherId,
+      teacherName: session.teacherName,
+      subjectId: session.subjectId,
+      subjectName: session.subject,
+      barcodeValue: raw,
+      subscriptionId: subscriptionId,
+      periodId: periodId,
+      monthNumber: monthNumber,
+      date: AttendanceService.today(),
+      checkInTime: AttendanceService.nowTime(),
+      mirrorId: mirrorId
+    };
+    logScanner('calling Edge Function...');
+    var edgeResult = null;
     try {
-      var allEvents = await SubscriptionService.getStudentEvents(student.id);
-      recs = (Array.isArray(allEvents) ? allEvents : []).filter(function (ev) {
-        return activePeriodIds.length ? activePeriodIds.indexOf(ev.subscriptionPeriodId) >= 0 : true;
-      });
-    } catch (e) { console.warn('[ATTENDANCE] loadSubscription events failed', e); }
-    subEvents = recs;
-
-    if (anyActive) {
-      subState = { active: true, reason: '', period: null, today: today, used: activeUsed, total: activeTotal, remaining: activeRemaining };
-      $('sub-badge').textContent = activeRemaining > 0 ? 'اشتراك نشط' : 'اكتملت حصص الشهر';
-      $('sub-badge').className = 'sub-badge ' + (activeRemaining > 0 ? 'ok' : 'full');
-      $('sub-status').innerHTML = activePeriodIds.length > 1
-        ? 'يوجد <b>' + activePeriodIds.length + '</b> اشتراكات نشطة هذا الشهر — كل مادة تُحسب حصصها بشكل مستقل.'
-        : 'يوجد اشتراك نشط لهذه المادة — يمكن تسجيل الحضور حسب المادة.';
-      $('subc-total').textContent = activeTotal;
-      $('subc-used').textContent = activeUsed;
-      $('subc-remaining').textContent = activeRemaining;
-      renderSubTeacherCounters(recs, activeTotal);
-      renderSubTimeline(recs);
-    } else {
-      var allUsed = 0, allTotal = 0;
-      for (var j = 0; j < subs.length; j++) {
-        var pp = subs[j].periods;
-        for (var k2 = 0; k2 < pp.length; k2++) { allUsed += pp[k2].used_sessions || 0; allTotal += pp[k2].total_sessions || 0; }
+      edgeResult = await recordAttendanceEdge(payload);
+      logScanner('Edge OK');
+    } catch (edgeErr) {
+      logScanner('Edge error: ' + ((edgeErr && edgeErr.message) || edgeErr));
+      if (fbReady && authState.signedIn) {
+        var mirror = {
+          studentId: studentId,
+          studentName: name,
+          teacherId: session.teacherId,
+          teacherName: session.teacherName,
+          subjectId: session.subjectId,
+          subjectName: session.subject,
+          studentType: reg.student_type || '',
+          sessionNumber: 1,
+          date: AttendanceService.today(),
+          checkInTime: AttendanceService.nowTime(),
+          barcodeValue: raw,
+          subscriptionId: subscriptionId,
+          syncStatus: 'failed',
+          source: 'eplus-attendance',
+          createdAt: AttendanceService.nowTime()
+        };
+        try { await AttendanceService.writeMirror(mirror); logScanner('mirror write done (failed record)'); } catch (me) { logScanner('mirror write error: ' + me.message); }
       }
-      subState = { active: false, reason: 'expired', period: null, today: today, used: allUsed, total: allTotal, remaining: 0 };
-      $('sub-badge').textContent = 'لا توجد أشهر نشطة';
-      $('sub-badge').className = 'sub-badge no';
-      $('sub-status').textContent = 'لا توجد أشهر نشطة حالياً لهذه الاشتراكات — يرجى مراجعة الإدارة.';
-      $('subc-total').textContent = allTotal || '—';
-      $('subc-used').textContent = allUsed || '—';
-      $('subc-remaining').textContent = '0';
-      renderSubTeacherCounters(recs, null);
-      renderSubTimeline(recs);
+      if (!fbReady) {
+        var offline = { studentId: studentId, name: name, subject: session.subject, teacher: session.teacherName, time: fmtTime(), payload: payload };
+        offlineQueue.push(offline);
+        updateOfflineBadge();
+        logScanner('offline queued');
+      }
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>تم التسجيل — ' + name + ' (off)';
+      showFeedback('success', '✅', name, (subDoc || {}).subject || session.subject, 'تم التسجيل بدون اتصال — ' + fmtTime(), fmtTime());
+      soundSuccess();
+      attendedCount++; updateCounter();
+      addRecent(name, fmtTime(), 'green');
+      processing = false; scanner.setBusy(false);
+      setTimeout(renderReady, 1800);
+      return;
     }
-  }
-
-  function renderSubTeacherCounters(recs, totalRef) {
-    var el = $('sub-teachers');
-    if (!totalRef) { el.innerHTML = '<div class="sub-empty">لا يوجد شهر حالي لحساب حصص الأساتذة</div>'; return; }
-    var map = {};
-    recs.forEach(function (r) {
-      if (!r.teacherName) return;
-      var k = r.teacherName;
-      if (!map[k]) map[k] = { teacher: r.teacherName, subject: r.subjectName || '', count: 0 };
-      map[k].count++;
-    });
-    var names = Object.keys(map);
-    if (!names.length) { el.innerHTML = '<div class="sub-empty">لا توجد حصص مسجلة هذا الشهر بعد</div>'; return; }
-    var html = '';
-    names.forEach(function (k) {
-      var t = map[k];
-      var pct = totalRef ? Math.min(100, Math.round((t.count / totalRef) * 100)) : 0;
-      html +=
-        '<div class="sub-teacher">' +
-          '<div class="t-name">' + esc(t.teacher) + '</div>' +
-          '<div class="t-bar"><i style="width:' + pct + '%"></i></div>' +
-          '<div class="t-count"><span class="u">' + t.count + '</span> حصة</div>' +
-        '</div>';
-    });
-    el.innerHTML = html;
-  }
-
-  function renderSubTimeline(recs) {
-    var el = $('sub-timeline');
-    if (!recs || !recs.length) { el.innerHTML = '<div class="sub-empty">لا توجد حصص مسجلة هذا الشهر بعد</div>'; return; }
-    var html = '';
-    recs.forEach(function (r) {
-      html +=
-        '<div class="sub-event">' +
-          '<div class="e-dot"></div>' +
-          '<div class="e-main">' +
-            '<div class="e-subject">' + esc(r.subjectName || '—') + '</div>' +
-            '<div class="e-teacher">' + esc(r.teacherName || '—') + ' — ' + esc(r.date || '') + '</div>' +
-          '</div>' +
-          '<div class="e-time">' + esc(r.checkInTime || r.time || '—') + '</div>' +
-        '</div>';
-    });
-    el.innerHTML = html;
-  }
-
-  async function returnToStudent() {
-    if (!currentStudent) { goReady(); return; }
-    try {
-      await loadSubscription(currentStudent);
-      await showStudent(currentStudent);
-    } catch (e) {
-      console.error('[ATTENDANCE] returnToStudent error:', e);
-      goReady();
+    if (fbReady && authState.signedIn) {
+      var mirrorRec = {
+        studentId: studentId,
+        studentName: name,
+        teacherId: session.teacherId,
+        teacherName: session.teacherName,
+        subjectId: session.subjectId,
+        subjectName: session.subject,
+        studentType: reg.student_type || '',
+        subscriptionId: subscriptionId,
+        periodId: periodId,
+        monthNumber: monthNumber,
+        sessionNumber: 1,
+        date: AttendanceService.today(),
+        checkInTime: AttendanceService.nowTime(),
+        barcodeValue: raw,
+        source: 'eplus-attendance',
+        createdAt: AttendanceService.nowTime()
+      };
+      try { await AttendanceService.writeMirror(mirrorRec); logScanner('mirror write OK'); } catch (e) { logScanner('mirror write error: ' + e.message); }
     }
+    $('k-status-pill').innerHTML = '<span class="dot" style="background:#22c55e"></span>تم التسجيل — ' + name;
+    logScanner('SUCCESS: ' + name);
+    showFeedback('success', '✅', name, session.subject + ' — ' + session.teacherName, 'تم تسجيل الحضور بنجاح', fmtTime());
+    soundSuccess();
+    attendedCount++; updateCounter();
+    addRecent(name, fmtTime(), 'green');
+    processing = false; scanner.setBusy(false);
+    setTimeout(renderReady, 1800);
   }
-
-  function setRecordBusy(busy) {
-    var btn = $('rec-btn-' + subjectBusyIdx);
-    if (btn) {
-      btn.disabled = busy;
-      btn.className = busy ? 'record-btn busy' : 'record-btn';
-      btn.textContent = busy ? 'جارٍ التسجيل…' : 'تسجيل الحضور';
-    }
-  }
-  var subjectBusyIdx = -1;
-
-  // ── Record attendance for one subject ──────────────────
-  // المصدر الموثوق: record_attendance (ذرّي في Supabase عبر Edge Function).
-  // بعد النجاح نكتب مرآة إلى Firestore للعرض؛ عند فشل المرآة نلغي الحضور
-  // (undo_attendance) ليعود الطالب حصته — لا حضور ناقص ولا حصة ضائعة.
+  // ── Edge Function call ──
   async function recordAttendanceEdge(payload) {
     var token = null;
-    try { const k = firebase.app('kiosk').auth().currentUser; if (k) token = await k.getIdToken(); } catch (e) {}
+    try {
+      var u = firebase.app('kiosk').auth().currentUser;
+      if (u) token = await u.getIdToken();
+    } catch (e) {}
     if (!token) throw new Error('auth token missing');
     var res = await fetch(ATTENDANCE_EDGE_URL, {
       method: 'POST',
@@ -1334,306 +877,86 @@
     });
     var r = null;
     try { r = await res.json(); } catch (e) {}
-    if (!res.ok || !r || !r.ok) {
-      var err = new Error((r && r.error) || ('HTTP ' + res.status));
-      err.code = (r && r.code) || null;
-      throw err;
-    }
+    if (!res.ok || !r || !r.ok) throw new Error((r && r.error) || ('HTTP ' + res.status));
     return r;
   }
 
-  function mirrorIdFor(studentId, pair, date) {
-    return (studentId + '_' + (pair.teacherId || 'x') + '_' + (pair.subjectId || 'x') + '_' + date + '_1')
-      .replace(/[^A-Za-z0-9_.\-]/g, '_');
-  }
+  // ── Scanner ──
+  var scanner = null;
+  try {
+    scanner = new BarcodeScanner.Scanner({
+      logPrefix: 'ATTENDANCE',
+      shouldIgnoreKey: function () { return processing || !appUnlocked || !session; },
+      onState: function (info) { if (info && info.buffer !== undefined) { updateDebug(info); if (info.buffer) logScanner('buf=' + info.buffer); } },
+      onScan: function (code) {
+        logScanner('SCAN: ' + code + ' (len=' + code.length + ')');
+        $('k-last-read').textContent = code;
+        handleScan(code);
+      },
+      onInvalid: function (info) { logScanner('INVALID: ' + (info && info.reason || 'unknown')); }
+    });
+  } catch (e) { console.error('[SCANNER INIT]', e); }
 
-  async function markAttendance(idx) {
-    if (attending || !currentStudent || !subjectPairs[idx]) return;
-    var pair = subjectPairs[idx];
-    if (pair.recording) { openModal('info', 'تسجيل مسبق موجود', 'تم تسجيل حضور هذا الطالب في هذه المادة مسبقاً.'); return; }
-
-    var gate = subGateFor(pair);
-    if (gate) { openModal('warn', gate.title, gate.msg); return; }
-
-    var date = AttendanceService.today();
-    var dup = await AttendanceService.isDuplicate(currentStudent.id, pair.subjectId, date, null, pair.teacherId);
-    if (dup) { showAlreadyAttended(pair); return; }
-
-    attending = true;
-    subjectBusyIdx = idx;
-    setRecordBusy(true);
-    try {
-      await ensureAttendanceAuth();
-      if (!authState.signedIn) {
-        console.error('[ATTENDANCE RECORD] blocked — ' + authState.reason);
-        setRecordBusy(false);
-        subjectBusyIdx = -1;
-        openModal('warn', '⚠️ تعذر الاتصال بنظام الحضور', 'تعذر التحقق من جلسة النظام. حاول مرة أخرى.');
-        return;
-      }
-      // الاشتراك الخاص بهذه المادة + هذا الأستاذ (وليس أي اشتراك آخر)
-      var subCtx = null;
-      var stNow = subjectSubState[subjectSubKey(pair)];
-      if (stNow && stNow.subscription && stNow.period) {
-        subCtx = {
-          subscriptionId: stNow.subscription.id,
-          subscriptionPeriodId: stNow.period.id,
-          monthNumber: stNow.period.month_number || 0
-        };
-      }
-      var mirrorId = mirrorIdFor(currentStudent.id, pair, date);
-
-      // 1) تسجيل ذرّي موثوق (Supabase)
-      var rec = await recordAttendanceEdge({
-        action: 'record',
-        studentId: currentStudent.id,
-        teacherId: pair.teacherId || '',
-        teacherName: pair.teacherName || '',
-        subjectId: pair.subjectId || '',
-        subjectName: pair.subjectName || '',
-        barcodeValue: currentScanValue || '',
-        subscriptionId: (subCtx && subCtx.subscriptionId) || '',
-        periodId: (subCtx && subCtx.subscriptionPeriodId) || '',
-        monthNumber: (subCtx && subCtx.monthNumber) || 0,
-        date: date,
-        checkInTime: AttendanceService.nowTime(),
-        mirrorId: mirrorId
-      });
-
-      // 2) مرآة إلى Firestore (للـ reports والبوابات) مع تعويض عند الفشل
-      try {
-        await AttendanceService.writeMirror({
-          id: mirrorId,
-          studentId: currentStudent.id,
-          studentName: studentFullName(currentStudent),
-          teacherId: pair.teacherId || '',
-          teacherName: pair.teacherName || '',
-          subjectId: pair.subjectId || '',
-          subjectName: pair.subjectName || '',
-          date: date,
-          checkInTime: rec.check_in_time || AttendanceService.nowTime(),
-          status: 'present',
-          sessionNumber: 1,
-          createdAt: new Date().toISOString(),
-          level: currentStudent.level || '',
-          stream: currentStudent.stream || '',
-          institution: currentStudent.institution || '',
-          barcodeValue: currentScanValue || '',
-          subscriptionId: (subCtx && subCtx.subscriptionId) || '',
-          subscriptionPeriodId: (subCtx && subCtx.subscriptionPeriodId) || '',
-          monthNumber: (subCtx && subCtx.monthNumber) || 0
-        });
-      } catch (mirrorErr) {
-        console.error('[ATTENDANCE RECORD] mirror failed — undoing DB record', mirrorErr);
-        try {
-          await recordAttendanceEdge({
-            action: 'undo',
-            attendanceId: mirrorId,
-            periodId: (subCtx && subCtx.subscriptionPeriodId) || ''
-          });
-        } catch (undoErr) {
-          console.error('[ATTENDANCE RECORD] undo failed (manual reconciliation needed)', undoErr);
-        }
-        setRecordBusy(false);
-        subjectBusyIdx = -1;
-        openModal('error', 'تعذر مزامنة الحضور', 'تم تسجيل الحضور في قاعدة البيانات لكن تعذرت مزامنته مع النظام المحلي وسيُلغى تلقائياً. حاول مرة أخرى.');
-        return;
-      }
-
-      // 3) تحديث واجهة الشهر من النتيجة الذرّية (في اشتراك المادة المعنية فقط)
-      pair.recording = true;
-      var card = $('subj-card-' + idx);
-      if (card) card.classList.add('recorded');
-      setRecordBusy(false);
-      subjectBusyIdx = -1;
-      if (subCtx && rec && rec.used_sessions != null) {
-        var stNow2 = subjectSubState[subjectSubKey(pair)];
-        if (stNow2) {
-          stNow2.used = rec.used_sessions;
-          stNow2.remaining = Math.max(0, rec.remaining_sessions);
-          stNow2.active = stNow2.remaining > 0;
-          if (stNow2.period) {
-            stNow2.period.used_sessions = rec.used_sessions;
-            stNow2.period.remaining_sessions = rec.remaining_sessions;
-          }
-        }
-        subState.used = rec.used_sessions;
-        subState.remaining = Math.max(0, rec.remaining_sessions);
-        if (subState.period) {
-          subState.period.used_sessions = rec.used_sessions;
-          subState.period.remaining_sessions = rec.remaining_sessions;
-        }
-      }
-      showSuccess(pair, { id: mirrorId });
-    } catch (e) {
-      console.error('[ATTENDANCE RECORD] error:', e);
-      setRecordBusy(false);
-      subjectBusyIdx = -1;
-      var msg = (e && e.message) || '';
-      if ((e && e.code === '23505') || /duplicate/i.test(msg) || /already recorded/i.test(msg)) {
-        showAlreadyAttended(pair);
-      } else if (/subscription not active for this subject\/teacher/i.test(msg)) {
-        openModal('warn', 'لا يمكن تسجيل الحضور', 'لا يوجد اشتراك نشط لهذه المادة عند هذا الأستاذ.');
-      } else if (/no sessions remaining|period not active|remaining/i.test(msg)) {
-        openModal('warn', 'لا يمكن تسجيل الحضور', 'انتهت حصص هذا الشهر لهذه المادة.');
-      } else if (/student not registered \(final\)/i.test(msg)) {
-        openModal('warn', 'لا يمكن تسجيل الحضور', 'الطالب غير مسجل نهائياً في النظام.');
-      } else if (/subscription|اشتراك/i.test(msg)) {
-        openModal('warn', 'لا يمكن تسجيل الحضور', 'لا يوجد اشتراك نشط لهذه المادة عند هذا الأستاذ.');
-      } else {
-        openModal('error', 'تعذر تسجيل الحضور', 'تعذر تسجيل الحضور حالياً. حاول مرة أخرى.');
-      }
-    } finally {
-      attending = false;
-    }
-  }
-
-  function showAlreadyAttended(pair) {
-    var date = AttendanceService.today();
-    var time = null;
-    AttendanceService.getRecords({ studentId: currentStudent.id, subjectId: pair.subjectId, teacherId: pair.teacherId, date: date })
-      .then(function (recs) {
-        if (recs && recs.length && recs[0].checkInTime) time = recs[0].checkInTime;
-      })
-      .catch(function () {})
-      .then(function () {
-        openModal('info', 'تسجيل مسبق موجود', 'تم تسجيل حضور هذا الطالب لدى الأستاذ <b>' + esc(pair.teacherName) + '</b> في مادة <b>' + esc(pair.subjectName) + '</b>' +
-          (time ? ' الساعة <span class="time-chip">' + esc(time) + '</span>' : '') +
-          ' — لا يسمح بالتسجيل المكرر.');
-      });
-  }
-
-  function showSuccess(pair, doc) {
-    $('sv-name').textContent = studentFullName(currentStudent) || '—';
-    $('sv-id').textContent = 'رقم التسجيل: ' + (currentStudent.id || '—');
-    $('sv-subject').textContent = pair.subjectName || '—';
-    $('sv-teacher').textContent = pair.teacherName || '—';
-    $('sv-datetime').textContent = fmtAlgeriaTime(new Date()) + ' — ' + fmtAlgeriaDate(new Date());
-    switchView('success');
-    clearTimeout(successTimer);
-    successTimer = setTimeout(returnToStudent, 4000);
-  }
-
-  // ── Modal ──────────────────────────────────────────────
-  var modalIcons = { info: 'ℹ️', warn: '⚠️', error: '⛔' };
-  function openModal(type, title, msg) {
-    $('overlay').classList.add('show');
-    $('modal').className = 'modal ' + type;
-    $('m-icon').textContent = modalIcons[type] || 'ℹ️';
-    $('m-title').textContent = title;
-    $('m-msg').innerHTML = msg;
-  }
-  function closeModal() {
-    $('overlay').classList.remove('show');
-  }
-  $('m-close').addEventListener('click', function () {
-    closeModal();
-    if (!$('view-student').classList.contains('active')) goReady();
-  });
-  $('overlay').addEventListener('click', function (e) {
-    if (e.target === $('overlay')) { closeModal(); if (!$('view-student').classList.contains('active')) goReady(); }
-  });
-
-  // ── Scan handling ──────────────────────────────────────
-  function animateCard(state) {
-    var card = $('scan-card');
-    card.classList.remove('verified', 'rejected');
-    void card.offsetWidth;
-    if (state) card.classList.add(state);
-  }
-
-  async function handleScan(raw) {
-    if (processing || !fbReady || !appUnlocked) return;
-    clearTimeout(successTimer);
-    $('overlay').classList.remove('show');
-    var val = String(raw || '').replace(/\r/g, '').trim();
-    if (!val) return;
-    processing = true;
-    $('last-read').textContent = val;
-    setPill('جارٍ المعالجة…', false);
-    console.log('[ATTENDANCE SCANNER] Looking up student for barcode "' + val + '"...');
-
-    try {
-      var resolved = await AttendanceService.resolveStudentFromScan(val);
-      var student = resolved ? resolved.student : null;
-
-      if (!student) {
-        console.log('[ATTENDANCE SCANNER] NOT FOUND');
-        logScanner('Student NOT found for "' + val + '"');
-        animateCard('rejected');
-        setPill('لم يتم العثور على الطالب', false);
-        openModal('error', 'طالب غير موجود', 'الباركود <b>' + esc(val) + '</b> غير مرتبط بأي تسجيل.<br>تأكد من صحة البطاقة أو أعد طباعتها من نظام E-PLUS.');
-        return;
-      }
-
-      console.log('[ATTENDANCE SCANNER] FOUND');
-      console.log('[ATTENDANCE SCANNER] matchedBy=' + (resolved.matchedBy || 'unknown') + ' student=' + student.id + ' (' + (student.first_name || '') + ' ' + (student.last_name || '') + ') status=' + (student.status || '?'));
-
-      var status = student.status;
-      if (status === 'مسجل مبدئياً') {
-        animateCard('rejected');
-        setPill('حضور غير مسموح', false);
-        openModal('warn', 'حضور غير مسموح', 'لا يمكن تسجيل الحضور — هذا الطالب <b>غير مسجل نهائياً</b> بعد.<br><span class="modal-name">' + esc(studentFullName(student)) + '</span>');
-        return;
-      }
-      if (status !== 'مسجل نهائياً') {
-        animateCard('rejected');
-        setPill('بطاقة غير صالحة', false);
-        openModal('error', 'بطاقة غير صالحة', 'حالة الطالب: <b>' + esc(status || 'غير معروفة') + '</b>.<br>لا يسمح بتسجيل الحضور لهذه البطاقة.');
-        return;
-      }
-
-      animateCard('verified');
-      setPill('تم التعرف على الطالب', false);
-      logScanner('Student found: "' + studentFullName(student) + '" (id=' + student.id + ', status=' + student.status + ')');
-      currentStudent = student;
-      currentScanValue = val;
-      await showStudent(student);
-    } catch (e) {
-      console.error('scan error:', e);
-      animateCard('rejected');
-      setPill('تعذر الاتصال', false);
-      openModal('error', 'خطأ في الاتصال', 'تعذر جلب بيانات الطالب. تأكد من اتصال النظام بالإنترنت وحاول مجدداً.');
-    } finally {
-      processing = false;
-    }
-  }
-
-  // ── Manual entry (fallback only — SP-1160 auto-scan is primary) ──
+  // ── Manual entry ──
+  var manualOpen = false;
   $('manual-toggle').addEventListener('click', function () {
-    var row = $('manual-row');
-    row.classList.toggle('show');
-    if (row.classList.contains('show')) $('manual-input').focus();
+    manualOpen = !manualOpen;
+    $('manual-row').classList.toggle('show', manualOpen);
+    if (manualOpen) $('manual-input').focus();
   });
-  $('manual-input').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); $('manual-submit').click(); }
-  });
-  $('manual-submit').addEventListener('click', function () {
+  async function submitManual() {
     var v = $('manual-input').value.trim();
-    if (!v) return;
+    if (!v || !session) return;
+    logScanner('MANUAL: ' + v);
+    await handleScan(v);
     $('manual-input').value = '';
-    handleScan(v);
-  });
+  }
+  $('manual-submit').addEventListener('click', submitManual);
+  $('manual-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); submitManual(); } });
 
-  // ── Scanner debug panel toggle ─────────────────────────
-  $('debug-toggle').addEventListener('click', function () {
-    dbOpen = !dbOpen;
-    $('debug-panel').classList.toggle('show', dbOpen);
-    if (dbOpen) dbAppend('debug panel opened');
-  });
+  // ── Focus management (SP-1160) ──
+  var focusInterval = null;
+  function grabScanFocus() {
+    if (focusInterval) clearInterval(focusInterval);
+    focusInterval = setInterval(function () {
+      if (!appUnlocked || processing) return;
+      var act = document.activeElement;
+      if (act && (act.tagName === 'INPUT' || act.tagName === 'SELECT' || act.tagName === 'TEXTAREA')) return;
+      try { window.focus(); } catch (e) {}
+    }, 800);
+  }
 
-  // ── Back / reset buttons ───────────────────────────────
-  $('back-ready').addEventListener('click', goReady);
-  $('sv-reset').addEventListener('click', goReady);
+  // ── Offline retry ──
+  async function retryOffline() {
+    if (!offlineQueue.length || !session || processing) return;
+    var item = offlineQueue[0];
+    try {
+      await recordAttendanceEdge(item.payload);
+      offlineQueue.shift();
+      updateOfflineBadge();
+      logScanner('offline retry OK');
+    } catch (e) { logScanner('offline retry failed: ' + e.message); }
+  }
+  setInterval(retryOffline, 5000);
 
-  // Expose for inline onclick handlers
-  window.__mark = markAttendance;
+  // ── Init ──
+  (function init() {
+    if (isUnlocked()) {
+      showApp();
+    } else {
+      showPin();
+    }
+    if (fbReady) {
+      ensureAttendanceAuth();
+      try {
+        var provider = new firebase.auth.GithubAuthProvider();
+        firebase.app('kiosk').auth().signInWithPopup(provider)
+          .then(function () { authState.signedIn = true; console.log('[ATTENDANCE AUTH] GitHub signed in'); })
+          .catch(function (e) { console.log('[ATTENDANCE AUTH] GitHub popup skipped:', e && e.code); ensureAttendanceAuth(); });
+      } catch (e) { ensureAttendanceAuth(); }
+    }
+  })();
 
-  // ── Init ───────────────────────────────────────────────
-  logScanner('Attendance station ready — SP-1160 HID capture active (event.code based)');
-  logScanner('لمعاينة المفاتيح الخام افتح barcode-debug.html');
-  ensureAttendanceAuth();
-  if (isUnlocked()) showApp(); else showPin();
 })();
 </script>
 </body>
