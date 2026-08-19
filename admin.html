@@ -24418,11 +24418,14 @@ function srRenderTable() {
     const statusBadge = r.status === 'مسجل نهائياً'
       ? '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:99px;background:rgba(16,185,129,0.1);color:#059669;border:1px solid rgba(16,185,129,0.25);font-size:11px;font-weight:800">🟢 مسجل نهائياً</span>'
       : '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:99px;background:rgba(245,158,11,0.1);color:#92400E;border:1px solid rgba(245,158,11,0.25);font-size:11px;font-weight:800">🟡 مسجل مبدئياً</span>';
+    const freeTag = (r.status === 'مسجل نهائياً' && (r.fee_amount === 0 || r.fee_amount === null))
+      ? ' <span style="display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:99px;background:rgba(124,58,237,0.1);color:#7c3aed;border:1px solid rgba(124,58,237,0.25);font-size:10px;font-weight:800;margin-inline-start:4px">🎁 بدون رسوم</span>'
+      : '';
     const streamText = r.stream || '<span style="color:var(--text-muted)">—</span>';
 
     return `<tr ondblclick="srShowDetail('${r.id}')" style="cursor:pointer" title="انقر مرتين لعرض التفاصيل">
       <td style="font-size:11px;color:var(--text-muted);font-weight:700">${rowNum}</td>
-      <td>${statusBadge}</td>
+      <td>${statusBadge}${freeTag}</td>
       <td style="font-family:monospace;font-weight:800;color:var(--primary)">${r.id}</td>
       <td style="font-weight:700">${srGetValue(r, 'last_name')}</td>
       <td style="font-weight:700">${srGetValue(r, 'first_name')}</td>
@@ -24502,6 +24505,7 @@ function srShowDetail(id) {
       <div class="sr-detail-hero-id" dir="ltr">${r.id}</div>
     </div>
     <span class="sr-detail-status-badge" style="${statusBg}">${statusLabel}</span>
+    ${(r.status === 'مسجل نهائياً' && (r.fee_amount === 0 || r.fee_amount === null)) ? '<span class="sr-detail-status-badge" style="background:rgba(124,58,237,0.12);color:#7c3aed;border:1px solid rgba(124,58,237,0.25);margin-inline-start:6px">🎁 تم التأكيد بدون رسوم</span>' : ''}
   </div>`;
 
   // Info grid
@@ -24629,7 +24633,7 @@ async function srConfirmFree(id) {
   if (!r) return;
   if (!(await cmConfirm('تأكيد بدون رسوم', 'هل أنت متأكد من تأكيد تسجيل هذا الطالب بدون قبض رسوم التسجيل؟\n\nسيتم:\n• تحويل الحالة إلى "مسجل نهائياً"\n• تفعيل بطاقة الطالب\n• فتح بوابة الطالب\n• لن تُضاف رسوم إلى الموارد المالية', '🎁'))) return;
   try {
-    const patchData = { status: 'مسجل نهائياً' };
+    const patchData = { status: 'مسجل نهائياً', fee_amount: 0 };
     if (!r.student_token) {
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
       let token = '';

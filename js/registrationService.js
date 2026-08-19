@@ -72,8 +72,8 @@ const RegistrationService = (function () {
   }
 
   async function getAll(status) {
-    let params = '';
-    if (status) params = 'status=eq.' + encodeURIComponent(status);
+    let params = 'deleted_at=is.null';
+    if (status) params += '&status=eq.' + encodeURIComponent(status);
     const data = await _fetchCols(params);
     return data;
   }
