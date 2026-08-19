@@ -203,6 +203,105 @@ const StudentCardRenderer = (function () {
 
   let CAL = _merge(_readStorage());
 
+  // ── CALIBRATION HISTORY ───────────────────────────────────────
+  // Snapshots saved to both localStorage (fast cache) and Supabase
+  // calibration_history table (cross-device persistence).
+  const HISTORY_KEY = 'eplus_calibration_history';
+  const HISTORY_TABLE = 'calibration_history';
+  const MAX_HISTORY = 100;
+
+  function _readHistory() {
+    try { const raw = localStorage.getItem(HISTORY_KEY); return raw ? JSON.parse(raw) : []; }
+    catch (e) { return []; }
+  }
+  function _writeHistory(arr) {
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(arr.slice(0, MAX_HISTORY))); } catch (e) {}
+  }
+  function _pushHistoryToSupabase(entry) {
+    const ep = _centralEndpoint();
+    if (!ep) return Promise.resolve(false);
+    const url = ep.url + '/rest/v1/' + HISTORY_TABLE;
+    return _centralFetch('POST', url, {
+      id: entry.id,
+      label: entry.label || null,
+      calibration: entry.calibration,
+      sheet: entry.sheet || null,
+      created_at: entry.created_at
+    }).then(function(r) { return r.ok; }).catch(function() { return false; });
+  }
+
+  // Public: save a snapshot. Returns the saved entry.
+  function saveCalSnapshot(label) {
+    const cal = _readStorage() || _clone(CAL);
+    const sheet = (_readSheet() !== null) ? _readSheet() : (SHEET ? _clone(SHEET) : null);
+    const entry = {
+      id: 'snap_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      label: label || null,
+      calibration: cal,
+      sheet: sheet,
+      created_at: new Date().toISOString()
+    };
+    var history = _readHistory();
+    history.unshift(entry);
+    if (history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
+    _writeHistory(history);
+    _pushHistoryToSupabase(entry);
+    return entry;
+  }
+
+  // Public: get all snapshots (merged local + remote).
+  function getCalHistory() {
+    var local = _readHistory();
+    return Promise.resolve(local);
+  }
+
+  // Public: restore a snapshot by id. Returns the restored calibration.
+  function restoreCalSnapshot(id) {
+    var history = _readHistory();
+    var entry = history.find(function(h) { return h.id === id; });
+    if (!entry) return null;
+    if (entry.calibration) { CAL = _merge(entry.calibration); _writeStorage(CAL); }
+    if (entry.sheet) { var s = _mergeSheet(entry.sheet); if (s) { SHEET = s; _writeSheet(s); } }
+    _pushCentral();
+    return { calibration: getCalibration(), sheet: getSheetLayout() };
+  }
+
+  // Public: delete a snapshot.
+  function deleteCalSnapshot(id) {
+    var history = _readHistory().filter(function(h) { return h.id !== id; });
+    _writeHistory(history);
+    // Also try to delete from Supabase (best effort)
+    var ep = _centralEndpoint();
+    if (ep) {
+      var url = ep.url + '/rest/v1/' + HISTORY_TABLE + '?id=eq.' + id;
+      _centralFetch('DELETE', url).catch(function() {});
+    }
+  }
+
+  // Public: load remote history into local cache (best effort).
+  function syncCalHistory() {
+    var ep = _centralEndpoint();
+    if (!ep || !_central.ready) return Promise.resolve(false);
+    var url = ep.url + '/rest/v1/' + HISTORY_TABLE + '?select=*&order=created_at.desc&limit=' + MAX_HISTORY;
+    return _centralFetch('GET', url)
+      .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(rows) {
+        if (!Array.isArray(rows) || !rows.length) return true;
+        var local = _readHistory();
+        var localIds = {};
+        local.forEach(function(h) { localIds[h.id] = true; });
+        var merged = local.slice();
+        rows.forEach(function(r) {
+          if (!localIds[r.id]) merged.push({ id: r.id, label: r.label, calibration: r.calibration, sheet: r.sheet, created_at: r.created_at });
+        });
+        merged.sort(function(a, b) { return (b.created_at || '').localeCompare(a.created_at || ''); });
+        if (merged.length > MAX_HISTORY) merged = merged.slice(0, MAX_HISTORY);
+        _writeHistory(merged);
+        return true;
+      })
+      .catch(function() { return false; });
+  }
+
   // ── Calibration public API ──────────────────────────────
   function getCalibration() { return _clone(CAL); }
   function setCalibration(cal) { CAL = _merge(cal); return getCalibration(); }
@@ -1524,7 +1623,8 @@ ${page(backSlots, 'الخلفي', 'ts-back')}
     a4SheetCSS, a4SlotStyle, a4DataStyle, a4DataGeom, a4BackDecorHTML, a4GridOverlayHTML, A4_GRID_CSS,
     buildA4PrintHTML, buildA4TestSheetHTML, buildA4FrontSheetHTML, buildA4BackSheetHTML, buildDuplexTestSheetHTML,
     renderBarcodeSVG, buildBarcodePrintHTML,
-    initCentral, centralSave, centralStatus
+    initCentral, centralSave, centralStatus,
+    saveCalSnapshot, getCalHistory, restoreCalSnapshot, deleteCalSnapshot, syncCalHistory
   };
 })();
 

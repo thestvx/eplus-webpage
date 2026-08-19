@@ -344,6 +344,55 @@
   </div>
   <div class="color-grid" id="color-grid"></div>
   <div class="color-hint">«شفاف» متاح للخلفيات فقط (لن يُرسم مستطيل). «لون مخصص» يفتح منتقي الألوان / إدخال HEX يدوي. حفظ إعدادات الألوان يخزّن القيم في نفس مكان حفظ معايرة البطاقة.</div>
+
+  <h2 class="sec-title"><span class="step">هـ</span> سجل التعديلات — استرجاع إعدادات الأيام السابقة</h2>
+  <div class="note">
+    كل حفظ يُسجَّل هنا تلقائياً مع التاريخ والوقت. يمكنك <b>استرجاع</b> أي إعداد سابق أو <b>حذفه</b>.
+    الإعدادات تُحفَظ في كل الأجهزة (Supabase) + هذا المتصفح (localStorage).
+  </div>
+  <div class="toolbar">
+    <label>تسمية الحفظ (اختياري):</label>
+    <input type="text" id="hist-label" placeholder="مثال: بعد معايرة الطابعة الجديدة" style="flex:1;max-width:300px;padding:8px 12px;border:1px solid #c4d0ea;border-radius:9px;font-family:inherit;font-size:13px">
+    <button id="hist-save-btn" class="save">📸 حفظ نسخة في السجل</button>
+    <span class="spacer"></span>
+    <button id="hist-refresh-btn">🔄 تحديث السجل</button>
+  </div>
+  <div id="hist-list" style="margin-top:14px"></div>
+
+  <div class="modal-overlay hidden" id="hist-confirm-modal" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <h3 id="hist-confirm-title">استرجاع الإعدادات؟</h3>
+      <p id="hist-confirm-msg">سيتم استبدال الإعدادات الحالية بالنسخة المحددة.</p>
+      <div class="modal-actions">
+        <button id="hist-confirm-cancel">إلغاء</button>
+        <button id="hist-confirm-restore" class="confirm" style="background:#059669;border-color:#059669">نعم، استرجاع</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-overlay hidden" id="hist-delete-modal" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <h3>حذف النسخة من السجل؟</h3>
+      <p>لن يمكن التراجع عن هذا الإجراء.</p>
+      <div class="modal-actions">
+        <button id="hist-delete-cancel">إلغاء</button>
+        <button id="hist-delete-confirm" class="confirm">نعم، حذف</button>
+      </div>
+    </div>
+  </div>
+  <style>
+    .hist-entry{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #dbe4f5;border-radius:12px;padding:12px 16px;margin-bottom:8px;transition:all .2s}
+    .hist-entry:hover{border-color:#2548A1;box-shadow:0 2px 8px rgba(37,72,161,.1)}
+    .hist-date{font-size:12px;font-weight:800;color:#1E3C86;white-space:nowrap;min-width:130px}
+    .hist-label{font-size:13px;font-weight:700;color:#334;flex:1}
+    .hist-label.empty{color:#8494bd;font-style:italic}
+    .hist-actions{display:flex;gap:6px}
+    .hist-actions button{font-family:inherit;font-size:12px;font-weight:800;padding:6px 12px;border-radius:8px;border:1px solid #c4d0ea;background:#fff;cursor:pointer}
+    .hist-actions button.restore{color:#059669;border-color:#a7f3d0}
+    .hist-actions button.restore:hover{background:#059669;color:#fff;border-color:#059669}
+    .hist-actions button.del{color:#b3362f;border-color:#e2a1a1}
+    .hist-actions button.del:hover{background:#b3362f;color:#fff;border-color:#b3362f}
+    .hist-empty{text-align:center;padding:32px;color:#8494bd;font-size:14px}
+  </style>
 </div>
 
 <footer>E-PLUS — أداة معايرة. الشبكة والمسطرة والتصاميم للمعايرة فقط ولا تُطبع في الإنتاج أبداً.</footer>
@@ -1418,6 +1467,105 @@
         toast(ok ? 'تم حفظ إعدادات المعايرة بنجاح' : 'تم الحفظ محلياً — تعذّر الاتصال بالخادم المركزي');
       });
     });
+
+    // ── سجل التعديلات (Calibration History) ──
+    var histConfirmId = null, histDeleteId = null;
+    function fmtHistDate(iso) {
+      if (!iso) return '—';
+      var d = new Date(iso);
+      var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+      var months = ['يناير','فبراير','مارس','أبريل','ماي','جوان','جويلية','أوت','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+      return d.getFullYear() + ' ' + months[d.getMonth()] + ' ' + d.getDate() + ' — ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    }
+    function renderHistList() {
+      R.getCalHistory().then(function(list) {
+        var el = document.getElementById('hist-list');
+        if (!el) return;
+        if (!list.length) { el.innerHTML = '<div class="hist-empty">📭 لا توجد نسخ محفوظة بعد — احفظ النسخة الأولى من الأعلى</div>'; return; }
+        el.innerHTML = list.map(function(entry) {
+          var d = fmtHistDate(entry.created_at);
+          var lbl = entry.label || '';
+          return '<div class="hist-entry">' +
+            '<div class="hist-date">' + d + '</div>' +
+            '<div class="hist-label' + (lbl ? '' : ' empty') + '">' + (lbl || 'بدون تسمية') + '</div>' +
+            '<div class="hist-actions">' +
+              '<button class="restore" data-id="' + entry.id + '">♻️ استرجاع</button>' +
+              '<button class="del" data-id="' + entry.id + '">🗑️ حذف</button>' +
+            '</div></div>';
+        }).join('');
+        el.querySelectorAll('button.restore').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            histConfirmId = btn.getAttribute('data-id');
+            document.getElementById('hist-confirm-modal').classList.remove('hidden');
+          });
+        });
+        el.querySelectorAll('button.del').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            histDeleteId = btn.getAttribute('data-id');
+            document.getElementById('hist-delete-modal').classList.remove('hidden');
+          });
+        });
+      });
+    }
+    document.getElementById('hist-save-btn').addEventListener('click', function() {
+      var label = (document.getElementById('hist-label').value || '').trim();
+      R.saveCalSnapshot(label || null);
+      document.getElementById('hist-label').value = '';
+      renderHistList();
+      toast('تم حفظ نسخة في السجل' + (label ? ': ' + label : ''));
+    });
+    document.getElementById('hist-refresh-btn').addEventListener('click', function() {
+      R.syncCalHistory().then(function() { renderHistList(); toast('تم تحديث السجل'); });
+    });
+    document.getElementById('hist-confirm-cancel').addEventListener('click', function() {
+      histConfirmId = null;
+      document.getElementById('hist-confirm-modal').classList.add('hidden');
+    });
+    document.getElementById('hist-confirm-restore').addEventListener('click', function() {
+      document.getElementById('hist-confirm-modal').classList.add('hidden');
+      if (!histConfirmId) return;
+      var result = R.restoreCalSnapshot(histConfirmId);
+      histConfirmId = null;
+      if (!result) { toast('النسخة غير موجودة'); return; }
+      PARAMS = R.sheetParams();
+      var lay = R.getSheetLayout();
+      if (lay && lay.params) PARAMS = JSON.parse(JSON.stringify(lay.params));
+      if (lay && Array.isArray(lay.slots) && lay.slots.length) SLOTS = lay.slots;
+      if (lay) {
+        var dm = (lay.duplex && lay.duplex.mode) || lay.flip || 'long';
+        document.getElementById('duplex-mode').value = (dm === 'long' || dm === 'short' || dm === 'none') ? dm : 'long';
+        if (lay.duplex && typeof lay.duplex.dx === 'number') document.getElementById('duplex-dx').value = lay.duplex.dx;
+        if (lay.duplex && typeof lay.duplex.dy === 'number') document.getElementById('duplex-dy').value = lay.duplex.dy;
+      }
+      if (!SLOTS.length) { balanceParams(); rebuildSlots(); }
+      applyParamsToFields();
+      renderA4Stage();
+      buildColorSection();
+      syncColorSection();
+      renderPreview();
+      renderCentralStatus();
+      toast('تم استرجاع الإعدادات بنجاح');
+    });
+    document.getElementById('hist-delete-cancel').addEventListener('click', function() {
+      histDeleteId = null;
+      document.getElementById('hist-delete-modal').classList.add('hidden');
+    });
+    document.getElementById('hist-delete-confirm').addEventListener('click', function() {
+      document.getElementById('hist-delete-modal').classList.add('hidden');
+      if (!histDeleteId) return;
+      R.deleteCalSnapshot(histDeleteId);
+      histDeleteId = null;
+      renderHistList();
+      toast('تم حذف النسخة');
+    });
+    document.getElementById('hist-confirm-modal').addEventListener('click', function(e) {
+      if (e.target === this) { histConfirmId = null; this.classList.add('hidden'); }
+    });
+    document.getElementById('hist-delete-modal').addEventListener('click', function(e) {
+      if (e.target === this) { histDeleteId = null; this.classList.add('hidden'); }
+    });
+    // Load remote history + render list
+    R.syncCalHistory().then(function() { renderHistList(); });
   });
 })();
 </script>
