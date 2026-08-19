@@ -69,7 +69,17 @@ header.topbar{display:flex;align-items:center;justify-content:space-between;gap:
 main{flex:1;position:relative;overflow:hidden}
 .view-screen{position:absolute;inset:0;flex-direction:column;align-items:center;justify-content:center;padding:16px;overflow-y:auto}
 .view-screen.active{animation:fadeIn .35s ease both}
-.kiosk-main{display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;position:relative}
+.kiosk-layout{display:flex;gap:14px;width:100%;max-width:1060px;height:100%;align-items:center;justify-content:center;padding:8px}
+.kiosk-sidebar{width:200px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
+.k-counter{background:rgba(20,24,58,0.55);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.14);border-radius:16px;padding:16px 14px;text-align:center}
+.k-counter-label{font-size:10px;font-weight:800;color:#c7d2fe;margin-bottom:2px}
+.k-counter-num{font-size:40px;font-weight:900;color:#fff;line-height:1;font-variant-numeric:tabular-nums}
+.k-counter-num .sep{font-size:26px;color:#c7d2fe;margin:0 2px}
+.k-progress{width:100%;height:7px;border-radius:99px;background:rgba(255,255,255,0.12);margin-top:10px;overflow:hidden}
+.k-progress>i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#10b981,#22c55e);transition:width .4s ease}
+.k-end-btn{width:100%;margin-top:8px;font-family:'Tajawal',sans-serif;font-size:11px;font-weight:800;color:#fecaca;background:rgba(220,38,38,0.14);border:1px solid rgba(220,38,38,0.3);border-radius:10px;padding:7px;cursor:pointer;transition:.2s}
+.k-end-btn:hover{background:rgba(220,38,38,0.28);color:#fff}
+.kiosk-main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;min-width:0}
 .scan-stage{position:relative;width:210px;height:210px;margin:0 auto 14px}
 .scan-stage .ring{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(255,255,255,0.18)}
 .scan-stage .ring.r1{animation:ringPulse 2.6s infinite}
@@ -146,7 +156,7 @@ main{flex:1;position:relative;overflow:hidden}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
 @keyframes logoIn{from{opacity:0;transform:translateY(10px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(max-width:768px){.clock .date{display:none}}
-@media(max-width:640px){.clock .time{font-size:16px}.ts-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}.ts-card{padding:20px 14px}.ts-card .tc-name{font-size:15px}}
+@media(max-width:640px){.kiosk-layout{flex-direction:column;gap:8px}.kiosk-sidebar{width:100%;flex-direction:row;gap:6px}.k-counter{flex:1;padding:10px 8px}.k-counter-num{font-size:26px}.clock .time{font-size:16px}.ts-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}.ts-card{padding:20px 14px}.ts-card .tc-name{font-size:15px}}
 </style>
 </head>
 <body>
@@ -183,7 +193,16 @@ main{flex:1;position:relative;overflow:hidden}
   </header>
   <main>
     <div id="view-kiosk" class="view-screen active">
-      <div class="kiosk-main">
+      <div class="kiosk-layout">
+        <div class="kiosk-sidebar">
+          <div class="k-counter">
+            <div class="k-counter-label">الحضور اليوم</div>
+            <div class="k-counter-num"><span id="k-attended">0</span><span class="sep">/</span><span id="k-total">-</span></div>
+            <div class="k-progress"><i id="k-progress-bar" style="width:0%"></i></div>
+          </div>
+          <button class="k-end-btn" id="k-end-btn">🔴 إنهاء اليوم</button>
+        </div>
+        <div class="kiosk-main">
         <div class="scan-stage" id="scan-stage">
           <div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div>
           <div class="scan-card" id="scan-card">
@@ -191,8 +210,9 @@ main{flex:1;position:relative;overflow:hidden}
             <div class="code-num" id="barcode-value">2000000000008</div>
             <div class="chip">BARCODE</div>
             <div class="scanline"></div>
-          </div>
-        </div>
+      </div>
+      </div>
+    </div>
         <div class="k-ready-text">امسح بطاقة الطالب</div>
         <div class="k-ready-sub">استخدم قارئ الباركود — ضع البطاقة على القارئ</div>
         <div class="k-status-pill"><span class="dot"></span> <span id="kiosk-status-text">جاهز للمسح</span></div>
@@ -232,6 +252,7 @@ main{flex:1;position:relative;overflow:hidden}
   const PIN_HASH='023e33504ab909cf87a6f4e4e545090e40bdc0a2153e5b68b19f7fad2b737904';
   const PIN_FALLBACK='2019';
   const SESSIONS_PER_MONTH=8;
+  var attendedCount=0;
   var db=window.db;
   var currentBarcode='';
   var ignoreKeys=false;
@@ -626,6 +647,7 @@ main{flex:1;position:relative;overflow:hidden}
     el('kiosk-status-text').textContent='جاري تسجيل الحضور...';
     var studentName=pendingRegistration?(pendingRegistration.first_name+' '+pendingRegistration.last_name):'';
     await checkSubscriptionAndRecord(studentId,studentName,teacherName,subjectName,barcode);
+    updateCounter();
     setTimeout(function(){
       el('kiosk-status-text').textContent='جاهز للمسح';
       busy=false;
@@ -665,6 +687,15 @@ main{flex:1;position:relative;overflow:hidden}
 
   el('manual-input').addEventListener('keydown',function(e){
     if(e.key==='Enter')el('manual-btn').click();
+  });
+
+  function updateCounter(){
+    attendedCount++;
+    el('k-attended').textContent=attendedCount;
+  }
+
+  el('k-end-btn').addEventListener('click',function(){
+    if(confirm('🔴 إنهاء يوم الحضور؟'))lockDevice();
   });
 
   SubscriptionService.init(SUPABASE_URL,SUPABASE_KEY);
