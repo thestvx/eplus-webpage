@@ -230,10 +230,11 @@ const StudentCardRenderer = (function () {
     }).then(function(r) { return r.ok; }).catch(function() { return false; });
   }
 
-  // Public: save a snapshot. Returns the saved entry.
-  function saveCalSnapshot(label) {
-    const cal = _readStorage() || _clone(CAL);
-    const sheet = (_readSheet() !== null) ? _readSheet() : (SHEET ? _clone(SHEET) : null);
+  // Public: save a snapshot. Pass calOverride to save the current page state
+  // (from sliders/drag) instead of just the localStorage cache.
+  function saveCalSnapshot(label, calOverride, sheetOverride) {
+    const cal = calOverride || _readStorage() || _clone(CAL);
+    const sheet = sheetOverride || ((_readSheet() !== null) ? _readSheet() : (SHEET ? _clone(SHEET) : null));
     const entry = {
       id: 'snap_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
       label: label || null,
@@ -1608,33 +1609,40 @@ ${page(backSlots, 'الخلفي', 'ts-back')}
     return { ready: _central.ready, mode: _central.mode, updatedAt: _central.updatedAt, hasDoc: !!_centralDoc };
   }
 
-  // ── Recover the latest calibration_settings row as the first history entry.
-  //    Called when history is empty so the user at least sees their last saved
-  //    calibration with its correct Supabase updated_at timestamp.
+  // ── Recover calibration snapshots from Supabase calibration_settings.
+  //    The table stores a single row per id. We fetch ALL rows and create
+  //    a history entry for each one that has valid calibration data, using
+  //    their updated_at as the timestamp. This gives us whatever versions
+  //    still exist in the database.
   function recoverLastSnapshot() {
     var ep = _centralEndpoint();
     if (!ep || !_central.ready) return Promise.resolve(null);
-    var q = CENTRAL_TABLE + '?id=eq.' + CENTRAL_ROW_ID + '&select=calibration,sheet,updated_at';
+    var q = CENTRAL_TABLE + '?select=id,calibration,sheet,updated_at&order=updated_at.asc';
     return _centralFetch('GET', ep.url + '/rest/v1/' + q)
       .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function(rows) {
-        if (!Array.isArray(rows) || !rows.length || !rows[0].calibration) return null;
-        var doc = rows[0];
+        if (!Array.isArray(rows) || !rows.length) return null;
         var existing = _readHistory();
-        // Don't duplicate if we already have this snapshot
-        var alreadyHas = existing.some(function(h) { return h._source === 'recovered'; });
-        if (alreadyHas) return null;
-        var entry = {
-          id: 'recovered_' + (doc.updated_at || Date.now()),
-          label: 'آخر إعدادات محفوظة في السيرفر',
-          calibration: doc.calibration,
-          sheet: doc.sheet || null,
-          created_at: doc.updated_at || new Date().toISOString(),
-          _source: 'recovered'
-        };
-        existing.unshift(entry);
-        _writeHistory(existing);
-        return entry;
+        var added = 0;
+        rows.forEach(function(doc) {
+          if (!doc.calibration || typeof doc.calibration !== 'object') return;
+          if (Object.keys(doc.calibration).length < 3) return;
+          var alreadyHas = existing.some(function(h) { return h._source === 'recovered_' + doc.id; });
+          if (alreadyHas) return;
+          var label = doc.id === 'global' ? 'آخر إعدادات محفوظة في السيرفر' : 'إعدادات محفوظة (' + doc.id + ')';
+          var entry = {
+            id: 'recovered_' + doc.id + '_' + (doc.updated_at || Date.now()),
+            label: label,
+            calibration: doc.calibration,
+            sheet: doc.sheet || null,
+            created_at: doc.updated_at || new Date().toISOString(),
+            _source: 'recovered_' + doc.id
+          };
+          existing.unshift(entry);
+          added++;
+        });
+        if (added) _writeHistory(existing);
+        return added ? existing : null;
       })
       .catch(function() { return null; });
   }

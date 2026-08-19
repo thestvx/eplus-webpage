@@ -1464,6 +1464,10 @@
       Promise.resolve(R.centralSave(cal(), save)).then(function (ok) {
         saveBtn.disabled = false;
         renderCentralStatus();
+        if (ok) {
+          R.saveCalSnapshot('حفظ تلقائي', cal(), save);
+          renderHistList();
+        }
         toast(ok ? 'تم حفظ إعدادات المعايرة بنجاح' : 'تم الحفظ محلياً — تعذّر الاتصال بالخادم المركزي');
       });
     });
@@ -1509,7 +1513,9 @@
     }
     document.getElementById('hist-save-btn').addEventListener('click', function() {
       var label = (document.getElementById('hist-label').value || '').trim();
-      R.saveCalSnapshot(label || null);
+      var save = { params: JSON.parse(JSON.stringify(PARAMS)), slots: SLOTS.slice(), duplex: duplexConf() };
+      if (save.duplex.mode === 'long' || save.duplex.mode === 'short') save.flip = save.duplex.mode;
+      R.saveCalSnapshot(label || null, cal(), save);
       document.getElementById('hist-label').value = '';
       renderHistList();
       toast('تم حفظ نسخة في السجل' + (label ? ': ' + label : ''));
@@ -1543,6 +1549,8 @@
       buildColorSection();
       syncColorSection();
       renderPreview();
+      updateInspector();
+      syncLabelSettings();
       renderCentralStatus();
       toast('تم استرجاع الإعدادات بنجاح');
     });
@@ -1564,13 +1572,10 @@
     document.getElementById('hist-delete-modal').addEventListener('click', function(e) {
       if (e.target === this) { histDeleteId = null; this.classList.add('hidden'); }
     });
-    // Load remote history, recover last Supabase snapshot if empty, then render
+    // Load remote history, recover Supabase snapshots, then render
     R.syncCalHistory().then(function() {
-      return R.getCalHistory();
-    }).then(function(list) {
-      if (list.length === 0) {
-        return R.recoverLastSnapshot().then(function() { renderHistList(); });
-      }
+      return R.recoverLastSnapshot();
+    }).then(function() {
       renderHistList();
     });
   });
