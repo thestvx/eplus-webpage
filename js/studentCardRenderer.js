@@ -1608,6 +1608,37 @@ ${page(backSlots, 'الخلفي', 'ts-back')}
     return { ready: _central.ready, mode: _central.mode, updatedAt: _central.updatedAt, hasDoc: !!_centralDoc };
   }
 
+  // ── Recover the latest calibration_settings row as the first history entry.
+  //    Called when history is empty so the user at least sees their last saved
+  //    calibration with its correct Supabase updated_at timestamp.
+  function recoverLastSnapshot() {
+    var ep = _centralEndpoint();
+    if (!ep || !_central.ready) return Promise.resolve(null);
+    var q = CENTRAL_TABLE + '?id=eq.' + CENTRAL_ROW_ID + '&select=calibration,sheet,updated_at';
+    return _centralFetch('GET', ep.url + '/rest/v1/' + q)
+      .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(rows) {
+        if (!Array.isArray(rows) || !rows.length || !rows[0].calibration) return null;
+        var doc = rows[0];
+        var existing = _readHistory();
+        // Don't duplicate if we already have this snapshot
+        var alreadyHas = existing.some(function(h) { return h._source === 'recovered'; });
+        if (alreadyHas) return null;
+        var entry = {
+          id: 'recovered_' + (doc.updated_at || Date.now()),
+          label: 'آخر إعدادات محفوظة في السيرفر',
+          calibration: doc.calibration,
+          sheet: doc.sheet || null,
+          created_at: doc.updated_at || new Date().toISOString(),
+          _source: 'recovered'
+        };
+        existing.unshift(entry);
+        _writeHistory(existing);
+        return entry;
+      })
+      .catch(function() { return null; });
+  }
+
   return {
     CARD_W, CARD_H, CARD_W_MM, CARD_H_MM, A4_W_MM, A4_H_MM, QR_SIZE, CAL, CAL_DEFAULTS, BARCODE_OPTS, BARCODE_STD,
     cardCSS, barcodeSpec, bcBox, qrBgGeom, bcBgGeom,
@@ -1624,7 +1655,7 @@ ${page(backSlots, 'الخلفي', 'ts-back')}
     buildA4PrintHTML, buildA4TestSheetHTML, buildA4FrontSheetHTML, buildA4BackSheetHTML, buildDuplexTestSheetHTML,
     renderBarcodeSVG, buildBarcodePrintHTML,
     initCentral, centralSave, centralStatus,
-    saveCalSnapshot, getCalHistory, restoreCalSnapshot, deleteCalSnapshot, syncCalHistory
+    saveCalSnapshot, getCalHistory, restoreCalSnapshot, deleteCalSnapshot, syncCalHistory, recoverLastSnapshot
   };
 })();
 
