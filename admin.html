@@ -3716,6 +3716,7 @@
             <option value="cancelled">ملغى</option>
           </select>
           <button class="tbl-action" onclick="subxLoadAll()" style="font-size:12px;border-color:rgba(245,158,11,0.3);color:#d97706">🔄 تحديث</button>
+          <button class="tbl-action" onclick="subxShowAllLogs()" style="font-size:12px;border-color:rgba(99,102,241,0.3);color:#6366f1">📋 سجلات الحضور</button>
         </div>
 
         <!-- List -->
@@ -3830,6 +3831,25 @@
           </div>
           <div class="teacher-modal-body" style="overflow:auto;max-height:72vh;padding:22px 26px">
             <div id="subx-detail-body"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== ATTENDANCE LOGS MODAL ===== -->
+      <div class="teacher-modal-bg" id="subx-logs-modal">
+        <div class="teacher-modal" style="max-width:780px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:rgba(99,102,241,0.1);border-color:rgba(99,102,241,0.2)">📋</div>
+            <div class="teacher-modal-title">سجلات الحضور — الكل</div>
+            <button class="att-modal-close" onclick="document.getElementById('subx-logs-modal').classList.remove('open')">✕</button>
+          </div>
+          <div class="teacher-modal-body" style="overflow:auto;max-height:72vh;padding:22px 26px">
+            <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+              <input type="text" id="subx-logs-search" placeholder="🔍 بحث بالطالب أو المادة..." oninput="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;flex:1;min-width:180px;background:var(--card)">
+              <input type="date" id="subx-logs-date" onchange="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+              <button class="tbl-action" onclick="subxLogsFilter()" style="font-size:12px;border-color:rgba(16,185,129,0.3);color:#059669">🔄 تحديث</button>
+            </div>
+            <div id="subx-logs-body" style="font-size:12px;color:var(--text-muted)">جارٍ تحميل سجلات الحضور…</div>
           </div>
         </div>
       </div>
@@ -24029,6 +24049,72 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       console.error('[SUBSCRIPTIONS] delete failed', e);
       showToast('❌ ' + ((e && e.message) || 'تعذر حذف الاشتراك'), true);
     }
+  };
+
+  // ── سجلات الحضور — نافذة عامة ──
+  window._subxLogsData = [];
+  window.subxShowAllLogs = async function () {
+    document.getElementById('subx-logs-modal').classList.add('open');
+    document.getElementById('subx-logs-body').innerHTML = '<div style="text-align:center;padding:18px;color:var(--text-muted)">جارٍ تحميل سجلات الحضور…</div>';
+    try {
+      const { _db: fdb, _firestore: fs } = window;
+      if (!fdb || !fs) { document.getElementById('subx-logs-body').innerHTML = '<div style="text-align:center;padding:12px;color:#dc2626">Firebase غير متاح</div>'; return; }
+      const snap = await fs.getDocs(fs.collection(fdb, 'support_attendance'));
+      const rows = [];
+      snap.forEach(d => {
+        const r = d.data();
+        if (r.type === 'grace') return;
+        if (!r.date) return;
+        rows.push({ id: d.id, studentId: r.studentId || '', studentName: r.studentName || '', date: r.date, time: r.checkInTime || r.createdAt || '', teacherName: r.teacherName || '', subjectName: r.subjectName || '', type: r.type || '', cancelled: r.cancelled || false });
+      });
+      rows.sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
+      window._subxLogsData = rows;
+      subxLogsFilter();
+    } catch (e) {
+      console.error('[SUBSCRIPTIONS] load all logs failed', e);
+      document.getElementById('subx-logs-body').innerHTML = '<div style="text-align:center;padding:12px;color:#dc2626">تعذر تحميل سجلات الحضور</div>';
+    }
+  };
+
+  window.subxLogsFilter = function () {
+    const q = (document.getElementById('subx-logs-search').value || '').trim().toLowerCase();
+    const dateFilter = document.getElementById('subx-logs-date').value || '';
+    const rows = (window._subxLogsData || []).filter(r => {
+      if (r.cancelled) return false;
+      if (dateFilter && r.date !== dateFilter) return false;
+      if (q && !(r.studentName + ' ' + r.studentId + ' ' + r.subjectName + ' ' + r.teacherName).toLowerCase().includes(q)) return false;
+      return true;
+    });
+    const c = document.getElementById('subx-logs-body');
+    if (!rows.length) {
+      c.innerHTML = '<div style="text-align:center;padding:14px;color:var(--text-muted);border:1px dashed var(--border);border-radius:12px">لا توجد سجلات حضور</div>';
+      return;
+    }
+    let h = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px">';
+    h += '<thead><tr style="background:rgba(99,102,241,0.06)">';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">التاريخ</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الوقت</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الطالب</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">رقم التسجيل</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">المادة</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الأستاذ</th>';
+    h += '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">النوع</th>';
+    h += '</tr></thead><tbody>';
+    rows.forEach(r => {
+      const typeLabel = r.type === 'grace_session' ? '<span style="color:#d97706">⚠️ حصّة مجانية</span>' : '<span style="color:#059669">✅ حضور</span>';
+      h += '<tr style="border-bottom:1px solid var(--border)">';
+      h += '<td style="padding:7px 10px;white-space:nowrap">' + escX(r.date) + '</td>';
+      h += '<td style="padding:7px 10px;white-space:nowrap" dir="ltr">' + escX(r.time) + '</td>';
+      h += '<td style="padding:7px 10px;font-weight:700">' + escX(r.studentName || '—') + '</td>';
+      h += '<td style="padding:7px 10px;font-family:monospace" dir="ltr">' + escX(r.studentId) + '</td>';
+      h += '<td style="padding:7px 10px">' + escX(r.subjectName || '—') + '</td>';
+      h += '<td style="padding:7px 10px">' + escX(r.teacherName || '—') + '</td>';
+      h += '<td style="padding:7px 10px;text-align:center">' + typeLabel + '</td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table></div>';
+    h += '<div style="text-align:center;margin-top:10px;font-size:11px;color:var(--text-muted)">إجمالي السجلات: ' + rows.length + '</div>';
+    c.innerHTML = h;
   };
 
   window.subxPrintReceipt = async function (id) {
