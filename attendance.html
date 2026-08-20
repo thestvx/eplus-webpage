@@ -692,7 +692,11 @@ main{flex:1;position:relative;overflow:hidden}
           } catch (e) { logScanner('mirror write error: ' + e.message); }
           try {
             var _ap = SubscriptionService.activePeriod(subCheck.periods);
-            if (_ap) { await SubscriptionService.incrementPeriodUsage(_ap.period_id || _ap.id, 1); }
+            var _pid = _ap ? (_ap.period_id || _ap.id) : null;
+            if (_pid) {
+              var _r = await SubscriptionService.incrementPeriodUsage(_pid, 1);
+              logScanner('increment result: ' + JSON.stringify(_r));
+            } else { logScanner('increment skipped: no active period found'); }
           } catch (e) { logScanner('increment usage error: ' + e.message); }
         }
       } else {
