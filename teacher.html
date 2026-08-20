@@ -648,7 +648,11 @@
             for(var j=0;j<reg.subjects.length;j++){
               var sj=reg.subjects[j];
               var regTeacher=(typeof sj==='string')?'':(sj.teacher||sj.teacherName||'');
-              if(regTeacher&&teacherNameLC&&regTeacher.toLowerCase()===teacherNameLC){studentCount++;break;}
+              var regTeacherId=(typeof sj==='string')?'':(sj.teacherId||sj.teacher_id||'');
+              var matched=false;
+              if(teacherId&&regTeacherId&&teacherId===regTeacherId){matched=true;}
+              else if(regTeacher&&teacherNameLC&&regTeacher.toLowerCase()===teacherNameLC){matched=true;}
+              if(matched){studentCount++;break;}
             }
           }
         }
@@ -928,6 +932,7 @@
     let _allStudentsData=[];
     async function renderStudentsPage(){
       currentTeacher=currentTeacher||{};var t=currentTeacher,teacherName=t.name||t.teacherName||'';
+      var tId=t.teacherId||t.id||'';
       document.getElementById('app').innerHTML=`
         <div class="app-layout">
           <aside class="sidebar" id="sidebar">${renderSidebar(t)}</aside>
@@ -970,9 +975,12 @@
           for(var si=0;si<subjArr.length;si++){
             var s=subjArr[si];
             var regTeacher=(typeof s==='string')?'':(s.teacher||s.teacherName||s.teacher_name||'');
+            var regTeacherId=(typeof s==='string')?'':(s.teacherId||s.teacher_id||'');
             var regSubject=(typeof s==='string')?s:(s.subject||s.name||s.subjectName||'');
-            var tNorm=regTeacher.replace(/\s+/g,' ').trim().toLowerCase();
-            if(tNorm&&tNameNorm&&(tNorm===tNameNorm||tNorm.includes(tNameNorm)||tNameNorm.includes(tNorm))){matched.push(regSubject);}
+            var matchedTeacher=false;
+            if(tId&&regTeacherId&&tId===regTeacherId){matchedTeacher=true;}
+            else{var tNorm=regTeacher.replace(/\s+/g,' ').trim().toLowerCase();if(tNorm&&tNameNorm&&(tNorm===tNameNorm||tNorm.includes(tNameNorm)||tNameNorm.includes(tNorm))){matchedTeacher=true;}}
+            if(matchedTeacher){matched.push(regSubject);}
           }
           if(matched.length>0){
             _allStudentsData.push({

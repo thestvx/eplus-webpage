@@ -3292,8 +3292,9 @@
                 <option value="">كل الأساتذة</option>
               </select>
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
               <input class="inp" id="sr-search" type="text" placeholder="🔍 بحث برقم التلميذ أو الاسم..." style="width:200px;padding:8px 14px" oninput="srApplyFilters()" />
+              <button class="tbl-action" id="sr-scan-btn" onclick="srToggleScanner()" style="font-size:12px;border-color:rgba(16,185,129,0.3);color:#059669">📷 مسح بطاقة</button>
               <button class="tbl-action" onclick="srExportCSV()" style="font-size:12px">📥 CSV</button>
               <button class="tbl-action" onclick="srExportExcel()" style="font-size:12px">📊 Excel</button>
               <button class="tbl-action" onclick="srPrint()" style="font-size:12px">🖨️ طباعة</button>
@@ -3301,6 +3302,9 @@
             </div>
           </div>
         </div>
+
+        <!-- Scan Hint -->
+        <div id="sr-scan-hint" style="display:none;text-align:center;padding:10px 16px;margin-bottom:12px;background:var(--success-soft);border:1px solid rgba(16,185,129,0.2);border-radius:var(--radius-sm);font-size:13px;font-weight:700;color:var(--success);animation:pageIn .3s ease"></div>
 
         <!-- Table -->
         <div class="panel" style="padding:0;overflow:hidden">
@@ -5470,6 +5474,14 @@ window.switchNavSection = (section) => {
     const el = document.getElementById('section-' + s);
     if (el) el.style.display = s === section ? 'block' : 'none';
   });
+  if (section !== 'support-registrations' && srScannerOn && srScanner) {
+    srScannerOn = false;
+    srScanner.stop();
+    var btn = document.getElementById('sr-scan-btn');
+    if (btn) { btn.style.borderColor = 'rgba(16,185,129,0.3)'; btn.style.color = '#059669'; btn.textContent = '📷 مسح بطاقة'; }
+    var hint = document.getElementById('sr-scan-hint');
+    if (hint) hint.style.display = 'none';
+  }
   if (section === 'settings') {
     switchSettingsTab('dashboard');
   }
@@ -23339,12 +23351,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   // يعيد بناء قيمة الباركود من event.code (المفتاح الفيزيائي) فقط، فلا
   // يتأثر بتخطيط لوحة المفاتيح (عربي/فرنسي → é/à/&/_). Scanner يعمل
   // تلقائياً ما دامت النافذة مفتوحة — لا حاجة لزر ولا لتركيز مدخل.
+  // لا نستخدم shouldIgnoreKey حتى لا نمنع المسح عند تركيز مدخل البحث.
   var subxScanner = new window.BarcodeScanner.Scanner({
     logPrefix: '[SUBSCRIPTION SCANNER]',
-    shouldIgnoreKey: function (e) {
-      // صندوق البحث اليدوي يترك مفاتيح الكتابة تمر بشكل طبيعي.
-      return !!(e.target && e.target.id === 'subx-student');
-    },
     onScan: function (codeVal) {
       console.log('[SUBSCRIPTION SCANNER] Scan complete');
       console.log('[SUBSCRIPTION SCANNER] rawCodeValue=' + codeVal);
@@ -24594,7 +24603,7 @@ function srApplyFilters() {
     }
     if (query) {
       const searchable = [
-        r.id, r.first_name, r.last_name
+        r.id, r.first_name, r.last_name, r.barcode_value || ''
       ].map(srSafeStr).join(' ').toLowerCase();
       if (!searchable.includes(query)) return false;
     }
@@ -24604,6 +24613,48 @@ function srApplyFilters() {
   srCurrentPage = 1;
   srUpdateStats();
   srRenderTable();
+}
+
+// ── ماسح الباركود لقسم تسجيلات الدعم ──
+var srScannerOn = false;
+var srScanner = null;
+function srEscHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function srToggleScanner() {
+  var btn = document.getElementById('sr-scan-btn');
+  if (srScannerOn) {
+    srScannerOn = false;
+    if (srScanner) srScanner.stop();
+    btn.style.borderColor = 'rgba(16,185,129,0.3)';
+    btn.style.color = '#059669';
+    btn.textContent = '📷 مسح بطاقة';
+    var hint = document.getElementById('sr-scan-hint');
+    if (hint) hint.style.display = 'none';
+    return;
+  }
+  if (!srScanner) {
+    srScanner = new window.BarcodeScanner.Scanner({
+      logPrefix: '[SR SCANNER]',
+      onScan: function (codeVal) {
+        console.log('[SR SCANNER] Scan:', codeVal);
+        var searchEl = document.getElementById('sr-search');
+        if (searchEl) {
+          searchEl.value = codeVal;
+          srApplyFilters();
+        }
+        var hint = document.getElementById('sr-scan-hint');
+        if (hint) {
+          hint.innerHTML = '✅ تم المسح: <span style="font-weight:800">' + srEscHtml(codeVal) + '</span>';
+          hint.style.display = 'block';
+          setTimeout(function () { hint.style.display = 'none'; }, 3000);
+        }
+      }
+    });
+  }
+  srScannerOn = true;
+  srScanner.start();
+  btn.style.borderColor = 'rgba(239,68,68,0.3)';
+  btn.style.color = '#dc2626';
+  btn.textContent = '⏹️ إيقاف المسح';
 }
 
 function srUpdateStats() {
