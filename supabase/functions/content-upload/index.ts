@@ -48,6 +48,6 @@ Deno.serve(async (req) => {
 
   if (error) return json({ error: error.message }, 400);
 
-  const url = (Deno.env.get('SUPABASE_URL') || '') + '/storage/v1/object/public/' + BUCKET + '/' + encodeURIComponent(path);
+  const url = (Deno.env.get('SUPABASE_URL') || '') + '/storage/v1/object/public/' + BUCKET + '/' + path;
   return json({ ok: true, path: data?.path || path, url });
 });

@@ -273,6 +273,13 @@
     .stu-content-url{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:var(--radius-xs);background:var(--blue-light);color:var(--blue);font-size:11px;font-weight:700;text-decoration:none;transition:var(--transition)}
     .stu-content-url:hover{background:var(--blue);color:#fff}
     .stu-content-type-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:800}
+    .stu-content-previews{padding:0 20px 14px;display:flex;gap:8px;flex-wrap:wrap}
+    .stu-preview-thumb{width:80px;height:80px;border-radius:10px;overflow:hidden;border:1.5px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);flex-shrink:0;position:relative;text-decoration:none}
+    .stu-preview-thumb:hover{border-color:var(--primary);box-shadow:0 2px 10px rgba(99,102,241,0.2);transform:scale(1.05)}
+    .stu-preview-thumb img{width:100%;height:100%;object-fit:cover}
+    .stu-preview-thumb .fp-icon{font-size:28px;opacity:.7}
+    .stu-preview-thumb .fp-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.65);color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px 0;text-transform:uppercase;letter-spacing:.5px}
+    .stu-preview-more{width:80px;height:80px;border-radius:10px;border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--text-muted);flex-shrink:0}
 
     /* ═══ RESPONSIVE ═══ */
     @media(max-width:1024px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
@@ -421,21 +428,55 @@
       if(!el)return;
       try{
         if(typeof _fbAuthPromise!=='undefined')await _fbAuthPromise.catch(function(){});
-        if(!window._fdb)return;
+        if(!window._fdb){console.warn('[Content] Firestore not ready');return;}
         var snap=await window._fdb.collection('teacher_content').get();
         var items=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+        console.log('[Content] Loaded '+items.length+' items, student subjects:',studentSubjects);
+        var filtered=items;
         if(Array.isArray(studentSubjects)&&studentSubjects.length>0){
-          items=items.filter(function(c){return studentSubjects.indexOf(c.subject)>=0;});
+          filtered=items.filter(function(c){
+            var cs=(c.subject||'').trim();
+            for(var i=0;i<studentSubjects.length;i++){
+              if(cs===studentSubjects[i].trim())return true;
+            }
+            return false;
+          });
+          if(filtered.length===0&&items.length>0){
+            console.warn('[Content] No subject match, showing all '+items.length+' items');
+            filtered=items;
+          }
         }
-        items=items.sort(function(a,b){return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0);}).slice(0,3);
-        if(items.length===0){el.innerHTML='';return;}
+        filtered=filtered.sort(function(a,b){return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0);}).slice(0,3);
+        if(filtered.length===0){el.innerHTML='';return;}
         var TL={lesson:'📚 درس',exercise:'📝 تمارين',homework:'📋 واجبات',announcement:'📢 إعلان'};
         var TC={lesson:'blue',exercise:'green',homework:'gold',announcement:'purple'};
         el.innerHTML='<div class="section-header" style="margin-bottom:14px"><div class="section-title">📖 آخر المحتوى المضاف</div><div style="cursor:pointer;font-size:12px;font-weight:700;color:var(--primary);background:var(--primary-light);padding:6px 14px;border-radius:20px" onclick="navigateTo(\'content\')">عرض الكل ←</div></div>'+
-          '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">'+items.map(function(c){
+          '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">'+filtered.map(function(c){
             var tc=TC[c.type]||'blue',tl=TL[c.type]||c.type;
             var createdAt=c.createdAt?(c.createdAt.seconds?new Date(c.createdAt.seconds*1000):new Date(c.createdAt)):null;
             var dateStr=createdAt?createdAt.toLocaleDateString('ar-DZ',{month:'short',day:'numeric'}):'';
+            var hasFiles=c.attachments&&c.attachments.length>0;
+            var previewHtml='';
+            if(hasFiles){
+              var first=c.attachments[0];
+              var isImg=first.type&&first.type.startsWith('image/');
+              previewHtml='<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">';
+              var showCount=Math.min(c.attachments.length,3);
+              for(var ai=0;ai<showCount;ai++){
+                var a=c.attachments[ai];
+                var isImage=a.type&&a.type.startsWith('image/');
+                var isPdf=a.type==='application/pdf'||(a.name&&a.name.toLowerCase().endsWith('.pdf'));
+                if(isImage&&a.url){
+                  previewHtml+='<a href="'+a.url+'" target="_blank" rel="noopener" style="width:56px;height:56px;border-radius:8px;overflow:hidden;border:1px solid var(--border);display:block;flex-shrink:0"><img src="'+a.url+'" style="width:100%;height:100%;object-fit:cover" alt="'+a.name+'"></a>';
+                }else if(isPdf){
+                  previewHtml+='<a href="'+a.url+'" target="_blank" rel="noopener" style="width:56px;height:56px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:var(--bg);flex-shrink:0;text-decoration:none;font-size:22px">📄</a>';
+                }else{
+                  previewHtml+='<a href="'+a.url+'" target="_blank" rel="noopener" style="width:56px;height:56px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:var(--bg);flex-shrink:0;text-decoration:none;font-size:22px">📎</a>';
+                }
+              }
+              if(c.attachments.length>3){previewHtml+='<div style="width:56px;height:56px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--text-muted);flex-shrink:0">+'+(c.attachments.length-3)+'</div>';}
+              previewHtml+='</div>';
+            }
             return '<div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);padding:16px;cursor:pointer;transition:var(--transition)" onclick="navigateTo(\'content\')" onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'var(--shadow-md)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'\'">'+
               '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'+
                 '<span style="padding:3px 8px;border-radius:8px;font-size:10px;font-weight:800;background:var(--'+tc+'-light);color:var(--'+tc+')">'+tl+'</span>'+
@@ -444,6 +485,7 @@
               '<div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:4px;line-height:1.4">'+(c.title||'بدون عنوان')+'</div>'+
               '<div style="font-size:11px;color:var(--text-muted);font-weight:600">'+(c.subject||'')+(c.level?' — '+c.level:'')+'</div>'+
               (c.teacherName?'<div style="font-size:10px;color:var(--primary);font-weight:700;margin-top:4px">👨‍🏫 '+c.teacherName+'</div>':'')+
+              previewHtml+
             '</div>';
           }).join('')+'</div>';
       }catch(e){console.warn('Content preview load failed:',e);el.innerHTML='';}
@@ -695,8 +737,20 @@
         if(!window._fdb){document.getElementById('stu-content-list').innerHTML='<div style="text-align:center;padding:40px"><div style="font-size:14px;color:var(--text-muted)">Firestore غير متاح</div></div>';return;}
         var snap=await window._fdb.collection('teacher_content').get();
         var items=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+        console.log('[StudentContent] Loaded '+items.length+' total items, subject filter:',subjectNames);
         if(subjectNames.length>0){
-          items=items.filter(function(c){return subjectNames.indexOf(c.subject)>=0;});
+          var before=items.length;
+          items=items.filter(function(c){
+            var cs=(c.subject||'').trim();
+            for(var i=0;i<subjectNames.length;i++){
+              if(cs===subjectNames[i].trim())return true;
+            }
+            return false;
+          });
+          if(items.length===0&&before>0){
+            console.warn('[StudentContent] No subject match from '+before+' items, showing all');
+            items=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+          }
         }
         items=items.sort(function(a,b){return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0);});
         var countEl=document.getElementById('stu-content-count');
@@ -725,6 +779,30 @@
             var hasUrl=c.url&&c.url.trim();
             var createdAt=c.createdAt?(c.createdAt.seconds?new Date(c.createdAt.seconds*1000):new Date(c.createdAt)):null;
             var dateStr=createdAt?createdAt.toLocaleDateString('ar-DZ',{year:'numeric',month:'short',day:'numeric'}):'';
+            var previewHtml='';
+            if(hasFiles){
+              var MAX_P=4;
+              var showN=Math.min(c.attachments.length,MAX_P);
+              previewHtml='<div class="stu-content-previews">';
+              for(var pi=0;pi<showN;pi++){
+                var pa=c.attachments[pi];
+                var isImg=pa.type&&pa.type.startsWith('image/');
+                var isPdf=pa.type==='application/pdf'||(pa.name&&pa.name.toLowerCase().endsWith('.pdf'));
+                var isVid=pa.type&&pa.type.startsWith('video/');
+                if(isImg&&pa.url){
+                  previewHtml+='<a class="stu-preview-thumb" href="'+pa.url+'" target="_blank" rel="noopener" title="'+pa.name+'"><img src="'+pa.url+'" alt="'+pa.name+'"></a>';
+                }else if(isPdf){
+                  previewHtml+='<a class="stu-preview-thumb" href="'+pa.url+'" target="_blank" rel="noopener" title="'+pa.name+'"><span class="fp-icon">📄</span><span class="fp-label">PDF</span></a>';
+                }else if(isVid){
+                  previewHtml+='<a class="stu-preview-thumb" href="'+pa.url+'" target="_blank" rel="noopener" title="'+pa.name+'"><span class="fp-icon">🎬</span><span class="fp-label">MP4</span></a>';
+                }else{
+                  var ext=(pa.name||'').split('.').pop().toUpperCase().slice(0,4);
+                  previewHtml+='<a class="stu-preview-thumb" href="'+pa.url+'" target="_blank" rel="noopener" title="'+pa.name+'"><span class="fp-icon">📎</span><span class="fp-label">'+ext+'</span></a>';
+                }
+              }
+              if(c.attachments.length>MAX_P){previewHtml+='<div class="stu-preview-more">+'+(c.attachments.length-MAX_P)+'</div>';}
+              previewHtml+='</div>';
+            }
             html+=`<div class="stu-content-card" style="animation-delay:${i*0.06}s">
               <div class="stu-content-card-header">
                 <div class="stu-content-card-icon ${c.type}">${tl.split(' ')[0]}</div>
@@ -734,13 +812,13 @@
                 </div>
               </div>
               ${c.description?'<div class="stu-content-card-body">'+c.description+'</div>':''}
+              ${previewHtml}
               <div class="stu-content-card-footer">
                 <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
                   <span class="stu-content-tag" style="background:var(--${tc}-light);color:var(--${tc})">${tl}</span>
                   ${hasFiles?'<a class="stu-content-attach" href="'+(c.attachments[0].url||'#')+'" target="_blank" rel="noopener">📎 '+c.attachments.length+' مرفق</a>':''}
                   ${hasUrl?'<a class="stu-content-url" href="'+c.url+'" target="_blank" rel="noopener">🔗 رابط</a>':''}
                 </div>
-                ${hasFiles&&c.attachments.length>1?'<div style="font-size:10px;color:var(--text-muted);font-weight:600">'+c.attachments.length+' ملفات</div>':''}
               </div>
             </div>`;
           });
