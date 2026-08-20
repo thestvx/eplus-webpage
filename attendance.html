@@ -578,11 +578,14 @@ main{flex:1;position:relative;overflow:hidden}
       try {
         var attSnap = await window.db.collection('support_attendance')
           .where('studentId', '==', studentId)
-          .where('teacherName', '==', s.teacher)
-          .where('subjectName', '==', s.subject)
           .where('date', '==', today).get();
-        if (!attSnap.empty) sess.alreadyCheckedIn = true;
-      } catch (e) {}
+        attSnap.forEach(function (doc) {
+          var d = doc.data();
+          if (d.teacherName === s.teacher && d.subjectName === s.subject && d.type !== 'grace' && d.type !== 'grace_session' && !d.cancelled) {
+            sess.alreadyCheckedIn = true;
+          }
+        });
+      } catch (e) { logScanner('att query error: ' + e.message); }
       try {
         var ym = today.slice(0, 7);
         var graceKey = studentId + '_' + s.teacher + '_' + s.subject + '_' + ym;
@@ -749,17 +752,20 @@ main{flex:1;position:relative;overflow:hidden}
 
     if (type === 'green') {
       playSoundCorrect();
-      showCheckinAnimation('green', session.subject, session.teacher);
-      showScanOverlay('green', '✅', 'تم تسجيل الحضور', pendingName, session.teacher + ' — ' + session.subject, 2200, function () { postCheckin(session, type); });
       attendedCount++; updateCounter();
+      postCheckin(session, type);
+      showCheckinAnimation('green', session.subject, session.teacher);
+      showScanOverlay('green', '✅', 'تم تسجيل الحضور', pendingName, session.teacher + ' — ' + session.subject, 2200);
     } else if (type === 'orange') {
       playSoundCorrect();
-      showCheckinAnimation('orange', session.subject, session.teacher);
-      showScanOverlay('orange', '⚠️', 'تم السماح بحضور هذه الحصة', pendingName, session.teacher + ' — ' + session.subject + '<br>الاشتراك غير مجدّد — يرجى التجديد', 3000, function () { postCheckin(session, type); });
       attendedCount++; updateCounter();
+      postCheckin(session, type);
+      showCheckinAnimation('orange', session.subject, session.teacher);
+      showScanOverlay('orange', '⚠️', 'تم السماح بحضور هذه الحصة', pendingName, session.teacher + ' — ' + session.subject + '<br>الاشتراك غير مجدّد — يرجى التجديد', 3000);
     } else {
       playSoundIncorrect();
-      showScanOverlay('red', '🚫', 'لا يمكن تسجيل الحضور', pendingName, session.teacher + ' — ' + session.subject + '<br>انتهى الاشتراك — تم استخدام الحصة المسموح بها', 3500, function () { postCheckin(session, type); });
+      postCheckin(session, type);
+      showScanOverlay('red', '🚫', 'لا يمكن تسجيل الحضور', pendingName, session.teacher + ' — ' + session.subject + '<br>انتهى الاشتراك — تم استخدام الحصة المسموح بها', 3500);
     }
   }
 

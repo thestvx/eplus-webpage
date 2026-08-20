@@ -23947,6 +23947,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         if (subjectName && r.subjectName && String(r.subjectName) !== String(subjectName)) return;
         if (teacherName && r.teacherName && String(r.teacherName) !== String(teacherName)) return;
         if (r.type === 'grace' || r.type === 'grace_session') return;
+        if (r.cancelled) return;
         if (!r.date) return;
         records.push({ id: d.id, date: r.date, time: r.checkInTime || r.createdAt || '', subjectName: r.subjectName || '', teacherName: r.teacherName || '', studentName: r.studentName || '' });
       });
@@ -23985,29 +23986,29 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     if (!ok) return;
     try {
       const { _db: fdb, _firestore: fs } = window;
-      await fs.deleteDoc(fs.doc(fdb, 'support_attendance', attId));
+      // Try hard delete first, fall back to soft-delete (cancelled flag)
+      try {
+        await fs.deleteDoc(fs.doc(fdb, 'support_attendance', attId));
+      } catch (delErr) {
+        console.warn('[SUBSCRIPTIONS] hard delete failed, trying soft-delete:', delErr);
+        await fs.updateDoc(fs.doc(fdb, 'support_attendance', attId), { cancelled: true, cancelledAt: new Date().toISOString() });
+      }
       // Decrement used_sessions for the matching period
       if (subId) {
-        const d = await SubscriptionService.adminSubscriptionDetail(subId);
-        if (d && d.periods && d.periods.length) {
-          const matchedPeriod = d.periods.find(p => attDate >= p.start_date && attDate <= p.end_date);
-          if (matchedPeriod) {
-            const newUsed = Math.max(0, (matchedPeriod.used_sessions || 0) - 1);
-            await SubscriptionService.adminSetPeriodSessions(matchedPeriod.period_id || matchedPeriod.id, newUsed);
+        try {
+          const d = await SubscriptionService.adminSubscriptionDetail(subId);
+          if (d && d.periods && d.periods.length) {
+            const matchedPeriod = d.periods.find(p => attDate >= p.start_date && attDate <= p.end_date);
+            if (matchedPeriod) {
+              const newUsed = Math.max(0, (matchedPeriod.used_sessions || 0) - 1);
+              await SubscriptionService.adminSetPeriodSessions(matchedPeriod.period_id || matchedPeriod.id, newUsed);
+            }
           }
-        }
+        } catch (rpcErr) { console.warn('[SUBSCRIPTIONS] session decrement failed:', rpcErr); }
       }
       // Refresh the subscription detail to update used/remaining counts and attendance list
       if (subId) {
         subxShowDetail(subId);
-      } else {
-        // Fallback: remove row from UI manually
-        const row = document.getElementById('subx-att-row-' + attId);
-        if (row) row.remove();
-        const container = document.getElementById('subx-att-container');
-        if (container && container.querySelectorAll('tbody tr').length === 0) {
-          container.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;border:1px dashed var(--border);border-radius:10px">لا توجد سجلات حضور لهذا الاشتراك</div>';
-        }
       }
       showToast('✔️ تم إلغاء الحضور بنجاح.');
     } catch (e) {
