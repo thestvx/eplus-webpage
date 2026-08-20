@@ -233,8 +233,16 @@ const SubscriptionService = (function () {
     if (!rows.length) return null;
     const r = refDate || today();
     const matches = function (s) {
-      if (s.subject_id && s.subject_id !== (subjectId || '')) return false;
-      if (s.teacher_id && s.teacher_id !== (teacherId || '')) return false;
+      var sId = s.subject_id || '';
+      var tId = s.teacher_id || '';
+      var sName = s.subject_name || '';
+      var tName = s.teacher_name || '';
+      if (sId && sId !== (subjectId || '')) {
+        if (!sName || sName !== (subjectId || '')) return false;
+      }
+      if (tId && tId !== (teacherId || '')) {
+        if (!tName || tName !== (teacherId || '')) return false;
+      }
       return true;
     };
     for (const row of rows) {
