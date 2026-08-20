@@ -281,6 +281,27 @@
     .stu-preview-thumb .fp-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.65);color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px 0;text-transform:uppercase;letter-spacing:.5px}
     .stu-preview-more{width:80px;height:80px;border-radius:10px;border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--text-muted);flex-shrink:0}
 
+    /* ═══ FILE PREVIEW MODAL ═══ */
+    .fp-overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.85);display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fpFadeIn .25s ease both}
+    .fp-overlay.open{display:flex}
+    .fp-container{position:relative;max-width:90vw;max-height:90vh;display:flex;flex-direction:column;align-items:center}
+    .fp-close{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;z-index:301;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+    .fp-close:hover{background:rgba(220,38,38,0.6);border-color:rgba(220,38,38,0.8);transform:scale(1.1)}
+    .fp-filename{color:#fff;font-size:13px;font-weight:700;margin-top:12px;text-align:center;opacity:.8;max-width:80vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .fp-img{max-width:85vw;max-height:80vh;border-radius:12px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.5);animation:fpZoomIn .3s ease both}
+    .fp-pdf{width:80vw;height:80vh;border:none;border-radius:12px;background:#fff;animation:fpZoomIn .3s ease both}
+    .fp-video{max-width:85vw;max-height:80vh;border-radius:12px;outline:none;animation:fpZoomIn .3s ease both}
+    .fp-unsupported{color:#fff;text-align:center;padding:40px}
+    .fp-unsupported-icon{font-size:48px;margin-bottom:12px;opacity:.5}
+    .fp-unsupported-text{font-size:16px;font-weight:700;opacity:.8}
+    .fp-unsupported-hint{font-size:12px;opacity:.5;margin-top:8px}
+    @keyframes fpFadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes fpZoomIn{from{opacity:0;transform:scale(0.9)}to{opacity:1;transform:scale(1)}}
+
+    /* ═══ TEACHER PHOTO AVATAR ═══ */
+    .teacher-photo-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);box-shadow:0 2px 8px rgba(0,0,0,0.2);flex-shrink:0}
+    .teacher-photo-sm{width:22px;height:22px;border-radius:50%;object-fit:cover;border:1.5px solid var(--border-light);box-shadow:0 1px 4px rgba(0,0,0,0.1);flex-shrink:0}
+
     /* ═══ RESPONSIVE ═══ */
     @media(max-width:1024px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:768px){
@@ -301,6 +322,12 @@
   </div>
   <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
 
+  <!-- FILE PREVIEW MODAL -->
+  <div class="fp-overlay" id="fp-overlay" onclick="if(event.target===this)closeFilePreview()">
+    <button class="fp-close" onclick="closeFilePreview()" title="إغلاق">✕</button>
+    <div class="fp-container" id="fp-container"></div>
+  </div>
+
   <script>
     const SP_URL='https://jftfvpultaqufhsekdle.supabase.co';
     const SP_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
@@ -316,6 +343,36 @@
       _fbAuthPromise=firebase.auth().signInAnonymously().then(function(){_fbReady=true;}).catch(function(e){console.error('Anonymous auth error:',e);_fbReady=true;});
     }catch(e){console.error('Firestore init error:',e);}
     SubscriptionService.init(SP_URL,SP_KEY);
+
+    /* ===== TEACHER PHOTO MAPPING ===== */
+    const TEACHER_PHOTOS={'نمسي عبدالرحمان':'teachersphotos/nemsi.png','سرهود عبدالرحمان':'teachersphotos/serrhoud.png'};
+    function getTeacherPhoto(name){return TEACHER_PHOTOS[name]||'icons/teacher.png';}
+
+    /* ===== FILE PREVIEW MODAL ===== */
+    function openFilePreview(url,name,type){
+      var overlay=document.getElementById('fp-overlay');
+      var container=document.getElementById('fp-container');
+      if(!overlay||!container)return;
+      var isImage=type&&type.startsWith('image/');
+      var isPdf=type==='application/pdf'||(name&&name.toLowerCase().endsWith('.pdf'));
+      var isVideo=type&&type.startsWith('video/');
+      var inner='';
+      if(isImage){inner='<img class="fp-img" src="'+url+'" alt="'+name+'">';}
+      else if(isPdf){inner='<iframe class="fp-pdf" src="'+url+'" title="'+name+'"></iframe>';}
+      else if(isVideo){inner='<video class="fp-video" controls autoplay src="'+url+'"></video>';}
+      else{inner='<div class="fp-unsupported"><div class="fp-unsupported-icon">📎</div><div class="fp-unsupported-text">'+name+'</div><div class="fp-unsupported-hint">لا يمكن معاينة هذا النوع — <a href="'+url+'" target="_blank" style="color:#a5b4fc;text-decoration:underline">تحميل الملف</a></div></div>';}
+      container.innerHTML=inner+'<div class="fp-filename">'+name+'</div>';
+      overlay.classList.add('open');
+      document.body.style.overflow='hidden';
+    }
+    function closeFilePreview(){
+      var overlay=document.getElementById('fp-overlay');
+      var container=document.getElementById('fp-container');
+      if(overlay)overlay.classList.remove('open');
+      if(container)container.innerHTML='';
+      document.body.style.overflow='';
+    }
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')closeFilePreview();});
 
     const SUB_AR_MONTHS=['يناير','فبراير','مارس','أبريل','ماي','جوان','جويلية','أوت','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
     function subFmtAr(d){
@@ -467,11 +524,11 @@
                 var isImage=a.type&&a.type.startsWith('image/');
                 var isPdf=a.type==='application/pdf'||(a.name&&a.name.toLowerCase().endsWith('.pdf'));
                 if(isImage&&a.url){
-                  previewHtml+='<a href="'+a.url+'" target="_blank" rel="noopener" style="width:56px;height:56px;border-radius:8px;overflow:hidden;border:1px solid var(--border);display:block;flex-shrink:0"><img src="'+a.url+'" style="width:100%;height:100%;object-fit:cover" alt="'+a.name+'"></a>';
+                  previewHtml+='<div onclick="openFilePreview(\''+a.url+'\',\''+a.name.replace(/'/g,"\\'")+'\',\''+a.type+'\')" style="width:56px;height:56px;border-radius:8px;overflow:hidden;border:1px solid var(--border);display:block;flex-shrink:0;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor=\'var(--primary)\';this.style.transform=\'scale(1.05)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'\'"><img src="'+a.url+'" style="width:100%;height:100%;object-fit:cover" alt="'+a.name+'"></div>';
                 }else if(isPdf){
-                  previewHtml+='<a href="'+a.url+'" target="_blank" rel="noopener" style="width:56px;height:56px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:var(--bg);flex-shrink:0;text-decoration:none;font-size:22px">📄</a>';
+                  previewHtml+='<div onclick="openFilePreview(\''+a.url+'\',\''+a.name.replace(/'/g,"\\'")+'\',\''+a.type+'\')" style="width:56px;height:56px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:var(--bg);flex-shrink:0;cursor:pointer;font-size:22px;transition:all .2s" onmouseover="this.style.borderColor=\'var(--primary)\';this.style.transform=\'scale(1.05)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'\'">📄</div>';
                 }else{
-                  previewHtml+='<a href="'+a.url+'" target="_blank" rel="noopener" style="width:56px;height:56px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:var(--bg);flex-shrink:0;text-decoration:none;font-size:22px">📎</a>';
+                  previewHtml+='<div onclick="openFilePreview(\''+a.url+'\',\''+a.name.replace(/'/g,"\\'")+'\',\''+a.type+'\')" style="width:56px;height:56px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:var(--bg);flex-shrink:0;cursor:pointer;font-size:22px;transition:all .2s" onmouseover="this.style.borderColor=\'var(--primary)\';this.style.transform=\'scale(1.05)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'\'">📎</div>';
                 }
               }
               if(c.attachments.length>3){previewHtml+='<div style="width:56px;height:56px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--text-muted);flex-shrink:0">+'+(c.attachments.length-3)+'</div>';}
@@ -484,7 +541,7 @@
               '</div>'+
               '<div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:4px;line-height:1.4">'+(c.title||'بدون عنوان')+'</div>'+
               '<div style="font-size:11px;color:var(--text-muted);font-weight:600">'+(c.subject||'')+(c.level?' — '+c.level:'')+'</div>'+
-              (c.teacherName?'<div style="font-size:10px;color:var(--primary);font-weight:700;margin-top:4px">👨‍🏫 '+c.teacherName+'</div>':'')+
+              (c.teacherName?'<div style="font-size:10px;color:var(--primary);font-weight:700;margin-top:4px;display:flex;align-items:center;gap:5px"><img class="teacher-photo-sm" src="'+getTeacherPhoto(c.teacherName)+'" alt="'+c.teacherName+'" onerror="this.src=\'icons/teacher.png\'" style="width:16px;height:16px"> '+c.teacherName+'</div>':'')+
               previewHtml+
             '</div>';
           }).join('')+'</div>';
@@ -614,7 +671,7 @@
       const streamText=r.stream?' | '+r.stream:'';
 
       let subjectsHTML=subjects.length===0?'<div style="text-align:center;padding:48px 20px;color:var(--text-muted);font-size:14px;grid-column:1/-1"><div style="font-size:48px;margin-bottom:12px">📭</div><div style="font-weight:700">لم تسجل في أي مادة بعد</div></div>':
-        subjects.map((s,i)=>{const icon=SUBJECT_ICONS[s.subject]||'📘';const color=SUBJECT_COLORS[i%SUBJECT_COLORS.length];return `<div class="subject-card" style="animation-delay:${i*0.08}s"><div class="subject-card-top"><div class="subject-icon" style="background:${color}">${icon}</div><div class="subject-info"><div class="subject-name">${s.subject||''}</div><div class="subject-teacher">👨‍🏫 ${s.teacher||''}</div></div></div><div class="subject-progress-wrap"><div class="subject-progress-bar"><div class="subject-progress-fill" style="width:0%"></div></div><div class="subject-progress-text"><span>تقدمك</span><span>قريباً</span></div></div><div class="subject-stats"><div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">الدروس</div></div><div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">التمارين</div></div><div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">آخر تحديث</div></div></div><div class="subject-card-footer"><button class="subject-btn" onclick="navigateTo('content')" style="cursor:pointer">📚 عرض المحتوى</button><button class="subject-btn disabled" disabled>📝 التمارين <span style="font-size:9px;color:var(--text-muted);margin-right:2px">قريباً</span></button></div></div>`;}).join('');
+        subjects.map((s,i)=>{const icon=SUBJECT_ICONS[s.subject]||'📘';const color=SUBJECT_COLORS[i%SUBJECT_COLORS.length];const tPhoto=getTeacherPhoto(s.teacher||'');return `<div class="subject-card" style="animation-delay:${i*0.08}s"><div class="subject-card-top"><div class="subject-icon" style="background:${color}">${icon}</div><div class="subject-info"><div class="subject-name">${s.subject||''}</div><div class="subject-teacher"><img class="teacher-photo-sm" src="${tPhoto}" alt="${s.teacher||''}" onerror="this.src='icons/teacher.png'"> ${s.teacher||''}</div></div></div><div class="subject-progress-wrap"><div class="subject-progress-bar"><div class="subject-progress-fill" style="width:0%"></div></div><div class="subject-progress-text"><span>تقدمك</span><span>قريباً</span></div></div><div class="subject-stats"><div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">الدروس</div></div><div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">التمارين</div></div><div class="subject-stat"><div class="subject-stat-num">—</div><div class="subject-stat-label">آخر تحديث</div></div></div><div class="subject-card-footer"><button class="subject-btn" onclick="navigateTo('content')" style="cursor:pointer">📚 عرض المحتوى</button><button class="subject-btn disabled" disabled>📝 التمارين <span style="font-size:9px;color:var(--text-muted);margin-right:2px">قريباً</span></button></div></div>`;}).join('');
 
       document.getElementById('app').innerHTML=`
         <div class="portal-layout">
@@ -771,7 +828,8 @@
         teacherOrder.forEach(function(tn){
           var tItems=grouped[tn];
           html+='<div style="margin-bottom:28px">';
-          html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--border)"><div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-dark));display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;font-weight:900">'+tn.charAt(0)+'</div><div><div style="font-size:14px;font-weight:900;color:var(--text)">الأستاذ: '+tn+'</div><div style="font-size:11px;color:var(--text-muted);font-weight:600">'+tItems.length+' محتوى</div></div></div>';
+          var tPhoto=getTeacherPhoto(tn);
+          html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--border)"><img class="teacher-photo-avatar" src="'+tPhoto+'" alt="'+tn+'" onerror="this.src=\'icons/teacher.png\'" style="width:38px;height:38px"><div><div style="font-size:14px;font-weight:900;color:var(--text)">الأستاذ: '+tn+'</div><div style="font-size:11px;color:var(--text-muted);font-weight:600">'+tItems.length+' محتوى</div></div></div>';
           html+='<div class="stu-content-grid">';
           tItems.forEach(function(c,i){
             var tc=STU_TYPE_COLORS[c.type]||'blue',tl=STU_TYPE_LABELS[c.type]||c.type;
@@ -790,14 +848,14 @@
                 var isPdf=pa.type==='application/pdf'||(pa.name&&pa.name.toLowerCase().endsWith('.pdf'));
                 var isVid=pa.type&&pa.type.startsWith('video/');
                 if(isImg&&pa.url){
-                  previewHtml+='<a class="stu-preview-thumb" href="'+pa.url+'" target="_blank" rel="noopener" title="'+pa.name+'"><img src="'+pa.url+'" alt="'+pa.name+'"></a>';
+                  previewHtml+='<div class="stu-preview-thumb" onclick="openFilePreview(\''+pa.url+'\',\''+pa.name.replace(/'/g,"\\'")+'\',\''+pa.type+'\')" title="'+pa.name+'"><img src="'+pa.url+'" alt="'+pa.name+'"></div>';
                 }else if(isPdf){
-                  previewHtml+='<a class="stu-preview-thumb" href="'+pa.url+'" target="_blank" rel="noopener" title="'+pa.name+'"><span class="fp-icon">📄</span><span class="fp-label">PDF</span></a>';
+                  previewHtml+='<div class="stu-preview-thumb" onclick="openFilePreview(\''+pa.url+'\',\''+pa.name.replace(/'/g,"\\'")+'\',\''+pa.type+'\')" title="'+pa.name+'"><span class="fp-icon">📄</span><span class="fp-label">PDF</span></div>';
                 }else if(isVid){
-                  previewHtml+='<a class="stu-preview-thumb" href="'+pa.url+'" target="_blank" rel="noopener" title="'+pa.name+'"><span class="fp-icon">🎬</span><span class="fp-label">MP4</span></a>';
+                  previewHtml+='<div class="stu-preview-thumb" onclick="openFilePreview(\''+pa.url+'\',\''+pa.name.replace(/'/g,"\\'")+'\',\''+pa.type+'\')" title="'+pa.name+'"><span class="fp-icon">🎬</span><span class="fp-label">MP4</span></div>';
                 }else{
                   var ext=(pa.name||'').split('.').pop().toUpperCase().slice(0,4);
-                  previewHtml+='<a class="stu-preview-thumb" href="'+pa.url+'" target="_blank" rel="noopener" title="'+pa.name+'"><span class="fp-icon">📎</span><span class="fp-label">'+ext+'</span></a>';
+                  previewHtml+='<div class="stu-preview-thumb" onclick="openFilePreview(\''+pa.url+'\',\''+pa.name.replace(/'/g,"\\'")+'\',\''+pa.type+'\')" title="'+pa.name+'"><span class="fp-icon">📎</span><span class="fp-label">'+ext+'</span></div>';
                 }
               }
               if(c.attachments.length>MAX_P){previewHtml+='<div class="stu-preview-more">+'+(c.attachments.length-MAX_P)+'</div>';}
@@ -816,7 +874,7 @@
               <div class="stu-content-card-footer">
                 <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
                   <span class="stu-content-tag" style="background:var(--${tc}-light);color:var(--${tc})">${tl}</span>
-                  ${hasFiles?'<a class="stu-content-attach" href="'+(c.attachments[0].url||'#')+'" target="_blank" rel="noopener">📎 '+c.attachments.length+' مرفق</a>':''}
+                  ${hasFiles?'<div class="stu-content-attach" onclick="openFilePreview(\''+c.attachments[0].url+'\',\''+c.attachments[0].name.replace(/'/g,"\\'")+'\',\''+c.attachments[0].type+'\')" style="cursor:pointer">📎 '+c.attachments.length+' مرفق</div>':''}
                   ${hasUrl?'<a class="stu-content-url" href="'+c.url+'" target="_blank" rel="noopener">🔗 رابط</a>':''}
                 </div>
               </div>
