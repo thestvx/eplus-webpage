@@ -912,8 +912,13 @@ main{flex:1;position:relative;overflow:hidden}
   function postCheckin(session, type) {
     if (type !== 'red') {
       session.alreadyCheckedIn = true;
-      session.attended = Math.min(8, session.attended + 1);
-      session.remaining = Math.max(0, session.remaining - 1);
+      if (type === 'orange') {
+        session.trialUsed = Math.min(TRIAL_MAX, (session.trialUsed || 0) + 1);
+        session.trialRemaining = Math.max(0, TRIAL_MAX - session.trialUsed);
+      } else {
+        session.attended = Math.min(8, session.attended + 1);
+        session.remaining = Math.max(0, session.remaining - 1);
+      }
     }
     var btn = document.querySelector('.tc-btn.loading') || document.querySelector('.tc-btn[data-sidx]');
     if (btn) {
@@ -929,9 +934,16 @@ main{flex:1;position:relative;overflow:hidden}
       var card = btn.closest('.tc-card');
       if (card && type !== 'red') {
         var nums = card.querySelectorAll('.tc-stat-num');
-        if (nums.length >= 2) {
-          nums[0].textContent = session.attended;
-          nums[1].textContent = session.remaining;
+        if (type === 'orange') {
+          if (nums.length >= 3) {
+            nums[0].textContent = session.trialUsed;
+            nums[1].textContent = session.trialRemaining;
+          }
+        } else {
+          if (nums.length >= 2) {
+            nums[0].textContent = session.attended;
+            nums[1].textContent = session.remaining;
+          }
         }
       }
     }
