@@ -516,6 +516,22 @@ main{flex:1;position:relative;overflow:hidden}
     } catch (e) { logScanner('trial mirror write error: ' + e.message); }
   }
 
+  // ── Attendance Control: check which teachers are open today ──
+  async function checkAttendanceControl() {
+    var openMap = {};
+    try {
+      var today = AttendanceService.today();
+      var snap = await window.db.collection('attendance_control')
+        .where('date', '==', today)
+        .get();
+      snap.forEach(function (doc) {
+        var d = doc.data();
+        if (d.isOpen && d.teacherName) openMap[d.teacherName] = true;
+      });
+    } catch (e) { logScanner('atc check error: ' + e.message); }
+    return openMap;
+  }
+
   // ── Scan overlay (auto-dismiss) ──
   var overlayTimer = null;
   function showScanOverlay(color, icon, title, name, sub, dismissMs, onDone) {
@@ -620,12 +636,14 @@ main{flex:1;position:relative;overflow:hidden}
     var seen = {};
     var today = AttendanceService.today();
     var trialUsage = await getTrialUsage(studentId);
+    var openMap = await checkAttendanceControl();
     for (var i = 0; i < subjects.length; i++) {
       var s = subjects[i];
       var key = (s.teacher || '') + '|' + (s.subject || '');
       if (seen[key]) continue;
       seen[key] = true;
-      var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, trialUsed: 0, trialRemaining: 0, alreadyCheckedIn: false, idx: sessions.length };
+      var isOpen = !!openMap[s.teacher];
+      var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, trialUsed: 0, trialRemaining: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length };
       try {
         var subResult = await SubscriptionService.getActiveSubscriptionForSubject(studentId, s.subject, s.teacher, today);
         if (subResult && subResult.subscription) {
@@ -702,28 +720,47 @@ main{flex:1;position:relative;overflow:hidden}
     for (var i = 0; i < sessions.length; i++) {
       var s = sessions[i];
       var icon = SubjectService.getSubjectIcon(s.subject);
+      var delay = (i * 0.08) + 's';
+
+      // ── Gate: attendance not open for this teacher ──
+      if (!s.attendanceOpen) {
+        html += '<div class="tc-card" style="animation-delay:' + delay + ';opacity:0.7">';
+        html += '<div class="tc-top">';
+        html += '<div class="tc-subject-icon red">' + icon + '</div>';
+        html += '<div class="tc-info"><div class="tc-teacher">' + esc(s.teacher) + '</div><div class="tc-subject">' + esc(s.subject) + '</div></div>';
+        html += '<div class="tc-badge red">\uD83D\uDD12 الحضور غير مفتوح</div>';
+        html += '</div>';
+        html += '<div style="text-align:center;padding:14px 8px;background:rgba(107,114,128,0.06);border-radius:12px;margin-top:4px">';
+        html += '<div style="font-size:28px;margin-bottom:6px">\uD83D\uDD12</div>';
+        html += '<div style="font-size:13px;font-weight:800;color:#6b7280">التسجيل غير متاح حالياً</div>';
+        html += '<div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;line-height:1.6">لم يبدأ المركز تسجيل الحضور لهذا الأستاذ بعد.<br>يرجى الانتظار حتى يقوم الإدارة بفتح الحضور.</div>';
+        html += '</div>';
+        html += '<div class="tc-btn-wrap"><button class="tc-btn" disabled style="background:var(--bg);color:var(--text-muted);border:1.5px solid var(--border);box-shadow:none">\uD83D\uDD12 الحضور مغلق</button></div>';
+        html += '</div>';
+        continue;
+      }
+
       var hasActiveSub = s.status === 'active';
       var hasTrial = !hasActiveSub && s.trialRemaining > 0;
       var stClass, badgeClass, badgeText;
       if (s.alreadyCheckedIn) {
         stClass = badgeClass = 'green';
-        badgeText = '✅ تم التسجيل';
+        badgeText = '\u2705 تم التسجيل';
       } else if (hasActiveSub) {
         stClass = badgeClass = 'green';
-        badgeText = '🟢 نشط';
+        badgeText = '\uD83D\uDFE2 نشط';
       } else if (hasTrial) {
         stClass = badgeClass = 'orange';
-        badgeText = '🟠 حصص تجريبية: ' + s.trialRemaining + '/' + TRIAL_MAX;
+        badgeText = '\uD83D\uDFE0 حصص تجريبية: ' + s.trialRemaining + '/' + TRIAL_MAX;
       } else {
         stClass = badgeClass = 'red';
-        badgeText = '🔴 منتهي';
+        badgeText = '\uD83D\uDD34 منتهي';
       }
       var attended = s.attended;
       var total = hasActiveSub ? 8 : TRIAL_MAX;
       var remaining = hasActiveSub ? Math.max(0, total - attended) : s.trialRemaining;
       var pct = Math.min(100, Math.round((attended / total) * 100));
       var barClass = hasActiveSub ? (pct >= 75 ? 'orange' : 'green') : (hasTrial ? 'orange' : 'red');
-      var delay = (i * 0.08) + 's';
       html += '<div class="tc-card" data-idx="' + i + '" style="animation-delay:' + delay + '">';
       html += '<div class="tc-top">';
       html += '<div class="tc-subject-icon ' + stClass + '">' + icon + '</div>';
@@ -769,6 +806,22 @@ main{flex:1;position:relative;overflow:hidden}
     btnEl.classList.add('loading');
     btnEl.innerHTML = '<span class="spin"></span>جاري التسجيل...';
     logScanner('handleCheckIn: ' + session.teacher + ' / ' + session.subject);
+
+    // ── Server-side gate: verify attendance is still open for this teacher ──
+    try {
+      var openMap = await checkAttendanceControl();
+      if (!openMap[session.teacher]) {
+        btnEl.classList.remove('loading');
+        btnEl.innerHTML = '\uD83D\uDD12 الحضور مغلق';
+        btnEl.classList.add('orange');
+        btnEl.disabled = true;
+        playSoundIncorrect();
+        showScanOverlay('red', '\uD83D\uDD12', 'الحضور غير متاح حالياً', pendingName,
+          'لم يبدأ المركز تسجيل الحضور لهذا الأستاذ بعد.<br>يرجى الانتظار حتى يتم فتح الحضور من الإدارة.', 3500);
+        processing = false; scanner.setBusy(false);
+        return;
+      }
+    } catch (e) { logScanner('atc gate check error: ' + e.message); }
 
     var subCheck = null;
     try { subCheck = await SubscriptionService.getActiveSubscriptionForSubject(pendingStudentId, session.subject, session.teacher, AttendanceService.today()); } catch (e) { logScanner('subCheck error: ' + e.message); }

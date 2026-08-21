@@ -3707,6 +3707,26 @@
           <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(245,158,11,0.1)">💰</div></div><div class="stat-num" id="subx-revenue" style="direction:ltr">0 دج</div><div class="stat-label">إيرادات الاشتراكات</div></div>
         </div>
 
+        <!-- ▶️ إدارة حضور اليوم -->
+        <div id="atc-section" style="margin-bottom:28px;padding:20px 24px;background:var(--card);border:1.5px solid var(--border);border-radius:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="font-size:22px">▶️</div>
+              <div>
+                <div style="font-size:16px;font-weight:900;color:var(--text)">إدارة حضور اليوم</div>
+                <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">افتح أو أغلق حضور الأساتذة لتسجيل الطلاب</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div id="atc-date-label" style="font-size:11.5px;color:var(--text-muted);background:var(--bg);padding:4px 12px;border-radius:8px;font-weight:700"></div>
+              <button onclick="atcLoad()" style="background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;font-weight:800;color:var(--text-muted);cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">🔄 تحديث</button>
+            </div>
+          </div>
+          <div id="atc-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+            <div style="text-align:center;color:var(--text-muted);padding:20px;font-size:13px;grid-column:1/-1">جارٍ تحميل قائمة الأساتذة...</div>
+          </div>
+        </div>
+
         <!-- List controls -->
         <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center">
           <input type="text" id="subx-search" placeholder="🔍 بحث بالطالب أو رقم التسجيل..." oninput="subxFilterList()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;flex:1;min-width:200px;background:var(--card)">
@@ -23780,7 +23800,95 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     const badge = document.getElementById('nav-badge-subscriptions');
     if (badge) badge.textContent = active;
     subxFilterList();
+    atcLoad();
     return allSubs;
+  };
+
+  // ══════════════════════════════════════════════
+  // ▶️ إدارة حضور اليوم — Attendance Control
+  // ══════════════════════════════════════════════
+  const ATC_COLLECTION = 'attendance_control';
+
+  function atcToday() {
+    return new Date().toLocaleDateString('sv-SE', { timeZone: 'Africa/Algiers' });
+  }
+  function atcNorm(name) {
+    return String(name || '').replace(/\s+/g, '').toLowerCase();
+  }
+  function atcDocId(teacherName) {
+    return atcToday() + '_' + atcNorm(teacherName);
+  }
+
+  window.atcLoad = async function () {
+    var grid = document.getElementById('atc-grid');
+    if (!grid) return;
+    var dateLabel = document.getElementById('atc-date-label');
+    if (dateLabel) dateLabel.textContent = '📅 ' + atcToday();
+    // Collect unique teacher names from allTeachers
+    var teacherMap = {};
+    (allTeachers || []).forEach(function (t) {
+      if (t.status === 'deleted') return;
+      var name = t.name || '';
+      if (!name || teacherMap[name]) return;
+      teacherMap[name] = { name: name, subjects: (t.subjects || []).map(function (s) { return s.subject || s.name || s; }).filter(Boolean), id: t.id || t.teacherId || '' };
+    });
+    var teachers = Object.values(teacherMap);
+    if (!teachers.length) {
+      grid.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;font-size:13px;grid-column:1/-1">لا يوجد أساتذة مسجلين</div>';
+      return;
+    }
+    // Batch fetch today's attendance_control docs
+    var statuses = {};
+    try {
+      var todayDocs = await getDocs(query(collection(db, ATC_COLLECTION), where('date', '==', atcToday())));
+      todayDocs.forEach(function (d) { var dd = d.data(); if (dd.teacherName) statuses[dd.teacherName] = dd; });
+    } catch (e) { console.warn('[ATC] load status failed', e); }
+    var html = '';
+    teachers.forEach(function (t) {
+      var st = statuses[t.name];
+      var isOpen = st && st.isOpen;
+      var statusColor = isOpen ? '#10b981' : '#6b7280';
+      var statusBg = isOpen ? 'rgba(16,185,129,0.1)' : 'rgba(107,114,128,0.08)';
+      var statusIcon = isOpen ? '🟢' : '🔒';
+      var statusText = isOpen ? 'الحضور مفتوح' : 'الحضور مغلق';
+      var btnText = isOpen ? '🔒 إغلاق الحضور' : '▶️ بدء الحضور';
+      var btnBg = isOpen ? 'linear-gradient(135deg,#dc2626,#ef4444)' : 'linear-gradient(135deg,#059669,#10b981)';
+      var subList = t.subjects.length ? t.subjects.join('، ') : '—';
+      html += '<div id="atc-card-' + atcNorm(t.name) + '" style="background:var(--bg);border:1.5px solid ' + (isOpen ? 'rgba(16,185,129,0.3)' : 'var(--border)') + ';border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;transition:all .2s">';
+      html += '<div style="display:flex;align-items:center;gap:10px">';
+      html += '<div style="width:38px;height:38px;border-radius:50%;background:' + statusBg + ';display:flex;align-items:center;justify-content:center;font-size:18px">' + statusIcon + '</div>';
+      html += '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:900;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escX(t.name) + '</div>';
+      html += '<div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escX(subList) + '</div></div>';
+      html += '</div>';
+      html += '<div style="font-size:12px;font-weight:800;color:' + statusColor + '">' + statusText + '</div>';
+      html += '<button onclick="atcToggle(\'' + escX(t.name).replace(/'/g, "\\'") + '\')" id="atc-btn-' + atcNorm(t.name) + '" style="width:100%;padding:8px 0;border:none;border-radius:10px;background:' + btnBg + ';color:#fff;font-size:12.5px;font-weight:800;font-family:inherit;cursor:pointer;transition:all .15s;box-shadow:0 4px 12px ' + (isOpen ? 'rgba(220,38,38,0.25)' : 'rgba(16,185,129,0.25)') + '">' + btnText + '</button>';
+      html += '</div>';
+    });
+    grid.innerHTML = html;
+  };
+
+  window.atcToggle = async function (teacherName) {
+    var btn = document.getElementById('atc-btn-' + atcNorm(teacherName));
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري التحديث...'; }
+    var docId = atcDocId(teacherName);
+    var docRef = doc(db, ATC_COLLECTION, docId);
+    try {
+      var snap = await getDoc(docRef);
+      if (snap.exists() && snap.data().isOpen) {
+        // Close
+        await updateDoc(docRef, { isOpen: false, closedAt: new Date().toISOString() });
+      } else {
+        // Open
+        await setDoc(docRef, {
+          date: atcToday(),
+          teacherName: teacherName,
+          isOpen: true,
+          openedAt: new Date().toISOString(),
+          closedAt: null
+        }, { merge: true });
+      }
+    } catch (e) { console.error('[ATC] toggle failed', e); showToast('❌ تعذر تحديث الحالة', true); }
+    atcLoad();
   };
 
   window.subxFilterList = function () {
