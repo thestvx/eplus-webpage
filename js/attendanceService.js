@@ -7,6 +7,7 @@
 const AttendanceService = (function () {
   const COLLECTION = 'support_attendance';
   const ALGERIA_TZ = 'Africa/Algiers';
+  function _db() { return window._db || window.db; }
 
   // ── Schema (reference) ────────────────────────────────
   // {
@@ -87,7 +88,7 @@ const AttendanceService = (function () {
   // Duplicate = same student + same teacher + same subject + same day/session.
 
   async function isDuplicate(studentId, subjectId, date, sessionNumber, teacherId) {
-    let q = db.collection(COLLECTION)
+    let q = _db().collection(COLLECTION)
       .where('studentId', '==', studentId)
       .where('subjectId', '==', subjectId)
       .where('date', '==', date || today());
@@ -179,7 +180,7 @@ const AttendanceService = (function () {
       updatedAt: new Date().toISOString()
     });
     delete doc.id;
-    await db.collection(COLLECTION).doc(mirrorId).set(doc);
+    await _db().collection(COLLECTION).doc(mirrorId).set(doc);
     return { success: true, id: mirrorId, doc };
   }
 
@@ -187,12 +188,12 @@ const AttendanceService = (function () {
   async function confirmDayRecords(teacherName, date) {
     const recDate = date || today();
     const normT = String(teacherName || '').replace(/\s+/g, '').toLowerCase();
-    const snap = await db.collection(COLLECTION)
+    const snap = await _db().collection(COLLECTION)
       .where('date', '==', recDate)
       .get();
     let count = 0;
     const batches = [];
-    let batch = db.batch();
+    let batch = _db().batch();
     let ops = 0;
     snap.forEach(document => {
       const d = document.data();
@@ -201,7 +202,7 @@ const AttendanceService = (function () {
         if (dn === normT) {
           batch.update(document.ref, { confirmed: true, updatedAt: new Date().toISOString() });
           ops++; count++;
-          if (ops >= 450) { batches.push(batch); batch = db.batch(); ops = 0; }
+          if (ops >= 450) { batches.push(batch); batch = _db().batch(); ops = 0; }
         }
       }
     });
@@ -212,9 +213,9 @@ const AttendanceService = (function () {
 
   // ── Clear all old attendance log records ──
   async function clearAllLogs() {
-    const snap = await db.collection(COLLECTION).get();
+    const snap = await _db().collection(COLLECTION).get();
     const batches = [];
-    let batch = db.batch();
+    let batch = _db().batch();
     let ops = 0;
     let count = 0;
     snap.forEach(document => {
@@ -222,7 +223,7 @@ const AttendanceService = (function () {
       if (d.type === 'trial_usage') return;
       batch.delete(document.ref);
       ops++; count++;
-      if (ops >= 450) { batches.push(batch); batch = db.batch(); ops = 0; }
+      if (ops >= 450) { batches.push(batch); batch = _db().batch(); ops = 0; }
     });
     if (ops > 0) batches.push(batch);
     for (const b of batches) { await b.commit(); }
@@ -280,10 +281,10 @@ const AttendanceService = (function () {
     const key = (studentId + '_' + (teacherId || 'x') + '_' + (subjectId || 'x') + '_' + recDate + '_' + recSession)
       .replace(/[^A-Za-z0-9_.\-]/g, '_');
 
-    if (typeof db.runTransaction === 'function') {
-      const ref = db.collection(COLLECTION).doc(key);
+    if (typeof _db().runTransaction === 'function') {
+      const ref = _db().collection(COLLECTION).doc(key);
       try {
-        return await db.runTransaction(async tx => {
+        return await _db().runTransaction(async tx => {
           const snap = await tx.get(ref);
           if (snap.exists) {
             return { success: false, reason: 'duplicate', message: 'تم تسجيل حضور هذا الطالب مسبقاً لهذه الحصة' };
@@ -300,7 +301,7 @@ const AttendanceService = (function () {
     }
 
     // Fallback (no transaction support): explicit get/set on the deterministic id.
-    const ref2 = db.collection(COLLECTION).doc(key);
+    const ref2 = _db().collection(COLLECTION).doc(key);
     const existing = await ref2.get();
     if (existing.exists) return { success: false, reason: 'duplicate', message: 'تم تسجيل حضور هذا الطالب مسبقاً لهذه الحصة' };
     await ref2.set(doc);
@@ -311,7 +312,7 @@ const AttendanceService = (function () {
 
   async function checkOut(studentId, subjectId, date) {
     const recDate = date || today();
-    const snap = await db.collection(COLLECTION)
+    const snap = await _db().collection(COLLECTION)
       .where('studentId', '==', studentId)
       .where('subjectId', '==', subjectId)
       .where('date', '==', recDate)
@@ -323,7 +324,7 @@ const AttendanceService = (function () {
     const doc = snap.docs[0];
     if (doc.data().checkOutTime) return { success: false, reason: 'already_checked_out' };
 
-    await db.collection(COLLECTION).doc(doc.id).update({
+    await _db().collection(COLLECTION).doc(doc.id).update({
       checkOutTime: nowTime(),
       updatedAt: new Date().toISOString()
     });
@@ -333,7 +334,7 @@ const AttendanceService = (function () {
   // ── Get Records (with filters) ────────────────────────
 
   async function getRecords(filters) {
-    let q = db.collection(COLLECTION);
+    let q = _db().collection(COLLECTION);
 
     if (filters.teacherId) q = q.where('teacherId', '==', filters.teacherId);
     if (filters.studentId) q = q.where('studentId', '==', filters.studentId);
