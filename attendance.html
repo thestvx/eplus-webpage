@@ -829,6 +829,7 @@ main{flex:1;position:relative;overflow:hidden}
     try { subCheck = await SubscriptionService.getActiveSubscriptionForSubject(pendingStudentId, session.subject, session.teacher, AttendanceService.today()); } catch (e) { logScanner('subCheck error: ' + e.message); }
 
     var type = 'none';
+    var freshTrialRemaining = session.trialRemaining;
 
     if (subCheck && subCheck.subscription) {
       var subStatus = SubscriptionService.subscriptionStatus(subCheck.subscription);
@@ -854,8 +855,13 @@ main{flex:1;position:relative;overflow:hidden}
           } catch (e) { logScanner('increment usage error: ' + e.message); }
         }
       } else {
-        // Subscription expired/not active → check trial
-        if (session.trialRemaining > 0) {
+        // ── Subscription expired → fresh trial check from Firestore ──
+        var _fu = await getTrialUsage(pendingStudentId);
+        var _fc = getTrialCount(_fu, session.teacher, session.subject);
+        var _fr = Math.max(0, TRIAL_MAX - _fc);
+        freshTrialRemaining = _fr;
+        logScanner('trial fresh check: used=' + _fc + ' remaining=' + _fr);
+        if (_fr > 0) {
           type = 'orange';
           if (fbReady && authState.signedIn) {
             await recordTrialUsage(pendingStudentId, pendingName, session.teacher, session.subject, pendingBarcode);
@@ -865,8 +871,13 @@ main{flex:1;position:relative;overflow:hidden}
         }
       }
     } else {
-      // No subscription at all → check trial
-      if (session.trialRemaining > 0) {
+      // ── No subscription → fresh trial check from Firestore ──
+      var _fu2 = await getTrialUsage(pendingStudentId);
+      var _fc2 = getTrialCount(_fu2, session.teacher, session.subject);
+      var _fr2 = Math.max(0, TRIAL_MAX - _fc2);
+      freshTrialRemaining = _fr2;
+      logScanner('trial fresh check: used=' + _fc2 + ' remaining=' + _fr2);
+      if (_fr2 > 0) {
         type = 'orange';
         if (fbReady && authState.signedIn) {
           await recordTrialUsage(pendingStudentId, pendingName, session.teacher, session.subject, pendingBarcode);
@@ -886,7 +897,7 @@ main{flex:1;position:relative;overflow:hidden}
       playSoundWarning();
       attendedCount++; updateCounter();
       postCheckin(session, type);
-      var newTrialRemain = Math.max(0, session.trialRemaining - 1);
+      var newTrialRemain = Math.max(0, freshTrialRemaining - 1);
       showCheckinAnimation('orange', session.subject, session.teacher);
       showScanOverlay('orange', '🟠', 'تم السماح بتسجيل الحضور', pendingName,
         'هذه حصة استثنائية بدون اشتراك<br>المتبقي: <b>' + newTrialRemain + ' / ' + TRIAL_MAX + '</b> حصة', 3000);
