@@ -23907,7 +23907,21 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     } catch (e) { console.error('[ATC] toggle failed', e); showToast('❌ تعذر تحديث الحالة', true); }
     if (isClosing) {
       try {
-        var confirmed = await AttendanceService.confirmDayRecords(name, atcToday());
+        var fs2 = window._firestore, fdb2 = window._db;
+        var todayStr = atcToday();
+        var normT = String(name || '').replace(/\s+/g, '').toLowerCase();
+        var cSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('date', '==', todayStr)));
+        var batch2 = fs2.writeBatch(fdb2);
+        var confirmed = 0, ops2 = 0;
+        cSnap.forEach(function (d) {
+          var r = d.data();
+          if (r.confirmed === false && String(r.teacherName || '').replace(/\s+/g, '').toLowerCase() === normT) {
+            batch2.update(d.ref, { confirmed: true, updatedAt: new Date().toISOString() });
+            confirmed++; ops2++;
+            if (ops2 >= 450) { batch2.commit(); batch2 = fs2.writeBatch(fdb2); ops2 = 0; }
+          }
+        });
+        if (ops2 > 0) await batch2.commit();
         showToast('✅ تم إغلاق الحضور وتأكيد ' + confirmed + ' سجل');
       } catch (e) { console.error('[ATC] confirm records failed', e); }
     } else {
@@ -24283,8 +24297,21 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
 
   window.subxClearAllLogs = async function () {
     if (!confirm('هل أنت متأكد من حذف جميع سجلات الحضور؟')) return;
+    const { _db: fdb, _firestore: fs } = window;
+    if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); return; }
     try {
-      var count = await AttendanceService.clearAllLogs();
+      const snap = await fs.getDocs(fs.collection(fdb, 'support_attendance'));
+      let count = 0;
+      let batch = fs.writeBatch(fdb);
+      let ops = 0;
+      snap.forEach(d => {
+        const r = d.data();
+        if (r.type === 'trial_usage') return;
+        batch.delete(fs.doc(fdb, 'support_attendance', d.id));
+        ops++; count++;
+        if (ops >= 450) { batch.commit(); batch = fs.writeBatch(fdb); ops = 0; }
+      });
+      if (ops > 0) await batch.commit();
       showToast('✅ تم مسح ' + count + ' سجل');
       subxShowAllLogs();
     } catch (e) { console.error('[SUBSCRIPTIONS] clear logs failed', e); showToast('❌ تعذر مسح السجلات', true); }
