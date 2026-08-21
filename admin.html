@@ -3708,22 +3708,19 @@
         </div>
 
         <!-- ▶️ إدارة حضور اليوم -->
-        <div id="atc-section" style="margin-bottom:28px;padding:20px 24px;background:var(--card);border:1.5px solid var(--border);border-radius:16px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-            <div style="display:flex;align-items:center;gap:10px">
-              <div style="font-size:22px">▶️</div>
-              <div>
-                <div style="font-size:16px;font-weight:900;color:var(--text)">إدارة حضور اليوم</div>
-                <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">افتح أو أغلق حضور الأساتذة لتسجيل الطلاب</div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px">
-              <div id="atc-date-label" style="font-size:11.5px;color:var(--text-muted);background:var(--bg);padding:4px 12px;border-radius:8px;font-weight:700"></div>
-              <button onclick="atcLoad()" style="background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;font-weight:800;color:var(--text-muted);cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">🔄 تحديث</button>
-            </div>
+        <div id="atc-section" style="margin-bottom:28px;padding:16px 20px;background:var(--card);border:1.5px solid var(--border);border-radius:16px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <div style="font-size:20px">▶️</div>
+            <div style="font-size:15px;font-weight:900;color:var(--text)">إدارة حضور اليوم</div>
+            <div id="atc-date-label" style="font-size:11px;color:var(--text-muted);background:var(--bg);padding:3px 10px;border-radius:8px;font-weight:700"></div>
           </div>
-          <div id="atc-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
-            <div style="text-align:center;color:var(--text-muted);padding:20px;font-size:13px;grid-column:1/-1">جارٍ تحميل قائمة الأساتذة...</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <select id="atc-teacher-select" onchange="atcUpdateStatus()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card);min-width:200px;flex:1">
+              <option value="">— اختر الأستاذ —</option>
+            </select>
+            <div id="atc-status" style="font-size:12px;font-weight:800;color:var(--text-muted);min-width:100px"></div>
+            <button id="atc-toggle-btn" onclick="atcToggleSelected()" style="padding:8px 20px;border:none;border-radius:10px;font-size:12.5px;font-weight:800;font-family:inherit;cursor:pointer;transition:all .15s;display:none">▶️ بدء الحضور</button>
+            <button onclick="atcLoad()" style="background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:800;color:var(--text-muted);cursor:pointer;font-family:inherit">🔄</button>
           </div>
         </div>
 
@@ -3866,7 +3863,13 @@
           </div>
           <div class="teacher-modal-body" style="overflow:auto;max-height:72vh;padding:22px 26px">
             <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
-              <input type="text" id="subx-logs-search" placeholder="🔍 بحث بالطالب أو المادة..." oninput="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;flex:1;min-width:180px;background:var(--card)">
+              <input type="text" id="subx-logs-search" placeholder="🔍 بحث بالطالب..." oninput="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;flex:1;min-width:160px;background:var(--card)">
+              <select id="subx-logs-teacher" onchange="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+                <option value="">كل الأساتذة</option>
+              </select>
+              <select id="subx-logs-subject" onchange="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+                <option value="">كل المواد</option>
+              </select>
               <input type="date" id="subx-logs-date" onchange="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
               <button class="tbl-action" onclick="subxLogsFilter()" style="font-size:12px;border-color:rgba(16,185,129,0.3);color:#059669">🔄 تحديث</button>
             </div>
@@ -23820,75 +23823,82 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   }
 
   window.atcLoad = async function () {
-    var grid = document.getElementById('atc-grid');
-    if (!grid) return;
+    var sel = document.getElementById('atc-teacher-select');
+    if (!sel) return;
     var dateLabel = document.getElementById('atc-date-label');
     if (dateLabel) dateLabel.textContent = '📅 ' + atcToday();
-    // Collect unique teacher names from allTeachers
+    // Ensure teachers data is loaded
+    var srtTeachers = window.srtAllData || [];
+    if (!srtTeachers.length) {
+      try {
+        var tSnap = await getDocs(collection(db, 'support_teachers'));
+        srtTeachers = tSnap.docs.map(function (d) { return { id: d.id, ...d.data() }; }).filter(function (t) { return t.status !== 'deleted'; });
+      } catch (e) { console.warn('[ATC] fallback teacher load failed', e); }
+    }
+    // Get unique teachers from support_teachers
     var teacherMap = {};
-    (window.allTeachers || window._allTeachers || []).forEach(function (t) {
-      if (t.status === 'deleted') return;
+    srtTeachers.forEach(function (t) {
+      if (t.status === 'deleted' || t.status === 'disabled') return;
       var name = t.name || '';
       if (!name || teacherMap[name]) return;
-      teacherMap[name] = { name: name, subjects: (t.subjects || []).map(function (s) { return s.subject || s.name || s; }).filter(Boolean), id: t.id || t.teacherId || '' };
+      var subjects = (t.subjects || []).map(function (s) { return s.subject || s.name || s; }).filter(Boolean);
+      teacherMap[name] = { name: name, subjects: subjects };
     });
-    var teachers = Object.values(teacherMap);
-    if (!teachers.length) {
-      grid.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;font-size:13px;grid-column:1/-1">لا يوجد أساتذة مسجلين</div>';
-      return;
-    }
-    // Batch fetch today's attendance_control docs
+    var teachers = Object.values(teacherMap).sort(function (a, b) { return a.name.localeCompare(b.name, 'ar'); });
+    var prevVal = sel.value;
+    sel.innerHTML = '<option value="">— اختر الأستاذ —</option>';
+    teachers.forEach(function (t) {
+      sel.innerHTML += '<option value="' + escX(t.name) + '">' + escX(t.name) + (t.subjects.length ? ' — ' + t.subjects[0] : '') + '</option>';
+    });
+    if (prevVal) sel.value = prevVal;
+    // Fetch today's statuses
     var statuses = {};
     try {
       var todayDocs = await getDocs(query(collection(db, ATC_COLLECTION), where('date', '==', atcToday())));
       todayDocs.forEach(function (d) { var dd = d.data(); if (dd.teacherName) statuses[dd.teacherName] = dd; });
     } catch (e) { console.warn('[ATC] load status failed', e); }
-    var html = '';
-    teachers.forEach(function (t) {
-      var st = statuses[t.name];
-      var isOpen = st && st.isOpen;
-      var statusColor = isOpen ? '#10b981' : '#6b7280';
-      var statusBg = isOpen ? 'rgba(16,185,129,0.1)' : 'rgba(107,114,128,0.08)';
-      var statusIcon = isOpen ? '🟢' : '🔒';
-      var statusText = isOpen ? 'الحضور مفتوح' : 'الحضور مغلق';
-      var btnText = isOpen ? '🔒 إغلاق الحضور' : '▶️ بدء الحضور';
-      var btnBg = isOpen ? 'linear-gradient(135deg,#dc2626,#ef4444)' : 'linear-gradient(135deg,#059669,#10b981)';
-      var subList = t.subjects.length ? t.subjects.join('، ') : '—';
-      html += '<div id="atc-card-' + atcNorm(t.name) + '" style="background:var(--bg);border:1.5px solid ' + (isOpen ? 'rgba(16,185,129,0.3)' : 'var(--border)') + ';border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;transition:all .2s">';
-      html += '<div style="display:flex;align-items:center;gap:10px">';
-      html += '<div style="width:38px;height:38px;border-radius:50%;background:' + statusBg + ';display:flex;align-items:center;justify-content:center;font-size:18px">' + statusIcon + '</div>';
-      html += '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:900;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escX(t.name) + '</div>';
-      html += '<div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escX(subList) + '</div></div>';
-      html += '</div>';
-      html += '<div style="font-size:12px;font-weight:800;color:' + statusColor + '">' + statusText + '</div>';
-      html += '<button onclick="atcToggle(\'' + escX(t.name).replace(/'/g, "\\'") + '\')" id="atc-btn-' + atcNorm(t.name) + '" style="width:100%;padding:8px 0;border:none;border-radius:10px;background:' + btnBg + ';color:#fff;font-size:12.5px;font-weight:800;font-family:inherit;cursor:pointer;transition:all .15s;box-shadow:0 4px 12px ' + (isOpen ? 'rgba(220,38,38,0.25)' : 'rgba(16,185,129,0.25)') + '">' + btnText + '</button>';
-      html += '</div>';
-    });
-    grid.innerHTML = html;
+    window._atcStatuses = statuses;
+    atcUpdateStatus();
   };
 
-  window.atcToggle = async function (teacherName) {
-    var btn = document.getElementById('atc-btn-' + atcNorm(teacherName));
+  window.atcUpdateStatus = function () {
+    var sel = document.getElementById('atc-teacher-select');
+    var statusEl = document.getElementById('atc-status');
+    var btn = document.getElementById('atc-toggle-btn');
+    if (!sel || !statusEl || !btn) return;
+    var name = sel.value;
+    if (!name) { statusEl.textContent = ''; btn.style.display = 'none'; return; }
+    var st = (window._atcStatuses || {})[name];
+    var isOpen = st && st.isOpen;
+    statusEl.textContent = isOpen ? '🟢 الحضور مفتوح' : '🔒 الحضور مغلق';
+    statusEl.style.color = isOpen ? '#10b981' : '#6b7280';
+    btn.style.display = 'inline-block';
+    btn.textContent = isOpen ? '🔒 إغلاق الحضور' : '▶️ بدء الحضور';
+    btn.style.background = isOpen ? 'linear-gradient(135deg,#dc2626,#ef4444)' : 'linear-gradient(135deg,#059669,#10b981)';
+    btn.style.color = '#fff';
+    btn.style.boxShadow = isOpen ? '0 4px 12px rgba(220,38,38,0.25)' : '0 4px 12px rgba(16,185,129,0.25)';
+  };
+
+  window.atcToggleSelected = async function () {
+    var sel = document.getElementById('atc-teacher-select');
+    var btn = document.getElementById('atc-toggle-btn');
+    var name = sel ? sel.value : '';
+    if (!name) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
     if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري التحديث...'; }
-    var docId = atcDocId(teacherName);
+    var docId = atcDocId(name);
     var docRef = doc(db, ATC_COLLECTION, docId);
     try {
       var snap = await getDoc(docRef);
       if (snap.exists() && snap.data().isOpen) {
-        // Close
         await updateDoc(docRef, { isOpen: false, closedAt: new Date().toISOString() });
       } else {
-        // Open
-        await setDoc(docRef, {
-          date: atcToday(),
-          teacherName: teacherName,
-          isOpen: true,
-          openedAt: new Date().toISOString(),
-          closedAt: null
-        }, { merge: true });
+        await setDoc(docRef, { date: atcToday(), teacherName: name, isOpen: true, openedAt: new Date().toISOString(), closedAt: null }, { merge: true });
       }
     } catch (e) { console.error('[ATC] toggle failed', e); showToast('❌ تعذر تحديث الحالة', true); }
-    atcLoad();
+    btn.disabled = false;
+    await atcLoad();
+    sel.value = name;
+    atcUpdateStatus();
   };
 
   window.subxFilterList = function () {
@@ -24238,6 +24248,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       });
       rows.sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
       window._subxLogsData = rows;
+      // Populate filter dropdowns
+      var tSet = new Set(), sSet = new Set();
+      rows.forEach(function (r) { if (r.teacherName) tSet.add(r.teacherName); if (r.subjectName) sSet.add(r.subjectName); });
+      var tSel = document.getElementById('subx-logs-teacher');
+      var sSel = document.getElementById('subx-logs-subject');
+      if (tSel) { var tv = tSel.value; tSel.innerHTML = '<option value="">كل الأساتذة</option>'; Array.from(tSet).sort().forEach(function (n) { tSel.innerHTML += '<option value="' + escX(n) + '">' + escX(n) + '</option>'; }); tSel.value = tv; }
+      if (sSel) { var sv = sSel.value; sSel.innerHTML = '<option value="">كل المواد</option>'; Array.from(sSet).sort().forEach(function (n) { sSel.innerHTML += '<option value="' + escX(n) + '">' + escX(n) + '</option>'; }); sSel.value = sv; }
       subxLogsFilter();
     } catch (e) {
       console.error('[SUBSCRIPTIONS] load all logs failed', e);
@@ -24248,9 +24265,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   window.subxLogsFilter = function () {
     const q = (document.getElementById('subx-logs-search').value || '').trim().toLowerCase();
     const dateFilter = document.getElementById('subx-logs-date').value || '';
+    const teacherFilter = document.getElementById('subx-logs-teacher').value || '';
+    const subjectFilter = document.getElementById('subx-logs-subject').value || '';
     const rows = (window._subxLogsData || []).filter(r => {
       if (r.cancelled) return false;
       if (dateFilter && r.date !== dateFilter) return false;
+      if (teacherFilter && r.teacherName !== teacherFilter) return false;
+      if (subjectFilter && r.subjectName !== subjectFilter) return false;
       if (q && !(r.studentName + ' ' + r.studentId + ' ' + r.subjectName + ' ' + r.teacherName).toLowerCase().includes(q)) return false;
       return true;
     });
