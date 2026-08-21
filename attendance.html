@@ -171,7 +171,7 @@ main{flex:1;position:relative;overflow:hidden}
 .tc-subject-icon.orange{background:rgba(180,83,9,0.2)}
 .tc-subject-icon.red{background:rgba(220,38,38,0.2)}
 .tc-info{flex:1;min-width:0}
-.tc-teacher{font-size:17px;font-weight:800;color:#fff;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-teacher{font-size:17px;font-weight:800;color:#fff;margin-bottom:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
 .tc-subject{font-size:12px;font-weight:600;color:#c7d2fe}
 .tc-badge{padding:5px 12px;border-radius:99px;font-size:11px;font-weight:800;white-space:nowrap;flex-shrink:0}
 .tc-badge.green{background:rgba(5,150,105,0.2);color:#6ee7b7;border:1px solid rgba(5,150,105,0.4)}
@@ -518,6 +518,7 @@ main{flex:1;position:relative;overflow:hidden}
   }
 
   // ── Attendance Control: check which teachers are open today ──
+  function normalizeTeacherName(n) { return String(n || '').replace(/\s+/g, '').toLowerCase(); }
   async function checkAttendanceControl() {
     var openMap = {};
     try {
@@ -527,7 +528,7 @@ main{flex:1;position:relative;overflow:hidden}
         .get();
       snap.forEach(function (doc) {
         var d = doc.data();
-        if (d.isOpen && d.teacherName) openMap[d.teacherName] = true;
+        if (d.isOpen && d.teacherName) openMap[normalizeTeacherName(d.teacherName)] = true;
       });
     } catch (e) { logScanner('atc check error: ' + e.message); }
     return openMap;
@@ -643,7 +644,7 @@ main{flex:1;position:relative;overflow:hidden}
       var key = (s.teacher || '') + '|' + (s.subject || '');
       if (seen[key]) continue;
       seen[key] = true;
-      var isOpen = !!openMap[s.teacher];
+      var isOpen = !!openMap[normalizeTeacherName(s.teacher)];
       var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, trialUsed: 0, trialRemaining: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length };
       try {
         var subResult = await SubscriptionService.getActiveSubscriptionForSubject(studentId, s.subject, s.teacher, today);
@@ -728,7 +729,7 @@ main{flex:1;position:relative;overflow:hidden}
         html += '<div class="tc-card" style="animation-delay:' + delay + ';opacity:0.7">';
         html += '<div class="tc-top">';
         html += '<div class="tc-subject-icon red">' + icon + '</div>';
-        html += '<div class="tc-info"><div class="tc-teacher">' + esc(s.teacher) + '</div><div class="tc-subject">' + esc(s.subject) + '</div></div>';
+        html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) + '">' + esc(s.teacher) + '</div><div class="tc-subject">' + esc(s.subject) + '</div></div>';
         html += '<div class="tc-badge red">\uD83D\uDD12 الحضور غير مفتوح</div>';
         html += '</div>';
         html += '<div style="text-align:center;padding:14px 8px;background:rgba(107,114,128,0.06);border-radius:12px;margin-top:4px">';
@@ -765,7 +766,7 @@ main{flex:1;position:relative;overflow:hidden}
       html += '<div class="tc-card" data-idx="' + i + '" style="animation-delay:' + delay + '">';
       html += '<div class="tc-top">';
       html += '<div class="tc-subject-icon ' + stClass + '">' + icon + '</div>';
-      html += '<div class="tc-info"><div class="tc-teacher">' + esc(s.teacher) + '</div><div class="tc-subject">' + esc(s.subject) + '</div></div>';
+      html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) + '">' + esc(s.teacher) + '</div><div class="tc-subject">' + esc(s.subject) + '</div></div>';
       html += '<div class="tc-badge ' + badgeClass + '">' + badgeText + '</div>';
       html += '</div>';
       if (hasActiveSub) {
@@ -811,15 +812,15 @@ main{flex:1;position:relative;overflow:hidden}
     // ── Server-side gate: verify attendance is still open for this teacher ──
     try {
       var openMap = await checkAttendanceControl();
-      if (!openMap[session.teacher]) {
+      if (!openMap[normalizeTeacherName(session.teacher)]) {
         btnEl.classList.remove('loading');
         btnEl.innerHTML = '\uD83D\uDD12 الحضور مغلق';
         btnEl.classList.add('orange');
         btnEl.disabled = true;
         playSoundIncorrect();
         showScanOverlay('red', '\uD83D\uDD12', 'الحضور غير متاح حالياً', pendingName,
-          'لم يبدأ المركز تسجيل الحضور لهذا الأستاذ بعد.<br>يرجى الانتظار حتى يتم فتح الحضور من الإدارة.', 3500);
-        processing = false; scanner.setBusy(false);
+          'لم يبدأ المركز تسجيل الحضور لهذا الأستاذ بعد.<br>يرجى الانتظار حتى يتم فتح الحضور من الإدارة.', 3500,
+          function() { processing = false; scanner.setBusy(false); setTimeout(renderReady, 300); });
         return;
       }
     } catch (e) { logScanner('atc gate check error: ' + e.message); }
