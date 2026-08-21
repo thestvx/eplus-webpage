@@ -3731,10 +3731,7 @@
                 <tr>
                   <th>#</th>
                   <th>الطالب</th>
-                  <th>الباقة</th>
-                  <th>المبلغ</th>
-                  <th>البداية</th>
-                  <th>النهاية</th>
+                  <th>عدد الاشتراكات</th>
                   <th>الحصص</th>
                   <th>الحالة</th>
                   <th>الإجراءات</th>
@@ -23687,6 +23684,36 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         teacherName: selectedSubject.teacherName
       });
       if (created && created.subscription) {
+        // ── Deduct trial sessions from first period if any exist ──
+        try {
+          var trialDeducted = 0;
+          var trialYm = new Date().toLocaleDateString('sv-SE', { timeZone: 'Africa/Algiers' }).slice(0, 7);
+          var trialDocId = 'trial_' + selectedStudent.id + '_' + trialYm;
+          var trialDoc = await window.db.collection('support_attendance').doc(trialDocId).get();
+          if (trialDoc.exists && trialDoc.data().used) {
+            var trialUsed = trialDoc.data().used || {};
+            var tKey = (selectedSubject.teacherName || '') + '_' + (selectedSubject.subjectName || '');
+            trialDeducted = trialUsed[tKey] || 0;
+          }
+          if (trialDeducted > 0) {
+            var subPeriods = created.periods || [];
+            if (!subPeriods.length && created.subscription && created.subscription.id) {
+              try {
+                var detail = await SubscriptionService.adminSubscriptionDetail(created.subscription.id);
+                subPeriods = (detail && detail.periods) || [];
+              } catch (e) {}
+            }
+            if (subPeriods.length) {
+              var firstPeriod = subPeriods[0];
+              var pid = firstPeriod.period_id || firstPeriod.id;
+              if (pid) {
+                await SubscriptionService.incrementPeriodUsage(pid, trialDeducted);
+                console.log('[SUBSCRIPTIONS] Trial deducted ' + trialDeducted + ' sessions from new subscription period ' + pid);
+              }
+            }
+          }
+        } catch (e) { console.warn('[SUBSCRIPTIONS] trial deduct failed', e); }
+
         const successHtml =
           '<div style="text-align:center;font-size:13px">' +
             '<div style="font-size:38px;margin-bottom:6px">✅</div>' +
@@ -23761,50 +23788,63 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     const f = $x('subx-filter-status').value;
     const today = SubscriptionService.today();
     if (!allSubs.length) {
-      $x('subx-tbody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">لا توجد اشتراكات بعد — اضغط "➕ اشتراك جديد".</td></tr>';
+      $x('subx-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">لا توجد اشتراكات بعد — اضغط "➕ اشتراك جديد".</td></tr>';
       return;
     }
-    let html = '';
-    let shown = 0;
-    let rowNum = 0;
+
+    // Group subscriptions by student_id
+    const studentMap = {};
     allSubs.forEach(row => {
       const s = row.subscription || {};
-      const periods = row.periods || [];
+      const sid = String(s.student_id || '');
+      if (!sid) return;
       const st = SubscriptionService.subscriptionStatus(s, today);
       if (f && st !== f) return;
-      const reg = regs.find(rr => String(rr.id) === String(s.student_id));
-      const name = reg ? studentFullName(reg) : (s.student_id || '—');
-      if (q && name.toLowerCase().indexOf(q) < 0 && String(s.student_id).toLowerCase().indexOf(q) < 0
+      const reg = regs.find(rr => String(rr.id) === sid);
+      const name = reg ? studentFullName(reg) : sid;
+      if (q && name.toLowerCase().indexOf(q) < 0 && sid.toLowerCase().indexOf(q) < 0
         && String(s.subject_name || '').toLowerCase().indexOf(q) < 0
         && String(s.teacher_name || '').toLowerCase().indexOf(q) < 0) return;
-      shown++;
+      if (!studentMap[sid]) {
+        studentMap[sid] = { name: name, studentId: sid, subs: [], reg: reg };
+      }
+      studentMap[sid].subs.push({ sub: s, periods: row.periods || [], status: st });
+    });
+
+    let html = '';
+    let rowNum = 0;
+    const studentIds = Object.keys(studentMap);
+    studentIds.forEach(sid => {
+      const stu = studentMap[sid];
       rowNum++;
-      const used = periods.reduce((a, p) => a + ((p.used_sessions || 0)), 0);
-      const total = s.total_sessions || (s.months || 1) * 8;
-      const pkg = SubscriptionService.packageByMonths(s.months);
-      const bg = st === 'active' ? 'background:rgba(16,185,129,0.12);color:#059669'
-        : st === 'done' ? 'background:rgba(245,158,11,0.14);color:#d97706'
-        : st === 'upcoming' ? 'background:rgba(59,130,246,0.1);color:#2563eb'
-        : st === 'cancelled' ? 'background:rgba(239,68,68,0.12);color:#dc2626'
-        : st === 'paused' ? 'background:rgba(147,51,234,0.12);color:#7c3aed'
-        : 'background:var(--border);color:var(--text-muted)';
-      html += '<tr ondblclick="subxShowDetail(\'' + escX(s.id) + '\')" style="cursor:pointer" title="اضغط مرتين لعرض التفاصيل">' +
+      const totalSubs = stu.subs.length;
+      const activeSubs = stu.subs.filter(x => x.status === 'active').length;
+      const totalUsed = stu.subs.reduce((a, x) => a + x.periods.reduce((b, p) => b + (p.used_sessions || 0), 0), 0);
+      const totalSessions = stu.subs.reduce((a, x) => a + (x.sub.total_sessions || (x.sub.months || 1) * 8), 0);
+      let statusSummary = '';
+      if (activeSubs > 0) statusSummary += '<span style="color:#059669;font-weight:800">' + activeSubs + ' نشط</span>';
+      const doneSubs = stu.subs.filter(x => x.status === 'done').length;
+      const expiredSubs = stu.subs.filter(x => x.status === 'expired').length;
+      const pausedSubs = stu.subs.filter(x => x.status === 'paused').length;
+      if (doneSubs > 0) statusSummary += (statusSummary ? ' · ' : '') + '<span style="color:#d97706;font-weight:800">' + doneSubs + ' منتهي</span>';
+      if (expiredSubs > 0) statusSummary += (statusSummary ? ' · ' : '') + '<span style="color:#dc2626;font-weight:800">' + expiredSubs + ' انتهى</span>';
+      if (pausedSubs > 0) statusSummary += (statusSummary ? ' · ' : '') + '<span style="color:#7c3aed;font-weight:800">' + pausedSubs + ' موقوف</span>';
+      const remaining = Math.max(0, totalSessions - totalUsed);
+      html += '<tr ondblclick="subxShowStudentDetail(\'' + escX(sid) + '\')" style="cursor:pointer" title="اضغط مرتين لعرض تفاصيل الاشتراكات">' +
         '<td style="font-weight:800;color:var(--text-muted);font-size:12px">' + rowNum + '</td>' +
-        '<td style="font-weight:800">' + escX(name) + '<div style="font-size:11px;color:var(--text-muted);font-weight:700;font-family:monospace">' + escX(s.student_id) + '</div></td>' +
-        '<td>' +
-          (s.subject_name ? '<div style="font-weight:800">' + escX(s.subject_name) + '</div>' +
-           '<div style="font-size:11px;color:var(--text-muted);font-weight:700">الأستاذ: ' + escX(s.teacher_name || '—') + '</div>' : '') +
-          '<div style="font-size:11px;color:var(--text-muted);font-weight:700">' + escX(pkg ? pkg.label : ((s.months || '—') + ' شهر')) + '</div>' +
+        '<td style="font-weight:800">' +
+          '<div style="display:flex;align-items:center;gap:10px">' +
+            '<div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--primary),#8b5cf6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;flex-shrink:0">' + escX(String((stu.reg && studentFullName(stu.reg) || '?').trim().charAt(0) || '?')) + '</div>' +
+            '<div><div>' + escX(stu.name) + '</div><div style="font-size:11px;color:var(--text-muted);font-weight:700;font-family:monospace">' + escX(sid) + '</div></div>' +
+          '</div>' +
         '</td>' +
-        '<td style="direction:ltr">' + (s.total_price || 0).toLocaleString('ar-DZ') + ' دج</td>' +
-        '<td>' + SubscriptionService.fmtAr(s.start_date) + '</td>' +
-        '<td>' + SubscriptionService.fmtAr(s.end_date) + '</td>' +
-        '<td>' + used + ' / ' + total + '</td>' +
-        '<td><span class="subx-status" style="' + bg + '">' + SubscriptionService.subscriptionStatusLabel(st) + '</span></td>' +
-        '<td><button class="tbl-action" style="font-size:12px" onclick="subxShowDetail(\'' + escX(s.id) + '\')">👁️ عرض التفاصيل</button></td>' +
+        '<td><span style="font-size:16px;font-weight:900;color:var(--primary)">' + totalSubs + '</span> <span style="font-size:11px;color:var(--text-muted);font-weight:700">اشتراك</span></td>' +
+        '<td><span style="font-weight:800">' + totalUsed + ' / ' + totalSessions + '</span> <span style="font-size:11px;color:var(--text-muted);font-weight:700">(متبقي ' + remaining + ')</span></td>' +
+        '<td><div style="font-size:11px;line-height:1.8">' + statusSummary + '</div></td>' +
+        '<td><button class="tbl-action" style="font-size:12px" onclick="subxShowStudentDetail(\'' + escX(sid) + '\')">👁️ عرض التفاصيل</button></td>' +
         '</tr>';
     });
-    $x('subx-tbody').innerHTML = shown ? html : '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">لا توجد نتائج مطابقة.</td></tr>';
+    $x('subx-tbody').innerHTML = rowNum ? html : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">لا توجد نتائج مطابقة.</td></tr>';
   };
 
   window.subxLoadList = window.subxFilterList;
@@ -23987,7 +24027,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         if (String(r.studentId) !== String(studentId)) return;
         if (subjectName && r.subjectName && String(r.subjectName) !== String(subjectName)) return;
         if (teacherName && r.teacherName && String(r.teacherName) !== String(teacherName)) return;
-        if (r.type === 'grace' || r.type === 'grace_session') return;
+        if (r.type === 'grace' || r.type === 'grace_session' || r.type === 'trial_session' || r.type === 'trial_usage') return;
         if (r.cancelled) return;
         if (!r.date) return;
         records.push({ id: d.id, date: r.date, time: r.checkInTime || r.createdAt || '', subjectName: r.subjectName || '', teacherName: r.teacherName || '', studentName: r.studentName || '' });
@@ -24122,7 +24162,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     h += '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">النوع</th>';
     h += '</tr></thead><tbody>';
     rows.forEach(r => {
-      const typeLabel = r.type === 'grace_session' ? '<span style="color:#d97706">⚠️ حصّة مجانية</span>' : '<span style="color:#059669">✅ حضور</span>';
+      const typeLabel = r.type === 'grace_session' ? '<span style="color:#d97706">⚠️ حصّة مجانية</span>' : r.type === 'trial_session' ? '<span style="color:#f59e0b">🟠 حصة تجريبية</span>' : '<span style="color:#059669">✅ حضور</span>';
       h += '<tr style="border-bottom:1px solid var(--border)">';
       h += '<td style="padding:7px 10px;white-space:nowrap">' + escX(r.date) + '</td>';
       h += '<td style="padding:7px 10px;white-space:nowrap" dir="ltr">' + escX(r.time) + '</td>';
@@ -24214,6 +24254,142 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
 
   window.subxCloseDetail = function () {
     $x('subx-detail-modal').classList.remove('open');
+  };
+
+  // ── تفاصيل جميع اشتراكات الطالب (نافذة مجمّعة) ──
+  window.subxShowStudentDetail = async function (studentId) {
+    const body = $x('subx-detail-body');
+    body.innerHTML = '<div style="text-align:center;padding:18px;color:var(--text-muted)">جارٍ تحميل تفاصيل الاشتراكات…</div>';
+    $x('subx-detail-modal').classList.add('open');
+    try {
+      const reg = regs.find(r => String(r.id) === String(studentId));
+      const name = reg ? studentFullName(reg) : studentId;
+      const initial = String(name.trim().charAt(0) || '?');
+      const today = SubscriptionService.today();
+
+      // Get all subscriptions for this student
+      const studentSubs = allSubs.filter(row => String((row.subscription || {}).student_id) === String(studentId));
+      if (!studentSubs.length) {
+        body.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">لا توجد اشتراكات لهذا الطالب.</div>';
+        return;
+      }
+
+      // Fetch detail for each subscription
+      const details = await Promise.all(studentSubs.map(async row => {
+        try {
+          const d = await SubscriptionService.adminSubscriptionDetail(row.subscription.id);
+          return d || { subscription: row.subscription, periods: row.periods || [] };
+        } catch (e) {
+          return { subscription: row.subscription, periods: row.periods || [] };
+        }
+      }));
+
+      let html = '';
+      // Hero
+      html += '<div class="subx-detail-hero">' +
+        '<div class="subx-detail-avatar">' + escX(initial) + '</div>' +
+        '<div style="min-width:0">' +
+          '<div class="subx-detail-hero-name">' + escX(name) + '</div>' +
+          '<div class="subx-detail-hero-id" dir="ltr">' + escX(studentId) + '</div>' +
+          '<div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-top:4px">' + details.length + ' اشتراك</div>' +
+        '</div>' +
+      '</div>';
+
+      // Student info
+      if (reg) {
+        html += '<div class="subx-detail-grid" style="margin-bottom:16px">' +
+          (reg.level ? '<div class="subx-detail-cell"><span class="subx-detail-label">المستوى</span><span class="subx-detail-val">' + escX(reg.level) + '</span></div>' : '') +
+          (reg.stream ? '<div class="subx-detail-cell"><span class="subx-detail-label">الشعبة</span><span class="subx-detail-val">' + escX(reg.stream) + '</span></div>' : '') +
+          (reg.institution ? '<div class="subx-detail-cell"><span class="subx-detail-label">المؤسسة</span><span class="subx-detail-val">' + escX(reg.institution) + '</span></div>' : '') +
+        '</div>';
+      }
+
+      // Each subscription as a card
+      details.forEach((d, idx) => {
+        const sub = (d && d.subscription) || {};
+        const periods = (d && d.periods) || [];
+        const pkg = SubscriptionService.packageByMonths(sub.months);
+        const used = periods.reduce((a, p) => a + (p.used_sessions || 0), 0);
+        const total = sub.total_sessions || (sub.months || 1) * 8;
+        const st = SubscriptionService.subscriptionStatus(sub, today);
+        const rem = Math.max(0, total - used);
+        const pct = total ? Math.round((used / total) * 100) : 0;
+        const stBg = st === 'active' ? 'background:rgba(16,185,129,0.12);color:#059669;border:1px solid rgba(16,185,129,0.25)'
+          : st === 'done' ? 'background:rgba(245,158,11,0.14);color:#d97706;border:1px solid rgba(245,158,11,0.2)'
+          : st === 'upcoming' ? 'background:rgba(59,130,246,0.1);color:#2563eb;border:1px solid rgba(59,130,246,0.2)'
+          : st === 'cancelled' ? 'background:rgba(239,68,68,0.12);color:#dc2626;border:1px solid rgba(239,68,68,0.2)'
+          : st === 'paused' ? 'background:rgba(147,51,234,0.12);color:#7c3aed;border:1px solid rgba(147,51,234,0.2)'
+          : 'background:var(--border);color:var(--text-muted);border:1px solid var(--border)';
+        const barColor = st === 'active' ? (pct >= 75 ? '#f59e0b' : '#10b981') : (st === 'done' ? '#dc2626' : '#94a3b8');
+
+        html += '<div style="background:var(--bg);border:1.5px solid var(--border);border-radius:16px;margin-bottom:14px;overflow:hidden;animation:pageIn .3s ease both" ' + (idx > 0 ? 'style="animation-delay:' + (idx * 0.08) + 's"' : '') + '>';
+
+        // Card header
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)">' +
+          '<div style="display:flex;align-items:center;gap:10px">' +
+            '<span style="font-size:18px">' + (sub.subject_name ? (typeof SubjectService !== 'undefined' ? SubjectService.getSubjectIcon(sub.subject_name) : '📚') : '📚') + '</span>' +
+            '<div>' +
+              '<div style="font-weight:900;font-size:14px">' + escX(sub.subject_name || '—') + '</div>' +
+              '<div style="font-size:11px;color:var(--text-muted);font-weight:700">الأستاذ: ' + escX(sub.teacher_name || '—') + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<span class="subx-status" style="' + stBg + '">' + SubscriptionService.subscriptionStatusLabel(st) + '</span>' +
+        '</div>';
+
+        // Card body
+        html += '<div style="padding:14px 18px">';
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:12px">';
+        html += '<div style="text-align:center"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">الباقة</div><div style="font-weight:900;font-size:13px">' + escX(pkg ? pkg.label : ((sub.months || '—') + ' شهر')) + '</div></div>';
+        html += '<div style="text-align:center"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">السعر</div><div style="font-weight:900;font-size:13px;direction:ltr">' + (sub.total_price || 0).toLocaleString('ar-DZ') + ' دج</div></div>';
+        html += '<div style="text-align:center"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">البداية</div><div style="font-weight:900;font-size:13px">' + SubscriptionService.fmtAr(sub.start_date) + '</div></div>';
+        html += '<div style="text-align:center"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">النهاية</div><div style="font-weight:900;font-size:13px">' + SubscriptionService.fmtAr(sub.end_date) + '</div></div>';
+        html += '</div>';
+
+        // Sessions progress
+        html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">' +
+          '<div style="flex:1">' +
+            '<div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;margin-bottom:4px">' +
+              '<span>الحضور: <b style="color:#2563eb">' + used + ' / ' + total + '</b></span>' +
+              '<span>المتبقي: <b style="color:#059669">' + rem + ' حصص</b></span>' +
+            '</div>' +
+            '<div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden">' +
+              '<div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:99px;transition:width .5s ease"></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+
+        // Monthly periods (compact)
+        if (periods.length) {
+          html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
+          periods.forEach(p => {
+            const pu = p.used_sessions || 0;
+            const pt = p.total_sessions || 8;
+            const ms = SubscriptionService.monthStatus(p, today);
+            const msBg = ms === 'active' ? 'background:rgba(16,185,129,0.1);color:#059669'
+              : ms === 'full' ? 'background:rgba(239,68,68,0.1);color:#dc2626'
+              : ms === 'completed' ? 'background:rgba(16,185,129,0.1);color:#059669'
+              : 'background:var(--border);color:var(--text-muted)';
+            html += '<div style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:8px;font-size:10px;font-weight:700;' + msBg + '">' +
+              '<span>شهر ' + (p.month_number || '—') + '</span>' +
+              '<span style="font-weight:900">' + pu + '/' + pt + '</span>' +
+            '</div>';
+          });
+          html += '</div>';
+        }
+
+        // Action button
+        html += '<div style="display:flex;justify-content:flex-end;gap:6px">' +
+          '<button class="tbl-action" style="font-size:11px;padding:5px 12px" onclick="subxShowDetail(\'' + escX(sub.id) + '\')">👁️ تفاصيل الاشتراك</button>' +
+        '</div>';
+
+        html += '</div></div>';
+      });
+
+      body.innerHTML = html;
+    } catch (e) {
+      console.error('[SUBSCRIPTIONS] student detail failed', e);
+      body.innerHTML = '<div style="text-align:center;color:#dc2626;padding:18px;font-size:13px;font-weight:800">تعذر تحميل البيانات. حاول مرة أخرى.</div>';
+    }
   };
 
   window.addEventListener('DOMContentLoaded', function () {
