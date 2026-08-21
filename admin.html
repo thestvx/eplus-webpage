@@ -23827,11 +23827,12 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     if (!sel) return;
     var dateLabel = document.getElementById('atc-date-label');
     if (dateLabel) dateLabel.textContent = '📅 ' + atcToday();
+    var { _db: fdb, _firestore: fs } = window;
     // Ensure teachers data is loaded
     var srtTeachers = window.srtAllData || [];
-    if (!srtTeachers.length) {
+    if (!srtTeachers.length && fdb && fs) {
       try {
-        var tSnap = await getDocs(collection(db, 'support_teachers'));
+        var tSnap = await fs.getDocs(fs.collection(fdb, 'support_teachers'));
         srtTeachers = tSnap.docs.map(function (d) { return { id: d.id, ...d.data() }; }).filter(function (t) { return t.status !== 'deleted'; });
       } catch (e) { console.warn('[ATC] fallback teacher load failed', e); }
     }
@@ -23853,10 +23854,12 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     if (prevVal) sel.value = prevVal;
     // Fetch today's statuses
     var statuses = {};
-    try {
-      var todayDocs = await getDocs(query(collection(db, ATC_COLLECTION), where('date', '==', atcToday())));
-      todayDocs.forEach(function (d) { var dd = d.data(); if (dd.teacherName) statuses[dd.teacherName] = dd; });
-    } catch (e) { console.warn('[ATC] load status failed', e); }
+    if (fdb && fs) {
+      try {
+        var todayDocs = await fs.getDocs(fs.query(fs.collection(fdb, ATC_COLLECTION), fs.where('date', '==', atcToday())));
+        todayDocs.forEach(function (d) { var dd = d.data(); if (dd.teacherName) statuses[dd.teacherName] = dd; });
+      } catch (e) { console.warn('[ATC] load status failed', e); }
+    }
     window._atcStatuses = statuses;
     atcUpdateStatus();
   };
@@ -23885,14 +23888,15 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var name = sel ? sel.value : '';
     if (!name) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
     if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري التحديث...'; }
-    var docId = atcDocId(name);
-    var docRef = doc(db, ATC_COLLECTION, docId);
+    var { _db: fdb, _firestore: fs } = window;
+    if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); btn.disabled = false; return; }
+    var docRef = fs.doc(fdb, ATC_COLLECTION, atcDocId(name));
     try {
-      var snap = await getDoc(docRef);
+      var snap = await fs.getDoc(docRef);
       if (snap.exists() && snap.data().isOpen) {
-        await updateDoc(docRef, { isOpen: false, closedAt: new Date().toISOString() });
+        await fs.updateDoc(docRef, { isOpen: false, closedAt: new Date().toISOString() });
       } else {
-        await setDoc(docRef, { date: atcToday(), teacherName: name, isOpen: true, openedAt: new Date().toISOString(), closedAt: null }, { merge: true });
+        await fs.setDoc(docRef, { date: atcToday(), teacherName: name, isOpen: true, openedAt: new Date().toISOString(), closedAt: null }, { merge: true });
       }
     } catch (e) { console.error('[ATC] toggle failed', e); showToast('❌ تعذر تحديث الحالة', true); }
     btn.disabled = false;
