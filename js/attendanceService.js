@@ -171,19 +171,62 @@ const AttendanceService = (function () {
   }
 
   // ── Mirror to Firestore (secondary/display copy) ───────
-  // The authoritative record lives in Supabase (attendance_sessions),
-  // written atomically by the record-attendance Edge Function.
-  // writeMirror copies it to Firestore for reports/portals; if this copy
-  // fails the caller calls undo_attendance to restore the session count.
   async function writeMirror(rec) {
     const mirrorId = rec.id;
     const doc = Object.assign({}, rec, {
+      confirmed: rec.confirmed !== undefined ? rec.confirmed : false,
       serverTime: _serverTimestamp(),
       updatedAt: new Date().toISOString()
     });
     delete doc.id;
     await db.collection(COLLECTION).doc(mirrorId).set(doc);
     return { success: true, id: mirrorId, doc };
+  }
+
+  // ── Confirm pending records for a teacher on a given date ──
+  async function confirmDayRecords(teacherName, date) {
+    const recDate = date || today();
+    const normT = String(teacherName || '').replace(/\s+/g, '').toLowerCase();
+    const snap = await db.collection(COLLECTION)
+      .where('date', '==', recDate)
+      .get();
+    let count = 0;
+    const batches = [];
+    let batch = db.batch();
+    let ops = 0;
+    snap.forEach(document => {
+      const d = document.data();
+      if (d.confirmed === false) {
+        const dn = String(d.teacherName || '').replace(/\s+/g, '').toLowerCase();
+        if (dn === normT) {
+          batch.update(document.ref, { confirmed: true, updatedAt: new Date().toISOString() });
+          ops++; count++;
+          if (ops >= 450) { batches.push(batch); batch = db.batch(); ops = 0; }
+        }
+      }
+    });
+    if (ops > 0) batches.push(batch);
+    for (const b of batches) { await b.commit(); }
+    return count;
+  }
+
+  // ── Clear all old attendance log records ──
+  async function clearAllLogs() {
+    const snap = await db.collection(COLLECTION).get();
+    const batches = [];
+    let batch = db.batch();
+    let ops = 0;
+    let count = 0;
+    snap.forEach(document => {
+      const d = document.data();
+      if (d.type === 'trial_usage') return;
+      batch.delete(document.ref);
+      ops++; count++;
+      if (ops >= 450) { batches.push(batch); batch = db.batch(); ops = 0; }
+    });
+    if (ops > 0) batches.push(batch);
+    for (const b of batches) { await b.commit(); }
+    return count;
   }
 
   // ── Record Attendance ─────────────────────────────────
@@ -468,6 +511,8 @@ const AttendanceService = (function () {
     record,
     recordSingle,
     writeMirror,
+    confirmDayRecords,
+    clearAllLogs,
     checkOut,
     getRecords,
     getDailyReport,

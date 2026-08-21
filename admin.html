@@ -3875,6 +3875,7 @@
               </select>
               <input type="date" id="subx-logs-date" onchange="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
               <button class="tbl-action" onclick="subxLogsFilter()" style="font-size:12px;border-color:rgba(16,185,129,0.3);color:#059669">🔄 تحديث</button>
+              <button class="tbl-action" onclick="subxClearAllLogs()" style="font-size:12px;border-color:rgba(220,38,38,0.3);color:#dc2626">🗑️ مسح السجلات</button>
             </div>
             <div id="subx-logs-body" style="font-size:12px;color:var(--text-muted)">جارٍ تحميل سجلات الحضور…</div>
           </div>
@@ -23894,14 +23895,24 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var { _db: fdb, _firestore: fs } = window;
     if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); btn.disabled = false; return; }
     var docRef = fs.doc(fdb, ATC_COLLECTION, atcDocId(name));
+    var isClosing = false;
     try {
       var snap = await fs.getDoc(docRef);
       if (snap.exists() && snap.data().isOpen) {
         await fs.updateDoc(docRef, { isOpen: false, closedAt: new Date().toISOString() });
+        isClosing = true;
       } else {
         await fs.setDoc(docRef, { date: atcToday(), teacherName: name, isOpen: true, openedAt: new Date().toISOString(), closedAt: null }, { merge: true });
       }
     } catch (e) { console.error('[ATC] toggle failed', e); showToast('❌ تعذر تحديث الحالة', true); }
+    if (isClosing) {
+      try {
+        var confirmed = await AttendanceService.confirmDayRecords(name, atcToday());
+        showToast('✅ تم إغلاق الحضور وتأكيد ' + confirmed + ' سجل');
+      } catch (e) { console.error('[ATC] confirm records failed', e); }
+    } else {
+      showToast('✅ تم بدء الحضور — التلاميذ يمكنهم الآن تسجيل الحضور');
+    }
     btn.disabled = false;
     await atcLoad();
     sel.value = name;
@@ -24251,6 +24262,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         const r = d.data();
         if (r.type === 'grace') return;
         if (!r.date) return;
+        if (r.confirmed === false) return;
         rows.push({ id: d.id, studentId: r.studentId || '', studentName: r.studentName || '', date: r.date, time: r.checkInTime || r.createdAt || '', teacherName: r.teacherName || '', subjectName: r.subjectName || '', type: r.type || '', cancelled: r.cancelled || false });
       });
       rows.sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
@@ -24267,6 +24279,15 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       console.error('[SUBSCRIPTIONS] load all logs failed', e);
       document.getElementById('subx-logs-body').innerHTML = '<div style="text-align:center;padding:12px;color:#dc2626">تعذر تحميل سجلات الحضور</div>';
     }
+  };
+
+  window.subxClearAllLogs = async function () {
+    if (!confirm('هل أنت متأكد من حذف جميع سجلات الحضور؟')) return;
+    try {
+      var count = await AttendanceService.clearAllLogs();
+      showToast('✅ تم مسح ' + count + ' سجل');
+      subxShowAllLogs();
+    } catch (e) { console.error('[SUBSCRIPTIONS] clear logs failed', e); showToast('❌ تعذر مسح السجلات', true); }
   };
 
   window.subxLogsFilter = function () {
