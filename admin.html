@@ -24308,16 +24308,18 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     try {
       const snap = await fs.getDocs(fs.collection(fdb, 'support_attendance'));
       let count = 0;
+      const batches = [];
       let batch = fs.writeBatch(fdb);
       let ops = 0;
       snap.forEach(d => {
         const r = d.data();
-        if (r.type === 'trial_usage' || r.type === 'trial_session') return;
+        if (r.type === 'grace' || r.type === 'grace_session') return;
         batch.delete(fs.doc(fdb, 'support_attendance', d.id));
         ops++; count++;
-        if (ops >= 450) { batch.commit(); batch = fs.writeBatch(fdb); ops = 0; }
+        if (ops >= 450) { batches.push(batch); batch = fs.writeBatch(fdb); ops = 0; }
       });
-      if (ops > 0) await batch.commit();
+      if (ops > 0) batches.push(batch);
+      for (const b of batches) { await b.commit(); }
       showToast('✅ تم مسح ' + count + ' سجل');
       subxShowAllLogs();
     } catch (e) { console.error('[SUBSCRIPTIONS] clear logs failed', e); showToast('❌ تعذر مسح السجلات', true); }

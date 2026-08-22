@@ -220,7 +220,7 @@ const AttendanceService = (function () {
     let count = 0;
     snap.forEach(document => {
       const d = document.data();
-      if (d.type === 'trial_usage' || d.type === 'trial_session') return;
+      if (d.type === 'grace' || d.type === 'grace_session') return;
       batch.delete(document.ref);
       ops++; count++;
       if (ops >= 450) { batches.push(batch); batch = _db().batch(); ops = 0; }
