@@ -477,7 +477,24 @@ main{flex:1;position:relative;overflow:hidden}
   async function getTrialUsage(studentId) {
     var used = {};
     if (!fbReady) return used;
-    var ym = AttendanceService.today().slice(0, 7);
+    // ── Cycle-aware: find the most recent expired subscription per teacher+subject ──
+    // Only count trial_session records created AFTER the last subscription's end_date.
+    // This ensures each subscription cycle starts with fresh 2 free trials.
+    var lastSubEndByTeacherSubject = {};
+    try {
+      var subs = await SubscriptionService.getSubscriptions(studentId);
+      if (subs && subs.length) {
+        for (var si = 0; si < subs.length; si++) {
+          var s = subs[si].subscription || {};
+          if (s.status === 'cancelled') continue;
+          var sKey = trialKey(s.teacher_name || '', s.subject_name || '');
+          var sEnd = s.end_date || '';
+          if (sEnd && (!lastSubEndByTeacherSubject[sKey] || sEnd > lastSubEndByTeacherSubject[sKey])) {
+            lastSubEndByTeacherSubject[sKey] = sEnd;
+          }
+        }
+      }
+    } catch (e) { logScanner('subscription lookup for trial cycle: ' + e.message); }
     try {
       var snap = await window.db.collection('support_attendance')
         .where('studentId', '==', studentId)
@@ -485,8 +502,11 @@ main{flex:1;position:relative;overflow:hidden}
         .get();
       snap.forEach(function (doc) {
         var d = doc.data();
-        if (!d.date || d.date.indexOf(ym) !== 0) return;
+        if (!d.date) return;
         var k = trialKey(d.teacherName || '', d.subjectName || '');
+        // Only count trial records from AFTER the last subscription ended for this teacher+subject
+        var cutoff = lastSubEndByTeacherSubject[k] || '';
+        if (cutoff && d.date <= cutoff) return;
         used[k] = (used[k] || 0) + 1;
       });
     } catch (e) { logScanner('trial read error: ' + e.message); }
@@ -917,6 +937,7 @@ main{flex:1;position:relative;overflow:hidden}
         btn.disabled = true;
         btn.innerHTML = '✓ تم التسجيل اليوم';
       } else {
+        btn.classList.add('green');
         btn.innerHTML = 'تسجيل الحضور';
       }
       var card = btn.closest('.tc-card');
