@@ -3725,6 +3725,7 @@
             <button id="atc-toggle-btn" onclick="atcToggleSelected()" style="padding:10px 22px;border:none;border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;transition:all .15s;display:none">▶️ بدء الحضور</button>
             <button onclick="atcLoad()" title="تحديث" style="background:rgba(16,185,129,0.08);border:1.5px solid rgba(16,185,129,0.2);border-radius:10px;padding:8px 12px;font-size:13px;font-weight:800;color:#059669;cursor:pointer;font-family:inherit;transition:all .15s">🔄</button>
           </div>
+          <div id="atc-open-bars" style="margin-top:12px;display:none"></div>
         </div>
 
         <!-- List controls -->
@@ -23962,6 +23963,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     }
     window._atcStatuses = statuses;
     atcUpdateStatus();
+    atcRenderOpenBars(statuses, teacherMap);
   };
 
   window.atcUpdateStatus = function () {
@@ -23980,6 +23982,64 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     btn.style.background = isOpen ? 'linear-gradient(135deg,#dc2626,#ef4444)' : 'linear-gradient(135deg,#059669,#10b981)';
     btn.style.color = '#fff';
     btn.style.boxShadow = isOpen ? '0 4px 12px rgba(220,38,38,0.25)' : '0 4px 12px rgba(16,185,129,0.25)';
+  };
+
+  window.atcRenderOpenBars = function (statuses, teacherMap) {
+    var container = document.getElementById('atc-open-bars');
+    if (!container) return;
+    var openTeachers = [];
+    Object.keys(statuses || {}).forEach(function (name) {
+      var st = statuses[name];
+      if (st && st.isOpen) {
+        var subjects = (teacherMap[name] || {}).subjects || [];
+        openTeachers.push({ name: name, subjects: subjects });
+      }
+    });
+    if (!openTeachers.length) { container.style.display = 'none'; container.innerHTML = ''; return; }
+    container.style.display = 'block';
+    var html = '<div style="font-size:12px;font-weight:800;color:#059669;margin-bottom:8px">🟢 الأساتذة المفتوح حاليًا:</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+    openTeachers.forEach(function (t) {
+      var label = t.name + (t.subjects.length ? ' — ' + t.subjects[0] : '');
+      html += '<div style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(16,185,129,0.08);border:1.5px solid rgba(16,185,129,0.25);border-radius:10px;font-size:12px;font-weight:700;color:#059669">';
+      html += '<span style="width:8px;height:8px;border-radius:50%;background:#10b981;flex-shrink:0"></span>';
+      html += '<span>' + escX(label) + '</span>';
+      html += '<button onclick="atcCloseFromBar(\'' + escX(t.name).replace(/'/g, "\\'") + '\')" style="margin-right:4px;padding:4px 10px;border:1.5px solid rgba(220,38,38,0.3);border-radius:8px;background:rgba(220,38,38,0.06);color:#dc2626;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit;transition:all .15s">🔒 إغلاق</button>';
+      html += '</div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  };
+
+  window.atcCloseFromBar = async function (name) {
+    var { _db: fdb, _firestore: fs } = window;
+    if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); return; }
+    try {
+      var docRef = fs.doc(fdb, ATC_COLLECTION, atcDocId(name));
+      var teacherId = (window._atcTeacherIdMap || {})[atcNorm(name)] || '';
+      var snap = await fs.getDoc(docRef);
+      if (snap.exists() && snap.data().isOpen) {
+        await fs.updateDoc(docRef, { isOpen: false, closedAt: new Date().toISOString() });
+        var normT = String(name || '').replace(/\s+/g, '').toLowerCase();
+        var todayStr = atcToday();
+        var cSnap = await fs.getDocs(fs.query(fs.collection(fdb, 'support_attendance'), fs.where('date', '==', todayStr)));
+        var batch = fs.writeBatch(fdb);
+        var confirmed = 0, ops = 0;
+        cSnap.forEach(function (d) {
+          var r = d.data();
+          var nameMatch = r.confirmed === false && String(r.teacherName || '').replace(/\s+/g, '').toLowerCase() === normT;
+          var idMatch = teacherId && r.teacherId && r.teacherId === teacherId;
+          if (nameMatch || idMatch) {
+            batch.update(d.ref, { confirmed: true, updatedAt: new Date().toISOString() });
+            confirmed++; ops++;
+            if (ops >= 450) { batch.commit(); batch = fs.writeBatch(fdb); ops = 0; }
+          }
+        });
+        if (ops > 0) await batch.commit();
+        showToast('✅ تم إغلاق حضور ' + name + ' وتأكيد ' + confirmed + ' سجل');
+        await atcLoad();
+      }
+    } catch (e) { console.error('[ATC] close from bar failed', e); showToast('❌ تعذر إغلاق الحضور', true); }
   };
 
   window.atcToggleSelected = async function () {
@@ -24400,7 +24460,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   };
 
   window.subxClearAllLogs = async function () {
-    if (!confirm('هل أنت متأكد من حذف جميع سجلات الحضور؟')) return;
+    var pin = prompt('⚠️ أدخل رمز التأكيد للحذف:');
+    if (pin !== '2019') { if (pin !== null) showToast('❌ رمز غير صحيح', true); return; }
     const { _db: fdb, _firestore: fs } = window;
     if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); return; }
     try {
