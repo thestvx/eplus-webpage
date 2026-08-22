@@ -3876,9 +3876,28 @@
               </select>
               <input type="date" id="subx-logs-date" onchange="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
               <button class="tbl-action" onclick="subxLogsFilter()" style="font-size:12px;border-color:rgba(16,185,129,0.3);color:#059669">🔄 تحديث</button>
-              <button class="tbl-action" onclick="subxClearAllLogs()" style="font-size:12px;border-color:rgba(220,38,38,0.3);color:#dc2626">🗑️ مسح السجلات</button>
+              <button class="tbl-action" onclick="subxShowClearPinModal()" style="font-size:12px;border-color:rgba(220,38,38,0.3);color:#dc2626">🗑️ مسح السجلات</button>
             </div>
             <div id="subx-logs-body" style="font-size:12px;color:var(--text-muted)">جارٍ تحميل سجلات الحضور…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PIN confirmation modal for clearing logs -->
+      <div id="pin-clear-modal" class="teacher-modal-bg">
+        <div class="teacher-modal" style="max-width:380px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:rgba(220,38,38,0.1);border-color:rgba(220,38,38,0.2)">⚠️</div>
+            <div class="teacher-modal-title">تأكيد الحذف</div>
+            <button class="att-modal-close" onclick="document.getElementById('pin-clear-modal').classList.remove('open')">✕</button>
+          </div>
+          <div class="teacher-modal-body" style="padding:22px 26px;text-align:center">
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">أدخل رمز التأكيد لحذف جميع سجلات الحضور</p>
+            <input id="pin-clear-input" type="password" maxlength="4" placeholder="••••" style="width:120px;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:20px;font-weight:900;text-align:center;letter-spacing:8px;font-family:monospace;background:var(--card);margin-bottom:16px" onkeydown="if(event.key==='Enter')document.getElementById('pin-clear-confirm').click()">
+            <div style="display:flex;gap:10px;justify-content:center">
+              <button id="pin-clear-confirm" onclick="subxConfirmClearLogs()" style="padding:10px 24px;border:none;border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff">🗑️ حذف</button>
+              <button onclick="document.getElementById('pin-clear-modal').classList.remove('open')" style="padding:10px 24px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:var(--card);color:var(--text)">إلغاء</button>
+            </div>
           </div>
         </div>
       </div>
@@ -23741,7 +23760,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           var trialDeducted = 0;
           var fs2 = window._firestore, fdb2 = window._db;
           if (fs2 && fdb2) {
-            var _nrm = function (s) { return String(s || '').replace(/\s+/g, ' ').trim(); };
+            var _nrm = function (s) { return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase().split(' ').sort().join(' '); };
             var tKey = _nrm(selectedSubject.teacherName) + '___' + _nrm(selectedSubject.subjectName);
             var lastEnd = '';
             var todayStr = SubscriptionService.today();
@@ -23915,6 +23934,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   function atcNorm(name) {
     return String(name || '').replace(/\s+/g, '').toLowerCase();
   }
+  function atcMatchNorm(name) {
+    return String(name || '').replace(/\s+/g, ' ').trim().toLowerCase().split(' ').sort().join(' ');
+  }
   function atcDocId(teacherName) {
     return atcToday() + '_' + atcNorm(teacherName);
   }
@@ -23950,7 +23972,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var prevVal = sel.value;
     sel.innerHTML = '<option value="">— اختر الأستاذ —</option>';
     teachers.forEach(function (t) {
-      sel.innerHTML += '<option value="' + escX(t.name) + '">' + escX(t.name) + (t.subjects.length ? ' — ' + t.subjects[0] : '') + '</option>';
+      var subLabel = t.subjects.join(', ');
+      sel.innerHTML += '<option value="' + escX(t.name) + '">' + escX(t.name) + (subLabel ? ' — ' + escX(subLabel) : '') + '</option>';
     });
     if (prevVal) sel.value = prevVal;
     // Fetch today's statuses
@@ -24020,14 +24043,14 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       var snap = await fs.getDoc(docRef);
       if (snap.exists() && snap.data().isOpen) {
         await fs.updateDoc(docRef, { isOpen: false, closedAt: new Date().toISOString() });
-        var normT = String(name || '').replace(/\s+/g, '').toLowerCase();
+        var normT = atcMatchNorm(name);
         var todayStr = atcToday();
         var cSnap = await fs.getDocs(fs.query(fs.collection(fdb, 'support_attendance'), fs.where('date', '==', todayStr)));
         var batch = fs.writeBatch(fdb);
         var confirmed = 0, ops = 0;
         cSnap.forEach(function (d) {
           var r = d.data();
-          var nameMatch = r.confirmed === false && String(r.teacherName || '').replace(/\s+/g, '').toLowerCase() === normT;
+          var nameMatch = r.confirmed === false && atcMatchNorm(r.teacherName) === normT;
           var idMatch = teacherId && r.teacherId && r.teacherId === teacherId;
           if (nameMatch || idMatch) {
             batch.update(d.ref, { confirmed: true, updatedAt: new Date().toISOString() });
@@ -24066,13 +24089,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       try {
         var fs2 = window._firestore, fdb2 = window._db;
         var todayStr = atcToday();
-        var normT = String(name || '').replace(/\s+/g, '').toLowerCase();
+        var normT = atcMatchNorm(name);
         var cSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('date', '==', todayStr)));
         var batch2 = fs2.writeBatch(fdb2);
         var confirmed = 0, ops2 = 0;
         cSnap.forEach(function (d) {
           var r = d.data();
-          var nameMatch = r.confirmed === false && String(r.teacherName || '').replace(/\s+/g, '').toLowerCase() === normT;
+          var nameMatch = r.confirmed === false && atcMatchNorm(r.teacherName) === normT;
           var idMatch = teacherId && r.teacherId && r.teacherId === teacherId;
           if (nameMatch || idMatch) {
             batch2.update(d.ref, { confirmed: true, updatedAt: new Date().toISOString() });
@@ -24459,9 +24482,18 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     }
   };
 
-  window.subxClearAllLogs = async function () {
-    var pin = prompt('⚠️ أدخل رمز التأكيد للحذف:');
-    if (pin !== '2019') { if (pin !== null) showToast('❌ رمز غير صحيح', true); return; }
+  window.subxShowClearPinModal = function () {
+    var modal = document.getElementById('pin-clear-modal');
+    var input = document.getElementById('pin-clear-input');
+    modal.classList.add('open');
+    input.value = '';
+    setTimeout(function () { input.focus(); }, 200);
+  };
+
+  window.subxConfirmClearLogs = async function () {
+    var pin = document.getElementById('pin-clear-input').value;
+    if (pin !== '2019') { showToast('❌ رمز غير صحيح', true); document.getElementById('pin-clear-input').value = ''; document.getElementById('pin-clear-input').focus(); return; }
+    document.getElementById('pin-clear-modal').classList.remove('open');
     const { _db: fdb, _firestore: fs } = window;
     if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); return; }
     try {
