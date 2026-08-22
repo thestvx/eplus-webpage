@@ -23758,13 +23758,16 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
                 if (!lastEnd || psEnd > lastEnd) lastEnd = psEnd;
               }
             } catch (e) { console.warn('[SUBSCRIPTIONS] prev subs lookup for trial deduct:', e); }
-            var trialSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('studentId', '==', String(selectedStudent.id)), fs2.where('type', '==', 'trial_session')));
+            var _qStudentId = selectedStudent.id;
+            var trialSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('studentId', '==', _qStudentId), fs2.where('type', '==', 'trial_session')));
+            console.log('[SUBSCRIPTIONS] Trial query: id=' + _qStudentId + ' type=' + typeof _qStudentId + ' results=' + trialSnap.size);
             trialSnap.forEach(function (d) {
               var r = d.data();
               var dk = (r.teacherName || '') + '___' + (r.subjectName || '');
               if (dk !== tKey) return;
               if (!r.date) return;
               if (lastEnd && r.date <= lastEnd) return;
+              console.log('[SUBSCRIPTIONS] Trial match: ' + r.date + ' ' + r.teacherName + '/' + r.subjectName);
               trialDeducted++;
             });
           }
@@ -23793,7 +23796,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         // and the student gets fresh free trials.
         try {
           if (fs2 && fdb2) {
-            var trialDeleteSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('studentId', '==', String(selectedStudent.id)), fs2.where('type', '==', 'trial_session')));
+            var trialDeleteSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('studentId', '==', _qStudentId), fs2.where('type', '==', 'trial_session')));
             var trialBatch = fs2.writeBatch(fdb2);
             var trialOps = 0;
             trialDeleteSnap.forEach(function (d) {
@@ -24243,7 +24246,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     try {
       const { _db: fdb, _firestore: fs } = window;
       if (!fdb || !fs) { c.innerHTML = '<div style="text-align:center;padding:8px;color:var(--text-muted);font-size:12px">Firebase غير متاح</div>'; return; }
-      const q = fs.query(fs.collection(fdb, 'support_attendance'), fs.where('studentId', '==', String(studentId)));
+      const q = fs.query(fs.collection(fdb, 'support_attendance'), fs.where('studentId', '==', studentId));
       const snap = await fs.getDocs(q);
       let records = [];
       snap.forEach(d => {
