@@ -23747,6 +23747,30 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           }
         } catch (e) { console.warn('[SUBSCRIPTIONS] trial deduct failed', e); }
 
+        // ── Delete old trial_session records for this student+teacher+subject ──
+        // After subscription is created, old trial records are no longer needed.
+        // This ensures that when the subscription expires, getTrialUsage returns 0
+        // and the student gets fresh free trials.
+        try {
+          if (fs2 && fdb2) {
+            var trialDeleteSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('studentId', '==', String(selectedStudent.id)), fs2.where('type', '==', 'trial_session')));
+            var trialBatch = fs2.writeBatch(fdb2);
+            var trialOps = 0;
+            trialDeleteSnap.forEach(function (d) {
+              var r = d.data();
+              var dk = (r.teacherName || '') + '___' + (r.subjectName || '');
+              if (dk === tKey) {
+                trialBatch.delete(fs2.doc(fdb2, 'support_attendance', d.id));
+                trialOps++;
+              }
+            });
+            if (trialOps > 0) {
+              await trialBatch.commit();
+              console.log('[SUBSCRIPTIONS] Deleted ' + trialOps + ' old trial_session records for ' + tKey);
+            }
+          }
+        } catch (e) { console.warn('[SUBSCRIPTIONS] trial cleanup failed', e); }
+
         const successHtml =
           '<div style="text-align:center;font-size:13px">' +
             '<div style="font-size:38px;margin-bottom:6px">✅</div>' +
