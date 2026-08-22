@@ -666,6 +666,11 @@ main{flex:1;position:relative;overflow:hidden}
             sess.status = 'active';
             sess.attended = ap.used_sessions || 0;
             sess.remaining = Math.max(0, (ap.total_sessions || 8) - sess.attended);
+            // If all sessions used, treat as expired for card display (trial mode)
+            if (sess.remaining <= 0) {
+              sess.status = 'expired';
+              sess.remaining = 0;
+            }
           } else {
             sess.status = 'expired';
             sess.attended = ap ? (ap.used_sessions || 0) : 0;
@@ -842,8 +847,13 @@ main{flex:1;position:relative;overflow:hidden}
 
     if (subCheck && subCheck.subscription) {
       var subStatus = SubscriptionService.subscriptionStatus(subCheck.subscription);
+      var _subHasRemaining = false;
       if (subStatus === 'active') {
-        // ── GREEN: active subscription ──
+        var _totals = SubscriptionService.computeSubscriptionTotals(subCheck.periods);
+        _subHasRemaining = _totals.remainingSessions > 0;
+      }
+      if (subStatus === 'active' && _subHasRemaining) {
+        // ── GREEN: active subscription with remaining sessions ──
         type = 'green';
         if (fbReady && authState.signedIn) {
           try {
@@ -864,7 +874,7 @@ main{flex:1;position:relative;overflow:hidden}
           } catch (e) { logScanner('increment usage error: ' + e.message); }
         }
       } else {
-        // ── Subscription expired → fresh trial check from Firestore ──
+        // ── Subscription expired or sessions exhausted → fresh trial check from Firestore ──
         var _fu = await getTrialUsage(pendingStudentId);
         var _fc = getTrialCount(_fu, session.teacher, session.subject);
         var _fr = Math.max(0, TRIAL_MAX - _fc);

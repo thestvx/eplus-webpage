@@ -23370,6 +23370,28 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     $x('subx-modal').classList.remove('open');
     $x('subx-combo-list').classList.remove('open');
   };
+  window.subxRenew = async function (studentId, subjectId, teacherId, subjectName, teacherName, renewStart) {
+    $x('subx-detail-modal').classList.remove('open');
+    await subxOpenEditor();
+    const r = regs.find(x => String(x.id) === String(studentId));
+    if (r) {
+      await subxApplyStudent(r, '');
+      await new Promise(function (res) { setTimeout(res, 100); });
+      const subj = $x('subx-subject');
+      for (let i = 0; i < _subjectOptions.length; i++) {
+        const o = _subjectOptions[i];
+        if (subjectName && teacherName && o.subjectName === subjectName && o.teacherName === teacherName) {
+          subj.value = String(i);
+          subxOnSubjectChange();
+          break;
+        }
+      }
+    }
+    if (renewStart) {
+      $x('subx-start').value = renewStart;
+      subxRenderPreview();
+    }
+  };
 
   // ── ماسح الاشتراكات بالبطاقة (نفس utility الخاص بالحضور) ──
   // يعيد بناء قيمة الباركود من event.code (المفتاح الفيزيائي) فقط، فلا
@@ -24115,6 +24137,10 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
 
       // Actions
       html += '<div class="subx-detail-actions">';
+      if (stNow === 'expired' || stNow === 'done' || stNow === 'cancelled' || (used >= total && total > 0)) {
+        var _renewStart = SubscriptionService.addDays(sub.end_date || today, 1);
+        html += '<button class="btn btn-primary" onclick="subxRenew(\'' + escX(sub.student_id) + '\',\'' + escX(sub.subject_id || '') + '\',\'' + escX(sub.teacher_id || '') + '\',\'' + escX(sub.subject_name || '') + '\',\'' + escX(sub.teacher_name || '') + '\',\'' + escX(_renewStart) + '\')" style="background:linear-gradient(135deg,#2563eb,#3b82f6);font-size:13px;padding:10px 24px;font-weight:900">🔄 تجديد الاشتراك</button>';
+      }
       if (stNow !== 'cancelled') {
         if (sub.status === 'paused') {
           html += '<button class="btn btn-primary" onclick="subxSetPaused(\'' + escX(sub.id) + '\',false)" style="background:linear-gradient(135deg,#10b981,#059669)">▶️ استئناف الاشتراك</button>';
@@ -25540,7 +25566,7 @@ async function srSaveEdit(id) {
 
 // ═══ DELETE ═══
 async function srDelete(id) {
-  const r = srAllData.find(x => x.id === id);
+  const r = srAllData.find(x => String(x.id) === String(id));
   if (!r) return;
   const isConfirmed = r.status === 'مسجل نهائياً';
   const msg = isConfirmed
@@ -25560,9 +25586,20 @@ async function srDelete(id) {
       // Hard delete for non-confirmed students
       res = await srFetch(`${SR_SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(id)}`, {
         method: 'DELETE',
+        headers: { 'Prefer': 'return=representation' },
       });
     }
     if (!res.ok) throw new Error('HTTP ' + res.status);
+    // Verify: PostgREST returns empty array [] when RLS blocks DELETE
+    const result = await res.json();
+    if (Array.isArray(result) && result.length === 0 && !isConfirmed) {
+      // DELETE blocked by RLS — fall back to soft delete
+      res = await srFetch(`${SR_SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ deleted_at: new Date().toISOString(), student_token: null }),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+    }
     srShowToast('🗑️ تم حذف الطالب من القائمة النشطة', 'success');
     await srLoadData();
   } catch (e) {

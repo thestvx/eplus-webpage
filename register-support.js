@@ -455,7 +455,12 @@ function msRemoveIdx(i) {
 function onSubmitClick() {
   const firstName = byId('sFirstName')?.value?.trim();
   const lastName = byId('sLastName')?.value?.trim();
-  const birthDate = byId('sBirthDate')?.value;
+  const birthDay = byId('sBirthDay')?.value;
+  const birthMonth = byId('sBirthMonth')?.value;
+  const birthYear = byId('sBirthYear')?.value;
+  const birthDate = (birthDay && birthMonth && birthYear)
+    ? birthYear + '-' + String(birthMonth).padStart(2, '0') + '-' + String(birthDay).padStart(2, '0')
+    : '';
   const parentName = byId('sParentName')?.value?.trim();
   const parentPhone = byId('sParentPhone')?.value?.trim();
 

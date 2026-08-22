@@ -147,7 +147,7 @@ const SubscriptionService = (function () {
   }
 
   function computeSubscriptionTotals(periods) {
-    const used = (periods || []).reduce((a, p) => a + ((p.usedSessions || 0)), 0);
+    const used = (periods || []).reduce((a, p) => a + ((p.usedSessions || p.used_sessions || 0)), 0);
     const total = (periods || []).length * SESSIONS_PER_MONTH;
     return { totalSessions: total, usedSessions: used, remainingSessions: Math.max(0, total - used) };
   }
