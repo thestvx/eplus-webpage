@@ -23734,8 +23734,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       });
       if (created && created.subscription) {
         // ── Deduct trial sessions from first period (cycle-aware) ──
-        // Only truly expired subs (today > end_date) set a cutoff for trial counting.
-        // "Done" subs (remaining=0, date not expired) are IGNORED — their trials are fresh.
+        // "Done" subs (remaining=0, date not expired): use start_date as cutoff
+        // so old trials before the subscription are excluded, but fresh trial records count.
         try {
           var trialDeducted = 0;
           var fs2 = window._firestore, fdb2 = window._db;
@@ -23757,7 +23757,11 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
                 if (!psEnd) continue;
                 var psPeriods = prevSubs[pi].periods || [];
                 var psTotals = SubscriptionService.computeSubscriptionTotals(psPeriods);
-                if (psTotals.remainingSessions <= 0 && todayStr <= psEnd) continue;
+                if (psTotals.remainingSessions <= 0 && todayStr <= psEnd) {
+                  var psStart = ps.start_date || '';
+                  if (psStart && (!lastEnd || psStart > lastEnd)) lastEnd = psStart;
+                  continue;
+                }
                 if (!lastEnd || psEnd > lastEnd) lastEnd = psEnd;
               }
             } catch (e) { console.warn('[SUBSCRIPTIONS] prev subs lookup for trial deduct:', e); }
@@ -23930,13 +23934,17 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     }
     // Get unique teachers from support_teachers
     var teacherMap = {};
+    var teacherIdByName = {};
     srtTeachers.forEach(function (t) {
       if (t.status === 'deleted' || t.status === 'disabled') return;
       var name = t.name || '';
       if (!name || teacherMap[name]) return;
+      var tid = t.teacherId || t.id || '';
       var subjects = (t.subjects || []).map(function (s) { return s.subject || s.name || s; }).filter(Boolean);
-      teacherMap[name] = { name: name, subjects: subjects };
+      teacherMap[name] = { name: name, subjects: subjects, teacherId: tid };
+      if (tid) teacherIdByName[atcNorm(name)] = tid;
     });
+    window._atcTeacherIdMap = teacherIdByName;
     var teachers = Object.values(teacherMap).sort(function (a, b) { return a.name.localeCompare(b.name, 'ar'); });
     var prevVal = sel.value;
     sel.innerHTML = '<option value="">— اختر الأستاذ —</option>';
@@ -23983,6 +23991,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var { _db: fdb, _firestore: fs } = window;
     if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); btn.disabled = false; return; }
     var docRef = fs.doc(fdb, ATC_COLLECTION, atcDocId(name));
+    var teacherId = (window._atcTeacherIdMap || {})[atcNorm(name)] || '';
     var isClosing = false;
     try {
       var snap = await fs.getDoc(docRef);
@@ -23990,7 +23999,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         await fs.updateDoc(docRef, { isOpen: false, closedAt: new Date().toISOString() });
         isClosing = true;
       } else {
-        await fs.setDoc(docRef, { date: atcToday(), teacherName: name, isOpen: true, openedAt: new Date().toISOString(), closedAt: null }, { merge: true });
+        await fs.setDoc(docRef, { date: atcToday(), teacherName: name, teacherId: teacherId, isOpen: true, openedAt: new Date().toISOString(), closedAt: null }, { merge: true });
       }
     } catch (e) { console.error('[ATC] toggle failed', e); showToast('❌ تعذر تحديث الحالة', true); }
     if (isClosing) {
@@ -24003,7 +24012,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         var confirmed = 0, ops2 = 0;
         cSnap.forEach(function (d) {
           var r = d.data();
-          if (r.confirmed === false && String(r.teacherName || '').replace(/\s+/g, '').toLowerCase() === normT) {
+          var nameMatch = r.confirmed === false && String(r.teacherName || '').replace(/\s+/g, '').toLowerCase() === normT;
+          var idMatch = teacherId && r.teacherId && r.teacherId === teacherId;
+          if (nameMatch || idMatch) {
             batch2.update(d.ref, { confirmed: true, updatedAt: new Date().toISOString() });
             confirmed++; ops2++;
             if (ops2 >= 450) { batch2.commit(); batch2 = fs2.writeBatch(fdb2); ops2 = 0; }

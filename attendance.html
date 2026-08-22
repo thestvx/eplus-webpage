@@ -477,10 +477,10 @@ main{flex:1;position:relative;overflow:hidden}
   async function getTrialUsage(studentId) {
     var used = {};
     if (!fbReady) return used;
-    // ── Cycle-aware: cutoff = most recent EXPIRED sub end_date per teacher+subject ──
-    // Only truly expired subs (today > end_date) set a cutoff.
-    // "Done" subs (remaining=0, date not expired) are IGNORED for cutoff —
-    //   their trial_session records ARE the fresh free trials and must be counted.
+    // ── Cycle-aware: cutoff = last sub end_date per teacher+subject ──
+    // Truly expired subs (today > end_date) set cutoff = end_date.
+    // "Done" subs (remaining=0, date not expired) set cutoff = start_date —
+    //   trials before the subscription are excluded, but fresh trial records count.
     var lastSubEndByTeacherSubject = {};
     try {
       var subs = await SubscriptionService.getSubscriptions(studentId);
@@ -492,10 +492,18 @@ main{flex:1;position:relative;overflow:hidden}
           var sKey = trialKey(s.teacher_name || '', s.subject_name || '');
           var sEnd = s.end_date || '';
           if (!sKey || !sEnd) continue;
-          // Skip "done" subs (remaining=0 but date not yet expired) — they don't set a cutoff
+          // "Done" subs (remaining=0 but date not yet expired):
+          //   Use start_date as cutoff — trials before the subscription are excluded,
+          //   but fresh trial records made during/after this sub ARE counted.
           var periods = subs[si].periods || [];
           var totals = SubscriptionService.computeSubscriptionTotals(periods);
-          if (totals.remainingSessions <= 0 && todayStr <= sEnd) continue;
+          if (totals.remainingSessions <= 0 && todayStr <= sEnd) {
+            var sStart = s.start_date || '';
+            if (sStart && (!lastSubEndByTeacherSubject[sKey] || sStart > lastSubEndByTeacherSubject[sKey])) {
+              lastSubEndByTeacherSubject[sKey] = sStart;
+            }
+            continue;
+          }
           // Only truly expired subs set the cutoff
           if (!lastSubEndByTeacherSubject[sKey] || sEnd > lastSubEndByTeacherSubject[sKey]) {
             lastSubEndByTeacherSubject[sKey] = sEnd;
@@ -536,8 +544,22 @@ main{flex:1;position:relative;overflow:hidden}
 
   // ── Attendance Control: check which teachers are open today ──
   function normalizeTeacherName(n) { return String(n || '').replace(/\s+/g, '').toLowerCase(); }
+  var _teacherIdByName = {};
+  var _teacherIdMapLoaded = false;
+  async function loadTeacherIdMap() {
+    if (_teacherIdMapLoaded) return;
+    try {
+      var snap = await window.db.collection('support_teachers').where('status', '==', 'active').get();
+      snap.forEach(function (doc) {
+        var d = doc.data();
+        if (d.name && d.teacherId) _teacherIdByName[normalizeTeacherName(d.name)] = d.teacherId;
+      });
+    } catch (e) { logScanner('teacherId map load error: ' + e.message); }
+    _teacherIdMapLoaded = true;
+  }
   async function checkAttendanceControl() {
     var openMap = {};
+    var openIdMap = {};
     try {
       var today = AttendanceService.today();
       var snap = await window.db.collection('attendance_control')
@@ -545,10 +567,20 @@ main{flex:1;position:relative;overflow:hidden}
         .get();
       snap.forEach(function (doc) {
         var d = doc.data();
-        if (d.isOpen && d.teacherName) openMap[normalizeTeacherName(d.teacherName)] = true;
+        if (d.isOpen) {
+          if (d.teacherName) openMap[normalizeTeacherName(d.teacherName)] = true;
+          if (d.teacherId) openIdMap[d.teacherId] = true;
+        }
       });
     } catch (e) { logScanner('atc check error: ' + e.message); }
-    return openMap;
+    return { openMap: openMap, openIdMap: openIdMap };
+  }
+  function isTeacherOpen(openMap, openIdMap, teacherName) {
+    var nn = normalizeTeacherName(teacherName);
+    if (openMap[nn]) return true;
+    var tid = _teacherIdByName[nn];
+    if (tid && openIdMap[tid]) return true;
+    return false;
   }
 
   // ── Scan overlay (auto-dismiss) ──
@@ -655,13 +687,15 @@ main{flex:1;position:relative;overflow:hidden}
     var seen = {};
     var today = AttendanceService.today();
     var trialUsage = await getTrialUsage(studentId);
-    var openMap = await checkAttendanceControl();
+    await loadTeacherIdMap();
+    var atc = await checkAttendanceControl();
+    var openMap = atc.openMap, openIdMap = atc.openIdMap;
     for (var i = 0; i < subjects.length; i++) {
       var s = subjects[i];
       var key = (s.teacher || '') + '|' + (s.subject || '');
       if (seen[key]) continue;
       seen[key] = true;
-      var isOpen = !!openMap[normalizeTeacherName(s.teacher)];
+      var isOpen = isTeacherOpen(openMap, openIdMap, s.teacher);
       var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, trialUsed: 0, trialRemaining: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length };
       try {
         var subResult = await SubscriptionService.getActiveSubscriptionForSubject(studentId, s.subject, s.teacher, today);
@@ -833,8 +867,8 @@ main{flex:1;position:relative;overflow:hidden}
 
     // ── Server-side gate: verify attendance is still open for this teacher ──
     try {
-      var openMap = await checkAttendanceControl();
-      if (!openMap[normalizeTeacherName(session.teacher)]) {
+      var atc2 = await checkAttendanceControl();
+      if (!isTeacherOpen(atc2.openMap, atc2.openIdMap, session.teacher)) {
         btnEl.classList.remove('loading');
         btnEl.innerHTML = '\uD83D\uDD12 الحضور مغلق';
         btnEl.classList.add('orange');
