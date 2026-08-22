@@ -23740,7 +23740,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           var trialDeducted = 0;
           var fs2 = window._firestore, fdb2 = window._db;
           if (fs2 && fdb2) {
-            var tKey = (selectedSubject.teacherName || '') + '___' + (selectedSubject.subjectName || '');
+            var _nrm = function (s) { return String(s || '').replace(/\s+/g, ' ').trim(); };
+            var tKey = _nrm(selectedSubject.teacherName) + '___' + _nrm(selectedSubject.subjectName);
             var lastEnd = '';
             var todayStr = SubscriptionService.today();
             try {
@@ -23748,7 +23749,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
               for (var pi = 0; pi < prevSubs.length; pi++) {
                 var ps = (prevSubs[pi].subscription || {});
                 if (ps.status === 'cancelled') continue;
-                var psKey = (ps.teacher_name || '') + '___' + (ps.subject_name || '');
+                var psKey = _nrm(ps.teacher_name) + '___' + _nrm(ps.subject_name);
                 if (psKey !== tKey) continue;
                 var psEnd = ps.end_date || '';
                 if (!psEnd) continue;
@@ -23759,17 +23760,29 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
               }
             } catch (e) { console.warn('[SUBSCRIPTIONS] prev subs lookup for trial deduct:', e); }
             var _qStudentId = selectedStudent.id;
-            var trialSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('studentId', '==', _qStudentId), fs2.where('type', '==', 'trial_session')));
-            console.log('[SUBSCRIPTIONS] Trial query: id=' + _qStudentId + ' type=' + typeof _qStudentId + ' results=' + trialSnap.size);
-            trialSnap.forEach(function (d) {
-              var r = d.data();
-              var dk = (r.teacherName || '') + '___' + (r.subjectName || '');
-              if (dk !== tKey) return;
-              if (!r.date) return;
-              if (lastEnd && r.date <= lastEnd) return;
-              console.log('[SUBSCRIPTIONS] Trial match: ' + r.date + ' ' + r.teacherName + '/' + r.subjectName);
-              trialDeducted++;
-            });
+            var _qStudentIdStr = String(_qStudentId);
+            var trialSnap;
+            try {
+              trialSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('studentId', '==', _qStudentId)));
+            } catch (e1) {
+              console.warn('[SUBSCRIPTIONS] Firestore query by number failed, trying string:', e1.message);
+              try { trialSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('studentId', '==', _qStudentIdStr))); } catch (e2) {
+                console.warn('[SUBSCRIPTIONS] Firestore query by string also failed:', e2.message);
+              }
+            }
+            if (trialSnap) {
+              console.log('[SUBSCRIPTIONS] Trial query: id=' + _qStudentId + ' type=' + typeof _qStudentId + ' results=' + trialSnap.size);
+              trialSnap.forEach(function (d) {
+                var r = d.data();
+                if (r.type !== 'trial_session') return;
+                var dk = _nrm(r.teacherName) + '___' + _nrm(r.subjectName);
+                if (dk !== tKey) return;
+                if (!r.date) return;
+                if (lastEnd && r.date <= lastEnd) return;
+                console.log('[SUBSCRIPTIONS] Trial match: ' + r.date + ' ' + r.teacherName + '/' + r.subjectName);
+                trialDeducted++;
+              });
+            }
           }
           if (trialDeducted > 0) {
             var subPeriods = created.periods || [];
