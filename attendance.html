@@ -469,8 +469,9 @@ main{flex:1;position:relative;overflow:hidden}
   // a trial_session mirror doc (CREATE-only), and we count them on read.
   const TRIAL_MAX = 2;
   function trialKey(teacher, subject) {
-    var tn = String(teacher || '').replace(/\s+/g, ' ').trim().toLowerCase().split(' ').sort().join(' ');
-    return tn + '___' + (subject || '');
+    var tn = String(teacher || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    tn = tn.replace(/\bعبد\s+ال/, 'عبدال');
+    return tn.split(' ').sort().join(' ') + '___' + (subject || '');
   }
   function getTrialCount(used, teacher, subject) {
     return used[trialKey(teacher, subject)] || 0;
@@ -544,7 +545,11 @@ main{flex:1;position:relative;overflow:hidden}
   }
 
   // ── Attendance Control: check which teachers are open today ──
-  function normalizeTeacherName(n) { return String(n || '').replace(/\s+/g, ' ').trim().toLowerCase().split(' ').sort().join(' '); }
+  function normalizeTeacherName(n) {
+    var s = String(n || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    s = s.replace(/\bعبد\s+ال/, 'عبدال');
+    return s.split(' ').sort().join(' ');
+  }
   var _teacherIdByName = {};
   var _teacherIdMapLoaded = false;
   async function loadTeacherIdMap() {
@@ -1058,7 +1063,7 @@ main{flex:1;position:relative;overflow:hidden}
   try {
     scanner = new BarcodeScanner.Scanner({
       logPrefix: 'ATTENDANCE',
-      shouldIgnoreKey: function () { return processing || !appUnlocked; },
+      shouldIgnoreKey: function () { var el = document.activeElement; var inInput = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable); return processing || !appUnlocked || inInput; },
       onState: function (info) { if (info && info.buffer !== undefined) { updateDebug(info); if (info.buffer) logScanner('buf=' + info.buffer); } },
       onScan: function (code) {
         logScanner('SCAN: ' + code + ' (len=' + code.length + ')');
@@ -1079,6 +1084,7 @@ main{flex:1;position:relative;overflow:hidden}
   async function submitManual() {
     var v = $('manual-input').value.trim();
     if (!v || processing) return;
+    if (v.length < 3) { $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>أدخل 3 أرقام على الأقل'; return; }
     logScanner('MANUAL: ' + v);
     await handleScan(v);
     $('manual-input').value = '';
