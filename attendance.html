@@ -569,15 +569,26 @@ main{flex:1;position:relative;overflow:hidden}
       snap.forEach(function (doc) {
         var d = doc.data();
         if (d.isOpen) {
-          if (d.teacherName) openMap[normalizeTeacherName(d.teacherName)] = true;
+          if (d.teacherName) {
+            var nn = normalizeTeacherName(d.teacherName);
+            if (d.subjectName) {
+              openMap[nn + '|||' + d.subjectName.trim().toLowerCase()] = true;
+            } else {
+              openMap[nn] = true;
+            }
+          }
           if (d.teacherId) openIdMap[d.teacherId] = true;
         }
       });
     } catch (e) { logScanner('atc check error: ' + e.message); }
     return { openMap: openMap, openIdMap: openIdMap };
   }
-  function isTeacherOpen(openMap, openIdMap, teacherName) {
+  function isTeacherOpen(openMap, openIdMap, teacherName, subjectName) {
     var nn = normalizeTeacherName(teacherName);
+    if (subjectName) {
+      var sk = nn + '|||' + subjectName.trim().toLowerCase();
+      if (openMap[sk]) return true;
+    }
     if (openMap[nn]) return true;
     var tid = _teacherIdByName[nn];
     if (tid && openIdMap[tid]) return true;
@@ -696,7 +707,7 @@ main{flex:1;position:relative;overflow:hidden}
       var key = (s.teacher || '') + '|' + (s.subject || '');
       if (seen[key]) continue;
       seen[key] = true;
-      var isOpen = isTeacherOpen(openMap, openIdMap, s.teacher);
+      var isOpen = isTeacherOpen(openMap, openIdMap, s.teacher, s.subject);
       var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, trialUsed: 0, trialRemaining: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length };
       try {
         var subResult = await SubscriptionService.getActiveSubscriptionForSubject(studentId, s.subject, s.teacher, today);
@@ -869,7 +880,7 @@ main{flex:1;position:relative;overflow:hidden}
     // ── Server-side gate: verify attendance is still open for this teacher ──
     try {
       var atc2 = await checkAttendanceControl();
-      if (!isTeacherOpen(atc2.openMap, atc2.openIdMap, session.teacher)) {
+      if (!isTeacherOpen(atc2.openMap, atc2.openIdMap, session.teacher, session.subject)) {
         btnEl.classList.remove('loading');
         btnEl.innerHTML = '\uD83D\uDD12 الحضور مغلق';
         btnEl.classList.add('orange');

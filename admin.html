@@ -23937,8 +23937,10 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   function atcMatchNorm(name) {
     return String(name || '').replace(/\s+/g, ' ').trim().toLowerCase().split(' ').sort().join(' ');
   }
-  function atcDocId(teacherName) {
-    return atcToday() + '_' + atcNorm(teacherName);
+  function atcDocId(teacherName, subjectName) {
+    var key = atcNorm(teacherName);
+    if (subjectName) key += '_' + atcNorm(subjectName);
+    return atcToday() + '_' + key;
   }
 
   window.atcLoad = async function () {
@@ -23955,25 +23957,38 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         srtTeachers = tSnap.docs.map(function (d) { return { id: d.id, ...d.data() }; }).filter(function (t) { return t.status !== 'deleted'; });
       } catch (e) { console.warn('[ATC] fallback teacher load failed', e); }
     }
-    // Get unique teachers from support_teachers
-    var teacherMap = {};
+    // Build one dropdown entry per teacher+subject
+    var teacherEntries = [];
     var teacherIdByName = {};
+    var teacherSubjectMap = {};
     srtTeachers.forEach(function (t) {
       if (t.status === 'deleted' || t.status === 'disabled') return;
       var name = t.name || '';
-      if (!name || teacherMap[name]) return;
+      if (!name) return;
       var tid = t.teacherId || t.id || '';
+      if (tid) teacherIdByName[atcMatchNorm(name)] = tid;
       var subjects = (t.subjects || []).map(function (s) { return s.subject || s.name || s; }).filter(Boolean);
-      teacherMap[name] = { name: name, subjects: subjects, teacherId: tid };
-      if (tid) teacherIdByName[atcNorm(name)] = tid;
+      if (!teacherSubjectMap[name]) teacherSubjectMap[name] = { name: name, teacherId: tid, subjects: [] };
+      subjects.forEach(function (sub) {
+        if (teacherSubjectMap[name].subjects.indexOf(sub) === -1) teacherSubjectMap[name].subjects.push(sub);
+      });
     });
     window._atcTeacherIdMap = teacherIdByName;
-    var teachers = Object.values(teacherMap).sort(function (a, b) { return a.name.localeCompare(b.name, 'ar'); });
+    Object.values(teacherSubjectMap).forEach(function (t) {
+      if (!t.subjects.length) {
+        teacherEntries.push({ value: t.name + '|||', label: t.name, teacherName: t.name, subjectName: '', teacherId: t.teacherId });
+      } else {
+        t.subjects.forEach(function (sub) {
+          teacherEntries.push({ value: t.name + '|||' + sub, label: t.name + ' — ' + sub, teacherName: t.name, subjectName: sub, teacherId: t.teacherId });
+        });
+      }
+    });
+    teacherEntries.sort(function (a, b) { return a.label.localeCompare(b.label, 'ar'); });
+    window._atcEntries = teacherEntries;
     var prevVal = sel.value;
     sel.innerHTML = '<option value="">— اختر الأستاذ —</option>';
-    teachers.forEach(function (t) {
-      var subLabel = t.subjects.join(', ');
-      sel.innerHTML += '<option value="' + escX(t.name) + '">' + escX(t.name) + (subLabel ? ' — ' + escX(subLabel) : '') + '</option>';
+    teacherEntries.forEach(function (e) {
+      sel.innerHTML += '<option value="' + escX(e.value) + '">' + escX(e.label) + '</option>';
     });
     if (prevVal) sel.value = prevVal;
     // Fetch today's statuses
@@ -23981,12 +23996,16 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     if (fdb && fs) {
       try {
         var todayDocs = await fs.getDocs(fs.query(fs.collection(fdb, ATC_COLLECTION), fs.where('date', '==', atcToday())));
-        todayDocs.forEach(function (d) { var dd = d.data(); if (dd.teacherName) statuses[dd.teacherName] = dd; });
+        todayDocs.forEach(function (d) {
+          var dd = d.data();
+          var dk = (dd.teacherName || '') + '|||' + (dd.subjectName || '');
+          if (dd.teacherName) statuses[dk] = dd;
+        });
       } catch (e) { console.warn('[ATC] load status failed', e); }
     }
     window._atcStatuses = statuses;
     atcUpdateStatus();
-    atcRenderOpenBars(statuses, teacherMap);
+    atcRenderOpenBars(statuses);
   };
 
   window.atcUpdateStatus = function () {
@@ -23994,9 +24013,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var statusEl = document.getElementById('atc-status');
     var btn = document.getElementById('atc-toggle-btn');
     if (!sel || !statusEl || !btn) return;
-    var name = sel.value;
-    if (!name) { statusEl.textContent = ''; btn.style.display = 'none'; return; }
-    var st = (window._atcStatuses || {})[name];
+    var val = sel.value;
+    if (!val) { statusEl.textContent = ''; btn.style.display = 'none'; return; }
+    var st = (window._atcStatuses || {})[val];
     var isOpen = st && st.isOpen;
     statusEl.textContent = isOpen ? '🟢 الحضور مفتوح' : '🔒 الحضور مغلق';
     statusEl.style.color = isOpen ? '#10b981' : '#6b7280';
@@ -24007,51 +24026,56 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     btn.style.boxShadow = isOpen ? '0 4px 12px rgba(220,38,38,0.25)' : '0 4px 12px rgba(16,185,129,0.25)';
   };
 
-  window.atcRenderOpenBars = function (statuses, teacherMap) {
+  window.atcRenderOpenBars = function (statuses) {
     var container = document.getElementById('atc-open-bars');
     if (!container) return;
-    var openTeachers = [];
-    Object.keys(statuses || {}).forEach(function (name) {
-      var st = statuses[name];
+    var openEntries = [];
+    Object.keys(statuses || {}).forEach(function (dk) {
+      var st = statuses[dk];
       if (st && st.isOpen) {
-        var subjects = (teacherMap[name] || {}).subjects || [];
-        openTeachers.push({ name: name, subjects: subjects });
+        openEntries.push({ value: dk, teacherName: st.teacherName || '', subjectName: st.subjectName || '' });
       }
     });
-    if (!openTeachers.length) { container.style.display = 'none'; container.innerHTML = ''; return; }
+    if (!openEntries.length) { container.style.display = 'none'; container.innerHTML = ''; return; }
     container.style.display = 'block';
     var html = '<div style="font-size:12px;font-weight:800;color:#059669;margin-bottom:8px">🟢 الأساتذة المفتوح حاليًا:</div>';
     html += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
-    openTeachers.forEach(function (t) {
-      var label = t.name + (t.subjects.length ? ' — ' + t.subjects[0] : '');
+    openEntries.forEach(function (e) {
+      var label = e.teacherName + (e.subjectName ? ' — ' + e.subjectName : '');
       html += '<div style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(16,185,129,0.08);border:1.5px solid rgba(16,185,129,0.25);border-radius:10px;font-size:12px;font-weight:700;color:#059669">';
       html += '<span style="width:8px;height:8px;border-radius:50%;background:#10b981;flex-shrink:0"></span>';
       html += '<span>' + escX(label) + '</span>';
-      html += '<button onclick="atcCloseFromBar(\'' + escX(t.name).replace(/'/g, "\\'") + '\')" style="margin-right:4px;padding:4px 10px;border:1.5px solid rgba(220,38,38,0.3);border-radius:8px;background:rgba(220,38,38,0.06);color:#dc2626;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit;transition:all .15s">🔒 إغلاق</button>';
+      var escapedVal = escX(e.value).replace(/'/g, "\\'");
+      html += '<button onclick="atcCloseFromBar(\'' + escapedVal + '\')" style="margin-right:4px;padding:4px 10px;border:1.5px solid rgba(220,38,38,0.3);border-radius:8px;background:rgba(220,38,38,0.06);color:#dc2626;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit;transition:all .15s">🔒 إغلاق</button>';
       html += '</div>';
     });
     html += '</div>';
     container.innerHTML = html;
   };
 
-  window.atcCloseFromBar = async function (name) {
+  window.atcCloseFromBar = async function (dk) {
+    var parts = dk.split('|||');
+    var name = parts[0] || '';
+    var subjectName = parts[1] || '';
     var { _db: fdb, _firestore: fs } = window;
     if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); return; }
     try {
-      var docRef = fs.doc(fdb, ATC_COLLECTION, atcDocId(name));
-      var teacherId = (window._atcTeacherIdMap || {})[atcNorm(name)] || '';
+      var docRef = fs.doc(fdb, ATC_COLLECTION, atcDocId(name, subjectName));
+      var teacherId = (window._atcTeacherIdMap || {})[atcMatchNorm(name)] || '';
       var snap = await fs.getDoc(docRef);
       if (snap.exists() && snap.data().isOpen) {
         await fs.updateDoc(docRef, { isOpen: false, closedAt: new Date().toISOString() });
         var normT = atcMatchNorm(name);
+        var normS = subjectName ? subjectName.trim().toLowerCase() : '';
         var todayStr = atcToday();
         var cSnap = await fs.getDocs(fs.query(fs.collection(fdb, 'support_attendance'), fs.where('date', '==', todayStr)));
         var batch = fs.writeBatch(fdb);
         var confirmed = 0, ops = 0;
         cSnap.forEach(function (d) {
           var r = d.data();
-          var nameMatch = r.confirmed === false && atcMatchNorm(r.teacherName) === normT;
-          var idMatch = teacherId && r.teacherId && r.teacherId === teacherId;
+          var rSubj = (r.subjectName || '').trim().toLowerCase();
+          var nameMatch = r.confirmed === false && atcMatchNorm(r.teacherName) === normT && (!normS || rSubj === normS);
+          var idMatch = teacherId && r.teacherId && r.teacherId === teacherId && (!normS || rSubj === normS);
           if (nameMatch || idMatch) {
             batch.update(d.ref, { confirmed: true, updatedAt: new Date().toISOString() });
             confirmed++; ops++;
@@ -24059,7 +24083,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           }
         });
         if (ops > 0) await batch.commit();
-        showToast('✅ تم إغلاق حضور ' + name + ' وتأكيد ' + confirmed + ' سجل');
+        showToast('✅ تم إغلاق حضور ' + name + (subjectName ? ' — ' + subjectName : '') + ' وتأكيد ' + confirmed + ' سجل');
         await atcLoad();
       }
     } catch (e) { console.error('[ATC] close from bar failed', e); showToast('❌ تعذر إغلاق الحضور', true); }
@@ -24068,13 +24092,16 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   window.atcToggleSelected = async function () {
     var sel = document.getElementById('atc-teacher-select');
     var btn = document.getElementById('atc-toggle-btn');
-    var name = sel ? sel.value : '';
-    if (!name) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
+    var val = sel ? sel.value : '';
+    if (!val) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
+    var parts = val.split('|||');
+    var name = parts[0] || '';
+    var subjectName = parts[1] || '';
     if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري التحديث...'; }
     var { _db: fdb, _firestore: fs } = window;
     if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); btn.disabled = false; return; }
-    var docRef = fs.doc(fdb, ATC_COLLECTION, atcDocId(name));
-    var teacherId = (window._atcTeacherIdMap || {})[atcNorm(name)] || '';
+    var docRef = fs.doc(fdb, ATC_COLLECTION, atcDocId(name, subjectName));
+    var teacherId = (window._atcTeacherIdMap || {})[atcMatchNorm(name)] || '';
     var isClosing = false;
     try {
       var snap = await fs.getDoc(docRef);
@@ -24082,7 +24109,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         await fs.updateDoc(docRef, { isOpen: false, closedAt: new Date().toISOString() });
         isClosing = true;
       } else {
-        await fs.setDoc(docRef, { date: atcToday(), teacherName: name, teacherId: teacherId, isOpen: true, openedAt: new Date().toISOString(), closedAt: null }, { merge: true });
+        await fs.setDoc(docRef, { date: atcToday(), teacherName: name, subjectName: subjectName, teacherId: teacherId, isOpen: true, openedAt: new Date().toISOString(), closedAt: null }, { merge: true });
       }
     } catch (e) { console.error('[ATC] toggle failed', e); showToast('❌ تعذر تحديث الحالة', true); }
     if (isClosing) {
@@ -24090,13 +24117,15 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         var fs2 = window._firestore, fdb2 = window._db;
         var todayStr = atcToday();
         var normT = atcMatchNorm(name);
+        var normS = subjectName ? subjectName.trim().toLowerCase() : '';
         var cSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('date', '==', todayStr)));
         var batch2 = fs2.writeBatch(fdb2);
         var confirmed = 0, ops2 = 0;
         cSnap.forEach(function (d) {
           var r = d.data();
-          var nameMatch = r.confirmed === false && atcMatchNorm(r.teacherName) === normT;
-          var idMatch = teacherId && r.teacherId && r.teacherId === teacherId;
+          var rSubj = (r.subjectName || '').trim().toLowerCase();
+          var nameMatch = r.confirmed === false && atcMatchNorm(r.teacherName) === normT && (!normS || rSubj === normS);
+          var idMatch = teacherId && r.teacherId && r.teacherId === teacherId && (!normS || rSubj === normS);
           if (nameMatch || idMatch) {
             batch2.update(d.ref, { confirmed: true, updatedAt: new Date().toISOString() });
             confirmed++; ops2++;
@@ -24111,7 +24140,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     }
     btn.disabled = false;
     await atcLoad();
-    sel.value = name;
+    sel.value = val;
     atcUpdateStatus();
   };
 
