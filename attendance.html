@@ -462,50 +462,38 @@ main{flex:1;position:relative;overflow:hidden}
   }
 
   // ── Trial session tracking (Firestore) ──
-  // Doc ID: trial_<studentId>_<YYYY-MM>
-  // Fields: { used: { "teacherName_subjectName": count } }
+  // Source of truth: individual trial_session docs in support_attendance.
+  // The kiosk signs in anonymously and Firestore rules allow CREATE but not
+  // UPDATE for anonymous users on support_attendance. So we NEVER use an
+  // aggregate doc that needs updating. Instead, each trial check-in creates
+  // a trial_session mirror doc (CREATE-only), and we count them on read.
   const TRIAL_MAX = 2;
-  async function getTrialUsage(studentId) {
-    if (!fbReady) return {};
-    var ym = AttendanceService.today().slice(0, 7);
-    var docId = 'trial_' + studentId + '_' + ym;
-    try {
-      var doc = await window.db.collection('support_attendance').doc(docId).get();
-      if (doc.exists) {
-        var data = doc.data();
-        return data.used || {};
-      }
-    } catch (e) { logScanner('trial read error: ' + e.message); }
-    return {};
-  }
   function trialKey(teacher, subject) {
-    return (teacher || '') + '_' + (subject || '');
+    return (teacher || '') + '___' + (subject || '');
   }
   function getTrialCount(used, teacher, subject) {
     return used[trialKey(teacher, subject)] || 0;
   }
+  async function getTrialUsage(studentId) {
+    var used = {};
+    if (!fbReady) return used;
+    var ym = AttendanceService.today().slice(0, 7);
+    try {
+      var snap = await window.db.collection('support_attendance')
+        .where('studentId', '==', studentId)
+        .where('type', '==', 'trial_session')
+        .get();
+      snap.forEach(function (doc) {
+        var d = doc.data();
+        if (!d.date || d.date.indexOf(ym) !== 0) return;
+        var k = trialKey(d.teacherName || '', d.subjectName || '');
+        used[k] = (used[k] || 0) + 1;
+      });
+    } catch (e) { logScanner('trial read error: ' + e.message); }
+    return used;
+  }
   async function recordTrialUsage(studentId, studentName, teacher, subject, barcode) {
     if (!fbReady) return;
-    var ym = AttendanceService.today().slice(0, 7);
-    var docId = 'trial_' + studentId + '_' + ym;
-    var key = trialKey(teacher, subject);
-    try {
-      var docRef = window.db.collection('support_attendance').doc(docId);
-      var doc = await docRef.get();
-      var used = {};
-      if (doc.exists && doc.data().used) used = Object.assign({}, doc.data().used);
-      used[key] = (used[key] || 0) + 1;
-      await docRef.set({
-        studentId: studentId,
-        studentName: studentName || '',
-        type: 'trial_usage',
-        yearMonth: ym,
-        used: used,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-      logScanner('trial recorded: ' + key + ' → ' + used[key]);
-    } catch (e) { logScanner('trial write error: ' + e.message); }
-    // Also write the attendance mirror
     try {
       await AttendanceService.writeMirror({
         studentId: studentId, studentName: studentName, studentType: pendingReg ? (pendingReg.student_type || '') : '',
@@ -514,6 +502,7 @@ main{flex:1;position:relative;overflow:hidden}
         teacherName: teacher, subjectName: subject,
         createdAt: AttendanceService.nowTime()
       });
+      logScanner('trial recorded: ' + trialKey(teacher, subject));
     } catch (e) { logScanner('trial mirror write error: ' + e.message); }
   }
 

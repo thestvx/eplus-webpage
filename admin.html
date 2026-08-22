@@ -23712,15 +23712,21 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       });
       if (created && created.subscription) {
         // ── Deduct trial sessions from first period if any exist ──
+        // Count trial_session mirror docs (source of truth for trial usage)
         try {
           var trialDeducted = 0;
           var trialYm = new Date().toLocaleDateString('sv-SE', { timeZone: 'Africa/Algiers' }).slice(0, 7);
-          var trialDocId = 'trial_' + selectedStudent.id + '_' + trialYm;
-          var trialDoc = await window.db.collection('support_attendance').doc(trialDocId).get();
-          if (trialDoc.exists && trialDoc.data().used) {
-            var trialUsed = trialDoc.data().used || {};
-            var tKey = (selectedSubject.teacherName || '') + '_' + (selectedSubject.subjectName || '');
-            trialDeducted = trialUsed[tKey] || 0;
+          var fs2 = window._firestore, fdb2 = window._db;
+          if (fs2 && fdb2) {
+            var tKey = (selectedSubject.teacherName || '') + '___' + (selectedSubject.subjectName || '');
+            var trialSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('studentId', '==', String(selectedStudent.id)), fs2.where('type', '==', 'trial_session')));
+            trialSnap.forEach(function (d) {
+              var r = d.data();
+              if (r.date && r.date.indexOf(trialYm) === 0) {
+                var dk = (r.teacherName || '') + '___' + (r.subjectName || '');
+                if (dk === tKey) trialDeducted++;
+              }
+            });
           }
           if (trialDeducted > 0) {
             var subPeriods = created.periods || [];
@@ -24306,7 +24312,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       let ops = 0;
       snap.forEach(d => {
         const r = d.data();
-        if (r.type === 'trial_usage') return;
+        if (r.type === 'trial_usage' || r.type === 'trial_session') return;
         batch.delete(fs.doc(fdb, 'support_attendance', d.id));
         ops++; count++;
         if (ops >= 450) { batch.commit(); batch = fs.writeBatch(fdb); ops = 0; }
