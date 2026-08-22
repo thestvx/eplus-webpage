@@ -23779,41 +23779,38 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
                 subPeriods = (detail && detail.periods) || [];
               } catch (e) {}
             }
+            if (!subPeriods.length && created.subscription && created.subscription.id) {
+              try {
+                await new Promise(function (res) { setTimeout(res, 1200); });
+                var detail2 = await SubscriptionService.adminSubscriptionDetail(created.subscription.id);
+                subPeriods = (detail2 && detail2.periods) || [];
+                console.log('[SUBSCRIPTIONS] Periods retry: found ' + subPeriods.length + ' periods');
+              } catch (e) { console.warn('[SUBSCRIPTIONS] period retry failed', e); }
+            }
             if (subPeriods.length) {
               var firstPeriod = subPeriods[0];
               var pid = firstPeriod.period_id || firstPeriod.id;
               if (pid) {
-                await SubscriptionService.incrementPeriodUsage(pid, trialDeducted);
-                console.log('[SUBSCRIPTIONS] Trial deducted ' + trialDeducted + ' sessions from new subscription period ' + pid);
+                var _incResult = await SubscriptionService.incrementPeriodUsage(pid, trialDeducted);
+                console.log('[SUBSCRIPTIONS] Trial deducted ' + trialDeducted + ' sessions from new subscription period ' + pid, _incResult);
+                if (_incResult) {
+                  console.log('[SUBSCRIPTIONS] RPC success — updated period:', JSON.stringify(_incResult));
+                } else {
+                  console.warn('[SUBSCRIPTIONS] RPC returned null — deduction may have failed');
+                }
+              } else {
+                console.warn('[SUBSCRIPTIONS] No period_id found in first period:', JSON.stringify(firstPeriod));
               }
+            } else {
+              console.warn('[SUBSCRIPTIONS] No periods found for subscription ' + (created.subscription ? created.subscription.id : '?') + ' — trial deduction skipped');
             }
           }
         } catch (e) { console.warn('[SUBSCRIPTIONS] trial deduct failed', e); }
 
-        // ── Delete old trial_session records for this student+teacher+subject ──
-        // After subscription is created, old trial records are no longer needed.
-        // This ensures that when the subscription expires, getTrialUsage returns 0
-        // and the student gets fresh free trials.
-        try {
-          if (fs2 && fdb2) {
-            var trialDeleteSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('studentId', '==', _qStudentId), fs2.where('type', '==', 'trial_session')));
-            var trialBatch = fs2.writeBatch(fdb2);
-            var trialOps = 0;
-            trialDeleteSnap.forEach(function (d) {
-              var r = d.data();
-              var dk = (r.teacherName || '') + '___' + (r.subjectName || '');
-              if (dk === tKey) {
-                trialBatch.delete(fs2.doc(fdb2, 'support_attendance', d.id));
-                trialOps++;
-              }
-            });
-            if (trialOps > 0) {
-              await trialBatch.commit();
-              console.log('[SUBSCRIPTIONS] Deleted ' + trialOps + ' old trial_session records for ' + tKey);
-            }
-          }
-        } catch (e) { console.warn('[SUBSCRIPTIONS] trial cleanup failed', e); }
-
+        var _effective = pkg.sessions - trialDeducted;
+        var _trialLine = trialDeducted > 0
+          ? '<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:6px 10px;margin-top:4px;color:#d97706;font-size:12px;font-weight:800">🟠 تم خصم ' + trialDeducted + ' حصة استثنائية سابقة → الحصص الفعلية: ' + _effective + '</div>'
+          : '';
         const successHtml =
           '<div style="text-align:center;font-size:13px">' +
             '<div style="font-size:38px;margin-bottom:6px">✅</div>' +
@@ -23823,8 +23820,11 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
               '<div><b>المادة — الأستاذ:</b> ' + escX(selectedSubject.icon + ' ' + selectedSubject.subjectName + ' — ' + (selectedSubject.teacherName || '—')) + '</div>' +
               '<div><b>الباقة:</b> ' + escX(pkg.label) + '</div>' +
               '<div><b>المبلغ:</b> ' + SubscriptionService.fmtPrice(pkg.price) + '</div>' +
-              '<div><b>الحصص:</b> ' + pkg.sessions + ' حصة</div>' +
-              SubscriptionService.buildPeriods(start, pkg.months).map(p => '<div><b>الشهر ' + p.monthNumber + ':</b> 8 حصص</div>').join('') +
+              '<div><b>الإجمالي:</b> ' + pkg.sessions + ' حصة</div>' +
+              (trialDeducted > 0 ? '<div><b>خصم حصص استثنائية:</b> ' + trialDeducted + ' حصة</div>' : '') +
+              (trialDeducted > 0 ? '<div style="font-weight:900;color:#059669"><b>المتبقي فعلياً:</b> ' + _effective + ' حصة</div>' : '') +
+              _trialLine +
+              SubscriptionService.buildPeriods(start, pkg.months).map(p => '<div><b>الشهر ' + p.monthNumber + ':</b> ' + (trialDeducted > 0 && p.monthNumber === 1 ? _effective : '8') + ' حصص</div>').join('') +
             '</div>' +
           '</div>';
         await cmShow('✅', 'تم بنجاح', successHtml, { hideCancel: true, confirmText: 'موافق', success: true });
@@ -24086,6 +24086,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       const pkg = SubscriptionService.packageByMonths(sub.months);
       const used = periods.reduce((a, p) => a + ((p.used_sessions || 0)), 0);
       const total = sub.total_sessions || (sub.months || 1) * 8;
+      if (!sub.periods && periods.length) sub.periods = periods;
       const stNow = SubscriptionService.subscriptionStatus(sub, today);
       const stLabel = SubscriptionService.subscriptionStatusLabel(stNow);
       const stBg = stNow === 'active' ? 'background:rgba(16,185,129,0.12);color:#059669;border:1px solid rgba(16,185,129,0.25)'
