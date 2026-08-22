@@ -477,19 +477,27 @@ main{flex:1;position:relative;overflow:hidden}
   async function getTrialUsage(studentId) {
     var used = {};
     if (!fbReady) return used;
-    // ── Cycle-aware: find the most recent expired subscription per teacher+subject ──
-    // Only count trial_session records created AFTER the last subscription's end_date.
-    // This ensures each subscription cycle starts with fresh 2 free trials.
+    // ── Cycle-aware: cutoff = most recent EXPIRED sub end_date per teacher+subject ──
+    // Only truly expired subs (today > end_date) set a cutoff.
+    // "Done" subs (remaining=0, date not expired) are IGNORED for cutoff —
+    //   their trial_session records ARE the fresh free trials and must be counted.
     var lastSubEndByTeacherSubject = {};
     try {
       var subs = await SubscriptionService.getSubscriptions(studentId);
+      var todayStr = AttendanceService.today();
       if (subs && subs.length) {
         for (var si = 0; si < subs.length; si++) {
           var s = subs[si].subscription || {};
           if (s.status === 'cancelled') continue;
           var sKey = trialKey(s.teacher_name || '', s.subject_name || '');
           var sEnd = s.end_date || '';
-          if (sEnd && (!lastSubEndByTeacherSubject[sKey] || sEnd > lastSubEndByTeacherSubject[sKey])) {
+          if (!sKey || !sEnd) continue;
+          // Skip "done" subs (remaining=0 but date not yet expired) — they don't set a cutoff
+          var periods = subs[si].periods || [];
+          var totals = SubscriptionService.computeSubscriptionTotals(periods);
+          if (totals.remainingSessions <= 0 && todayStr <= sEnd) continue;
+          // Only truly expired subs set the cutoff
+          if (!lastSubEndByTeacherSubject[sKey] || sEnd > lastSubEndByTeacherSubject[sKey]) {
             lastSubEndByTeacherSubject[sKey] = sEnd;
           }
         }

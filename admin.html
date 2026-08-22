@@ -23733,21 +23733,39 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         teacherName: selectedSubject.teacherName
       });
       if (created && created.subscription) {
-        // ── Deduct trial sessions from first period if any exist ──
-        // Count trial_session mirror docs (source of truth for trial usage)
+        // ── Deduct trial sessions from first period (cycle-aware) ──
+        // Only truly expired subs (today > end_date) set a cutoff for trial counting.
+        // "Done" subs (remaining=0, date not expired) are IGNORED — their trials are fresh.
         try {
           var trialDeducted = 0;
-          var trialYm = new Date().toLocaleDateString('sv-SE', { timeZone: 'Africa/Algiers' }).slice(0, 7);
           var fs2 = window._firestore, fdb2 = window._db;
           if (fs2 && fdb2) {
             var tKey = (selectedSubject.teacherName || '') + '___' + (selectedSubject.subjectName || '');
+            var lastEnd = '';
+            var todayStr = SubscriptionService.today();
+            try {
+              var prevSubs = await SubscriptionService.getSubscriptions(String(selectedStudent.id));
+              for (var pi = 0; pi < prevSubs.length; pi++) {
+                var ps = (prevSubs[pi].subscription || {});
+                if (ps.status === 'cancelled') continue;
+                var psKey = (ps.teacher_name || '') + '___' + (ps.subject_name || '');
+                if (psKey !== tKey) continue;
+                var psEnd = ps.end_date || '';
+                if (!psEnd) continue;
+                var psPeriods = prevSubs[pi].periods || [];
+                var psTotals = SubscriptionService.computeSubscriptionTotals(psPeriods);
+                if (psTotals.remainingSessions <= 0 && todayStr <= psEnd) continue;
+                if (!lastEnd || psEnd > lastEnd) lastEnd = psEnd;
+              }
+            } catch (e) { console.warn('[SUBSCRIPTIONS] prev subs lookup for trial deduct:', e); }
             var trialSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('studentId', '==', String(selectedStudent.id)), fs2.where('type', '==', 'trial_session')));
             trialSnap.forEach(function (d) {
               var r = d.data();
-              if (r.date && r.date.indexOf(trialYm) === 0) {
-                var dk = (r.teacherName || '') + '___' + (r.subjectName || '');
-                if (dk === tKey) trialDeducted++;
-              }
+              var dk = (r.teacherName || '') + '___' + (r.subjectName || '');
+              if (dk !== tKey) return;
+              if (!r.date) return;
+              if (lastEnd && r.date <= lastEnd) return;
+              trialDeducted++;
             });
           }
           if (trialDeducted > 0) {
