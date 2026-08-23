@@ -1081,15 +1081,34 @@
 
         const totalSessions=details.reduce(function(s,d){return s+d.sessions;},0);
         const totalEarnings=totalSessions*rate;
-        const balance=(finSnap.docs.length>0?(finSnap.docs[0].data().balance||0):0);
-        const lastUpdate=finSnap.docs.length>0?(finSnap.docs[0].data().updatedAt?fmtDate(finSnap.docs[0].data().updatedAt):'—'):'—';
+        const finDoc=finSnap.docs.length>0?finSnap.docs[0].data():{};
+        const payments=Array.isArray(finDoc.payments)?finDoc.payments:[];
+        const totalPaid=payments.reduce(function(s,p){return s+(p.amount||0);},0);
+        const remaining=Math.max(0,totalEarnings-totalPaid);
+        const lastUpdate=finDoc.updatedAt?fmtDate(finDoc.updatedAt):'—';
+
+        let paymentsHtml='';
+        if(payments.length===0){
+          paymentsHtml='<div style="text-align:center;padding:32px 20px;color:var(--text-muted)"><div style="font-size:40px;margin-bottom:10px;opacity:.2">💵</div><div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:4px">لا توجد دفعات مسجلة</div><div style="font-size:12px">لم يتم إيداع أي مبلغ بعد</div></div>';
+        }else{
+          const sorted=payments.slice().sort(function(a,b){return(b.timestamp||0)-(a.timestamp||0);});
+          paymentsHtml='<table class="data-table" style="margin:0"><thead><tr><th>#</th><th>التاريخ</th><th style="text-align:center">المبلغ</th><th>البيان</th><th>رقم الإيصال</th></tr></thead><tbody>'
+            +sorted.map(function(p,i){
+              return '<tr><td style="font-weight:800;color:var(--text-muted)">'+(i+1)+'</td>'
+                +'<td style="font-size:12px;font-weight:600">'+fmtDate(p.date||p.timestamp)+'</td>'
+                +'<td style="text-align:center;font-weight:900;color:var(--green);font-size:14px;direction:ltr">'+fmtNum(p.amount)+' <span style="font-size:11px;opacity:.5">دج</span></td>'
+                +'<td style="font-size:12px;color:var(--text-muted)">'+(p.note||'—')+'</td>'
+                +'<td><code style="font-size:10px;background:var(--green-light);padding:3px 10px;border-radius:6px;color:var(--green);font-weight:700">'+(p.receiptId||'—')+'</code></td></tr>';
+            }).join('')
+            +'</tbody></table>';
+        }
 
         document.getElementById('finance-content').innerHTML=`
           <div style="background:linear-gradient(135deg,#059669 0%,#10b981 50%,#34d399 100%);border-radius:var(--radius-lg);padding:40px 32px;color:#fff;text-align:center;margin-bottom:24px;position:relative;overflow:hidden">
             <div style="position:absolute;top:-40px;right:-40px;width:180px;height:180px;background:rgba(255,255,255,0.08);border-radius:50%;pointer-events:none"></div>
             <div style="position:absolute;bottom:-30px;left:10%;width:120px;height:120px;background:rgba(255,255,255,0.05);border-radius:50%;pointer-events:none"></div>
-            <div style="font-size:14px;font-weight:600;opacity:.7;margin-bottom:8px;position:relative;z-index:1">💰 الرصيد الحالي</div>
-            <div style="font-size:48px;font-weight:900;position:relative;z-index:1">${fmtNum(balance)} <span style="font-size:18px;opacity:.6">دج</span></div>
+            <div style="font-size:14px;font-weight:600;opacity:.7;margin-bottom:8px;position:relative;z-index:1">💰 المتبقي من المستحقات</div>
+            <div style="font-size:48px;font-weight:900;position:relative;z-index:1">${fmtNum(remaining)} <span style="font-size:18px;opacity:.6">دج</span></div>
             <div style="font-size:12px;opacity:.5;margin-top:8px;position:relative;z-index:1">آخر تحديث: ${lastUpdate}</div>
           </div>
 
@@ -1098,6 +1117,17 @@
               <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">إجمالي الأرباح</div>
               <div style="font-size:26px;font-weight:900;color:var(--green)">${fmtNum(totalEarnings)} <span style="font-size:12px;opacity:.5">دج</span></div>
             </div>
+            <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
+              <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">المدفوع</div>
+              <div style="font-size:26px;font-weight:900;color:var(--blue)">${fmtNum(totalPaid)} <span style="font-size:12px;opacity:.5">دج</span></div>
+            </div>
+            <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
+              <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">المتبقي</div>
+              <div style="font-size:26px;font-weight:900;color:${remaining>0?'#d97706':'var(--green)'}">${fmtNum(remaining)} <span style="font-size:12px;opacity:.5">دج</span></div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:24px">
             <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
               <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">عدد الحصص</div>
               <div style="font-size:26px;font-weight:900;color:var(--primary)">${fmtNum(totalSessions)}</div>
@@ -1136,6 +1166,14 @@
                 </tr></tfoot>
               </table>
             </div>`}
+          </div>
+
+          <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);margin-bottom:24px">
+            <div style="padding:16px 20px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between">
+              <div style="font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px">💵 سجل الدفعات</div>
+              <div style="font-size:12px;color:var(--text-muted);font-weight:600">${payments.length} دفعة</div>
+            </div>
+            ${paymentsHtml}
           </div>`;
       }catch(e){
         console.error('Finance error:',e);

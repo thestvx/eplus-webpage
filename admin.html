@@ -26460,6 +26460,19 @@ async function srtFinanceAddPayment() {
   try {
     const res = await TeacherFinance.addPayment(t, amount, form.note || '', srtFinAdminName());
     srtTreasuryAdjust(-amount);
+    try {
+      const {getDocs,collection:c,doc:d,setDoc,updateDoc}=srtFS(),fbs=srtDB();
+      const finSnap = await getDocs(c(fbs, 'teacher_finance').where('teacherId','==',id).limit(1));
+      const payRecord = { date: TeacherFinance.today(), amount: amount, note: form.note || '', receiptId: res.receiptId, adminName: srtFinAdminName(), timestamp: Date.now() };
+      if (finSnap.empty) {
+        await setDoc(d(fbs, 'teacher_finance', 'tf_' + id), { teacherId: id, teacherName: t.name || '', payments: [payRecord], updatedAt: new Date().toISOString() });
+      } else {
+        const fd = finSnap.docs[0].data();
+        const payments = Array.isArray(fd.payments) ? fd.payments.slice() : [];
+        payments.push(payRecord);
+        await updateDoc(d(fbs, 'teacher_finance', finSnap.docs[0].id), { payments: payments, updatedAt: new Date().toISOString() });
+      }
+    } catch (e) { console.warn('Firestore teacher_finance sync failed:', e); }
     await srtFinanceRefresh();
     srtShowToast('✅ تم تسجيل دفعة ' + amount.toLocaleString('ar-DZ') + ' دج وإصدار إيصال ' + res.receiptId, 'success');
     const print = await cmConfirm('الإيصال', 'هل تريد طباعة إيصال الدفع الآن؟\n\nرقم الإيصال: ' + res.receiptId, '🧾');
