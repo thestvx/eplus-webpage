@@ -632,11 +632,15 @@
     async function loadDashboardStats(teacherId,teacherName){
       try{
         var teacherNameLC=teacherName.toLowerCase();
-        var[contentSnap,attSnap,supabaseRegCount]=await Promise.all([
+        var[contentSnap,attSnap,supabaseRegCount,teacherDoc,finSnap]=await Promise.all([
           db.collection(CONTENT_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
           db.collection(ATTENDANCE_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
           fetch(SUPABASE_URL+'/rest/v1/registrations?select=id,subjects,status&status=eq.'+encodeURIComponent('مسجل نهائياً'),{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}).then(function(data){return Array.isArray(data)?data.filter(function(d){return !d.deleted_at;}):[];}).catch(function(){return [];}),
+          db.collection(SRT_COLLECTION).doc(teacherId).get().catch(function(){return null;}),
+          db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(function(){return {docs:[]};}),
         ]);
+        if(teacherDoc&&teacherDoc.exists){var td=teacherDoc.data();if(td.rate){currentTeacher.rate=td.rate;}}
+        var rate=currentTeacher.rate||0;
         var allContent=contentSnap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
         var lessons=allContent.filter(function(c){return c.type==='lesson';});
         var exercises=allContent.filter(function(c){return c.type==='exercise'||c.type==='homework';});
@@ -658,8 +662,9 @@
           }
         }
         var attendanceCount=attSnap.docs.length||0;
-        var rate=currentTeacher.rate||0;
-        var balance=attendanceCount*rate;
+        var finDoc=finSnap.docs.length>0?finSnap.docs[0].data():{};
+        var payments=Array.isArray(finDoc.payments)?finDoc.payments:[];
+        var totalPaid=payments.reduce(function(s,p){return s+(p.amount||0);},0);
 
         document.getElementById('stat-students').textContent=fmtNum(studentCount);
         document.getElementById('stat-lessons').textContent=fmtNum(lessons.length);
@@ -667,7 +672,7 @@
         document.getElementById('stat-announcements').textContent=fmtNum(announcements.length);
 
         const balEl=document.getElementById('dash-balance');
-        if(balEl)balEl.innerHTML='<div style="text-align:center"><div style="font-size:13px;color:var(--text-muted);font-weight:600;margin-bottom:6px">المبلغ المدفوع</div><div style="font-size:32px;font-weight:900;color:var(--green)">'+fmtNum(balance)+' <span style="font-size:14px;opacity:.6">دج</span></div><div style="font-size:11px;color:var(--text-muted);margin-top:4px">'+attendanceCount+' حصة × '+fmtNum(rate)+' دج</div><div style="margin-top:10px"><a href="javascript:navigateTo(\'finance\')" style="color:var(--primary);font-size:12px;font-weight:700;cursor:pointer">عرض التفاصيل ←</a></div></div>';
+        if(balEl)balEl.innerHTML='<div style="text-align:center"><div style="font-size:13px;color:var(--text-muted);font-weight:600;margin-bottom:6px">المبلغ المدفوع</div><div style="font-size:32px;font-weight:900;color:var(--green)">'+fmtNum(totalPaid)+' <span style="font-size:14px;opacity:.6">دج</span></div><div style="font-size:11px;color:var(--text-muted);margin-top:4px">'+payments.length+' دفعة مسجلة</div><div style="margin-top:10px"><a href="javascript:navigateTo(\'finance\')" style="color:var(--primary);font-size:12px;font-weight:700;cursor:pointer">عرض التفاصيل ←</a></div></div>';
 
         const sorted=allContent.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
         const recentLessons=sorted.filter(c=>c.type==='lesson').slice(0,5);
@@ -1020,7 +1025,7 @@
     /* ===== FINANCE PAGE ===== */
     async function renderFinancePage(){
       currentTeacher=currentTeacher||{};const t=currentTeacher,teacherId=t.teacherId||t.id,teacherName=t.name||t.teacherName||'';
-      const rate=t.rate||0;
+      let rate=t.rate||0;
       document.getElementById('app').innerHTML=`
         <div class="app-layout">
           <aside class="sidebar" id="sidebar">${renderSidebar(t)}</aside>
@@ -1038,30 +1043,38 @@
           </div>
         </div>`;
       try{
-        const [attSnap,finSnap,supabaseRegs,atcSnap]=await Promise.all([
+        const [attSnap,finSnap,supabaseRegs,atcSnap,teacherDoc]=await Promise.all([
           db.collection(ATTENDANCE_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
           db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(function(){return {docs:[]};}),
           fetch(SUPABASE_URL+'/rest/v1/registrations?select=id,first_name,last_name,subjects,status&status=eq.'+encodeURIComponent('مسجل نهائياً'),{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d.filter(function(x){return !x.deleted_at&&Array.isArray(x.subjects);}):[];}).catch(function(){return [];}),
           db.collection('attendance_control').where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
+          db.collection(SRT_COLLECTION).doc(teacherId).get().catch(function(){return null;}),
         ]);
+
+        if(teacherDoc&&teacherDoc.exists){const td=teacherDoc.data();if(td.rate)rate=td.rate;if(td.rate&&currentTeacher)currentTeacher.rate=td.rate;}
 
         const allAttendance=attSnap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
         const totalSessionsOffered=atcSnap.docs.length;
 
-        const attendedStudentIds=new Set(allAttendance.map(function(a){return a.studentId||a.student_id;}).filter(Boolean));
-        const regStudentIds=new Set(supabaseRegs.map(function(r){return r.id;}).filter(Boolean));
+        var tNameNorm=teacherName.replace(/\s+/g,' ').trim().toLowerCase();
         const matchedStudents=[];
         for(const reg of supabaseRegs){
-          const subjects=(reg.subjects||[]).filter(function(sj){
-            if(typeof sj==='string')return false;
+          var subjArr=reg.subjects;
+          if(typeof subjArr==='string'){try{subjArr=JSON.parse(subjArr);}catch(pe){subjArr=[];}}
+          if(!Array.isArray(subjArr)||subjArr.length===0)continue;
+          const matched=[];
+          for(const sj of subjArr){
+            if(typeof sj==='string')continue;
             const sjTeacherId=sj.teacherId||sj.teacher_id||'';
-            const sjTeacher=(sj.teacher||sj.teacherName||'').toLowerCase();
-            if(sjTeacherId&&sjTeacherId===teacherId)return true;
-            if(sjTeacher&&teacherName&&sjTeacher.toLowerCase()===teacherName.toLowerCase())return true;
-            return false;
-          });
-          if(subjects.length===0)continue;
-          matchedStudents.push({id:reg.id,name:((reg.first_name||'')+' '+(reg.last_name||'')).trim(),subjects:subjects});
+            const sjTeacher=(sj.teacher||sj.teacherName||sj.teacher_name||'').toLowerCase();
+            const sjSubject=sj.subject||sj.subjectName||sj.name||'';
+            var matchedTeacher=false;
+            if(teacherId&&sjTeacherId&&teacherId===sjTeacherId){matchedTeacher=true;}
+            else{var tNorm=sjTeacher.replace(/\s+/g,' ').trim().toLowerCase();if(tNorm&&tNameNorm&&(tNorm===tNameNorm||tNorm.includes(tNameNorm)||tNameNorm.includes(tNorm))){matchedTeacher=true;}}
+            if(matchedTeacher)matched.push(sjSubject);
+          }
+          if(matched.length===0)continue;
+          matchedStudents.push({id:reg.id,name:((reg.first_name||'')+' '+(reg.last_name||'')).trim(),matchedSubjects:matched});
         }
 
         const byStudent={};
@@ -1079,8 +1092,8 @@
         const details=matchedStudents.map(function(s){
           const info=byStudent[s.id]||{sessions:0,subjects:{}};
           const absent=Math.max(0,totalSessionsOffered-info.sessions);
-          return {name:s.name,sessions:info.sessions,absent:absent,subjects:info.subjects,amount:info.sessions*rate};
-        }).filter(function(d){return d.sessions>0 || d.absent>0;}).sort(function(a,b){return b.amount-a.amount;});
+          return {name:s.name,sessions:info.sessions,absent:absent,matchedSubjects:s.matchedSubjects,amount:info.sessions*rate};
+        }).sort(function(a,b){return b.amount-a.amount;});
 
         const totalSessions=details.reduce(function(s,d){return s+d.sessions;},0);
         const totalAbsent=details.reduce(function(s,d){return s+d.absent;},0);
@@ -1088,12 +1101,11 @@
         const finDoc=finSnap.docs.length>0?finSnap.docs[0].data():{};
         const payments=Array.isArray(finDoc.payments)?finDoc.payments.slice().sort(function(a,b){return(b.timestamp||0)-(a.timestamp||0);}):[];
         const totalPaid=payments.reduce(function(s,p){return s+(p.amount||0);},0);
-        const remaining=Math.max(0,totalEarnings-totalPaid);
         const lastUpdate=finDoc.updatedAt?fmtDate(finDoc.updatedAt):'—';
 
         let paymentsHtml='';
         if(payments.length===0){
-          paymentsHtml='<div style="text-align:center;padding:32px 20px;color:var(--text-muted)"><div style="font-size:40px;margin-bottom:10px;opacity:.2">💵</div><div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:4px">لا توجد دفعات مسجلة</div><div style="font-size:12px">لم يتم إيداع أي مبلغ بعد</div></div>';
+          paymentsHtml='<div style="text-align:center;padding:32px 20px;color:var(--text-muted)"><div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:4px">لا توجد دفعات مسجلة</div><div style="font-size:12px">لم يتم إيداع أي مبلغ بعد</div></div>';
         }else{
           const sorted=payments.slice().sort(function(a,b){return(b.timestamp||0)-(a.timestamp||0);});
           paymentsHtml='<table class="data-table" style="margin:0"><thead><tr><th>#</th><th>التاريخ</th><th style="text-align:center">المبلغ</th><th>البيان</th><th>رقم الإيصال</th></tr></thead><tbody>'
@@ -1118,21 +1130,6 @@
 
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px">
             <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
-              <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">إجمالي الأرباح</div>
-              <div style="font-size:26px;font-weight:900;color:var(--green)">${fmtNum(totalEarnings)} <span style="font-size:12px;opacity:.5">دج</span></div>
-            </div>
-            <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
-              <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">المدفوع</div>
-              <div style="font-size:26px;font-weight:900;color:var(--blue)">${fmtNum(totalPaid)} <span style="font-size:12px;opacity:.5">دج</span></div>
-            </div>
-            <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
-              <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">المتبقي</div>
-              <div style="font-size:26px;font-weight:900;color:${remaining>0?'#d97706':'var(--green)'}">${fmtNum(remaining)} <span style="font-size:12px;opacity:.5">دج</span></div>
-            </div>
-          </div>
-
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px">
-            <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
               <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">المحاضرات</div>
               <div style="font-size:26px;font-weight:900;color:var(--green)">${fmtNum(totalSessions)}</div>
             </div>
@@ -1148,10 +1145,10 @@
 
           <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);margin-bottom:24px">
             <div style="padding:16px 20px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between">
-              <div style="font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px">تفاصيل الأرباح لكل تلميذ</div>
+              <div style="font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px">تفاصيل حضور كل تلميذ</div>
               <div style="font-size:12px;color:var(--text-muted);font-weight:600">سعر الحصة: ${fmtNum(rate)} دج</div>
             </div>
-            ${details.length===0?'<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:14px;font-weight:600">لا توجد حصص مسجلة بعد</div>':`
+            ${details.length===0?'<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:14px;font-weight:600">لا يوجد تلاميذ مسجلون بعد</div>':`
             <div style="overflow-x:auto">
               <table class="data-table" style="margin:0">
                 <thead><tr>
@@ -1163,7 +1160,7 @@
                   <th style="text-align:center">المستحق</th>
                 </tr></thead>
                 <tbody>${details.map(function(d,i){
-                  const subLines=Object.entries(d.subjects).map(function(e){return e[0]+': '+e[1];}).join(', ');
+                  var subLines=d.matchedSubjects.join(', ');
                   return '<tr><td style="font-weight:800;color:var(--text-muted)">'+(i+1)+'</td><td style="font-weight:700">'+d.name+'</td><td style="font-size:11px;color:var(--text-muted)">'+subLines+'</td><td style="text-align:center;font-weight:800;color:var(--green)">'+d.sessions+'</td><td style="text-align:center;font-weight:800;color:#dc2626">'+d.absent+'</td><td style="text-align:center;font-weight:900;color:var(--green)">'+fmtNum(d.amount)+' دج</td></tr>';
                 }).join('')}</tbody>
                 <tfoot><tr style="background:rgba(99,102,241,0.04)">
