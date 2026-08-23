@@ -3877,6 +3877,7 @@
               </select>
               <input type="date" id="subx-logs-date" onchange="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
               <button class="tbl-action" onclick="subxLogsFilter()" style="font-size:12px;border-color:rgba(16,185,129,0.3);color:#059669">🔄 تحديث</button>
+              <button class="tbl-action" onclick="subxExportLogsCSV()" style="font-size:12px;border-color:rgba(99,102,241,0.3);color:#6366f1">📥 CSV</button>
               <button class="tbl-action" onclick="subxShowClearPinModal()" style="font-size:12px;border-color:rgba(220,38,38,0.3);color:#dc2626">🗑️ مسح السجلات</button>
             </div>
             <div id="subx-logs-body" style="font-size:12px;color:var(--text-muted)">جارٍ تحميل سجلات الحضور…</div>
@@ -3893,7 +3894,7 @@
             <button class="att-modal-close" onclick="document.getElementById('pin-clear-modal').classList.remove('open')">✕</button>
           </div>
           <div class="teacher-modal-body" style="padding:22px 26px;text-align:center">
-            <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">أدخل رمز التأكيد لحذف جميع سجلات الحضور</p>
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">أدخل رمز التأكيد لحذف سجلات الحضور<br><span style="font-size:11px;color:var(--text-muted)">(إذا حددت فلتر → يُحذف فقط ما يطابق الفلتر)</span></p>
             <input id="pin-clear-input" type="password" maxlength="4" placeholder="••••" style="width:120px;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:20px;font-weight:900;text-align:center;letter-spacing:8px;font-family:monospace;background:var(--card);margin-bottom:16px" onkeydown="if(event.key==='Enter')document.getElementById('pin-clear-confirm').click()">
             <div style="display:flex;gap:10px;justify-content:center">
               <button id="pin-clear-confirm" onclick="subxConfirmClearLogs()" style="padding:10px 24px;border:none;border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff">🗑️ حذف</button>
@@ -24559,7 +24560,6 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       });
       rows.sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
       window._subxLogsData = rows;
-      // Populate filter dropdowns
       var tSet = new Set(), sSet = new Set();
       rows.forEach(function (r) { if (r.teacherName) tSet.add(r.teacherName); if (r.subjectName) sSet.add(r.subjectName); });
       var tSel = document.getElementById('subx-logs-teacher');
@@ -24571,6 +24571,51 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       console.error('[SUBSCRIPTIONS] load all logs failed', e);
       document.getElementById('subx-logs-body').innerHTML = '<div style="text-align:center;padding:12px;color:#dc2626">تعذر تحميل سجلات الحضور</div>';
     }
+  };
+
+  // ── جلب السجلات المفلترة حسب الفلتر الحالي ──
+  function _getFilteredLogs() {
+    var q = (document.getElementById('subx-logs-search').value || '').trim().toLowerCase();
+    var dateFilter = document.getElementById('subx-logs-date').value || '';
+    var teacherFilter = document.getElementById('subx-logs-teacher').value || '';
+    var subjectFilter = document.getElementById('subx-logs-subject').value || '';
+    return (window._subxLogsData || []).filter(function (r) {
+      if (r.cancelled) return false;
+      if (dateFilter && r.date !== dateFilter) return false;
+      if (teacherFilter && r.teacherName !== teacherFilter) return false;
+      if (subjectFilter && r.subjectName !== subjectFilter) return false;
+      if (q && !(r.studentName + ' ' + r.studentId + ' ' + r.subjectName + ' ' + r.teacherName).toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }
+
+  // ── تصدير CSV من السجلات المفلترة ──
+  window.subxExportLogsCSV = function () {
+    var rows = _getFilteredLogs();
+    if (!rows.length) { showToast('⚠️ لا توجد سجلات للتصدير', true); return; }
+    var headers = ['التاريخ', 'الوقت', 'الطالب', 'رقم التسجيل', 'المادة', 'الأستاذ', 'النوع'];
+    var typeMap = { 'grace_session': 'حصّة مجانية', 'trial_session': 'حصة تجريبية' };
+    var csvRows = [headers];
+    rows.forEach(function (r) {
+      csvRows.push([r.date, r.time, r.studentName, r.studentId, r.subjectName, r.teacherName, typeMap[r.type] || 'حضور']);
+    });
+    var csvContent = csvRows.map(function (row) {
+      return row.map(function (cell) { return '"' + String(cell).replace(/"/g, '""') + '"'; }).join(',');
+    }).join('\r\n');
+    var blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    var teacherFilter = document.getElementById('subx-logs-teacher').value || '';
+    var dateFilter = document.getElementById('subx-logs-date').value || '';
+    var label = teacherFilter ? teacherFilter.replace(/[\\/:*?"<>|]/g, '_') : 'الكل';
+    if (dateFilter) label += '_' + dateFilter;
+    a.download = 'سجلات_الحضور_' + label + '_' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('✅ تم تصدير ' + rows.length + ' سجل — ' + a.download);
   };
 
   window.subxShowClearPinModal = function () {
@@ -24588,21 +24633,39 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     const { _db: fdb, _firestore: fs } = window;
     if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); return; }
     try {
-      const snap = await fs.getDocs(fs.collection(fdb, 'support_attendance'));
-      let count = 0;
-      const batches = [];
-      let batch = fs.writeBatch(fdb);
-      let ops = 0;
-      snap.forEach(d => {
-        const r = d.data();
+      var teacherFilter = document.getElementById('subx-logs-teacher').value || '';
+      var subjectFilter = document.getElementById('subx-logs-subject').value || '';
+      var dateFilter = document.getElementById('subx-logs-date').value || '';
+      var hasFilter = teacherFilter || subjectFilter || dateFilter;
+
+      if (!hasFilter) {
+        var ok = await cmConfirm('⚠️ حذف كل السجلات', 'لم تحدد فلتر — سيتم حذف جميع سجلات الحضور.\nهل أنت متأكد؟', '🗑️', { danger: true, confirmText: 'حذف الكل' });
+        if (!ok) return;
+      }
+
+      var snap = await fs.getDocs(fs.collection(fdb, 'support_attendance'));
+      var count = 0;
+      var skipped = 0;
+      var batches = [];
+      var batch = fs.writeBatch(fdb);
+      var ops = 0;
+      snap.forEach(function (d) {
+        var r = d.data();
         if (r.type === 'grace' || r.type === 'grace_session') return;
+        if (hasFilter) {
+          if (teacherFilter && r.teacherName !== teacherFilter) { skipped++; return; }
+          if (subjectFilter && r.subjectName !== subjectFilter) { skipped++; return; }
+          if (dateFilter && r.date !== dateFilter) { skipped++; return; }
+        }
         batch.delete(fs.doc(fdb, 'support_attendance', d.id));
         ops++; count++;
         if (ops >= 450) { batches.push(batch); batch = fs.writeBatch(fdb); ops = 0; }
       });
       if (ops > 0) batches.push(batch);
-      for (const b of batches) { await b.commit(); }
-      showToast('✅ تم مسح ' + count + ' سجل');
+      for (var i = 0; i < batches.length; i++) { await batches[i].commit(); }
+      var msg = '✅ تم حذف ' + count + ' سجل';
+      if (skipped > 0) msg += ' (تم تخطي ' + skipped + ' سجل لا يطابق الفلتر)';
+      showToast(msg);
       subxShowAllLogs();
     } catch (e) { console.error('[SUBSCRIPTIONS] clear logs failed', e); showToast('❌ تعذر مسح السجلات', true); }
   };
