@@ -26366,46 +26366,65 @@ function srtShowDuesReport(res) {
   const rows = res.duesRows || [];
   const rate = res.rate || 0;
   let overlay = document.getElementById('srt-dues-report-overlay');
-  if (overlay) overlay.remove();
-  overlay = document.createElement('div');
-  overlay.id = 'srt-dues-report-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn .25s';
-  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'srt-dues-report-overlay';
+    overlay.className = 'teacher-modal-bg';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.classList.remove('open'); };
+    document.body.appendChild(overlay);
+  }
 
   let rowsHtml = '';
   if (rows.length === 0) {
-    rowsHtml = '<div style="text-align:center;padding:40px 20px;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:12px;opacity:.3">📊</div><div style="font-weight:800;font-size:15px;color:var(--text);margin-bottom:6px">لا توجد حصص مسجلة بعد</div><div style="font-size:13px">لم يتم العثور على سجلات حضور لهذا الأستاذ</div></div>';
+    rowsHtml = '<div style="text-align:center;padding:48px 20px"><div style="font-size:56px;margin-bottom:16px;opacity:.2">📊</div><div style="font-size:16px;font-weight:900;color:var(--text);margin-bottom:6px">لا توجد حصص مسجلة بعد</div><div style="font-size:13px;color:var(--text-muted);max-width:300px;margin:0 auto;line-height:1.7">لم يتم العثور على سجلات حضور لهذا الأستاذ. تأكد من تسجيل الحضور أولاً.</div></div>';
   } else {
-    rowsHtml = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>'
-      + '<th style="padding:12px 14px;text-align:right;font-size:11px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light)">#</th>'
-      + '<th style="padding:12px 14px;text-align:right;font-size:11px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light)">التلميذ</th>'
-      + '<th style="padding:12px 14px;text-align:right;font-size:11px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light)">المادة</th>'
-      + '<th style="padding:12px 14px;text-align:center;font-size:11px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light)">الحصص</th>'
-      + '<th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light)">المستحق</th>'
+    rowsHtml = '<div style="overflow-x:auto;border:1px solid var(--border-light);border-radius:14px">'
+      + '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>'
+      + '<th style="padding:14px 16px;text-align:right;font-size:11px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light);white-space:nowrap">#</th>'
+      + '<th style="padding:14px 16px;text-align:right;font-size:11px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light);white-space:nowrap">التلميذ</th>'
+      + '<th style="padding:14px 16px;text-align:right;font-size:11px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light);white-space:nowrap">المادة</th>'
+      + '<th style="padding:14px 16px;text-align:center;font-size:11px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light);white-space:nowrap">الحصص</th>'
+      + '<th style="padding:14px 16px;text-align:left;font-size:11px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light);white-space:nowrap">المستحق</th>'
       + '</tr></thead><tbody>'
       + rows.map(function(r, i) {
-        return '<tr style="border-bottom:1px solid var(--border-light)">'
-          + '<td style="padding:12px 14px;font-weight:800;color:var(--text-muted)">' + (i + 1) + '</td>'
-          + '<td style="padding:12px 14px;font-weight:700">' + (r.student_name || '—') + '</td>'
-          + '<td style="padding:12px 14px;font-size:12px;color:var(--text-muted)">' + (r.subject_name || '—') + '</td>'
-          + '<td style="padding:12px 14px;text-align:center;font-weight:800;color:var(--primary)">' + (r.session_count || 0) + '</td>'
-          + '<td style="padding:12px 14px;text-align:left;font-weight:800;color:var(--green)">' + (r.amount || 0).toLocaleString('ar-DZ') + ' دج</td>'
+        const isEven = i % 2 === 0;
+        return '<tr style="border-bottom:1px solid var(--border-light)' + (isEven ? '' : 'background:var(--bg)') + '">'
+          + '<td style="padding:14px 16px;font-weight:800;color:var(--text-muted)">' + (i + 1) + '</td>'
+          + '<td style="padding:14px 16px;font-weight:700;color:var(--text)">' + (r.student_name || '—') + '</td>'
+          + '<td style="padding:14px 16px;font-size:12px;color:var(--text-muted);font-weight:600"><span style="display:inline-block;padding:3px 10px;border-radius:8px;background:rgba(99,102,241,0.07);color:var(--primary);font-weight:700">' + (r.subject_name || '—') + '</span></td>'
+          + '<td style="padding:14px 16px;text-align:center"><span style="display:inline-block;min-width:36px;padding:4px 12px;border-radius:8px;background:rgba(99,102,241,0.1);color:var(--primary);font-weight:900;font-size:14px">' + (r.session_count || 0) + '</span></td>'
+          + '<td style="padding:14px 16px;text-align:left;font-weight:900;color:var(--green);font-size:14px;direction:ltr">' + (r.amount || 0).toLocaleString('ar-DZ') + ' <span style="font-size:11px;font-weight:700;opacity:.6">دج</span></td>'
           + '</tr>';
       }).join('')
-      + '</tbody></table>';
+      + '</tbody></table></div>';
   }
 
-  overlay.innerHTML = '<div style="background:var(--card);border-radius:20px;max-width:700px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.25);overflow:hidden">'
-    + '<div style="padding:20px 24px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">'
-    + '<div><div style="font-size:16px;font-weight:900;display:flex;align-items:center;gap:8px">📊 تقرير المستحقات</div>'
-    + '<div style="font-size:12px;color:var(--text-muted);margin-top:4px">' + (res.studentCount || 0) + ' تلميذ — ' + (res.totalSessions || 0) + ' حصة — سعر الحصة: ' + (rate || 0).toLocaleString('ar-DZ') + ' دج</div></div>'
-    + '<button onclick="document.getElementById(\'srt-dues-report-overlay\').remove()" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--text)">✕ إغلاق</button></div>'
-    + '<div style="overflow-y:auto;flex:1;padding:8px">' + rowsHtml + '</div>'
-    + (rows.length > 0 ? '<div style="padding:16px 24px;border-top:1px solid var(--border-light);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:rgba(99,102,241,0.04)">'
-      + '<div style="font-size:14px;font-weight:800">الإجمالي</div>'
-      + '<div style="font-size:20px;font-weight:900;color:var(--green)">' + (res.totalSessions * rate).toLocaleString('ar-DZ') + ' دج</div></div>' : '')
-    + '</div>';
-  document.body.appendChild(overlay);
+  overlay.innerHTML = '<div class="teacher-modal" style="max-width:800px;max-height:92vh;display:flex;flex-direction:column">'
+    + '<div class="teacher-modal-header">'
+    + '<div class="panel-icon" style="background:rgba(124,58,237,0.1);border-color:rgba(124,58,237,0.2)">📊</div>'
+    + '<div class="teacher-modal-title">تقرير المستحقات — ' + ((_srtFinanceTeacher && _srtFinanceTeacher.name) || '') + '</div>'
+    + '<button class="att-modal-close" onclick="document.getElementById(\'srt-dues-report-overlay\').classList.remove(\'open\')">✕</button></div>'
+    + '<div class="teacher-modal-body" style="overflow-y:auto;padding:20px 24px">'
+
+    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px">'
+    + '<div style="background:linear-gradient(135deg,rgba(99,102,241,0.1),rgba(99,102,241,0.04));border:1px solid rgba(99,102,241,0.18);border-radius:12px;padding:14px;text-align:center">'
+    + '<div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">التلاميذ</div>'
+    + '<div style="font-weight:900;font-size:20px;color:var(--primary)">' + (res.studentCount || 0) + '</div></div>'
+    + '<div style="background:linear-gradient(135deg,rgba(16,185,129,0.1),rgba(16,185,129,0.04));border:1px solid rgba(16,185,129,0.18);border-radius:12px;padding:14px;text-align:center">'
+    + '<div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">الحصص</div>'
+    + '<div style="font-weight:900;font-size:20px;color:var(--green)">' + (res.totalSessions || 0) + '</div></div>'
+    + '<div style="background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(245,158,11,0.04));border:1px solid rgba(245,158,11,0.2);border-radius:12px;padding:14px;text-align:center">'
+    + '<div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">سعر الحصة</div>'
+    + '<div style="font-weight:900;font-size:20px;color:#d97706">' + (rate || 0).toLocaleString('ar-DZ') + ' <span style="font-size:11px;opacity:.6">دج</span></div></div>'
+    + '<div style="background:linear-gradient(135deg,rgba(124,58,237,0.1),rgba(124,58,237,0.04));border:1px solid rgba(124,58,237,0.2);border-radius:12px;padding:14px;text-align:center">'
+    + '<div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px">الإجمالي</div>'
+    + '<div style="font-weight:900;font-size:20px;color:#7C3AED">' + ((res.totalSessions || 0) * rate).toLocaleString('ar-DZ') + ' <span style="font-size:11px;opacity:.6">دج</span></div></div>'
+    + '</div>'
+
+    + rowsHtml
+    + '</div></div>';
+
+  requestAnimationFrame(function() { overlay.classList.add('open'); });
 }
 
 async function srtTreasuryAdjust(delta) {
