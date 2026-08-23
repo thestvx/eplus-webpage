@@ -3832,6 +3832,8 @@
                   <div class="p-sess">حدد يدوياً</div>
                 </div>
               </div>
+              <div id="subx-custom-presets" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px"></div>
+              <script>if(typeof subxSelectPackage==='function')document.addEventListener('DOMContentLoaded',function(){if(typeof _renderCustomPkgCards==='function')_renderCustomPkgCards();});</script>
               <div id="subx-custom-fields" style="display:none;margin-top:12px;padding:14px;border:1.5px solid var(--border);border-radius:12px;background:var(--card);transition:all 0.2s">
                 <div style="display:flex;gap:12px;flex-wrap:wrap">
                   <div style="flex:1;min-width:140px">
@@ -3842,6 +3844,11 @@
                     <label style="font-size:11px;font-weight:800;color:var(--text-muted);display:block;margin-bottom:4px">السعر (دج)</label>
                     <input class="inp" type="number" id="subx-custom-price" min="0" step="100" placeholder="مثال: 3000" style="width:100%" oninput="subxUpdateCustomPreview()">
                   </div>
+                </div>
+                <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+                  <label style="font-size:11px;font-weight:800;color:var(--text-muted)">اسم الباقة:</label>
+                  <input class="inp" type="text" id="subx-custom-name" placeholder="مثال: 12 حصة" style="flex:1;padding:6px 10px;font-size:12px">
+                  <button onclick="subxSaveCustomPkg()" style="padding:6px 14px;border:none;border-radius:8px;background:linear-gradient(135deg,#059669,#10b981);color:white;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">💾 حفظ</button>
                 </div>
               </div>
             </div>
@@ -23460,6 +23467,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     if ($x('subx-custom-sessions')) $x('subx-custom-sessions').value = '';
     if ($x('subx-custom-price')) $x('subx-custom-price').value = '';
     subxSelectPackage(1);
+    _renderCustomPkgCards();
     subxRenderPreview();
     $x('subx-modal').classList.add('open');
     // Auto-activate the scanner: SP-1160 captures with NO input focus.
@@ -23500,6 +23508,10 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   // لا نستخدم shouldIgnoreKey حتى لا نمنع المسح عند تركيز مدخل البحث.
   var subxScanner = new window.BarcodeScanner.Scanner({
     logPrefix: '[SUBSCRIPTION SCANNER]',
+    shouldIgnoreKey: function () {
+      var el = document.activeElement;
+      return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+    },
     onScan: function (codeVal) {
       console.log('[SUBSCRIPTION SCANNER] Scan complete');
       console.log('[SUBSCRIPTION SCANNER] rawCodeValue=' + codeVal);
@@ -23718,12 +23730,82 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   window.subxSelectPackage = function (n) {
     selectedPkg = n;
     ['custom', 1, 2, 3].forEach(i => { const el = $x('subx-pkg-' + i); if (el) el.classList.toggle('sel', i === n); });
+    document.querySelectorAll('[id^="subx-pkg-sp-"]').forEach(el => el.classList.remove('sel'));
     var cf = $x('subx-custom-fields');
     if (cf) cf.style.display = n === 'custom' ? 'block' : 'none';
     subxRenderPreview();
   };
 
   window.subxUpdateCustomPreview = function () {
+    subxRenderPreview();
+  };
+
+  // ── حفظ باقة مخصصة كاختصار ──
+  function _getSavedCustomPkgs() {
+    try { return JSON.parse(localStorage.getItem('subx_custom_pkgs') || '[]'); } catch (e) { return []; }
+  }
+  function _saveCustomPkgs(list) {
+    try { localStorage.setItem('subx_custom_pkgs', JSON.stringify(list)); } catch (e) {}
+  }
+
+  window.subxSaveCustomPkg = function () {
+    var sessions = parseInt($x('subx-custom-sessions')?.value, 10) || 0;
+    var price = parseInt($x('subx-custom-price')?.value, 10) || 0;
+    var name = ($x('subx-custom-name')?.value || '').trim();
+    if (!sessions || sessions < 1) { showToast('⚠️ أدخل عدد الحصص', true); return; }
+    if (!price || price < 0) { showToast('⚠️ أدخل السعر', true); return; }
+    if (!name) name = sessions + ' حصة — ' + price.toLocaleString('ar-DZ') + ' دج';
+    var list = _getSavedCustomPkgs();
+    // Avoid duplicates
+    if (list.some(function (p) { return p.sessions === sessions && p.price === price; })) {
+      showToast('⚠️ هذه الباقة موجودة بالفعل', true); return;
+    }
+    list.push({ sessions: sessions, price: price, name: name });
+    _saveCustomPkgs(list);
+    _renderCustomPkgCards();
+    showToast('✅ تم حفظ الباقة: ' + name);
+  };
+
+  window.subxDeleteCustomPkg = function (idx) {
+    var list = _getSavedCustomPkgs();
+    list.splice(idx, 1);
+    _saveCustomPkgs(list);
+    _renderCustomPkgCards();
+  };
+
+  function _renderCustomPkgCards() {
+    var list = _getSavedCustomPkgs();
+    var container = document.getElementById('subx-custom-presets');
+    if (!container) return;
+    if (!list.length) { container.innerHTML = ''; return; }
+    var html = '';
+    list.forEach(function (p, i) {
+      html += '<div class="subx-pkg" id="subx-pkg-sp-' + i + '" onclick="subxSelectSavedPkg(' + i + ')" style="position:relative">';
+      html += '<div class="p-check">✓</div>';
+      html += '<div class="p-name">' + escX(p.name) + '</div>';
+      html += '<div class="p-price">' + SubscriptionService.fmtPrice(p.price) + '</div>';
+      html += '<div class="p-sess">' + p.sessions + ' حصة</div>';
+      html += '<button onclick="event.stopPropagation();subxDeleteCustomPkg(' + i + ')" title="حذف الباقة" style="position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(239,68,68,0.12);color:#dc2626;font-size:11px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>';
+      html += '</div>';
+    });
+    container.innerHTML = html;
+  }
+
+  window.subxSelectSavedPkg = function (idx) {
+    var list = _getSavedCustomPkgs();
+    var p = list[idx];
+    if (!p) return;
+    selectedPkg = 'custom';
+    ['custom', 1, 2, 3].forEach(function (i) { var el = $x('subx-pkg-' + i); if (el) el.classList.remove('sel'); });
+    var cf = $x('subx-custom-fields');
+    if (cf) cf.style.display = 'block';
+    $x('subx-custom-sessions').value = p.sessions;
+    $x('subx-custom-price').value = p.price;
+    $x('subx-custom-name').value = p.name;
+    // Deselect all saved preset cards, highlight the clicked one
+    document.querySelectorAll('[id^="subx-pkg-sp-"]').forEach(function (el) { el.classList.remove('sel'); });
+    var card = $x('subx-pkg-sp-' + idx);
+    if (card) card.classList.add('sel');
     subxRenderPreview();
   };
 
