@@ -2742,6 +2742,7 @@
         <option value="subscribed-unassigned">🔀 مشتركون بلا فوج</option>
       </select>
       <button onclick="exportAttendanceCSV()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif" title="تصدير CSV" id="att-csv-btn">📥 CSV</button>
+      <button onclick="deleteFilteredRecords()" style="padding:7px 12px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.06);color:#DC2626;font-size:11px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif" title="حذف سجلات الحضور (حسب الفلتر)" id="att-del-filter-btn">🗑️ حذف السجلات</button>
       <button onclick="openAddStudentModal()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #059669;background:rgba(5,150,105,0.08);color:#059669;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إضافة تلميذ جديد للأستاذ المختار" id="att-add-student-btn">➕ إضافة تلميذ</button>
       <button onclick="openAddGroupModal()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #f59e0b;background:rgba(245,158,11,0.08);color:#f59e0b;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="إضافة فوج جديد للأستاذ المختار" id="att-add-group-btn">🏫 إضافة فوج</button>
       <button onclick="openNewAttendanceCycleModal()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #7C3AED;background:rgba(124,58,237,0.08);color:#7C3AED;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" title="أرشفة الدورة الحالية وبدء دورة حضور جديدة للفوج المختار" id="att-new-cycle-btn">🆕 بدء حضور جديد</button>
@@ -14089,22 +14090,32 @@ function _showGroupPicker(teacher, groups, callback) {
 window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) => {
   const teacherId = document.getElementById('att-sum-teacher')?.value || '';
   const teacher = (allTeachers || []).find(t => t.id === teacherId);
-  if (!teacher) { showToast('⚠️ اختر أستاذاً أولاً', true); return; }
+
+  // Verify full CSV data exists (built by loadAttendanceSummary)
+  if (!window._attAllStudentsCsvData || !window._attAllStudentsCsvData.length) {
+    showToast('⚠️ لا توجد بيانات متاحة، حمّل الجدول أولاً', true);
+    return;
+  }
+
+  // No teacher selected → export ALL students directly
+  if (!teacher) {
+    if (giFilterOverride === undefined) {
+      const allData = window._attAllStudentsCsvData.slice();
+      if (!allData.length) { showToast('⚠️ لا توجد بيانات', true); return; }
+      _exportCSVRows(allData, 'الكل', '');
+      return;
+    }
+    return;
+  }
 
   const groups = teacher.groups || [];
 
-  // First call from button: show picker
+  // First call from button: show picker (only when teacher is selected)
   if (giFilterOverride === undefined) {
     if (!groups.length) { showToast('⚠️ الأستاذ لا يملك أفواجاً', true); return; }
     _showGroupPicker(teacher, groups, (gi, label, subFilter) => {
       window.exportAttendanceCSV(gi, label, subFilter);
     });
-    return;
-  }
-
-  // Verify full CSV data exists (built by loadAttendanceSummary)
-  if (!window._attAllStudentsCsvData || !window._attAllStudentsCsvData.length) {
-    showToast('⚠️ لا توجد بيانات متاحة، حمّل الجدول أولاً', true);
     return;
   }
 
@@ -14115,7 +14126,7 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) 
     ? _normalizeNameStrict
     : (n) => String(n || '').trim().replace(/\s+/g,' ').toLowerCase()
         .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
-        .replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ').trim();
+        .replace(/[ًٌٍَُِّْٰٕٖٓٔـ]/g,'').replace(/\s+/g,' ').trim();
   const ticketSubMap = new Map();
   (allTicketsData||[]).forEach(t => {
     if (t.deleted || t.status !== 'paid') return;
@@ -14139,7 +14150,6 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) 
   if (filterType && filterType !== 'all') {
     const before = exportData.length;
     if (filterType === 'subscribed-unassigned') {
-      // مشتركون غير موجودين في أي فوج (باستخدام الدالة الموحدة)
       exportData = exportData.filter(s => {
         const isSub = ticketSubMap.has(_normS(s.name));
         if (!isSub) return false;
@@ -14154,13 +14164,20 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) 
     }
     console.log(`📊 Subscription filter "${filterType}": ${exportData.length}/${before} students`);
     if (!exportData.length) {
-      const label = filterType === 'subscribed-unassigned' ? 'مشتركين بلا فوج' : (filterType === 'subscribed' ? 'مشتركين' : 'غير مشتركين');
+      const label = filterType === 'subscribed-unassigned' ? 'مشتركون بلا فوج' : (filterType === 'subscribed' ? 'مشتركين' : 'غير مشتركين');
       showToast(`⚠️ لا يوجد تلاميذ ${label}`, true);
       return;
     }
   }
 
-  // Build CSV rows
+  const groupSuffix = (giFilterOverride !== '' && groupLabelOverride)
+    ? `_${groupLabelOverride.replace(/[^a-zA-Z0-9\u0600-\u06FF\s]/g,'').trim().replace(/\s+/g,'_')}`
+    : '';
+  _exportCSVRows(exportData, teacher.name, groupSuffix);
+};
+
+// ─── Shared CSV builder + download ───
+function _exportCSVRows(exportData, teacherLabel, suffix) {
   const csvTotalSessions = 12;
   const sessionRange = Array.from({length: csvTotalSessions}, (_, i) => i + 1);
   const headers = ['التلميذ', 'الأستاذ', 'الفوج'];
@@ -14182,7 +14199,6 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) 
     return;
   }
 
-  // Generate CSV file
   const csvContent = csvRows.map(row =>
     row.map(cell => `"${cell.replace(/"/g,'""')}"`).join(',')
   ).join('\r\n');
@@ -14190,17 +14206,14 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) 
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  const teacherNameClean = teacher.name.replace(/[\\/:*?"<>|]/g, '_');
-  const groupSuffix = (giFilterOverride !== '' && groupLabelOverride)
-    ? `_${groupLabelOverride.replace(/[^a-zA-Z0-9\u0600-\u06FF\s]/g,'').trim().replace(/\s+/g,'_')}`
-    : '';
-  a.download = `حضور_${teacherNameClean}${groupSuffix}_${new Date().toISOString().slice(0,10)}.csv`;
+  const cleanLabel = teacherLabel.replace(/[\\/:*?"<>|]/g, '_');
+  a.download = `حضور_${cleanLabel}${suffix}_${new Date().toISOString().slice(0,10)}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   showToast(`✅ تم تصدير ${csvRows.length - 1} تلميذ — ${a.download}`);
-};
+}
 
 // Populate teacher select when teachers load
 const _origRenderTeachers = window.renderTeachersGrid;
@@ -18027,7 +18040,53 @@ window.resetAttendance = async () => {
   }
 };
 
-// ─── picker: اختيار حصة مسجّلة للتعديل ───
+// ─── حذف سجلات الحضور حسب الفلتر المحدد ───
+window.deleteFilteredRecords = async () => {
+  const teacherId = document.getElementById('att-sum-teacher')?.value || '';
+  if (!teacherId) { showToast('⚠️ اختر أستاذاً أولاً من القائمة', true); return; }
+
+  const teacher = (allTeachers || []).find(t => t.id === teacherId);
+  const teacherName = teacher ? teacher.name : 'الأستاذ';
+
+  const confirmed = await cmConfirm('⚠️ حذف سجلات الحضور',
+    `هل أنت متأكد من حذف جميع سجلات الحضور لـ "${teacherName}"؟\n\nهذا الإجراء لا يمكن التراجع عنه.`, '🗑️',
+    { danger: true, confirmText: 'حذف' });
+  if (!confirmed) return;
+
+  const confirmed2 = await cmConfirm('تأكيد أخير',
+    `تأكيد حذف كل سجلات حضور "${teacherName}"؟`, '⚠️',
+    { danger: true, confirmText: 'حذف' });
+  if (!confirmed2) return;
+
+  try {
+    const q = query(
+      collection(db, 'sessionAttendance'),
+      where('teacherId', '>=', teacherId),
+      where('teacherId', '<', teacherId + '_\ufff0')
+    );
+    const snap = await getDocs(q);
+
+    if (snap.empty) {
+      showToast('لا توجد سجلات حضور لهذا الأستاذ');
+      return;
+    }
+
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+
+    _allRecordedSessions = {};
+    _allRecordedSessionsByGroup = {};
+
+    await addLog('🗑️ حذف سجلات', `تم حذف ${snap.size} سجل حضور لـ ${teacherName}`, '⚠️');
+    showToast(`✅ تم حذف ${snap.size} سجل — الحضور جاهز للتسجيل من جديد`);
+
+    if (window._attSummaryCache) delete window._attSummaryCache[teacherId];
+    loadAttendanceSummary();
+  } catch(e) {
+    showToast('خطأ: ' + e.message, true);
+  }
+};
 window.openEditSessionPicker = () => {
   const tid = currentAttTeacherId;
   if (!tid) return;
