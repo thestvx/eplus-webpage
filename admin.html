@@ -13649,7 +13649,7 @@ window.cleanLeakedStudents = async (gid) => {
 // ─── أدوات مساعدة للكونسول (Firebase Functions غير متاحة في الـ Console بسبب module) ───
 window._db = db;
 window._allTeachers = allTeachers;
-window._firestore = { addDoc, getDoc, setDoc, updateDoc, doc, collection, query, where, getDocs, writeBatch, deleteDoc, serverTimestamp, orderBy };
+window._firestore = { addDoc, getDoc, setDoc, updateDoc, doc, collection, query, where, limit, getDocs, writeBatch, deleteDoc, serverTimestamp, orderBy };
 window._showCurrentTeacher = () => {
   const tid = document.getElementById('att-sum-teacher')?.value || '';
   const t = (allTeachers || []).find(t => t.id === tid);
@@ -26461,8 +26461,9 @@ async function srtFinanceAddPayment() {
   const payRecord = { date: TeacherFinance.today(), amount: amount, note: form.note || '', adminName: srtFinAdminName(), timestamp: Date.now(), receiptId: '' };
 
   try {
-    const {getDocs,collection:c,doc:d,setDoc,updateDoc}=srtFS(),fbs=srtDB();
-    const finSnap = await getDocs(c(fbs, 'teacher_finance').where('teacherId','==',id).limit(1));
+    const {getDocs,collection:c,doc:d,setDoc,updateDoc,query:q,where:w,limit:l}=srtFS(),fbs=srtDB();
+    const finQ = q(c(fbs, 'teacher_finance'), w('teacherId','==',id), l(1));
+    const finSnap = await getDocs(finQ);
     if (finSnap.empty) {
       await setDoc(d(fbs, 'teacher_finance', 'tf_' + id), { teacherId: id, teacherName: t.name || '', payments: [payRecord], totalPaid: amount, updatedAt: new Date().toISOString() });
     } else {
@@ -26479,8 +26480,9 @@ async function srtFinanceAddPayment() {
     srtTreasuryAdjust(-amount);
 
     try {
-      const {getDocs,collection:c,doc:d,updateDoc}=srtFS(),fbs=srtDB();
-      const finSnap2 = await getDocs(c(fbs, 'teacher_finance').where('teacherId','==',id).limit(1));
+      const {getDocs,collection:c,doc:d,updateDoc,query:q,where:w,limit:l}=srtFS(),fbs=srtDB();
+      const finQ2 = q(c(fbs, 'teacher_finance'), w('teacherId','==',id), l(1));
+      const finSnap2 = await getDocs(finQ2);
       if (!finSnap2.empty) {
         const fd2 = finSnap2.docs[0].data();
         const pays = Array.isArray(fd2.payments) ? fd2.payments.slice() : [];

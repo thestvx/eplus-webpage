@@ -229,7 +229,7 @@ window.TeacherFinance = (function () {
     });
   }
 
-  // ── Receipt Print (Professional A4, Apple-like, no emojis) ──
+  // ── Receipt Print (Professional A4 — Apple-invoice style) ──
 
   function printReceipt(payload) {
     const {
@@ -238,215 +238,151 @@ window.TeacherFinance = (function () {
     } = payload;
     const win = window.open('', '_blank', 'width=794,height=1123');
     if (!win) return false;
-    const breakdownRows = Array.isArray(studentBreakdown) && studentBreakdown.length
+
+    const rows = Array.isArray(studentBreakdown) && studentBreakdown.length
       ? studentBreakdown.map((s, i) =>
-        `<tr>
-          <td>${i + 1}</td>
-          <td>${s.name || '---'}</td>
-          <td>${s.subject || '---'}</td>
-          <td class="c-center">${s.sessions || 0}</td>
-          <td class="c-left">${Number(s.amount || 0).toLocaleString('ar-DZ')}</td>
-        </tr>`
+        '<tr><td class="row-num">' + (i + 1) + '</td><td class="row-name">' + (s.name || '---') + '</td><td class="row-sub">' + (s.subject || '---') + '</td><td class="row-qty">' + (s.sessions || 0) + '</td><td class="row-amt">' + Number(s.amount || 0).toLocaleString('ar-DZ') + '</td></tr>'
       ).join('')
-      : '<tr><td colspan="5" class="c-center" style="color:#86868b">---</td></tr>';
+      : '<tr><td colspan="5" style="text-align:center;color:#8e8e93;padding:24px">No attendance records</td></tr>';
 
     const _date = date || new Date().toISOString().split('T')[0];
-    const _formattedDate = (function() {
+    const _fmtDate = (function() {
       try {
-        return new Date(_date + 'T12:00:00').toLocaleDateString('ar-DZ', { year: 'numeric', month: 'long', day: 'numeric' });
+        const d = new Date(_date + 'T12:00:00');
+        const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
       } catch(e) { return _date; }
     })();
 
-    win.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>Document - ${receiptId}</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-  @page { margin: 0; size: A4; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
-    background: #fff; color: #1d1d1f; direction: rtl; -webkit-font-smoothing: antialiased;
-  }
-  .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 0; position: relative; overflow: hidden; }
+    const _receiptNum = (receiptId || 'RCP-' + Date.now().toString(36).toUpperCase()).toUpperCase();
 
-  .header-band {
-    background: #1d1d1f; padding: 48px 56px 40px; color: #fff; position: relative;
-  }
-  .header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
-  .logo { display: flex; align-items: center; gap: 14px; }
-  .logo img { height: 44px; filter: brightness(0) invert(1); }
-  .logo-text { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.5); letter-spacing: 2px; text-transform: uppercase; }
-  .doc-type { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.4); letter-spacing: 1px; text-transform: uppercase; text-align: left; }
-  .doc-id { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.7); margin-top: 4px; text-align: left; font-family: 'SF Mono', 'Fira Code', monospace; direction: ltr; }
-  .header-title { font-size: 28px; font-weight: 800; color: #fff; letter-spacing: -0.5px; margin-bottom: 8px; }
-  .header-sub { font-size: 13px; font-weight: 400; color: rgba(255,255,255,0.45); }
+    win.document.write('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Receipt ' + _receiptNum + '</title>' +
+    '<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">' +
+    '<style>' +
+    '@page{margin:0;size:A4}' +
+    '*{box-sizing:border-box;margin:0;padding:0}' +
+    'body{font-family:Inter,-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif;color:#1d1d1f;background:#fff;-webkit-font-smoothing:antialiased;line-height:1.5}' +
 
-  .content { padding: 40px 56px; }
-  .section-label { font-size: 11px; font-weight: 700; color: #86868b; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 16px; }
+    '.page{width:210mm;min-height:297mm;margin:0 auto;padding:0;position:relative;background:#fff}' +
 
-  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #e5e5ea; border-radius: 12px; overflow: hidden; margin-bottom: 36px; }
-  .meta-cell { background: #fff; padding: 16px 20px; }
-  .meta-cell .label { font-size: 11px; font-weight: 600; color: #86868b; margin-bottom: 4px; }
-  .meta-cell .value { font-size: 15px; font-weight: 700; color: #1d1d1f; }
+    /* --- header --- */
+    '.hdr{padding:56px 64px 44px;display:flex;justify-content:space-between;align-items:flex-start}' +
+    '.hdr-left{}' +
+    '.hdr-logo{display:flex;align-items:center;gap:12px;margin-bottom:6px}' +
+    '.hdr-logo img{height:36px;filter:brightness(0)}' +
+    '.hdr-brand{font-size:13px;font-weight:600;color:#86868b;letter-spacing:1.5px}' +
+    '.hdr-right{text-align:right}' +
+    '.hdr-title{font-size:24px;font-weight:700;color:#1d1d1f;letter-spacing:-0.3px;margin-bottom:2px}' +
+    '.hdr-num{font-size:13px;font-weight:500;color:#8e8e93;font-family:SF Mono,Fira Code,Consolas,monospace}' +
 
-  .table-wrap { border: 1px solid #e5e5ea; border-radius: 12px; overflow: hidden; margin-bottom: 36px; }
-  table { width: 100%; border-collapse: collapse; }
-  thead th {
-    background: #f5f5f7; padding: 12px 16px; font-size: 11px; font-weight: 700; color: #86868b;
-    text-align: right; border-bottom: 1px solid #e5e5ea; letter-spacing: 0.3px;
-  }
-  thead th.c-center { text-align: center; }
-  thead th.c-left { text-align: left; }
-  tbody td {
-    padding: 14px 16px; font-size: 13px; font-weight: 500; color: #1d1d1f;
-    border-bottom: 1px solid #f5f5f5;
-  }
-  tbody td.c-center { text-align: center; font-weight: 700; color: #1d1d1f; }
-  tbody td.c-left { text-align: left; font-weight: 700; direction: ltr; }
-  tbody tr:last-child td { border-bottom: none; }
-  tbody tr:nth-child(even) { background: #fafafa; }
+    /* --- separator --- */
+    '.sep{margin:0 64px;border:none;border-top:1px solid #d2d2d7}' +
 
-  .total-strip {
-    background: #1d1d1f; border-radius: 12px; padding: 24px 28px;
-    display: flex; justify-content: space-between; align-items: center; margin-bottom: 36px;
-  }
-  .total-strip .label { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.5); }
-  .total-strip .value { font-size: 28px; font-weight: 800; color: #fff; direction: ltr; letter-spacing: -0.5px; }
-  .total-strip .currency { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.4); margin-right: 6px; }
+    /* --- body --- */
+    '.body{padding:40px 64px}' +
+    '.row{display:flex;justify-content:space-between;margin-bottom:24px}' +
+    '.row-block{flex:1}' +
+    '.lbl{font-size:11px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px}' +
+    '.val{font-size:14px;font-weight:600;color:#1d1d1f}' +
 
-  .note-bar {
-    background: #f5f5f7; border-radius: 10px; padding: 14px 20px;
-    font-size: 12px; color: #86868b; font-weight: 500; margin-bottom: 36px;
-  }
+    /* --- table --- */
+    '.tbl-wrap{margin:0 0 40px;border:1px solid #d2d2d7;border-radius:10px;overflow:hidden}' +
+    'table{width:100%;border-collapse:collapse}' +
+    'thead th{background:#f5f5f7;padding:11px 16px;font-size:11px;font-weight:600;color:#86868b;text-align:left;border-bottom:1px solid #d2d2d7;letter-spacing:0.3px}' +
+    'thead th:nth-child(1){width:36px;text-align:center}' +
+    'thead th:nth-child(4),thead th:nth-child(5){text-align:right}' +
+    'tbody td{padding:13px 16px;font-size:13px;font-weight:400;color:#1d1d1f;border-bottom:1px solid #f2f2f7}' +
+    'tbody tr:last-child td{border-bottom:none}' +
+    '.row-num{text-align:center;color:#8e8e93;font-weight:500}' +
+    '.row-name{font-weight:500}' +
+    '.row-sub{color:#86868b;font-size:12px}' +
+    '.row-qty{text-align:right;font-weight:600}' +
+    '.row-amt{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}' +
 
-  .footer-area {
-    border-top: 1px solid #e5e5ea; padding: 24px 56px 40px;
-    display: flex; justify-content: space-between; align-items: flex-end;
-  }
-  .footer-sig { text-align: center; }
-  .footer-sig .line { width: 140px; border-bottom: 1px solid #d1d1d6; margin-bottom: 6px; height: 20px; }
-  .footer-sig .label { font-size: 11px; font-weight: 600; color: #86868b; }
-  .footer-stamp { text-align: center; }
-  .footer-stamp .seal {
-    width: 64px; height: 64px; border: 2px solid #e5e5ea; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center; margin: 0 auto 6px;
-    font-size: 10px; font-weight: 700; color: #c7c7cc;
-  }
-  .footer-stamp .label { font-size: 11px; font-weight: 600; color: #86868b; }
-  .footer-info { text-align: left; font-size: 10px; color: #c7c7cc; line-height: 1.8; }
+    /* --- total --- */
+    '.total-row{display:flex;justify-content:flex-end;align-items:baseline;margin-bottom:40px;gap:16px}' +
+    '.total-lbl{font-size:13px;font-weight:500;color:#86868b}' +
+    '.total-val{font-size:28px;font-weight:700;color:#1d1d1f;letter-spacing:-0.5px}' +
+    '.total-curr{font-size:14px;font-weight:500;color:#86868b;margin-left:4px}' +
 
-  .print-btn {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-    padding: 14px 48px; border: none; border-radius: 14px;
-    background: #1d1d1f; color: #fff; font-size: 14px; font-weight: 700;
-    cursor: pointer; font-family: inherit; box-shadow: 0 4px 24px rgba(0,0,0,0.15);
-    transition: all 0.2s;
-  }
-  .print-btn:hover { background: #424245; transform: translateX(-50%) translateY(-1px); }
+    /* --- note --- */
+    '.note{background:#f5f5f7;border-radius:8px;padding:14px 20px;margin-bottom:40px}' +
+    '.note-text{font-size:12px;font-weight:500;color:#6e6e73}' +
 
-  @media print {
-    .no-print { display: none !important; }
-    body { background: #fff; }
-    .page { box-shadow: none; }
-    @page { size: A4; margin: 0; }
-  }
-</style></head><body>
+    /* --- footer --- */
+    '.ftr{border-top:1px solid #d2d2d7;padding:32px 64px 48px;display:flex;justify-content:space-between;align-items:flex-end}' +
+    '.ftr-sig{text-align:center}' +
+    '.ftr-line{width:130px;border-bottom:1px solid #d2d2d7;height:24px;margin-bottom:8px}' +
+    '.ftr-sig .lbl{font-size:10px;font-weight:500;color:#8e8e93}' +
+    '.ftr-meta{text-align:center}' +
+    '.ftr-seal{width:52px;height:52px;border:1.5px solid #d2d2d7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:9px;font-weight:700;color:#c7c7cc;letter-spacing:1px}' +
+    '.ftr-disclaimer{position:absolute;bottom:24px;left:64px;right:64px;font-size:9px;color:#aeaeb2;text-align:center;border-top:1px solid #f2f2f7;padding-top:16px}' +
 
-<div class="page">
-  <div class="header-band">
-    <div class="header-top">
-      <div>
-        <div class="logo">
-          <img src="schoollogo/schoollogoblack.PNG" alt="E-PLUS">
-          <span class="logo-text">E-PLUS Academy</span>
-        </div>
-      </div>
-      <div>
-        <div class="doc-type">Payment Receipt</div>
-        <div class="doc-id">${receiptId || '---'}</div>
-      </div>
-    </div>
-    <div class="header-title">Premium Payment Receipt</div>
-    <div class="header-sub">Official teacher payment document for recorded attendance sessions</div>
-  </div>
+    /* --- print button --- */
+    '.print-btn{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 40px;border:none;border-radius:12px;background:#1d1d1f;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.12);transition:all .15s;z-index:10}' +
+    '.print-btn:hover{background:#424245}' +
+    '@media print{.no-print{display:none!important}body{background:#fff}.page{box-shadow:none}@page{size:A4;margin:0}}' +
+    '</style></head><body>' +
 
-  <div class="content">
-    <div class="section-label">Transaction Details</div>
-    <div class="meta-grid">
-      <div class="meta-cell">
-        <div class="label">Teacher Name</div>
-        <div class="value">${teacherName || '---'}</div>
-      </div>
-      <div class="meta-cell">
-        <div class="label">Subject</div>
-        <div class="value">${subjectName || '---'}</div>
-      </div>
-      <div class="meta-cell">
-        <div class="label">Issue Date</div>
-        <div class="value">${_formattedDate}</div>
-      </div>
-      <div class="meta-cell">
-        <div class="label">Total Students</div>
-        <div class="value">${totalStudents || 0}</div>
-      </div>
-      <div class="meta-cell">
-        <div class="label">Rate Per Session</div>
-        <div class="value">${Number(rate || 0).toLocaleString('ar-DZ')} DZD</div>
-      </div>
-      <div class="meta-cell">
-        <div class="label">Total Sessions</div>
-        <div class="value">${totalSess || 0}</div>
-      </div>
-    </div>
+    '<div class="page">' +
 
-    <div class="section-label">Attendance Breakdown</div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr>
-          <th style="width:40px">#</th>
-          <th>Student Name</th>
-          <th>Subject</th>
-          <th class="c-center" style="width:80px">Sessions</th>
-          <th class="c-left" style="width:120px">Amount (DZD)</th>
-        </tr></thead>
-        <tbody>${breakdownRows}</tbody>
-      </table>
-    </div>
+    /* HEADER */
+    '<div class="hdr">' +
+      '<div class="hdr-left">' +
+        '<div class="hdr-logo"><img src="schoollogo/schoollogoblack.PNG" alt=""></div>' +
+        '<div class="hdr-brand">E-PLUS ACADEMY</div>' +
+      '</div>' +
+      '<div class="hdr-right">' +
+        '<div class="hdr-title">Payment Receipt</div>' +
+        '<div class="hdr-num">' + _receiptNum + '</div>' +
+      '</div>' +
+    '</div>' +
 
-    <div class="total-strip">
-      <div class="label">Total Amount Due</div>
-      <div><span class="value">${Number(amount || 0).toLocaleString('ar-DZ')}</span><span class="currency">DZD</span></div>
-    </div>
+    '<hr class="sep">' +
 
-    ${note ? '<div class="note-bar"><strong>Note:</strong> ' + note + '</div>' : ''}
-  </div>
+    /* META */
+    '<div class="body">' +
+      '<div class="row">' +
+        '<div class="row-block"><div class="lbl">Teacher</div><div class="val">' + (teacherName || '---') + '</div></div>' +
+        '<div class="row-block"><div class="lbl">Subject</div><div class="val">' + (subjectName || '---') + '</div></div>' +
+        '<div class="row-block"><div class="lbl">Date</div><div class="val">' + _fmtDate + '</div></div>' +
+      '</div>' +
+      '<div class="row">' +
+        '<div class="row-block"><div class="lbl">Students</div><div class="val">' + (totalStudents || 0) + '</div></div>' +
+        '<div class="row-block"><div class="lbl">Rate / Session</div><div class="val">' + Number(rate || 0).toLocaleString('ar-DZ') + ' DZD</div></div>' +
+        '<div class="row-block"><div class="lbl">Total Sessions</div><div class="val">' + (totalSess || 0) + '</div></div>' +
+      '</div>' +
 
-  <div class="footer-area">
-    <div class="footer-sig">
-      <div class="line"></div>
-      <div class="label">Teacher Signature</div>
-    </div>
-    <div class="footer-stamp">
-      <div class="seal">E+</div>
-      <div class="label">Academy Stamp</div>
-    </div>
-    <div class="footer-sig">
-      <div class="line"></div>
-      <div class="label">Admin: ${adminName || '---'}</div>
-    </div>
-  </div>
+      '<div class="tbl-wrap"><table>' +
+        '<thead><tr>' +
+          '<th>#</th><th>Student</th><th>Subject</th><th>Sessions</th><th>Amount (DZD)</th>' +
+        '</tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table></div>' +
 
-  <div class="footer-info" style="padding: 0 56px 24px; text-align: left; font-size: 9px; color: #c7c7cc;">
-    This document was generated electronically by E-PLUS Academy Management System.<br>
-    Valid for administrative and financial records. ${_formattedDate}
-  </div>
-</div>
+      '<div class="total-row">' +
+        '<span class="total-lbl">Total Amount</span>' +
+        '<span class="total-val">' + Number(amount || 0).toLocaleString('ar-DZ') + '<span class="total-curr"> DZD</span></span>' +
+      '</div>' +
 
-<button class="print-btn no-print" onclick="window.print()">Print Receipt</button>
-<script>
-window.onafterprint=function(){setTimeout(function(){window.close();},200);};
-if(window.matchMedia){try{window.matchMedia('print').addEventListener('change',function(m){if(!m.matches)setTimeout(function(){window.close();},200);});}catch(e){}}
-</script>
-</body></html>`);
+      (note ? '<div class="note"><div class="note-text"><strong>Note:</strong> ' + note + '</div></div>' : '') +
+    '</div>' +
+
+    /* FOOTER */
+    '<div class="ftr">' +
+      '<div class="ftr-sig"><div class="ftr-line"></div><div class="lbl">Teacher</div></div>' +
+      '<div class="ftr-meta"><div class="ftr-seal">E+</div><div class="lbl">E-PLUS Academy</div></div>' +
+      '<div class="ftr-sig"><div class="ftr-line"></div><div class="lbl">Admin: ' + (adminName || '---') + '</div></div>' +
+    '</div>' +
+
+    '<div class="ftr-disclaimer">Generated electronically by E-PLUS Academy Management System. ' + _fmtDate + '</div>' +
+
+    '</div>' +
+
+    '<button class="print-btn no-print" onclick="window.print()">Print</button>' +
+    '<script>window.onafterprint=function(){setTimeout(function(){window.close();},200)};' +
+    'if(window.matchMedia){try{window.matchMedia("print").addEventListener("change",function(m){if(!m.matches)setTimeout(function(){window.close()},200)})}catch(e){}}</' + 'script>' +
+    '</body></html>');
     win.document.close();
     return true;
   }
