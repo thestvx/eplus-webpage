@@ -229,132 +229,219 @@ window.TeacherFinance = (function () {
     });
   }
 
-  // ── Receipt Print (Premium, RTL, academy logo, per-student breakdown) ──
+  // ── Receipt Print (Professional A4, Apple-like, no emojis) ──
 
   function printReceipt(payload) {
     const {
       receiptId, teacherName, subjectName, sessions, rate, amount, date, adminName, note,
       studentBreakdown, totalStudents, totalSessions: totalSess
     } = payload;
-    const win = window.open('', '_blank', 'width=520,height=800');
+    const win = window.open('', '_blank', 'width=794,height=1123');
     if (!win) return false;
     const breakdownRows = Array.isArray(studentBreakdown) && studentBreakdown.length
       ? studentBreakdown.map((s, i) =>
-        `<tr style="border-bottom:1px solid #f1f5f9">
-          <td style="padding:12px 14px;font-weight:700;color:#1e293b">${i + 1}</td>
-          <td style="padding:12px 14px;font-weight:700;color:#1e293b">${s.name || '—'}</td>
-          <td style="padding:12px 14px;text-align:center;font-weight:800;color:#6366f1">${s.sessions || 0}</td>
-          <td style="padding:12px 14px;text-align:left;font-weight:800;color:#059669">${Number(s.amount || 0).toLocaleString('ar-DZ')} دج</td>
+        `<tr>
+          <td>${i + 1}</td>
+          <td>${s.name || '---'}</td>
+          <td>${s.subject || '---'}</td>
+          <td class="c-center">${s.sessions || 0}</td>
+          <td class="c-left">${Number(s.amount || 0).toLocaleString('ar-DZ')}</td>
         </tr>`
       ).join('')
-      : `<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;font-weight:700">لا توجد تفاصيل حضور</td></tr>`;
+      : '<tr><td colspan="5" class="c-center" style="color:#86868b">---</td></tr>';
 
-    win.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>وصل مالي — ${receiptId}</title>
+    const _date = date || new Date().toISOString().split('T')[0];
+    const _formattedDate = (function() {
+      try {
+        return new Date(_date + 'T12:00:00').toLocaleDateString('ar-DZ', { year: 'numeric', month: 'long', day: 'numeric' });
+      } catch(e) { return _date; }
+    })();
+
+    win.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>Document - ${receiptId}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-  @page { margin: 12mm; size: A4; }
+  @page { margin: 0; size: A4; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Tajawal','Segoe UI',Arial,sans-serif; background: #f8f9fc; color: #1e293b; direction: rtl; }
-  .page { max-width: 500px; margin: 0 auto; background: #fff; border-radius: 20px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); overflow: hidden; }
-  .header { background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 32px 28px 24px; text-align: center; position: relative; }
-  .header::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 24px; background: #fff; border-radius: 24px 24px 0 0; }
-  .logo-wrap { display: flex; justify-content: center; margin-bottom: 12px; }
-  .logo-wrap img { height: 64px; width: auto; filter: brightness(0) invert(1); }
-  .brand-name { font-size: 18px; font-weight: 900; color: #fff; letter-spacing: 1px; }
-  .brand-sub { font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 2px; }
-  .success-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25); color: #059669; padding: 6px 18px; border-radius: 999px; font-size: 13px; font-weight: 800; margin: 20px auto 0; }
-  .success-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #059669; }
-  .success-sub { text-align: center; font-size: 11.5px; color: #94a3b8; margin-top: 8px; font-weight: 600; }
-  .body { padding: 24px 28px; }
-  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-  .info-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; }
-  .info-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-  .info-val { font-size: 14px; font-weight: 900; color: #1e293b; }
-  .info-val.primary { color: #6366f1; }
-  .divider { border: none; border-top: 2px dashed #e2e8f0; margin: 16px 0; }
-  .section-title { font-size: 13px; font-weight: 900; color: #64748b; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
-  .detail-table { width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
-  .detail-table th { background: #f1f5f9; padding: 10px 14px; font-size: 11px; font-weight: 800; color: #64748b; text-align: right; border-bottom: 2px solid #e2e8f0; }
-  .detail-table th:nth-child(3), .detail-table th:nth-child(4) { text-align: center; }
-  .detail-table td { font-size: 13px; }
-  .total-box { background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 16px; padding: 20px; text-align: center; margin: 20px 0; }
-  .total-label { font-size: 12px; color: rgba(255,255,255,0.8); font-weight: 700; }
-  .total-amount { font-size: 32px; font-weight: 900; color: #fff; margin-top: 4px; direction: ltr; }
-  .total-currency { font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.7); }
-  .footer { text-align: center; padding: 20px 28px; border-top: 1px solid #f1f5f9; }
-  .footer-note { font-size: 11px; color: #94a3b8; line-height: 1.8; }
-  .receipt-id-badge { display: inline-block; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); padding: 4px 14px; border-radius: 999px; font-size: 11px; font-weight: 800; color: rgba(255,255,255,0.9); margin-top: 8px; }
-  .print-btn { display: block; width: 100%; padding: 14px; border: none; border-radius: 14px; background: linear-gradient(135deg, #059669, #047857); color: #fff; font-size: 15px; font-weight: 900; cursor: pointer; font-family: inherit; margin-top: 20px; box-shadow: 0 4px 16px rgba(5,150,105,0.25); }
-  .print-btn:hover { transform: translateY(-1px); }
-  @media print { .no-print { display: none !important; } body { background: #fff; } .page { box-shadow: none; border-radius: 0; } }
-  @media (max-width: 540px) { .page { border-radius: 0; margin: 0; } .info-grid { grid-template-columns: 1fr; } }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+    background: #fff; color: #1d1d1f; direction: rtl; -webkit-font-smoothing: antialiased;
+  }
+  .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 0; position: relative; overflow: hidden; }
+
+  .header-band {
+    background: #1d1d1f; padding: 48px 56px 40px; color: #fff; position: relative;
+  }
+  .header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
+  .logo { display: flex; align-items: center; gap: 14px; }
+  .logo img { height: 44px; filter: brightness(0) invert(1); }
+  .logo-text { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.5); letter-spacing: 2px; text-transform: uppercase; }
+  .doc-type { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.4); letter-spacing: 1px; text-transform: uppercase; text-align: left; }
+  .doc-id { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.7); margin-top: 4px; text-align: left; font-family: 'SF Mono', 'Fira Code', monospace; direction: ltr; }
+  .header-title { font-size: 28px; font-weight: 800; color: #fff; letter-spacing: -0.5px; margin-bottom: 8px; }
+  .header-sub { font-size: 13px; font-weight: 400; color: rgba(255,255,255,0.45); }
+
+  .content { padding: 40px 56px; }
+  .section-label { font-size: 11px; font-weight: 700; color: #86868b; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 16px; }
+
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #e5e5ea; border-radius: 12px; overflow: hidden; margin-bottom: 36px; }
+  .meta-cell { background: #fff; padding: 16px 20px; }
+  .meta-cell .label { font-size: 11px; font-weight: 600; color: #86868b; margin-bottom: 4px; }
+  .meta-cell .value { font-size: 15px; font-weight: 700; color: #1d1d1f; }
+
+  .table-wrap { border: 1px solid #e5e5ea; border-radius: 12px; overflow: hidden; margin-bottom: 36px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: #f5f5f7; padding: 12px 16px; font-size: 11px; font-weight: 700; color: #86868b;
+    text-align: right; border-bottom: 1px solid #e5e5ea; letter-spacing: 0.3px;
+  }
+  thead th.c-center { text-align: center; }
+  thead th.c-left { text-align: left; }
+  tbody td {
+    padding: 14px 16px; font-size: 13px; font-weight: 500; color: #1d1d1f;
+    border-bottom: 1px solid #f5f5f5;
+  }
+  tbody td.c-center { text-align: center; font-weight: 700; color: #1d1d1f; }
+  tbody td.c-left { text-align: left; font-weight: 700; direction: ltr; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) { background: #fafafa; }
+
+  .total-strip {
+    background: #1d1d1f; border-radius: 12px; padding: 24px 28px;
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 36px;
+  }
+  .total-strip .label { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.5); }
+  .total-strip .value { font-size: 28px; font-weight: 800; color: #fff; direction: ltr; letter-spacing: -0.5px; }
+  .total-strip .currency { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.4); margin-right: 6px; }
+
+  .note-bar {
+    background: #f5f5f7; border-radius: 10px; padding: 14px 20px;
+    font-size: 12px; color: #86868b; font-weight: 500; margin-bottom: 36px;
+  }
+
+  .footer-area {
+    border-top: 1px solid #e5e5ea; padding: 24px 56px 40px;
+    display: flex; justify-content: space-between; align-items: flex-end;
+  }
+  .footer-sig { text-align: center; }
+  .footer-sig .line { width: 140px; border-bottom: 1px solid #d1d1d6; margin-bottom: 6px; height: 20px; }
+  .footer-sig .label { font-size: 11px; font-weight: 600; color: #86868b; }
+  .footer-stamp { text-align: center; }
+  .footer-stamp .seal {
+    width: 64px; height: 64px; border: 2px solid #e5e5ea; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 6px;
+    font-size: 10px; font-weight: 700; color: #c7c7cc;
+  }
+  .footer-stamp .label { font-size: 11px; font-weight: 600; color: #86868b; }
+  .footer-info { text-align: left; font-size: 10px; color: #c7c7cc; line-height: 1.8; }
+
+  .print-btn {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    padding: 14px 48px; border: none; border-radius: 14px;
+    background: #1d1d1f; color: #fff; font-size: 14px; font-weight: 700;
+    cursor: pointer; font-family: inherit; box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+    transition: all 0.2s;
+  }
+  .print-btn:hover { background: #424245; transform: translateX(-50%) translateY(-1px); }
+
+  @media print {
+    .no-print { display: none !important; }
+    body { background: #fff; }
+    .page { box-shadow: none; }
+    @page { size: A4; margin: 0; }
+  }
 </style></head><body>
+
 <div class="page">
-  <div class="header">
-    <div class="logo-wrap"><img src="schoollogo/schoollogoblack.PNG" alt="E-PLUS"></div>
-    <div class="brand-name">E-PLUS Academy</div>
-    <div class="brand-sub">مؤسسة E-PLUS التعليمية — بقمار</div>
-    <div class="receipt-id-badge">رقم الوصل: ${receiptId}</div>
+  <div class="header-band">
+    <div class="header-top">
+      <div>
+        <div class="logo">
+          <img src="schoollogo/schoollogoblack.PNG" alt="E-PLUS">
+          <span class="logo-text">E-PLUS Academy</span>
+        </div>
+      </div>
+      <div>
+        <div class="doc-type">Payment Receipt</div>
+        <div class="doc-id">${receiptId || '---'}</div>
+      </div>
+    </div>
+    <div class="header-title">Premium Payment Receipt</div>
+    <div class="header-sub">Official teacher payment document for recorded attendance sessions</div>
   </div>
 
-  <div class="body">
-    <div style="text-align:center">
-      <div class="success-badge"><span class="dot"></span> تم إصدار الوصل بنجاح</div>
-      <div class="success-sub">مستحقات الأستاذ عن الحصص المسجلة</div>
+  <div class="content">
+    <div class="section-label">Transaction Details</div>
+    <div class="meta-grid">
+      <div class="meta-cell">
+        <div class="label">Teacher Name</div>
+        <div class="value">${teacherName || '---'}</div>
+      </div>
+      <div class="meta-cell">
+        <div class="label">Subject</div>
+        <div class="value">${subjectName || '---'}</div>
+      </div>
+      <div class="meta-cell">
+        <div class="label">Issue Date</div>
+        <div class="value">${_formattedDate}</div>
+      </div>
+      <div class="meta-cell">
+        <div class="label">Total Students</div>
+        <div class="value">${totalStudents || 0}</div>
+      </div>
+      <div class="meta-cell">
+        <div class="label">Rate Per Session</div>
+        <div class="value">${Number(rate || 0).toLocaleString('ar-DZ')} DZD</div>
+      </div>
+      <div class="meta-cell">
+        <div class="label">Total Sessions</div>
+        <div class="value">${totalSess || 0}</div>
+      </div>
     </div>
 
-    <div class="info-grid">
-      <div class="info-card">
-        <div class="info-label">الأستاذ</div>
-        <div class="info-val">${teacherName || '—'}</div>
-      </div>
-      <div class="info-card">
-        <div class="info-label">المادة</div>
-        <div class="info-val">${subjectName || '—'}</div>
-      </div>
-      <div class="info-card">
-        <div class="info-label">تاريخ الإصدار</div>
-        <div class="info-val">${date || '—'}</div>
-      </div>
-      <div class="info-card">
-        <div class="info-label">إجمالي التلاميذ</div>
-        <div class="info-val primary">${totalStudents || 0} تلميذ</div>
-      </div>
+    <div class="section-label">Attendance Breakdown</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:40px">#</th>
+          <th>Student Name</th>
+          <th>Subject</th>
+          <th class="c-center" style="width:80px">Sessions</th>
+          <th class="c-left" style="width:120px">Amount (DZD)</th>
+        </tr></thead>
+        <tbody>${breakdownRows}</tbody>
+      </table>
     </div>
 
-    <div class="info-card" style="background:rgba(99,102,241,0.04);border-color:rgba(99,102,241,0.15);margin-bottom:16px;text-align:center">
-      <div class="info-label">سعر الحصة الواحدة</div>
-      <div class="info-val primary" style="font-size:20px">${Number(rate || 0).toLocaleString('ar-DZ')} دج</div>
+    <div class="total-strip">
+      <div class="label">Total Amount Due</div>
+      <div><span class="value">${Number(amount || 0).toLocaleString('ar-DZ')}</span><span class="currency">DZD</span></div>
     </div>
 
-    <hr class="divider">
-
-    <div class="section-title">📊 تفاصيل الحضور والحساب</div>
-    <table class="detail-table">
-      <thead><tr>
-        <th>#</th>
-        <th>اسم التلميذ</th>
-        <th style="text-align:center">الحصص</th>
-        <th style="text-align:center">المستحق</th>
-      </tr></thead>
-      <tbody>${breakdownRows}</tbody>
-    </table>
-
-    <div class="total-box">
-      <div class="total-label">إجمالي المستحقات</div>
-      <div class="total-amount">${Number(amount || 0).toLocaleString('ar-DZ')} <span class="total-currency">دج</span></div>
-    </div>
-
-    ${note ? '<div style="text-align:center;font-size:11px;color:#94a3b8;margin-bottom:8px">البيان: ' + note + '</div>' : ''}
+    ${note ? '<div class="note-bar"><strong>Note:</strong> ' + note + '</div>' : ''}
   </div>
 
-  <div class="footer">
-    <div class="footer-note">
-      MANAGEMENT: ${adminName || 'الإدارة'}<br>
-      هذا الوصل تم إنشاؤه إلكترونياً من نظام E-PLUS Academy
+  <div class="footer-area">
+    <div class="footer-sig">
+      <div class="line"></div>
+      <div class="label">Teacher Signature</div>
     </div>
-    <button class="print-btn no-print" onclick="window.print()">🖨️ طباعة الوصل</button>
+    <div class="footer-stamp">
+      <div class="seal">E+</div>
+      <div class="label">Academy Stamp</div>
+    </div>
+    <div class="footer-sig">
+      <div class="line"></div>
+      <div class="label">Admin: ${adminName || '---'}</div>
+    </div>
+  </div>
+
+  <div class="footer-info" style="padding: 0 56px 24px; text-align: left; font-size: 9px; color: #c7c7cc;">
+    This document was generated electronically by E-PLUS Academy Management System.<br>
+    Valid for administrative and financial records. ${_formattedDate}
   </div>
 </div>
+
+<button class="print-btn no-print" onclick="window.print()">Print Receipt</button>
 <script>
 window.onafterprint=function(){setTimeout(function(){window.close();},200);};
 if(window.matchMedia){try{window.matchMedia('print').addEventListener('change',function(m){if(!m.matches)setTimeout(function(){window.close();},200);});}catch(e){}}
