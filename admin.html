@@ -3825,6 +3825,24 @@
                   <div class="p-price">6,000 دج</div>
                   <div class="p-sess">24 حصة</div>
                 </div>
+                <div class="subx-pkg" id="subx-pkg-custom" onclick="subxSelectPackage('custom')" style="border-style:dashed">
+                  <div class="p-check">✓</div>
+                  <div class="p-name">⚙️ باقة مخصصة</div>
+                  <div class="p-price">—</div>
+                  <div class="p-sess">حدد يدوياً</div>
+                </div>
+              </div>
+              <div id="subx-custom-fields" style="display:none;margin-top:12px;padding:14px;border:1.5px solid var(--border);border-radius:12px;background:var(--card);transition:all 0.2s">
+                <div style="display:flex;gap:12px;flex-wrap:wrap">
+                  <div style="flex:1;min-width:140px">
+                    <label style="font-size:11px;font-weight:800;color:var(--text-muted);display:block;margin-bottom:4px">عدد الحصص</label>
+                    <input class="inp" type="number" id="subx-custom-sessions" min="1" max="100" placeholder="مثال: 12" style="width:100%" oninput="subxUpdateCustomPreview()">
+                  </div>
+                  <div style="flex:1;min-width:140px">
+                    <label style="font-size:11px;font-weight:800;color:var(--text-muted);display:block;margin-bottom:4px">السعر (دج)</label>
+                    <input class="inp" type="number" id="subx-custom-price" min="0" step="100" placeholder="مثال: 3000" style="width:100%" oninput="subxUpdateCustomPreview()">
+                  </div>
+                </div>
               </div>
             </div>
             <div class="form-group">
@@ -23439,6 +23457,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     $x('subx-valid-msg').style.display = 'none';
     $x('subx-scan-hint').innerHTML = '🟢 بانتظار مسح بطاقة الطالب…';
     $x('subx-start').value = SubscriptionService.today();
+    if ($x('subx-custom-sessions')) $x('subx-custom-sessions').value = '';
+    if ($x('subx-custom-price')) $x('subx-custom-price').value = '';
     subxSelectPackage(1);
     subxRenderPreview();
     $x('subx-modal').classList.add('open');
@@ -23697,9 +23717,21 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   // ── اختيار الباقة ──
   window.subxSelectPackage = function (n) {
     selectedPkg = n;
-    [1, 2, 3].forEach(i => { const el = $x('subx-pkg-' + i); if (el) el.classList.toggle('sel', i === n); });
+    ['custom', 1, 2, 3].forEach(i => { const el = $x('subx-pkg-' + i); if (el) el.classList.toggle('sel', i === n); });
+    var cf = $x('subx-custom-fields');
+    if (cf) cf.style.display = n === 'custom' ? 'block' : 'none';
     subxRenderPreview();
   };
+
+  window.subxUpdateCustomPreview = function () {
+    subxRenderPreview();
+  };
+
+  function _getCustomPkg() {
+    var sessions = parseInt($x('subx-custom-sessions')?.value, 10) || 0;
+    var price = parseInt($x('subx-custom-price')?.value, 10) || 0;
+    return { sessions: sessions, price: price };
+  }
 
   // ── التحقق: زر التأكيد لا يعمل إلا باكتمال كل عناصر الاشتراك ──
   function subxValidate() {
@@ -23707,7 +23739,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     if (!selectedStudent) missing.push('اختيار الطالب');
     else if (selectedStudent.status !== 'مسجل نهائياً') missing.push('تسجيل الطالب نهائياً');
     if (!selectedSubject) missing.push('اختيار المادة + الأستاذ');
-    if (!(selectedPkg >= 1 && selectedPkg <= 3)) missing.push('اختيار الباقة');
+    if (selectedPkg === 'custom') {
+      var cp = _getCustomPkg();
+      if (!cp.sessions || cp.sessions < 1) missing.push('عدد الحصص');
+      if (!cp.price || cp.price < 0) missing.push('سعر الباقة');
+    } else {
+      if (!(selectedPkg >= 1 && selectedPkg <= 3)) missing.push('اختيار الباقة');
+    }
     if (!$x('subx-start').value) missing.push('تاريخ البداية');
     const el = $x('subx-valid-msg');
     const btn = $x('subx-create-btn');
@@ -23726,9 +23764,15 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
 
   // ── معاينة قبل التأكيد ──
   window.subxRenderPreview = function () {
-    const pkg = SubscriptionService.packageByMonths(selectedPkg);
+    const isCustom = selectedPkg === 'custom';
+    const pkg = isCustom ? null : SubscriptionService.packageByMonths(selectedPkg);
+    const customPkg = isCustom ? _getCustomPkg() : null;
+    const months = isCustom ? Math.max(1, Math.ceil((customPkg.sessions || 8) / 8)) : pkg.months;
     const start = $x('subx-start').value || SubscriptionService.today();
-    const end = SubscriptionService.endDateFor(start, pkg.months);
+    const end = SubscriptionService.endDateFor(start, months);
+    const price = isCustom ? (customPkg.price || 0) : pkg.price;
+    const sessions = isCustom ? (customPkg.sessions || 0) : pkg.sessions;
+    const label = isCustom ? ('باقة مخصصة — ' + sessions + ' حصة') : pkg.label;
     const body = $x('subx-preview-body');
     if (!selectedStudent) {
       body.innerHTML = '<div class="subx-note">اختر الطالب أولاً لعرض معاينة الاشتراك.</div>';
@@ -23739,19 +23783,22 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     let html = '<table style="width:100%;border-collapse:collapse;font-size:13px">';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700;width:130px">الطالب</td><td style="padding:5px 6px;font-weight:800">' + escX(name) + ' <span style="font-family:monospace;font-size:11px;color:var(--text-muted)">' + escX(selectedStudent.id) + '</span></td></tr>';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">المادة — الأستاذ</td><td style="padding:5px 6px;font-weight:800">' + (selectedSubject ? escX(selectedSubject.icon + ' ' + selectedSubject.subjectName + ' — ' + (selectedSubject.teacherName || '—')) : '<span style="color:#b45309">لم تُختر بعد</span>') + '</td></tr>';
-    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">الباقة</td><td style="padding:5px 6px;font-weight:800">' + escX(pkg.label) + '</td></tr>';
-    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">السعر</td><td style="padding:5px 6px;font-weight:800;color:#059669">' + SubscriptionService.fmtPrice(pkg.price) + '</td></tr>';
-    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">عدد الحصص</td><td style="padding:5px 6px;font-weight:800">' + pkg.sessions + ' حصة (' + pkg.months + ' × 8)</td></tr>';
+    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">الباقة</td><td style="padding:5px 6px;font-weight:800">' + escX(label) + '</td></tr>';
+    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">السعر</td><td style="padding:5px 6px;font-weight:800;color:#059669">' + SubscriptionService.fmtPrice(price) + '</td></tr>';
+    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">عدد الحصص</td><td style="padding:5px 6px;font-weight:800">' + sessions + ' حصة' + (isCustom ? '' : ' (' + pkg.months + ' × 8)') + '</td></tr>';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">تاريخ البداية</td><td style="padding:5px 6px;font-weight:800">' + SubscriptionService.fmtAr(start, true) + '</td></tr>';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">تاريخ النهاية</td><td style="padding:5px 6px;font-weight:800">' + SubscriptionService.fmtAr(end, true) + '</td></tr>';
     html += '</table>';
-    const periods = SubscriptionService.buildPeriods(start, pkg.months);
+    const periods = SubscriptionService.buildPeriods(start, months);
     html += '<div style="margin-top:10px;font-size:12px;font-weight:800;color:var(--text-muted)">الحصص حسب الشهر:</div>';
     html += '<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">';
+    var sessLeft = sessions;
     periods.forEach(p => {
+      var perSess = isCustom ? Math.min(8, sessLeft) : 8;
+      sessLeft -= perSess;
       html += '<div style="flex:1;min-width:120px;background:var(--primary-light);border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:800">الشهر ' + p.monthNumber +
         '<div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-top:2px">' + SubscriptionService.fmtAr(p.startDate) + ' → ' + SubscriptionService.fmtAr(p.endDate) + '</div>' +
-        '<div style="color:#059669;margin-top:2px">8 حصص</div></div>';
+        '<div style="color:#059669;margin-top:2px">' + perSess + ' حصة</div></div>';
     });
     html += '</div>';
     body.innerHTML = html;
@@ -23762,14 +23809,20 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   window.subxCreate = async function () {
     if (!subxValidate()) { srShowToast('أكمل البيانات الناقصة أولاً', 'error'); return; }
     if (!selectedStudent || !selectedSubject) { srShowToast('أكمل البيانات الناقصة أولاً', 'error'); return; }
-    const pkg = SubscriptionService.packageByMonths(selectedPkg);
+    const isCustom = selectedPkg === 'custom';
+    const pkg = isCustom ? null : SubscriptionService.packageByMonths(selectedPkg);
+    const customPkg = isCustom ? _getCustomPkg() : null;
+    const months = isCustom ? Math.max(1, Math.ceil((customPkg.sessions || 8) / 8)) : pkg.months;
+    const price = isCustom ? (customPkg.price || 0) : pkg.price;
+    const sessions = isCustom ? (customPkg.sessions || 0) : pkg.sessions;
+    const label = isCustom ? ('باقة مخصصة — ' + sessions + ' حصة') : pkg.label;
     const btn = $x('subx-create-btn');
     let start = $x('subx-start').value || SubscriptionService.today();
 
     btn.disabled = true;
     try {
       // منع التداخل: نفس الطالب + نفس المادة + نفس الأستاذ فقط
-      const overlap = await SubscriptionService.findOverlapping(selectedStudent.id, start, pkg.months, selectedSubject.subjectId, selectedSubject.teacherId);
+      const overlap = await SubscriptionService.findOverlapping(selectedStudent.id, start, months, selectedSubject.subjectId, selectedSubject.teacherId);
       if (overlap && overlap.subscription) {
         btn.disabled = false;
         const until = SubscriptionService.fmtAr(overlap.subscription.end_date, true);
@@ -23786,31 +23839,33 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       }
 
       const name = studentFullName(selectedStudent);
-      const end = SubscriptionService.endDateFor(start, pkg.months);
+      const end = SubscriptionService.endDateFor(start, months);
       const summary =
         '<div style="text-align:right;font-size:13px;line-height:2">' +
           '<div><b>الطالب:</b> ' + escX(name) + ' <span style="font-family:monospace;font-size:11px;color:var(--text-muted)">' + escX(selectedStudent.id) + '</span></div>' +
           '<div><b>المادة — الأستاذ:</b> ' + escX(selectedSubject.icon + ' ' + selectedSubject.subjectName + ' — ' + (selectedSubject.teacherName || '—')) + '</div>' +
-          '<div><b>الباقة:</b> ' + escX(pkg.label) + '</div>' +
-          '<div><b>السعر:</b> ' + SubscriptionService.fmtPrice(pkg.price) + '</div>' +
-          '<div><b>الحصص:</b> ' + pkg.sessions + ' حصة</div>' +
+          '<div><b>الباقة:</b> ' + escX(label) + '</div>' +
+          '<div><b>السعر:</b> ' + SubscriptionService.fmtPrice(price) + '</div>' +
+          '<div><b>الحصص:</b> ' + sessions + ' حصة</div>' +
           '<div><b>البداية:</b> ' + SubscriptionService.fmtAr(start, true) + '</div>' +
           '<div><b>النهاية:</b> ' + SubscriptionService.fmtAr(end, true) + '</div>' +
         '</div>';
       const ok = await cmShow('📅', 'تأكيد الاشتراك', summary + '<div style="margin-top:8px;font-size:12px;color:var(--text-muted)">هل تريد تأكيد إنشاء هذا الاشتراك؟</div>', { confirmText: 'تأكيد الاشتراك', success: true });
       if (!ok) { btn.disabled = false; return; }
 
-      const paymentId = 'SUBPAY-' + selectedStudent.id + '-' + (selectedSubject.subjectId || 'x') + '-' + start + '-' + pkg.months;
+      const paymentId = 'SUBPAY-' + selectedStudent.id + '-' + (selectedSubject.subjectId || 'x') + '-' + start + '-' + months;
       const created = await SubscriptionService.createSubscription({
         studentId: selectedStudent.id,
-        months: pkg.months,
+        months: months,
         startDate: start,
         paymentId: paymentId,
-        notes: 'أنشئ من لوحة الإدارة',
+        notes: isCustom ? ('باقة مخصصة: ' + sessions + ' حصة بـ ' + price + ' دج') : 'أنشئ من لوحة الإدارة',
         subjectId: selectedSubject.subjectId,
         teacherId: selectedSubject.teacherId,
         subjectName: selectedSubject.subjectName,
-        teacherName: selectedSubject.teacherName
+        teacherName: selectedSubject.teacherName,
+        totalPrice: price,
+        totalSessions: isCustom ? sessions : undefined
       });
       if (created && created.subscription) {
         // ── Deduct trial sessions from first period (cycle-aware) ──

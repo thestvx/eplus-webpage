@@ -277,18 +277,21 @@ const SubscriptionService = (function () {
     const months = parseInt(opts.months, 10) || 1;
     const start = opts.startDate || today();
     const pkg = packageByMonths(months);
+    const isCustom = !!(opts.totalSessions || opts.totalPrice);
+    const price = isCustom ? (opts.totalPrice || pkg.price) : pkg.price;
     const paymentId = opts.paymentId || ('SUBPAY-' + opts.studentId + '-' + (opts.subjectId || '') + '-' + start + '-' + months);
     const data = await _adminCall('create-subscription', {
       studentId: opts.studentId,
       months: months,
       startDate: start,
-      totalPrice: pkg.price,
+      totalPrice: price,
       paymentId: paymentId,
       notes: opts.notes || '',
       subjectId: opts.subjectId || '',
       teacherId: opts.teacherId || '',
       subjectName: opts.subjectName || '',
-      teacherName: opts.teacherName || ''
+      teacherName: opts.teacherName || '',
+      ...(isCustom ? { totalSessions: opts.totalSessions || undefined } : {})
     });
     if (!data) throw new Error('create-subscription returned no data');
     return data;
