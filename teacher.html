@@ -1249,50 +1249,6 @@
       requestAnimationFrame(function(){el.style.transform='translateY(0)';el.style.opacity='1';});
       setTimeout(function(){el.style.transition='all 0.4s ease';el.style.transform='translateY(-10px)';el.style.opacity='0';el.style.maxHeight=el.offsetHeight+'px';setTimeout(function(){el.style.maxHeight='0';el.style.padding='0 24px';el.style.marginBottom='0';el.style.borderRadius='0';},300);setTimeout(function(){el.remove();},600);},6000);
     }
-      setupFinanceNotifications(teacherId,teacherName);
-    }
-
-    let _finNotifUnsub=null;
-    function setupFinanceNotifications(teacherId,teacherName){
-      if(_finNotifUnsub){try{_finNotifUnsub();}catch(e){}_finNotifUnsub=null;}
-      try{
-        const now=Date.now();
-        _finNotifUnsub=db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).onSnapshot(function(snap){
-          snap.docChanges().forEach(function(change){
-            if(change.type!=='modified')return;
-            const d=change.doc.data();
-            const pays=Array.isArray(d.payments)?d.payments:[];
-            const recent=pays.filter(function(p){return(p.timestamp||0)>now-5000;});
-            if(recent.length===0)return;
-            recent.forEach(function(p){
-              showTeacherNotification({
-                type:'payment',
-                title:'تم تسجيل دفعة جديدة',
-                message:'تم إيداع '+fmtNum(p.amount)+' دج في حسابك المالي',
-                detail:p.note||'',
-                amount:p.amount,
-                receiptId:p.receiptId||''
-              });
-            });
-          });
-        },function(e){console.warn('Finance listener error:',e);});
-      }catch(e){console.warn('Finance notification setup failed:',e);}
-    }
-    function showTeacherNotification(n){
-      const wrap=document.getElementById('teacher-notifications');
-      if(!wrap)return;
-      const el=document.createElement('div');
-      el.style.cssText='background:linear-gradient(135deg,#059669,#10b981);border-radius:16px;padding:20px 24px;color:#fff;margin-bottom:12px;box-shadow:0 8px 32px rgba(5,150,105,0.3);transform:translateY(-20px);opacity:0;transition:all 0.4s cubic-bezier(0.16,1,0.3,1);position:relative;overflow:hidden';
-      el.innerHTML='<div style="position:absolute;top:-20px;right:-20px;width:100px;height:100px;background:rgba(255,255,255,0.08);border-radius:50%"></div>'
-        +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;position:relative;z-index:1">'
-        +'<div style="width:40px;height:40px;background:rgba(255,255,255,0.2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">✓</div>'
-        +'<div><div style="font-size:15px;font-weight:800">'+n.title+'</div><div style="font-size:12px;opacity:.7;margin-top:2px">'+n.message+'</div></div></div>'
-        +(n.detail?'<div style="font-size:11px;opacity:.6;margin-top:4px;padding-left:52px;position:relative;z-index:1">'+n.detail+'</div>':'')
-        +(n.receiptId?'<div style="margin-top:10px;padding-left:52px;position:relative;z-index:1"><span style="font-size:10px;font-weight:700;background:rgba(255,255,255,0.15);padding:3px 10px;border-radius:6px">'+n.receiptId+'</span></div>':'');
-      wrap.prepend(el);
-      requestAnimationFrame(function(){el.style.transform='translateY(0)';el.style.opacity='1';});
-      setTimeout(function(){el.style.transform='translateY(-10px)';el.style.opacity='0';el.style.maxHeight=el.offsetHeight+'px';setTimeout(function(){el.style.maxHeight='0';el.style.padding='0 24px';el.style.margin='0';},300);setTimeout(function(){el.remove();},600);},6000);
-    }
 
     /* ===== LOGIN ===== */
     function showLogin(errorMsg){
