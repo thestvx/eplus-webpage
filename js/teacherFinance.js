@@ -31,6 +31,7 @@ window.TeacherFinance = (function () {
 
   function today() { return new Date().toISOString().split('T')[0]; }
   function _uid(prefix) { return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7); }
+  function _fs() { return window._firestore || null; }
   function _fb() { return window._db || window.db || (typeof db !== 'undefined' ? db : null); }
   function _norm(name) { return String(name || '').replace(/\s+/g, '').toLowerCase(); }
 
@@ -67,14 +68,16 @@ window.TeacherFinance = (function () {
   // ── Attendance (Firestore) — 1 حضور = 1 حصة ───────────
 
   async function countAttendance(studentId, subjectId, teacherId) {
+    const fs = _fs();
     const db = _fb();
-    if (!db) return 0;
+    if (!fs || !db) return 0;
     try {
-      let q = db.collection(ATT_COLLECTION)
-        .where('studentId', '==', studentId)
-        .where('subjectId', '==', subjectId);
-      if (teacherId) q = q.where('teacherId', '==', teacherId);
-      const snap = await q.get();
+      const { query, where, getDocs, collection } = fs;
+      let q = query(collection(db, 'support_attendance'),
+        where('studentId', '==', studentId),
+        where('subjectId', '==', subjectId));
+      if (teacherId) q = query(q, where('teacherId', '==', teacherId));
+      const snap = await getDocs(q);
       let count = 0;
       snap.forEach(d => {
         const r = d.data();
@@ -202,10 +205,14 @@ window.TeacherFinance = (function () {
 
   // تحديث سعر الحصة الحالي في ملف الأستاذ (Firestore) + دفتر الرصيد
   async function saveTeacherRate(teacherId, rate, adminName) {
+    const fs = _fs();
     const db = _fb();
     const r = Math.max(0, Math.round(Number(rate) || 0));
-    if (db) {
-      try { await db.collection('support_teachers').doc(teacherId).update({ rate: r, updatedAt: new Date().toISOString() }); } catch (e) { console.warn('rate save failed', e); }
+    if (fs && db) {
+      try {
+        const { doc, updateDoc } = fs;
+        await updateDoc(doc(db, 'support_teachers', teacherId), { rate: r, updatedAt: new Date().toISOString() });
+      } catch (e) { console.warn('rate save failed', e); }
     }
     return await _adminCall('set-rate', { teacherId: teacherId, rate: r });
   }
