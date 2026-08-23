@@ -4200,6 +4200,7 @@
         <div style="flex:1"></div>
         <button class="btn-primary" onclick="srtFinanceComputeDues()" style="padding:10px 16px;font-weight:800;font-size:12px;background:linear-gradient(135deg,#7C3AED,#6d28d9)">🔄 حساب المستحقات من الحضور</button>
         <button class="btn-primary" onclick="srtFinanceAddPayment()" style="padding:10px 16px;font-weight:800;font-size:12px;background:linear-gradient(135deg,#059669,#047857)">💵 تسجيل دفعة + إيصال</button>
+        <button class="btn-primary" onclick="srtFinanceClearOldPayments()" style="padding:10px 16px;font-weight:800;font-size:12px;background:linear-gradient(135deg,#dc2626,#b91c1c)">🗑️ مسح سجل الدفعات</button>
       </div>
 
       <!-- دفتر المعاملات -->
@@ -26506,28 +26507,62 @@ async function srtFinanceAddPayment() {
   }
 }
 
+async function srtFinanceClearOldPayments() {
+  const t = _srtFinanceTeacher;
+  if (!t) return;
+  const id = t.teacherId || t.id;
+  if (!(await cmConfirm('مسح سجل الدفعات', 'هل أنت متأكد من مسح جميع سجلات الدفعات القديمة لهذا الأستاذ؟\n\nسيتم حذف جميع الدفعات المسجلة في Firestore.', '🗑️', { danger: true }))) return;
+  try {
+    const {getDocs,collection:c,doc:d,setDoc,query:q,where:w,limit:l}=srtFS(),fbs=srtDB();
+    const finQ = q(c(fbs, 'teacher_finance'), w('teacherId','==',id), l(1));
+    const finSnap = await getDocs(finQ);
+    if (!finSnap.empty) {
+      await setDoc(d(fbs, 'teacher_finance', finSnap.docs[0].id), {
+        teacherId: id, teacherName: t.name || '', payments: [], totalPaid: 0, updatedAt: new Date().toISOString()
+      });
+    }
+    srtFinanceRefresh();
+    srtShowToast('تم مسح سجل الدفعات بنجاح', 'success');
+  } catch (e) {
+    srtShowToast('فشل مسح سجل الدفعات: ' + e.message, 'error');
+  }
+}
+
 async function srtFinancePrintReceipt(txId) {
   const t = _srtFinanceTeacher;
   if (!t) return;
   const id = t.teacherId || t.id;
   try {
-    const receipts = await TeacherFinance.getReceipts(id);
+    const [receipts, ledger, atcSnap] = await Promise.all([
+      TeacherFinance.getReceipts(id),
+      TeacherFinance.getLedger(id),
+      (function(){try{const {getDocs:c2,query:q2,where:w2,collection:c3}=srtFS(),db2=srtDB();return getDocs(q2(c3(db2,'attendance_control'),w2('teacherId','==',id)));}catch(e){return Promise.resolve({docs:[]});}})().catch(function(){return {docs:[]};}),
+    ]);
     const rcpt = receipts.find(x => x.transaction_id === txId) || receipts[0];
-    const ledger = await TeacherFinance.getLedger(id);
     const tx = ledger.find(x => x.id === txId) || (rcpt ? { amount: rcpt.amount, date: rcpt.date, notes: rcpt.notes } : null);
     if (!tx) return;
 
-    const studentBreakdown = ledger.filter(x => x.transaction_type === 'dues').map(x => ({
-      name: x.student_name || '',
-      sessions: x.session_count || 0,
-      amount: x.amount || 0,
-      subject: x.subject_name || '',
-    }));
+    const totalSessionsOffered = atcSnap.docs.length;
+
+    const studentBreakdown = ledger.filter(x => x.transaction_type === 'dues').map(x => {
+      const attended = x.session_count || 0;
+      const absent = Math.max(0, totalSessionsOffered - attended);
+      return {
+        name: x.student_name || '',
+        sessions: attended,
+        absent: absent,
+        amount: x.amount || 0,
+        subject: x.subject_name || '',
+      };
+    });
+
+    const subjects = t.subjects || t.spec || '';
+    const subjectNames = (typeof subjects === 'string' ? subjects : Array.isArray(subjects) ? subjects.map(function(s){return s.subject||s.name||s;}).join(', ') : '') || '';
 
     TeacherFinance.printReceipt({
       receiptId: (rcpt && rcpt.id) || ('RCP-' + (tx.date || TeacherFinance.today()).replace(/-/g, '') + '-' + txId.slice(-4)),
       teacherName: t.name || tx.teacher_name || '',
-      subjectName: '',
+      subjectName: subjectNames,
       rate: tx.lesson_rate || t.rate || 0,
       amount: (rcpt && rcpt.amount) || tx.amount || 0,
       date: (rcpt && rcpt.date) || tx.date || TeacherFinance.today(),

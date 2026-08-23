@@ -239,11 +239,11 @@ window.TeacherFinance = (function () {
     const win = window.open('', '_blank', 'width=794,height=1123');
     if (!win) return false;
 
-    const rows = Array.isArray(studentBreakdown) && studentBreakdown.length
+    const allRows = Array.isArray(studentBreakdown) && studentBreakdown.length
       ? studentBreakdown.map((s, i) =>
-        '<tr><td class="row-num">' + (i + 1) + '</td><td class="row-name">' + (s.name || '---') + '</td><td class="row-sub">' + (s.subject || '---') + '</td><td class="row-qty">' + (s.sessions || 0) + '</td><td class="row-amt">' + Number(s.amount || 0).toLocaleString('ar-DZ') + '</td></tr>'
-      ).join('')
-      : '<tr><td colspan="5" style="text-align:center;color:#8e8e93;padding:24px">No attendance records</td></tr>';
+        '<tr><td class="row-num">' + (i + 1) + '</td><td class="row-name">' + (s.name || '---') + '</td><td class="row-sub">' + (s.subject || '---') + '</td><td class="row-att">' + (s.sessions || 0) + '</td><td class="row-abs">' + (s.absent || 0) + '</td><td class="row-amt">' + Number(s.amount || 0).toLocaleString('ar-DZ') + '</td></tr>'
+      )
+      : [];
 
     const _date = date || new Date().toISOString().split('T')[0];
     const _fmtDate = (function() {
@@ -255,134 +255,150 @@ window.TeacherFinance = (function () {
     })();
 
     const _receiptNum = (receiptId || 'RCP-' + Date.now().toString(36).toUpperCase()).toUpperCase();
+    const ROWS_PER_PAGE = 12;
+    const pages = [];
+    if (allRows.length === 0) {
+      pages.push(['<tr><td colspan="6" style="text-align:center;color:#8e8e93;padding:24px">No attendance records</td></tr>']);
+    } else {
+      for (let i = 0; i < allRows.length; i += ROWS_PER_PAGE) {
+        pages.push(allRows.slice(i, i + ROWS_PER_PAGE));
+      }
+    }
 
-    win.document.write('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Receipt ' + _receiptNum + '</title>' +
-    '<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">' +
-    '<style>' +
-    '@page{margin:0;size:A4}' +
+    const pageStyles = '@page{margin:0;size:A4}' +
     '*{box-sizing:border-box;margin:0;padding:0}' +
     'body{font-family:Inter,-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif;color:#1d1d1f;background:#fff;-webkit-font-smoothing:antialiased;line-height:1.5}' +
-
-    '.page{width:210mm;min-height:297mm;margin:0 auto;padding:0;position:relative;background:#fff}' +
-
-    /* --- header --- */
-    '.hdr{padding:56px 64px 44px;display:flex;justify-content:space-between;align-items:flex-start}' +
-    '.hdr-left{}' +
+    '.page{width:210mm;min-height:297mm;margin:0 auto;padding:0;position:relative;background:#fff;page-break-after:always;overflow:hidden}' +
+    '.page:last-child{page-break-after:auto}' +
+    '.hdr{padding:48px 64px 36px;display:flex;justify-content:space-between;align-items:flex-start}' +
     '.hdr-logo{display:flex;align-items:center;gap:12px;margin-bottom:6px}' +
-    '.hdr-logo img{height:36px;filter:brightness(0)}' +
-    '.hdr-brand{font-size:13px;font-weight:600;color:#86868b;letter-spacing:1.5px}' +
+    '.hdr-logo img{height:32px;filter:brightness(0)}' +
+    '.hdr-brand{font-size:12px;font-weight:600;color:#86868b;letter-spacing:1.5px}' +
     '.hdr-right{text-align:right}' +
-    '.hdr-title{font-size:24px;font-weight:700;color:#1d1d1f;letter-spacing:-0.3px;margin-bottom:2px}' +
-    '.hdr-num{font-size:13px;font-weight:500;color:#8e8e93;font-family:SF Mono,Fira Code,Consolas,monospace}' +
-
-    /* --- separator --- */
+    '.hdr-title{font-size:22px;font-weight:700;color:#1d1d1f;letter-spacing:-0.3px;margin-bottom:2px}' +
+    '.hdr-num{font-size:12px;font-weight:500;color:#8e8e93;font-family:SF Mono,Fira Code,Consolas,monospace}' +
     '.sep{margin:0 64px;border:none;border-top:1px solid #d2d2d7}' +
-
-    /* --- body --- */
-    '.body{padding:40px 64px}' +
-    '.row{display:flex;justify-content:space-between;margin-bottom:24px}' +
+    '.body{padding:28px 64px 20px}' +
+    '.row{display:flex;justify-content:space-between;margin-bottom:16px}' +
     '.row-block{flex:1}' +
-    '.lbl{font-size:11px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px}' +
-    '.val{font-size:14px;font-weight:600;color:#1d1d1f}' +
-
-    /* --- table --- */
-    '.tbl-wrap{margin:0 0 40px;border:1px solid #d2d2d7;border-radius:10px;overflow:hidden}' +
+    '.lbl{font-size:10px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px}' +
+    '.val{font-size:13px;font-weight:600;color:#1d1d1f}' +
+    '.tbl-wrap{margin:0 0 24px;border:1px solid #d2d2d7;border-radius:10px;overflow:hidden}' +
     'table{width:100%;border-collapse:collapse}' +
-    'thead th{background:#f5f5f7;padding:11px 16px;font-size:11px;font-weight:600;color:#86868b;text-align:left;border-bottom:1px solid #d2d2d7;letter-spacing:0.3px}' +
-    'thead th:nth-child(1){width:36px;text-align:center}' +
-    'thead th:nth-child(4),thead th:nth-child(5){text-align:right}' +
-    'tbody td{padding:13px 16px;font-size:13px;font-weight:400;color:#1d1d1f;border-bottom:1px solid #f2f2f7}' +
+    'thead th{background:#f5f5f7;padding:9px 14px;font-size:10px;font-weight:600;color:#86868b;text-align:left;border-bottom:1px solid #d2d2d7;letter-spacing:0.3px}' +
+    'thead th:nth-child(1){width:32px;text-align:center}' +
+    'thead th:nth-child(4),thead th:nth-child(5),thead th:nth-child(6){text-align:right}' +
+    'tbody td{padding:10px 14px;font-size:12px;font-weight:400;color:#1d1d1f;border-bottom:1px solid #f2f2f7}' +
     'tbody tr:last-child td{border-bottom:none}' +
     '.row-num{text-align:center;color:#8e8e93;font-weight:500}' +
     '.row-name{font-weight:500}' +
-    '.row-sub{color:#86868b;font-size:12px}' +
-    '.row-qty{text-align:right;font-weight:600}' +
+    '.row-sub{color:#86868b;font-size:11px}' +
+    '.row-att{text-align:right;font-weight:600;color:#059669}' +
+    '.row-abs{text-align:right;font-weight:600;color:#dc2626}' +
     '.row-amt{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}' +
-
-    /* --- total --- */
-    '.total-row{display:flex;justify-content:flex-end;align-items:baseline;margin-bottom:40px;gap:16px}' +
-    '.total-lbl{font-size:13px;font-weight:500;color:#86868b}' +
-    '.total-val{font-size:28px;font-weight:700;color:#1d1d1f;letter-spacing:-0.5px}' +
-    '.total-curr{font-size:14px;font-weight:500;color:#86868b;margin-left:4px}' +
-
-    /* --- note --- */
-    '.note{background:#f5f5f7;border-radius:8px;padding:14px 20px;margin-bottom:40px}' +
-    '.note-text{font-size:12px;font-weight:500;color:#6e6e73}' +
-
-    /* --- footer --- */
-    '.ftr{border-top:1px solid #d2d2d7;padding:32px 64px 48px;display:flex;justify-content:space-between;align-items:flex-end}' +
+    '.total-row{display:flex;justify-content:flex-end;align-items:baseline;margin-bottom:24px;gap:16px}' +
+    '.total-lbl{font-size:12px;font-weight:500;color:#86868b}' +
+    '.total-val{font-size:26px;font-weight:700;color:#1d1d1f;letter-spacing:-0.5px}' +
+    '.total-curr{font-size:13px;font-weight:500;color:#86868b;margin-left:4px}' +
+    '.note{background:#f5f5f7;border-radius:8px;padding:12px 18px;margin-bottom:24px}' +
+    '.note-text{font-size:11px;font-weight:500;color:#6e6e73}' +
+    '.ftr{border-top:1px solid #d2d2d7;padding:24px 64px 36px;display:flex;justify-content:space-between;align-items:flex-end}' +
     '.ftr-sig{text-align:center}' +
-    '.ftr-line{width:130px;border-bottom:1px solid #d2d2d7;height:24px;margin-bottom:8px}' +
-    '.ftr-sig .lbl{font-size:10px;font-weight:500;color:#8e8e93}' +
+    '.ftr-line{width:120px;border-bottom:1px solid #d2d2d7;height:20px;margin-bottom:6px}' +
+    '.ftr-sig .lbl{font-size:9px;font-weight:500;color:#8e8e93}' +
     '.ftr-meta{text-align:center}' +
-    '.ftr-seal{width:52px;height:52px;border:1.5px solid #d2d2d7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:9px;font-weight:700;color:#c7c7cc;letter-spacing:1px}' +
-    '.ftr-disclaimer{position:absolute;bottom:24px;left:64px;right:64px;font-size:9px;color:#aeaeb2;text-align:center;border-top:1px solid #f2f2f7;padding-top:16px}' +
-
-    /* --- print button --- */
+    '.ftr-seal{width:44px;height:44px;border:1.5px solid #d2d2d7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 6px;font-size:8px;font-weight:700;color:#c7c7cc;letter-spacing:1px}' +
+    '.ftr-disclaimer{font-size:8px;color:#aeaeb2;text-align:center;border-top:1px solid #f2f2f7;padding-top:12px;margin:0 64px}' +
+    '.page-num{position:absolute;bottom:14px;left:64px;font-size:9px;color:#c7c7cc}' +
     '.print-btn{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 40px;border:none;border-radius:12px;background:#1d1d1f;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.12);transition:all .15s;z-index:10}' +
     '.print-btn:hover{background:#424245}' +
-    '@media print{.no-print{display:none!important}body{background:#fff}.page{box-shadow:none}@page{size:A4;margin:0}}' +
-    '</style></head><body>' +
+    '@media print{.no-print{display:none!important}body{background:#fff}.page{box-shadow:none}@page{size:A4;margin:0}}';
 
-    '<div class="page">' +
+    let html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Receipt ' + _receiptNum + '</title>' +
+    '<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">' +
+    '<style>' + pageStyles + '</style></head><body>';
 
-    /* HEADER */
-    '<div class="hdr">' +
-      '<div class="hdr-left">' +
-        '<div class="hdr-logo"><img src="schoollogo/schoollogoblack.PNG" alt=""></div>' +
-        '<div class="hdr-brand">E-PLUS ACADEMY</div>' +
-      '</div>' +
-      '<div class="hdr-right">' +
-        '<div class="hdr-title">Payment Receipt</div>' +
-        '<div class="hdr-num">' + _receiptNum + '</div>' +
-      '</div>' +
-    '</div>' +
+    pages.forEach(function(pageRows, pi) {
+      const isFirst = pi === 0;
+      const isLast = pi === pages.length - 1;
+      html += '<div class="page">';
 
-    '<hr class="sep">' +
+      if (isFirst) {
+        html += '<div class="hdr">' +
+          '<div class="hdr-left">' +
+            '<div class="hdr-logo"><img src="schoollogo/schoollogoblack.PNG" alt=""></div>' +
+            '<div class="hdr-brand">EDUCATION PLUS CENTER</div>' +
+          '</div>' +
+          '<div class="hdr-right">' +
+            '<div class="hdr-title">Payment Receipt</div>' +
+            '<div class="hdr-num">' + _receiptNum + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<hr class="sep">' +
+        '<div class="body">' +
+          '<div class="row">' +
+            '<div class="row-block"><div class="lbl">Teacher</div><div class="val">' + (teacherName || '---') + '</div></div>' +
+            '<div class="row-block"><div class="lbl">Subject</div><div class="val">' + (subjectName || '---') + '</div></div>' +
+            '<div class="row-block"><div class="lbl">Date</div><div class="val">' + _fmtDate + '</div></div>' +
+          '</div>' +
+          '<div class="row">' +
+            '<div class="row-block"><div class="lbl">Students</div><div class="val">' + (totalStudents || 0) + '</div></div>' +
+            '<div class="row-block"><div class="lbl">Rate / Session</div><div class="val">' + Number(rate || 0).toLocaleString('ar-DZ') + ' DZD</div></div>' +
+            '<div class="row-block"><div class="lbl">Total Sessions</div><div class="val">' + (totalSess || 0) + '</div></div>' +
+          '</div>';
+      } else {
+        html += '<div class="hdr" style="padding-bottom:24px">' +
+          '<div class="hdr-left">' +
+            '<div class="hdr-logo"><img src="schoollogo/schoollogoblack.PNG" alt=""></div>' +
+            '<div class="hdr-brand">EDUCATION PLUS CENTER</div>' +
+          '</div>' +
+          '<div class="hdr-right">' +
+            '<div class="hdr-title" style="font-size:16px">Payment Receipt (continued)</div>' +
+            '<div class="hdr-num">' + _receiptNum + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<hr class="sep">' +
+        '<div class="body" style="padding-top:20px">';
+      }
 
-    /* META */
-    '<div class="body">' +
-      '<div class="row">' +
-        '<div class="row-block"><div class="lbl">Teacher</div><div class="val">' + (teacherName || '---') + '</div></div>' +
-        '<div class="row-block"><div class="lbl">Subject</div><div class="val">' + (subjectName || '---') + '</div></div>' +
-        '<div class="row-block"><div class="lbl">Date</div><div class="val">' + _fmtDate + '</div></div>' +
-      '</div>' +
-      '<div class="row">' +
-        '<div class="row-block"><div class="lbl">Students</div><div class="val">' + (totalStudents || 0) + '</div></div>' +
-        '<div class="row-block"><div class="lbl">Rate / Session</div><div class="val">' + Number(rate || 0).toLocaleString('ar-DZ') + ' DZD</div></div>' +
-        '<div class="row-block"><div class="lbl">Total Sessions</div><div class="val">' + (totalSess || 0) + '</div></div>' +
-      '</div>' +
-
-      '<div class="tbl-wrap"><table>' +
+      html += '<div class="tbl-wrap"><table>' +
         '<thead><tr>' +
-          '<th>#</th><th>Student</th><th>Subject</th><th>Sessions</th><th>Amount (DZD)</th>' +
+          '<th>#</th><th>Student</th><th>Subject</th><th style="text-align:right">Attended</th><th style="text-align:right">Absent</th><th style="text-align:right">Amount (DZD)</th>' +
         '</tr></thead>' +
-        '<tbody>' + rows + '</tbody>' +
-      '</table></div>' +
+        '<tbody>' + pageRows.join('') + '</tbody>' +
+      '</table></div>';
 
-      '<div class="total-row">' +
-        '<span class="total-lbl">Total Amount</span>' +
-        '<span class="total-val">' + Number(amount || 0).toLocaleString('ar-DZ') + '<span class="total-curr"> DZD</span></span>' +
-      '</div>' +
+      if (isLast) {
+        const totalAtt = allRows.reduce(function(s, r) { const m = r.match(/row-att">(\d+)/); return s + (m ? parseInt(m[1]) || 0 : 0); }, 0);
+        const totalAbs = allRows.reduce(function(s, r) { const m = r.match(/row-abs">(\d+)/); return s + (m ? parseInt(m[1]) || 0 : 0); }, 0);
+        html += '<div class="total-row">' +
+          '<span class="total-lbl">Total Amount</span>' +
+          '<span class="total-val">' + Number(amount || 0).toLocaleString('ar-DZ') + '<span class="total-curr"> DZD</span></span>' +
+        '</div>' +
+        (note ? '<div class="note"><div class="note-text"><strong>Note:</strong> ' + note + '</div></div>' : '');
+      }
 
-      (note ? '<div class="note"><div class="note-text"><strong>Note:</strong> ' + note + '</div></div>' : '') +
-    '</div>' +
+      html += '</div>';
 
-    /* FOOTER */
-    '<div class="ftr">' +
-      '<div class="ftr-sig"><div class="ftr-line"></div><div class="lbl">Teacher</div></div>' +
-      '<div class="ftr-meta"><div class="ftr-seal">E+</div><div class="lbl">E-PLUS Academy</div></div>' +
-      '<div class="ftr-sig"><div class="ftr-line"></div><div class="lbl">Admin: ' + (adminName || '---') + '</div></div>' +
-    '</div>' +
+      if (isLast) {
+        html += '<div class="ftr">' +
+          '<div class="ftr-sig"><div class="ftr-line"></div><div class="lbl">Teacher</div></div>' +
+          '<div class="ftr-meta"><div class="ftr-seal">E+</div><div class="lbl">Education Plus Center</div></div>' +
+          '<div class="ftr-sig"><div class="ftr-line"></div><div class="lbl">Admin: ' + (adminName || '---') + '</div></div>' +
+        '</div>' +
+        '<div class="ftr-disclaimer">Generated electronically by Education Plus Center Management System. ' + _fmtDate + '</div>';
+      }
 
-    '<div class="ftr-disclaimer">Generated electronically by E-PLUS Academy Management System. ' + _fmtDate + '</div>' +
+      html += '<div class="page-num">' + (pi + 1) + ' / ' + pages.length + '</div>';
+      html += '</div>';
+    });
 
-    '</div>' +
-
-    '<button class="print-btn no-print" onclick="window.print()">Print</button>' +
+    html += '<button class="print-btn no-print" onclick="window.print()">Print</button>' +
     '<script>window.onafterprint=function(){setTimeout(function(){window.close();},200)};' +
     'if(window.matchMedia){try{window.matchMedia("print").addEventListener("change",function(m){if(!m.matches)setTimeout(function(){window.close()},200)})}catch(e){}}</' + 'script>' +
-    '</body></html>');
+    '</body></html>';
+
+    win.document.write(html);
     win.document.close();
     return true;
   }
