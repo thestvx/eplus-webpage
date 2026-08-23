@@ -16,7 +16,7 @@
   <script src="js/subjectService.js?v=4"></script>
   <script src="js/attendanceService.js?v=2"></script>
   <script src="js/barcodeScanner.js?v=1"></script>
-  <script src="js/teacherFinance.js?v=2"></script>
+  <script src="js/teacherFinance.js?v=3"></script>
   <script src="js/subscriptionService.js?v=2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
@@ -26348,17 +26348,64 @@ async function srtFinanceComputeDues() {
   const t = _srtFinanceTeacher;
   if (!t) return;
   const id = t.teacherId || t.id;
-  if (!(await cmConfirm('حساب المستحقات', 'سيتم احتساب مستحقات الأستاذ من سجلات الحضور الفعلية:\n\n• كل حضور = حصة واحدة × سعر الحصة\n• المعرّف ثابت ⇒ لا تتكرر المستحقات عند إعادة الحساب\n\nمتابعة؟', '🔄'))) return;
+  if (!(await cmConfirm('حساب المستحقات', 'سيتم احتساب مستحقات الأستاذ من سجلات الحضور الفعلية:\n\n• كل حضور = حصة واحدة × سعر الحصة\n• لا تُحتسب الحصص المجانية (ال grace session)\n\nمتابعة؟', '🔄'))) return;
   document.getElementById('srt-finance-ledger').innerHTML = '<div style="text-align:center;padding:24px;font-size:13px;font-weight:700;color:var(--text-muted)">⏳ جارٍ حساب المستحقات من الحضور...</div>';
   try {
     const res = await TeacherFinance.computeDuesForTeacher(t, t.rate || 0, srtFinAdminName());
-    srtShowToast('✅ تم حساب ' + res.duesRows.length + ' مستحقات (' + res.totalSessions + ' حصة، ' + res.studentCount + ' تلميذ)', 'success');
+    srtShowToast('✅ تم حساب ' + res.studentCount + ' تلميذ — ' + res.totalSessions + ' حصة', 'success');
     await srtFinanceRefresh();
+    srtShowDuesReport(res);
   } catch (e) {
     console.error('Compute dues error:', e);
     srtShowToast('فشل حساب المستحقات: ' + e.message, 'error');
     await srtFinanceRefresh();
   }
+}
+
+function srtShowDuesReport(res) {
+  const rows = res.duesRows || [];
+  const rate = res.rate || 0;
+  let overlay = document.getElementById('srt-dues-report-overlay');
+  if (overlay) overlay.remove();
+  overlay = document.createElement('div');
+  overlay.id = 'srt-dues-report-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn .25s';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+  let rowsHtml = '';
+  if (rows.length === 0) {
+    rowsHtml = '<div style="text-align:center;padding:40px 20px;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:12px;opacity:.3">📊</div><div style="font-weight:800;font-size:15px;color:var(--text);margin-bottom:6px">لا توجد حصص مسجلة بعد</div><div style="font-size:13px">لم يتم العثور على سجلات حضور لهذا الأستاذ</div></div>';
+  } else {
+    rowsHtml = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>'
+      + '<th style="padding:12px 14px;text-align:right;font-size:11px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light)">#</th>'
+      + '<th style="padding:12px 14px;text-align:right;font-size:11px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light)">التلميذ</th>'
+      + '<th style="padding:12px 14px;text-align:right;font-size:11px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light)">المادة</th>'
+      + '<th style="padding:12px 14px;text-align:center;font-size:11px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light)">الحصص</th>'
+      + '<th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light)">المستحق</th>'
+      + '</tr></thead><tbody>'
+      + rows.map(function(r, i) {
+        return '<tr style="border-bottom:1px solid var(--border-light)">'
+          + '<td style="padding:12px 14px;font-weight:800;color:var(--text-muted)">' + (i + 1) + '</td>'
+          + '<td style="padding:12px 14px;font-weight:700">' + (r.student_name || '—') + '</td>'
+          + '<td style="padding:12px 14px;font-size:12px;color:var(--text-muted)">' + (r.subject_name || '—') + '</td>'
+          + '<td style="padding:12px 14px;text-align:center;font-weight:800;color:var(--primary)">' + (r.session_count || 0) + '</td>'
+          + '<td style="padding:12px 14px;text-align:left;font-weight:800;color:var(--green)">' + (r.amount || 0).toLocaleString('ar-DZ') + ' دج</td>'
+          + '</tr>';
+      }).join('')
+      + '</tbody></table>';
+  }
+
+  overlay.innerHTML = '<div style="background:var(--card);border-radius:20px;max-width:700px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.25);overflow:hidden">'
+    + '<div style="padding:20px 24px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">'
+    + '<div><div style="font-size:16px;font-weight:900;display:flex;align-items:center;gap:8px">📊 تقرير المستحقات</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-top:4px">' + (res.studentCount || 0) + ' تلميذ — ' + (res.totalSessions || 0) + ' حصة — سعر الحصة: ' + (rate || 0).toLocaleString('ar-DZ') + ' دج</div></div>'
+    + '<button onclick="document.getElementById(\'srt-dues-report-overlay\').remove()" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--text)">✕ إغلاق</button></div>'
+    + '<div style="overflow-y:auto;flex:1;padding:8px">' + rowsHtml + '</div>'
+    + (rows.length > 0 ? '<div style="padding:16px 24px;border-top:1px solid var(--border-light);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:rgba(99,102,241,0.04)">'
+      + '<div style="font-size:14px;font-weight:800">الإجمالي</div>'
+      + '<div style="font-size:20px;font-weight:900;color:var(--green)">' + (res.totalSessions * rate).toLocaleString('ar-DZ') + ' دج</div></div>' : '')
+    + '</div>';
+  document.body.appendChild(overlay);
 }
 
 async function srtTreasuryAdjust(delta) {

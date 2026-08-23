@@ -67,21 +67,21 @@ window.TeacherFinance = (function () {
 
   // ── Attendance (Firestore) — 1 حضور = 1 حصة ───────────
 
-  async function countAttendance(studentId, subjectId, teacherId) {
+  async function countAttendance(studentId, subjectId, teacherId, subjectName, teacherName) {
     const fs = _fs();
     const db = _fb();
     if (!fs || !db) return 0;
     try {
       const { query, where, getDocs, collection } = fs;
-      let q = query(collection(db, 'support_attendance'),
-        where('studentId', '==', studentId),
-        where('subjectId', '==', subjectId));
-      if (teacherId) q = query(q, where('teacherId', '==', teacherId));
+      let q = query(collection(db, ATT_COLLECTION),
+        where('studentId', '==', studentId));
       const snap = await getDocs(q);
       let count = 0;
       snap.forEach(d => {
         const r = d.data();
         if (r.type === 'grace' || r.type === 'grace_session') return;
+        if (teacherName && r.teacherName && _norm(r.teacherName) !== _norm(teacherName)) return;
+        if (subjectName && r.subjectName && _norm(r.subjectName) !== _norm(subjectName)) return;
         count++;
       });
       return count;
@@ -121,7 +121,7 @@ window.TeacherFinance = (function () {
       for (const s of subjects) {
         const subjectId = s.subjectId || (window.SubjectService && SubjectService.getSubjectId(s.subject || s.subjectName || '')) || '';
         const subjectName = s.subject || s.subjectName || '';
-        const count = await countAttendance(r.id, subjectId, teacherId);
+        const count = await countAttendance(r.id, subjectId, teacherId, subjectName, teacherName);
         if (count <= 0) continue;
         const lessonRate = Number(s.lessonRateAtTransaction) > 0 ? Number(s.lessonRateAtTransaction) : baseRate;
         const amount = count * lessonRate;
