@@ -75,7 +75,13 @@ window.TeacherFinance = (function () {
         .where('subjectId', '==', subjectId);
       if (teacherId) q = q.where('teacherId', '==', teacherId);
       const snap = await q.get();
-      return snap.size || 0;
+      let count = 0;
+      snap.forEach(d => {
+        const r = d.data();
+        if (r.type === 'grace' || r.type === 'grace_session') return;
+        count++;
+      });
+      return count;
     } catch (e) {
       console.warn('[TeacherFinance] attendance count failed:', e);
       return 0;
@@ -216,64 +222,137 @@ window.TeacherFinance = (function () {
     });
   }
 
-  // ── Receipt Print (RTL، هوية E-PLUS، بدون تنسيق المتصفح الافتراضي) ──
+  // ── Receipt Print (Premium, RTL, academy logo, per-student breakdown) ──
 
   function printReceipt(payload) {
     const {
-      receiptId, teacherName, studentName, subjectName, sessions, rate, amount, date, adminName, note
+      receiptId, teacherName, subjectName, sessions, rate, amount, date, adminName, note,
+      studentBreakdown, totalStudents, totalSessions: totalSess
     } = payload;
-    const win = window.open('', '_blank', 'width=420,height=640');
+    const win = window.open('', '_blank', 'width=520,height=800');
     if (!win) return false;
-    win.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>إيصال - ${receiptId}</title>
+    const breakdownRows = Array.isArray(studentBreakdown) && studentBreakdown.length
+      ? studentBreakdown.map((s, i) =>
+        `<tr style="border-bottom:1px solid #f1f5f9">
+          <td style="padding:12px 14px;font-weight:700;color:#1e293b">${i + 1}</td>
+          <td style="padding:12px 14px;font-weight:700;color:#1e293b">${s.name || '—'}</td>
+          <td style="padding:12px 14px;text-align:center;font-weight:800;color:#6366f1">${s.sessions || 0}</td>
+          <td style="padding:12px 14px;text-align:left;font-weight:800;color:#059669">${Number(s.amount || 0).toLocaleString('ar-DZ')} دج</td>
+        </tr>`
+      ).join('')
+      : `<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;font-weight:700">لا توجد تفاصيل حضور</td></tr>`;
+
+    win.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>وصل مالي — ${receiptId}</title>
 <style>
-  @page { margin: 8mm; size: 80mm 120mm; }
-  * { box-sizing: border-box; }
-  body { font-family: 'Tajawal','Segoe UI',Arial,sans-serif; background: #fff; color: #0d1520; margin: 0; padding: 0; direction: rtl; }
-  .receipt { max-width: 100%; margin: 0 auto; padding: 8px 10px; }
-  .head { text-align: center; border-bottom: 2px dashed #0d1520; padding-bottom: 10px; margin-bottom: 12px; }
-  .logo { font-size: 20px; font-weight: 900; color: #7C3AED; letter-spacing: 0.5px; }
-  .brand { font-size: 12px; color: #6d28d9; font-weight: 700; margin-top: 2px; }
-  .rcpt-id { display: inline-block; margin-top: 6px; font-size: 11px; background: #ede9fe; color: #4c4587; padding: 3px 10px; border-radius: 999px; font-weight: 800; }
-  .title { text-align: center; font-size: 15px; font-weight: 900; margin: 10px 0; }
-  table.rows { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-  table.rows td { padding: 6px 4px; border-bottom: 1px dotted #cbd5e1; }
-  table.rows td.k { color: #64748b; font-weight: 700; width: 42%; }
-  table.rows td.v { font-weight: 900; text-align: left; }
-  .amount-box { text-align: center; margin: 14px 0; padding: 10px; border: 2px solid #0d1520; border-radius: 10px; }
-  .amount-box .lbl { font-size: 11px; color: #64748b; font-weight: 700; }
-  .amount-box .val { font-size: 22px; font-weight: 900; color: #0d1520; }
-  .footer { text-align: center; margin-top: 14px; font-size: 11px; color: #64748b; border-top: 1px dashed #cbd5e1; padding-top: 8px; }
-  .sig { display: flex; justify-content: space-between; margin-top: 26px; font-size: 11.5px; font-weight: 800; color: #334155; }
-  @media print { .no-print { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-</style></head><body><div class="receipt">
-  <div class="head">
-    <div class="logo">E-PLUS</div>
-    <div class="brand">مؤسسة E-PLUS التعليمية — بقمار</div>
-    <div class="rcpt-id">إيصال رقم ${receiptId}</div>
+  @page { margin: 12mm; size: A4; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Tajawal','Segoe UI',Arial,sans-serif; background: #f8f9fc; color: #1e293b; direction: rtl; }
+  .page { max-width: 500px; margin: 0 auto; background: #fff; border-radius: 20px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); overflow: hidden; }
+  .header { background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 32px 28px 24px; text-align: center; position: relative; }
+  .header::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 24px; background: #fff; border-radius: 24px 24px 0 0; }
+  .logo-wrap { display: flex; justify-content: center; margin-bottom: 12px; }
+  .logo-wrap img { height: 64px; width: auto; filter: brightness(0) invert(1); }
+  .brand-name { font-size: 18px; font-weight: 900; color: #fff; letter-spacing: 1px; }
+  .brand-sub { font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 2px; }
+  .success-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25); color: #059669; padding: 6px 18px; border-radius: 999px; font-size: 13px; font-weight: 800; margin: 20px auto 0; }
+  .success-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #059669; }
+  .success-sub { text-align: center; font-size: 11.5px; color: #94a3b8; margin-top: 8px; font-weight: 600; }
+  .body { padding: 24px 28px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .info-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; }
+  .info-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .info-val { font-size: 14px; font-weight: 900; color: #1e293b; }
+  .info-val.primary { color: #6366f1; }
+  .divider { border: none; border-top: 2px dashed #e2e8f0; margin: 16px 0; }
+  .section-title { font-size: 13px; font-weight: 900; color: #64748b; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .detail-table { width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
+  .detail-table th { background: #f1f5f9; padding: 10px 14px; font-size: 11px; font-weight: 800; color: #64748b; text-align: right; border-bottom: 2px solid #e2e8f0; }
+  .detail-table th:nth-child(3), .detail-table th:nth-child(4) { text-align: center; }
+  .detail-table td { font-size: 13px; }
+  .total-box { background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 16px; padding: 20px; text-align: center; margin: 20px 0; }
+  .total-label { font-size: 12px; color: rgba(255,255,255,0.8); font-weight: 700; }
+  .total-amount { font-size: 32px; font-weight: 900; color: #fff; margin-top: 4px; direction: ltr; }
+  .total-currency { font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.7); }
+  .footer { text-align: center; padding: 20px 28px; border-top: 1px solid #f1f5f9; }
+  .footer-note { font-size: 11px; color: #94a3b8; line-height: 1.8; }
+  .receipt-id-badge { display: inline-block; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); padding: 4px 14px; border-radius: 999px; font-size: 11px; font-weight: 800; color: rgba(255,255,255,0.9); margin-top: 8px; }
+  .print-btn { display: block; width: 100%; padding: 14px; border: none; border-radius: 14px; background: linear-gradient(135deg, #059669, #047857); color: #fff; font-size: 15px; font-weight: 900; cursor: pointer; font-family: inherit; margin-top: 20px; box-shadow: 0 4px 16px rgba(5,150,105,0.25); }
+  .print-btn:hover { transform: translateY(-1px); }
+  @media print { .no-print { display: none !important; } body { background: #fff; } .page { box-shadow: none; border-radius: 0; } }
+  @media (max-width: 540px) { .page { border-radius: 0; margin: 0; } .info-grid { grid-template-columns: 1fr; } }
+</style></head><body>
+<div class="page">
+  <div class="header">
+    <div class="logo-wrap"><img src="schoollogo/schoollogoblack.PNG" alt="E-PLUS"></div>
+    <div class="brand-name">E-PLUS Academy</div>
+    <div class="brand-sub">مؤسسة E-PLUS التعليمية — بقمار</div>
+    <div class="receipt-id-badge">رقم الوصل: ${receiptId}</div>
   </div>
-  <div class="title">🧾 إيصال دفع مستحقات أستاذ</div>
-  <table class="rows">
-    <tr><td class="k">اسم الأستاذ</td><td class="v">${teacherName}</td></tr>
-    ${studentName ? `<tr><td class="k">التلميذ</td><td class="v">${studentName}</td></tr>` : ''}
-    ${subjectName ? `<tr><td class="k">المادة</td><td class="v">${subjectName}</td></tr>` : ''}
-    ${sessions ? `<tr><td class="k">عدد الحصص</td><td class="v">${sessions}</td></tr>` : ''}
-    ${rate ? `<tr><td class="k">سعر الحصة (دج)</td><td class="v">${rate}</td></tr>` : ''}
-    <tr><td class="k">التاريخ</td><td class="v">${date}</td></tr>
-    ${note ? `<tr><td class="k">البيان</td><td class="v">${note}</td></tr>` : ''}
-  </table>
-  <div class="amount-box">
-    <div class="lbl">المبلغ المدفوع</div>
-    <div class="val">${Number(amount).toLocaleString('ar-DZ')} دج</div>
+
+  <div class="body">
+    <div style="text-align:center">
+      <div class="success-badge"><span class="dot"></span> تم إصدار الوصل بنجاح</div>
+      <div class="success-sub">مستحقات الأستاذ عن الحصص المسجلة</div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="info-label">الأستاذ</div>
+        <div class="info-val">${teacherName || '—'}</div>
+      </div>
+      <div class="info-card">
+        <div class="info-label">المادة</div>
+        <div class="info-val">${subjectName || '—'}</div>
+      </div>
+      <div class="info-card">
+        <div class="info-label">تاريخ الإصدار</div>
+        <div class="info-val">${date || '—'}</div>
+      </div>
+      <div class="info-card">
+        <div class="info-label">إجمالي التلاميذ</div>
+        <div class="info-val primary">${totalStudents || 0} تلميذ</div>
+      </div>
+    </div>
+
+    <div class="info-card" style="background:rgba(99,102,241,0.04);border-color:rgba(99,102,241,0.15);margin-bottom:16px;text-align:center">
+      <div class="info-label">سعر الحصة الواحدة</div>
+      <div class="info-val primary" style="font-size:20px">${Number(rate || 0).toLocaleString('ar-DZ')} دج</div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="section-title">📊 تفاصيل الحضور والحساب</div>
+    <table class="detail-table">
+      <thead><tr>
+        <th>#</th>
+        <th>اسم التلميذ</th>
+        <th style="text-align:center">الحصص</th>
+        <th style="text-align:center">المستحق</th>
+      </tr></thead>
+      <tbody>${breakdownRows}</tbody>
+    </table>
+
+    <div class="total-box">
+      <div class="total-label">إجمالي المستحقات</div>
+      <div class="total-amount">${Number(amount || 0).toLocaleString('ar-DZ')} <span class="total-currency">دج</span></div>
+    </div>
+
+    ${note ? '<div style="text-align:center;font-size:11px;color:#94a3b8;margin-bottom:8px">البيان: ' + note + '</div>' : ''}
   </div>
-  <div class="sig">
-    <span>المدير: ${adminName || 'الإدارة'}</span>
-    <span>إمضاء الأستاذ: ............</span>
+
+  <div class="footer">
+    <div class="footer-note">
+      MANAGEMENT: ${adminName || 'الإدارة'}<br>
+      هذا الوصل تم إنشاؤه إلكترونياً من نظام E-PLUS Academy
+    </div>
+    <button class="print-btn no-print" onclick="window.print()">🖨️ طباعة الوصل</button>
   </div>
-  <div class="footer">شكراً لثقتكم في E-PLUS</div>
-  <div style="text-align:center;margin-top:12px">
-    <button class="no-print" onclick="window.print()" style="padding:10px 30px;border:none;border-radius:10px;background:#7C3AED;color:#fff;font-weight:800;cursor:pointer">🖨️ طباعة</button>
-  </div>
-</div><script>window.onafterprint=function(){setTimeout(function(){window.close();},200);};if(window.matchMedia){try{window.matchMedia('print').addEventListener('change',function(m){if(!m.matches)setTimeout(function(){window.close();},200);});}catch(e){}}</script></body></html>`);
+</div>
+<script>
+window.onafterprint=function(){setTimeout(function(){window.close();},200);};
+if(window.matchMedia){try{window.matchMedia('print').addEventListener('change',function(m){if(!m.matches)setTimeout(function(){window.close();},200);});}catch(e){}}
+</script>
+</body></html>`);
     win.document.close();
     return true;
   }

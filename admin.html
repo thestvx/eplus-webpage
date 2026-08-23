@@ -26414,17 +26414,26 @@ async function srtFinancePrintReceipt(txId) {
     const ledger = await TeacherFinance.getLedger(id);
     const tx = ledger.find(x => x.id === txId) || (rcpt ? { amount: rcpt.amount, date: rcpt.date, notes: rcpt.notes } : null);
     if (!tx) return;
+
+    const studentBreakdown = ledger.filter(x => x.transaction_type === 'dues').map(x => ({
+      name: x.student_name || '',
+      sessions: x.session_count || 0,
+      amount: x.amount || 0,
+      subject: x.subject_name || '',
+    }));
+
     TeacherFinance.printReceipt({
       receiptId: (rcpt && rcpt.id) || ('RCP-' + (tx.date || TeacherFinance.today()).replace(/-/g, '') + '-' + txId.slice(-4)),
       teacherName: t.name || tx.teacher_name || '',
-      studentName: tx.student_name || '',
-      subjectName: tx.subject_name || '',
-      sessions: tx.session_count || 0,
-      rate: tx.lesson_rate || 0,
+      subjectName: '',
+      rate: tx.lesson_rate || t.rate || 0,
       amount: (rcpt && rcpt.amount) || tx.amount || 0,
       date: (rcpt && rcpt.date) || tx.date || TeacherFinance.today(),
       adminName: (rcpt && rcpt.admin_name) || tx.admin_name || srtFinAdminName(),
-      note: tx.notes || ''
+      note: tx.notes || '',
+      studentBreakdown: studentBreakdown,
+      totalStudents: new Set(studentBreakdown.map(s => s.name)).size,
+      totalSessions: studentBreakdown.reduce((sum, s) => sum + s.sessions, 0),
     });
   } catch (e) {
     srtShowToast('فشل طباعة الإيصال: ' + e.message, 'error');

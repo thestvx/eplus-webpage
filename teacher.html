@@ -16,6 +16,7 @@
   <script src="js/registrationService.js?v=4"></script>
   <script src="js/subjectService.js?v=4"></script>
   <script src="js/attendanceService.js?v=2"></script>
+  <script src="js/teacherFinance.js?v=1"></script>
   <style>
     *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
     :root{
@@ -631,9 +632,9 @@
     async function loadDashboardStats(teacherId,teacherName){
       try{
         var teacherNameLC=teacherName.toLowerCase();
-        var[contentSnap,finSnap,supabaseRegCount]=await Promise.all([
+        var[contentSnap,attSnap,supabaseRegCount]=await Promise.all([
           db.collection(CONTENT_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
-          db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(function(){return {docs:[]};}),
+          db.collection(ATTENDANCE_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
           fetch(SUPABASE_URL+'/rest/v1/registrations?select=id,subjects,status&status=eq.'+encodeURIComponent('مسجل نهائياً'),{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}).then(function(data){return Array.isArray(data)?data.filter(function(d){return !d.deleted_at;}):[];}).catch(function(){return [];}),
         ]);
         var allContent=contentSnap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
@@ -656,7 +657,9 @@
             }
           }
         }
-        const balance=finSnap.docs.length>0?(finSnap.docs[0].data().balance||0):0;
+        var attendanceCount=attSnap.docs.length||0;
+        var rate=currentTeacher.rate||0;
+        var balance=attendanceCount*rate;
 
         document.getElementById('stat-students').textContent=fmtNum(studentCount);
         document.getElementById('stat-lessons').textContent=fmtNum(lessons.length);
@@ -664,7 +667,7 @@
         document.getElementById('stat-announcements').textContent=fmtNum(announcements.length);
 
         const balEl=document.getElementById('dash-balance');
-        if(balEl)balEl.innerHTML='<div style="text-align:center"><div style="font-size:13px;color:var(--text-muted);font-weight:600;margin-bottom:6px">الرصيد الحالي</div><div style="font-size:32px;font-weight:900;color:var(--green)">'+fmtNum(balance)+' <span style="font-size:14px;opacity:.6">دج</span></div></div>';
+        if(balEl)balEl.innerHTML='<div style="text-align:center"><div style="font-size:13px;color:var(--text-muted);font-weight:600;margin-bottom:6px">إجمالي الأرباح</div><div style="font-size:32px;font-weight:900;color:var(--green)">'+fmtNum(balance)+' <span style="font-size:14px;opacity:.6">دج</span></div><div style="font-size:11px;color:var(--text-muted);margin-top:4px">'+attendanceCount+' حصة × '+fmtNum(rate)+' دج</div><div style="margin-top:10px"><a href="javascript:navigateTo(\'finance\')" style="color:var(--primary);font-size:12px;font-weight:700;cursor:pointer">عرض التفاصيل ←</a></div></div>';
 
         const sorted=allContent.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
         const recentLessons=sorted.filter(c=>c.type==='lesson').slice(0,5);
@@ -1016,7 +1019,8 @@
 
     /* ===== FINANCE PAGE ===== */
     async function renderFinancePage(){
-      currentTeacher=currentTeacher||{};const t=currentTeacher,teacherId=t.teacherId||t.id;
+      currentTeacher=currentTeacher||{};const t=currentTeacher,teacherId=t.teacherId||t.id,teacherName=t.name||t.teacherName||'';
+      const rate=t.rate||0;
       document.getElementById('app').innerHTML=`
         <div class="app-layout">
           <aside class="sidebar" id="sidebar">${renderSidebar(t)}</aside>
@@ -1025,7 +1029,7 @@
             <div class="main-scroll">
               <div class="content-inner">
                 <div class="page-header">
-                  <div><div class="page-title"><span class="page-title-icon" style="background:var(--green-light);color:var(--green)">💰</span>الموارد المالية</div><div class="page-subtitle">إدارة رصيدك المالي</div></div>
+                  <div><div class="page-title"><span class="page-title-icon" style="background:var(--green-light);color:var(--green)">💰</span>الموارد المالية</div><div class="page-subtitle">تفاصيل أرباحك من الحضور والمحاضرات</div></div>
                 </div>
                 <div id="finance-content"><div class="loading-page"><div class="spinner"></div></div></div>
                 <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
@@ -1034,10 +1038,52 @@
           </div>
         </div>`;
       try{
-        const snap=await db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get();
-        const data=snap.docs.length>0?snap.docs[0].data():{};
-        const balance=data.balance||0;
-        const lastUpdate=data.updatedAt?fmtDate(data.updatedAt):'—';
+        const [attSnap,finSnap,supabaseRegs]=await Promise.all([
+          db.collection(ATTENDANCE_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
+          db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(function(){return {docs:[]};}),
+          fetch(SUPABASE_URL+'/rest/v1/registrations?select=id,first_name,last_name,subjects,status&status=eq.'+encodeURIComponent('مسجل نهائياً'),{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d.filter(function(x){return !x.deleted_at&&Array.isArray(x.subjects);}):[];}).catch(function(){return [];}),
+        ]);
+
+        const allAttendance=attSnap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+
+        const attendedStudentIds=new Set(allAttendance.map(function(a){return a.studentId||a.student_id;}).filter(Boolean));
+        const matchedStudents=[];
+        for(const reg of supabaseRegs){
+          if(!attendedStudentIds.has(reg.id))continue;
+          const subjects=(reg.subjects||[]).filter(function(sj){
+            if(typeof sj==='string')return false;
+            const sjTeacherId=sj.teacherId||sj.teacher_id||'';
+            const sjTeacher=(sj.teacher||sj.teacherName||'').toLowerCase();
+            if(sjTeacherId&&sjTeacherId===teacherId)return true;
+            if(sjTeacher&&teacherName&&sjTeacher.toLowerCase()===teacherName.toLowerCase())return true;
+            return false;
+          });
+          if(subjects.length===0)continue;
+          matchedStudents.push({id:reg.id,name:((reg.first_name||'')+' '+(reg.last_name||'')).trim(),subjects:subjects});
+        }
+
+        const byStudent={};
+        allAttendance.forEach(function(a){
+          const sid=a.studentId||a.student_id;if(!sid)return;
+          if(!byStudent[sid])byStudent[sid]={sessions:0,subjects:{}};
+          byStudent[sid].sessions++;
+          const sub=a.subject||a.subjectName||a.subject_name||'';
+          if(sub){
+            if(!byStudent[sid].subjects[sub])byStudent[sid].subjects[sub]=0;
+            byStudent[sid].subjects[sub]++;
+          }
+        });
+
+        const details=matchedStudents.map(function(s){
+          const info=byStudent[s.id]||{sessions:0,subjects:{}};
+          return {name:s.name,sessions:info.sessions,subjects:info.subjects,amount:info.sessions*rate};
+        }).filter(function(d){return d.sessions>0;}).sort(function(a,b){return b.amount-a.amount;});
+
+        const totalSessions=details.reduce(function(s,d){return s+d.sessions;},0);
+        const totalEarnings=totalSessions*rate;
+        const balance=(finSnap.docs.length>0?(finSnap.docs[0].data().balance||0):0);
+        const lastUpdate=finSnap.docs.length>0?(finSnap.docs[0].data().updatedAt?fmtDate(finSnap.docs[0].data().updatedAt):'—'):'—';
+
         document.getElementById('finance-content').innerHTML=`
           <div style="background:linear-gradient(135deg,#059669 0%,#10b981 50%,#34d399 100%);border-radius:var(--radius-lg);padding:40px 32px;color:#fff;text-align:center;margin-bottom:24px;position:relative;overflow:hidden">
             <div style="position:absolute;top:-40px;right:-40px;width:180px;height:180px;background:rgba(255,255,255,0.08);border-radius:50%;pointer-events:none"></div>
@@ -1046,12 +1092,55 @@
             <div style="font-size:48px;font-weight:900;position:relative;z-index:1">${fmtNum(balance)} <span style="font-size:18px;opacity:.6">دج</span></div>
             <div style="font-size:12px;opacity:.5;margin-top:8px;position:relative;z-index:1">آخر تحديث: ${lastUpdate}</div>
           </div>
-          <div style="text-align:center;padding:40px 24px;color:var(--text-muted);font-size:14px;font-weight:600">
-            <div style="font-size:56px;margin-bottom:16px;opacity:.25">📊</div>
-            <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:8px">قريباً — سجل العمليات</div>
-            <div style="font-size:13px;max-width:360px;margin:0 auto;line-height:1.8">سيتم تطوير قسم المالية ليشمل سجل العمليات والأرباح والتقارير التفصيلية</div>
+
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px">
+            <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
+              <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">إجمالي الأرباح</div>
+              <div style="font-size:26px;font-weight:900;color:var(--green)">${fmtNum(totalEarnings)} <span style="font-size:12px;opacity:.5">دج</span></div>
+            </div>
+            <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
+              <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">عدد الحصص</div>
+              <div style="font-size:26px;font-weight:900;color:var(--primary)">${fmtNum(totalSessions)}</div>
+            </div>
+            <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
+              <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">عدد التلاميذ</div>
+              <div style="font-size:26px;font-weight:900;color:var(--purple)">${details.length}</div>
+            </div>
+          </div>
+
+          <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);margin-bottom:24px">
+            <div style="padding:16px 20px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between">
+              <div style="font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px">📊 تفاصيل الأرباح لكل تلميذ</div>
+              <div style="font-size:12px;color:var(--text-muted);font-weight:600">سعر الحصة: ${fmtNum(rate)} دج</div>
+            </div>
+            ${details.length===0?'<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:14px;font-weight:600"><div style="font-size:48px;margin-bottom:12px;opacity:.25">📊</div>لا توجد حصص مسجلة بعد</div>':`
+            <div style="overflow-x:auto">
+              <table class="data-table" style="margin:0">
+                <thead><tr>
+                  <th>#</th>
+                  <th>التلميذ</th>
+                  <th style="text-align:center">عدد الحصص</th>
+                  <th>المادة</th>
+                  <th style="text-align:center">المستحق</th>
+                </tr></thead>
+                <tbody>${details.map(function(d,i){
+                  const subLines=Object.entries(d.subjects).map(function(e){return e[0]+': '+e[1]+' حصة';}).join('، ');
+                  return '<tr><td style="font-weight:800;color:var(--text-muted)">'+(i+1)+'</td><td style="font-weight:700">'+d.name+'</td><td style="text-align:center;font-weight:800;color:var(--primary)">'+d.sessions+'</td><td style="font-size:11px;color:var(--text-muted)">'+subLines+'</td><td style="text-align:center;font-weight:900;color:var(--green)">'+fmtNum(d.amount)+' دج</td></tr>';
+                }).join('')}</tbody>
+                <tfoot><tr style="background:rgba(99,102,241,0.04)">
+                  <td></td>
+                  <td style="font-weight:900">الإجمالي</td>
+                  <td style="text-align:center;font-weight:900;color:var(--primary)">${totalSessions}</td>
+                  <td></td>
+                  <td style="text-align:center;font-weight:900;color:var(--green)">${fmtNum(totalEarnings)} دج</td>
+                </tr></tfoot>
+              </table>
+            </div>`}
           </div>`;
-      }catch(e){console.error('Finance error:',e);document.getElementById('finance-content').innerHTML='<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">حدث خطأ</div></div>';}
+      }catch(e){
+        console.error('Finance error:',e);
+        document.getElementById('finance-content').innerHTML='<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">حدث خطأ أثناء تحميل البيانات المالية</div><div class="empty-state-sub">'+e.message+'</div></div>';
+      }
     }
 
     /* ===== LOGIN ===== */
