@@ -910,6 +910,15 @@ REVOKE ALL ON FUNCTION admin_get_teacher_receipts(TEXT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION get_student_subscription(TEXT) TO anon, service_role;
 GRANT EXECUTE ON FUNCTION get_student_attendance_events(TEXT) TO anon, service_role;
 
+-- قراءة اشتراكات الأستاذ النشطة (للPortal)
+CREATE OR REPLACE FUNCTION get_teacher_active_subs(p_teacher_id TEXT)
+RETURNS TABLE(student_id TEXT, subject_name TEXT, subject_id TEXT, teacher_name TEXT) AS $$
+  SELECT s.student_id, s.subject_name, s.subject_id, s.teacher_name
+  FROM student_subscriptions s
+  WHERE s.teacher_id = p_teacher_id AND s.status = 'active';
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+GRANT EXECUTE ON FUNCTION get_teacher_active_subs(TEXT) TO anon, service_role;
+
 -- الدوال الحسّاسة: service_role فقط (تستدعيها Edge Functions بمفتاح الخادم)
 GRANT EXECUTE ON FUNCTION admin_is_uid_admin(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_add_admin(TEXT, TEXT, TEXT) TO service_role;
