@@ -634,7 +634,7 @@
         var teacherNameLC=teacherName.toLowerCase();
         var[contentSnap,attSnap,supabaseRegCount,teacherDoc,finSnap]=await Promise.all([
           db.collection(CONTENT_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
-          db.collection(ATTENDANCE_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
+          db.collection(ATTENDANCE_COLLECTION).where('teacherName','==',teacherName).get().catch(function(){return {docs:[]};}),
           fetch(SUPABASE_URL+'/rest/v1/registrations?select=id,subjects,status&status=eq.'+encodeURIComponent('مسجل نهائياً'),{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}).then(function(data){return Array.isArray(data)?data.filter(function(d){return !d.deleted_at;}):[];}).catch(function(){return [];}),
           db.collection(SRT_COLLECTION).doc(teacherId).get().catch(function(){return null;}),
           db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(function(){return {docs:[]};}),
@@ -661,7 +661,8 @@
             }
           }
         }
-        var attendanceCount=attSnap.docs.length||0;
+        var attDocs=attSnap.docs.map(function(d){return d.data();}).filter(function(a){return a.type!=='grace'&&a.type!=='grace_session'&&a.type!=='trial_session';});
+        var attendanceCount=attDocs.length||0;
         var finDoc=finSnap.docs.length>0?finSnap.docs[0].data():{};
         var payments=Array.isArray(finDoc.payments)?finDoc.payments:[];
         var totalPaid=payments.reduce(function(s,p){return s+(p.amount||0);},0);
@@ -1044,7 +1045,7 @@
         </div>`;
       try{
         const [attSnap,finSnap,supabaseRegs,atcSnap,teacherDoc]=await Promise.all([
-          db.collection(ATTENDANCE_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
+          db.collection(ATTENDANCE_COLLECTION).where('teacherName','==',teacherName).get().catch(function(){return {docs:[]};}),
           db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(function(){return {docs:[]};}),
           fetch(SUPABASE_URL+'/rest/v1/registrations?select=id,first_name,last_name,subjects,status&status=eq.'+encodeURIComponent('مسجل نهائياً'),{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d.filter(function(x){return !x.deleted_at&&Array.isArray(x.subjects);}):[];}).catch(function(){return [];}),
           db.collection('attendance_control').where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
@@ -1053,7 +1054,7 @@
 
         if(teacherDoc&&teacherDoc.exists){const td=teacherDoc.data();if(td.rate)rate=td.rate;if(td.rate&&currentTeacher)currentTeacher.rate=td.rate;}
 
-        const allAttendance=attSnap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+        const allAttendance=attSnap.docs.map(function(d){return Object.assign({id:d.id},d.data());}).filter(function(a){return a.type!=='grace'&&a.type!=='grace_session'&&a.type!=='trial_session';});
         const totalSessionsOffered=atcSnap.docs.length;
 
         var tNameNorm=teacherName.replace(/\s+/g,' ').trim().toLowerCase();
