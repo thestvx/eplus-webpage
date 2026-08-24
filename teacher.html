@@ -967,39 +967,37 @@
           </div>
         </div>`;
       try{
-        var statusParam=encodeURIComponent('مسجل نهائياً');
-        var url=SUPABASE_URL+'/rest/v1/registrations?select=*&status=eq.'+statusParam;
-        var res=await fetch(url,{headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});
-        if(!res.ok){var errText=await res.text();throw new Error('HTTP '+res.status+': '+errText.substring(0,200));}
-        var rows=await res.json();
-        if(!Array.isArray(rows))throw new Error('Expected array');
-        _allStudentsData=[];
-        var tNameNorm=teacherName.replace(/\s+/g,' ').trim().toLowerCase();
-        for(var ai=0;ai<rows.length;ai++){
-          var d=rows[ai];
-          if(d.deleted_at)continue;
-          var subjArr=d.subjects;
-          if(typeof subjArr==='string'){try{subjArr=JSON.parse(subjArr);}catch(pe){subjArr=[];}}
-          if(!Array.isArray(subjArr)||subjArr.length===0)continue;
-          var matched=[];
-          for(var si=0;si<subjArr.length;si++){
-            var s=subjArr[si];
-            var regTeacher=(typeof s==='string')?'':(s.teacher||s.teacherName||s.teacher_name||'');
-            var regTeacherId=(typeof s==='string')?'':(s.teacherId||s.teacher_id||'');
-            var regSubject=(typeof s==='string')?s:(s.subject||s.name||s.subjectName||'');
-            var matchedTeacher=false;
-            if(tId&&regTeacherId&&tId===regTeacherId){matchedTeacher=true;}
-            else{var tNorm=regTeacher.replace(/\s+/g,' ').trim().toLowerCase();if(tNorm&&tNameNorm&&(tNorm===tNameNorm||tNorm.includes(tNameNorm)||tNameNorm.includes(tNorm))){matchedTeacher=true;}}
-            if(matchedTeacher){matched.push(regSubject);}
-          }
-          if(matched.length>0){
-            _allStudentsData.push({
-              id:d.id,first_name:d.first_name,last_name:d.last_name,level:d.level,stream:d.stream,
-              status:d.status,timestamp:d.createdAt,
-              matchedSubjects:matched
-            });
-          }
+        var subHeaders={'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
+        var subsSnap=await fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_active_subs',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:tId})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(){return [];});
+
+        var subStudentIds=[];
+        for(var si=0;si<subsSnap.length;si++){if(subsSnap[si].student_id&&subStudentIds.indexOf(subsSnap[si].student_id)===-1)subStudentIds.push(subsSnap[si].student_id);}
+
+        var regMap={};
+        if(subStudentIds.length>0){
+          try{
+            var regRes=await fetch(SUPABASE_URL+'/rest/v1/registrations?id=in.('+encodeURIComponent(subStudentIds.join(','))+')&select=id,first_name,last_name,level,stream,createdAt',{headers:subHeaders});
+            var regData=await regRes.json();
+            if(Array.isArray(regData)){for(var ri=0;ri<regData.length;ri++){regMap[regData[ri].id]=regData[ri];}}
+          }catch(e){}
         }
+
+        var subsByStudent={};
+        for(var si2=0;si2<subsSnap.length;si2++){
+          var s=subsSnap[si2];if(!s.student_id)continue;
+          if(!subsByStudent[s.student_id])subsByStudent[s.student_id]={subjects:[]};
+          if(s.subject_name&&subsByStudent[s.student_id].subjects.indexOf(s.subject_name)===-1)subsByStudent[s.student_id].subjects.push(s.subject_name);
+        }
+
+        _allStudentsData=Object.keys(subsByStudent).map(function(sid){
+          var reg=regMap[sid]||{};
+          return {
+            id:sid,first_name:reg.first_name||'',last_name:reg.last_name||'',level:reg.level||'',stream:reg.stream||'',
+            status:'active',timestamp:reg.createdAt,
+            matchedSubjects:subsByStudent[sid].subjects
+          };
+        });
+
         document.getElementById('students-count').textContent=_allStudentsData.length+' طالب';
         renderStudentsTable(_allStudentsData);
       }catch(e){
@@ -1050,7 +1048,7 @@
           db.collection(ATTENDANCE_COLLECTION).where('teacherName','==',teacherName).get().catch(function(){return {docs:[]};}),
           db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(function(){return {docs:[]};}),
           fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_active_subs',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:teacherId})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(){return [];}),
-          db.collection('attendance_control').where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
+          db.collection('attendance_control').where('teacherName','==',teacherName).get().catch(function(){return {docs:[]};}),
           db.collection(SRT_COLLECTION).doc(teacherId).get().catch(function(){return null;}),
         ]);
 

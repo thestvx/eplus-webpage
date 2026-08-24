@@ -26536,7 +26536,7 @@ async function srtFinancePrintReceipt(txId) {
     const [receipts, ledger, atcSnap] = await Promise.all([
       TeacherFinance.getReceipts(id),
       TeacherFinance.getLedger(id),
-      (function(){try{const {getDocs:c2,query:q2,where:w2,collection:c3}=srtFS(),db2=srtDB();return getDocs(q2(c3(db2,'attendance_control'),w2('teacherId','==',id)));}catch(e){return Promise.resolve({docs:[]});}})().catch(function(){return {docs:[]};}),
+      (function(){try{const {getDocs:c2,query:q2,where:w2,collection:c3}=srtFS(),db2=srtDB();return getDocs(q2(c3(db2,'attendance_control'),w2('teacherName','==',t.name||'')));}catch(e){return Promise.resolve({docs:[]});}})().catch(function(){return {docs:[]};}),
     ]);
     const rcpt = receipts.find(x => x.transaction_id === txId) || receipts[0];
     const tx = ledger.find(x => x.id === txId) || (rcpt ? { amount: rcpt.amount, date: rcpt.date, notes: rcpt.notes } : null);
@@ -26581,8 +26581,22 @@ async function srtFinanceDeleteTx(txId) {
   const t = _srtFinanceTeacher;
   if (!t) return;
   if (!(await cmConfirm('حذف معاملة', 'هل أنت متأكد من حذف هذه المعاملة من الدفتر؟\n\nسيُعاد حساب رصيد الأستاذ تلقائياً بعد الحذف.', '🗑️', { danger: true }))) return;
+  const id=t.teacherId||t.id;
   try {
-    await TeacherFinance.deleteTransaction(t.teacherId || t.id, t.name || '', txId, t.rate || 0, srtFinAdminName());
+    await TeacherFinance.deleteTransaction(id, t.name || '', txId, t.rate || 0, srtFinAdminName());
+    try {
+      const {getDocs,collection:c,doc:d,updateDoc,query:q,where:w,limit:l}=srtFS(),fbs=srtDB();
+      const finQ=q(c(fbs,'teacher_finance'),w('teacherId','==',id),l(1));
+      const finSnap=await getDocs(finQ);
+      if(!finSnap.empty){
+        const fd=finSnap.docs[0].data();
+        const pays=Array.isArray(fd.payments)?fd.payments.slice():[];
+        const delIdx=pays.findIndex(function(p){return p.receiptId===txId||p.txId===txId;});
+        if(delIdx>=0)pays.splice(delIdx,1);
+        const newTotalPaid=pays.reduce(function(s,p){return s+(p.amount||0);},0);
+        await updateDoc(d(fbs,'teacher_finance',finSnap.docs[0].id),{payments:pays,totalPaid:newTotalPaid,updatedAt:new Date().toISOString()});
+      }
+    }catch(fsErr){console.warn('Firestore teacher_finance sync failed:',fsErr);}
     srtShowToast('✅ تم حذف المعاملة وإعادة حساب الرصيد', 'success');
     await srtFinanceRefresh();
   } catch (e) {
