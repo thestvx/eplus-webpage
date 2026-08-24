@@ -968,18 +968,10 @@
         </div>`;
       try{
         var subHeaders={'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
-        var subsSnap=await fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_active_subs',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:tId})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(){return [];});
+        var rows=await fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_registered_students',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:tId,p_teacher_name:teacherName})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(e){console.error('RPC error:',e);return [];});
 
-        var byStudent={};
-        for(var si=0;si<subsSnap.length;si++){
-          var s=subsSnap[si];if(!s.student_id)continue;
-          if(!byStudent[s.student_id])byStudent[s.student_id]={first_name:s.first_name||'',last_name:s.last_name||'',level:s.level||'',stream:s.stream||'',timestamp:s.created_at,subjects:[]};
-          if(s.subject_name&&byStudent[s.student_id].subjects.indexOf(s.subject_name)===-1)byStudent[s.student_id].subjects.push(s.subject_name);
-        }
-
-        _allStudentsData=Object.keys(byStudent).map(function(sid){
-          var info=byStudent[sid];
-          return {id:sid,first_name:info.first_name,last_name:info.last_name,level:info.level,stream:info.stream,status:'active',timestamp:info.timestamp,matchedSubjects:info.subjects};
+        _allStudentsData=rows.map(function(r){
+          return {id:r.student_id||'',first_name:r.first_name||'',last_name:r.last_name||'',level:r.level||'',stream:r.stream||'',status:'active',timestamp:r.created_at,matchedSubjects:(r.matched_subjects||'').split(', ').filter(Boolean)};
         });
 
         document.getElementById('students-count').textContent=_allStudentsData.length+' طالب';

@@ -922,7 +922,27 @@ RETURNS TABLE(student_id TEXT, student_name TEXT, first_name TEXT, last_name TEX
   LEFT JOIN registrations r ON r.id::TEXT = s.student_id
   WHERE s.teacher_id = p_teacher_id AND s.status = 'active';
 $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+
+-- قائمة الطلاب المسجلين نهائياً عند الأستاذ (من جدول التسجيلات مباشرة)
+CREATE OR REPLACE FUNCTION get_teacher_registered_students(p_teacher_id TEXT, p_teacher_name TEXT)
+RETURNS TABLE(student_id TEXT, first_name TEXT, last_name TEXT, level TEXT, stream TEXT, created_at TIMESTAMPTZ, matched_subjects TEXT) AS $$
+  SELECT r.id::TEXT, r.first_name, r.last_name, r.level, r.stream, r."createdAt",
+         string_agg(DISTINCT COALESCE(el->>'subject', el->>'subjectName', el->>'name', ''), ', ')
+  FROM registrations r,
+       jsonb_array_elements(
+         CASE WHEN jsonb_typeof(r.subjects) = 'array' THEN r.subjects ELSE '[]'::jsonb END
+       ) el
+  WHERE r.status = 'مسجل نهائياً'
+    AND r.deleted_at IS NULL
+    AND (
+      el->>'teacherId' = p_teacher_id
+      OR el->>'teacher_id' = p_teacher_id
+      OR LOWER(COALESCE(el->>'teacher', el->>'teacherName', el->>'teacher_name', '')) = LOWER(p_teacher_name)
+    )
+  GROUP BY r.id, r.first_name, r.last_name, r.level, r.stream, r."createdAt";
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 GRANT EXECUTE ON FUNCTION get_teacher_active_subs(TEXT) TO anon, service_role;
+GRANT EXECUTE ON FUNCTION get_teacher_registered_students(TEXT, TEXT) TO anon, service_role;
 
 -- الدوال الحسّاسة: service_role فقط (تستدعيها Edge Functions بمفتاح الخادم)
 GRANT EXECUTE ON FUNCTION admin_is_uid_admin(TEXT) TO service_role;
