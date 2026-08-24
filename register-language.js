@@ -194,44 +194,48 @@ function openLangLaws() {
   }
   const agree = $id('langLawsAgree');
   const confirmBtn = $id('langLawsConfirmBtn');
-  const cbArea = $id('lang-laws-modal')?.querySelector('.laws-checkbox-area');
+  const cbArea = document.querySelector('#lang-laws-modal .laws-checkbox-area');
   if (agree) { agree.checked = false; agree.disabled = true; }
   if (confirmBtn) confirmBtn.disabled = true;
-  if (cbArea) cbArea.style.display = 'none';
+  if (cbArea) { cbArea.style.display = 'none'; cbArea.style.animation = ''; }
 
   const modal = $id('lang-laws-modal');
   if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
+
+  var _lawShown = false;
+  function showCheckboxArea() {
+    if (_lawShown) return;
+    _lawShown = true;
+    if (cbArea) { cbArea.style.display = 'block'; cbArea.style.animation = 'lawsFadeIn 0.4s ease forwards'; }
+    if (agree) agree.disabled = false;
+  }
 
   const scrollArea = $id('lang-laws-scroll-area');
   const sentinel = $id('lang-laws-bottom-sentinel');
   if (scrollArea && sentinel) {
     scrollArea.scrollTop = 0;
 
-    function showCheckboxArea() {
-      if (cbArea && cbArea.style.display !== 'block') {
-        cbArea.style.display = 'block';
-        cbArea.style.animation = 'lawsFadeIn 0.4s ease forwards';
-      }
-      if (agree) agree.disabled = false;
-    }
-
     if (scrollArea.scrollHeight <= scrollArea.clientHeight + 5) {
       showCheckboxArea();
-      return;
+    } else {
+      const obs = new IntersectionObserver(entries => {
+        if (entries[0].isIntersecting) { showCheckboxArea(); obs.disconnect(); }
+      }, { root: scrollArea, threshold: 0.8 });
+      obs.observe(sentinel);
+
+      scrollArea.addEventListener('scroll', function onScroll() {
+        if (scrollArea.scrollTop + scrollArea.clientHeight >= scrollArea.scrollHeight - 10) {
+          showCheckboxArea();
+          scrollArea.removeEventListener('scroll', onScroll);
+          obs.disconnect();
+        }
+      });
     }
 
-    const obs = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting) { showCheckboxArea(); obs.disconnect(); }
-    }, { root: scrollArea, threshold: 0.8 });
-    obs.observe(sentinel);
-
-    scrollArea.addEventListener('scroll', function onScroll() {
-      if (scrollArea.scrollTop + scrollArea.clientHeight >= scrollArea.scrollHeight - 10) {
-        showCheckboxArea();
-        scrollArea.removeEventListener('scroll', onScroll);
-        obs.disconnect();
-      }
-    });
+    // Safety fallback — always show after 2s no matter what
+    setTimeout(showCheckboxArea, 2000);
+  } else {
+    showCheckboxArea();
   }
 }
 
