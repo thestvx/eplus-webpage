@@ -26536,7 +26536,7 @@ async function srtFinancePrintReceipt(txId) {
     const [receipts, ledger, atcSnap] = await Promise.all([
       TeacherFinance.getReceipts(id),
       TeacherFinance.getLedger(id),
-      (function(){try{const {getDocs:c2,query:q2,where:w2,collection:c3}=srtFS(),db2=srtDB();return getDocs(q2(c3(db2,'attendance_control'),w2('teacherName','==',t.name||'')));}catch(e){return Promise.resolve({docs:[]});}})().catch(function(){return {docs:[]};}),
+      (function(){try{const {getDocs:c2,collection:c3}=srtFS(),db2=srtDB();return getDocs(c3(db2,'attendance_control'));}catch(e){return Promise.resolve({docs:[]});}})().then(function(snap){var tName=String(t.name||'').replace(/\s+/g,' ').trim().toLowerCase().replace(/عبد\s+ال/g,'abd');return{docs:snap.docs.filter(function(d){var dd=d.data();var dn=String(dd.teacherName||'').replace(/\s+/g,' ').trim().toLowerCase().replace(/عبد\s+ال/g,'abd');return dn===tName;})};}).catch(function(){return {docs:[]};}),
     ]);
     const rcpt = receipts.find(x => x.transaction_id === txId) || receipts[0];
     const tx = ledger.find(x => x.id === txId) || (rcpt ? { amount: rcpt.amount, date: rcpt.date, notes: rcpt.notes } : null);
