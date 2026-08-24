@@ -3481,11 +3481,10 @@
         </div>
 
         <!-- Stats -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
           <div class="stat-card"><div class="stat-num" id="lang-stat-total">0</div><div class="stat-label">إجمالي التسجيلات</div></div>
-          <div class="stat-card"><div class="stat-num" id="lang-stat-initial">0</div><div class="stat-label">مسجل مبدئياً</div></div>
-          <div class="stat-card"><div class="stat-num" id="lang-stat-confirmed">0</div><div class="stat-label">مسجل نهائياً</div></div>
           <div class="stat-card"><div class="stat-num" id="lang-stat-langs">0</div><div class="stat-label">عدد اللغات</div></div>
+          <div class="stat-card"><div class="stat-num" id="lang-stat-levels">0</div><div class="stat-label">عدد المستويات</div></div>
         </div>
 
         <!-- Filters -->
@@ -3496,19 +3495,12 @@
             <option value="الفرنسية">🇫🇷 الفرنسية</option>
             <option value="الإسبانية">🇪🇸 الإسبانية</option>
             <option value="الألمانية">🇩🇪 الألمانية</option>
-            <option value="الإيطالية">🇮🇹 الإيطالية</option>
-            <option value="التركية">🇹🇷 التركية</option>
           </select>
           <select class="inp" id="lang-filter-level" onchange="langRegApplyFilters()" style="min-width:120px">
             <option value="">كل المستويات</option>
             <option value="A0">A0</option><option value="A1">A1</option><option value="A2">A2</option>
             <option value="B1">B1</option><option value="B2">B2</option>
             <option value="C1">C1</option><option value="C2">C2</option>
-          </select>
-          <select class="inp" id="lang-filter-status" onchange="langRegApplyFilters()" style="min-width:140px">
-            <option value="">كل الحالات</option>
-            <option value="مسجل مبدئياً">🟡 مسجل مبدئياً</option>
-            <option value="مسجل نهائياً">🟢 مسجل نهائياً</option>
           </select>
           <input class="inp" id="lang-search" placeholder="بحث بالاسم أو الرقم..." oninput="langRegApplyFilters()" style="flex:1;min-width:200px" />
         </div>
@@ -3518,7 +3510,6 @@
           <table class="tbl" id="lang-reg-table">
             <thead><tr>
               <th style="width:36px">#</th>
-              <th>الحالة</th>
               <th onclick="langRegSort('id')" style="cursor:pointer">ID ↕</th>
               <th onclick="langRegSort('last_name')" style="cursor:pointer">اللقب ↕</th>
               <th onclick="langRegSort('first_name')" style="cursor:pointer">الاسم ↕</th>
@@ -3540,18 +3531,6 @@
           <div class="modal-box" style="max-width:520px;max-height:85vh;overflow-y:auto;margin:auto">
             <div class="modal-header"><h3 class="modal-title">تفاصيل التسجيل</h3><button class="close-btn" onclick="document.getElementById('lang-detail-modal').style.display='none'">✕</button></div>
             <div id="lang-detail-body" style="padding:20px"></div>
-          </div>
-        </div>
-
-        <!-- Confirm Modal -->
-        <div class="modal-overlay" id="lang-confirm-modal" style="display:none;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:9999">
-          <div class="modal-box" style="max-width:400px;text-align:center;margin:auto">
-            <div class="modal-header"><h3 class="modal-title">تأكيد التسجيل النهائي</h3></div>
-            <div style="padding:16px 24px;font-size:14px;color:var(--text-muted)">هل أنت متأكد من تأكيد هذا التسجيل؟</div>
-            <div style="display:flex;gap:10px;justify-content:center;padding:0 24px 20px">
-              <button class="btn-sm" id="lang-confirm-final-btn" style="background:#10b981;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:800;cursor:pointer">✅ تأكيد</button>
-              <button class="btn-sm" onclick="document.getElementById('lang-confirm-modal').style.display='none'" style="border:1.5px solid var(--border);background:var(--card);color:var(--text);padding:10px 24px;border-radius:8px;font-weight:800;cursor:pointer">إلغاء</button>
-            </div>
           </div>
         </div>
 
@@ -26270,7 +26249,6 @@ const LR_TABLE = 'language_registrations';
 let lrAllData = [], lrFilteredData = [];
 let lrPage = 1, lrPageSize = 20;
 let lrSortField = null, lrSortDir = 'asc';
-let lrConfirmTarget = null;
 
 async function lrFetch(url, opts) {
   return fetch(url, Object.assign({}, opts, {
@@ -26279,7 +26257,6 @@ async function lrFetch(url, opts) {
 }
 
 function lrFmtDate(d) { if(!d) return '—'; const t=new Date(d); return t.toLocaleDateString('ar-DZ',{year:'numeric',month:'short',day:'numeric'}); }
-function lrStatusBadge(s) { return s === 'مسجل نهائياً' ? '<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">🟢 نهائي</span>' : '<span style="background:#fef9c3;color:#854d0e;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">🟡 مبدئي</span>'; }
 
 window.langRegLoadData = async function() {
   try {
@@ -26296,14 +26273,12 @@ window.langRegLoadData = async function() {
 window.langRegApplyFilters = function() {
   const lang = (document.getElementById('lang-filter-language')||{}).value || '';
   const lvl = (document.getElementById('lang-filter-level')||{}).value || '';
-  const status = (document.getElementById('lang-filter-status')||{}).value || '';
   const q = ((document.getElementById('lang-search')||{}).value || '').trim().toLowerCase();
   lrFilteredData = lrAllData.filter(r => {
     if (lang && r.language !== lang) return false;
     if (lvl && r.cefr_level !== lvl) return false;
-    if (status && r.status !== status) return false;
     if (q) {
-      const hay = ((r.id||'')+' '+(r.first_name||'')+' '+(r.last_name||'')+' '+(r.barcode_value||'')).toLowerCase();
+      const hay = ((r.id||'')+' '+(r.first_name||'')+' '+(r.last_name||'')+' '+(r.parent_phone||'')+' '+(r.language||'')).toLowerCase();
       if (hay.indexOf(q) === -1) return false;
     }
     return true;
@@ -26315,11 +26290,10 @@ window.langRegApplyFilters = function() {
 
 window.langRegUpdateStats = function() {
   const t = lrAllData.length;
-  const ini = lrAllData.filter(r => r.status === 'مسجل مبدئياً').length;
-  const conf = lrAllData.filter(r => r.status === 'مسجل نهائياً').length;
   const langs = new Set(lrAllData.map(r => r.language).filter(Boolean)).size;
+  const levels = new Set(lrAllData.map(r => r.cefr_level).filter(Boolean)).size;
   const el = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
-  el('lang-stat-total', t); el('lang-stat-initial', ini); el('lang-stat-confirmed', conf); el('lang-stat-langs', langs);
+  el('lang-stat-total', t); el('lang-stat-langs', langs); el('lang-stat-levels', levels);
 };
 
 window.langRegSort = function(field) {
@@ -26346,13 +26320,12 @@ window.langRegRenderTable = function() {
   const langIcons = {'الإنجليزية':'🇬🇧','الفرنسية':'🇫🇷','الإسبانية':'🇪🇸','الألمانية':'🇩🇪','الإيطالية':'🇮🇹','التركية':'🇹🇷'};
 
   tbody.innerHTML = page.length === 0
-    ? '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted);font-weight:600">لا توجد تسجيلات</td></tr>'
+    ? '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);font-weight:600">لا توجد تسجيلات</td></tr>'
     : page.map((r, i) => {
       const row = start + i + 1;
       const icon = langIcons[r.language] || '🌍';
       return '<tr ondblclick="langRegShowDetail(\''+r.id+'\')" style="cursor:pointer" title="انقر مرتين لعرض التفاصيل">'
         +'<td style="font-weight:700;color:var(--text-muted)">'+row+'</td>'
-        +'<td>'+lrStatusBadge(r.status)+'</td>'
         +'<td><strong>'+r.id+'</strong></td>'
         +'<td>'+(r.last_name||'')+'</td>'
         +'<td>'+(r.first_name||'')+'</td>'
@@ -26385,14 +26358,12 @@ window.langRegShowDetail = function(id) {
   if (!r) return;
   const langIcons = {'الإنجليزية':'🇬🇧','الفرنسية':'🇫🇷','الإسبانية':'🇪🇸','الألمانية':'🇩🇪','الإيطالية':'🇮🇹','التركية':'🇹🇷'};
   const icon = langIcons[r.language] || '🌍';
-  const isInitial = r.status === 'مسجل مبدئياً';
   const bd = r.birth_date ? r.birth_date.split('-') : [];
   const birthStr = bd.length === 3 ? bd[2]+'/'+bd[1]+'/'+bd[0] : (r.birth_date || '—');
 
   let html = '<div style="text-align:center;margin-bottom:16px">'
     +'<div style="width:60px;height:60px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:28px">'+(r.first_name||'?')[0]+'</div>'
     +'<div style="font-size:18px;font-weight:900">'+(r.first_name||'')+' '+(r.last_name||'')+'</div>'
-    +'<div style="margin-top:6px">'+lrStatusBadge(r.status)+'</div>'
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
     +'<div style="background:var(--bg-secondary);padding:10px 14px;border-radius:10px"><div style="font-size:11px;color:var(--text-muted);font-weight:700">رقم التسجيل</div><div style="font-size:14px;font-weight:900">'+r.id+'</div></div>'
@@ -26405,38 +26376,14 @@ window.langRegShowDetail = function(id) {
     +'<div style="background:var(--bg-secondary);padding:10px 14px;border-radius:10px"><div style="font-size:11px;color:var(--text-muted);font-weight:700">تاريخ التسجيل</div><div style="font-size:14px;font-weight:700">'+lrFmtDate(r.created_at)+'</div></div>'
     +'</div>'
     +(r.motivation ? '<div style="background:var(--bg-secondary);padding:12px 14px;border-radius:10px;margin-bottom:16px"><div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:4px">ملاحظات</div><div style="font-size:13px;line-height:1.6">'+r.motivation+'</div></div>' : '')
-    +'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">';
-  if (isInitial) {
-    html += '<button onclick="langRegConfirm(\''+r.id+'\')" style="flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:linear-gradient(135deg,#059669,#10b981);color:#fff">✅ تأكيد وقبض الرسوم</button>';
-  }
-  html += '<button onclick="langRegEdit(\''+r.id+'\')" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:var(--card);color:var(--text)">✏️ تعديل</button>';
-  html += '<button onclick="langRegDelete(\''+r.id+'\')" style="flex:1;padding:10px;border:1.5px solid #dc2626;border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:transparent;color:#dc2626">🗑️ حذف</button>';
-  html += '</div>';
+    +'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">'
+    +'<button onclick="langRegEdit(\''+r.id+'\')" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:var(--card);color:var(--text)">✏️ تعديل</button>'
+    +'<button onclick="langRegDelete(\''+r.id+'\')" style="flex:1;padding:10px;border:1.5px solid #dc2626;border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:transparent;color:#dc2626">🗑️ حذف</button>'
+    +'</div>';
 
   document.getElementById('lang-detail-body').innerHTML = html;
   document.getElementById('lang-detail-modal').style.display = 'flex';
 };
-
-window.langRegConfirm = function(id) {
-  lrConfirmTarget = id;
-  document.getElementById('lang-confirm-modal').style.display = 'flex';
-  document.getElementById('lang-confirm-final-btn').onclick = async function() {
-    try {
-      const patch = { status: 'مسجل نهائياً', student_token: _lrGenToken(32) };
-      await lrFetch(LR_URL+'/rest/v1/'+LR_TABLE+'?id=eq.'+id, { method:'PATCH', body: JSON.stringify(patch) });
-      srShowToast('تم تأكيد التسجيل بنجاح ✅');
-      document.getElementById('lang-confirm-modal').style.display = 'none';
-      document.getElementById('lang-detail-modal').style.display = 'none';
-      langRegLoadData();
-    } catch(e) { srShowToast('خطأ: '+e.message, 'error'); }
-  };
-};
-
-function _lrGenToken(n) {
-  const c='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let r=''; for(let i=0;i<n;i++) r+=c.charAt(Math.floor(Math.random()*c.length));
-  return r;
-}
 
 window.langRegEdit = function(id) {
   const r = lrAllData.find(x => x.id === id);
@@ -26485,13 +26432,8 @@ window.langRegSaveEdit = async function() {
 
 window.langRegDelete = async function(id) {
   if (!confirm('هل أنت متأكد من حذف هذا التسجيل؟')) return;
-  const r = lrAllData.find(x => x.id === id);
   try {
-    if (r && r.status === 'مسجل نهائياً') {
-      await lrFetch(LR_URL+'/rest/v1/'+LR_TABLE+'?id=eq.'+id, { method:'PATCH', body: JSON.stringify({ deleted_at: new Date().toISOString() }) });
-    } else {
-      await lrFetch(LR_URL+'/rest/v1/'+LR_TABLE+'?id=eq.'+id, { method:'DELETE', headers:{'Prefer':'return=representation'} });
-    }
+    await lrFetch(LR_URL+'/rest/v1/'+LR_TABLE+'?id=eq.'+id, { method:'DELETE', headers:{'Prefer':'return=representation'} });
     srShowToast('تم حذف التسجيل 🗑️');
     document.getElementById('lang-detail-modal').style.display = 'none';
     langRegLoadData();
