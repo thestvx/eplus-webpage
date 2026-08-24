@@ -961,6 +961,8 @@
       try{
         var subHeaders={'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
         var rows=await fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_registered_students',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:tId,p_teacher_name:teacherName})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(e){console.error('RPC error:',e);return [];});
+        console.log('[STU] teacher:',teacherName,'id:',tId,'students:',rows.length);
+        if(rows.length===0)console.log('[STU] WARNING: 0 students — check teacher name/ID match');
 
         _allStudentsData=rows.map(function(r){
           return {id:r.student_id||'',first_name:r.first_name||'',last_name:r.last_name||'',level:r.level||'',stream:r.stream||'',status:'active',timestamp:r.created_at,matchedSubjects:(r.matched_subjects||'').split(', ').filter(Boolean)};
@@ -1034,6 +1036,12 @@
         var attSeen={};var atcSeen={};var atcDocs=[];var attAllDocs=[];
         attResults.forEach(function(r){(r.docs||[]).forEach(function(d){if(!attSeen[d.id]){attSeen[d.id]=true;attAllDocs.push(d);}});});
         atcResults.forEach(function(r){(r.docs||[]).forEach(function(d){if(!atcSeen[d.id]){atcSeen[d.id]=true;atcDocs.push(d);}});});
+
+        console.log('[FIN] teacher:',teacherName,'id:',teacherId);
+        console.log('[FIN] attAllDocs:',attAllDocs.length,'atcDocs:',atcDocs.length);
+        console.log('[FIN] attResults queries:',attResults.length,'atcResults queries:',atcResults.length);
+        if(attAllDocs.length>0)console.log('[FIN] sample att:',attAllDocs[0].data());
+        if(attAllDocs.length===0&&atcDocs.length>0)console.log('[FIN] WARNING: ATC found but ATT empty — auth issue?');
 
         if(teacherDoc&&teacherDoc.exists){var td=teacherDoc.data();if(td.rate){rate=td.rate;currentTeacher.rate=td.rate;}}
 
