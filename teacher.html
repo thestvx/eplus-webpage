@@ -1005,18 +1005,30 @@
         </div>`;
       try{
         var subHeaders={'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
-        function _tnorm(n){return String(n||'').replace(/\s+/g,' ').trim().toLowerCase().replace(/عبد\s+ال/g,'عبدال');}
-        const [attSnap,finSnap,regSnap,atcSnap,teacherDoc]=await Promise.all([
-          db.collection(ATTENDANCE_COLLECTION).get().catch(function(){return {docs:[]};}),
+        function _tnorm(n){return String(n||'').replace(/\s+/g,' ').trim().toLowerCase().replace(/abd\s+al/g,'abd').replace(/عبد\s+ال/g,'abd');}
+        var tNameN=_tnorm(teacherName);
+        var _nameVariants=[teacherName];
+        if(teacherName.indexOf('عبدال')!==-1)_nameVariants.push(teacherName.replace(/عبدال/g,'عبد ال'));
+        else if(teacherName.indexOf('عبد ال')!==-1)_nameVariants.push(teacherName.replace(/عبد ال/g,'عبدال'));
+
+        var _attQueries=_nameVariants.map(function(n){return db.collection(ATTENDANCE_COLLECTION).where('teacherName','==',n).get().catch(function(){return {docs:[]};});});
+        var _atcQueries=_nameVariants.map(function(n){return db.collection('attendance_control').where('teacherName','==',n).get().catch(function(){return {docs:[]};});});
+
+        const [attResults,atcResults,finSnap,regSnap,teacherDoc]=await Promise.all([
+          Promise.all(_attQueries),
+          Promise.all(_atcQueries),
           db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(function(){return {docs:[]};}),
           fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_registered_students',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:teacherId,p_teacher_name:teacherName})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(){return [];}),
-          db.collection('attendance_control').get().catch(function(){return {docs:[]};}),
           db.collection(SRT_COLLECTION).doc(teacherId).get().catch(function(){return null;}),
         ]);
 
-        var tNameN=_tnorm(teacherName);
-        var atcDocs=atcSnap.docs.filter(function(d){var dd=d.data();return _tnorm(dd.teacherName)===tNameN;});
-        var attDocsFiltered=attSnap.docs.filter(function(d){var dd=d.data();return _tnorm(dd.teacherName)===tNameN;});
+        var attSeen={};var attAllDocs=[];
+        attResults.forEach(function(r){(r.docs||[]).forEach(function(d){if(!attSeen[d.id]){attSeen[d.id]=true;attAllDocs.push(d);}});});
+        var atcSeen={};var atcAllDocs=[];
+        atcResults.forEach(function(r){(r.docs||[]).forEach(function(d){if(!atcSeen[d.id]){atcSeen[d.id]=true;atcAllDocs.push(d);}});});
+
+        var atcDocs=atcAllDocs.filter(function(d){return _tnorm(d.data().teacherName)===tNameN;});
+        var attSnap={docs:attAllDocs};
 
         if(teacherDoc&&teacherDoc.exists){var td=teacherDoc.data();if(td.rate){rate=td.rate;currentTeacher.rate=td.rate;}}
 
@@ -1024,7 +1036,8 @@
         var regStudents={};
         for(var si2=0;si2<regSnap.length;si2++){
           var s=regSnap[si2];if(!s.student_id)continue;
-          if(!nameMap[s.student_id])nameMap[s.student_id]=s.student_name||s.student_id;
+          var fullName=((s.first_name||'')+' '+(s.last_name||'')).trim()||s.student_id;
+          if(!nameMap[s.student_id])nameMap[s.student_id]=fullName;
           if(!regStudents[s.student_id])regStudents[s.student_id]={subjects:[]};
           if(s.matched_subjects){
             var subs=s.matched_subjects.split(',').map(function(x){return x.trim();}).filter(Boolean);
@@ -1032,7 +1045,7 @@
           }
         }
 
-        const allAttendance=attDocsFiltered.map(function(d){return Object.assign({id:d.id},d.data());}).filter(function(a){return a.type!=='grace'&&a.type!=='grace_session';});
+        const allAttendance=attSnap.docs.map(function(d){return Object.assign({id:d.id},d.data());}).filter(function(a){return a.type!=='grace'&&a.type!=='grace_session';});
         const totalSessionsOffered=atcDocs.length;
 
         const byStudent={};
