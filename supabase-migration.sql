@@ -926,7 +926,7 @@ $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 -- قائمة الطلاب المسجلين نهائياً عند الأستاذ (من جدول التسجيلات مباشرة)
 CREATE OR REPLACE FUNCTION get_teacher_registered_students(p_teacher_id TEXT, p_teacher_name TEXT)
 RETURNS TABLE(student_id TEXT, first_name TEXT, last_name TEXT, level TEXT, stream TEXT, created_at TIMESTAMPTZ, matched_subjects TEXT) AS $$
-  SELECT r.id::TEXT, r.first_name, r.last_name, r.level, r.stream, r."createdAt",
+  SELECT r.id::TEXT, r.first_name, r.last_name, r.level, r.stream, r.created_at,
          string_agg(DISTINCT COALESCE(el->>'subject', el->>'subjectName', el->>'name', ''), ', ')
   FROM registrations r,
        jsonb_array_elements(
@@ -939,7 +939,7 @@ RETURNS TABLE(student_id TEXT, first_name TEXT, last_name TEXT, level TEXT, stre
       OR el->>'teacher_id' = p_teacher_id
       OR LOWER(COALESCE(el->>'teacher', el->>'teacherName', el->>'teacher_name', '')) = LOWER(p_teacher_name)
     )
-  GROUP BY r.id, r.first_name, r.last_name, r.level, r.stream, r."createdAt";
+  GROUP BY r.id, r.first_name, r.last_name, r.level, r.stream, r.created_at;
 $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 GRANT EXECUTE ON FUNCTION get_teacher_active_subs(TEXT) TO anon, service_role;
 GRANT EXECUTE ON FUNCTION get_teacher_registered_students(TEXT, TEXT) TO anon, service_role;
