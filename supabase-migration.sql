@@ -911,6 +911,7 @@ GRANT EXECUTE ON FUNCTION get_student_subscription(TEXT) TO anon, service_role;
 GRANT EXECUTE ON FUNCTION get_student_attendance_events(TEXT) TO anon, service_role;
 
 -- قراءة اشتراكات الأستاذ النشطة (للPortal)
+DROP FUNCTION IF EXISTS get_teacher_active_subs(TEXT);
 CREATE OR REPLACE FUNCTION get_teacher_active_subs(p_teacher_id TEXT)
 RETURNS TABLE(student_id TEXT, student_name TEXT, first_name TEXT, last_name TEXT, level TEXT, stream TEXT, subject_name TEXT, subject_id TEXT, teacher_name TEXT) AS $$
   SELECT s.student_id,
