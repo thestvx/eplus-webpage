@@ -159,6 +159,8 @@ function validateForm() {
   if (!parentName.trim()) { langAlert('الرجاء إدخال اسم ولي الأمر'); return null; }
   if (!parentPhone.trim() || parentPhone.trim().length < 8) { langAlert('الرجاء إدخال رقم هاتف صحيح لولي الأمر'); return null; }
   if (!lLanguage) { langAlert('الرجاء اختيار اللغة'); return null; }
+  var availLangs = ['الإنجليزية','الفرنسية','الإسبانية','الألمانية'];
+  if (availLangs.indexOf(lLanguage) === -1) { langAlert('هذه اللغة غير متاحة حالياً. الرجاء اختيار لغة أخرى.'); return null; }
   if (!lCefrLevel) { langAlert('الرجاء اختيار مستواك'); return null; }
   if (!levelTest) { langAlert('الرجاء الرد على سؤال اختبار التعيين'); return null; }
 
@@ -192,8 +194,10 @@ function openLangLaws() {
   }
   const agree = $id('langLawsAgree');
   const confirmBtn = $id('langLawsConfirmBtn');
-  if (agree) agree.checked = false;
+  const cbArea = $id('lang-laws-modal')?.querySelector('.laws-checkbox-area');
+  if (agree) { agree.checked = false; agree.disabled = true; }
   if (confirmBtn) confirmBtn.disabled = true;
+  if (cbArea) cbArea.style.display = 'none';
 
   const modal = $id('lang-laws-modal');
   if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
@@ -202,13 +206,32 @@ function openLangLaws() {
   const sentinel = $id('lang-laws-bottom-sentinel');
   if (scrollArea && sentinel) {
     scrollArea.scrollTop = 0;
+
+    function showCheckboxArea() {
+      if (cbArea && cbArea.style.display !== 'block') {
+        cbArea.style.display = 'block';
+        cbArea.style.animation = 'lawsFadeIn 0.4s ease forwards';
+      }
+      if (agree) agree.disabled = false;
+    }
+
+    if (scrollArea.scrollHeight <= scrollArea.clientHeight + 5) {
+      showCheckboxArea();
+      return;
+    }
+
     const obs = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting) {
-        if (agree) agree.disabled = false;
+      if (entries[0].isIntersecting) { showCheckboxArea(); obs.disconnect(); }
+    }, { root: scrollArea, threshold: 0.8 });
+    obs.observe(sentinel);
+
+    scrollArea.addEventListener('scroll', function onScroll() {
+      if (scrollArea.scrollTop + scrollArea.clientHeight >= scrollArea.scrollHeight - 10) {
+        showCheckboxArea();
+        scrollArea.removeEventListener('scroll', onScroll);
         obs.disconnect();
       }
-    }, { root: scrollArea, threshold: 0.9 });
-    obs.observe(sentinel);
+    });
   }
 }
 
