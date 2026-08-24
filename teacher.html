@@ -404,8 +404,14 @@
 
   <script>
     const firebaseConfig={apiKey:"AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",authDomain:"eplus-center-39.firebaseapp.com",projectId:"eplus-center-39",storageBucket:"eplus-center-39.firebasestorage.app",messagingSenderId:"191532732034",appId:"1:191532732034:web:b11449a2f0595db5d02e9b"};
-    let db;
-    try{firebase.initializeApp(firebaseConfig);db=firebase.firestore();}catch(e){console.error('Firebase init error:',e);}
+    let db;let _authReady=Promise.resolve();
+    try{
+      firebase.initializeApp(firebaseConfig);
+      db=firebase.firestore();
+      if(firebase.auth&&typeof firebase.auth==='function'){
+        _authReady=firebase.auth().signInAnonymously().catch(function(e){console.warn('[AUTH] anon sign-in failed:',e.message);});
+      }
+    }catch(e){console.error('Firebase init error:',e);}
 
     const SUPABASE_URL='https://jftfvpultaqufhsekdle.supabase.co';
     const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
@@ -630,6 +636,7 @@
     }
 
     async function loadDashboardStats(teacherId,teacherName){
+      await _authReady;
       try{
         var teacherNameLC=teacherName.toLowerCase();
         var subHeaders={'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
@@ -985,6 +992,7 @@
 
     /* ===== FINANCE PAGE ===== */
     async function renderFinancePage(){
+      await _authReady;
       currentTeacher=currentTeacher||{};const t=currentTeacher,teacherId=t.teacherId||t.id,teacherName=t.name||t.teacherName||'';
       let rate=t.rate||0;
       document.getElementById('app').innerHTML=`
@@ -1005,14 +1013,15 @@
         </div>`;
       try{
         var subHeaders={'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
-        function _tnorm(n){return String(n||'').replace(/\s+/g,' ').trim().toLowerCase().replace(/عبد\s+ال/g,'عبدال');}
-        var tNameN=_tnorm(teacherName);
-        var _nameVariants=[teacherName];
-        if(teacherName.indexOf('عبدال')!==-1)_nameVariants.push(teacherName.replace(/عبدال/g,'عبد ال'));
-        else if(teacherName.indexOf('عبد ال')!==-1)_nameVariants.push(teacherName.replace(/عبد ال/g,'عبدال'));
+        function _tN(n){return String(n||'').replace(/\s+/g,' ').trim();}
+        var _variants=[teacherName];
+        var _with=teacherName.replace(/عبدال/g,'عبد ال');
+        var _without=teacherName.replace(/عبد ال/g,'عبدال');
+        if(_with!==teacherName)_variants.push(_with);
+        if(_without!==teacherName)_variants.push(_without);
 
         var _attQ=[],_atcQ=[];
-        _nameVariants.forEach(function(n){_attQ.push(db.collection(ATTENDANCE_COLLECTION).where('teacherName','==',n).get().catch(function(){return {docs:[]};}));_atcQ.push(db.collection('attendance_control').where('teacherName','==',n).get().catch(function(){return {docs:[]};}));});
+        _variants.forEach(function(n){_attQ.push(db.collection(ATTENDANCE_COLLECTION).where('teacherName','==',n).get().catch(function(){return {docs:[]};}));_atcQ.push(db.collection('attendance_control').where('teacherName','==',n).get().catch(function(){return {docs:[]};}));});
         if(teacherId){_attQ.push(db.collection(ATTENDANCE_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}));_atcQ.push(db.collection('attendance_control').where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}));}
 
         const [attResults,atcResults,finSnap,regSnap,teacherDoc]=await Promise.all([
@@ -1022,13 +1031,9 @@
           db.collection(SRT_COLLECTION).doc(teacherId).get().catch(function(){return null;}),
         ]);
 
-        var attSeen={};var attAllDocs=[];
+        var attSeen={};var atcSeen={};var atcDocs=[];var attAllDocs=[];
         attResults.forEach(function(r){(r.docs||[]).forEach(function(d){if(!attSeen[d.id]){attSeen[d.id]=true;attAllDocs.push(d);}});});
-        var atcSeen={};var atcAllDocs=[];
-        atcResults.forEach(function(r){(r.docs||[]).forEach(function(d){if(!atcSeen[d.id]){atcSeen[d.id]=true;atcAllDocs.push(d);}});});
-
-        var atcDocs=atcAllDocs.filter(function(d){return _tnorm(d.data().teacherName)===tNameN;});
-        var attDocsAll=attAllDocs.filter(function(d){return _tnorm(d.data().teacherName)===tNameN;});
+        atcResults.forEach(function(r){(r.docs||[]).forEach(function(d){if(!atcSeen[d.id]){atcSeen[d.id]=true;atcDocs.push(d);}});});
 
         if(teacherDoc&&teacherDoc.exists){var td=teacherDoc.data();if(td.rate){rate=td.rate;currentTeacher.rate=td.rate;}}
 
@@ -1045,7 +1050,7 @@
           }
         }
 
-        const allAttendance=attDocsAll.map(function(d){return Object.assign({id:d.id},d.data());}).filter(function(a){return a.type!=='grace'&&a.type!=='grace_session';});
+        const allAttendance=attAllDocs.map(function(d){return Object.assign({id:d.id},d.data());}).filter(function(a){return a.type!=='grace'&&a.type!=='grace_session';});
         const totalSessionsOffered=atcDocs.length;
 
         const byStudent={};
