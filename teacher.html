@@ -633,10 +633,10 @@
       try{
         var teacherNameLC=teacherName.toLowerCase();
         var subHeaders={'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
-        var[contentSnap,attSnap,subsSnap,teacherDoc,finSnap]=await Promise.all([
+        var[contentSnap,attSnap,supabaseRegCount,teacherDoc,finSnap]=await Promise.all([
           db.collection(CONTENT_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
           db.collection(ATTENDANCE_COLLECTION).where('teacherName','==',teacherName).get().catch(function(){return {docs:[]};}),
-          fetch(SUPABASE_URL+'/rest/v1/student_subscriptions?select=student_id&teacher_id=eq.'+encodeURIComponent(teacherId)+'&status=eq.active',{headers:subHeaders}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(){return [];}),
+          fetch(SUPABASE_URL+'/rest/v1/registrations?select=id,subjects,status&status=eq.'+encodeURIComponent('مسجل نهائياً'),{headers:subHeaders}).then(function(r){return r.json();}).then(function(data){return Array.isArray(data)?data.filter(function(d){return !d.deleted_at;}):[];}).catch(function(){return [];}),
           db.collection(SRT_COLLECTION).doc(teacherId).get().catch(function(){return null;}),
           db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(function(){return {docs:[]};}),
         ]);
@@ -646,9 +646,22 @@
         var lessons=allContent.filter(function(c){return c.type==='lesson';});
         var exercises=allContent.filter(function(c){return c.type==='exercise'||c.type==='homework';});
         var announcements=allContent.filter(function(c){return c.type==='announcement';});
-        var subStudentSet={};
-        for(var i=0;i<subsSnap.length;i++){if(subsSnap[i].student_id)subStudentSet[subsSnap[i].student_id]=true;}
-        var studentCount=Object.keys(subStudentSet).length;
+        var studentCount=0;
+        if(Array.isArray(supabaseRegCount)){
+          for(var i=0;i<supabaseRegCount.length;i++){
+            var reg=supabaseRegCount[i];
+            if(!Array.isArray(reg.subjects))continue;
+            for(var j=0;j<reg.subjects.length;j++){
+              var sj=reg.subjects[j];
+              var regTeacher=(typeof sj==='string')?'':(sj.teacher||sj.teacherName||'');
+              var regTeacherId=(typeof sj==='string')?'':(sj.teacherId||sj.teacher_id||'');
+              var matched=false;
+              if(teacherId&&regTeacherId&&teacherId===regTeacherId){matched=true;}
+              else if(regTeacher&&teacherNameLC&&regTeacher.toLowerCase()===teacherNameLC){matched=true;}
+              if(matched){studentCount++;break;}
+            }
+          }
+        }
         var attDocs=attSnap.docs.map(function(d){return d.data();}).filter(function(a){return a.type!=='grace'&&a.type!=='grace_session';});
         var attendanceCount=attDocs.length||0;
         var finDoc=finSnap.docs.length>0?finSnap.docs[0].data():{};
@@ -1033,33 +1046,36 @@
         </div>`;
       try{
         var subHeaders={'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
-        const [attSnap,finSnap,subsSnap,atcSnap,teacherDoc]=await Promise.all([
+        const [attSnap,finSnap,supabaseRegs,atcSnap,teacherDoc]=await Promise.all([
           db.collection(ATTENDANCE_COLLECTION).where('teacherName','==',teacherName).get().catch(function(){return {docs:[]};}),
           db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(function(){return {docs:[]};}),
-          fetch(SUPABASE_URL+'/rest/v1/student_subscriptions?select=student_id,subject_name&teacher_id=eq.'+encodeURIComponent(teacherId)+'&status=eq.active',{headers:subHeaders}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(){return [];}),
+          fetch(SUPABASE_URL+'/rest/v1/registrations?select=id,first_name,last_name,subjects,status&status=eq.'+encodeURIComponent('مسجل نهائياً'),{headers:subHeaders}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d.filter(function(x){return !x.deleted_at&&Array.isArray(x.subjects);}):[];}).catch(function(){return [];}),
           db.collection('attendance_control').where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
           db.collection(SRT_COLLECTION).doc(teacherId).get().catch(function(){return null;}),
         ]);
 
         if(teacherDoc&&teacherDoc.exists){var td=teacherDoc.data();if(td.rate){rate=td.rate;currentTeacher.rate=td.rate;}}
 
-        var subStudentIds=[];
-        for(var si=0;si<subsSnap.length;si++){if(subsSnap[si].student_id&&subStudentIds.indexOf(subsSnap[si].student_id)===-1)subStudentIds.push(subsSnap[si].student_id);}
-
-        var nameMap={};
-        if(subStudentIds.length>0){
-          try{
-            var regRes=await fetch(SUPABASE_URL+'/rest/v1/registrations?id=in.('+encodeURIComponent(subStudentIds.join(','))+')&select=id,first_name,last_name',{headers:subHeaders});
-            var regData=await regRes.json();
-            if(Array.isArray(regData)){for(var ri=0;ri<regData.length;ri++){nameMap[regData[ri].id]=((regData[ri].first_name||'')+' '+(regData[ri].last_name||'')).trim();}}
-          }catch(e){}
-        }
-
-        var subsByStudent={};
-        for(var si2=0;si2<subsSnap.length;si2++){
-          var s=subsSnap[si2];if(!s.student_id)continue;
-          if(!subsByStudent[s.student_id])subsByStudent[s.student_id]={subjects:[]};
-          if(s.subject_name&&subsByStudent[s.student_id].subjects.indexOf(s.subject_name)===-1)subsByStudent[s.student_id].subjects.push(s.subject_name);
+        var tNameNorm=teacherName.replace(/\s+/g,' ').trim().toLowerCase();
+        var matchedStudents=[];
+        for(var ai=0;ai<supabaseRegs.length;ai++){
+          var reg=supabaseRegs[ai];
+          var subjArr=reg.subjects;
+          if(typeof subjArr==='string'){try{subjArr=JSON.parse(subjArr);}catch(pe){subjArr=[];}}
+          if(!Array.isArray(subjArr)||subjArr.length===0)continue;
+          var matched=[];
+          for(var si=0;si<subjArr.length;si++){
+            var sj=subjArr[si];
+            if(typeof sj==='string')continue;
+            var sjTeacherId=sj.teacherId||sj.teacher_id||'';
+            var sjTeacher=(sj.teacher||sj.teacherName||sj.teacher_name||'');
+            var sjSubject=sj.subject||sj.subjectName||sj.name||'';
+            var matchedTeacher=false;
+            if(teacherId&&sjTeacherId&&teacherId===sjTeacherId){matchedTeacher=true;}
+            else{var tNorm=sjTeacher.replace(/\s+/g,' ').trim().toLowerCase();if(tNorm&&tNameNorm&&(tNorm===tNameNorm||tNorm.includes(tNameNorm)||tNameNorm.includes(tNorm))){matchedTeacher=true;}}
+            if(matchedTeacher&&sjSubject)matched.push(sjSubject);
+          }
+          if(matched.length>0)matchedStudents.push({id:reg.id,name:((reg.first_name||'')+' '+(reg.last_name||'')).trim(),matchedSubjects:matched});
         }
 
         const allAttendance=attSnap.docs.map(function(d){return Object.assign({id:d.id},d.data());}).filter(function(a){return a.type!=='grace'&&a.type!=='grace_session';});
@@ -1077,11 +1093,10 @@
           }
         });
 
-        const subStudentIds2=Object.keys(subsByStudent);
-        const details=subStudentIds2.map(function(sid){
-          const info=byStudent[sid]||{sessions:0,subjects:{}};
+        const details=matchedStudents.map(function(s){
+          const info=byStudent[s.id]||{sessions:0,subjects:{}};
           const absent=Math.max(0,totalSessionsOffered-info.sessions);
-          return {name:nameMap[sid]||sid,sessions:info.sessions,absent:absent,matchedSubjects:subsByStudent[sid].subjects,amount:info.sessions*rate};
+          return {name:s.name,sessions:info.sessions,absent:absent,matchedSubjects:s.matchedSubjects,amount:info.sessions*rate};
         }).sort(function(a,b){return b.amount-a.amount;});
 
         const totalSessions=details.reduce(function(s,d){return s+d.sessions;},0);
