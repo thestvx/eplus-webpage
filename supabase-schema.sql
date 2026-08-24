@@ -180,6 +180,43 @@ CREATE POLICY "anon_update_summer_camp_registrations" ON summer_camp_registratio
 DROP POLICY IF EXISTS "anon_delete_summer_camp_registrations" ON summer_camp_registrations;
 CREATE POLICY "anon_delete_summer_camp_registrations" ON summer_camp_registrations FOR DELETE TO anon USING (true);
 
+-- 7c. LANGUAGE COURSE REGISTRATIONS (تسجيلات دورات اللغات)
+CREATE TABLE IF NOT EXISTS language_registrations (
+  id TEXT PRIMARY KEY,
+  first_name TEXT NOT NULL DEFAULT '',
+  last_name TEXT NOT NULL DEFAULT '',
+  birth_date TEXT DEFAULT '',
+  parent_name TEXT DEFAULT '',
+  parent_phone TEXT DEFAULT '',
+  language TEXT DEFAULT '',
+  cefr_level TEXT DEFAULT '',
+  level_test TEXT DEFAULT '',
+  motivation TEXT DEFAULT '',
+  status TEXT DEFAULT 'مسجل مبدئياً',
+  fee_amount INTEGER DEFAULT 500,
+  student_token TEXT DEFAULT '',
+  barcode_value TEXT DEFAULT '',
+  terms_accepted BOOLEAN DEFAULT FALSE,
+  deleted_at TIMESTAMPTZ DEFAULT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lang_reg_created_at ON language_registrations(created_at);
+CREATE INDEX IF NOT EXISTS idx_lang_reg_status ON language_registrations(status);
+CREATE INDEX IF NOT EXISTS idx_lang_reg_language ON language_registrations(language);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lang_reg_barcode ON language_registrations(barcode_value) WHERE barcode_value != '';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lang_reg_token ON language_registrations(student_token) WHERE student_token != '';
+
+ALTER TABLE language_registrations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_insert_lang_reg" ON language_registrations;
+CREATE POLICY "anon_insert_lang_reg" ON language_registrations FOR INSERT TO anon WITH CHECK (true);
+DROP POLICY IF EXISTS "anon_select_lang_reg" ON language_registrations;
+CREATE POLICY "anon_select_lang_reg" ON language_registrations FOR SELECT TO anon USING (true);
+DROP POLICY IF EXISTS "anon_update_lang_reg" ON language_registrations;
+CREATE POLICY "anon_update_lang_reg" ON language_registrations FOR UPDATE TO anon USING (true);
+DROP POLICY IF EXISTS "anon_delete_lang_reg" ON language_registrations;
+CREATE POLICY "anon_delete_lang_reg" ON language_registrations FOR DELETE TO anon USING (true);
+
 -- 7c. CALIBRATION SETTINGS (إعدادات المعايرة المركزية — مصدر واحد مشترك)
 -- صف واحد واحد id='global' يضم معايرة البطاقة + تخطيط ورقة A4 معاً، يُقرأ
 -- ويُكتب من كل الأجهزة (صفحة المعايرة، لوحة الإدارة، بوابة الطالب) بحيث يظهر

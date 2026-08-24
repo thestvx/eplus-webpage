@@ -1449,6 +1449,7 @@ function unlockPageScroll() {
    MODAL OPEN / CLOSE
 ────────────────────────────────────────────────────────── */
 function openModal(type) {
+  if (type === 'lang') { if (typeof openLangReg === 'function') { openLangReg(); } return; }
   currentModalType = type;
   resetForm();
   const modalTitles = {
