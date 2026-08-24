@@ -912,9 +912,13 @@ GRANT EXECUTE ON FUNCTION get_student_attendance_events(TEXT) TO anon, service_r
 
 -- قراءة اشتراكات الأستاذ النشطة (للPortal)
 CREATE OR REPLACE FUNCTION get_teacher_active_subs(p_teacher_id TEXT)
-RETURNS TABLE(student_id TEXT, subject_name TEXT, subject_id TEXT, teacher_name TEXT) AS $$
-  SELECT s.student_id, s.subject_name, s.subject_id, s.teacher_name
+RETURNS TABLE(student_id TEXT, student_name TEXT, first_name TEXT, last_name TEXT, level TEXT, stream TEXT, subject_name TEXT, subject_id TEXT, teacher_name TEXT) AS $$
+  SELECT s.student_id,
+         COALESCE(r.first_name||' '||r.last_name, s.student_id) AS student_name,
+         r.first_name, r.last_name, r.level, r.stream,
+         s.subject_name, s.subject_id, s.teacher_name
   FROM student_subscriptions s
+  LEFT JOIN registrations r ON r.id::TEXT = s.student_id
   WHERE s.teacher_id = p_teacher_id AND s.status = 'active';
 $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 GRANT EXECUTE ON FUNCTION get_teacher_active_subs(TEXT) TO anon, service_role;
