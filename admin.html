@@ -3527,10 +3527,14 @@
         </div>
 
         <!-- Detail Modal -->
-        <div class="modal-overlay" id="lang-detail-modal" style="display:none;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:9999">
-          <div class="modal-box" style="max-width:520px;max-height:85vh;overflow-y:auto;margin:auto">
-            <div class="modal-header"><h3 class="modal-title">تفاصيل التسجيل</h3><button class="close-btn" onclick="document.getElementById('lang-detail-modal').style.display='none'">✕</button></div>
-            <div id="lang-detail-body" style="padding:20px"></div>
+        <div class="teacher-modal-bg" id="lang-detail-modal">
+          <div class="teacher-modal" style="max-width:600px">
+            <div class="teacher-modal-header">
+              <div class="panel-icon" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.2)">🌍</div>
+              <div class="teacher-modal-title">تفاصيل التسجيل</div>
+              <button class="att-modal-close" onclick="document.getElementById('lang-detail-modal').classList.remove('open')">✕</button>
+            </div>
+            <div class="teacher-modal-body" id="lang-detail-body" style="padding:20px 24px"></div>
           </div>
         </div>
 
@@ -26358,31 +26362,62 @@ window.langRegShowDetail = function(id) {
   if (!r) return;
   const langIcons = {'الإنجليزية':'🇬🇧','الفرنسية':'🇫🇷','الإسبانية':'🇪🇸','الألمانية':'🇩🇪','الإيطالية':'🇮🇹','التركية':'🇹🇷'};
   const icon = langIcons[r.language] || '🌍';
+  const initial = (r.first_name || '?').charAt(0) || '?';
   const bd = r.birth_date ? r.birth_date.split('-') : [];
   const birthStr = bd.length === 3 ? bd[2]+'/'+bd[1]+'/'+bd[0] : (r.birth_date || '—');
+  const cefrColors = {A0:'#94a3b8',A1:'#22c55e',A2:'#eab308',B1:'#3b82f6',B2:'#f97316',C1:'#ef4444',C2:'#a855f7'};
+  const cefrColor = cefrColors[r.cefr_level] || 'var(--primary)';
 
-  let html = '<div style="text-align:center;margin-bottom:16px">'
-    +'<div style="width:60px;height:60px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:28px">'+(r.first_name||'?')[0]+'</div>'
-    +'<div style="font-size:18px;font-weight:900">'+(r.first_name||'')+' '+(r.last_name||'')+'</div>'
-    +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
-    +'<div style="background:var(--bg-secondary);padding:10px 14px;border-radius:10px"><div style="font-size:11px;color:var(--text-muted);font-weight:700">رقم التسجيل</div><div style="font-size:14px;font-weight:900">'+r.id+'</div></div>'
-    +'<div style="background:var(--bg-secondary);padding:10px 14px;border-radius:10px"><div style="font-size:11px;color:var(--text-muted);font-weight:700">تاريخ الميلاد</div><div style="font-size:14px;font-weight:700">'+birthStr+'</div></div>'
-    +'<div style="background:var(--bg-secondary);padding:10px 14px;border-radius:10px"><div style="font-size:11px;color:var(--text-muted);font-weight:700">ولي الأمر</div><div style="font-size:14px;font-weight:700">'+(r.parent_name||'—')+'</div></div>'
-    +'<div style="background:var(--bg-secondary);padding:10px 14px;border-radius:10px"><div style="font-size:11px;color:var(--text-muted);font-weight:700">هاتف ولي الأمر</div><div style="font-size:14px;font-weight:700" dir="ltr">'+(r.parent_phone||'—')+'</div></div>'
-    +'<div style="background:var(--bg-secondary);padding:10px 14px;border-radius:10px"><div style="font-size:11px;color:var(--text-muted);font-weight:700">اللغة</div><div style="font-size:14px;font-weight:700">'+icon+' '+(r.language||'—')+'</div></div>'
-    +'<div style="background:var(--bg-secondary);padding:10px 14px;border-radius:10px"><div style="font-size:11px;color:var(--text-muted);font-weight:700">المستوى (CEFR)</div><div style="font-size:14px;font-weight:900">'+(r.cefr_level||'—')+'</div></div>'
-    +'<div style="background:var(--bg-secondary);padding:10px 14px;border-radius:10px"><div style="font-size:11px;color:var(--text-muted);font-weight:700">اختبار التعيين</div><div style="font-size:14px;font-weight:700">'+(r.level_test||'—')+'</div></div>'
-    +'<div style="background:var(--bg-secondary);padding:10px 14px;border-radius:10px"><div style="font-size:11px;color:var(--text-muted);font-weight:700">تاريخ التسجيل</div><div style="font-size:14px;font-weight:700">'+lrFmtDate(r.created_at)+'</div></div>'
-    +'</div>'
-    +(r.motivation ? '<div style="background:var(--bg-secondary);padding:12px 14px;border-radius:10px;margin-bottom:16px"><div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:4px">ملاحظات</div><div style="font-size:13px;line-height:1.6">'+r.motivation+'</div></div>' : '')
-    +'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">'
-    +'<button onclick="langRegEdit(\''+r.id+'\')" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:var(--card);color:var(--text)">✏️ تعديل</button>'
-    +'<button onclick="langRegDelete(\''+r.id+'\')" style="flex:1;padding:10px;border:1.5px solid #dc2626;border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:transparent;color:#dc2626">🗑️ حذف</button>'
-    +'</div>';
+  let html = '';
+
+  // Hero section
+  html += `<div class="sr-detail-hero" style="background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.04));border-color:rgba(16,185,129,0.25)">
+    <div class="sr-detail-avatar" style="background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 6px 16px rgba(16,185,129,0.3)">${initial}</div>
+    <div style="min-width:0">
+      <div class="sr-detail-hero-name">${r.first_name || ''} ${r.last_name || ''}</div>
+      <div class="sr-detail-hero-id" style="color:#10b981" dir="ltr">${r.id}</div>
+    </div>
+  </div>`;
+
+  // Language & Level highlight
+  html += `<div style="display:flex;gap:10px;margin-bottom:16px">
+    <div style="flex:1;padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,rgba(99,102,241,0.1),rgba(99,102,241,0.03));border:1px solid rgba(99,102,241,0.2);text-align:center">
+      <div style="font-size:32px;margin-bottom:4px">${icon}</div>
+      <div style="font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:2px">اللغة المطلوبة</div>
+      <div style="font-size:15px;font-weight:900;color:var(--text)">${r.language || '—'}</div>
+    </div>
+    <div style="flex:1;padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,rgba(99,102,241,0.1),rgba(99,102,241,0.03));border:1px solid rgba(99,102,241,0.2);text-align:center">
+      <div style="font-size:32px;margin-bottom:4px">📊</div>
+      <div style="font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:2px">المستوى الحالي</div>
+      <div style="font-size:20px;font-weight:900;color:${cefrColor}">${r.cefr_level || '—'}</div>
+    </div>
+  </div>`;
+
+  // Personal info grid
+  html += '<div class="sr-detail-block-title" style="margin-top:0">المعلومات الشخصية</div>';
+  html += `<div class="sr-detail-grid">
+    <div class="sr-detail-cell"><span class="sr-detail-label">تاريخ الميلاد</span><span class="sr-detail-val">${birthStr}</span></div>
+    <div class="sr-detail-cell"><span class="sr-detail-label">ولي الأمر</span><span class="sr-detail-val">${r.parent_name || '—'}</span></div>
+    <div class="sr-detail-cell"><span class="sr-detail-label">هاتف ولي الأمر</span><span class="sr-detail-val" dir="ltr">${r.parent_phone || '—'}</span></div>
+    <div class="sr-detail-cell"><span class="sr-detail-label">اختبار التعيين</span><span class="sr-detail-val">${r.level_test || '—'}</span></div>
+    <div class="sr-detail-cell"><span class="sr-detail-label">تاريخ التسجيل</span><span class="sr-detail-val">${lrFmtDate(r.created_at)}</span></div>
+    <div class="sr-detail-cell"><span class="sr-detail-label">رسوم التسجيل</span><span class="sr-detail-val">${r.fee_amount || 500} دج</span></div>
+  </div>`;
+
+  // Motivation / Notes
+  if (r.motivation) {
+    html += '<div class="sr-detail-block-title">ملاحظات المسجل</div>';
+    html += `<div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.7;color:var(--text)">${r.motivation}</div>`;
+  }
+
+  // Actions
+  html += `<div class="sr-detail-actions">
+    <button class="tbl-action" onclick="langRegEdit('${r.id}')" style="padding:8px 20px;font-size:12px">✏️ تعديل</button>
+    <button class="tbl-action del" onclick="langRegDelete('${r.id}')" style="padding:8px 20px;font-size:12px">🗑️ حذف</button>
+  </div>`;
 
   document.getElementById('lang-detail-body').innerHTML = html;
-  document.getElementById('lang-detail-modal').style.display = 'flex';
+  document.getElementById('lang-detail-modal').classList.add('open');
 };
 
 window.langRegEdit = function(id) {
@@ -26425,7 +26460,7 @@ window.langRegSaveEdit = async function() {
     await lrFetch(LR_URL+'/rest/v1/'+LR_TABLE+'?id=eq.'+id, { method:'PATCH', body: JSON.stringify(patch) });
     srShowToast('تم حفظ التعديلات ✅');
     document.getElementById('lang-edit-modal').style.display = 'none';
-    document.getElementById('lang-detail-modal').style.display = 'none';
+    document.getElementById('lang-detail-modal').classList.remove('open');
     langRegLoadData();
   } catch(e) { srShowToast('خطأ: '+e.message, 'error'); }
 };
@@ -26435,7 +26470,7 @@ window.langRegDelete = async function(id) {
   try {
     await lrFetch(LR_URL+'/rest/v1/'+LR_TABLE+'?id=eq.'+id, { method:'DELETE', headers:{'Prefer':'return=representation'} });
     srShowToast('تم حذف التسجيل 🗑️');
-    document.getElementById('lang-detail-modal').style.display = 'none';
+    document.getElementById('lang-detail-modal').classList.remove('open');
     langRegLoadData();
   } catch(e) { srShowToast('خطأ: '+e.message, 'error'); }
 };
