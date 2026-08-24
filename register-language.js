@@ -256,7 +256,8 @@ window.onLangLawsAgreeChange = function() {
 };
 
 window.onLangLawsConfirm = function() {
-  closeLangLaws();
+  var modal = $id('lang-laws-modal');
+  if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
   doLangSubmit();
 };
 
