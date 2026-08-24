@@ -937,7 +937,10 @@ RETURNS TABLE(student_id TEXT, first_name TEXT, last_name TEXT, level TEXT, stre
     AND (
       el->>'teacherId' = p_teacher_id
       OR el->>'teacher_id' = p_teacher_id
-      OR LOWER(COALESCE(el->>'teacher', el->>'teacherName', el->>'teacher_name', '')) = LOWER(p_teacher_name)
+      OR REPLACE(REPLACE(LOWER(COALESCE(el->>'teacher', el->>'teacherName', el->>'teacher_name', el->>'teachername', '')), ' ', ''), 'عبدال', 'abd')
+         = REPLACE(REPLACE(LOWER(p_teacher_name), ' ', ''), 'عبدال', 'abd')
+      OR REPLACE(LOWER(r.subjects::text), ' ', '')
+         LIKE '%' || REPLACE(LOWER(p_teacher_name), ' ', '') || '%'
     )
   GROUP BY r.id, r.first_name, r.last_name, r.level, r.stream, r.created_at;
 $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
