@@ -47,6 +47,7 @@ const SUPPORT_STREAMS = {
     { subject: 'العلوم الفيزيائية', teacher: 'نمسي عبد الرحمان' },
     { subject: 'العلوم الفيزيائية', teacher: 'لكموته لمين' },
     { subject: 'الرياضيات', teacher: 'نعورة عبدالباسط' },
+    { subject: 'الرياضيات', teacher: 'ترعة فاطمة' },
     { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
     { subject: 'اللغة الإنجليزية ( دورة )', teacher: 'تليلي راضية' },
     { subject: 'العلوم الإسلامية ( دورة )', teacher: 'هبيته ربيع' },
