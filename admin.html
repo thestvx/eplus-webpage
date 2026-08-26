@@ -24925,6 +24925,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">المادة</th>';
     h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الأستاذ</th>';
     h += '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">النوع</th>';
+    h += '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">إجراءات</th>';
     h += '</tr></thead><tbody>';
     rows.forEach(r => {
       const typeLabel = r.type === 'grace_session' ? '<span style="color:#d97706">⚠️ حصّة مجانية</span>' : r.type === 'trial_session' ? '<span style="color:#f59e0b">🟠 حصة تجريبية</span>' : '<span style="color:#059669">✅ حضور</span>';
@@ -24936,11 +24937,34 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       h += '<td style="padding:7px 10px">' + escX(r.subjectName || '—') + '</td>';
       h += '<td style="padding:7px 10px">' + escX(r.teacherName || '—') + '</td>';
       h += '<td style="padding:7px 10px;text-align:center">' + typeLabel + '</td>';
+      h += '<td style="padding:7px 10px;text-align:center"><button onclick="subxDeleteLog(\'' + r.id + '\',\'' + escX(r.studentName || '').replace(/'/g, "\\'") + '\',\'' + escX(r.date) + '\')" style="background:rgba(220,38,38,0.1);color:#dc2626;border:1px solid rgba(220,38,38,0.25);border-radius:8px;padding:4px 12px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.background=\'rgba(220,38,38,0.2)\'" onmouseout="this.style.background=\'rgba(220,38,38,0.1)\'">🗑️ حذف</button></td>';
       h += '</tr>';
     });
     h += '</tbody></table></div>';
     h += '<div style="text-align:center;margin-top:10px;font-size:11px;color:var(--text-muted)">إجمالي السجلات: ' + rows.length + '</div>';
     c.innerHTML = h;
+  };
+
+  window.subxDeleteLog = async function (attId, studentName, attDate) {
+    const ok = await cmConfirm('حذف سجل الحضور', 'هل أنت متأكد من حذف حضور <b>' + (studentName || '—') + '</b> يوم <b>' + (attDate || '—') + '</b>؟<br><span style="color:#dc2626;font-size:11px;font-weight:800">⚠️ سيُخصم هذا الحضور من سجل الطالب</span>', '🗑️', { confirmText: 'نعم، احذف' });
+    if (!ok) return;
+    try {
+      const { _db: fdb, _firestore: fs } = window;
+      // Try hard delete first, fall back to soft-delete
+      try {
+        await fs.deleteDoc(fs.doc(fdb, 'support_attendance', attId));
+      } catch (delErr) {
+        await fs.updateDoc(fs.doc(fdb, 'support_attendance', attId), { cancelled: true, cancelledAt: new Date().toISOString() });
+      }
+      showToast('✔️ تم حذف سجل الحضور بنجاح.');
+      // Refresh the logs modal data
+      if (typeof subxShowAllLogs === 'function') {
+        await subxShowAllLogs();
+      }
+    } catch (e) {
+      console.error('[SUBSCRIPTIONS] delete log failed', e);
+      showToast('❌ ' + ((e && e.message) || 'تعذر حذف السجل'), true);
+    }
   };
 
   window.subxPrintReceipt = async function (id) {
