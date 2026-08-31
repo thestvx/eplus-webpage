@@ -825,10 +825,21 @@ CREATE OR REPLACE FUNCTION admin_delete_transaction(
   p_admin_name TEXT
 )
 RETURNS TEXT AS $$
+DECLARE
+  v_deleted INT := 0;
 BEGIN
   IF NOT is_admin(p_admin_uid) THEN RAISE EXCEPTION 'unauthorized'; END IF;
   IF p_tx_id IS NULL OR p_tx_id = '' THEN RAISE EXCEPTION 'tx id required'; END IF;
+
   DELETE FROM teacher_transactions WHERE id = p_tx_id;
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+  IF v_deleted = 0 THEN
+    RAISE EXCEPTION 'transaction not found' USING ERRCODE = 'P0002';
+  END IF;
+
+  -- حذف الإيصال المرتبط (إن وُجد) والحفاظ على الاتساق مع دفتر المعاملات
+  DELETE FROM teacher_receipts WHERE transaction_id = p_tx_id;
+
   PERFORM admin_recompute_balance(p_admin_uid, p_teacher_id, p_teacher_name, NULL, NULL, p_rate, p_admin_name);
   RETURN p_tx_id;
 END; $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
@@ -966,7 +977,7 @@ REVOKE ALL ON FUNCTION admin_remove_admin(TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_admins(TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION record_attendance(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION undo_attendance(TEXT, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, INT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_pause_subscription(TEXT, TEXT, BOOLEAN) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_subscriptions(TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_subscriptions_rich(TEXT) FROM PUBLIC;
@@ -1031,7 +1042,7 @@ GRANT EXECUTE ON FUNCTION admin_remove_admin(TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_admins(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION record_attendance(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION undo_attendance(TEXT, TEXT) TO service_role;
-GRANT EXECUTE ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, INT, TEXT, TEXT, TEXT, TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_pause_subscription(TEXT, TEXT, BOOLEAN) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_subscriptions(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_subscriptions_rich(TEXT) TO service_role;
