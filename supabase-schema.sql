@@ -383,3 +383,68 @@ CREATE POLICY "anon_all_student_subscriptions" ON student_subscriptions FOR ALL 
 ALTER TABLE subscription_periods ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "anon_all_subscription_periods" ON subscription_periods;
 CREATE POLICY "anon_all_subscription_periods" ON subscription_periods FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- 15. SUPPORT FINANCE RESOURCES (موارد مالية الدعم المدرسي)
+-- يوحد إيرادات الدعم المدرسي: الاشتراكات الشهرية + حقوق التسجيل + المخيم الصيفي v2 + دورات اللغات
+-- بالإضافة إلى المصروفات ودفع رواتب الأساتذة، مع سجل معاملات شامل.
+-- الإيرادات تُحسب ديناميكياً من جداولها الأصلية (محدثة الآن() عند الاضافة).
+-- المبالغ الفعلية المدفوعة: subscriptions = student_subscriptions.total_price,
+-- support fees = registrations.fee_amount, camp v2 = summer_camp_registrations.total_amount,
+-- language = language_registrations.fee_amount. المصروفات والرواتب تُسجل هنا يدوياً.
+
+-- 15a. سجل معاملات الدعم المدرسي (وحدة واحدة للمعاملات المالية)
+-- source_type: 'subscription' | 'support_fee' | 'camp_v2' | 'language' | 'expense' | 'salary' | 'adjustment'
+-- direction: 'in' (إيراد/إيداع) | 'out' (مصروف/سحب)
+CREATE TABLE IF NOT EXISTS support_finance_tx (
+  id TEXT PRIMARY KEY,
+  source_type TEXT NOT NULL DEFAULT 'subscription',
+  direction TEXT NOT NULL DEFAULT 'in',
+  amount INTEGER NOT NULL DEFAULT 0,
+  description TEXT DEFAULT '',
+  student_id TEXT DEFAULT '',
+  student_name TEXT DEFAULT '',
+  subject_name TEXT DEFAULT '',
+  teacher_id TEXT DEFAULT '',
+  teacher_name TEXT DEFAULT '',
+  reference_id TEXT DEFAULT '',
+  admin_name TEXT DEFAULT '',
+  date TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD'),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_support_finance_tx_type ON support_finance_tx(source_type);
+CREATE INDEX IF NOT EXISTS idx_support_finance_tx_date ON support_finance_tx(date);
+CREATE INDEX IF NOT EXISTS idx_support_finance_tx_direction ON support_finance_tx(direction);
+
+-- 15b. إجمالي الخزينة (رصيد واحد إجمالي) — يُخصم منه رواتب الأساتذة والمصاريف
+CREATE TABLE IF NOT EXISTS support_finance_balance (
+  id TEXT PRIMARY KEY,
+  total_balance INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE support_finance_tx ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_all_support_finance_tx" ON support_finance_tx;
+CREATE POLICY "anon_all_support_finance_tx" ON support_finance_tx FOR ALL TO anon USING (true) WITH CHECK (true);
+
+ALTER TABLE support_finance_balance ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_all_support_finance_balance" ON support_finance_balance;
+CREATE POLICY "anon_all_support_finance_balance" ON support_finance_balance FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- دالة ذرّية لإضافة/خصم من الخزينة — تُستدعى من لوحة الإدارة عبر REST
+INSERT INTO support_finance_balance (id, total_balance) VALUES ('global', 0)
+  ON CONFLICT (id) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION add_support_balance(p_delta INT)
+RETURNS INT AS $$
+DECLARE
+  v_bal INT;
+BEGIN
+  INSERT INTO support_finance_balance (id, total_balance) VALUES ('global', GREATEST(0, COALESCE(p_delta,0)))
+  ON CONFLICT (id) DO UPDATE
+    SET total_balance = GREATEST(0, support_finance_balance.total_balance + COALESCE(p_delta, 0)),
+        updated_at = now()
+  RETURNING total_balance INTO v_bal;
+  RETURN v_bal;
+END; $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+GRANT EXECUTE ON FUNCTION add_support_balance(INT) TO anon, service_role;

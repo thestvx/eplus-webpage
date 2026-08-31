@@ -1,11 +1,10 @@
--- ═══════════════════════════════════════════════════════════
---  إصلاح: إنشاء اشتراك لطلاب مسجلين نهائياً
---  كان يفشل بخطأ "student not enrolled" لأن بيانات التسجيل
---  القديمة لا تحوي subjectId/teacherId داخل subjects.
---  الآن المطابقة بالاسم (subject + teacher) مع تجاهل المسافات،
---  وبديل اسمي: الاجتماعيات = التاريخ ( دورة ).
---  يُشغَّل في Supabase → SQL Editor ثم Run.
--- ═══════════════════════════════════════════════════════════
+-- ═══════════════════════════════════════════════════════════════════════
+--  إصلاح: جلسات الباقة المخصصة (متغيرات عدد الجلسات)
+--  الهدف: السماح بإنشاء اشتراك بباقة مخصصة بعدد جلسات محدد (p_total_sessions)
+--         وتوزيع العدد الإجمالي على أشهر الاشتراك بدلاً من تثبيت 8 حصص لكل شهر.
+--         يمنع خطأ "student not enrolled" بتطابق اسمي للمواد/الأساتذة.
+--  شغّل هذا الملف كاملاً في Supabase SQL Editor ثم Run.
+-- ═══════════════════════════════════════════════════════════════════════
 
 CREATE OR REPLACE FUNCTION _sn(p TEXT) RETURNS TEXT AS $$
   SELECT lower(regexp_replace(COALESCE(p, ''), '\s+', '', 'g'));
@@ -18,6 +17,7 @@ CREATE OR REPLACE FUNCTION admin_create_subscription(
   p_months INT,
   p_total_price INT,
   p_payment_id TEXT,
+  p_total_sessions INT DEFAULT NULL,
   p_notes TEXT DEFAULT NULL,
   p_teacher_id TEXT DEFAULT NULL,
   p_subject_id TEXT DEFAULT NULL,
@@ -33,6 +33,8 @@ DECLARE
   v_start TEXT;
   v_end TEXT;
   v_total INT;
+  v_total_sessions INT;
+  v_period INT;
   v_today TEXT := to_char(CURRENT_DATE, 'YYYY-MM-DD');
   v_teacher_id TEXT := COALESCE(NULLIF(p_teacher_id, ''), '');
   v_subject_id TEXT := COALESCE(NULLIF(p_subject_id, ''), '');
@@ -46,11 +48,20 @@ BEGIN
   IF EXISTS (SELECT 1 FROM student_subscriptions WHERE payment_id = p_payment_id) THEN
     RAISE EXCEPTION 'payment already exists: %', p_payment_id USING ERRCODE = '23505';
   END IF;
+  -- الاشتراك يجب أن يخص مادة + أستاذ (لا اشتراكات عامة جديدة)
   IF v_subject_id = '' THEN RAISE EXCEPTION 'subject_id required (per-subject subscription)'; END IF;
   IF v_teacher_id = '' THEN RAISE EXCEPTION 'teacher_id required (per-subject subscription)'; END IF;
   v_total := COALESCE(p_total_price, v_months * 2000);
   IF v_total < 0 THEN RAISE EXCEPTION 'total_price must be >= 0'; END IF;
+  -- الباقة المخصصة: عدد الحصص يأتي من p_total_sessions (المستخدم يحدده بنفسه).
+  -- إذا لم يُوفَّر، يُحسب 8 حصص لكل شهر كافتراضي.
+  v_total_sessions := COALESCE(p_total_sessions, v_months * 8);
+  IF v_total_sessions < 1 THEN RAISE EXCEPTION 'total_sessions must be >= 1'; END IF;
 
+  -- الطالب مسجل فعلاً لدى هذا الأستاذ في هذه المادة (مصدر واحد للتسجيل).
+  -- المطابقة بالاسم أولاً: بيانات التسجيل القديمة قد لا تحوي subjectId/teacherId
+  -- (فقط subject + teacher)، لذا المطابقة الصارمة بالـ IDs تُفشل طلاباً مسجلين فعلاً.
+  -- الـ IDs تُستخدم كتطابق إضافي إن وُجدت، مع بديل اسمي: الاجتماعيات = التاريخ ( دورة ).
   IF NOT EXISTS (
     SELECT 1 FROM registrations r,
            jsonb_array_elements(CASE WHEN jsonb_typeof(r.subjects) = 'array' THEN r.subjects ELSE '[]'::jsonb END) el
@@ -74,6 +85,9 @@ BEGIN
   v_next := v_cur + (v_months * interval '1 month');
   v_end := to_char(v_next - interval '1 day', 'YYYY-MM-DD');
 
+  -- منع التداخل: لا يتداخل اشتراك مع اشتراك آخر نشط لنفس الطالب
+  -- في نفس المادة + نفس الأستاذ. (الطلبة قد يملكون اشتراكات مختلفة
+  -- في مواد مختلفة بشكل متوازٍ — وهذا مسموح.)
   IF EXISTS (
     SELECT 1 FROM student_subscriptions s
      WHERE s.student_id = p_student_id
@@ -90,16 +104,21 @@ BEGIN
   VALUES
     (v_sub_id, p_student_id, v_teacher_id, v_subject_id,
      COALESCE(p_teacher_name, ''), COALESCE(p_subject_name, ''),
-     p_start_date, v_end, v_months, v_total, v_months * 8, 'active', p_payment_id, COALESCE(p_notes, ''));
+     p_start_date, v_end, v_months, v_total, v_total_sessions, 'active', p_payment_id, COALESCE(p_notes, ''));
 
   FOR i IN 1..v_months LOOP
     v_start := to_char(v_cur, 'YYYY-MM-DD');
     v_next := v_cur + interval '1 month';
     v_end := to_char(v_next - interval '1 day', 'YYYY-MM-DD');
+    -- توزيع الحصص على الأشهر: في الباقة المخصصة وزّع عدد الحصص المتبقية على
+    -- الأشهر المتبقية، وفي غيرها 8 حصص لكل شهر.
+    v_period := CASE WHEN p_total_sessions IS NOT NULL
+      THEN (SELECT COALESCE(floor((v_total_sessions - (i - 1) * (v_total_sessions / v_months)) / (v_months - (i - 1))), 0))
+      ELSE 8 END;
     INSERT INTO subscription_periods
       (id, subscription_id, month_number, start_date, end_date, total_sessions, used_sessions, remaining_sessions, status)
     VALUES
-      (v_sub_id || '-M' || i, v_sub_id, i, v_start, v_end, 8, 0, 8,
+      (v_sub_id || '-M' || i, v_sub_id, i, v_start, v_end, v_period, 0, v_period,
        CASE WHEN v_today < v_start THEN 'upcoming'
             WHEN v_today > v_end THEN 'completed'
             ELSE 'active' END);

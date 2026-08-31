@@ -440,8 +440,8 @@ CREATE OR REPLACE FUNCTION admin_create_subscription(
   p_start_date TEXT,
   p_months INT,
   p_total_price INT,
-  p_total_sessions INT DEFAULT NULL,
   p_payment_id TEXT,
+  p_total_sessions INT DEFAULT NULL,
   p_notes TEXT DEFAULT NULL,
   p_teacher_id TEXT DEFAULT NULL,
   p_subject_id TEXT DEFAULT NULL,
@@ -536,9 +536,9 @@ BEGIN
     v_end := to_char(v_next - interval '1 day', 'YYYY-MM-DD');
     -- توزيع الحصص على الأشهر: في الباقة المخصصة وزّع |استة الحصص المتبقية على
     -- الأشهر المتبقية، وفي غيرها 8 حصص لكل شهر.
-    v_period := (p_total_sessions IS NOT NULL)
-      ? (SELECT COALESCE(floor((v_total_sessions - (i - 1) * (v_total_sessions / v_months)) / (v_months - (i - 1))), 0))
-      : 8;
+    v_period := CASE WHEN p_total_sessions IS NOT NULL
+      THEN (SELECT COALESCE(floor((v_total_sessions - (i - 1) * (v_total_sessions / v_months)) / (v_months - (i - 1))), 0))
+      ELSE 8 END;
     INSERT INTO subscription_periods
       (id, subscription_id, month_number, start_date, end_date, total_sessions, used_sessions, remaining_sessions, status)
     VALUES
@@ -795,6 +795,22 @@ BEGIN
     (v_rcpt, v_tx, p_teacher_id, COALESCE(p_teacher_name, ''), v_amt, v_date,
      COALESCE(p_admin_name, ''), COALESCE(p_note, ''));
 
+  -- خصم راتب الأستاذ من موارد الدعم المدرسي (الخزينة) + تسجيل معاملة راتب
+  INSERT INTO support_finance_tx
+    (id, source_type, direction, amount, description, teacher_id, teacher_name,
+     reference_id, admin_name, date)
+  VALUES
+    (v_tx, 'salary', 'out', v_amt,
+     COALESCE(p_note, 'دفعة مالية') || ' — راتب ' || COALESCE(p_teacher_name, 'أستاذ'),
+     p_teacher_id, COALESCE(p_teacher_name, ''), v_tx,
+     COALESCE(p_admin_name, ''), v_date);
+
+  INSERT INTO support_finance_balance (id, total_balance, updated_at)
+  VALUES ('global', -v_amt, now())
+  ON CONFLICT (id) DO UPDATE
+    SET total_balance = GREATEST(0, support_finance_balance.total_balance - v_amt),
+        updated_at = now();
+
   PERFORM admin_recompute_balance(p_admin_uid, p_teacher_id, p_teacher_name, NULL, NULL, p_rate, p_admin_name);
 
   RETURN jsonb_build_object('tx_id', v_tx, 'receipt_id', v_rcpt, 'amount', v_amt, 'date', v_date);
@@ -862,6 +878,55 @@ BEGIN
 END; $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- ────────────────────────────────────────────────────────────────
+-- 12. موارد مالية الدعم المدرسي — جداول + دالة رصيد ذرّي
+--     تُنشأ أيضاً في supabase-schema.sql (نفس البنية). تُشغَّل هذه
+--     الصيغة هنا لضمان وجودها عند تشغيل الترحيل في أي بيئة.
+-- ────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS support_finance_tx (
+  id TEXT PRIMARY KEY,
+  source_type TEXT NOT NULL DEFAULT 'subscription',
+  direction TEXT NOT NULL DEFAULT 'in',
+  amount INTEGER NOT NULL DEFAULT 0,
+  description TEXT DEFAULT '',
+  student_id TEXT DEFAULT '',
+  student_name TEXT DEFAULT '',
+  subject_name TEXT DEFAULT '',
+  teacher_id TEXT DEFAULT '',
+  teacher_name TEXT DEFAULT '',
+  reference_id TEXT DEFAULT '',
+  admin_name TEXT DEFAULT '',
+  date TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD'),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_support_finance_tx_type ON support_finance_tx(source_type);
+CREATE INDEX IF NOT EXISTS idx_support_finance_tx_date ON support_finance_tx(date);
+CREATE INDEX IF NOT EXISTS idx_support_finance_tx_direction ON support_finance_tx(direction);
+
+CREATE TABLE IF NOT EXISTS support_finance_balance (
+  id TEXT PRIMARY KEY,
+  total_balance INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+INSERT INTO support_finance_balance (id, total_balance) VALUES ('global', 0)
+  ON CONFLICT (id) DO NOTHING;
+
+-- دالة ذرّية لإضافة/خصم من الخزينة (تُستدعى من لوحة الإدارة عبر REST)
+CREATE OR REPLACE FUNCTION add_support_balance(p_delta INT)
+RETURNS INT AS $$
+DECLARE
+  v_bal INT;
+BEGIN
+  INSERT INTO support_finance_balance (id, total_balance) VALUES ('global', GREATEST(0, COALESCE(p_delta,0)))
+  ON CONFLICT (id) DO UPDATE
+    SET total_balance = GREATEST(0, support_finance_balance.total_balance + COALESCE(p_delta, 0)),
+        updated_at = now()
+  RETURNING total_balance INTO v_bal;
+  RETURN v_bal;
+END; $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+GRANT EXECUTE ON FUNCTION add_support_balance(INT) TO anon, service_role;
+
+-- ────────────────────────────────────────────────────────────────
 -- 12. RLS — صفر سياسات anon + رفض صريح
 --     نُسقط سياسات النسخ القديمة (إن وُجدت) ونفعّل RLS على كل جدول.
 --     لا سياسة قراءة/كتابة لأي دور عام.
@@ -901,7 +966,7 @@ REVOKE ALL ON FUNCTION admin_remove_admin(TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_admins(TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION record_attendance(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION undo_attendance(TEXT, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_pause_subscription(TEXT, TEXT, BOOLEAN) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_subscriptions(TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_subscriptions_rich(TEXT) FROM PUBLIC;
@@ -966,7 +1031,7 @@ GRANT EXECUTE ON FUNCTION admin_remove_admin(TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_admins(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION record_attendance(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION undo_attendance(TEXT, TEXT) TO service_role;
-GRANT EXECUTE ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_pause_subscription(TEXT, TEXT, BOOLEAN) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_subscriptions(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_subscriptions_rich(TEXT) TO service_role;

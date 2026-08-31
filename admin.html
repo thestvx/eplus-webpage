@@ -1913,6 +1913,11 @@
         <span class="nav-label">الاشتراكات الشهرية</span>
         <span class="nav-badge" id="nav-badge-subscriptions">0</span>
       </div>
+      <div class="nav-item" data-nav="support-finance" onclick="switchNavSection('support-finance')">
+        <span class="nav-icon">💰</span>
+        <span class="nav-label">موارد مالية الدعم المدرسي</span>
+        <span class="nav-badge" id="nav-badge-sfinance">0</span>
+      </div>
       <div class="nav-section" data-nav-cat="mail" data-i18n="mail_service">خدمات البريد</div>
       <div class="nav-item" data-nav="notifications" onclick="switchNavSection('notifications')">
         <span class="nav-icon">📨</span>
@@ -3791,7 +3796,7 @@
         <div class="stats-grid" style="margin-bottom:24px">
           <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--primary-light)">📅</div></div><div class="stat-num" id="subx-total">0</div><div class="stat-label">إجمالي الاشتراكات</div></div>
           <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(16,185,129,0.1)">🟢</div></div><div class="stat-num" id="subx-active" style="color:var(--success)">0</div><div class="stat-label">اشتراكات نشطة</div></div>
-          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(245,158,11,0.1)">💰</div></div><div class="stat-num" id="subx-revenue" style="direction:ltr">0 دج</div><div class="stat-label">إيرادات الاشتراكات</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(245,158,11,0.1)">💰</div></div><div class="stat-num" id="subx-revenue" style="direction:ltr">0 دج</div><div class="stat-label">إيرادات الاشتراكات</div><button onclick="subxShowRevenueDetail()" style="margin-top:8px;padding:6px 14px;border-radius:8px;border:1px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.08);color:#B45309;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" onmouseover="this.style.background='rgba(245,158,11,0.16)'" onmouseout="this.style.background='rgba(245,158,11,0.08)'">👁️ عرض التفاصيل</button></div>
         </div>
 
         <!-- ▶️ إدارة حضور اليوم -->
@@ -4011,6 +4016,136 @@
               <button id="pin-clear-confirm" onclick="subxConfirmClearLogs()" style="padding:10px 24px;border:none;border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff">🗑️ حذف</button>
               <button onclick="document.getElementById('pin-clear-modal').classList.remove('open')" style="padding:10px 24px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:var(--card);color:var(--text)">إلغاء</button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SUBSCRIPTIONS REVENUE DETAIL MODAL ===== -->
+      <div class="teacher-modal-bg" id="subx-revenue-modal">
+        <div class="teacher-modal" style="max-width:900px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.2)">💰</div>
+            <div class="teacher-modal-title">تفاصيل إيرادات الاشتراكات الشهرية</div>
+            <button class="att-modal-close" onclick="document.getElementById('subx-revenue-modal').classList.remove('open')">✕</button>
+          </div>
+          <div class="teacher-modal-body" style="overflow:auto;max-height:72vh;padding:22px 26px">
+            <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+              <input type="text" id="subx-rev-search" placeholder="🔍 بحث بالطالب أو المادة..." oninput="subxRenderRevenue()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;flex:1;min-width:160px;background:var(--card)">
+              <select id="subx-rev-status" onchange="subxRenderRevenue()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+                <option value="">كل الحالات</option>
+                <option value="active">نشط</option>
+                <option value="completed">منتهي</option>
+                <option value="paused">موقوف</option>
+                <option value="cancelled">ملغى</option>
+              </select>
+              <button class="tbl-action" onclick="subxShowRevenueDetail()" style="font-size:12px;border-color:rgba(16,185,129,0.3);color:#059669">🔄 تحديث</button>
+              <button class="tbl-action" onclick="subxExportRevenueCSV()" style="font-size:12px;border-color:rgba(99,102,241,0.3);color:#6366f1">📥 CSV</button>
+              <div style="font-size:13px;font-weight:900;color:var(--text);background:rgba(245,158,11,0.1);padding:8px 16px;border-radius:10px" id="subx-rev-total-label">الإجمالي: 0 دج</div>
+            </div>
+            <div id="subx-rev-body" style="font-size:12px;color:var(--text-muted)">جارٍ تحميل الإيرادات…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== ADD EXPENSE MODAL ===== -->
+      <div class="teacher-modal-bg" id="sf-expense-modal">
+        <div class="teacher-modal" style="max-width:460px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:rgba(220,38,38,0.1);border-color:rgba(220,38,38,0.2)">➖</div>
+            <div class="teacher-modal-title">إضافة مصروف</div>
+            <button class="att-modal-close" onclick="document.getElementById('sf-expense-modal').classList.remove('open')">✕</button>
+          </div>
+          <div class="teacher-modal-body" style="padding:22px 26px">
+            <label style="display:block;font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:6px">البيان *</label>
+            <input id="sf-exp-desc" type="text" placeholder="مثال: كراس ومحفظة، إيجار..." style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card);margin-bottom:14px">
+            <label style="display:block;font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:6px">المبلغ (دج) *</label>
+            <input id="sf-exp-amount" type="number" min="0" placeholder="0" style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-weight:800;font-family:'Tajawal',sans-serif;background:var(--card);margin-bottom:14px">
+            <div style="display:flex;gap:10px">
+              <button onclick="sfConfirmExpense()" style="flex:1;padding:12px 20px;border:none;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;font-family:'Tajawal',sans-serif">✅ تأكيد المصروف</button>
+              <button onclick="document.getElementById('sf-expense-modal').classList.remove('open')" style="background:var(--card);border:1.5px solid var(--border);color:var(--text);padding:12px 24px;border-radius:12px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SECTION: SUPPORT FINANCE (موارد مالية الدعم المدرسي) ===== -->
+      <div id="section-support-finance" style="display:none">
+        <div class="section-header">
+          <div class="section-title">
+            <div class="section-icon">💰</div>
+            <div>
+              <h2>موارد مالية الدعم المدرسي</h2>
+              <p style="font-size:12px;color:var(--text-muted);margin-top:2px">إيرادات + خزينة + مصروفات + رواتب الأساتذة</p>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <button onclick="sfAddExpense()" style="padding:9px 18px;border:none;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;font-family:'Tajawal',sans-serif">➖ إضافة مصروف</button>
+            <button onclick="sfLoad()" style="padding:9px 18px;border:1.5px solid rgba(16,185,129,0.3);border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;background:var(--success-soft);color:#059669;font-family:'Tajawal',sans-serif">🔄 تحديث</button>
+          </div>
+        </div>
+
+        <!-- خزينة الإجمالية -->
+        <div style="padding:20px 24px;border-radius:16px;background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(245,158,11,0.04));border:1.5px solid rgba(245,158,11,0.3);margin-bottom:18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div style="width:52px;height:52px;border-radius:14px;background:rgba(245,158,11,0.15);display:flex;align-items:center;justify-content:center;font-size:24px">🏦</div>
+          <div style="flex:1;min-width:180px">
+            <div style="font-size:12px;font-weight:800;color:#B45309">إجمالي الخزينة</div>
+            <div style="font-size:30px;font-weight:900;color:var(--text)" id="sf-balance" dir="ltr">0 دج</div>
+          </div>
+          <div style="text-align:center;min-width:110px">
+            <div style="font-size:11px;color:var(--text-muted);font-weight:800">إيرادات إجمالية</div>
+            <div style="font-size:16px;font-weight:900;color:#059669" id="sf-in-total" dir="ltr">0 دج</div>
+          </div>
+          <div style="text-align:center;min-width:110px">
+            <div style="font-size:11px;color:var(--text-muted);font-weight:800">مصروفات ورواتب</div>
+            <div style="font-size:16px;font-weight:900;color:#dc2626" id="sf-out-total" dir="ltr">0 دج</div>
+          </div>
+        </div>
+
+        <!-- 4 بطاقات إيرادات -->
+        <div class="stats-grid" style="margin-bottom:18px">
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(245,158,11,0.1)">📅</div></div><div class="stat-num" id="sf-rc-sub" style="direction:ltr">0 دج</div><div class="stat-label">اشتراكات شهرية</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(16,185,129,0.1)">📚</div></div><div class="stat-num" id="sf-rc-fee" style="direction:ltr">0 دج</div><div class="stat-label">حقوق التسجيل (دعم)</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(99,102,241,0.1)">🏕️</div></div><div class="stat-num" id="sf-rc-camp" style="direction:ltr">0 دج</div><div class="stat-label">مخيم صيفي v2</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(124,58,237,0.1)">🌍</div></div><div class="stat-num" id="sf-rc-lang" style="direction:ltr">0 دج</div><div class="stat-label">دورات اللغات</div></div>
+        </div>
+
+        <!-- سجل المعاملات -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px">
+          <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+            <div style="font-size:15px;font-weight:900;color:var(--text);margin-inline-end:auto">📒 سجل المعاملات</div>
+            <input type="text" id="sf-tx-search" placeholder="🔍 بحث..." oninput="sfRenderTx()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card);min-width:150px">
+            <select id="sf-tx-type" onchange="sfRenderTx()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+              <option value="">كل الأنواع</option>
+              <option value="subscription">اشتراك شهري</option>
+              <option value="support_fee">حقوق تسجيل</option>
+              <option value="camp_v2">مخيم صيفي</option>
+              <option value="language">دورات لغات</option>
+              <option value="expense">مصروف</option>
+              <option value="salary">راتب أستاذ</option>
+              <option value="adjustment">تسوية</option>
+            </select>
+            <select id="sf-tx-dir" onchange="sfRenderTx()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+              <option value="">كل الاتجاهات</option>
+              <option value="in">إيراد</option>
+              <option value="out">مصروف</option>
+            </select>
+            <button class="tbl-action" onclick="sfExportCSV()" style="font-size:12px;border-color:rgba(99,102,241,0.3);color:#6366f1">📥 CSV</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:separate;border-spacing:0;font-size:12px">
+              <thead><tr style="background:var(--hover, rgba(0,0,0,0.03))">
+                <th style="padding:9px 12px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">التاريخ</th>
+                <th style="padding:9px 12px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">النوع</th>
+                <th style="padding:9px 12px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">البيان</th>
+                <th style="padding:9px 12px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الطالب / الأستاذ</th>
+                <th style="padding:9px 12px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">الجهة</th>
+                <th style="padding:9px 12px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">المبلغ</th>
+                <th style="padding:9px 12px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">إجراء</th>
+              </tr></thead>
+              <tbody id="sf-tx-tbody">
+                <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">لا توجد معاملات بعد.</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -5260,7 +5395,7 @@ window.NAV_CATS = [
   { key: 'communication', label: 'التواصل', items: ['msgs'] },
   { key: 'finance', label: 'المالية', items: ['finance'] },
   { key: 'system', label: 'النظام', items: ['settings'] },
-  { key: 'support', label: 'الدعم المدرسي', items: ['support-registrations', 'language-registrations', 'support-teachers', 'subscriptions'] },
+  { key: 'support', label: 'الدعم المدرسي', items: ['support-registrations', 'language-registrations', 'support-teachers', 'subscriptions', 'support-finance'] },
   { key: 'mail', label: 'خدمات البريد', items: ['notifications'] },
 ];
 window.NAV_ITEMS = {
@@ -5277,6 +5412,7 @@ window.NAV_ITEMS = {
   'language-registrations': { icon: '🌍', label: 'تسجيلات دورات اللغات' },
   'support-teachers': { icon: '👨‍🏫', label: 'أساتذة الدعم المدرسي' },
   subscriptions: { icon: '📅', label: 'الاشتراكات الشهرية' },
+  'support-finance': { icon: '💰', label: 'موارد مالية الدعم المدرسي' },
   notifications: { icon: '📨', label: 'مركز الإشعارات' },
 };
 const NAV_FORCED_CATS = ['system'];
@@ -5629,7 +5765,7 @@ window.switchNavSection = (section) => {
     if (typeof renderRegStats === 'function') renderRegStats();
     if (typeof updateSiteStats === 'function') updateSiteStats();
   }
-  ['home','announcements','summer','camp-v2','students','teachers','finance','settings','notifications','support-registrations','language-registrations','support-teachers','subscriptions'].forEach(s => {
+  ['home','announcements','summer','camp-v2','students','teachers','finance','settings','notifications','support-registrations','language-registrations','support-teachers','subscriptions','support-finance'].forEach(s => {
     const el = document.getElementById('section-' + s);
     if (el) el.style.display = s === section ? 'block' : 'none';
   });
@@ -5688,6 +5824,9 @@ window.switchNavSection = (section) => {
   }
   if (section === 'subscriptions') {
     if (typeof window.subxLoadAll === 'function') window.subxLoadAll();
+  }
+  if (section === 'support-finance') {
+    if (typeof window.sfLoad === 'function') window.sfLoad();
   }
 };
 
@@ -24211,6 +24350,109 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     return allSubs;
   };
 
+  // ── تفاصيل إيرادات الاشتراكات الشهرية ──
+  function _subxRevName(sid) {
+    const r = regs.find(rr => String(rr.id) === String(sid || ''));
+    if (r) return studentFullName(r);
+    return String(sid || '—');
+  }
+  window.subxShowRevenueDetail = function () {
+    const today = SubscriptionService.today();
+    let html = '';
+    let total = 0;
+    allSubs.forEach(row => {
+      const s = row.subscription || {};
+      const st = SubscriptionService.subscriptionStatus(s, today);
+      const sid = String(s.student_id || '');
+      const isCancelled = s.status === 'cancelled';
+      if (!isCancelled) total += (s.total_price || 0);
+      const statusColor = isCancelled ? '#dc2626' : (st === 'active' ? '#059669' : (st === 'paused' ? '#7c3aed' : '#d97706'));
+      html += '<tr style="border-bottom:1px solid var(--border)">'
+        + '<td style="padding:7px 10px;font-weight:700">' + escX(_subxRevName(sid)) + '</td>'
+        + '<td style="padding:7px 10px;font-family:monospace" dir="ltr">' + escX(sid) + '</td>'
+        + '<td style="padding:7px 10px">' + escX(s.subject_name || '—') + '</td>'
+        + '<td style="padding:7px 10px">' + escX(s.teacher_name || '—') + '</td>'
+        + '<td style="padding:7px 10px;text-align:center;font-weight:800;color:' + statusColor + '">' + (isCancelled ? 'ملغى' : st === 'active' ? 'نشط' : st === 'paused' ? 'موقوف' : 'منتهي') + '</td>'
+        + '<td style="padding:7px 10px;text-align:center;font-weight:900;color:' + (isCancelled ? '#dc2626' : '#059669') + ';direction:ltr">' + ((s.total_price || 0).toLocaleString('ar-DZ')) + ' دج</td>'
+        + '</tr>';
+    });
+    const lbl = document.getElementById('subx-rev-total-label');
+    if (lbl) lbl.textContent = 'الإجمالي: ' + total.toLocaleString('ar-DZ') + ' دج';
+    const body = document.getElementById('subx-rev-body');
+    body.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:separate;border-spacing:0;font-size:12px">'
+      + '<thead><tr style="background:rgba(245,158,11,0.08)">'
+      + '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الطالب</th>'
+      + '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">رقم التسجيل</th>'
+      + '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">المادة</th>'
+      + '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الأستاذ</th>'
+      + '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">الحالة</th>'
+      + '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">المبلغ</th>'
+      + '</tr></thead><tbody>' + html + '</tbody></table></div>'
+      + '<div style="text-align:center;margin-top:10px;font-size:11px;color:var(--text-muted)">إجمالي الاشتراكات: ' + allSubs.length + '</div>';
+    document.getElementById('subx-revenue-modal').classList.add('open');
+  };
+  window.subxRenderRevenue = function () {
+    const q = (document.getElementById('subx-rev-search') || {}).value || '';
+    const f = (document.getElementById('subx-rev-status') || {}).value || '';
+    const today = SubscriptionService.today();
+    let html = '';
+    let total = 0;
+    allSubs.forEach(row => {
+      const s = row.subscription || {};
+      const st = SubscriptionService.subscriptionStatus(s, today);
+      const sid = String(s.student_id || '');
+      const name = _subxRevName(sid);
+      if (f) {
+        const match = f === 'cancelled' ? s.status === 'cancelled' : st === f;
+        if (!match) return;
+      }
+      if (q) {
+        const hay = (name + ' ' + sid + ' ' + (s.subject_name || '') + ' ' + (s.teacher_name || '')).toLowerCase();
+        if (hay.indexOf(q.toLowerCase()) < 0) return;
+      }
+      const isCancelled = s.status === 'cancelled';
+      if (!isCancelled) total += (s.total_price || 0);
+      const statusColor = isCancelled ? '#dc2626' : (st === 'active' ? '#059669' : (st === 'paused' ? '#7c3aed' : '#d97706'));
+      html += '<tr style="border-bottom:1px solid var(--border)">'
+        + '<td style="padding:7px 10px;font-weight:700">' + escX(name) + '</td>'
+        + '<td style="padding:7px 10px;font-family:monospace" dir="ltr">' + escX(sid) + '</td>'
+        + '<td style="padding:7px 10px">' + escX(s.subject_name || '—') + '</td>'
+        + '<td style="padding:7px 10px">' + escX(s.teacher_name || '—') + '</td>'
+        + '<td style="padding:7px 10px;text-align:center;font-weight:800;color:' + statusColor + '">' + (isCancelled ? 'ملغى' : st === 'active' ? 'نشط' : st === 'paused' ? 'موقوف' : 'منتهي') + '</td>'
+        + '<td style="padding:7px 10px;text-align:center;font-weight:900;color:' + (isCancelled ? '#dc2626' : '#059669') + ';direction:ltr">' + ((s.total_price || 0).toLocaleString('ar-DZ')) + ' دج</td>'
+        + '</tr>';
+    });
+    const lbl = document.getElementById('subx-rev-total-label');
+    if (lbl) lbl.textContent = 'الإجمالي: ' + total.toLocaleString('ar-DZ') + ' دج';
+    const body = document.getElementById('subx-rev-body');
+    body.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:separate;border-spacing:0;font-size:12px">'
+      + '<thead><tr style="background:rgba(245,158,11,0.08)">'
+      + '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الطالب</th>'
+      + '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">رقم التسجيل</th>'
+      + '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">المادة</th>'
+      + '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الأستاذ</th>'
+      + '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">الحالة</th>'
+      + '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">المبلغ</th>'
+      + '</tr></thead><tbody>' + (html || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:18px">لا توجد نتائج مطابقة.</td></tr>') + '</tbody></table></div>'
+      + '<div style="text-align:center;margin-top:10px;font-size:11px;color:var(--text-muted)">إجمالي الاشتراكات: ' + allSubs.length + '</div>';
+  };
+  window.subxExportRevenueCSV = function () {
+    const today = SubscriptionService.today();
+    const rows = [];
+    allSubs.forEach(row => {
+      const s = row.subscription || {};
+      const st = SubscriptionService.subscriptionStatus(s, today);
+      const sid = String(s.student_id || '');
+      rows.push([_subxRevName(sid), sid, s.subject_name || '', s.teacher_name || '', s.status || st, s.total_price || 0]);
+    });
+    const csv = '\uFEFF' + 'الطالب,رقم التسجيل,المادة,الأستاذ,الحالة,المبلغ\n'
+      + rows.map(r => r.map(c => '"' + String(c || '').replace(/"/g, '""') + '"').join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'subscriptions_revenue.csv';
+    a.click();
+  };
+
   // ══════════════════════════════════════════════
   // ▶️ إدارة حضور اليوم — Attendance Control
   // ══════════════════════════════════════════════
@@ -27403,6 +27645,284 @@ async function srtConfirmResetPassword() {
   } catch (e) { console.error('Password reset error:', e); srShowToast('حدث خطأ أثناء إعادة التعيين', 'error'); }
   btn.disabled = false; btn.textContent = '🔄 إعادة تعيين';
 }
+
+/* ══════════════════════════════════════════════════════
+   موارد مالية الدعم المدرسي — School Support Finance
+   ══════════════════════════════════════════════════════ */
+const SF_URL = SR_SUPABASE_URL;
+const SF_KEY = SR_ANON_KEY;
+const SF_TX = 'support_finance_tx';
+const SF_BAL = 'support_finance_balance';
+let sfTxCache = [];
+let sfBalanceCache = 0;
+let sfBalLoaded = false;
+
+async function sfFetch(url, options) {
+  return fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SF_KEY,
+      'Authorization': 'Bearer ' + SF_KEY,
+      ...(options?.headers || {}),
+    },
+  });
+}
+
+function sfToday() {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Africa/Algiers' });
+}
+function sfMoney(n) { return (Number(n) || 0).toLocaleString('ar-DZ') + ' دج'; }
+function sfEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function sfUid() { return 'SF-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(); }
+const SF_TYPE_LABELS = {
+  subscription: 'اشتراك شهري',
+  support_fee: 'حقوق تسجيل',
+  camp_v2: 'مخيم صيفي',
+  language: 'دورات لغات',
+  expense: 'مصروف',
+  salary: 'راتب أستاذ',
+  adjustment: 'تسوية'
+};
+
+// RPC لقراءة/كتابة الرصيد بذرة — استخدم security definer function في supabase
+async function sfLoadBalance() {
+  try {
+    const res = await sfFetch(`${SF_URL}/rest/v1/${SF_BAL}?select=*&limit=1`);
+    if (res.ok) {
+      const arr = await res.json();
+      if (arr && arr.length) { sfBalanceCache = Number(arr[0].total_balance) || 0; sfBalLoaded = true; }
+      else {
+        // أنشئ صف الرصيد الافتراضي
+        await sfFetch(`${SF_URL}/rest/v1/${SF_BAL}`, {
+          method: 'POST',
+          body: JSON.stringify({ id: 'global', total_balance: 0 }),
+        });
+        sfBalanceCache = 0; sfBalLoaded = true;
+      }
+    }
+  } catch (e) { console.error('[SF] load balance failed', e); }
+  const el = document.getElementById('sf-balance');
+  if (el) el.textContent = sfBalanceCache > 0 ? ('+' + sfMoney(sfBalanceCache)) : sfMoney(sfBalanceCache);
+  return sfBalanceCache;
+}
+
+async function sfAddToBalance(delta) {
+  if (!sfBalLoaded) await sfLoadBalance();
+  const newBal = (sfBalanceCache || 0) + delta;
+  // استخدم RPC الذري إن وُجد، وإلا حدّث مباشرة
+  try {
+    const rpcRes = await sfFetch(`${SF_URL}/rest/v1/rpc/add_support_balance`, {
+      method: 'POST',
+      body: JSON.stringify({ p_delta: delta }),
+    });
+    if (rpcRes.ok) {
+      const data = await rpcRes.json();
+      sfBalanceCache = Number(Array.isArray(data) ? data[0] : (data && data.add_support_balance != null ? data.add_support_balance : data)) || sfBalanceCache || 0;
+    } else {
+      await sfDirectSetBalance(newBal);
+    }
+  } catch (e) {
+    await sfDirectSetBalance(newBal);
+  }
+  const el = document.getElementById('sf-balance');
+  if (el) el.textContent = sfBalanceCache > 0 ? ('+' + sfMoney(sfBalanceCache)) : sfMoney(sfBalanceCache);
+  return sfBalanceCache;
+}
+
+async function sfDirectSetBalance(val) {
+  try {
+    await sfFetch(`${SF_URL}/rest/v1/${SF_BAL}?id=eq.global`, {
+      method: 'PATCH',
+      body: JSON.stringify({ total_balance: val, updated_at: new Date().toISOString() }),
+    });
+    sfBalanceCache = val;
+  } catch (e) { console.error('[SF] set balance failed', e); }
+}
+
+async function sfInsertTx(row) {
+  const rec = Object.assign({
+    id: sfUid(),
+    source_type: 'subscription',
+    direction: 'in',
+    amount: 0,
+    description: '',
+    student_id: '',
+    student_name: '',
+    subject_name: '',
+    teacher_id: '',
+    teacher_name: '',
+    reference_id: '',
+    admin_name: '',
+    date: sfToday(),
+  }, row);
+  try {
+    const res = await sfFetch(`${SF_URL}/rest/v1/${SF_TX}`, {
+      method: 'POST',
+      body: JSON.stringify(rec),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+  } catch (e) { console.error('[SF] insert tx failed', e); throw e; }
+}
+
+async function sfLoadTx() {
+  try {
+    const res = await sfFetch(`${SF_URL}/rest/v1/${SF_TX}?select=*&order=created_at.desc`);
+    if (res.ok) { sfTxCache = await res.json(); sfTxCache = sfTxCache || []; }
+  } catch (e) { console.error('[SF] load tx failed', e); }
+}
+
+async function sfAggregateRevenue() {
+  let sub = 0, fee = 0, camp = 0, lang = 0;
+  try {
+    // الاشتراكات الشهرية — عبر Edge Function (ليست متاحة للقراءة المباشرة بالأنون)
+    try {
+      if (typeof SubscriptionService !== 'undefined' && SubscriptionService.adminListSubscriptions) {
+        const subs = await SubscriptionService.adminListSubscriptions();
+        (subs || []).forEach(row => {
+          const s = row.subscription || {};
+          if ((s.status || 'active') !== 'cancelled') sub += Number(s.total_price) || 0;
+        });
+      }
+    } catch (e) { console.warn('[SF] subscriptions revenue failed', e); }
+
+    const [feeRes, campRes, langRes] = await Promise.all([
+      sfFetch(`${SF_URL}/rest/v1/registrations?select=fee_amount,status`),
+      sfFetch(`${SF_URL}/rest/v1/summer_camp_registrations?select=total_amount`),
+      sfFetch(`${SF_URL}/rest/v1/language_registrations?select=fee_amount,status`),
+    ]);
+    if (feeRes.ok) {
+      const arr = await feeRes.json() || [];
+      arr.forEach(r => { if (r.status === 'مسجل نهائياً') fee += Number(r.fee_amount) || 0; });
+    }
+    if (campRes.ok) {
+      const arr = await campRes.json() || [];
+      arr.forEach(r => { camp += Number(r.total_amount) || 0; });
+    }
+    if (langRes.ok) {
+      const arr = await langRes.json() || [];
+      arr.forEach(r => { if (r.status === 'مسجل نهائياً') lang += Number(r.fee_amount) || 0; });
+    }
+  } catch (e) { console.error('[SF] aggregate revenue failed', e); }
+  document.getElementById('sf-rc-sub').textContent = sfMoney(sub);
+  document.getElementById('sf-rc-fee').textContent = sfMoney(fee);
+  document.getElementById('sf-rc-camp').textContent = sfMoney(camp);
+  document.getElementById('sf-rc-lang').textContent = sfMoney(lang);
+  window.__sfRevenue = { sub, fee, camp, lang };
+  return { sub, fee, camp, lang };
+}
+
+async function sfLoad() {
+  if (!(window._auth && window._auth.currentUser && !window._auth.currentUser.isAnonymous)) return;
+  document.getElementById('sf-balance').textContent = 'جارٍ التحميل…';
+  const rev = await sfAggregateRevenue();
+  await sfLoadTx();
+  sfRenderTx();
+  const badge = document.getElementById('nav-badge-sfinance');
+  if (badge) badge.textContent = sfTxCache.length;
+  const sIn = document.getElementById('sf-in-total');
+  const sOut = document.getElementById('sf-out-total');
+  let inT = 0, outT = 0;
+  sfTxCache.forEach(t => { const a = Number(t.amount) || 0; if (t.direction === 'out') outT += a; else inT += a; });
+  if (sIn) sIn.textContent = sfMoney(inT);
+  if (sOut) sOut.textContent = sfMoney(outT);
+  // الخزينة = مجموع الإيرادات (من البطاقات الأربع) − كل المدفوعات الخارجة (مصروفات + رواتب)
+  const gross = (rev.sub + rev.fee + rev.camp + rev.lang);
+  const treasury = Math.max(0, gross - outT);
+  sfBalanceCache = treasury;
+  const el = document.getElementById('sf-balance');
+  if (el) el.textContent = sfMoney(treasury);
+}
+
+function sfRenderTx() {
+  const q = ((document.getElementById('sf-tx-search')) || {}).value || '';
+  const tf = ((document.getElementById('sf-tx-type')) || {}).value || '';
+  const df = ((document.getElementById('sf-tx-dir')) || {}).value || '';
+  let rows = sfTxCache.filter(t => {
+    if (tf && t.source_type !== tf) return false;
+    if (df && t.direction !== df) return false;
+    if (q) {
+      const hay = (t.description + ' ' + (t.student_name || '') + ' ' + (t.teacher_name || '') + ' ' + (t.reference_id || '')).toLowerCase();
+      if (hay.indexOf(q.toLowerCase()) < 0) return false;
+    }
+    return true;
+  });
+  const body = document.getElementById('sf-tx-tbody');
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">لا توجد معاملات مطابقة.</td></tr>'; return; }
+  let html = '';
+  rows.forEach((t, i) => {
+    const isOut = t.direction === 'out';
+    const typeLabel = SF_TYPE_LABELS[t.source_type] || t.source_type || '—';
+    const person = t.student_name || t.teacher_name || '—';
+    const amt = Number(t.amount) || 0;
+    html += '<tr style="border-bottom:1px solid var(--border);background:' + (i % 2 ? 'transparent' : 'rgba(0,0,0,0.015)') + '">'
+      + '<td style="padding:9px 12px;font-family:monospace;font-size:11px" dir="ltr">' + sfEsc(t.date || '') + '</td>'
+      + '<td style="padding:9px 12px;font-weight:800">' + sfEsc(typeLabel) + '</td>'
+      + '<td style="padding:9px 12px;color:var(--text-muted)">' + sfEsc(t.description || '') + '</td>'
+      + '<td style="padding:9px 12px;font-weight:700">' + sfEsc(person) + '</td>'
+      + '<td style="padding:9px 12px;text-align:center"><span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;background:' + (isOut ? 'rgba(220,38,38,0.1);color:#dc2626' : 'rgba(16,185,129,0.1);color:#059669') + '">' + (isOut ? 'مصروف' : 'إيراد') + '</span></td>'
+      + '<td style="padding:9px 12px;text-align:center;font-weight:900;direction:ltr;color:' + (isOut ? '#dc2626' : '#059669') + '">' + (isOut ? '-' : '+') + (amt.toLocaleString('ar-DZ')) + ' دج</td>'
+      + '<td style="padding:9px 12px;text-align:center"><button class="tbl-action" style="font-size:11px;border-color:rgba(220,38,38,0.3);color:#dc2626" onclick="sfDeleteTx(\'' + sfEsc(t.id) + '\')">🗑️</button></td>'
+      + '</tr>';
+  });
+  body.innerHTML = html;
+}
+
+async function sfDeleteTx(id) {
+  if (!confirm('هل أنت متأكد من حذف هذه المعاملة؟')) return;
+  try {
+    const res = await sfFetch(`${SF_URL}/rest/v1/${SF_TX}?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    sfTxCache = sfTxCache.filter(t => t.id !== id);
+    sfRenderTx();
+    srShowToast('🗑️ تم حذف المعاملة', 'success');
+    sfLoad();
+  } catch (e) { console.error('[SF] delete tx failed', e); srShowToast('حدث خطأ أثناء الحذف', 'error'); }
+}
+
+window.sfAddExpense = function () {
+  document.getElementById('sf-exp-desc').value = '';
+  document.getElementById('sf-exp-amount').value = '';
+  document.getElementById('sf-expense-modal').classList.add('open');
+};
+
+window.sfConfirmExpense = async function () {
+  const desc = document.getElementById('sf-exp-desc').value.trim();
+  const amount = Number(document.getElementById('sf-exp-amount').value) || 0;
+  if (!desc) { srShowToast('الرجاء إدخال البيان', 'error'); return; }
+  if (amount <= 0) { srShowToast('الرجاء إدخال مبلغ صحيح', 'error'); return; }
+  try {
+    const tx = {
+      id: sfUid(),
+      source_type: 'expense',
+      direction: 'out',
+      amount: amount,
+      description: desc,
+      admin_name: (window._auth && window._auth.currentUser && window._auth.currentUser.email) || 'admin',
+      date: sfToday(),
+    };
+    await sfInsertTx(tx);
+    sfTxCache.unshift(tx);
+    sfRenderTx();
+    document.getElementById('sf-expense-modal').classList.remove('open');
+    srShowToast('✅ تم تسجيل المصروف', 'success');
+    sfLoad();
+  } catch (e) { console.error('[SF] add expense failed', e); srShowToast('حدث خطأ أثناء إضافة المصروف', 'error'); }
+};
+
+window.sfExportCSV = function () {
+  const rows = sfTxCache.map(t => [
+    t.date || '', SF_TYPE_LABELS[t.source_type] || t.source_type || '', t.description || '',
+    t.student_name || t.teacher_name || '', t.direction === 'out' ? 'مصروف' : 'إيراد', Number(t.amount) || 0
+  ]);
+  const csv = '\uFEFF' + 'التاريخ,النوع,البيان,الطالب/الأستاذ,الجهة,المبلغ\n'
+    + rows.map(r => r.map(c => '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"').join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'support_finance.csv';
+  a.click();
+};
+
 </script>
 
 <script src="js/camp-programs.js?v=1"></script>
