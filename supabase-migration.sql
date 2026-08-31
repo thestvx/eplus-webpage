@@ -440,6 +440,7 @@ CREATE OR REPLACE FUNCTION admin_create_subscription(
   p_start_date TEXT,
   p_months INT,
   p_total_price INT,
+  p_total_sessions INT DEFAULT NULL,
   p_payment_id TEXT,
   p_notes TEXT DEFAULT NULL,
   p_teacher_id TEXT DEFAULT NULL,
@@ -456,6 +457,8 @@ DECLARE
   v_start TEXT;
   v_end TEXT;
   v_total INT;
+  v_total_sessions INT;
+  v_period INT;
   v_today TEXT := to_char(CURRENT_DATE, 'YYYY-MM-DD');
   v_teacher_id TEXT := COALESCE(NULLIF(p_teacher_id, ''), '');
   v_subject_id TEXT := COALESCE(NULLIF(p_subject_id, ''), '');
@@ -474,6 +477,10 @@ BEGIN
   IF v_teacher_id = '' THEN RAISE EXCEPTION 'teacher_id required (per-subject subscription)'; END IF;
   v_total := COALESCE(p_total_price, v_months * 2000);
   IF v_total < 0 THEN RAISE EXCEPTION 'total_price must be >= 0'; END IF;
+  -- الباقة المخصصة: عدد الحصص يأتي من p_total_sessions (المستخدم يحدده بنفسه).
+  -- إذا لم يُوفَّر، يُحسب 8 حصص لكل شهر كافتراضي.
+  v_total_sessions := COALESCE(p_total_sessions, v_months * 8);
+  IF v_total_sessions < 1 THEN RAISE EXCEPTION 'total_sessions must be >= 1'; END IF;
 
   -- الطالب مسجل فعلاً لدى هذا الأستاذ في هذه المادة (مصدر واحد للتسجيل).
   -- المطابقة بالاسم أولاً: بيانات التسجيل القديمة قد لا تحوي subjectId/teacherId
@@ -521,16 +528,21 @@ BEGIN
   VALUES
     (v_sub_id, p_student_id, v_teacher_id, v_subject_id,
      COALESCE(p_teacher_name, ''), COALESCE(p_subject_name, ''),
-     p_start_date, v_end, v_months, v_total, v_months * 8, 'active', p_payment_id, COALESCE(p_notes, ''));
+     p_start_date, v_end, v_months, v_total, v_total_sessions, 'active', p_payment_id, COALESCE(p_notes, ''));
 
   FOR i IN 1..v_months LOOP
     v_start := to_char(v_cur, 'YYYY-MM-DD');
     v_next := v_cur + interval '1 month';
     v_end := to_char(v_next - interval '1 day', 'YYYY-MM-DD');
+    -- توزيع الحصص على الأشهر: في الباقة المخصصة وزّع |استة الحصص المتبقية على
+    -- الأشهر المتبقية، وفي غيرها 8 حصص لكل شهر.
+    v_period := (p_total_sessions IS NOT NULL)
+      ? (SELECT COALESCE(floor((v_total_sessions - (i - 1) * (v_total_sessions / v_months)) / (v_months - (i - 1))), 0))
+      : 8;
     INSERT INTO subscription_periods
       (id, subscription_id, month_number, start_date, end_date, total_sessions, used_sessions, remaining_sessions, status)
     VALUES
-      (v_sub_id || '-M' || i, v_sub_id, i, v_start, v_end, 8, 0, 8,
+      (v_sub_id || '-M' || i, v_sub_id, i, v_start, v_end, v_period, 0, v_period,
        CASE WHEN v_today < v_start THEN 'upcoming'
             WHEN v_today > v_end THEN 'completed'
             ELSE 'active' END);
