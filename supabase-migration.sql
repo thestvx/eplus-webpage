@@ -827,9 +827,14 @@ CREATE OR REPLACE FUNCTION admin_delete_transaction(
 RETURNS TEXT AS $$
 DECLARE
   v_deleted INT := 0;
+  v_tx_type TEXT := '';
+  v_amount INT := 0;
 BEGIN
   IF NOT is_admin(p_admin_uid) THEN RAISE EXCEPTION 'unauthorized'; END IF;
   IF p_tx_id IS NULL OR p_tx_id = '' THEN RAISE EXCEPTION 'tx id required'; END IF;
+
+  SELECT transaction_type, amount INTO v_tx_type, v_amount
+    FROM teacher_transactions WHERE id = p_tx_id;
 
   DELETE FROM teacher_transactions WHERE id = p_tx_id;
   GET DIAGNOSTICS v_deleted = ROW_COUNT;
@@ -839,6 +844,16 @@ BEGIN
 
   -- حذف الإيصال المرتبط (إن وُجد) والحفاظ على الاتساق مع دفتر المعاملات
   DELETE FROM teacher_receipts WHERE transaction_id = p_tx_id;
+
+  -- إذا كان السجل المحذوف دفعة راتب: اعكس أثرها على الخزينة
+  -- (معاملة الراتب + إنقاص الخزينة) حتى لا يُترك أثر يتيم للدفعة المحذوفة.
+  IF v_tx_type = 'payment' THEN
+    DELETE FROM support_finance_tx WHERE id = p_tx_id AND source_type = 'salary';
+    UPDATE support_finance_balance
+       SET total_balance = total_balance + COALESCE(v_amount, 0),
+           updated_at = now()
+     WHERE id = 'global';
+  END IF;
 
   PERFORM admin_recompute_balance(p_admin_uid, p_teacher_id, p_teacher_name, NULL, NULL, p_rate, p_admin_name);
   RETURN p_tx_id;

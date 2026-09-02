@@ -27090,6 +27090,7 @@ async function srtFinanceAddPayment() {
   try {
     const res = await TeacherFinance.addPayment(t, amount, form.note || '', srtFinAdminName());
     payRecord.receiptId = res.receiptId || '';
+    payRecord.txId = res.txId || '';
     srtTreasuryAdjust(-amount);
 
     try {
@@ -27102,6 +27103,7 @@ async function srtFinanceAddPayment() {
         const last = pays[pays.length - 1];
         if (last && last.timestamp === payRecord.timestamp && !last.receiptId) {
           last.receiptId = res.receiptId || '';
+          last.txId = res.txId || '';
         }
         await updateDoc(d(fbs, 'teacher_finance', finSnap2.docs[0].id), { payments: pays, updatedAt: new Date().toISOString() });
       }
@@ -27194,8 +27196,18 @@ async function srtFinanceDeleteTx(txId) {
   if (!t) return;
   if (!(await cmConfirm('حذف معاملة', 'هل أنت متأكد من حذف هذه المعاملة من الدفتر؟\n\nسيُعاد حساب رصيد الأستاذ تلقائياً بعد الحذف.', '🗑️', { danger: true }))) return;
   const id=t.teacherId||t.id;
+  let ok = false;
   try {
-    await TeacherFinance.deleteTransaction(id, t.name || '', txId, t.rate || 0, srtFinAdminName());
+    // 1) حذف فعلي من Supabase (teacher_transactions + teacher_receipts) عبر admin-api.
+    //    admin_delete_transaction يتحقق من ROW_COUNT: إذا لم يُحذف صف → يرفض صراحة.
+    try {
+      await TeacherFinance.deleteTransaction(id, t.name || '', txId, t.rate || 0, srtFinAdminName());
+      ok = true;
+    } catch (e) {
+      // لو السجل موجود في مصدر آخر (مثل إيصال بدون معاملة) لا نُوقف التنظيف
+      console.warn('delete-transaction rpc:', e.message);
+    }
+    // 2) تنظيف مرآة Firestore دائماً (دفعة قد لا تملك صفاً في Supabase).
     try {
       const {getDocs,collection:c,doc:d,updateDoc,query:q,where:w,limit:l}=srtFS(),fbs=srtDB();
       const finQ=q(c(fbs,'teacher_finance'),w('teacherId','==',id),l(1));
@@ -27209,10 +27221,14 @@ async function srtFinanceDeleteTx(txId) {
         await updateDoc(d(fbs,'teacher_finance',finSnap.docs[0].id),{payments:pays,totalPaid:newTotalPaid,updatedAt:new Date().toISOString()});
       }
     }catch(fsErr){console.warn('Firestore teacher_finance sync failed:',fsErr);}
-    srtShowToast('✅ تم حذف المعاملة وإعادة حساب الرصيد', 'success');
+
+    // 3) إعادة تعبئة القائمة + نتيجة صادقة
     await srtFinanceRefresh();
+    srtShowToast(ok ? '✅ تم حذف المعاملة وإعادة حساب الرصيد' : '⚠️ لم تُحذف سجل من المصدر الأساسي، أُزيلت النسخة المحلية', ok ? 'success' : 'warning');
   } catch (e) {
+    console.error('Delete tx error:', e);
     srtShowToast('فشل حذف المعاملة: ' + e.message, 'error');
+    await srtFinanceRefresh();
   }
 }
 
