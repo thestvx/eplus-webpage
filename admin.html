@@ -427,7 +427,20 @@
     body.emp-hide-money .srt-money-card,
     body.emp-hide-money .srt-money-cell,
     body.emp-hide-money .srt-money-box,
-    body.emp-hide-money .sr-fee-box { display:none !important; }
+    body.emp-hide-money .sr-fee-box,
+
+    /* ── إخفاء المبالغ في قسم الاشتراكات الشهرية (لدور بدون وصول مالي) ── */
+    body.emp-hide-money .subx-revenue-card,
+    body.emp-hide-money .subx-revenue-actions,
+    body.emp-hide-money .subx-pkg .p-price,
+    body.emp-hide-money .subx-detail-total,
+    body.emp-hide-money .subx-detail-price,
+    body.emp-hide-money .subx-money,
+    body.emp-hide-money .subx-money-td,
+    body.emp-hide-money .subx-money-th,
+    body.emp-hide-money #subx-revenue-modal,
+    body.emp-hide-money .subx-custom-price-field,
+    body.emp-hide-money button[onclick*="subxPrintReceipt"] { display:none !important; }
 
     /* ===== CAMP V2 DETAIL MODAL ===== */
     .camp2-detail-hero{display:flex;align-items:center;gap:14px;padding:16px 18px;margin-bottom:16px;background:linear-gradient(135deg,rgba(249,115,22,0.14),rgba(249,115,22,0.05));border:1px solid rgba(249,115,22,0.28);border-radius:16px}
@@ -3796,7 +3809,7 @@
         <div class="stats-grid" style="margin-bottom:24px">
           <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--primary-light)">📅</div></div><div class="stat-num" id="subx-total">0</div><div class="stat-label">إجمالي الاشتراكات</div></div>
           <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(16,185,129,0.1)">🟢</div></div><div class="stat-num" id="subx-active" style="color:var(--success)">0</div><div class="stat-label">اشتراكات نشطة</div></div>
-          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(245,158,11,0.1)">💰</div></div><div class="stat-num" id="subx-revenue" style="direction:ltr">0 دج</div><div class="stat-label">إيرادات الاشتراكات</div><button onclick="subxShowRevenueDetail()" style="margin-top:8px;padding:6px 14px;border-radius:8px;border:1px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.08);color:#B45309;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" onmouseover="this.style.background='rgba(245,158,11,0.16)'" onmouseout="this.style.background='rgba(245,158,11,0.08)'">👁️ عرض التفاصيل</button></div>
+          <div class="stat-card subx-revenue-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(245,158,11,0.1)">💰</div></div><div class="stat-num" id="subx-revenue" style="direction:ltr">0 دج</div><div class="stat-label">إيرادات الاشتراكات</div><button onclick="subxShowRevenueDetail()" style="margin-top:8px;padding:6px 14px;border-radius:8px;border:1px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.08);color:#B45309;font-size:11px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s" onmouseover="this.style.background='rgba(245,158,11,0.16)'" onmouseout="this.style.background='rgba(245,158,11,0.08)'">👁️ عرض التفاصيل</button></div>
         </div>
 
         <!-- ▶️ إدارة حضور اليوم -->
@@ -3931,7 +3944,7 @@
                     <label style="font-size:11px;font-weight:800;color:var(--text-muted);display:block;margin-bottom:4px">عدد الحصص</label>
                     <input class="inp" type="number" id="subx-custom-sessions" min="1" max="100" placeholder="مثال: 12" style="width:100%" oninput="subxUpdateCustomPreview()">
                   </div>
-                  <div style="flex:1;min-width:140px">
+                  <div style="flex:1;min-width:140px" class="subx-custom-price-field">
                     <label style="font-size:11px;font-weight:800;color:var(--text-muted);display:block;margin-bottom:4px">السعر (دج)</label>
                     <input class="inp" type="number" id="subx-custom-price" min="0" step="100" placeholder="مثال: 3000" style="width:100%" oninput="subxUpdateCustomPreview()">
                   </div>
@@ -5009,15 +5022,15 @@ const EMPLOYEES = {
 // • تسجيلات الدعم المدرسي: تأكيد نهائي + طباعة بطاقة، إضافة/حذف مادة، تعديل بيانات التلميذ
 //   (ممنوع: الحذف، إلغاء التأكيد، التأكيد بدون قبض الرسوم)
 // • أساتذة الدعم المدرسي: عرض فقط (كل الأزرار الإدارية مخفية)
-// • كل المبالغ المالية مخفية (الرسوم، الخزينة، المستحقات، الإجمالي في المخيم)
-// • قسم الاشتراكات الشهرية مخفي بالكامل
+// • كل المبالغ المالية مخفية (الرسوم، الخزينة، المستحقات، الإجمالي في المخيم، إيرادات الاشتراكات وأسعارها)
+// • قسم الاشتراكات الشهرية ظاهر للإدارة، لكن المبالغ المالية داخله مخفية (الإيرادات، الأسعار، الطباعة)]
 // التطبيق يحدث على مستوى الدوال (window.*) وليس إخفاء الأزرار فقط.
 const SUPPORT_ACCOUNTS = {
   'support@epluscenter.com': {
     uid: '',
     name: 'مشرف المركز التعليمي',
     role: 'مشرف المركز التعليمي',
-    allowedSections: ['home', 'camp-v2', 'support-registrations', 'support-teachers', 'msgs'],
+    allowedSections: ['home', 'camp-v2', 'support-registrations', 'support-teachers', 'subscriptions', 'msgs'],
     showWebsite: false,
     restrictions: {
       noActivityLog: true,
@@ -5029,6 +5042,7 @@ const SUPPORT_ACCOUNTS = {
       srtReadOnly: true,
       srtHideMoney: true,
       camp2HideMoney: true,
+      subxHideMoney: true,
     }
   }
 };
@@ -5036,7 +5050,7 @@ const SUPPORT_ACCOUNTS = {
 function applyEmployeeMode(cfg) {
   window._employeeRestrictions = cfg.restrictions;
 
-  if (cfg.restrictions.srHideMoney || cfg.restrictions.srtHideMoney || cfg.restrictions.camp2HideMoney) {
+  if (cfg.restrictions.srHideMoney || cfg.restrictions.srtHideMoney || cfg.restrictions.camp2HideMoney || cfg.restrictions.subxHideMoney) {
     document.body.classList.add('emp-hide-money');
   }
 
@@ -24096,7 +24110,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700;width:130px">الطالب</td><td style="padding:5px 6px;font-weight:800">' + escX(name) + ' <span style="font-family:monospace;font-size:11px;color:var(--text-muted)">' + escX(selectedStudent.id) + '</span></td></tr>';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">المادة — الأستاذ</td><td style="padding:5px 6px;font-weight:800">' + (selectedSubject ? escX(selectedSubject.icon + ' ' + selectedSubject.subjectName + ' — ' + (selectedSubject.teacherName || '—')) : '<span style="color:#b45309">لم تُختر بعد</span>') + '</td></tr>';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">الباقة</td><td style="padding:5px 6px;font-weight:800">' + escX(label) + '</td></tr>';
-    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">السعر</td><td style="padding:5px 6px;font-weight:800;color:#059669">' + SubscriptionService.fmtPrice(price) + '</td></tr>';
+    if (!(window._employeeRestrictions && window._employeeRestrictions.subxHideMoney)) {
+      html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">السعر</td><td style="padding:5px 6px;font-weight:800;color:#059669">' + SubscriptionService.fmtPrice(price) + '</td></tr>';
+    }
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">عدد الحصص</td><td style="padding:5px 6px;font-weight:800">' + sessions + ' حصة' + (isCustom ? '' : ' (' + pkg.months + ' × 8)') + '</td></tr>';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">تاريخ البداية</td><td style="padding:5px 6px;font-weight:800">' + SubscriptionService.fmtAr(start, true) + '</td></tr>';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">تاريخ النهاية</td><td style="padding:5px 6px;font-weight:800">' + SubscriptionService.fmtAr(end, true) + '</td></tr>';
@@ -25371,7 +25387,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         html += '<div style="padding:14px 18px">';
         html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:12px">';
         html += '<div style="text-align:center"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">الباقة</div><div style="font-weight:900;font-size:13px">' + escX(pkg ? pkg.label : ((sub.months || '—') + ' شهر')) + '</div></div>';
-        html += '<div style="text-align:center"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">السعر</div><div style="font-weight:900;font-size:13px;direction:ltr">' + (sub.total_price || 0).toLocaleString('ar-DZ') + ' دج</div></div>';
+        html += '<div style="text-align:center" class="subx-money"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">السعر</div><div style="font-weight:900;font-size:13px;direction:ltr">' + (sub.total_price || 0).toLocaleString('ar-DZ') + ' دج</div></div>';
         html += '<div style="text-align:center"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">البداية</div><div style="font-weight:900;font-size:13px">' + SubscriptionService.fmtAr(sub.start_date) + '</div></div>';
         html += '<div style="text-align:center"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">النهاية</div><div style="font-weight:900;font-size:13px">' + SubscriptionService.fmtAr(sub.end_date) + '</div></div>';
         html += '</div>';
