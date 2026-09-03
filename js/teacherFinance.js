@@ -229,6 +229,18 @@ window.TeacherFinance = (function () {
     });
   }
 
+  // ── مسح جماعي لكل دفعات الأستاذ (زر «مسح سجل الدفعات») ─────
+  //    يحذف كل الدفعات المالية (payments) من Supabase مع
+  //    الإيصالات والخزينة، ويُبقي المستحقات (dues) دون مساس.
+  async function clearTeacherPayments(teacherId, teacherName, rate, adminName) {
+    return await _adminCall('clear-payments', {
+      teacherId: teacherId,
+      teacherName: teacherName || '',
+      rate: Number(rate) || 0,
+      adminName: adminName || '',
+    });
+  }
+
   // ── Receipt Print (Professional A4 — Apple-invoice style) ──
 
   function printReceipt(payload) {

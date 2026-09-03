@@ -859,6 +859,71 @@ BEGIN
   RETURN p_tx_id;
 END; $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
+-- ────────────────────────────────────────────────────────────────
+-- مسح جماعي لكل دفعات الأستاذ (زر «مسح سجل الدفعات»).
+--   يحذف كل صفوف payment (لا يلمس dues) من teacher_transactions،
+--   الإيصالات المرتبطة teacher_receipts، ويعكس أثرها على الخزينة
+--   (support_finance_tx + support_finance_balance) تماماً كما يفعل
+--   admin_delete_transaction لكل دفعة، ثم يعيد حساب الرصيد.
+--   ينفَّذ داخل معاملة واحدة لضمان الذرية.
+-- ────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION admin_clear_teacher_payments(
+  p_admin_uid TEXT,
+  p_teacher_id TEXT,
+  p_teacher_name TEXT,
+  p_rate INT,
+  p_admin_name TEXT
+)
+RETURNS JSONB AS $$
+DECLARE
+  v_total INT := 0;
+  v_count INT := 0;
+BEGIN
+  IF NOT is_admin(p_admin_uid) THEN RAISE EXCEPTION 'unauthorized'; END IF;
+  IF p_teacher_id IS NULL OR p_teacher_id = '' THEN RAISE EXCEPTION 'teacher_id required'; END IF;
+
+  BEGIN
+    -- 1) اجمع مبالغ وعناوين كل الدفعات (قبل الحذف)
+    SELECT COALESCE(SUM(amount), 0), COUNT(*)
+      INTO v_total, v_count
+      FROM teacher_transactions
+     WHERE teacher_id = p_teacher_id AND transaction_type = 'payment';
+
+    IF v_count = 0 THEN
+      RETURN jsonb_build_object('deleted', 0, 'amount_reversed', 0);
+    END IF;
+
+    -- 2) حذف الإيصالات المرتبطة بالدفعات (قبل حذف الدفعات نفسها)
+    DELETE FROM teacher_receipts
+     WHERE teacher_id = p_teacher_id
+       AND transaction_id IN (
+             SELECT id FROM teacher_transactions
+              WHERE teacher_id = p_teacher_id AND transaction_type = 'payment'
+           );
+
+    -- 3) حذف كل الدفعات من الدفتر
+    DELETE FROM teacher_transactions
+     WHERE teacher_id = p_teacher_id AND transaction_type = 'payment';
+
+    -- 4) الخزينة: احذف معاملات الرواتب الصادرة عن هذه الدفعات
+    DELETE FROM support_finance_tx
+     WHERE teacher_id = p_teacher_id AND source_type = 'salary';
+
+    -- 5) إعادة المبلغ الإجمالي للرصيد (كما يفعل admin_delete_transaction)
+    UPDATE support_finance_balance
+       SET total_balance = GREATEST(0, total_balance + v_total),
+           updated_at = now()
+     WHERE id = 'global';
+
+    -- 6) إعادة حساب رصيد الأستاذ
+    PERFORM admin_recompute_balance(p_admin_uid, p_teacher_id, p_teacher_name, NULL, NULL, p_rate, p_admin_name);
+
+    RETURN jsonb_build_object('deleted', v_count, 'amount_reversed', v_total);
+  EXCEPTION WHEN OTHERS THEN
+    RAISE;
+  END;
+END; $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
 CREATE OR REPLACE FUNCTION admin_set_teacher_rate(p_admin_uid TEXT, p_teacher_id TEXT, p_rate INT)
 RETURNS JSONB AS $$
 DECLARE
@@ -1003,6 +1068,7 @@ REVOKE ALL ON FUNCTION admin_upsert_balance(TEXT, JSONB) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_recompute_balance(TEXT, TEXT, TEXT, INT, INT, INT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_add_payment(TEXT, TEXT, TEXT, INT, TEXT, TEXT, INT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_delete_transaction(TEXT, TEXT, TEXT, TEXT, INT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION admin_clear_teacher_payments(TEXT, TEXT, TEXT, INT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_set_teacher_rate(TEXT, TEXT, INT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_get_teacher_balance(TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_balances(TEXT) FROM PUBLIC;
@@ -1068,6 +1134,7 @@ GRANT EXECUTE ON FUNCTION admin_upsert_balance(TEXT, JSONB) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_recompute_balance(TEXT, TEXT, TEXT, INT, INT, INT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_add_payment(TEXT, TEXT, TEXT, INT, TEXT, TEXT, INT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_delete_transaction(TEXT, TEXT, TEXT, TEXT, INT, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION admin_clear_teacher_payments(TEXT, TEXT, TEXT, INT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_set_teacher_rate(TEXT, TEXT, INT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_get_teacher_balance(TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_balances(TEXT) TO service_role;

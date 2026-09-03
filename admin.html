@@ -4438,7 +4438,7 @@
       </div>
 
       <!-- دفتر المعاملات -->
-      <div style="font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:8px">📒 دفتر معاملات الأستاذ</div>
+      <div style="font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:8px">📒 دفتر مدفوعات الأستاذ</div>
       <div id="srt-finance-ledger" style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;padding:4px 2px"></div>
 
     </div>
@@ -27141,19 +27141,33 @@ async function srtFinanceClearOldPayments() {
   const t = _srtFinanceTeacher;
   if (!t) return;
   const id = t.teacherId || t.id;
-  if (!(await cmConfirm('مسح سجل الدفعات', 'هل أنت متأكد من مسح جميع سجلات الدفعات القديمة لهذا الأستاذ؟\n\nسيتم حذف جميع الدفعات المسجلة في Firestore.', '🗑️', { danger: true }))) return;
+  if (!(await cmConfirm('مسح سجل الدفعات', 'هل أنت متأكد من مسح جميع سجلات الدفعات المالية لهذا الأستاذ؟\n\nسيتم حذف جميع الدفعات (المبالغ المدفوعة) مع إيصالاتها، وسيُعاد حساب رصيد الأستاذ والخزينة. لا تتأثر المستحقات (الحصص) بأي حال.', '🗑️', { danger: true }))) return;
+  let res = null;
   try {
-    const {getDocs,collection:c,doc:d,setDoc,query:q,where:w,limit:l}=srtFS(),fbs=srtDB();
-    const finQ = q(c(fbs, 'teacher_finance'), w('teacherId','==',id), l(1));
-    const finSnap = await getDocs(finQ);
-    if (!finSnap.empty) {
-      await setDoc(d(fbs, 'teacher_finance', finSnap.docs[0].id), {
-        teacherId: id, teacherName: t.name || '', payments: [], totalPaid: 0, updatedAt: new Date().toISOString()
-      });
-    }
+    res = await TeacherFinance.clearTeacherPayments(id, t.name || '', t.rate || 0, srtFinAdminName());
+
+    // تنظيف مرآة Firestore القديمة (teacher_finance) حفاظاً على الاتساق
+    try {
+      const {getDocs,collection:c,doc:d,setDoc,query:q,where:w,limit:l}=srtFS(),fbs=srtDB();
+      const finQ = q(c(fbs, 'teacher_finance'), w('teacherId','==',id), l(1));
+      const finSnap = await getDocs(finQ);
+      if (!finSnap.empty) {
+        await setDoc(d(fbs, 'teacher_finance', finSnap.docs[0].id), {
+          teacherId: id, teacherName: t.name || '', payments: [], totalPaid: 0, updatedAt: new Date().toISOString()
+        });
+      }
+    } catch (e) { console.warn('Firestore teacher_finance clear mirror failed:', e); }
+
     srtFinanceRefresh();
-    srtShowToast('تم مسح سجل الدفعات بنجاح', 'success');
+    const n = (res && res.deleted) || 0;
+    if (n > 0) {
+      srtShowToast('✅ تم مسح ' + n + ' دفعة وإعادة حساب الرصيد', 'success');
+    } else {
+      srtShowToast('لا توجد دفعات مالية لحذفها لهذا الأستاذ', 'info');
+    }
   } catch (e) {
+    console.error('Clear payments error:', e);
+    srtFinanceRefresh();
     srtShowToast('فشل مسح سجل الدفعات: ' + e.message, 'error');
   }
 }

@@ -171,6 +171,15 @@ Deno.serve(async (req) => {
         p_admin_name: String(body.adminName || ''),
       });
 
+    case 'clear-payments':
+      return rpc('admin_clear_teacher_payments', {
+        p_admin_uid: uid,
+        p_teacher_id: String(body.teacherId || ''),
+        p_teacher_name: String(body.teacherName || ''),
+        p_rate: Number(body.rate) || 0,
+        p_admin_name: String(body.adminName || ''),
+      });
+
     case 'set-rate':
       return rpc('admin_set_teacher_rate', {
         p_admin_uid: uid,
