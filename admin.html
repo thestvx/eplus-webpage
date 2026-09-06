@@ -26931,12 +26931,37 @@ async function srtFinanceRefresh() {
     const bal = await TeacherFinance.getBalance(id) || {};
     document.getElementById('srt-fin-card-due').textContent = (bal.total_due || 0).toLocaleString('ar-DZ') + ' دج';
     document.getElementById('srt-fin-card-paid').textContent = (bal.total_paid || 0).toLocaleString('ar-DZ') + ' دج';
-    const pending = (bal.pending || 0).toLocaleString('ar-DZ') + ' دج';
+    const pendingVal = Number(bal.pending || 0);
     const pendingEl = document.getElementById('srt-fin-card-pending');
-    pendingEl.textContent = pending;
-    pendingEl.style.color = (bal.pending || 0) <= 0 ? '#059669' : '#d97706';
-    document.getElementById('srt-fin-card-students').textContent = bal.student_count || 0;
-    document.getElementById('srt-fin-card-sessions').textContent = bal.session_count || 0;
+    pendingEl.textContent = pendingVal.toLocaleString('ar-DZ') + ' دج';
+    pendingEl.style.color = pendingVal <= 0 ? '#059669' : '#d97706';
+    // التلاميذ = عدد المشتركين في مواد الأستاذ (RPC) — الحصص = سجلات الحضور الفعلية
+    try {
+      const rpcRes = await srFetch(`${SR_SUPABASE_URL}/rest/v1/rpc/get_teacher_registered_students`, {
+        method: 'POST',
+        body: JSON.stringify({ p_teacher_id: id, p_teacher_name: t.name || '' }),
+      });
+      let studentsCount = bal.student_count || 0;
+      if (rpcRes.ok) {
+        try { const arr = await rpcRes.json(); if (Array.isArray(arr)) studentsCount = arr.length; } catch (e) {}
+      }
+      document.getElementById('srt-fin-card-students').textContent = studentsCount;
+    } catch (e) {
+      document.getElementById('srt-fin-card-students').textContent = bal.student_count || 0;
+    }
+    try {
+      const { getDocs, collection: cc3 } = srtFS();
+      const attestSnap = await getDocs(cc3(srtDB(), 'attendance_control'));
+      const tNameMatch = String(t.name || '').replace(/\s+/g, ' ').trim().toLowerCase().replace(/عبد\s+ال/g, 'abd');
+      const sessionCount = attestSnap.docs.filter(d => {
+        const dd = d.data();
+        const dn = String(dd.teacherName || '').replace(/\s+/g, ' ').trim().toLowerCase().replace(/عبد\s+ال/g, 'abd');
+        return dn === tNameMatch;
+      }).length;
+      document.getElementById('srt-fin-card-sessions').textContent = sessionCount || 0;
+    } catch (e) {
+      document.getElementById('srt-fin-card-sessions').textContent = bal.session_count || 0;
+    }
     if (bal.rate && document.getElementById('srt-finance-rate').value === '0') document.getElementById('srt-finance-rate').value = bal.rate;
 
     const ledger = await TeacherFinance.getLedger(id);
@@ -26948,31 +26973,38 @@ async function srtFinanceRefresh() {
     const fmtD = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('ar-DZ', { day:'2-digit', month:'2-digit', year:'numeric' }) : '—';
     body.innerHTML = ledger.map(tx => {
       const isDue = tx.transaction_type === 'dues';
+      const rateVal = (tx.lesson_rate || t.rate || 0) || 0;
       const typeBadge = isDue
         ? '<span style="font-size:10px;font-weight:800;background:rgba(124,58,237,0.1);color:#7C3AED;padding:2px 9px;border-radius:999px">📚 مستحقات</span>'
         : '<span style="font-size:10px;font-weight:800;background:rgba(5,150,105,0.12);color:#059669;padding:2px 9px;border-radius:999px">💵 دفعة</span>';
       const amountHtml = isDue
-        ? '<span style="font-weight:900;color:#7C3AED;direction:ltr;display:inline-block">+' + (tx.amount||0).toLocaleString('ar-DZ') + ' دج</span>'
-        : '<span style="font-weight:900;color:#059669;direction:ltr;display:inline-block">−' + (tx.amount||0).toLocaleString('ar-DZ') + ' دج</span>';
+        ? '<span style="font-weight:900;color:#7C3AED;direction:ltr;display:inline-block;white-space:nowrap">+' + (tx.amount||0).toLocaleString('ar-DZ') + ' دج</span>'
+        : '<span style="font-weight:900;color:#059669;direction:ltr;display:inline-block;white-space:nowrap">−' + (tx.amount||0).toLocaleString('ar-DZ') + ' دج</span>';
       const detail = isDue
         ? (tx.student_name || '') + (tx.subject_name ? ' — ' + tx.subject_name : '') + (tx.session_count ? ' — ' + tx.session_count + ' حصة' : '')
         : (tx.notes || 'دفعة مالية');
-      const printBtn = !isDue
-        ? `<button onclick="srtFinancePrintReceipt('${tx.id.replace(/'/g, '')}')" title="طباعة الإيصال" style="padding:6px 10px;border-radius:8px;border:1.5px solid rgba(5,150,105,0.3);background:rgba(5,150,105,0.06);color:#059669;cursor:pointer;font-size:12px;font-weight:800">🖨️ إيصال</button>`
+      const rateChip = !isDue && rateVal
+        ? `<span style="font-size:10px;font-weight:800;background:rgba(245,158,11,0.12);color:#d97706;padding:2px 8px;border-radius:999px;white-space:nowrap">سعر الحصة: ${rateVal.toLocaleString('ar-DZ')} دج</span>`
         : '';
+      const actions = !isDue
+        ? `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+          <button onclick="srtShowReceiptPreview('${tx.id.replace(/'/g, '')}')" title="عرض الوصل قبل الطباعة" style="padding:6px 10px;border-radius:8px;border:1.5px solid rgba(99,102,241,0.25);background:rgba(99,102,241,0.06);color:var(--primary);cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap">👁️ الوصل</button>
+          <button onclick="srtFinancePaymentDetails()" title="عرض كل الدفعات المسجلة لهذا الأستاذ" style="padding:6px 10px;border-radius:8px;border:1.5px solid rgba(5,150,105,0.3);background:rgba(5,150,105,0.06);color:#059669;cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap">📋 تفاصيل المدفوعات</button>
+          <button onclick="srtFinanceDeleteTx('${tx.id.replace(/'/g, '')}')" title="حذف المعاملة" style="padding:6px 10px;border-radius:8px;border:1.5px solid rgba(220,38,38,0.2);background:rgba(220,38,38,0.05);color:#dc2626;cursor:pointer;font-size:12px">🗑️</button>
+        </div>`
+        : `<button onclick="srtFinanceDeleteTx('${tx.id.replace(/'/g, '')}')" title="حذف المعاملة" style="padding:6px 10px;border-radius:8px;border:1.5px solid rgba(220,38,38,0.2);background:rgba(220,38,38,0.05);color:#dc2626;cursor:pointer;font-size:12px">🗑️</button>`;
       return `<div style="display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px">
         <div style="flex:1;min-width:0">
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             ${typeBadge}
             <span style="font-size:11px;color:var(--text-muted);font-weight:700">${fmtD(tx.date)}</span>
-            ${isDue ? `<span style="font-size:10px;font-family:monospace;background:var(--primary-light);color:var(--primary);padding:2px 7px;border-radius:6px">${tx.session_count} × ${tx.lesson_rate}</span>` : ''}
+            ${isDue ? `<span style="font-size:10px;font-family:monospace;background:var(--primary-light);color:var(--primary);padding:2px 7px;border-radius:6px">${tx.session_count} × ${tx.lesson_rate}</span>` : rateChip}
           </div>
           <div style="font-size:12.5px;font-weight:700;margin-top:4px;color:var(--text)">${detail}</div>
           ${isDue ? '<div style="font-size:10.5px;color:var(--text-muted);margin-top:2px">' + (tx.notes || '') + '</div>' : ''}
         </div>
         ${amountHtml}
-        ${printBtn}
-        <button onclick="srtFinanceDeleteTx('${tx.id.replace(/'/g, '')}')" title="حذف المعاملة" style="padding:6px 10px;border-radius:8px;border:1.5px solid rgba(220,38,38,0.2);background:rgba(220,38,38,0.05);color:#dc2626;cursor:pointer;font-size:12px">🗑️</button>
+        ${actions}
       </div>`;
     }).join('');
   } catch (e) {
@@ -27014,7 +27046,7 @@ async function srtFinanceComputeDues() {
   }
 }
 
-function srtShowDuesReport(res) {
+function srtShowDuesReport(res, title) {
   const rows = res.duesRows || [];
   const rate = res.rate || 0;
   let overlay = document.getElementById('srt-dues-report-overlay');
@@ -27054,7 +27086,7 @@ function srtShowDuesReport(res) {
   overlay.innerHTML = '<div class="teacher-modal" style="max-width:800px;max-height:92vh;display:flex;flex-direction:column">'
     + '<div class="teacher-modal-header">'
     + '<div class="panel-icon" style="background:rgba(124,58,237,0.1);border-color:rgba(124,58,237,0.2)">📊</div>'
-    + '<div class="teacher-modal-title">تقرير المستحقات — ' + ((_srtFinanceTeacher && _srtFinanceTeacher.name) || '') + '</div>'
+    + '<div class="teacher-modal-title">' + (title || ('تقرير المستحقات — ' + ((_srtFinanceTeacher && _srtFinanceTeacher.name) || ''))) + '</div>'
     + '<button class="att-modal-close" onclick="document.getElementById(\'srt-dues-report-overlay\').classList.remove(\'open\')">✕</button></div>'
     + '<div class="teacher-modal-body" style="overflow-y:auto;padding:20px 24px">'
 
@@ -27226,50 +27258,161 @@ async function srtFinanceClearOldPayments() {
 async function srtFinancePrintReceipt(txId) {
   const t = _srtFinanceTeacher;
   if (!t) return;
-  const id = t.teacherId || t.id;
   try {
-    const [receipts, ledger, atcSnap] = await Promise.all([
-      TeacherFinance.getReceipts(id),
-      TeacherFinance.getLedger(id),
-      (function(){try{const {getDocs:c2,collection:c3}=srtFS(),db2=srtDB();return getDocs(c3(db2,'attendance_control'));}catch(e){return Promise.resolve({docs:[]});}})().then(function(snap){var tName=String(t.name||'').replace(/\s+/g,' ').trim().toLowerCase().replace(/عبد\s+ال/g,'abd');return{docs:snap.docs.filter(function(d){var dd=d.data();var dn=String(dd.teacherName||'').replace(/\s+/g,' ').trim().toLowerCase().replace(/عبد\s+ال/g,'abd');return dn===tName;})};}).catch(function(){return {docs:[]};}),
-    ]);
-    const rcpt = receipts.find(x => x.transaction_id === txId) || receipts[0];
-    const tx = ledger.find(x => x.id === txId) || (rcpt ? { amount: rcpt.amount, date: rcpt.date, notes: rcpt.notes } : null);
-    if (!tx) return;
-
-    const totalSessionsOffered = atcSnap.docs.length;
-
-    const studentBreakdown = ledger.filter(x => x.transaction_type === 'dues').map(x => {
-      const attended = x.session_count || 0;
-      const absent = Math.max(0, totalSessionsOffered - attended);
-      return {
-        name: x.student_name || '',
-        sessions: attended,
-        absent: absent,
-        amount: x.amount || 0,
-        subject: x.subject_name || '',
-      };
-    });
-
-    const subjects = t.subjects || t.spec || '';
-    const subjectNames = (typeof subjects === 'string' ? subjects : Array.isArray(subjects) ? subjects.map(function(s){return s.subject||s.name||s;}).join(', ') : '') || '';
-
-    TeacherFinance.printReceipt({
-      receiptId: (rcpt && rcpt.id) || ('RCP-' + (tx.date || TeacherFinance.today()).replace(/-/g, '') + '-' + txId.slice(-4)),
-      teacherName: t.name || tx.teacher_name || '',
-      subjectName: subjectNames,
-      rate: tx.lesson_rate || t.rate || 0,
-      amount: (rcpt && rcpt.amount) || tx.amount || 0,
-      date: (rcpt && rcpt.date) || tx.date || TeacherFinance.today(),
-      adminName: (rcpt && rcpt.admin_name) || tx.admin_name || srtFinAdminName(),
-      note: tx.notes || '',
-      studentBreakdown: studentBreakdown,
-      totalStudents: new Set(studentBreakdown.map(s => s.name)).size,
-      totalSessions: studentBreakdown.reduce((sum, s) => sum + s.sessions, 0),
-    });
+    const payload = await srtFinanceGetReceiptPayload(txId);
+    if (!payload) { srtShowToast('لم يتم العثور على بيانات الإيصال', 'error'); return; }
+    try {
+      TeacherFinance.printReceipt(payload);
+    } catch (e) {
+      srtShowToast('فشل طباعة الإيصال: ' + e.message, 'error');
+    }
   } catch (e) {
     srtShowToast('فشل طباعة الإيصال: ' + e.message, 'error');
   }
+}
+
+// تحضير بيانات الإيصال من الخادم (الأعلى: transaction_id → ثم الأحدث)
+async function srtFinanceGetReceiptPayload(txId) {
+  const t = _srtFinanceTeacher;
+  if (!t) return null;
+  const id = t.teacherId || t.id;
+  const [receipts, ledger, atcSnap] = await Promise.all([
+    TeacherFinance.getReceipts(id),
+    TeacherFinance.getLedger(id),
+    (function(){try{const {getDocs:c2,collection:c3}=srtFS(),db2=srtDB();return getDocs(c3(db2,'attendance_control'));}catch(e){return Promise.resolve({docs:[]});}})().then(function(snap){var tName=String(t.name||'').replace(/\s+/g,' ').trim().toLowerCase().replace(/عبد\s+ال/g,'abd');return{docs:snap.docs.filter(function(d){var dd=d.data();var dn=String(dd.teacherName||'').replace(/\s+/g,' ').trim().toLowerCase().replace(/عبد\s+ال/g,'abd');return dn===tName;})};}).catch(function(){return {docs:[]};}),
+  ]);
+  const rcpt = receipts.find(x => x.transaction_id === txId) || receipts[0];
+  const tx = ledger.find(x => x.id === txId) || (rcpt ? { amount: rcpt.amount, date: rcpt.date, notes: rcpt.notes } : null);
+  if (!tx) return null;
+
+  const totalSessionsOffered = atcSnap.docs.length;
+
+  const studentBreakdown = ledger.filter(x => x.transaction_type === 'dues').map(x => {
+    const attended = x.session_count || 0;
+    const absent = Math.max(0, totalSessionsOffered - attended);
+    return {
+      name: x.student_name || '',
+      sessions: attended,
+      absent: absent,
+      amount: x.amount || 0,
+      subject: x.subject_name || '',
+    };
+  });
+
+  const subjects = t.subjects || t.spec || '';
+  const subjectNames = (typeof subjects === 'string' ? subjects : Array.isArray(subjects) ? subjects.map(function(s){return s.subject||s.name||s;}).join(', ') : '') || '';
+
+  return {
+    receiptId: (rcpt && rcpt.id) || ('RCP-' + (tx.date || TeacherFinance.today()).replace(/-/g, '') + '-' + txId.slice(-4)),
+    teacherName: t.name || tx.teacher_name || '',
+    subjectName: subjectNames,
+    rate: tx.lesson_rate || t.rate || 0,
+    amount: (rcpt && rcpt.amount) || tx.amount || 0,
+    date: (rcpt && rcpt.date) || tx.date || TeacherFinance.today(),
+    adminName: (rcpt && rcpt.admin_name) || tx.admin_name || srtFinAdminName(),
+    note: tx.notes || '',
+    studentBreakdown: studentBreakdown,
+    totalStudents: new Set(studentBreakdown.map(s => s.name)).size,
+    totalSessions: studentBreakdown.reduce((sum, s) => sum + s.sessions, 0),
+  };
+}
+
+// معاينة الإيصال داخل نافذة (modal) قبل الطباعة
+async function srtShowReceiptPreview(txId) {
+  try {
+    const payload = await srtFinanceGetReceiptPayload(txId);
+    if (!payload) { srtShowToast('لم يتم العثور على بيانات الإيصال', 'error'); return; }
+    window._srtRcptPreview = payload;
+    let overlay = document.getElementById('srt-receipt-preview-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'srt-receipt-preview-overlay';
+      overlay.className = 'teacher-modal-bg';
+      overlay.onclick = function(e) { if (e.target === overlay) srtCloseReceiptPreview(); };
+      document.body.appendChild(overlay);
+    }
+    overlay.innerHTML =
+      '<div class="teacher-modal" style="max-width:840px;max-height:94vh;display:flex;flex-direction:column">' +
+        '<div class="teacher-modal-header">' +
+          '<div class="panel-icon" style="background:rgba(5,150,105,0.1);border-color:rgba(5,150,105,0.2)">🧾</div>' +
+          '<div class="teacher-modal-title">معاينة الإيصال — ' + (payload.teacherName || '') + '</div>' +
+          '<button class="att-modal-close" onclick="srtCloseReceiptPreview()">✕</button>' +
+        '</div>' +
+        '<div class="teacher-modal-body" style="overflow-y:auto;padding:0;background:#e8e8ed">' +
+          '<div>' + TeacherFinance.buildReceiptHtml(payload) + '</div>' +
+          '<div style="position:sticky;bottom:0;display:flex;justify-content:center;gap:10px;padding:14px;background:rgba(255,255,255,0.92);backdrop-filter:blur(6px)">' +
+            '<button onclick="srtPrintReceiptPreview()" style="padding:12px 34px;border:none;border-radius:12px;background:#059669;color:#fff;font-size:14px;font-weight:800;cursor:pointer">🖨️ طباعة الإيصال</button>' +
+            '<button onclick="srtCloseReceiptPreview()" style="padding:12px 34px;border:1.5px solid var(--border);border-radius:12px;background:var(--bg-card);color:var(--text);font-size:14px;font-weight:700;cursor:pointer">إغلاق</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    requestAnimationFrame(function() { overlay.classList.add('open'); });
+  } catch (e) {
+    srtShowToast('فشل معاينة الإيصال: ' + e.message, 'error');
+  }
+}
+
+function srtPrintReceiptPreview() {
+  const payload = window._srtRcptPreview;
+  if (!payload) return;
+  try { TeacherFinance.printReceipt(payload); } catch (e) { srtShowToast('فشل الطباعة: ' + e.message, 'error'); }
+}
+
+function srtCloseReceiptPreview() {
+  const el = document.getElementById('srt-receipt-preview-overlay');
+  if (el) el.classList.remove('open');
+}
+
+// «تفاصيل المدفوعات» — كل دفعات الأستاذ، كل واحدة مع زر «عرض الوصل»
+async function srtFinancePaymentDetails() {
+  const t = _srtFinanceTeacher;
+  if (!t) return;
+  const id = t.teacherId || t.id;
+  let payments = [];
+  try {
+    const ledger = await TeacherFinance.getLedger(id);
+    payments = ledger.filter(x => x.transaction_type === 'payment');
+  } catch (e) {
+    srtShowToast('فشل تحميل الدفعات: ' + e.message, 'error');
+    return;
+  }
+  const fmtD = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('ar-DZ', { day:'2-digit', month:'2-digit', year:'numeric' }) : '—';
+  const totalPaid = payments.reduce(function(s, p) { return s + (Number(p.amount) || 0); }, 0);
+  const rowsHtml = payments.length === 0
+    ? '<div style="text-align:center;padding:44px 20px"><div style="font-size:52px;margin-bottom:12px;opacity:.25">💵</div><div style="font-size:15px;font-weight:900;color:var(--text)">لا توجد دفعات مسجلة لهذا الأستاذ</div></div>'
+    : payments.map(p =>
+      '<div style="display:flex;gap:10px;align-items:center;padding:10px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;margin-bottom:8px">' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+            '<span style="font-size:10px;font-weight:800;background:rgba(5,150,105,0.12);color:#059669;padding:2px 9px;border-radius:999px">💵 دفعة</span>' +
+            '<span style="font-size:11px;color:var(--text-muted);font-weight:700">' + fmtD(p.date) + '</span>' +
+            (Number(p.lesson_rate || t.rate || 0) ? '<span style="font-size:10px;font-weight:800;background:rgba(245,158,11,0.12);color:#d97706;padding:2px 8px;border-radius:999px">سعر الحصة: ' + Number(p.lesson_rate || t.rate || 0).toLocaleString('ar-DZ') + ' دج</span>' : '') +
+          '</div>' +
+          '<div style="font-size:12.5px;font-weight:700;margin-top:4px;color:var(--text)">' + (p.notes || 'دفعة مالية') + '</div>' +
+        '</div>' +
+        '<span style="font-weight:900;color:#059669;direction:ltr;display:inline-block;white-space:nowrap">−' + (p.amount || 0).toLocaleString('ar-DZ') + ' دج</span>' +
+        '<button onclick="srtShowReceiptPreview(\'' + String(p.id || '').replace(/'/g, '') + '\')" title="عرض الوصل قبل الطباعة" style="padding:6px 12px;border-radius:8px;border:1.5px solid rgba(99,102,241,0.25);background:rgba(99,102,241,0.06);color:var(--primary);cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap">👁️ الوصل</button>' +
+      '</div>'
+    ).join('');
+
+  let overlay = document.getElementById('srt-payments-details-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'srt-payments-details-overlay';
+    overlay.className = 'teacher-modal-bg';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.classList.remove('open'); };
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = '<div class="teacher-modal" style="max-width:760px;max-height:90vh;display:flex;flex-direction:column">'
+    + '<div class="teacher-modal-header">'
+    + '<div class="panel-icon" style="background:rgba(5,150,105,0.1);border-color:rgba(5,150,105,0.2)">💵</div>'
+    + '<div class="teacher-modal-title">تفاصيل المدفوعات — ' + (t.name || '') + '</div>'
+    + '<button class="att-modal-close" onclick="document.getElementById(\'srt-payments-details-overlay\').classList.remove(\'open\')">✕</button></div>'
+    + '<div class="teacher-modal-body" style="overflow-y:auto;padding:16px 18px">'
+    + rowsHtml
+    + (payments.length ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:12px 14px;background:linear-gradient(135deg,rgba(5,150,105,0.08),rgba(5,150,105,0.03));border:1px solid rgba(5,150,105,0.18);border-radius:12px"><span style="font-size:13px;font-weight:800;color:var(--text)">إجمالي المدفوعات</span><span style="font-weight:900;color:#059669;direction:ltr">−' + totalPaid.toLocaleString('ar-DZ') + ' دج</span></div>' : '')
+    + '</div></div>';
+  requestAnimationFrame(function() { overlay.classList.add('open'); });
 }
 
 async function srtFinanceDeleteTx(txId) {

@@ -16,7 +16,7 @@
   <script src="js/registrationService.js?v=4"></script>
   <script src="js/subjectService.js?v=4"></script>
   <script src="js/attendanceService.js?v=2"></script>
-  <script src="js/teacherFinance.js?v=4"></script>
+  <script src="js/teacherFinance.js?v=5"></script>
   <style>
     *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
     :root{
@@ -1098,13 +1098,21 @@
           paymentsHtml='<div style="text-align:center;padding:32px 20px;color:var(--text-muted)"><div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:4px">لا توجد دفعات مسجلة</div><div style="font-size:12px">لم يتم إيداع أي مبلغ بعد</div></div>';
         }else{
           const sorted=payments.slice().sort(function(a,b){return(b.timestamp||0)-(a.timestamp||0);});
-          paymentsHtml='<table class="data-table" style="margin:0"><thead><tr><th>#</th><th>التاريخ</th><th style="text-align:center">المبلغ</th><th>البيان</th><th>رقم الإيصال</th></tr></thead><tbody>'
+          window._finSorted=sorted;
+          window._finTName=teacherName;
+          window._finRate=rate;
+          window._finSessions=totalSessions;
+          window._finStudents=details.length;
+          var _subjSrc=t.subjects||t.spec||'';
+          window._finSubjects=(typeof _subjSrc==='string'?_subjSrc:(Array.isArray(_subjSrc)?_subjSrc.map(function(s){return s&&(s.subject||s.name||s);}).join(', '):''));
+          paymentsHtml='<table class="data-table" style="margin:0"><thead><tr><th>#</th><th>التاريخ</th><th style="text-align:center">المبلغ</th><th>البيان</th><th>رقم الإيصال</th><th style="text-align:center">الوصل</th></tr></thead><tbody>'
             +sorted.map(function(p,i){
               return '<tr><td style="font-weight:800;color:var(--text-muted)">'+(i+1)+'</td>'
                 +'<td style="font-size:12px;font-weight:600">'+fmtDate(p.date||p.timestamp)+'</td>'
                 +'<td style="text-align:center;font-weight:900;color:var(--green);font-size:14px;direction:ltr">'+fmtNum(p.amount)+' <span style="font-size:11px;opacity:.5">دج</span></td>'
                 +'<td style="font-size:12px;color:var(--text-muted)">'+(p.note||'—')+'</td>'
-                +'<td><code style="font-size:10px;background:var(--green-light);padding:3px 10px;border-radius:6px;color:var(--green);font-weight:700">'+(p.receiptId||'—')+'</code></td></tr>';
+                +'<td><code style="font-size:10px;background:var(--green-light);padding:3px 10px;border-radius:6px;color:var(--green);font-weight:700">'+(p.receiptId||'—')+'</code></td>'
+                +'<td style="text-align:center"><button onclick="tShowReceiptPreview('+i+')" style="padding:5px 10px;border:1.5px solid var(--green-light);border-radius:8px;background:var(--green-light);color:var(--green);font-size:11px;font-weight:800;cursor:pointer">👁️ عرض الوصل</button></td></tr>';
             }).join('')
             +'</tbody></table>';
         }
@@ -1120,12 +1128,8 @@
 
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
             <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
-              <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">المحاضرات</div>
+              <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">الحضور</div>
               <div style="font-size:26px;font-weight:900;color:var(--green)">${fmtNum(totalSessions)}</div>
-            </div>
-            <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
-              <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">مجانية</div>
-              <div style="font-size:26px;font-weight:900;color:#f59e0b">${fmtNum(totalFreeSessions)}</div>
             </div>
             <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
               <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">الغيابات</div>
@@ -1134,6 +1138,10 @@
             <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
               <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">عدد التلاميذ</div>
               <div style="font-size:26px;font-weight:900;color:var(--purple)">${details.length}</div>
+            </div>
+            <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
+              <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">سعر الحصة</div>
+              <div style="font-size:26px;font-weight:900;color:var(--green)">${fmtNum(rate)} <span style="font-size:13px;color:var(--text-muted)">دج</span></div>
             </div>
           </div>
 
@@ -1149,21 +1157,19 @@
                   <th>#</th>
                   <th>التلميذ</th>
                   <th>المادة</th>
-                  <th style="text-align:center">المحاضرات</th>
-                  <th style="text-align:center">مجانية</th>
+                  <th style="text-align:center">الحضور</th>
                   <th style="text-align:center">الغيابات</th>
                   <th style="text-align:center">المستحق</th>
                 </tr></thead>
                 <tbody>${details.map(function(d,i){
                   var subLines=d.matchedSubjects.join(', ');
-                  return '<tr><td style="font-weight:800;color:var(--text-muted)">'+(i+1)+'</td><td style="font-weight:700">'+d.name+'</td><td style="font-size:11px;color:var(--text-muted)">'+subLines+'</td><td style="text-align:center;font-weight:800;color:var(--green)">'+d.sessions+'</td><td style="text-align:center;font-weight:800;color:#f59e0b">'+d.freeSessions+'</td><td style="text-align:center;font-weight:800;color:#dc2626">'+d.absent+'</td><td style="text-align:center;font-weight:900;color:var(--green)">'+fmtNum(d.amount)+' دج</td></tr>';
+                  return '<tr><td style="font-weight:800;color:var(--text-muted)">'+(i+1)+'</td><td style="font-weight:700">'+d.name+'</td><td style="font-size:11px;color:var(--text-muted)">'+subLines+'</td><td style="text-align:center;font-weight:800;color:var(--green)">'+d.sessions+'</td><td style="text-align:center;font-weight:800;color:#dc2626">'+d.absent+'</td><td style="text-align:center;font-weight:900;color:var(--green)">'+fmtNum(d.amount)+' دج</td></tr>';
                 }).join('')}</tbody>
                 <tfoot><tr style="background:rgba(99,102,241,0.04)">
                   <td></td>
                   <td style="font-weight:900">الإجمالي</td>
                   <td></td>
                   <td style="text-align:center;font-weight:900;color:var(--green)">${totalSessions}</td>
-                  <td style="text-align:center;font-weight:900;color:#f59e0b">${totalFreeSessions}</td>
                   <td style="text-align:center;font-weight:900;color:#dc2626">${totalAbsent}</td>
                   <td style="text-align:center;font-weight:900;color:var(--green)">${fmtNum(totalEarnings)} دج</td>
                 </tr></tfoot>
@@ -1185,6 +1191,70 @@
         document.getElementById('finance-content').innerHTML='<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">حدث خطأ أثناء تحميل البيانات المالية</div><div class="empty-state-sub">'+e.message+'</div></div>';
       }
       setupFinanceNotifications(teacherId,teacherName);
+    }
+
+    function tShowReceiptPreview(idx){
+      const list=(Array.isArray(window._finSorted)?window._finSorted:[]);
+      const p=list[idx];
+      if(!p)return;
+      if(typeof TeacherFinance==='undefined'||!TeacherFinance.buildReceiptHtml){alert('عنصر المعاينة غير متاح — حدّث الصفحة بـ Ctrl+F5.');return;}
+      const payload={
+        receiptId:p.receiptId||('RCP-'+(p.date||'').replace(/-/g,'')+'-'+String((idx+1)*97 % 10000).padStart(4,'0')),
+        teacherName:window._finTName||'',
+        subjectName:window._finSubjects||'',
+        rate:window._finRate||0,
+        amount:p.amount||0,
+        date:p.date||'',
+        adminName:p.adminName||'',
+        note:p.note||'',
+        totalSessions:window._finSessions||0,
+        totalStudents:window._finStudents||0
+      };
+      window._finPreview=payload;
+      tRenderReceiptOverlay(payload);
+    }
+
+    function tRenderReceiptOverlay(payload){
+      let bg=document.getElementById('t-receipt-modal-bg');
+      if(!bg){
+        bg=document.createElement('div');
+        bg.id='t-receipt-modal-bg';
+        bg.className='modal-bg';
+        bg.onclick=function(e){if(e.target===bg)tClosePreview();};
+        document.body.appendChild(bg);
+      }
+      let ov=document.getElementById('t-receipt-modal');
+      if(!ov){
+        ov=document.createElement('div');
+        ov.id='t-receipt-modal';
+        ov.className='modal';
+        ov.style.maxWidth='840px';
+        ov.style.maxHeight='94vh';
+        ov.style.display='flex';
+        ov.style.flexDirection='column';
+        bg.appendChild(ov);
+      }
+      ov.innerHTML=
+        '<div class="modal-header"><div class="modal-title">🧾 معاينة الإيصال — '+(payload.teacherName||'')+'</div><button class="modal-close" onclick="tClosePreview()">✕</button></div>'+
+        '<div class="modal-body" style="padding:0;background:#e8e8ed;overflow:auto">'+
+          TeacherFinance.buildReceiptHtml(payload)+
+          '<div style="position:sticky;bottom:0;display:flex;justify-content:center;gap:10px;padding:14px;background:rgba(255,255,255,0.92);backdrop-filter:blur(6px)">'+
+            '<button onclick="tPrintPreview()" style="padding:12px 34px;border:none;border-radius:12px;background:#059669;color:#fff;font-size:14px;font-weight:800;cursor:pointer">🖨️ طباعة الإيصال</button>'+
+            '<button onclick="tClosePreview()" style="padding:12px 34px;border:1.5px solid var(--border-light);border-radius:12px;background:var(--card);color:var(--text);font-size:14px;font-weight:700;cursor:pointer">إغلاق</button>'+
+          '</div>'+
+        '</div>';
+      bg.classList.add('open');
+    }
+
+    function tPrintPreview(){
+      const p=window._finPreview;
+      if(!p)return;
+      try{TeacherFinance.printReceipt(p);}catch(e){console.error('Print error:',e);}
+    }
+
+    function tClosePreview(){
+      const bg=document.getElementById('t-receipt-modal-bg');
+      if(bg)bg.classList.remove('open');
     }
 
     let _finNotifUnsub=null;

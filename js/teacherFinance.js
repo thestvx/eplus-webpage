@@ -241,176 +241,95 @@ window.TeacherFinance = (function () {
     });
   }
 
-  // ── Receipt Print (Professional A4 — Apple-invoice style) ──
+  // ── Receipt (single-page A4 — بدون قائمة التلاميذ، لوقو الأكاديمية) ──
+
+  function _receiptStyles() {
+    return '' +
+    '@import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Inter:wght@400;600;700;800&display=swap");' +
+    '.rcpt-page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;color:#1d1d1f;font-family:"Tajawal","Inter",sans-serif;direction:rtl;display:flex;flex-direction:column;padding:38px 48px;box-sizing:border-box}' +
+    '.rcpt-hdr{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:3px double #d2d2d7;padding-bottom:18px}' +
+    '.rcpt-logo img{height:56px}' +
+    '.rcpt-brand{text-align:left}' +
+    '.rcpt-brand-name{font-weight:800;font-size:20px;letter-spacing:.5px}' +
+    '.rcpt-brand-sub{font-size:11px;color:#86868b;letter-spacing:2px}' +
+    '.rcpt-title{text-align:center;margin:22px 0 4px}' +
+    '.rcpt-title h1{font-size:22px;font-weight:800;margin:0}' +
+    '.rcpt-title .num{font-family:"Inter",monospace;font-size:12px;color:#86868b;margin-top:4px}' +
+    '.rcpt-card{background:#f5f5f7;border:1px solid #e5e5ea;border-radius:14px;padding:14px 18px;margin-top:16px}' +
+    '.rcpt-row{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;font-size:13.5px;border-bottom:1px dashed #e5e5ea}' +
+    '.rcpt-row:last-child{border-bottom:none}' +
+    '.rcpt-row .k{color:#86868b;font-weight:700}' +
+    '.rcpt-row .v{font-weight:800}' +
+    '.rcpt-amt{text-align:center;margin:30px 0 10px}' +
+    '.rcpt-amt .lbl{font-size:13px;color:#86868b;font-weight:700}' +
+    '.rcpt-amt .val{font-size:46px;font-weight:900;letter-spacing:-1px;line-height:1.1}' +
+    '.rcpt-amt .cur{font-size:17px;font-weight:700;color:#86868b}' +
+    '.rcpt-note{background:#fffbe6;border:1px solid #f3e8b8;border-radius:12px;padding:12px 16px;font-size:12.5px;margin-top:12px}' +
+    '.rcpt-sigs{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:auto;padding-top:54px}' +
+    '.rcpt-sig{text-align:center;flex:1}' +
+    '.rcpt-line{width:150px;border-bottom:1px solid #1d1d1f;height:28px;margin:0 auto}' +
+    '.rcpt-sig .cap{font-size:11px;color:#86868b;font-weight:700;margin-top:4px}' +
+    '.rcpt-mid{text-align:center;flex:0 0 auto}' +
+    '.rcpt-mid img{height:46px;display:block;margin:0 auto 4px}' +
+    '.rcpt-mid span{font-size:10px;color:#86868b;font-weight:700}' +
+    '.rcpt-foot{border-top:1px solid #ededf0;margin-top:22px;padding-top:12px;text-align:center;font-size:9.5px;color:#aeaeb2}' +
+    '@media print{.rcpt-page{box-shadow:none}}';
+  }
+
+  function _receiptBody(payload) {
+    const p = payload || {};
+    const _receiptNum = (p.receiptId || ('RCP-' + (p.date || today()).replace(/-/g, '') + '-0000')).toUpperCase();
+    const fmt = n => { try { return Number(n || 0).toLocaleString('ar-DZ'); } catch(e) { return String(Number(n) || 0); } };
+    const _date = p.date ? String(p.date).split('-').reverse().join(' / ') : '—';
+    const chips = [];
+    if (Number(p.rate)) chips.push(['سعر الحصة', fmt(p.rate) + ' دج']);
+    if (Number(p.totalSessions)) chips.push(['عدد الحصص', fmt(p.totalSessions) + ' حصة']);
+    if (Number(p.totalStudents)) chips.push(['عدد التلاميذ', fmt(p.totalStudents)]);
+    if (p.subjectName) chips.push(['المادة', p.subjectName]);
+    const chipsHtml = chips.map(c => '<div class="rcpt-row"><span class="k">' + c[0] + '</span><span class="v">' + c[1] + '</span></div>').join('');
+
+    return '' +
+    '<div class="rcpt-page">' +
+      '<div class="rcpt-hdr">' +
+        '<div class="rcpt-logo"><img src="schoollogo/schoollogoblack.PNG" alt="logo"></div>' +
+        '<div class="rcpt-brand"><div class="rcpt-brand-name">EDUCATION PLUS CENTER</div><div class="rcpt-brand-sub">ACADÉMIE DE SOUTIEN SCOLAIRE</div></div>' +
+      '</div>' +
+      '<div class="rcpt-title"><h1>إيصال سداد مستحقات</h1><div class="num">رقم الوصل: ' + _receiptNum + '</div></div>' +
+      '<div class="rcpt-card">' +
+        '<div class="rcpt-row"><span class="k">الأستاذ</span><span class="v">' + (p.teacherName || '—') + '</span></div>' +
+        '<div class="rcpt-row"><span class="k">التاريخ</span><span class="v">' + _date + '</span></div>' +
+        (chipsHtml ? chipsHtml : '') +
+      '</div>' +
+      '<div class="rcpt-amt"><div class="lbl">المبلغ المدفوع</div><div class="val">' + fmt(p.amount) + ' <span class="cur">دج</span></div></div>' +
+      (p.note ? '<div class="rcpt-note">📝 ' + p.note + '</div>' : '') +
+      '<div class="rcpt-sigs">' +
+        '<div class="rcpt-sig"><div class="rcpt-line"></div><div class="cap">توقيع الأستاذ</div></div>' +
+        '<div class="rcpt-mid"><img src="schoollogo/schoollogoblack.PNG" alt="logo"><span>EDUCATION PLUS CENTER</span></div>' +
+        '<div class="rcpt-sig"><div class="rcpt-line"></div><div class="cap">الإدارة: ' + (p.adminName || '—') + '</div></div>' +
+      '</div>' +
+      '<div class="rcpt-foot">صدر هذا الوصل إلكترونياً عبر نظام إدارة أكاديمية التعليم والدعم المدرسي</div>' +
+    '</div>';
+  }
+
+  // HTML جاهز للعرض داخل نافذة (preview/معاينة)
+  function buildReceiptHtml(payload) {
+    return '<style>' + _receiptStyles() + '</style>' + _receiptBody(payload || {});
+  }
 
   function printReceipt(payload) {
-    const {
-      receiptId, teacherName, subjectName, sessions, rate, amount, date, adminName, note,
-      studentBreakdown, totalStudents, totalSessions: totalSess
-    } = payload;
-    const win = window.open('', '_blank', 'width=794,height=1123');
+    const win = window.open('', '_blank', 'width=850,height=1100');
     if (!win) return false;
-
-    const allRows = Array.isArray(studentBreakdown) && studentBreakdown.length
-      ? studentBreakdown.map((s, i) =>
-        '<tr><td class="row-num">' + (i + 1) + '</td><td class="row-name">' + (s.name || '---') + '</td><td class="row-sub">' + (s.subject || '---') + '</td><td class="row-att">' + (s.sessions || 0) + '</td><td class="row-abs">' + (s.absent || 0) + '</td><td class="row-amt">' + Number(s.amount || 0).toLocaleString('ar-DZ') + '</td></tr>'
-      )
-      : [];
-
-    const _date = date || new Date().toISOString().split('T')[0];
-    const _fmtDate = (function() {
-      try {
-        const d = new Date(_date + 'T12:00:00');
-        const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-        return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
-      } catch(e) { return _date; }
-    })();
-
-    const _receiptNum = (receiptId || 'RCP-' + Date.now().toString(36).toUpperCase()).toUpperCase();
-    const ROWS_PER_PAGE = 12;
-    const pages = [];
-    if (allRows.length === 0) {
-      pages.push(['<tr><td colspan="6" style="text-align:center;color:#8e8e93;padding:24px">No attendance records</td></tr>']);
-    } else {
-      for (let i = 0; i < allRows.length; i += ROWS_PER_PAGE) {
-        pages.push(allRows.slice(i, i + ROWS_PER_PAGE));
-      }
-    }
-
-    const pageStyles = '@page{margin:0;size:A4}' +
-    '*{box-sizing:border-box;margin:0;padding:0}' +
-    'body{font-family:Inter,-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif;color:#1d1d1f;background:#fff;-webkit-font-smoothing:antialiased;line-height:1.5}' +
-    '.page{width:210mm;min-height:297mm;margin:0 auto;padding:0;position:relative;background:#fff;page-break-after:always;overflow:hidden}' +
-    '.page:last-child{page-break-after:auto}' +
-    '.hdr{padding:48px 64px 36px;display:flex;justify-content:space-between;align-items:flex-start}' +
-    '.hdr-logo{display:flex;align-items:center;gap:12px;margin-bottom:6px}' +
-    '.hdr-logo img{height:32px;filter:brightness(0)}' +
-    '.hdr-brand{font-size:12px;font-weight:600;color:#86868b;letter-spacing:1.5px}' +
-    '.hdr-right{text-align:right}' +
-    '.hdr-title{font-size:22px;font-weight:700;color:#1d1d1f;letter-spacing:-0.3px;margin-bottom:2px}' +
-    '.hdr-num{font-size:12px;font-weight:500;color:#8e8e93;font-family:SF Mono,Fira Code,Consolas,monospace}' +
-    '.sep{margin:0 64px;border:none;border-top:1px solid #d2d2d7}' +
-    '.body{padding:28px 64px 20px}' +
-    '.row{display:flex;justify-content:space-between;margin-bottom:16px}' +
-    '.row-block{flex:1}' +
-    '.lbl{font-size:10px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px}' +
-    '.val{font-size:13px;font-weight:600;color:#1d1d1f}' +
-    '.tbl-wrap{margin:0 0 24px;border:1px solid #d2d2d7;border-radius:10px;overflow:hidden}' +
-    'table{width:100%;border-collapse:collapse}' +
-    'thead th{background:#f5f5f7;padding:9px 14px;font-size:10px;font-weight:600;color:#86868b;text-align:left;border-bottom:1px solid #d2d2d7;letter-spacing:0.3px}' +
-    'thead th:nth-child(1){width:32px;text-align:center}' +
-    'thead th:nth-child(4),thead th:nth-child(5),thead th:nth-child(6){text-align:right}' +
-    'tbody td{padding:10px 14px;font-size:12px;font-weight:400;color:#1d1d1f;border-bottom:1px solid #f2f2f7}' +
-    'tbody tr:last-child td{border-bottom:none}' +
-    '.row-num{text-align:center;color:#8e8e93;font-weight:500}' +
-    '.row-name{font-weight:500}' +
-    '.row-sub{color:#86868b;font-size:11px}' +
-    '.row-att{text-align:right;font-weight:600;color:#059669}' +
-    '.row-abs{text-align:right;font-weight:600;color:#dc2626}' +
-    '.row-amt{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}' +
-    '.total-row{display:flex;justify-content:flex-end;align-items:baseline;margin-bottom:24px;gap:16px}' +
-    '.total-lbl{font-size:12px;font-weight:500;color:#86868b}' +
-    '.total-val{font-size:26px;font-weight:700;color:#1d1d1f;letter-spacing:-0.5px}' +
-    '.total-curr{font-size:13px;font-weight:500;color:#86868b;margin-left:4px}' +
-    '.note{background:#f5f5f7;border-radius:8px;padding:12px 18px;margin-bottom:24px}' +
-    '.note-text{font-size:11px;font-weight:500;color:#6e6e73}' +
-    '.ftr{border-top:1px solid #d2d2d7;padding:24px 64px 36px;display:flex;justify-content:space-between;align-items:flex-end}' +
-    '.ftr-sig{text-align:center}' +
-    '.ftr-line{width:120px;border-bottom:1px solid #d2d2d7;height:20px;margin-bottom:6px}' +
-    '.ftr-sig .lbl{font-size:9px;font-weight:500;color:#8e8e93}' +
-    '.ftr-meta{text-align:center}' +
-    '.ftr-seal{width:44px;height:44px;border:1.5px solid #d2d2d7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 6px;font-size:8px;font-weight:700;color:#c7c7cc;letter-spacing:1px}' +
-    '.ftr-disclaimer{font-size:8px;color:#aeaeb2;text-align:center;border-top:1px solid #f2f2f7;padding-top:12px;margin:0 64px}' +
-    '.page-num{position:absolute;bottom:14px;left:64px;font-size:9px;color:#c7c7cc}' +
-    '.print-btn{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 40px;border:none;border-radius:12px;background:#1d1d1f;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.12);transition:all .15s;z-index:10}' +
-    '.print-btn:hover{background:#424245}' +
-    '@media print{.no-print{display:none!important}body{background:#fff}.page{box-shadow:none}@page{size:A4;margin:0}}';
-
-    let html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Receipt ' + _receiptNum + '</title>' +
-    '<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">' +
-    '<style>' + pageStyles + '</style></head><body>';
-
-    pages.forEach(function(pageRows, pi) {
-      const isFirst = pi === 0;
-      const isLast = pi === pages.length - 1;
-      html += '<div class="page">';
-
-      if (isFirst) {
-        html += '<div class="hdr">' +
-          '<div class="hdr-left">' +
-            '<div class="hdr-logo"><img src="schoollogo/schoollogoblack.PNG" alt=""></div>' +
-            '<div class="hdr-brand">EDUCATION PLUS CENTER</div>' +
-          '</div>' +
-          '<div class="hdr-right">' +
-            '<div class="hdr-title">Payment Receipt</div>' +
-            '<div class="hdr-num">' + _receiptNum + '</div>' +
-          '</div>' +
-        '</div>' +
-        '<hr class="sep">' +
-        '<div class="body">' +
-          '<div class="row">' +
-            '<div class="row-block"><div class="lbl">Teacher</div><div class="val">' + (teacherName || '---') + '</div></div>' +
-            '<div class="row-block"><div class="lbl">Subject</div><div class="val">' + (subjectName || '---') + '</div></div>' +
-            '<div class="row-block"><div class="lbl">Date</div><div class="val">' + _fmtDate + '</div></div>' +
-          '</div>' +
-          '<div class="row">' +
-            '<div class="row-block"><div class="lbl">Students</div><div class="val">' + (totalStudents || 0) + '</div></div>' +
-            '<div class="row-block"><div class="lbl">Rate / Session</div><div class="val">' + Number(rate || 0).toLocaleString('ar-DZ') + ' DZD</div></div>' +
-            '<div class="row-block"><div class="lbl">Total Sessions</div><div class="val">' + (totalSess || 0) + '</div></div>' +
-          '</div>';
-      } else {
-        html += '<div class="hdr" style="padding-bottom:24px">' +
-          '<div class="hdr-left">' +
-            '<div class="hdr-logo"><img src="schoollogo/schoollogoblack.PNG" alt=""></div>' +
-            '<div class="hdr-brand">EDUCATION PLUS CENTER</div>' +
-          '</div>' +
-          '<div class="hdr-right">' +
-            '<div class="hdr-title" style="font-size:16px">Payment Receipt (continued)</div>' +
-            '<div class="hdr-num">' + _receiptNum + '</div>' +
-          '</div>' +
-        '</div>' +
-        '<hr class="sep">' +
-        '<div class="body" style="padding-top:20px">';
-      }
-
-      html += '<div class="tbl-wrap"><table>' +
-        '<thead><tr>' +
-          '<th>#</th><th>Student</th><th>Subject</th><th style="text-align:right">Attended</th><th style="text-align:right">Absent</th><th style="text-align:right">Amount (DZD)</th>' +
-        '</tr></thead>' +
-        '<tbody>' + pageRows.join('') + '</tbody>' +
-      '</table></div>';
-
-      if (isLast) {
-        const totalAtt = allRows.reduce(function(s, r) { const m = r.match(/row-att">(\d+)/); return s + (m ? parseInt(m[1]) || 0 : 0); }, 0);
-        const totalAbs = allRows.reduce(function(s, r) { const m = r.match(/row-abs">(\d+)/); return s + (m ? parseInt(m[1]) || 0 : 0); }, 0);
-        html += '<div class="total-row">' +
-          '<span class="total-lbl">Total Amount</span>' +
-          '<span class="total-val">' + Number(amount || 0).toLocaleString('ar-DZ') + '<span class="total-curr"> DZD</span></span>' +
-        '</div>' +
-        (note ? '<div class="note"><div class="note-text"><strong>Note:</strong> ' + note + '</div></div>' : '');
-      }
-
-      html += '</div>';
-
-      if (isLast) {
-        html += '<div class="ftr">' +
-          '<div class="ftr-sig"><div class="ftr-line"></div><div class="lbl">Teacher</div></div>' +
-          '<div class="ftr-meta"><div class="ftr-seal">E+</div><div class="lbl">Education Plus Center</div></div>' +
-          '<div class="ftr-sig"><div class="ftr-line"></div><div class="lbl">Admin: ' + (adminName || '---') + '</div></div>' +
-        '</div>' +
-        '<div class="ftr-disclaimer">Generated electronically by Education Plus Center Management System. ' + _fmtDate + '</div>';
-      }
-
-      html += '<div class="page-num">' + (pi + 1) + ' / ' + pages.length + '</div>';
-      html += '</div>';
-    });
-
-    html += '<button class="print-btn no-print" onclick="window.print()">Print</button>' +
-    '<script>window.onafterprint=function(){setTimeout(function(){window.close();},200)};' +
-    'if(window.matchMedia){try{window.matchMedia("print").addEventListener("change",function(m){if(!m.matches)setTimeout(function(){window.close()},200)})}catch(e){}}</' + 'script>' +
-    '</body></html>';
-
-    win.document.write(html);
+    const styles = _receiptStyles() +
+      '.print-btn{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:14px 46px;border:none;border-radius:12px;background:#1d1d1f;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;z-index:10}' +
+      '@media print{.no-print{display:none!important}}';
+    const doc = '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>وصل ' + ((payload && payload.receiptId) || '').toUpperCase() + '</title><style>' + styles + '</style></head><body style="background:#e8e8ed">' +
+      _receiptBody(payload || {}) +
+      '<button class="print-btn no-print" onclick="window.print()">🖨️ طباعة</button>' +
+      '<script>window.onafterprint=function(){setTimeout(function(){window.close();},200)};' +
+      'if(window.matchMedia){try{window.matchMedia("print").addEventListener("change",function(m){if(!m.matches)setTimeout(function(){window.close()},200)})}catch(e){}}</' + 'script>' +
+      '</body></html>';
+    win.document.open();
+    win.document.write(doc);
     win.document.close();
     return true;
   }
@@ -421,6 +340,6 @@ window.TeacherFinance = (function () {
     today, countAttendance, loadConfirmedRegistrations,
     computeDuesForTeacher, addPayment, recomputeBalance,
     getBalance, listBalances, getLedger, getReceipts, saveTeacherRate,
-    deleteTransaction, clearTeacherPayments, printReceipt
+    deleteTransaction, clearTeacherPayments, printReceipt, buildReceiptHtml
   };
 })();

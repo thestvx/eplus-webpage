@@ -787,7 +787,7 @@ BEGIN
      session_count, lesson_rate, amount, transaction_type, status, date, notes, admin_name)
   VALUES
     (v_tx, p_teacher_id, COALESCE(p_teacher_name, ''), '', '', '', '',
-     0, 0, v_amt, 'payment', 'paid', v_date, COALESCE(p_note, 'دفعة مالية'), COALESCE(p_admin_name, ''));
+     0, GREATEST(0, COALESCE(p_rate, 0)), v_amt, 'payment', 'paid', v_date, COALESCE(p_note, 'دفعة مالية'), COALESCE(p_admin_name, ''));
 
   INSERT INTO teacher_receipts
     (id, transaction_id, teacher_id, teacher_name, amount, date, admin_name, notes)
