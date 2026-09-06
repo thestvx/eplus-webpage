@@ -280,6 +280,7 @@
     [dir="rtl"] .lang-btn + .lang-btn { border-right:none; border-left:1px solid var(--border); }
 
     *{box-sizing:border-box;margin:0;padding:0}
+    button,input,select,textarea{font-family:'Tajawal',sans-serif}
     body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;width:100%}
     html{overflow-x:hidden}
 
@@ -4014,6 +4015,7 @@
               <input type="date" id="subx-logs-date" onchange="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
               <button class="tbl-action" onclick="subxLogsFilter()" style="font-size:12px;border-color:rgba(16,185,129,0.3);color:#059669">🔄 تحديث</button>
               <button class="tbl-action" onclick="subxExportLogsCSV()" style="font-size:12px;border-color:rgba(99,102,241,0.3);color:#6366f1">📥 CSV</button>
+              <button class="tbl-action" onclick="subxShowDeletedLogs()" style="font-size:12px;border-color:rgba(245,158,11,0.35);color:#d97706">🗂️ المحذوفة</button>
               <button class="tbl-action" onclick="subxShowClearPinModal()" style="font-size:12px;border-color:rgba(220,38,38,0.3);color:#dc2626">🗑️ مسح السجلات</button>
             </div>
             <div id="subx-logs-body" style="font-size:12px;color:var(--text-muted)">جارٍ تحميل سجلات الحضور…</div>
@@ -4036,6 +4038,26 @@
               <button id="pin-clear-confirm" onclick="subxConfirmClearLogs()" style="padding:10px 24px;border:none;border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff">🗑️ حذف</button>
               <button onclick="document.getElementById('pin-clear-modal').classList.remove('open')" style="padding:10px 24px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:var(--card);color:var(--text)">إلغاء</button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== DELETED ATTENDANCE LOGS MODAL ===== -->
+      <div class="teacher-modal-bg" id="subx-deleted-logs-modal">
+        <div class="teacher-modal" style="max-width:860px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.2)">🗂️</div>
+            <div class="teacher-modal-title">سجلات الحضور المحذوفة (النسخ الاحتياطي)</div>
+            <button class="att-modal-close" onclick="document.getElementById('subx-deleted-logs-modal').classList.remove('open')">✕</button>
+          </div>
+          <div class="teacher-modal-body" style="overflow:auto;max-height:72vh;padding:22px 26px">
+            <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+              <input type="text" id="subx-deleted-search" placeholder="🔍 بحث بالطالب..." oninput="subxDeletedFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;flex:1;min-width:160px;background:var(--card)">
+              <button class="tbl-action" onclick="subxShowDeletedLogs()" style="font-size:12px;border-color:rgba(16,185,129,0.3);color:#059669">🔄 تحديث</button>
+              <button class="tbl-action" onclick="subxRestoreAllDeletedLogs()" style="font-size:12px;border-color:rgba(59,130,246,0.3);color:#2563eb">↩️ استعادة الكل</button>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;padding:10px 14px;background:rgba(245,158,11,0.06);border:1px dashed rgba(245,158,11,0.25);border-radius:10px;line-height:1.7">سجلات الحضور المحذوفة تُحفظ هنا مع <b>تاريخ ووقت الحذف</b> تلقائياً، وتُزال من القائمة الرئيسية. يمكنك استعادتها في أي وقت.</div>
+            <div id="subx-deleted-logs-body" style="font-size:12px;color:var(--text-muted)">جارٍ تحميل السجلات المحذوفة…</div>
           </div>
         </div>
       </div>
@@ -14458,17 +14480,23 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) 
 
 // ─── Shared CSV builder + download ───
 function _exportCSVRows(exportData, teacherLabel, suffix) {
-  const csvTotalSessions = 12;
+  const csvTotalSessions = 8;
   const sessionRange = Array.from({length: csvTotalSessions}, (_, i) => i + 1);
   const headers = ['التلميذ', 'الأستاذ', 'الفوج'];
   sessionRange.forEach(i => headers.push(`الحصة ${i}`));
+  headers.push('الحضور');
   const csvRows = [headers];
 
   exportData.forEach(s => {
     const row = [s.name, s.teacher, s.group];
+    let attendedCount = 0;
     for (let i = 0; i < csvTotalSessions; i++) {
-      row.push(i < s.sessions.length ? s.sessions[i] : '—');
+      const val = i < s.sessions.length ? s.sessions[i] : '';
+      const cell = (val === 'حاضر') ? 'حاضر' : 'غائب';
+      if (val === 'حاضر') attendedCount++;
+      row.push(cell);
     }
+    row.push(attendedCount + '/' + csvTotalSessions);
     csvRows.push(row);
   });
 
@@ -25176,8 +25204,16 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           if (subjectFilter && r.subjectName !== subjectFilter) { skipped++; return; }
           if (dateFilter && r.date !== dateFilter) { skipped++; return; }
         }
+        // Backup copy (deleted records moved to backup collection)
+        var nowMs = Date.now();
+        var bkDoc = Object.assign({}, r, {
+          _backupDeletedAt: new Date(nowMs).toISOString(),
+          _backupDeletedDate: new Date(nowMs).toLocaleString('ar-DZ'),
+          _backupReason: 'bulk_clear'
+        });
+        batch.set(fs.doc(fdb, 'support_attendance_backup', 'b_' + d.id + '_' + nowMs + '_' + (count % 900)), bkDoc);
         batch.delete(fs.doc(fdb, 'support_attendance', d.id));
-        ops++; count++;
+        ops += 2; count++;
         if (ops >= 450) { batches.push(batch); batch = fs.writeBatch(fdb); ops = 0; }
       });
       if (ops > 0) batches.push(batch);
@@ -25237,17 +25273,33 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   };
 
   window.subxDeleteLog = async function (attId, studentName, attDate) {
-    const ok = await cmConfirm('حذف سجل الحضور', 'هل أنت متأكد من حذف حضور <b>' + (studentName || '—') + '</b> يوم <b>' + (attDate || '—') + '</b>؟<br><span style="color:#dc2626;font-size:11px;font-weight:800">⚠️ سيُخصم هذا الحضور من سجل الطالب</span>', '🗑️', { confirmText: 'نعم، احذف' });
+    const ok = await cmConfirm('حذف سجل الحضور', 'هل أنت متأكد من حذف حضور <b>' + (studentName || '—') + '</b> يوم <b>' + (attDate || '—') + '</b>؟<br><span style="color:#dc2626;font-size:11px;font-weight:800">⚠️ سيُخصم هذا الحضور من سجل الطالب وسيُحفظ في النسخ الاحتياطي</span>', '🗑️', { confirmText: 'نعم، احذف' });
     if (!ok) return;
     try {
       const { _db: fdb, _firestore: fs } = window;
+      // Save backup copy with deletion time before removing
+      const srcRef = fs.doc(fdb, 'support_attendance', attId);
+      try {
+        const srcSnap = await fs.getDoc(srcRef);
+        if (srcSnap.exists()) {
+          const now = new Date();
+          const data = srcSnap.data();
+          const backupDoc = Object.assign({}, data, {
+            _backupDeletedAt: now.toISOString(),
+            _backupDeletedDate: now.toLocaleString('ar-DZ'),
+            _backupReason: 'deleted'
+          });
+          const bid = 'b_' + attId + '_' + now.getTime();
+          await fs.setDoc(fs.doc(fdb, 'support_attendance_backup', bid), backupDoc);
+        }
+      } catch (bkErr) { console.warn('[SUBSCRIPTIONS] backup failed', bkErr); }
       // Try hard delete first, fall back to soft-delete
       try {
-        await fs.deleteDoc(fs.doc(fdb, 'support_attendance', attId));
+        await fs.deleteDoc(srcRef);
       } catch (delErr) {
-        await fs.updateDoc(fs.doc(fdb, 'support_attendance', attId), { cancelled: true, cancelledAt: new Date().toISOString() });
+        await fs.updateDoc(srcRef, { cancelled: true, cancelledAt: new Date().toISOString() });
       }
-      showToast('✔️ تم حذف سجل الحضور بنجاح.');
+      showToast('🗑️ تم حذف السجل وحفظ نسخة احتياطية.');
       // Refresh the logs modal data
       if (typeof subxShowAllLogs === 'function') {
         await subxShowAllLogs();
@@ -25255,6 +25307,150 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     } catch (e) {
       console.error('[SUBSCRIPTIONS] delete log failed', e);
       showToast('❌ ' + ((e && e.message) || 'تعذر حذف السجل'), true);
+    }
+  };
+
+  // ── عرض سجلات الحضور المحذوفة (النسخ الاحتياطي) ──
+  window.subxShowDeletedLogs = async function () {
+    const modal = document.getElementById('subx-deleted-logs-modal');
+    const body = document.getElementById('subx-deleted-logs-body');
+    modal.classList.add('open');
+    body.innerHTML = '<div style="text-align:center;padding:18px;color:var(--text-muted)">جارٍ تحميل السجلات المحذوفة…</div>';
+    try {
+      const { _db: fdb, _firestore: fs } = window;
+      if (!fdb || !fs) { body.innerHTML = '<div style="text-align:center;padding:12px;color:#dc2626">Firebase غير متاح</div>'; return; }
+      const snap = await fs.getDocs(fs.collection(fdb, 'support_attendance_backup'));
+      const rows = [];
+      snap.forEach(d => {
+        const r = d.data();
+        rows.push({
+          id: d.id,
+          studentId: r.studentId || '',
+          studentName: r.studentName || '',
+          date: r.date || '',
+          time: r.checkInTime || r.createdAt || '',
+          teacherName: r.teacherName || '',
+          subjectName: r.subjectName || '',
+          type: r.type || '',
+          deletedAt: r._backupDeletedAt || '',
+          deletedDate: r._backupDeletedDate || ''
+        });
+      });
+      rows.sort((a, b) => (b.deletedAt || '').localeCompare(a.deletedAt || ''));
+      window._subxDeletedData = rows;
+      var searchInput = document.getElementById('subx-deleted-search');
+      if (searchInput) searchInput.value = '';
+      subxDeletedFilter();
+    } catch (e) {
+      console.error('[SUBSCRIPTIONS] load deleted logs failed', e);
+      body.innerHTML = '<div style="text-align:center;padding:12px;color:#dc2626">تعذر تحميل السجلات المحذوفة</div>';
+    }
+  };
+
+  window.subxDeletedFilter = function () {
+    const q = (document.getElementById('subx-deleted-search').value || '').trim().toLowerCase();
+    const rows = (window._subxDeletedData || []).filter(r => {
+      if (q && !(r.studentName + ' ' + r.studentId + ' ' + r.subjectName + ' ' + r.teacherName).toLowerCase().includes(q)) return false;
+      return true;
+    });
+    const c = document.getElementById('subx-deleted-logs-body');
+    if (!rows.length) {
+      c.innerHTML = '<div style="text-align:center;padding:14px;color:var(--text-muted);border:1px dashed var(--border);border-radius:12px">لا توجد سجلات محذوفة</div>';
+      return;
+    }
+    const typeLabel = {
+      'grace_session': '<span style="color:#d97706">⚠️ حصّة مجانية</span>',
+      'trial_session': '<span style="color:#f59e0b">🟠 حصة تجريبية</span>'
+    };
+    let h = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px">';
+    h += '<thead><tr style="background:rgba(245,158,11,0.06)">';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">تاريخ الحذف</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">التاريخ</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الطالب</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">رقم التسجيل</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">المادة</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الأستاذ</th>';
+    h += '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">النوع</th>';
+    h += '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">إجراءات</th>';
+    h += '</tr></thead><tbody>';
+    rows.forEach(r => {
+      h += '<tr style="border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'rgba(245,158,11,0.04)\'" onmouseout="this.style.background=\'\'">';
+      h += '<td style="padding:7px 10px;white-space:nowrap;color:#d97706;font-weight:700">' + escX(r.deletedDate || '—') + '</td>';
+      h += '<td style="padding:7px 10px;white-space:nowrap">' + escX(r.date) + '</td>';
+      h += '<td style="padding:7px 10px;font-weight:700">' + escX(r.studentName || '—') + '</td>';
+      h += '<td style="padding:7px 10px;font-family:monospace" dir="ltr">' + escX(r.studentId) + '</td>';
+      h += '<td style="padding:7px 10px">' + escX(r.subjectName || '—') + '</td>';
+      h += '<td style="padding:7px 10px">' + escX(r.teacherName || '—') + '</td>';
+      h += '<td style="padding:7px 10px;text-align:center">' + (typeLabel[r.type] || '<span style="color:#059669">✅ حضور</span>') + '</td>';
+      h += '<td style="padding:7px 10px;text-align:center"><button onclick="subxRestoreDeletedLog(\'' + r.id + '\')" style="background:rgba(59,130,246,0.1);color:#2563eb;border:1px solid rgba(59,130,246,0.25);border-radius:8px;padding:4px 12px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.background=\'rgba(59,130,246,0.2)\'" onmouseout="this.style.background=\'rgba(59,130,246,0.1)\'">↩️ استعادة</button></td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table></div>';
+    h += '<div style="text-align:center;margin-top:10px;font-size:11px;color:var(--text-muted)">إجمالي المحذوفة: ' + rows.length + '</div>';
+    c.innerHTML = h;
+  };
+
+  window.subxRestoreDeletedLog = async function (backupId) {
+    const { _db: fdb, _firestore: fs } = window;
+    if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); return; }
+    try {
+      const bkSnap = await fs.getDoc(fs.doc(fdb, 'support_attendance_backup', backupId));
+      if (!bkSnap.exists()) { showToast('⚠️ السجل غير موجود في النسخ الاحتياطي', true); return; }
+      const data = bkSnap.data();
+      const isLive = await fs.getDoc(fs.doc(fdb, 'support_attendance', backupId.replace(/^b_/, '')));
+      if (isLive.exists()) {
+        const ok = await cmConfirm('⚠️ سجل موجود مسبقاً', 'هذا السجل موجود أصلاً في سجلات الحضور.<br>هل تريد حذف النسخة الاحتياطية فقط؟', '🗂️', { confirmText: 'نعم' });
+        if (!ok) return;
+        await fs.deleteDoc(fs.doc(fdb, 'support_attendance_backup', backupId));
+        showToast('✅ تم حذف النسخة الاحتياطية.');
+      } else {
+        const clean = {};
+        Object.keys(data).forEach(k => {
+          if (!k.startsWith('_backup')) clean[k] = data[k];
+        });
+        await fs.setDoc(fs.doc(fdb, 'support_attendance', backupId.replace(/^b_/, '')), clean);
+        await fs.deleteDoc(fs.doc(fdb, 'support_attendance_backup', backupId));
+        showToast('↩️ تمت استعادة السجل إلى سجلات الحضور.');
+      }
+      if (typeof subxShowAllLogs === 'function') await subxShowAllLogs();
+      await subxShowDeletedLogs();
+    } catch (e) {
+      console.error('[SUBSCRIPTIONS] restore deleted log failed', e);
+      showToast('❌ تعذر استعادة السجل', true);
+    }
+  };
+
+  window.subxRestoreAllDeletedLogs = async function () {
+    const rows = window._subxDeletedData || [];
+    if (!rows.length) { showToast('⚠️ لا توجد سجلات محذوفة', true); return; }
+    const ok = await cmConfirm('↩️ استعادة الكل', 'هل تريد استعادة جميع السجلات المحذوفة (' + rows.length + ') إلى سجلات الحضور؟', '↩️', { confirmText: 'نعم، استعد الكل' });
+    if (!ok) return;
+    const { _db: fdb, _firestore: fs } = window;
+    if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); return; }
+    try {
+      let restored = 0;
+      let skipped = 0;
+      for (const r of rows) {
+        const origId = r.id.replace(/^b_/, '');
+        const liveSnap = await fs.getDoc(fs.doc(fdb, 'support_attendance', origId));
+        if (liveSnap.exists()) { skipped++; continue; }
+        const bkSnap = await fs.getDoc(fs.doc(fdb, 'support_attendance_backup', r.id));
+        if (!bkSnap.exists()) { skipped++; continue; }
+        const data = bkSnap.data();
+        const clean = {};
+        Object.keys(data).forEach(k => {
+          if (!k.startsWith('_backup')) clean[k] = data[k];
+        });
+        await fs.setDoc(fs.doc(fdb, 'support_attendance', origId), clean);
+        await fs.deleteDoc(fs.doc(fdb, 'support_attendance_backup', r.id));
+        restored++;
+      }
+      showToast('↩️ تمت استعادة ' + restored + ' سجل' + (skipped ? ' (تخطي ' + skipped + ' موجود مسبقاً)' : ''));
+      if (typeof subxShowAllLogs === 'function') await subxShowAllLogs();
+      await subxShowDeletedLogs();
+    } catch (e) {
+      console.error('[SUBSCRIPTIONS] restore all failed', e);
+      showToast('❌ تعذرت الاستعادة', true);
     }
   };
 

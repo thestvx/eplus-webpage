@@ -36,6 +36,7 @@
     }
     html,body{height:100%;overflow:hidden}
     body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+    button,input,select,textarea{font-family:'Tajawal',sans-serif}
 
     @keyframes fadeSlideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -1157,17 +1158,22 @@
                   <th>#</th>
                   <th>التلميذ</th>
                   <th>المادة</th>
+                  <th style="text-align:center">سعر الحصة</th>
                   <th style="text-align:center">الحضور</th>
                   <th style="text-align:center">الغيابات</th>
                   <th style="text-align:center">المستحق</th>
                 </tr></thead>
                 <tbody>${details.map(function(d,i){
-                  var subLines=d.matchedSubjects.join(', ');
-                  return '<tr><td style="font-weight:800;color:var(--text-muted)">'+(i+1)+'</td><td style="font-weight:700">'+d.name+'</td><td style="font-size:11px;color:var(--text-muted)">'+subLines+'</td><td style="text-align:center;font-weight:800;color:var(--green)">'+d.sessions+'</td><td style="text-align:center;font-weight:800;color:#dc2626">'+d.absent+'</td><td style="text-align:center;font-weight:900;color:var(--green)">'+fmtNum(d.amount)+' دج</td></tr>';
+                  var tSubs=t.subjects||t.spec||'';
+                  var tArr=Array.isArray(tSubs)?tSubs.map(function(s){return (s&&(s.subject||s.name||s))||'';}).filter(Boolean):String(tSubs).split(',').map(function(x){return x.trim();}).filter(Boolean);
+                  var matched=(d.matchedSubjects||[]).filter(function(m){return !tArr.length||tArr.indexOf(m)>-1;});
+                  var subLines=(matched.length?matched:tArr).join(', ')||'—';
+                  return '<tr><td style="font-weight:800;color:var(--text-muted)">'+(i+1)+'</td><td style="font-weight:700">'+d.name+'</td><td style="font-size:11px;color:var(--text-muted)">'+subLines+'</td><td style="text-align:center;font-weight:800;color:var(--text)">'+fmtNum(rate)+' دج</td><td style="text-align:center;font-weight:800;color:var(--green)">'+d.sessions+'</td><td style="text-align:center;font-weight:800;color:#dc2626">'+d.absent+'</td><td style="text-align:center;font-weight:900;color:var(--green)">'+fmtNum(d.amount)+' دج</td></tr>';
                 }).join('')}</tbody>
                 <tfoot><tr style="background:rgba(99,102,241,0.04)">
                   <td></td>
                   <td style="font-weight:900">الإجمالي</td>
+                  <td></td>
                   <td></td>
                   <td style="text-align:center;font-weight:900;color:var(--green)">${totalSessions}</td>
                   <td style="text-align:center;font-weight:900;color:#dc2626">${totalAbsent}</td>
