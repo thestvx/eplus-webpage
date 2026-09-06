@@ -23888,9 +23888,32 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     const idx = $x('subx-subject').value;
     selectedSubject = (idx !== '' && _subjectOptions[Number(idx)]) ? _subjectOptions[Number(idx)] : null;
     $x('subx-subject-note').innerHTML = selectedSubject
-      ? selectedSubject.icon + ' ' + escX(selectedSubject.subjectName) + ' — الأستاذ: <b>' + escX(selectedSubject.teacherName || 'غير معروف') + '</b>' + (selectedSubject.teacherId ? '' : ' <span style="color:#d97706">(تعذر ربط ID الأستاذ — تأكد من بيانات الأستاذ)</span>')
+      ? selectedSubject.icon + ' ' + escX(selectedSubject.subjectName) + ' — الأستاذ: <b>' + escX(selectedSubject.teacherName || 'غير معروف') + '</b>' + (selectedSubject.teacherId ? '' : ' <span style="color:#d97706">(تعذر ربط ID الأستاذ — ' + '<button type="button" onclick="subxRetryTeacherLink()" style="background:rgba(217,119,6,0.1);border:1px solid rgba(217,119,6,0.35);color:#d97706;padding:2px 10px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;margin:0 4px">🔄 إعادة المحاولة</button>' + ' تأكد من بيانات الأستاذ)</span>')
       : '';
     subxRenderPreview();
+  };
+
+  // إعادة محاولة ربط ID الأستاذ للمادة المحددة (بعد إصلاح بيانات الأستاذ/إنشائه)
+  window.subxRetryTeacherLink = async function () {
+    const idx = $x('subx-subject').value;
+    const o = (idx !== '' && _subjectOptions[Number(idx)]) ? _subjectOptions[Number(idx)] : null;
+    if (!o) return;
+    const note = $x('subx-subject-note');
+    note.innerHTML = '⏳ جاري إعادة ربط الأستاذ...';
+    try {
+      let tid = '';
+      if (typeof SubjectService.resolveTeacherId === 'function') {
+        tid = await SubjectService.resolveTeacherId(o.subjectName, o.teacherName, selectedStudent ? selectedStudent.level : '');
+      }
+      if (!tid && typeof SubjectService.getTeachersForSubject === 'function') {
+        const ts = await SubjectService.getTeachersForSubject(o.subjectName, selectedStudent ? selectedStudent.level : '');
+        const t = ts.find(function (x) { return _norm(x.name) === _norm(o.teacherName); }) || (ts.length ? ts[0] : null);
+        if (t) tid = t.teacherId || t.id || '';
+      }
+      o.teacherId = tid;
+    } catch (e) { console.warn('[SUBSCRIPTIONS] retry link failed', e); }
+    subxOnSubjectChange();
+    if (o.teacherId) srShowToast('✅ تم ربط الأستاذ: ' + (o.teacherName || ''), 'success');
   };
 
   // ── Combobox للطالب (بحث بالاسم / اللقب / الاسم الكامل / Student ID / باركود) ──

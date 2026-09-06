@@ -296,12 +296,72 @@ const SubjectService = (function () {
     }) || null;
   }
 
+  // ── Robust Arabic normalization for teacher/subject matching ──
+  // Handles: "الأستاذ/أستاذ" prefix, hamza variants (أ إ آ), ة/ه, ى/ي,
+  // tatweel/diacritics, token-order swap (أيمن دخان ⇄ دخان أيمن).
+  function _normTeacher(name) {
+    return String(name || '')
+      .replace(/^(ال)?[أا]ستاذ\s+/g, '')
+      .replace(/[ًٌٍَُِّْـ]/g, '')
+      .replace(/[إأآٱ]/g, 'ا')
+      .replace(/ى/g, 'ي')
+      .replace(/ة/g, 'ه')
+      .replace(/[^\u0600-\u06FF\w]/g, ' ')
+      .replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+  function _teacherTokenKey(name) {
+    return _normTeacher(name).split(' ').filter(Boolean).sort().join(' ');
+  }
+  function _normSubject(name) {
+    return String(name || '')
+      .replace(/[ًٌٍَُِّْـ]/g, '')
+      .replace(/[إأآٱ]/g, 'ا')
+      .replace(/ى/g, 'ي')
+      .replace(/ة/g, 'ه')
+      .replace(/\s+/g, '').toLowerCase();
+  }
+  // الاجتماعيات ⇄ التاريخ ( دورة ) ⇄ تاريخ وجغرافيا : نفس المادة في منظومتنا
+  const _SOCIAL_KEYS = new Set(['الاجتماعيات', 'التاريخدورة', 'تاريخوجغرافيا', 'التاريخ']);
+  function _sameSubject(a, b) {
+    if (!a && !b) return false;
+    const A = _normSubject(a), B = _normSubject(b);
+    if (A === B) return A !== '';
+    return _SOCIAL_KEYS.has(A) && _SOCIAL_KEYS.has(B);
+  }
+
+  // All non-deleted teachers (active + disabled + missing status). Resolving a
+  // teacherId must not depend on 'active' — a disabled account still teaches
+  // its already-registered students (subscriptions, attendance, finance).
+  let _allTeachersCache = null;
+  let _allTeachersCacheTime = 0;
+  async function _loadAllTeachers() {
+    const now = Date.now();
+    if (_allTeachersCache && (now - _allTeachersCacheTime) < CACHE_TTL) return _allTeachersCache;
+    const db = _resolveDb();
+    const fs = window._firestore;
+    let snap = null;
+    try {
+      if (fs && db && typeof fs.getDocs === 'function' && typeof fs.collection === 'function') {
+        snap = await fs.getDocs(fs.collection(db, 'support_teachers'));
+      } else if (db && typeof db.collection === 'function') {
+        snap = await db.collection('support_teachers').get();
+      }
+    } catch (e) {
+      console.error('SubjectService: Failed to load all teachers', e);
+    }
+    _allTeachersCache = snap
+      ? snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => (t.status || 'active') !== 'deleted')
+      : [];
+    _allTeachersCacheTime = now;
+    return _allTeachersCache;
+  }
+
   async function getTeachersForSubject(subjectName, level) {
-    const teachers = await _loadTeachers();
+    const teachers = await _loadAllTeachers();
     return teachers.filter(t => {
       const tLevels = Array.isArray(t.levels) ? t.levels : [];
-      const tSubjects = (Array.isArray(t.subjects) ? t.subjects : []).map(s => s.subject || s);
-      return tLevels.includes(level) && tSubjects.includes(subjectName);
+      const tSubjects = (Array.isArray(t.subjects) ? t.subjects : []).map(s => (s && (s.subject || s)) || s);
+      return (tLevels.length === 0 || tLevels.includes(level)) && tSubjects.some(sub => _sameSubject(sub, subjectName));
     });
   }
 
@@ -318,27 +378,45 @@ const SubjectService = (function () {
     });
   }
 
-  // Resolve a teacherId by name (robust: name-first like attendance kiosk,
-  // level used only as a soft preference). Falls back to partial name match.
+  // Resolve a teacherId by name (robust): name normalization (title/hamza/
+  // word order) first, then subject+level fallback for the unique teacher of
+  // that subject. Works across ALL non-deleted teachers.
   async function resolveTeacherId(subjectName, teacherName, level) {
-    const teachers = await _loadTeachers();
+    const teachers = await _loadAllTeachers();
     if (!teacherName) return '';
-    const norm = name => String(name || '').replace(/\s+/g, '').toLowerCase();
-    const target = norm(teacherName);
-    const exact = teachers.filter(t => norm(t.name) === target);
-    if (exact.length) {
-      if (level) {
-        const byLevel = exact.find(t => (Array.isArray(t.levels) ? t.levels : []).includes(level));
-        if (byLevel) return byLevel.teacherId || byLevel.id || '';
+    const pick = t => (t && (t.teacherId || t.id)) || '';
+    const target = _normTeacher(teacherName);
+    const targetKey = _teacherTokenKey(teacherName);
+    if (target) {
+      // 1) مطابقة الاسم كاملة (بعد التطبيع) — المستوى يُفضَّل إن وُجد فقط
+      const exact = teachers.filter(t => _normTeacher(t.name) === target);
+      if (exact.length) {
+        if (level) {
+          const byLevel = exact.find(t => (Array.isArray(t.levels) ? t.levels : []).includes(level));
+          if (byLevel) return pick(byLevel);
+        }
+        return pick(exact[0]);
       }
-      const t = exact[0];
-      return t.teacherId || t.id || '';
+      // 2) ترتيب الاسمين معكوس (أيمن دخان / دخان أيمن) — مطابقة بالكلمات
+      const byKey = teachers.find(t => _teacherTokenKey(t.name) === targetKey);
+      if (byKey) return pick(byKey);
     }
-    const partial = teachers.find(t => {
-      const n = norm(t.name);
-      return n && (n.includes(target) || target.includes(n));
-    });
-    if (partial) return partial.teacherId || partial.id || '';
+    // 3) مادة + مستوى: الأستاذ الوحيد الذي يدرّس هذه المادة لهذا المستوى
+    if (subjectName) {
+      const hits = teachers.filter(t => {
+        const tLevels = Array.isArray(t.levels) ? t.levels : [];
+        const tSubjects = (Array.isArray(t.subjects) ? t.subjects : []).map(s => (s && (s.subject || s)) || s);
+        return (tLevels.length === 0 || tLevels.includes(level)) && tSubjects.some(sub => _sameSubject(sub, subjectName));
+      });
+      if (hits.length === 1) return pick(hits[0]);
+      if (target && hits.length > 1) {
+        const nameHits = hits.filter(t => {
+          const n = _normTeacher(t.name);
+          return n && (n.includes(target) || target.includes(n));
+        });
+        if (nameHits.length === 1) return pick(nameHits[0]);
+      }
+    }
     return '';
   }
 
@@ -391,6 +469,8 @@ const SubjectService = (function () {
   function invalidateCache() {
     _teachersCache = null;
     _teachersCacheTime = 0;
+    _allTeachersCache = null;
+    _allTeachersCacheTime = 0;
   }
 
   // ── Expose ────────────────────────────────────────────
