@@ -4434,7 +4434,7 @@
         <div style="flex:1"></div>
         <button class="btn-primary" onclick="srtFinanceComputeDues()" style="padding:10px 16px;font-weight:800;font-size:12px;background:linear-gradient(135deg,#7C3AED,#6d28d9)">🔄 حساب المستحقات من الحضور</button>
         <button class="btn-primary" onclick="srtFinanceAddPayment()" style="padding:10px 16px;font-weight:800;font-size:12px;background:linear-gradient(135deg,#059669,#047857)">💵 تسجيل دفعة + إيصال</button>
-        <button class="btn-primary" onclick="srtFinanceClearOldPayments()" style="padding:10px 16px;font-weight:800;font-size:12px;background:linear-gradient(135deg,#dc2626,#b91c1c)">🗑️ مسح سجل الدفعات</button>
+        <button class="btn-primary" onclick="srtFinanceClearOldPayments()" style="padding:10px 16px;font-weight:800;font-size:12px;background:linear-gradient(135deg,#dc2626,#b91c1c)">🗑️ مسح دفتر الحسابات</button>
       </div>
 
       <!-- دفتر المعاملات -->
@@ -27164,7 +27164,7 @@ async function srtFinanceClearOldPayments() {
   const t = _srtFinanceTeacher;
   if (!t) return;
   const id = t.teacherId || t.id;
-  if (!(await cmConfirm('مسح سجل الدفعات', 'هل أنت متأكد من مسح جميع سجلات الدفعات المالية لهذا الأستاذ؟\n\nسيتم حذف جميع الدفعات (المبالغ المدفوعة) مع إيصالاتها، وسيُعاد حساب رصيد الأستاذ والخزينة. لا تتأثر المستحقات (الحصص) بأي حال.', '🗑️', { danger: true }))) return;
+  if (!(await cmConfirm('مسح دفتر الحسابات', 'هل أنت متأكد من مسح جميع سجلات الحسابات المالية لهذا الأستاذ؟\n\nسيتم حذف كل الدفعات والمستحقات مع إيصالاتها، وسيُعاد حساب رصيد الأستاذ والخزينة.', '🗑️', { danger: true }))) return;
   let res = null;
   let mirrorCleared = 0, mirrorAmount = 0;
   try {
@@ -27209,15 +27209,17 @@ async function srtFinanceClearOldPayments() {
 
   await srtFinanceRefresh();
   const n = (res && res.deleted) || 0;
+  const dd = (res && res.dues_removed) || 0;
   const rc = (res && res.receipts_removed) || 0;
-  if (n > 0 || rc > 0 || mirrorCleared > 0) {
+  if (n > 0 || dd > 0 || rc > 0 || mirrorCleared > 0) {
     let msg = '✅ تم مسح ' + n + ' دفعة';
+    if (dd > 0) msg += ' و' + dd + ' مستحق';
     if (rc > 0) msg += ' و' + rc + ' إيصال';
     if (mirrorCleared > 0) msg += ' و' + mirrorCleared + ' سجل من دفتر الأستاذ';
     if (mirrorAmount > 0) msg += ' وأُعيد ' + mirrorAmount.toLocaleString('ar-DZ') + ' دج للخزينة';
     srtShowToast(msg, 'success');
   } else {
-    srtShowToast('لا توجد دفعات مالية لحذفها لهذا الأستاذ', 'info');
+    srtShowToast('لا توجد سجلات مالية لحذفها لهذا الأستاذ', 'info');
   }
 }
 

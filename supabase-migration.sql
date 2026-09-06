@@ -878,6 +878,7 @@ RETURNS JSONB AS $$
 DECLARE
   v_amount INT := 0;
   v_count INT := 0;
+  v_dues INT := 0;
   v_receipts INT := 0;
 BEGIN
   IF NOT is_admin(p_admin_uid) THEN RAISE EXCEPTION 'unauthorized'; END IF;
@@ -889,20 +890,21 @@ BEGIN
     FROM teacher_transactions
    WHERE teacher_id = p_teacher_id AND transaction_type = 'payment';
 
-  -- 2) عدد إيصالات الأستاذ (قد تكون حتى من دون معاملة مقابلة — إيصالات قديمة)
+  -- 2) عدد سجلات المستحقات وإيصالات الأستاذ (قد تكون حتى من دون معاملة مقابلة — إيصالات قديمة)
+  SELECT COUNT(*) INTO v_dues
+    FROM teacher_transactions
+   WHERE teacher_id = p_teacher_id AND transaction_type = 'dues';
+
   SELECT COUNT(*) INTO v_receipts
     FROM teacher_receipts
    WHERE teacher_id = p_teacher_id;
 
-  IF v_count = 0 AND v_receipts = 0 THEN
-    RETURN jsonb_build_object('deleted', 0, 'receipts_removed', 0, 'amount_reversed', 0);
+  IF v_count = 0 AND v_dues = 0 AND v_receipts = 0 THEN
+    RETURN jsonb_build_object('deleted', 0, 'dues_removed', 0, 'receipts_removed', 0, 'amount_reversed', 0);
   END IF;
 
-  -- 3) حذف كل الدفعات من الدفتر (إن وُجدت)
-  IF v_count > 0 THEN
-    DELETE FROM teacher_transactions
-     WHERE teacher_id = p_teacher_id AND transaction_type = 'payment';
-  END IF;
+  -- 3) حذف كل معاملات الأستاذ من الدفتر (دفعات ومستحقات على حد سواء)
+  DELETE FROM teacher_transactions WHERE teacher_id = p_teacher_id;
 
   -- 4) حذف كل إيصالات الأستاذ (المرتبطة بالدفعات واليتيمة على حد سواء)
   DELETE FROM teacher_receipts WHERE teacher_id = p_teacher_id;
@@ -924,6 +926,7 @@ BEGIN
 
   RETURN jsonb_build_object(
     'deleted', v_count,
+    'dues_removed', v_dues,
     'receipts_removed', v_receipts,
     'amount_reversed', v_amount
   );
