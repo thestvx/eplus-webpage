@@ -4425,22 +4425,25 @@
         </div>
       </div>
 
-      <!-- سعر الحصة + الأزرار -->
-      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:14px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;margin-bottom:16px">
-        <div class="form-group" style="margin-bottom:0">
-          <label class="form-label" style="font-size:11px">سعر الحصة (دج)</label>
-          <input class="inp" type="number" id="srt-finance-rate" min="0" step="50" style="width:140px;padding:9px 12px" placeholder="0">
+      <!-- شريط أدوات رئيسي -->
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <div style="display:flex;gap:8px;align-items:center;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px">
+          <span style="font-size:11px;font-weight:800;color:var(--text-muted)">سعر الحصة</span>
+          <input class="inp" type="number" id="srt-finance-rate" min="0" step="50" style="width:96px;padding:8px 10px;text-align:center" placeholder="0">
+          <button class="btn-primary" onclick="srtFinanceSaveRate()" style="padding:8px 14px;font-weight:800;font-size:12px">💾 حفظ</button>
         </div>
-        <button class="btn-primary" onclick="srtFinanceSaveRate()" style="padding:10px 16px;font-weight:800;font-size:12px">💾 حفظ السعر</button>
         <div style="flex:1"></div>
-        <button class="btn-primary" onclick="srtFinanceComputeDues()" style="padding:10px 16px;font-weight:800;font-size:12px;background:linear-gradient(135deg,#7C3AED,#6d28d9)">🔄 حساب المستحقات من الحضور</button>
-        <button class="btn-primary" onclick="srtFinanceAddPayment()" style="padding:10px 16px;font-weight:800;font-size:12px;background:linear-gradient(135deg,#059669,#047857)">💵 تسجيل دفعة + إيصال</button>
-        <button class="btn-primary" onclick="srtFinanceClearOldPayments()" style="padding:10px 16px;font-weight:800;font-size:12px;background:linear-gradient(135deg,#dc2626,#b91c1c)">🗑️ مسح دفتر الحسابات</button>
+        <button class="btn-primary" onclick="srtFinanceComputeDues()" style="padding:10px 18px;font-weight:800;font-size:12px;background:linear-gradient(135deg,#7C3AED,#6d28d9)">🔄 حساب المستحقات</button>
+        <button class="btn-primary" onclick="srtFinanceAddPayment()" style="padding:10px 18px;font-weight:800;font-size:12px;background:linear-gradient(135deg,#059669,#047857)">💵 تسجيل دفعة + إيصال</button>
+        <button class="btn-danger" onclick="srtFinanceClearOldPayments()" title="مسح دفتر الحسابات بالكامل" style="padding:10px 14px;font-weight:800;font-size:12px;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px">🗑️ مسح الدفتر</button>
       </div>
 
       <!-- دفتر المعاملات -->
-      <div style="font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:8px">📒 دفتر مدفوعات الأستاذ</div>
-      <div id="srt-finance-ledger" style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;padding:4px 2px"></div>
+      <div style="font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+        <span>📒 دفتر مدفوعات الأستاذ</span>
+        <button onclick="srtFinancePaymentDetails()" style="padding:6px 12px;border:1.5px solid rgba(99,102,241,0.25);background:rgba(99,102,241,0.06);color:var(--primary);cursor:pointer;font-size:11.5px;font-weight:800;border-radius:9px">📋 تفاصيل الحساب</button>
+      </div>
+      <div id="srt-finance-ledger" style="display:flex;flex-direction:column;gap:6px;max-height:360px;overflow-y:auto;padding:4px 2px"></div>
 
     </div>
   </div>
@@ -26970,7 +26973,7 @@ async function srtFinanceRefresh() {
     const payments = (ledger || []).filter(x => x.transaction_type === 'payment');
     const fmtD = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('ar-DZ', { day:'2-digit', month:'2-digit', year:'numeric' }) : '—';
     const totalPaid = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
-    const duesCount = ledger.filter(x => x.transaction_type === 'dues').length;
+    const duesCount = (ledger || []).filter(x => x.transaction_type === 'dues').length;
 
     const pendingBanner = pendingVal > 0
       ? `<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:16px 18px;margin-bottom:14px;background:linear-gradient(135deg,rgba(245,158,11,0.1),rgba(217,119,6,0.04));border:1px solid rgba(245,158,11,0.28);border-radius:14px">
@@ -26989,7 +26992,6 @@ async function srtFinanceRefresh() {
       : `<div style="display:flex;gap:10px;align-items:center;padding:12px 16px;margin-bottom:14px;background:linear-gradient(135deg,rgba(5,150,105,0.08),rgba(16,185,129,0.03));border:1px solid rgba(5,150,105,0.18);border-radius:12px">
           <span style="font-size:16px">✅</span>
           <span style="flex:1;font-size:12.5px;font-weight:800;color:var(--text)">لا توجد مستحقات معلّقة — جميع المستحقات مسددة</span>
-          ${duesCount ? `<button onclick="srtFinancePaymentDetails()" style="padding:8px 14px;border:1.5px solid rgba(5,150,105,0.3);background:transparent;color:#059669;cursor:pointer;font-size:12px;font-weight:800;border-radius:9px" >📋 عرض التفاصيل</button>` : ''}
         </div>`;
 
     const listHtml = (payments.length ? payments.map(tx => {
@@ -27006,16 +27008,11 @@ async function srtFinanceRefresh() {
         <span style="font-weight:900;color:#059669;direction:ltr;display:inline-block;white-space:nowrap">−${(tx.amount||0).toLocaleString('ar-DZ')} دج</span>
         <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
           <button onclick="srtShowReceiptPreview('${tx.id.replace(/'/g, '')}')" title="عرض الوصل قبل الطباعة" style="padding:6px 10px;border-radius:8px;border:1.5px solid rgba(99,102,241,0.25);background:rgba(99,102,241,0.06);color:var(--primary);cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap">👁️ الوصل</button>
-          <button onclick="srtFinancePaymentDetails()" title="عرض كل تفاصيل الحسابات" style="padding:6px 10px;border-radius:8px;border:1.5px solid rgba(5,150,105,0.3);background:rgba(5,150,105,0.06);color:#059669;cursor:pointer;font-size:12px;font-weight:800;white-space:nowrap">📋 تفاصيل المدفوعات</button>
           <button onclick="srtFinanceDeleteTx('${tx.id.replace(/'/g, '')}')" title="حذف الدفعة" style="padding:6px 10px;border-radius:8px;border:1.5px solid rgba(220,38,38,0.2);background:rgba(220,38,38,0.05);color:#dc2626;cursor:pointer;font-size:12px">🗑️</button>
         </div>
       </div>`;
     }).join('') : '');
-    body.innerHTML = (pendingBanner || '') +
-      '<div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px">' +
-      '<span style="font-size:12px;font-weight:800;color:var(--text)">سجل الدفعات (' + payments.length + ')</span>' +
-      (payments.length ? '<div style="display:flex;align-items:center;gap:10px"><button onclick="srtFinancePaymentDetails()" style="padding:7px 12px;border:1.5px solid rgba(99,102,241,0.25);background:rgba(99,102,241,0.06);color:var(--primary);cursor:pointer;font-size:11.5px;font-weight:800;border-radius:9px">📋 تفاصيل المدفوعات</button><span style="font-weight:900;color:#059669;direction:ltr">' + totalPaid.toLocaleString('ar-DZ') + ' دج</span></div>' : '<span style="font-weight:700;color:var(--text-muted);font-size:12px">لا توجد دفعات مسجلة بعد</span>') +
-      '</div>' + listHtml;
+    body.innerHTML = (pendingBanner || '') + listHtml;
   } catch (e) {
     console.error('Finance refresh error:', e);
     document.getElementById('srt-finance-ledger').innerHTML = '<div style="text-align:center;padding:24px;color:#dc2626;font-size:13px;font-weight:700">❌ فشل تحميل البيانات: ' + e.message + '</div>';
@@ -27117,6 +27114,7 @@ function srtShowDuesReport(res, title) {
     + rowsHtml
     + '</div></div>';
 
+  overlay.style.zIndex = '99998';
   requestAnimationFrame(function() { overlay.classList.add('open'); });
 }
 
@@ -27355,6 +27353,7 @@ async function srtShowReceiptPreview(txId) {
           '</div>' +
         '</div>' +
       '</div>';
+    overlay.style.zIndex = '99998';
     requestAnimationFrame(function() { overlay.classList.add('open'); });
   } catch (e) {
     srtShowToast('فشل معاينة الإيصال: ' + e.message, 'error');
@@ -27469,6 +27468,7 @@ async function srtFinancePaymentDetails() {
         '<div style="font-size:13px;font-weight:800;color:var(--text);margin:20px 0 10px;display:flex;align-items:center;gap:8px">💵 الدفعات المسجلة</div>' + paysHtml +
       '</div>' +
     '</div>';
+  overlay.style.zIndex = '99998';
   requestAnimationFrame(function() { overlay.classList.add('open'); });
 }
 

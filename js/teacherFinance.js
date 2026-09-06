@@ -368,9 +368,9 @@ window.TeacherFinance = (function () {
       '<div class="rcpt-amt">' +
         '<div class="cap">المبلغ الإجمالي المدفوع</div>' +
         '<div class="val">' + fmt(p.amount) + ' <span class="cur">دج</span></div>' +
-        (words ? '<div class="words">فقط لا غير: ' + words + ' دينار جزائري</div>' : '') +
+        (words ? '<div class="words">' + words + ' دينار جزائري</div>' : '') +
       '</div>' +
-      (p.note ? '<div class="rcpt-note">ملاحظة: ' + p.note + '</div>' : '<div class="rcpt-note">نُشكر الأستاذ(ة) على ثقته في أكاديمية التعليم والدعم المدرسي.</div>') +
+      (p.note ? '<div class="rcpt-note">ملاحظة: ' + p.note + '</div>' : '<div class="rcpt-note">نُشكر الأستاذ(ة) على ثقته في المركز التعليمي.</div>') +
       '<div class="rcpt-sigs">' +
         '<div class="rcpt-sig"><div class="rcpt-line"></div><div class="cap">توقيع الأستاذ(ة)</div></div>' +
         '<div class="rcpt-mid"><img src="schoollogo/schoollogoblack.PNG" alt="logo"><span>EDUCATION PLUS CENTER</span></div>' +
