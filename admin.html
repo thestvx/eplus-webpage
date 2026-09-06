@@ -27179,7 +27179,7 @@ async function srtFinanceClearOldPayments() {
   // تنظيف مرآة Firestore القديمة (teacher_finance) حفاظاً على الاتساق
   //   نغطي كلا المعرفين (t.teacherId و t.id) لضمان العثور على كل وثائق الدفعات.
   try {
-    const {getDocs,collection:c,doc:d,deleteDoc,query:q,where:w}=srtFS(),fbs=srtDB();
+    const {getDocs,collection:c,doc:d,deleteDoc,updateDoc,query:q,where:w}=srtFS(),fbs=srtDB();
     const ids = [...new Set([id, t.id].filter(Boolean))];
     const seen = new Set();
     for (const one of ids) {
@@ -27191,7 +27191,15 @@ async function srtFinanceClearOldPayments() {
         const pays = Array.isArray(dta.payments) ? dta.payments : [];
         mirrorCleared += pays.length;
         mirrorAmount += pays.reduce(function(s,p){ return s + (Number(p.amount) || 0); }, 0);
-        await deleteDoc(d(fbs, 'teacher_finance', docu.id));
+        try {
+          await deleteDoc(d(fbs, 'teacher_finance', docu.id));
+        } catch (delErr) {
+          // fallback: إفراغ الوثيقة عبر update (صلاحية موجودة مسبقاً) إن لم يكن الحذف متاحاً بعد
+          console.warn('teacher_finance delete failed, falling back to empty update:', delErr);
+          await updateDoc(d(fbs, 'teacher_finance', docu.id), {
+            payments: [], totalPaid: 0, updatedAt: new Date().toISOString()
+          });
+        }
       }
     }
   } catch (e) { console.warn('Firestore teacher_finance clear mirror failed:', e); }
