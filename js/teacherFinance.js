@@ -109,10 +109,11 @@ window.TeacherFinance = (function () {
   async function loadActiveSubs(teacherId) {
     try {
       const rows = await _adminCall('list-active-subs', { teacherId: teacherId });
-      return Array.isArray(rows) ? rows : [];
+      if (!Array.isArray(rows)) return { list: [], ok: false };
+      return { list: rows, ok: true };
     } catch (e) {
       console.warn('[TeacherFinance] load active subs failed:', e);
-      return [];
+      return { list: [], ok: false };
     }
   }
 
@@ -136,7 +137,9 @@ window.TeacherFinance = (function () {
     const teacherName = teacher.name || '';
     const baseRate = Number(rate || teacher.rate || 0) || 0;
     const registrations = await loadConfirmedRegistrations();
-    const activeSubs = await loadActiveSubs(teacherId);
+    const activeSubsRes = await loadActiveSubs(teacherId);
+    const activeSubs = activeSubsRes.list;
+    const filterDues = activeSubsRes.ok;
     const duesRows = [];
     let totalSessions = 0;
     let uniqueStudents = new Set();
@@ -150,7 +153,7 @@ window.TeacherFinance = (function () {
       for (const s of subjects) {
         const subjectId = s.subjectId || (window.SubjectService && SubjectService.getSubjectId(s.subject || s.subjectName || '')) || '';
         const subjectName = s.subject || s.subjectName || '';
-        if (!isActiveSubActive(r.id, subjectName, activeSubs)) continue;
+        if (filterDues && !isActiveSubActive(r.id, subjectName, activeSubs)) continue;
         const count = await countAttendance(r.id, subjectId, teacherId, subjectName, teacherName);
         if (count <= 0) continue;
         const lessonRate = Number(s.lessonRateAtTransaction) > 0 ? Number(s.lessonRateAtTransaction) : baseRate;
@@ -240,8 +243,16 @@ window.TeacherFinance = (function () {
     const r = Math.max(0, Math.round(Number(rate) || 0));
     if (fs && db) {
       try {
-        const { doc, updateDoc } = fs;
-        await updateDoc(doc(db, 'support_teachers', teacherId), { rate: r, updatedAt: new Date().toISOString() });
+        const { doc, updateDoc, getDocs, query, collection, where } = fs;
+        // مستندات support_teachers تُخزَّن بمعرّفات Firestore تلقائية، لذلك
+        // نبحث عن المستند الحقيقي للأستاذ بحقل teacherId ثم نحدّث سعره هناك.
+        let targetDocId = teacherId;
+        try {
+          const q = query(collection(db, 'support_teachers'), where('teacherId', '==', teacherId));
+          const snap = await getDocs(q);
+          if (!snap.empty) targetDocId = snap.docs[0].id;
+        } catch (e) { console.warn('rate doc lookup failed', e); }
+        await updateDoc(doc(db, 'support_teachers', targetDocId), { rate: r, updatedAt: new Date().toISOString() });
       } catch (e) { console.warn('rate save failed', e); }
     }
     return await _adminCall('set-rate', { teacherId: teacherId, rate: r });

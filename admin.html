@@ -27884,6 +27884,18 @@ async function srtLoadData() {
         const b = byId[t.teacherId || t.id];
         if (b) { t.pending = b.pending || 0; t.total_paid = b.total_paid || 0; t.rate = b.rate || t.rate; }
       });
+      // backfill: كتابة سعر الحصة إلى المستند الفعلي للأستاذ (مستند support_teachers
+      // يُخزَّن بمعرّف Firestore تلقائي وليس بـ SRT-XXXX) حتى تظهر القيمة في بوابة الأستاذ
+      const fsx = srtFS(), dbx = srtDB();
+      srtAllData.forEach(t => {
+        const b = byId[t.teacherId || t.id];
+        if (b && Number(b.rate) > 0 && t.id && Number(t.rate) > 0) {
+          try {
+            const { updateDoc, doc: ddoc } = fsx;
+            updateDoc(ddoc(dbx, SRT_COLLECTION, t.id), { rate: Number(t.rate), updatedAt: new Date().toISOString() }).catch(() => {});
+          } catch (e) {}
+        }
+      });
     } catch (e) { console.warn('Balances merge failed:', e); }
     srtRenderStats();
     srtRenderTable(srtAllData);

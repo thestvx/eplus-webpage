@@ -645,7 +645,7 @@
           db.collection(CONTENT_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}),
           db.collection(ATTENDANCE_COLLECTION).where('teacherName','==',teacherName).get().catch(function(){return {docs:[]};}),
           fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_registered_students',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:teacherId,p_teacher_name:teacherName})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(){return [];}),
-          db.collection(SRT_COLLECTION).doc(teacherId).get().catch(function(){return null;}),
+          db.collection(SRT_COLLECTION).doc((currentTeacher&&currentTeacher.id)||teacherId).get().catch(function(){return null;}),
           db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(function(){return {docs:[]};}),
         ]);
         if(teacherDoc&&teacherDoc.exists){var td=teacherDoc.data();if(td.rate){currentTeacher.rate=td.rate;}}
@@ -1028,13 +1028,12 @@
         _variants.forEach(function(n){_attQ.push(db.collection(ATTENDANCE_COLLECTION).where('teacherName','==',n).get().catch(function(){return {docs:[]};}));_atcQ.push(db.collection('attendance_control').where('teacherName','==',n).get().catch(function(){return {docs:[]};}));});
         if(teacherId){_attQ.push(db.collection(ATTENDANCE_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}));_atcQ.push(db.collection('attendance_control').where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}));}
 
-        const [attResults,atcResults,finSnap,regSnap,teacherDoc,activeSubsSnap,balSnap]=await Promise.all([
+        const [attResults,atcResults,finSnap,regSnap,teacherDoc,activeSubsSnap]=await Promise.all([
           Promise.all(_attQ),Promise.all(_atcQ),
           db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(function(){return {docs:[]};}),
           fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_registered_students',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:teacherId,p_teacher_name:teacherName})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(){return [];}),
-          db.collection(SRT_COLLECTION).doc(teacherId).get().catch(function(){return null;}),
+          db.collection(SRT_COLLECTION).doc((t&&t.id)||teacherId).get().catch(function(){return null;}),
           fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_active_subs',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:teacherId})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(){return [];}),
-          fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_balance_rate',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:teacherId})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)&&d.length>0?d[0]:null;}).catch(function(){return null;}),
         ]);
 
         var attSeen={};var atcSeen={};var atcDocs=[];var attAllDocs=[];
@@ -1048,7 +1047,6 @@
         if(attAllDocs.length===0&&atcDocs.length>0)console.log('[FIN] WARNING: ATC found but ATT empty — auth issue?');
 
         if(teacherDoc&&teacherDoc.exists){var td=teacherDoc.data();if(td.rate){rate=td.rate;currentTeacher.rate=td.rate;}}
-        if((!rate||rate<=0)&&balSnap&&Number(balSnap.rate)>0){rate=Number(balSnap.rate);currentTeacher.rate=rate;}
         if((!rate||rate<=0)&&t.rate){rate=Number(t.rate)||0;}
 
         var nameMap={};
