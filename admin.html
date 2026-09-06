@@ -4110,6 +4110,26 @@
         </div>
       </div>
 
+      <!-- المدخول اليومي للخزينة -->
+      <div class="teacher-modal-bg" id="sf-daily-income-modal">
+        <div class="teacher-modal" style="max-width:760px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:rgba(245,158,11,0.15);border-color:rgba(245,158,11,0.25)">📅</div>
+            <div class="teacher-modal-title">المدخول اليومي للخزينة</div>
+            <button class="att-modal-close" onclick="document.getElementById('sf-daily-income-modal').classList.remove('open')">✕</button>
+          </div>
+          <div class="teacher-modal-body" style="overflow:auto;max-height:72vh;padding:22px 26px">
+            <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+              <input type="date" id="sf-daily-from" onchange="sfRenderDailyIncome()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+              <span style="font-size:13px;color:var(--text-muted);font-weight:700">إلى</span>
+              <input type="date" id="sf-daily-to" onchange="sfRenderDailyIncome()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+              <button class="sf-btn sf-btn-outline" onclick="document.getElementById('sf-daily-from').value='';document.getElementById('sf-daily-to').value='';sfRenderDailyIncome()" style="border-color:rgba(220,38,38,0.3);color:#dc2626">↺ الكل</button>
+            </div>
+            <div id="sf-daily-income-body" style="font-size:12px;color:var(--text-muted)">جارٍ التحميل…</div>
+          </div>
+        </div>
+      </div>
+
       <!-- ===== SECTION: SUPPORT FINANCE (موارد مالية الدعم المدرسي) ===== -->
       <div id="section-support-finance" style="display:none">
         <div class="section-header">
@@ -4141,6 +4161,9 @@
             <div style="font-size:11px;color:var(--text-muted);font-weight:800">مصروفات ورواتب</div>
             <div style="font-size:16px;font-weight:900;color:#dc2626" id="sf-out-total" dir="ltr">0 دج</div>
           </div>
+          <button onclick="sfOpenDailyIncome()" class="sf-btn sf-btn-outline"
+            style="border-color:rgba(245,158,11,0.4);color:#B45309;background:rgba(245,158,11,0.08)"
+            title="المدخول اليومي للخزينة حسب التاريخ">📅 المدخول اليومي</button>
         </div>
 
         <!-- 4 بطاقات إيرادات -->
@@ -28407,6 +28430,76 @@ function sfRenderTx() {
       + '<td style="padding:9px 12px;text-align:center"><button class="tbl-action del" onclick="sfDeleteTx(\'' + sfEsc(t.id) + '\')">🗑️</button></td>'
       + '</tr>';
   });
+  body.innerHTML = html;
+}
+
+window.sfOpenDailyIncome = function () {
+  document.getElementById('sf-daily-income-modal').classList.add('open');
+  if (sfTxCache.length) sfRenderDailyIncome();
+  else {
+    sfLoadTx().then(() => sfRenderDailyIncome());
+  }
+};
+
+function sfRenderDailyIncome() {
+  const body = document.getElementById('sf-daily-income-body');
+  if (!body) return;
+  const from = document.getElementById('sf-daily-from') ? document.getElementById('sf-daily-from').value : '';
+  const to = document.getElementById('sf-daily-to') ? document.getElementById('sf-daily-to').value : '';
+  const filtered = sfTxCache.filter(t => {
+    const d = t.date || '';
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  });
+  // Group by date
+  const byDate = {};
+  filtered.forEach(t => {
+    const d = t.date || '—';
+    if (!byDate[d]) byDate[d] = { in: 0, out: 0, tx: [] };
+    const amt = Number(t.amount) || 0;
+    if (t.direction === 'out') byDate[d].out += amt; else byDate[d].in += amt;
+    byDate[d].tx.push(t);
+  });
+  const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+  if (!dates.length) {
+    body.innerHTML = '<div style="text-align:center;padding:18px;color:var(--text-muted)">لا توجد معاملات في النطاق المحدد.</div>';
+    return;
+  }
+  const fmtD = d => {
+    if (!d || d === '—') return '—';
+    try { return new Date(d + 'T00:00:00').toLocaleDateString('ar-DZ', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (e) { return d; }
+  };
+  let html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:separate;border-spacing:0;font-size:12px">';
+  html += '<thead><tr style="background:rgba(245,158,11,0.07)">';
+  html += '<th style="padding:9px 12px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">التاريخ</th>';
+  html += '<th style="padding:9px 12px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">المدخول (إيراد)</th>';
+  html += '<th style="padding:9px 12px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">الخارج (مصروف)</th>';
+  html += '<th style="padding:9px 12px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">الصافي اليوم</th>';
+  html += '<th style="padding:9px 12px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">عدد المعاملات</th>';
+  html += '</tr></thead><tbody>';
+  let totIn = 0, totOut = 0;
+  dates.forEach(d => {
+    const g = byDate[d];
+    totIn += g.in; totOut += g.out;
+    const net = g.in - g.out;
+    html += '<tr style="border-bottom:1px solid var(--border)">'
+      + '<td style="padding:9px 12px;font-weight:900;white-space:nowrap">' + sfEsc(fmtD(d)) + '</td>'
+      + '<td style="padding:9px 12px;text-align:center;font-weight:800;color:#059669;direction:ltr">' + sfMoney(g.in) + '</td>'
+      + '<td style="padding:9px 12px;text-align:center;font-weight:800;color:#dc2626;direction:ltr">' + (g.out ? sfMoney(g.out) : '—') + '</td>'
+      + '<td style="padding:9px 12px;text-align:center;font-weight:900;color:' + (net >= 0 ? '#059669' : '#dc2626') + ';direction:ltr">' + (net >= 0 ? '+' : '') + sfMoney(net) + '</td>'
+      + '<td style="padding:9px 12px;text-align:center;color:var(--text-muted)">' + g.tx.length + '</td>'
+      + '</tr>';
+  });
+  html += '<tr style="background:rgba(245,158,11,0.06)">'
+    + '<td style="padding:10px 12px;font-weight:900">الإجمالي</td>'
+    + '<td style="padding:10px 12px;text-align:center;font-weight:900;color:#059669;direction:ltr">' + sfMoney(totIn) + '</td>'
+    + '<td style="padding:10px 12px;text-align:center;font-weight:900;color:#dc2626;direction:ltr">' + (totOut ? sfMoney(totOut) : '—') + '</td>'
+    + '<td style="padding:10px 12px;text-align:center;font-weight:900;color:' + ((totIn - totOut) >= 0 ? '#059669' : '#dc2626') + ';direction:ltr">' + ((totIn - totOut) >= 0 ? '+' : '') + sfMoney(totIn - totOut) + '</td>'
+    + '<td style="padding:10px 12px;text-align:center;color:var(--text-muted)">' + filtered.length + '</td>'
+    + '</tr>';
+  html += '</tbody></table></div>';
+  html += '<div style="margin-top:12px;font-size:11px;color:var(--text-muted);text-align:center">المدخول اليومي = مجموع المعاملات الواردة (direction=in) لكل تاريخ — المبالغ من سجل المعاملات.</div>';
   body.innerHTML = html;
 }
 
