@@ -421,6 +421,6 @@ window.TeacherFinance = (function () {
     today, countAttendance, loadConfirmedRegistrations,
     computeDuesForTeacher, addPayment, recomputeBalance,
     getBalance, listBalances, getLedger, getReceipts, saveTeacherRate,
-    deleteTransaction, printReceipt
+    deleteTransaction, clearTeacherPayments, printReceipt
   };
 })();
