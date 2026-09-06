@@ -245,12 +245,12 @@ window.TeacherFinance = (function () {
 
   function _receiptStyles() {
     return '' +
-    '@import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap");' +
-    '.rcpt-page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;color:#1d1d1f;font-family:"Tajawal","Inter",sans-serif;direction:rtl;display:flex;flex-direction:column;padding:40px 50px;box-sizing:border-box}' +
+    '@import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap");' +
+    '.rcpt-page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;color:#1d1d1f;font-family:"Tajawal",sans-serif;direction:rtl;display:flex;flex-direction:column;padding:40px 50px;box-sizing:border-box}' +
     '.rcpt-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding-bottom:22px;border-bottom:1px solid #e8e8ed}' +
     '.rcpt-logo{height:54px;width:auto;display:block}' +
     '.rcpt-brand-side{text-align:left;padding-top:6px}' +
-    '.rcpt-brand-word{font-family:"Inter",sans-serif;font-weight:800;font-size:15px;letter-spacing:3.5px;text-transform:uppercase}' +
+    '.rcpt-brand-word{font-weight:800;font-size:15px;letter-spacing:3.5px;text-transform:uppercase}' +
     '.rcpt-brand-tag{font-size:10px;color:#86868b;letter-spacing:1px;margin-top:3px}' +
     '.rcpt-head{text-align:center;margin:26px 0 4px}' +
     '.rcpt-kicker{font-size:10px;letter-spacing:3.5px;color:#86868b;font-weight:700;text-transform:uppercase}' +
@@ -269,7 +269,7 @@ window.TeacherFinance = (function () {
     '.rcpt-row .v{font-weight:800}' +
     '.rcpt-amt{text-align:center;margin:26px 0 8px;padding:26px 18px 22px;background:linear-gradient(180deg,#fbfbfc,#f4f4f6);border:1px solid #ececee;border-radius:18px}' +
     '.rcpt-amt .cap{font-size:10px;letter-spacing:2px;color:#86868b;font-weight:700;text-transform:uppercase}' +
-    '.rcpt-amt .val{font-size:52px;font-weight:900;letter-spacing:-1.5px;line-height:1.08;font-family:"Inter",sans-serif;margin-top:2px}' +
+    '.rcpt-amt .val{font-size:52px;font-weight:900;letter-spacing:-1.5px;line-height:1.08;margin-top:2px}' +
     '.rcpt-amt .cur{font-size:15px;font-weight:800;color:#86868b}' +
     '.rcpt-amt .words{font-size:12.5px;color:#6e6e73;font-weight:700;margin-top:10px}' +
     '.rcpt-tbl{width:100%;border-collapse:collapse;margin-top:6px;font-size:12.5px}' +
