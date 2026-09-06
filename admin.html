@@ -3855,6 +3855,9 @@
             <option value="paused">موقوف مؤقتاً</option>
             <option value="cancelled">ملغى</option>
           </select>
+          <select id="subx-filter-teacher" onchange="subxFilterList()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+            <option value="">كل الأساتذة</option>
+          </select>
           <button class="tbl-action" onclick="subxLoadAll()" style="font-size:12px;border-color:rgba(245,158,11,0.3);color:#d97706">🔄 تحديث</button>
           <button class="tbl-action" onclick="subxShowAllLogs()" style="font-size:12px;border-color:rgba(99,102,241,0.3);color:#6366f1">📋 سجلات الحضور</button>
         </div>
@@ -24441,10 +24444,27 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     $x('subx-revenue').textContent = revenue.toLocaleString('ar-DZ') + ' دج';
     const badge = document.getElementById('nav-badge-subscriptions');
     if (badge) badge.textContent = active;
+    subxPopulateTeacherFilter();
     subxFilterList();
     atcLoad();
     return allSubs;
   };
+
+  function subxPopulateTeacherFilter() {
+    const sel = document.getElementById('subx-filter-teacher');
+    if (!sel) return;
+    const cur = sel.value;
+    const teachers = {};
+    allSubs.forEach(row => {
+      const tn = (row.subscription && row.subscription.teacher_name || '').trim();
+      if (!tn) return;
+      teachers[tn] = true;
+    });
+    const names = Object.keys(teachers).sort((a, b) => a.localeCompare(b, 'ar'));
+    sel.innerHTML = '<option value="">كل الأساتذة</option>' + names.map(n => '<option value="' + escX(n) + '">' + escX(n) + '</option>').join('');
+    if (cur && names.indexOf(cur) > -1) sel.value = cur;
+    else sel.value = '';
+  }
 
   // ── تفاصيل إيرادات الاشتراكات الشهرية ──
   function _subxRevName(sid) {
@@ -24776,6 +24796,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   window.subxFilterList = function () {
     const q = ($x('subx-search').value || '').trim().toLowerCase();
     const f = $x('subx-filter-status').value;
+    const tf = (document.getElementById('subx-filter-teacher') || {}).value || '';
     const today = SubscriptionService.today();
     if (!allSubs.length) {
       $x('subx-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:18px;font-size:13px">لا توجد اشتراكات بعد — اضغط "➕ اشتراك جديد".</td></tr>';
@@ -24790,6 +24811,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       if (!sid) return;
       const st = SubscriptionService.subscriptionStatus(s, today);
       if (f && st !== f) return;
+      if (tf && String(s.teacher_name || '').trim() !== tf) return;
       const reg = regs.find(rr => String(rr.id) === sid);
       const name = reg ? studentFullName(reg) : sid;
       if (q && name.toLowerCase().indexOf(q) < 0 && sid.toLowerCase().indexOf(q) < 0
@@ -27860,7 +27882,7 @@ async function srtLoadData() {
       balances.forEach(b => { byId[b.teacher_id] = b; });
       srtAllData.forEach(t => {
         const b = byId[t.teacherId || t.id];
-        if (b) { t.pending = b.pending || 0; t.rate = b.rate || t.rate; }
+        if (b) { t.pending = b.pending || 0; t.total_paid = b.total_paid || 0; t.rate = b.rate || t.rate; }
       });
     } catch (e) { console.warn('Balances merge failed:', e); }
     srtRenderStats();
@@ -27911,7 +27933,7 @@ function srtRenderTable(data) {
       <td style="font-size:12px;max-width:160px">${levels}</td>
       <td>${statusBadge}</td>
       <td style="font-size:12px">${created}</td>
-      <td class="srt-money-cell" style="font-weight:700;font-size:13px;direction:ltr;text-align:center;color:${(t.pending || 0) > 0 ? '#d97706' : '#059669'}">${(t.pending || 0).toLocaleString('ar-DZ')} دج</td>
+      <td class="srt-money-cell" style="font-weight:700;font-size:13px;direction:ltr;text-align:center;color:#059669">${(t.total_paid || 0).toLocaleString('ar-DZ')} دج</td>
       <td style="font-size:11px;color:var(--text-muted);font-style:italic">انقر مرتين</td>
     </tr>`;
   }).join('');

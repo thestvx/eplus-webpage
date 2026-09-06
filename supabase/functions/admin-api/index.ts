@@ -65,6 +65,9 @@ Deno.serve(async (req) => {
     case 'list-subscriptions-rich':
       return rpc('admin_list_subscriptions_rich', { p_admin_uid: uid });
 
+    case 'list-active-subs':
+      return rpc('get_teacher_active_subs', { p_teacher_id: String(body.teacherId || '') });
+
     case 'get-subscription-detail':
       return rpc('admin_get_subscription_detail', {
         p_admin_uid: uid,

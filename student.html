@@ -480,6 +480,21 @@
         '<div class="sub-month-grid">'+monthsHTML+'</div>';
     }
 
+    function _stuNorm(x){return String(x||'').replace(/\s+/g,'').toLowerCase();}
+    function _stuMatch(subjectsArr, c){
+      var cs=_stuNorm(c.subject);
+      var ct=_stuNorm(c.teacherName);
+      for(var i=0;i<subjectsArr.length;i++){
+        var s=subjectsArr[i];
+        if(typeof s==='string'){ if(cs===_stuNorm(s))return true; continue; }
+        var ss=_stuNorm(s.subject||s.subjectName||s.name||'');
+        var st=_stuNorm(s.teacher||s.teacherName||s.teacher_name||'');
+        if(!cs||cs!==ss)continue;
+        if(!ct||!st||ct===st)return true;
+      }
+      return false;
+    }
+
     async function loadStudentContentPreview(studentSubjects){
       var el=document.getElementById('stu-content-preview');
       if(!el)return;
@@ -491,15 +506,9 @@
         console.log('[Content] Loaded '+items.length+' items, student subjects:',studentSubjects);
         var filtered=items;
         if(Array.isArray(studentSubjects)&&studentSubjects.length>0){
-          filtered=items.filter(function(c){
-            var cs=(c.subject||'').trim();
-            for(var i=0;i<studentSubjects.length;i++){
-              if(cs===studentSubjects[i].trim())return true;
-            }
-            return false;
-          });
+          filtered=items.filter(function(c){return _stuMatch(studentSubjects,c);});
           if(filtered.length===0&&items.length>0){
-            console.warn('[Content] No subject match, showing all '+items.length+' items');
+            console.warn('[Content] No subject/teacher match, showing all '+items.length+' items');
             filtered=items;
           }
         }
@@ -710,7 +719,7 @@
       updateSidebarActive();document.body.style.overflow='auto';
       loadStudentSubscription(r.id);
       var subNames=subjects.map(function(s){return s.subject||'';}).filter(Boolean);
-      loadStudentContentPreview(subNames);
+      loadStudentContentPreview(subjects);
     }
 
     /* ═══ CARD PAGE (3D FLIP) ═══ */
@@ -803,18 +812,12 @@
         if(!window._fdb){document.getElementById('stu-content-list').innerHTML='<div style="text-align:center;padding:40px"><div style="font-size:14px;color:var(--text-muted)">Firestore غير متاح</div></div>';return;}
         var snap=await window._fdb.collection('teacher_content').get();
         var items=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
-        console.log('[StudentContent] Loaded '+items.length+' total items, subject filter:',subjectNames);
-        if(subjectNames.length>0){
+        console.log('[StudentContent] Loaded '+items.length+' total items');
+        if(stuSubjects.length>0){
           var before=items.length;
-          items=items.filter(function(c){
-            var cs=(c.subject||'').trim();
-            for(var i=0;i<subjectNames.length;i++){
-              if(cs===subjectNames[i].trim())return true;
-            }
-            return false;
-          });
+          items=items.filter(function(c){return _stuMatch(stuSubjects,c);});
           if(items.length===0&&before>0){
-            console.warn('[StudentContent] No subject match from '+before+' items, showing all');
+            console.warn('[StudentContent] No subject/teacher match from '+before+' items, showing all');
             items=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
           }
         }

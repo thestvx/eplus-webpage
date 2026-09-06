@@ -1027,11 +1027,13 @@
         _variants.forEach(function(n){_attQ.push(db.collection(ATTENDANCE_COLLECTION).where('teacherName','==',n).get().catch(function(){return {docs:[]};}));_atcQ.push(db.collection('attendance_control').where('teacherName','==',n).get().catch(function(){return {docs:[]};}));});
         if(teacherId){_attQ.push(db.collection(ATTENDANCE_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}));_atcQ.push(db.collection('attendance_control').where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}));}
 
-        const [attResults,atcResults,finSnap,regSnap,teacherDoc]=await Promise.all([
+        const [attResults,atcResults,finSnap,regSnap,teacherDoc,activeSubsSnap,balSnap]=await Promise.all([
           Promise.all(_attQ),Promise.all(_atcQ),
           db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(function(){return {docs:[]};}),
           fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_registered_students',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:teacherId,p_teacher_name:teacherName})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(){return [];}),
           db.collection(SRT_COLLECTION).doc(teacherId).get().catch(function(){return null;}),
+          fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_active_subs',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:teacherId})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(){return [];}),
+          fetch(SUPABASE_URL+'/rest/v1/teacher_balances?teacher_id=eq.'+encodeURIComponent(teacherId),{method:'GET',headers:subHeaders}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)&&d.length>0?d[0]:null;}).catch(function(){return null;}),
         ]);
 
         var attSeen={};var atcSeen={};var atcDocs=[];var attAllDocs=[];
@@ -1045,6 +1047,8 @@
         if(attAllDocs.length===0&&atcDocs.length>0)console.log('[FIN] WARNING: ATC found but ATT empty — auth issue?');
 
         if(teacherDoc&&teacherDoc.exists){var td=teacherDoc.data();if(td.rate){rate=td.rate;currentTeacher.rate=td.rate;}}
+        if((!rate||rate<=0)&&balSnap&&Number(balSnap.rate)>0){rate=Number(balSnap.rate);currentTeacher.rate=rate;}
+        if((!rate||rate<=0)&&t.rate){rate=Number(t.rate)||0;}
 
         var nameMap={};
         var regStudents={};
@@ -1078,7 +1082,9 @@
           }
         });
 
-        const subStudentIds2=Object.keys(regStudents);
+        var activeSidSet={};
+        (activeSubsSnap||[]).forEach(function(a){activeSidSet[a.student_id]=true;});
+        const subStudentIds2=Object.keys(regStudents).filter(function(sid){return activeSidSet[sid];});
         const details=subStudentIds2.map(function(sid){
           const info=byStudent[sid]||{sessions:0,freeSessions:0,subjects:{}};
           const absent=0;
@@ -1168,7 +1174,7 @@
                   var tArr=Array.isArray(tSubs)?tSubs.map(function(s){return (s&&(s.subject||s.name||s))||'';}).filter(Boolean):String(tSubs).split(',').map(function(x){return x.trim();}).filter(Boolean);
                   var matched=(d.matchedSubjects||[]).filter(function(m){return !tArr.length||tArr.indexOf(m)>-1;});
                   var subLines=(matched.length?matched:tArr).join(', ')||'—';
-                  return '<tr><td style="font-weight:800;color:var(--text-muted)">'+(i+1)+'</td><td style="font-weight:700">'+d.name+'</td><td style="font-size:11px;color:var(--text-muted)">'+subLines+'</td><td style="text-align:center;font-weight:800;color:var(--text)">'+fmtNum(rate)+' دج</td><td style="text-align:center;font-weight:800;color:var(--green)">'+d.sessions+'</td><td style="text-align:center;font-weight:800;color:#dc2626">'+d.absent+'</td><td style="text-align:center;font-weight:900;color:var(--green)">'+fmtNum(d.amount)+' دج</td></tr>';
+                  return '<tr><td style="font-weight:800;color:var(--text-muted)">'+(i+1)+'</td><td style="font-weight:700">'+d.name+'</td><td style="font-size:11px;color:var(--text-muted)">'+subLines+'</td><td style="text-align:center;font-weight:800;color:var(--text)">'+fmtNum(rate)+' دج</td><td style="text-align:center;font-weight:800;color:var(--green)">'+d.sessions+'</td><td style="text-align:center;font-weight:800;color:#dc2626">'+d.absent+'</td><td style="text-align:center;font-weight:900;color:var(--green)">'+(payments.length>0?fmtNum(d.amount)+' دج':'<span style="color:var(--text-muted);font-weight:700">—</span>')+'</td></tr>';
                 }).join('')}</tbody>
                 <tfoot><tr style="background:rgba(99,102,241,0.04)">
                   <td></td>
@@ -1177,7 +1183,7 @@
                   <td></td>
                   <td style="text-align:center;font-weight:900;color:var(--green)">${totalSessions}</td>
                   <td style="text-align:center;font-weight:900;color:#dc2626">${totalAbsent}</td>
-                  <td style="text-align:center;font-weight:900;color:var(--green)">${fmtNum(totalEarnings)} دج</td>
+                  <td style="text-align:center;font-weight:900;color:var(--green)">${payments.length>0?fmtNum(totalEarnings)+' دج':'—'}</td>
                 </tr></tfoot>
               </table>
             </div>`}

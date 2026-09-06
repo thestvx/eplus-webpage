@@ -98,6 +98,34 @@ window.TeacherFinance = (function () {
     return (Array.isArray(rows) ? rows : []).filter(r => !r.deleted_at && r.status === 'مسجل نهائياً' && Array.isArray(r.subjects));
   }
 
+  // ── Active monthly subscriptions (عبر admin-api) ────────
+  //  يُرجع أزواج (student_id, subject) ذات اشتراك شهري نشط عند الأستاذ.
+  //  تُستخدم لاحتساب المستحقات لذوي الاشتراك الشهري النشط فقط.
+
+  function _sEqual(a, b) {
+    return _norm(a) === _norm(b);
+  }
+
+  async function loadActiveSubs(teacherId) {
+    try {
+      const rows = await _adminCall('list-active-subs', { teacherId: teacherId });
+      return Array.isArray(rows) ? rows : [];
+    } catch (e) {
+      console.warn('[TeacherFinance] load active subs failed:', e);
+      return [];
+    }
+  }
+
+  function isActiveSubActive(studentId, subjectName, activeSubs) {
+    for (let i = 0; i < activeSubs.length; i++) {
+      const s = activeSubs[i];
+      if (String(s.student_id) !== String(studentId)) continue;
+      if (_sEqual(s.subject_name, subjectName)) return true;
+      if (s.subject_id && _sEqual(s.subject_id, subjectName)) return true;
+    }
+    return false;
+  }
+
   // ── Dues: تحويل الحضور إلى مستحقات ────────────────────
 
   // يحسب المستحقات لمعلم معيّن من سجلات الحضور الحقيقية.
@@ -108,6 +136,7 @@ window.TeacherFinance = (function () {
     const teacherName = teacher.name || '';
     const baseRate = Number(rate || teacher.rate || 0) || 0;
     const registrations = await loadConfirmedRegistrations();
+    const activeSubs = await loadActiveSubs(teacherId);
     const duesRows = [];
     let totalSessions = 0;
     let uniqueStudents = new Set();
@@ -121,6 +150,7 @@ window.TeacherFinance = (function () {
       for (const s of subjects) {
         const subjectId = s.subjectId || (window.SubjectService && SubjectService.getSubjectId(s.subject || s.subjectName || '')) || '';
         const subjectName = s.subject || s.subjectName || '';
+        if (!isActiveSubActive(r.id, subjectName, activeSubs)) continue;
         const count = await countAttendance(r.id, subjectId, teacherId, subjectName, teacherName);
         if (count <= 0) continue;
         const lessonRate = Number(s.lessonRateAtTransaction) > 0 ? Number(s.lessonRateAtTransaction) : baseRate;
