@@ -245,51 +245,51 @@ window.TeacherFinance = (function () {
 
   function _receiptStyles() {
     return '' +
-    '@import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap");' +
-    '.rcpt-page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;color:#1d1d1f;font-family:"Tajawal",sans-serif;direction:rtl;display:flex;flex-direction:column;padding:40px 50px;box-sizing:border-box}' +
-    '.rcpt-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding-bottom:22px;border-bottom:1px solid #e8e8ed}' +
-    '.rcpt-logo{height:54px;width:auto;display:block}' +
-    '.rcpt-brand-side{text-align:left;padding-top:6px}' +
-    '.rcpt-brand-word{font-weight:800;font-size:15px;letter-spacing:3.5px;text-transform:uppercase}' +
-    '.rcpt-brand-tag{font-size:10px;color:#86868b;letter-spacing:1px;margin-top:3px}' +
-    '.rcpt-head{text-align:center;margin:26px 0 4px}' +
-    '.rcpt-kicker{font-size:10px;letter-spacing:3.5px;color:#86868b;font-weight:700;text-transform:uppercase}' +
-    '.rcpt-head h1{font-size:24px;font-weight:800;margin:7px 0 0;letter-spacing:.5px}' +
-    '.rcpt-meta{display:flex;justify-content:space-between;gap:10px;margin:24px 0 4px;background:#fafafa;border:1px solid #ededf0;border-radius:14px;padding:15px 20px}' +
-    '.rcpt-meta .cell{flex:1;min-width:0}' +
-    '.rcpt-meta .k{font-size:9.5px;color:#86868b;font-weight:700;display:block;margin-bottom:4px;letter-spacing:.3px}' +
-    '.rcpt-meta .v{font-size:13.5px;font-weight:800;display:block;direction:rtl}' +
-    '.rcpt-meta .v.ltr{direction:ltr;text-align:right}' +
-    '.rcpt-panels{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:0}' +
-    '.rcpt-panel{border:1px solid #ededf0;border-radius:14px;padding:4px 16px 10px}' +
-    '.rcpt-panel-title{font-size:10px;font-weight:800;color:#86868b;letter-spacing:1px;margin:10px 0 2px;text-transform:uppercase}' +
-    '.rcpt-row{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;font-size:13px;border-bottom:1px solid #f3f3f5}' +
-    '.rcpt-row:last-child{border-bottom:none}' +
-    '.rcpt-row .k{color:#86868b;font-weight:700}' +
-    '.rcpt-row .v{font-weight:800}' +
-    '.rcpt-amt{text-align:center;margin:26px 0 8px;padding:26px 18px 22px;background:linear-gradient(180deg,#fbfbfc,#f4f4f6);border:1px solid #ececee;border-radius:18px}' +
-    '.rcpt-amt .cap{font-size:10px;letter-spacing:2px;color:#86868b;font-weight:700;text-transform:uppercase}' +
-    '.rcpt-amt .val{font-size:52px;font-weight:900;letter-spacing:-1.5px;line-height:1.08;margin-top:2px}' +
-    '.rcpt-amt .cur{font-size:15px;font-weight:800;color:#86868b}' +
-    '.rcpt-amt .words{font-size:12.5px;color:#6e6e73;font-weight:700;margin-top:10px}' +
-    '.rcpt-tbl{width:100%;border-collapse:collapse;margin-top:6px;font-size:12.5px}' +
-    '.rcpt-tbl th{background:#f5f5f7;color:#86868b;font-size:10px;font-weight:800;padding:10px 13px;text-align:right;border-bottom:1px solid #e5e5ea}' +
-    '.rcpt-tbl th.amt{text-align:left;direction:ltr}' +
-    '.rcpt-tbl td{padding:9px 13px;border-bottom:1px solid #f0f0f2;font-weight:600}' +
-    '.rcpt-tbl td.cnt{text-align:center}' +
-    '.rcpt-tbl td.amt{font-weight:800;text-align:left;direction:ltr}' +
-    '.rcpt-tbl tr.total td{background:#fafafa;border-top:1px solid #e5e5ea;border-bottom:none;font-weight:900}' +
-    '.rcpt-tbl-title{display:none}' +
-    '.rcpt-note{background:#fdfdfe;border:1px solid #e5e5ea;border-radius:12px;padding:12px 16px;font-size:12.5px;margin-top:14px;color:#4a4a4f}' +
-    '.rcpt-sigs{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:auto;padding-top:52px}' +
+    '@import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap");' +
+    '*{margin:0;padding:0;box-sizing:border-box}' +
+    '.rcpt-page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;color:#1E1B4B;font-family:"Tajawal",sans-serif;direction:rtl;display:flex;flex-direction:column;padding:36px 48px 32px;box-sizing:border-box;position:relative;overflow:hidden}' +
+    '.rcpt-deco{position:absolute;left:16px;top:95px;bottom:130px;width:16px;opacity:.09;pointer-events:none}' +
+    '.rcpt-deco::before{content:"";position:absolute;left:5px;top:0;bottom:0;width:3px;background:repeating-linear-gradient(135deg,#6D28D9 0 3px,transparent 3px,transparent 10px)}' +
+    '.rcpt-deco::after{content:"";position:absolute;left:0;top:0;bottom:0;width:14px;background:repeating-linear-gradient(-135deg,#C9A036 0 2px,transparent 2px,transparent 14px)}' +
+    '.rcpt-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px}' +
+    '.rcpt-logo{height:50px;width:auto;display:block}' +
+    '.rcpt-brand{text-align:left;flex-shrink:0}' +
+    '.rcpt-brand-name{font-size:12.5px;font-weight:900;color:#4C1D95;letter-spacing:3.5px;text-transform:uppercase}' +
+    '.rcpt-brand-tag{font-size:9px;color:#6B7280;font-weight:600;letter-spacing:.4px;margin-top:2px}' +
+    '.rcpt-rule{height:2px;border:none;margin:0 0 22px;border-radius:1px;background:linear-gradient(90deg,#6D28D9 0%,#8B5CF6 35%,#C9A036 70%,#D4A843 100%)}' +
+    '.rcpt-kicker{text-align:center;font-size:9px;letter-spacing:4.5px;color:#9CA3AF;font-weight:700;text-transform:uppercase;margin-bottom:5px}' +
+    '.rcpt-title{text-align:center;font-size:22px;font-weight:900;color:#1E1B4B;margin:0 0 22px;letter-spacing:.2px}' +
+    '.rcpt-info{display:flex;gap:0;margin:0 0 22px;border:1px solid #E5E7EB;border-radius:14px;overflow:hidden;background:#FAFAFD}' +
+    '.rcpt-info .rcpt-cell{flex:1;padding:13px 16px;border-left:1px solid #F0EFF5}' +
+    '.rcpt-info .rcpt-cell:last-child{border-left:none}' +
+    '.rcpt-info .rcpt-k{display:block;font-size:8.5px;color:#9CA3AF;font-weight:700;letter-spacing:.4px;margin-bottom:5px;text-transform:uppercase}' +
+    '.rcpt-info .rcpt-v{display:block;font-size:13px;font-weight:800;color:#1E1B4B;direction:rtl}' +
+    '.rcpt-info .rcpt-v.ltr{direction:ltr;text-align:right}' +
+    '.rcpt-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 26px}' +
+    '.rcpt-card{background:#F8F7FC;border:1px solid #EDE9F6;border-radius:14px;padding:14px 16px}' +
+    '.rcpt-card-title{font-size:8.5px;font-weight:800;color:#6D28D9;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;padding-bottom:7px;border-bottom:1px solid #EDE9F6}' +
+    '.rcpt-card-row{display:flex;justify-content:space-between;align-items:baseline;padding:5.5px 0;font-size:12px}' +
+    '.rcpt-card-row:not(:last-child){border-bottom:1px solid #F3F0FA}' +
+    '.rcpt-card-row .rcpt-k{color:#6B7280;font-weight:700}' +
+    '.rcpt-card-row .rcpt-v{font-weight:800;color:#1E1B4B}' +
+    '.rcpt-paid{color:#059669!important}' +
+    '.rcpt-amount-box{text-align:center;margin:0 0 22px;padding:28px 24px;border:2px solid #EDE9F6;border-radius:18px;background:linear-gradient(180deg,#FEFEFF,#F8F7FC 100%)}' +
+    '.rcpt-amount-label{font-size:9px;font-weight:700;color:#9CA3AF;letter-spacing:3px;text-transform:uppercase;margin-bottom:6px}' +
+    '.rcpt-amount-val{font-size:50px;font-weight:900;color:#4C1D95;line-height:1.1;letter-spacing:-1px}' +
+    '.rcpt-amount-cur{font-size:15px;font-weight:800;color:#8B5CF6}' +
+    '.rcpt-amount-words{font-size:12px;color:#6B7280;font-weight:700;margin-top:8px}' +
+    '.rcpt-thanks{display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 20px;border:1px solid #EDE9F6;border-radius:12px;background:#FAFAFD;margin-bottom:0;font-size:12px;color:#4C1D95;font-weight:700}' +
+    '.rcpt-thanks-icon{color:#C9A036;font-size:9px}' +
+    '.rcpt-note{padding:11px 16px;border:1px solid #EDE9F6;border-radius:12px;background:#FAFAFD;margin-bottom:0;font-size:11.5px;color:#6B7280;font-weight:600}' +
+    '.rcpt-sigs{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;margin-top:auto;padding-top:44px}' +
     '.rcpt-sig{text-align:center;flex:1}' +
-    '.rcpt-line{width:150px;border-bottom:1px solid #1d1d1f;height:30px;margin:0 auto}' +
-    '.rcpt-sig .cap{font-size:11px;color:#86868b;font-weight:700;margin-top:4px}' +
-    '.rcpt-mid{text-align:center;flex:0 0 auto}' +
-    '.rcpt-mid img{height:44px;display:block;margin:0 auto 4px}' +
-    '.rcpt-mid span{font-size:9.5px;color:#86868b;font-weight:700;letter-spacing:.5px}' +
-    '.rcpt-foot{border-top:1px solid #edeef0;margin-top:20px;padding-top:12px;text-align:center;font-size:9.5px;color:#aeaeb2;line-height:1.6}' +
-    '@media print{.rcpt-page{box-shadow:none}}';
+    '.rcpt-sig-line{width:136px;border-bottom:1.5px solid #1E1B4B;height:26px;margin:0 auto}' +
+    '.rcpt-sig .rcpt-sig-label{font-size:10px;color:#6B7280;font-weight:700;margin-top:3px}' +
+    '.rcpt-mid{text-align:center;flex:0 0 auto;padding:0 18px}' +
+    '.rcpt-mid img{height:40px;display:block;margin:0 auto 3px}' +
+    '.rcpt-mid span{font-size:8.5px;color:#9CA3AF;font-weight:700;letter-spacing:.4px}' +
+    '.rcpt-footer{border-top:1px solid #EDE9F6;margin-top:16px;padding-top:10px;text-align:center;font-size:8.5px;color:#9CA3AF;line-height:1.7}' +
+    '@media print{.rcpt-page{box-shadow:none;margin:0;padding:28px 40px;min-height:100vh}@page{size:A4 portrait;margin:0}}';
   }
 
   // تحويل المبلغ إلى حروف عربية (فقط لا غير) للصيغة الرسمية
@@ -339,44 +339,51 @@ window.TeacherFinance = (function () {
     const _date = p.date ? String(p.date).split('-').reverse().join(' / ') : '—';
     const words = _numWords(p.amount);
 
-    const panelRows1 = [];
-    if (p.teacherName) panelRows1.push(['الأستاذ', p.teacherName]);
-    if (p.subjectName) panelRows1.push(['المادة', p.subjectName]);
-    if (Number(p.rate)) panelRows1.push(['سعر الحصة', fmt(p.rate) + ' دج']);
-    const panelRows2 = [];
-    if (Number(p.totalSessions)) panelRows2.push(['عدد الحصص', fmt(p.totalSessions) + ' حصة']);
-    if (Number(p.totalStudents)) panelRows2.push(['عدد التلاميذ', fmt(p.totalStudents)]);
-    panelRows2.push(['الحالة', 'مسدد بالكامل']);
-    const row = r => '<div class="rcpt-row"><span class="k">' + r[0] + '</span><span class="v">' + r[1] + '</span></div>';
+    const card1 = [];
+    if (p.teacherName) card1.push(['الأستاذ(ة)', p.teacherName]);
+    if (p.subjectName) card1.push(['المادة', p.subjectName]);
+    if (Number(p.rate)) card1.push(['سعر الحصة', fmt(p.rate) + ' دج']);
+    const card2 = [];
+    if (Number(p.totalSessions)) card2.push(['عدد الحصص', fmt(p.totalSessions) + ' حصة']);
+    if (Number(p.totalStudents)) card2.push(['عدد التلاميذ', fmt(p.totalStudents)]);
+    card2.push(['الحالة', 'مسدد بالكامل']);
+
+    const row = r => '<div class="rcpt-card-row"><span class="rcpt-k">' + r[0] + '</span><span class="rcpt-v">' + r[1] + '</span></div>';
+    const thanks = p.note
+      ? '<div class="rcpt-note">ملاحظة: ' + p.note + '</div>'
+      : '<div class="rcpt-thanks"><span class="rcpt-thanks-icon">✦&nbsp;✦</span> نُشكر الأستاذ(ة) على ثقته في المركز التعليمي.</div>';
 
     return '' +
     '<div class="rcpt-page">' +
-      '<div class="rcpt-top">' +
+      '<div class="rcpt-deco"></div>' +
+      '<div class="rcpt-header">' +
         '<img class="rcpt-logo" src="schoollogo/schoollogoblack.PNG" alt="logo">' +
-        '<div class="rcpt-brand-side"><div class="rcpt-brand-word">Education Plus Center</div><div class="rcpt-brand-tag">أكاديمية التعليم والدعم المدرسي</div></div>' +
+        '<div class="rcpt-brand"><div class="rcpt-brand-name">EDUCATION PLUS CENTER</div><div class="rcpt-brand-tag">أكاديمية التعليم والدعم المدرسي</div></div>' +
       '</div>' +
-      '<div class="rcpt-head"><div class="rcpt-kicker">Official Payment Receipt</div><h1>إيصال سداد مستحقات</h1></div>' +
-      '<div class="rcpt-meta">' +
-        '<div class="cell"><span class="k">رقم الوصل — Receipt No.</span><span class="v ltr">' + _receiptNum + '</span></div>' +
-        '<div class="cell"><span class="k">تاريخ الإصدار — Date</span><span class="v">' + _date + '</span></div>' +
-        '<div class="cell"><span class="k">المبلغ المدفوع — Amount</span><span class="v">' + fmt(p.amount) + ' دج</span></div>' +
+      '<hr class="rcpt-rule">' +
+      '<div class="rcpt-kicker">OFFICIAL PAYMENT RECEIPT</div>' +
+      '<div class="rcpt-title">إيصال لسداد مستحقات</div>' +
+      '<div class="rcpt-info">' +
+        '<div class="rcpt-cell"><span class="rcpt-k">رقم الوصل</span><span class="rcpt-v ltr">' + _receiptNum + '</span></div>' +
+        '<div class="rcpt-cell"><span class="rcpt-k">تاريخ الإيصال</span><span class="rcpt-v">' + _date + '</span></div>' +
+        '<div class="rcpt-cell"><span class="rcpt-k">المبلغ المدفوع</span><span class="rcpt-v">' + fmt(p.amount) + ' دج</span></div>' +
       '</div>' +
-      '<div class="rcpt-panels">' +
-        '<div class="rcpt-panel"><div class="rcpt-panel-title">بيانات الأستاذ</div>' + (panelRows1.length ? panelRows1.map(row).join('') : '<div class="rcpt-row"><span class="k">الأستاذ</span><span class="v">—</span></div>') + '</div>' +
-        '<div class="rcpt-panel"><div class="rcpt-panel-title">تفاصيل الدفع</div>' + (panelRows2.length ? panelRows2.map(row).join('') : '') + '</div>' +
+      '<div class="rcpt-grid">' +
+        '<div class="rcpt-card"><div class="rcpt-card-title">بيانات الأستاذ</div>' + (card1.length ? card1.map(row).join('') : '<div class="rcpt-card-row"><span class="rcpt-k">الأستاذ</span><span class="rcpt-v">—</span></div>') + '</div>' +
+        '<div class="rcpt-card"><div class="rcpt-card-title">تفاصيل الدفع</div>' + (card2.length ? card2.map(row).join('') : '') + '</div>' +
       '</div>' +
-      '<div class="rcpt-amt">' +
-        '<div class="cap">المبلغ الإجمالي المدفوع</div>' +
-        '<div class="val">' + fmt(p.amount) + ' <span class="cur">دج</span></div>' +
-        (words ? '<div class="words">' + words + ' دينار جزائري</div>' : '') +
+      '<div class="rcpt-amount-box">' +
+        '<div class="rcpt-amount-label">المبلغ الإجمالي المدفوع</div>' +
+        '<div class="rcpt-amount-val">' + fmt(p.amount) + ' <span class="rcpt-amount-cur">دج</span></div>' +
+        (words ? '<div class="rcpt-amount-words">' + words + ' دينار جزائري</div>' : '') +
       '</div>' +
-      (p.note ? '<div class="rcpt-note">ملاحظة: ' + p.note + '</div>' : '<div class="rcpt-note">نُشكر الأستاذ(ة) على ثقته في المركز التعليمي.</div>') +
+      thanks +
       '<div class="rcpt-sigs">' +
-        '<div class="rcpt-sig"><div class="rcpt-line"></div><div class="cap">توقيع الأستاذ(ة)</div></div>' +
+        '<div class="rcpt-sig"><div class="rcpt-sig-line"></div><div class="rcpt-sig-label">توقيع الأستاذ(ة)</div></div>' +
         '<div class="rcpt-mid"><img src="schoollogo/schoollogoblack.PNG" alt="logo"><span>EDUCATION PLUS CENTER</span></div>' +
-        '<div class="rcpt-sig"><div class="rcpt-line"></div><div class="cap">الإدارة: ' + (p.adminName || '—') + '</div></div>' +
+        '<div class="rcpt-sig"><div class="rcpt-sig-line"></div><div class="rcpt-sig-label">الإدارة: ' + (p.adminName || '—') + '</div></div>' +
       '</div>' +
-      '<div class="rcpt-foot">وصل إلكتروني رسمي صادر عبر نظام إدارة أكاديمية التعليم والدعم المدرسي — يُحتفظ به للرجوع إليه</div>' +
+      '<div class="rcpt-footer">وصل إلكتروني رسمي صادر عبر نظام إدارة أكاديمية التعليم والدعم المدرسي — يُحتفظ به للرجوع إليه</div>' +
     '</div>';
   }
 

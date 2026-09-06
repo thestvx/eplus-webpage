@@ -1155,6 +1155,8 @@
     .teacher-modal-header{padding:22px 26px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
     .teacher-modal-title{font-size:16px;font-weight:900;color:var(--text);flex:1}
     .teacher-modal-body{padding:24px 26px;overflow-y:auto;flex:1}
+    .srt-spinner{width:48px;height:48px;border:5px solid rgba(124,58,237,0.14);border-top-color:#7C3AED;border-radius:50%;animation:srtSpin .75s linear infinite;margin:0 auto}
+    @keyframes srtSpin{to{transform:rotate(360deg)}}
 
     /* Admin log */
     .log-entry{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
@@ -27307,7 +27309,9 @@ async function srtFinanceComputeDues() {
   if (!t) return;
   const id = t.teacherId || t.id;
   if (!(await cmConfirm('حساب المستحقات', 'سيتم احتساب مستحقات الأستاذ من سجلات الحضور الفعلية:\n\n• كل حضور = حصة واحدة × سعر الحصة\n• لا تُحتسب الحصص المجانية (ال grace session)\n\nمتابعة؟', '🔄'))) return;
-  document.getElementById('srt-finance-ledger').innerHTML = '<div style="text-align:center;padding:24px;font-size:13px;font-weight:700;color:var(--text-muted)">⏳ جارٍ حساب المستحقات من الحضور...</div>';
+  document.getElementById('srt-finance-ledger').innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px 20px">'
+    + '<div class="srt-spinner"></div>'
+    + '<div style="font-size:13px;font-weight:800;color:var(--text);background:linear-gradient(135deg,rgba(124,58,237,0.12),rgba(124,58,237,0.05));border:1px solid rgba(124,58,237,0.2);padding:8px 18px;border-radius:10px">⏳ جارٍ حساب مستحقات الأستاذ من سجلات الحضور...</div>';
   try {
     const res = await TeacherFinance.computeDuesForTeacher(t, t.rate || 0, srtFinAdminName());
     srtShowToast('✅ تم حساب ' + res.studentCount + ' تلميذ — ' + res.totalSessions + ' حصة', 'success');
@@ -27409,10 +27413,7 @@ async function srtFinanceAddPayment() {
   const id = t.teacherId || t.id;
   const bal = await TeacherFinance.getBalance(id);
   const pending = (bal && bal.pending) || 0;
-  const form = await EPUI.form([
-    { name: 'amount', label: 'المبلغ المدفوع (دج) ' + (pending > 0 ? '— المتبقي ' + pending.toLocaleString('ar-DZ') + ' دج' : ''), value: pending > 0 ? String(pending) : '' },
-    { name: 'note', label: 'البيان / ملاحظة (اختياري)' }
-  ], { title: '💵 تسجيل دفعة للأستاذ ' + (t.name || ''), confirmText: 'تسجيل الدفعة' });
+  const form = await srtPaymentForm((t.name || ''), pending);
   if (!form) return;
   const amount = parseInt(form.amount);
   if (!amount || amount <= 0) { srtShowToast('أدخل مبلغ صحيح', 'error'); return; }
@@ -27465,6 +27466,61 @@ async function srtFinanceAddPayment() {
     srtFinanceRefresh();
     srtShowToast('تم تسجيل الدفعة في النظام. خطأ الاتصال بالخادم: ' + e.message, 'warning');
   }
+}
+
+function srtPaymentForm(teacherName, pending) {
+  return new Promise(function (resolve) {
+    const overlay = document.createElement('div');
+    overlay.id = 'srt-payment-modal-overlay';
+    overlay.className = 'teacher-modal-bg modal-top';
+    overlay.onclick = function (e) { if (e.target === overlay) { overlay.remove(); resolve(null); } };
+    const pendingBadge = pending > 0
+      ? '<div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#d97706;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);padding:8px 14px;border-radius:10px;margin-bottom:14px">💰 المتبقي على الأستاذ: ' + pending.toLocaleString('ar-DZ') + ' دج</div>'
+      : '';
+    overlay.innerHTML =
+      '<div class="teacher-modal" style="max-width:460px;max-height:92vh;display:flex;flex-direction:column">'
+      + '<div class="teacher-modal-header">'
+      + '<div class="panel-icon" style="background:rgba(5,150,105,0.12);border-color:rgba(5,150,105,0.25)">💵</div>'
+      + '<div class="teacher-modal-title">تسجيل دفعة للأستاذ ' + teacherName + '</div>'
+      + '<button class="att-modal-close" type="button" title="إغلاق">✕</button>'
+      + '</div>'
+      + '<div class="teacher-modal-body" style="padding:22px 26px">'
+      + pendingBadge
+      + '<label style="display:block;font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:6px">المبلغ المدفوع (دج) *</label>'
+      + '<input id="srt-pay-amount" type="number" min="0" placeholder="0" style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;background:var(--card);box-sizing:border-box;margin-bottom:14px">'
+      + '<label style="display:block;font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:6px">ملاحظة (اختياري)</label>'
+      + '<input id="srt-pay-note" type="text" placeholder="ملاحظة حول الدفعة..." style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit;background:var(--card);box-sizing:border-box;margin-bottom:18px">'
+      + '<div style="display:flex;gap:10px">'
+      + '<button id="srt-pay-submit" type="button" class="sf-btn sf-btn-green" style="flex:1">✅ تسجيل الدفعة</button>'
+      + '<button id="srt-pay-cancel" type="button" class="sf-btn sf-btn-outline" style="flex:1">إلغاء</button>'
+      + '</div>'
+      + '</div>'
+      + '</div>';
+    document.body.appendChild(overlay);
+    overlay.style.setProperty('z-index', '2147483000', 'important');
+    requestAnimationFrame(function () { overlay.classList.add('open'); });
+
+    const amountEl = overlay.querySelector('#srt-pay-amount');
+    const noteEl = overlay.querySelector('#srt-pay-note');
+    if (pending > 0) amountEl.value = String(pending);
+    function closeModal() { overlay.remove(); }
+    function submit() {
+      const value = parseInt(amountEl.value);
+      if (!value || value <= 0) { srtShowToast('أدخل مبلغ صحيح', 'error'); amountEl.focus(); return; }
+      closeModal();
+      resolve({ amount: value, note: noteEl.value.trim() });
+    }
+    overlay.querySelector('#srt-pay-submit').onclick = submit;
+    overlay.querySelector('#srt-pay-cancel').onclick = function () { closeModal(); resolve(null); };
+    overlay.querySelector('.att-modal-close').onclick = function () { closeModal(); resolve(null); };
+    [amountEl, noteEl].forEach(function (el) {
+      el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') submit();
+        if (e.key === 'Escape') { closeModal(); resolve(null); }
+      });
+    });
+    amountEl.focus();
+  });
 }
 
 async function srtFinanceClearOldPayments() {
