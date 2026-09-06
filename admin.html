@@ -14480,23 +14480,17 @@ window.exportAttendanceCSV = (giFilterOverride, groupLabelOverride, filterType) 
 
 // ─── Shared CSV builder + download ───
 function _exportCSVRows(exportData, teacherLabel, suffix) {
-  const csvTotalSessions = 8;
+  const csvTotalSessions = 12;
   const sessionRange = Array.from({length: csvTotalSessions}, (_, i) => i + 1);
   const headers = ['التلميذ', 'الأستاذ', 'الفوج'];
   sessionRange.forEach(i => headers.push(`الحصة ${i}`));
-  headers.push('الحضور');
   const csvRows = [headers];
 
   exportData.forEach(s => {
     const row = [s.name, s.teacher, s.group];
-    let attendedCount = 0;
     for (let i = 0; i < csvTotalSessions; i++) {
-      const val = i < s.sessions.length ? s.sessions[i] : '';
-      const cell = (val === 'حاضر') ? 'حاضر' : 'غائب';
-      if (val === 'حاضر') attendedCount++;
-      row.push(cell);
+      row.push(i < s.sessions.length ? s.sessions[i] : '—');
     }
-    row.push(attendedCount + '/' + csvTotalSessions);
     csvRows.push(row);
   });
 
@@ -25136,16 +25130,67 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     });
   }
 
-  // ── تصدير CSV من السجلات المفلترة ──
+  // ── تصدير CSV: جدول حضور لكل أستاذ (8 حصص، حاضر/غائب) ──
   window.subxExportLogsCSV = function () {
     var rows = _getFilteredLogs();
     if (!rows.length) { showToast('⚠️ لا توجد سجلات للتصدير', true); return; }
-    var headers = ['التاريخ', 'الوقت', 'الطالب', 'رقم التسجيل', 'المادة', 'الأستاذ', 'النوع'];
-    var typeMap = { 'grace_session': 'حصّة مجانية', 'trial_session': 'حصة تجريبية' };
-    var csvRows = [headers];
+    var teacherFilter = document.getElementById('subx-logs-teacher').value || '';
+    var dateFilter = document.getElementById('subx-logs-date').value || '';
+    var subjectFilter = document.getElementById('subx-logs-subject').value || '';
+
+    // Group records by teacher
+    var byTeacher = {};
     rows.forEach(function (r) {
-      csvRows.push([r.date, r.time, r.studentName, r.studentId, r.subjectName, r.teacherName, typeMap[r.type] || 'حضور']);
+      var tName = r.teacherName || 'أستاذ غير محدد';
+      if (!byTeacher[tName]) byTeacher[tName] = [];
+      byTeacher[tName].push(r);
     });
+
+    var csvRows = [];
+
+    Object.keys(byTeacher).sort(function (a, b) { return String(a).localeCompare(String(b), 'ar'); }).forEach(function (tName) {
+      var recs = byTeacher[tName];
+      // Distinct session dates (ascending), capped at the 8 most recent
+      var dateSet = {};
+      recs.forEach(function (r) { if (r.date) dateSet[r.date] = true; });
+      var sessionDates = Object.keys(dateSet).sort();
+      if (sessionDates.length > 8) sessionDates = sessionDates.slice(sessionDates.length - 8);
+
+      // Unique students of this teacher
+      var students = {};
+      recs.forEach(function (r) {
+        var sid = r.studentId || r.studentName || '—';
+        if (!students[sid]) students[sid] = { id: r.studentId || '—', name: r.studentName || sid, att: {} };
+        if (r.date) students[sid].att[r.date] = true;
+      });
+
+      // Block header
+      var subjects = {};
+      recs.forEach(function (r) { if (r.subjectName) subjects[r.subjectName] = true; });
+      var subjList = Object.keys(subjects).sort();
+      csvRows.push([]);
+      csvRows.push(['أستاذ: ' + tName + (subjList.length ? ' — المواد: ' + subjList.join('، ') : '')]);
+
+      var header = ['الطالب', 'رقم التسجيل'];
+      for (var si = 0; si < sessionDates.length; si++) {
+        header.push('الحصة ' + (si + 1) + ' (' + sessionDates[si] + ')');
+      }
+      header.push('مجموع الحضور');
+      csvRows.push(header);
+
+      Object.keys(students).sort(function (a, b) { return String(students[a].name).localeCompare(String(students[b].name), 'ar'); }).forEach(function (sid) {
+        var st = students[sid];
+        var row = [st.name, st.id];
+        var cnt = 0;
+        for (var si = 0; si < sessionDates.length; si++) {
+          if (st.att[sessionDates[si]]) { row.push('حاضر'); cnt++; }
+          else row.push('غائب');
+        }
+        row.push(cnt);
+        csvRows.push(row);
+      });
+    });
+
     var csvContent = csvRows.map(function (row) {
       return row.map(function (cell) { return '"' + String(cell).replace(/"/g, '""') + '"'; }).join(',');
     }).join('\r\n');
@@ -25153,16 +25198,14 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    var teacherFilter = document.getElementById('subx-logs-teacher').value || '';
-    var dateFilter = document.getElementById('subx-logs-date').value || '';
-    var label = teacherFilter ? teacherFilter.replace(/[\\/:*?"<>|]/g, '_') : 'الكل';
+    var label = teacherFilter ? teacherFilter.replace(/[\\/:*?"<>|]/g, '_') : 'كل_الأساتذة';
     if (dateFilter) label += '_' + dateFilter;
-    a.download = 'سجلات_الحضور_' + label + '_' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.download = 'حضور_' + label + '_8حصص_' + new Date().toISOString().slice(0, 10) + '.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('✅ تم تصدير ' + rows.length + ' سجل — ' + a.download);
+    showToast('✅ تم تصدير جدول حضور ' + Object.keys(byTeacher).length + ' أستاذ — ' + a.download);
   };
 
   window.subxShowClearPinModal = function () {
