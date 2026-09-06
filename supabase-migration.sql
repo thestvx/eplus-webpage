@@ -1100,6 +1100,14 @@ RETURNS TABLE(student_id TEXT, student_name TEXT, first_name TEXT, last_name TEX
   WHERE s.teacher_id = p_teacher_id AND s.status = 'active';
 $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
+-- سعر حصة الأستاذ الحالي وأرصدة (قراءة آمنة لبوابة الأستاذ — anon)
+CREATE OR REPLACE FUNCTION get_teacher_balance_rate(p_teacher_id TEXT)
+RETURNS TABLE(rate INTEGER, total_due INTEGER, total_paid INTEGER, pending INTEGER, updated_at TIMESTAMPTZ) AS $$
+  SELECT COALESCE(rate,0), COALESCE(total_due,0), COALESCE(total_paid,0), COALESCE(pending,0), updated_at
+  FROM teacher_balances
+  WHERE teacher_id = p_teacher_id;
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+
 -- قائمة الطلاب المسجلين نهائياً عند الأستاذ (من جدول التسجيلات مباشرة)
 CREATE OR REPLACE FUNCTION get_teacher_registered_students(p_teacher_id TEXT, p_teacher_name TEXT)
 RETURNS TABLE(student_id TEXT, first_name TEXT, last_name TEXT, level TEXT, stream TEXT, created_at TIMESTAMPTZ, matched_subjects TEXT) AS $$
@@ -1123,6 +1131,7 @@ RETURNS TABLE(student_id TEXT, first_name TEXT, last_name TEXT, level TEXT, stre
 $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 GRANT EXECUTE ON FUNCTION get_teacher_active_subs(TEXT) TO anon, service_role;
 GRANT EXECUTE ON FUNCTION get_teacher_registered_students(TEXT, TEXT) TO anon, service_role;
+GRANT EXECUTE ON FUNCTION get_teacher_balance_rate(TEXT) TO anon, service_role;
 
 -- الدوال الحسّاسة: service_role فقط (تستدعيها Edge Functions بمفتاح الخادم)
 GRANT EXECUTE ON FUNCTION admin_is_uid_admin(TEXT) TO service_role;

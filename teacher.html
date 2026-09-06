@@ -661,10 +661,11 @@
         var payments=Array.isArray(finDoc.payments)?finDoc.payments:[];
         var totalPaid=payments.reduce(function(s,p){return s+(p.amount||0);},0);
 
-        document.getElementById('stat-students').textContent=fmtNum(studentCount);
-        document.getElementById('stat-lessons').textContent=fmtNum(lessons.length);
-        document.getElementById('stat-exercises').textContent=fmtNum(exercises.length);
-        document.getElementById('stat-announcements').textContent=fmtNum(announcements.length);
+        var _setStat=function(id,val){var e=document.getElementById(id);if(e)e.textContent=fmtNum(val);};
+        _setStat('stat-students',studentCount);
+        _setStat('stat-lessons',lessons.length);
+        _setStat('stat-exercises',exercises.length);
+        _setStat('stat-announcements',announcements.length);
 
         const balEl=document.getElementById('dash-balance');
         if(balEl)balEl.innerHTML='<div style="text-align:center"><div style="font-size:13px;color:var(--text-muted);font-weight:600;margin-bottom:6px">المبلغ المدفوع</div><div style="font-size:32px;font-weight:900;color:var(--green)">'+fmtNum(totalPaid)+' <span style="font-size:14px;opacity:.6">دج</span></div><div style="font-size:11px;color:var(--text-muted);margin-top:4px">'+payments.length+' دفعة مسجلة</div><div style="margin-top:10px"><a href="javascript:navigateTo(\'finance\')" style="color:var(--primary);font-size:12px;font-weight:700;cursor:pointer">عرض التفاصيل ←</a></div></div>';
@@ -1033,7 +1034,7 @@
           fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_registered_students',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:teacherId,p_teacher_name:teacherName})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(){return [];}),
           db.collection(SRT_COLLECTION).doc(teacherId).get().catch(function(){return null;}),
           fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_active_subs',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:teacherId})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(){return [];}),
-          fetch(SUPABASE_URL+'/rest/v1/teacher_balances?teacher_id=eq.'+encodeURIComponent(teacherId),{method:'GET',headers:subHeaders}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)&&d.length>0?d[0]:null;}).catch(function(){return null;}),
+          fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_balance_rate',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:teacherId})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)&&d.length>0?d[0]:null;}).catch(function(){return null;}),
         ]);
 
         var attSeen={};var atcSeen={};var atcDocs=[];var attAllDocs=[];
