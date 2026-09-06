@@ -279,7 +279,7 @@ window.TeacherFinance = (function () {
     '.rcpt-tbl td.cnt{text-align:center}' +
     '.rcpt-tbl td.amt{font-weight:800;text-align:left;direction:ltr}' +
     '.rcpt-tbl tr.total td{background:#fafafa;border-top:1px solid #e5e5ea;border-bottom:none;font-weight:900}' +
-    '.rcpt-tbl-title{font-size:10px;font-weight:800;color:#86868b;letter-spacing:1px;margin:12px 0 4px;text-transform:uppercase}' +
+    '.rcpt-tbl-title{display:none}' +
     '.rcpt-note{background:#fdfdfe;border:1px solid #e5e5ea;border-radius:12px;padding:12px 16px;font-size:12.5px;margin-top:14px;color:#4a4a4f}' +
     '.rcpt-sigs{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:auto;padding-top:52px}' +
     '.rcpt-sig{text-align:center;flex:1}' +
@@ -339,24 +339,6 @@ window.TeacherFinance = (function () {
     const _date = p.date ? String(p.date).split('-').reverse().join(' / ') : '—';
     const words = _numWords(p.amount);
 
-    const breakdown = (Array.isArray(p.studentBreakdown) && p.studentBreakdown.length) ? p.studentBreakdown : null;
-    let tblHtml = '';
-    if (breakdown) {
-      const totalAmt = breakdown.reduce((s, b) => s + (Number(b.amount) || 0), 0);
-      tblHtml = '<div class="rcpt-tbl-title">تفاصيل الحصص المحتسبة</div>' +
-        '<table class="rcpt-tbl"><thead><tr>' +
-        '<th>التلميذ</th><th>المادة</th><th class="cnt">الحصص</th><th class="amt">المستحق</th>' +
-        '</tr></thead><tbody>' +
-        breakdown.map(b => '<tr>' +
-          '<td>' + (b.name || '—') + '</td>' +
-          '<td>' + (b.subject || '—') + '</td>' +
-          '<td class="cnt">' + fmt(b.sessions) + '</td>' +
-          '<td class="amt">' + fmt(b.amount) + ' دج</td>' +
-        '</tr>').join('') +
-        '<tr class="total"><td colspan="2">إجمالي المستحقات</td><td class="cnt">' + fmt(p.totalSessions || 0) + ' حصة</td><td class="amt">' + fmt(totalAmt) + ' دج</td></tr>' +
-        '</tbody></table>';
-    }
-
     const panelRows1 = [];
     if (p.teacherName) panelRows1.push(['الأستاذ', p.teacherName]);
     if (p.subjectName) panelRows1.push(['المادة', p.subjectName]);
@@ -388,7 +370,6 @@ window.TeacherFinance = (function () {
         '<div class="val">' + fmt(p.amount) + ' <span class="cur">دج</span></div>' +
         (words ? '<div class="words">فقط لا غير: ' + words + ' دينار جزائري</div>' : '') +
       '</div>' +
-      tblHtml +
       (p.note ? '<div class="rcpt-note">ملاحظة: ' + p.note + '</div>' : '<div class="rcpt-note">نُشكر الأستاذ(ة) على ثقته في أكاديمية التعليم والدعم المدرسي.</div>') +
       '<div class="rcpt-sigs">' +
         '<div class="rcpt-sig"><div class="rcpt-line"></div><div class="cap">توقيع الأستاذ(ة)</div></div>' +
