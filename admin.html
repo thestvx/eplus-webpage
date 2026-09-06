@@ -27166,32 +27166,50 @@ async function srtFinanceClearOldPayments() {
   const id = t.teacherId || t.id;
   if (!(await cmConfirm('مسح سجل الدفعات', 'هل أنت متأكد من مسح جميع سجلات الدفعات المالية لهذا الأستاذ؟\n\nسيتم حذف جميع الدفعات (المبالغ المدفوعة) مع إيصالاتها، وسيُعاد حساب رصيد الأستاذ والخزينة. لا تتأثر المستحقات (الحصص) بأي حال.', '🗑️', { danger: true }))) return;
   let res = null;
+  let mirrorCleared = 0, mirrorAmount = 0;
   try {
     res = await TeacherFinance.clearTeacherPayments(id, t.name || '', t.rate || 0, srtFinAdminName());
-
-    // تنظيف مرآة Firestore القديمة (teacher_finance) حفاظاً على الاتساق
-    try {
-      const {getDocs,collection:c,doc:d,setDoc,query:q,where:w,limit:l}=srtFS(),fbs=srtDB();
-      const finQ = q(c(fbs, 'teacher_finance'), w('teacherId','==',id), l(1));
-      const finSnap = await getDocs(finQ);
-      if (!finSnap.empty) {
-        await setDoc(d(fbs, 'teacher_finance', finSnap.docs[0].id), {
-          teacherId: id, teacherName: t.name || '', payments: [], totalPaid: 0, updatedAt: new Date().toISOString()
-        });
-      }
-    } catch (e) { console.warn('Firestore teacher_finance clear mirror failed:', e); }
-
-    srtFinanceRefresh();
-    const n = (res && res.deleted) || 0;
-    if (n > 0) {
-      srtShowToast('✅ تم مسح ' + n + ' دفعة وإعادة حساب الرصيد', 'success');
-    } else {
-      srtShowToast('لا توجد دفعات مالية لحذفها لهذا الأستاذ', 'info');
-    }
   } catch (e) {
     console.error('Clear payments error:', e);
     srtFinanceRefresh();
     srtShowToast('فشل مسح سجل الدفعات: ' + e.message, 'error');
+    return;
+  }
+
+  // تنظيف مرآة Firestore القديمة (teacher_finance) حفاظاً على الاتساق
+  //   نغطي كلا المعرفين (t.teacherId و t.id) لضمان العثور على كل وثائق الدفعات.
+  try {
+    const {getDocs,collection:c,doc:d,deleteDoc,query:q,where:w}=srtFS(),fbs=srtDB();
+    const ids = [...new Set([id, t.id].filter(Boolean))];
+    const seen = new Set();
+    for (const one of ids) {
+      const finSnap = await getDocs(q(c(fbs, 'teacher_finance'), w('teacherId','==',one)));
+      for (const docu of finSnap.docs) {
+        if (seen.has(docu.id)) continue;
+        seen.add(docu.id);
+        const dta = docu.data();
+        const pays = Array.isArray(dta.payments) ? dta.payments : [];
+        mirrorCleared += pays.length;
+        mirrorAmount += pays.reduce(function(s,p){ return s + (Number(p.amount) || 0); }, 0);
+        await deleteDoc(d(fbs, 'teacher_finance', docu.id));
+      }
+    }
+  } catch (e) { console.warn('Firestore teacher_finance clear mirror failed:', e); }
+
+  // إعادة مبالغ الدفعات الممسوحة إلى رصيد الخزينة (على غرار ما يفعله مسح الخزنة على Supabase)
+  if (mirrorAmount > 0) srtTreasuryAdjust(mirrorAmount);
+
+  await srtFinanceRefresh();
+  const n = (res && res.deleted) || 0;
+  const rc = (res && res.receipts_removed) || 0;
+  if (n > 0 || rc > 0 || mirrorCleared > 0) {
+    let msg = '✅ تم مسح ' + n + ' دفعة';
+    if (rc > 0) msg += ' و' + rc + ' إيصال';
+    if (mirrorCleared > 0) msg += ' و' + mirrorCleared + ' سجل من دفتر الأستاذ';
+    if (mirrorAmount > 0) msg += ' وأُعيد ' + mirrorAmount.toLocaleString('ar-DZ') + ' دج للخزينة';
+    srtShowToast(msg, 'success');
+  } else {
+    srtShowToast('لا توجد دفعات مالية لحذفها لهذا الأستاذ', 'info');
   }
 }
 
