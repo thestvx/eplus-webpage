@@ -247,49 +247,68 @@ window.TeacherFinance = (function () {
     return '' +
     '@import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap");' +
     '*{margin:0;padding:0;box-sizing:border-box}' +
-    '.rcpt-page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;color:#1E1B4B;font-family:"Tajawal",sans-serif;direction:rtl;display:flex;flex-direction:column;padding:36px 48px 32px;box-sizing:border-box;position:relative;overflow:hidden}' +
-    '.rcpt-deco{position:absolute;left:16px;top:95px;bottom:130px;width:16px;opacity:.09;pointer-events:none}' +
-    '.rcpt-deco::before{content:"";position:absolute;left:5px;top:0;bottom:0;width:3px;background:repeating-linear-gradient(135deg,#6D28D9 0 3px,transparent 3px,transparent 10px)}' +
-    '.rcpt-deco::after{content:"";position:absolute;left:0;top:0;bottom:0;width:14px;background:repeating-linear-gradient(-135deg,#C9A036 0 2px,transparent 2px,transparent 14px)}' +
-    '.rcpt-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px}' +
-    '.rcpt-logo{height:50px;width:auto;display:block}' +
+    '.rcpt-page{width:210mm;min-height:297mm;margin:0 auto;font-family:"Tajawal",sans-serif;direction:rtl;display:flex;flex-direction:column;padding:38px 50px 32px;box-sizing:border-box;position:relative;overflow:hidden;color:#221A44;' +
+      'background:radial-gradient(1100px 480px at 50% -120px,rgba(124,58,237,.07),transparent 62%),radial-gradient(900px 520px at 100% 108%,rgba(76,29,149,.09),transparent 60%),radial-gradient(760px 420px at 0% 115%,rgba(109,40,217,.06),transparent 55%),linear-gradient(180deg,#FDFCFF 0%,#FAF8FE 55%,#F6F2FB 100%)}' +
+    '.rcpt-page,.rcpt-page *{-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+    '.rcpt-bg{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}' +
+    '.rcpt-page>*:not(.rcpt-bg){position:relative;z-index:1}' +
+    '.bg-arc{position:absolute;border-radius:50%}' +
+    '.bg-arc-1{width:560px;height:560px;border:1.5px solid rgba(76,29,149,.14);top:-210px;left:-250px}' +
+    '.bg-arc-2{width:380px;height:380px;border:1px solid rgba(76,29,149,.10);top:-120px;left:-160px}' +
+    '.bg-arc-3{width:210px;height:210px;border:1px solid rgba(109,40,217,.08);top:-40px;left:-70px}' +
+    '.bg-arc-4{width:820px;height:820px;border:1.5px solid rgba(76,29,149,.08);bottom:-360px;right:-380px}' +
+    '.bg-arc-5{width:560px;height:560px;border:1px solid rgba(109,40,217,.08);bottom:-180px;right:-220px}' +
+    '.bg-arc-6{width:300px;height:300px;border:1px solid rgba(124,58,237,.06);bottom:-60px;right:-110px}' +
+    '.bg-band{position:absolute;top:0;bottom:0;left:0;width:230px;background-image:repeating-linear-gradient(135deg,rgba(76,29,149,.045) 0 1.5px,transparent 1.5px 22px),repeating-linear-gradient(-135deg,rgba(109,40,217,.035) 0 1.5px,transparent 1.5px 30px)}' +
+    '.bg-band::before{content:"";position:absolute;top:0;bottom:0;left:26px;width:1px;background:linear-gradient(180deg,transparent,rgba(109,40,217,.10) 18%,rgba(109,40,217,.10) 82%,transparent)}' +
+    '.bg-glow{position:absolute;border-radius:50%}' +
+    '.bg-glow-1{width:520px;height:520px;top:-160px;left:50%;transform:translateX(-50%);background:radial-gradient(50% 50% at 50% 50%,rgba(124,58,237,.08),transparent 70%)}' +
+    '.bg-glow-2{width:640px;height:640px;right:-280px;bottom:-320px;background:radial-gradient(50% 50% at 50% 50%,rgba(76,29,149,.10),transparent 70%)}' +
+    '.bg-gem{position:absolute;width:8px;height:8px;background:#C9A036;opacity:.4;transform:rotate(45deg)}' +
+    '.bg-gem-1{top:64px;left:38px;width:11px;height:11px}' +
+    '.bg-gem-2{bottom:96px;right:54px;opacity:.3}' +
+    '.bg-gem-3{top:192px;left:58px;width:6px;height:6px;opacity:.25}' +
+    '.rcpt-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:15px}' +
+    '.rcpt-logo{height:54px;width:auto;display:block}' +
     '.rcpt-brand{text-align:left;flex-shrink:0}' +
-    '.rcpt-brand-name{font-size:12.5px;font-weight:900;color:#4C1D95;letter-spacing:3.5px;text-transform:uppercase}' +
-    '.rcpt-brand-tag{font-size:9px;color:#6B7280;font-weight:600;letter-spacing:.4px;margin-top:2px}' +
-    '.rcpt-rule{height:2px;border:none;margin:0 0 22px;border-radius:1px;background:linear-gradient(90deg,#6D28D9 0%,#8B5CF6 35%,#C9A036 70%,#D4A843 100%)}' +
-    '.rcpt-kicker{text-align:center;font-size:9px;letter-spacing:4.5px;color:#9CA3AF;font-weight:700;text-transform:uppercase;margin-bottom:5px}' +
-    '.rcpt-title{text-align:center;font-size:22px;font-weight:900;color:#1E1B4B;margin:0 0 22px;letter-spacing:.2px}' +
-    '.rcpt-info{display:flex;gap:0;margin:0 0 22px;border:1px solid #E5E7EB;border-radius:14px;overflow:hidden;background:#FAFAFD}' +
-    '.rcpt-info .rcpt-cell{flex:1;padding:13px 16px;border-left:1px solid #F0EFF5}' +
+    '.rcpt-brand-name{font-size:13px;font-weight:900;color:#4C1D95;letter-spacing:4px;text-transform:uppercase}' +
+    '.rcpt-brand-tag{font-size:9px;color:#837C9C;font-weight:600;letter-spacing:.4px;margin-top:2px}' +
+    '.rcpt-rule{position:relative;height:1px;border:none;margin:0 0 20px;background:linear-gradient(90deg,transparent,rgba(76,29,149,.22) 22%,rgba(76,29,149,.22) 78%,transparent)}' +
+    '.rcpt-rule::after{content:"";position:absolute;left:50%;top:-3px;width:7px;height:7px;background:#C9A036;opacity:.5;transform:translateX(-50%) rotate(45deg)}' +
+    '.rcpt-kicker{text-align:center;font-size:8.5px;letter-spacing:5px;color:#8A83A3;font-weight:700;text-transform:uppercase;margin-bottom:6px}' +
+    '.rcpt-title{text-align:center;font-size:24px;font-weight:900;color:#201742;margin:0 0 20px;letter-spacing:.2px}' +
+    '.rcpt-info{display:flex;gap:0;margin:0 0 20px;border:1px solid #EAE5F2;border-radius:16px;overflow:hidden;background:rgba(255,255,255,.72);box-shadow:0 6px 22px rgba(76,29,149,.045)}' +
+    '.rcpt-info .rcpt-cell{flex:1;padding:14px 18px;border-left:1px solid #F0ECF7}' +
     '.rcpt-info .rcpt-cell:last-child{border-left:none}' +
-    '.rcpt-info .rcpt-k{display:block;font-size:8.5px;color:#9CA3AF;font-weight:700;letter-spacing:.4px;margin-bottom:5px;text-transform:uppercase}' +
-    '.rcpt-info .rcpt-v{display:block;font-size:13px;font-weight:800;color:#1E1B4B;direction:rtl}' +
+    '.rcpt-info .rcpt-k{display:block;font-size:8.5px;color:#8A83A3;font-weight:700;letter-spacing:.5px;margin-bottom:5px;text-transform:uppercase}' +
+    '.rcpt-info .rcpt-v{display:block;font-size:13.5px;font-weight:800;color:#221A44;direction:rtl}' +
     '.rcpt-info .rcpt-v.ltr{direction:ltr;text-align:right}' +
-    '.rcpt-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 26px}' +
-    '.rcpt-card{background:#F8F7FC;border:1px solid #EDE9F6;border-radius:14px;padding:14px 16px}' +
-    '.rcpt-card-title{font-size:8.5px;font-weight:800;color:#6D28D9;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;padding-bottom:7px;border-bottom:1px solid #EDE9F6}' +
-    '.rcpt-card-row{display:flex;justify-content:space-between;align-items:baseline;padding:5.5px 0;font-size:12px}' +
-    '.rcpt-card-row:not(:last-child){border-bottom:1px solid #F3F0FA}' +
-    '.rcpt-card-row .rcpt-k{color:#6B7280;font-weight:700}' +
-    '.rcpt-card-row .rcpt-v{font-weight:800;color:#1E1B4B}' +
-    '.rcpt-paid{color:#059669!important}' +
-    '.rcpt-amount-box{text-align:center;margin:0 0 22px;padding:28px 24px;border:2px solid #EDE9F6;border-radius:18px;background:linear-gradient(180deg,#FEFEFF,#F8F7FC 100%)}' +
-    '.rcpt-amount-label{font-size:9px;font-weight:700;color:#9CA3AF;letter-spacing:3px;text-transform:uppercase;margin-bottom:6px}' +
-    '.rcpt-amount-val{font-size:50px;font-weight:900;color:#4C1D95;line-height:1.1;letter-spacing:-1px}' +
-    '.rcpt-amount-cur{font-size:15px;font-weight:800;color:#8B5CF6}' +
-    '.rcpt-amount-words{font-size:12px;color:#6B7280;font-weight:700;margin-top:8px}' +
-    '.rcpt-thanks{display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 20px;border:1px solid #EDE9F6;border-radius:12px;background:#FAFAFD;margin-bottom:0;font-size:12px;color:#4C1D95;font-weight:700}' +
+    '.rcpt-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0 0 24px}' +
+    '.rcpt-card{background:rgba(255,255,255,.6);border:1px solid #EAE5F2;border-radius:16px;padding:15px 18px;box-shadow:0 4px 14px rgba(76,29,149,.035)}' +
+    '.rcpt-card-title{font-size:8.5px;font-weight:800;color:#6D28D9;letter-spacing:1.8px;text-transform:uppercase;margin-bottom:9px;padding-bottom:8px;border-bottom:1px solid #EDE8F6}' +
+    '.rcpt-card-row{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;font-size:12.5px}' +
+    '.rcpt-card-row:not(:last-child){border-bottom:1px solid #F3EFFA}' +
+    '.rcpt-card-row .rcpt-k{color:#837C9C;font-weight:700}' +
+    '.rcpt-card-row .rcpt-v{font-weight:800;color:#221A44}' +
+    '.rcpt-paid{color:#4C1D95!important;font-weight:900}' +
+    '.rcpt-amount-box{position:relative;text-align:center;margin:0 0 18px;padding:34px 28px 28px;border:1px solid #E2DCF1;border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(244,240,252,.66));box-shadow:0 10px 34px rgba(76,29,149,.06)}' +
+    '.rcpt-amount-box::before{content:"";display:block;width:54px;height:2px;background:#C9A036;margin:0 auto 16px;border-radius:2px;opacity:.75}' +
+    '.rcpt-amount-label{font-size:9px;font-weight:700;color:#8A83A3;letter-spacing:3.5px;text-transform:uppercase;margin-bottom:8px}' +
+    '.rcpt-amount-val{font-size:56px;font-weight:900;color:#24184A;line-height:1.05;letter-spacing:-1.5px}' +
+    '.rcpt-amount-cur{font-size:16px;font-weight:800;color:#6D28D9}' +
+    '.rcpt-amount-words{font-size:12.5px;color:#6E6784;font-weight:700;margin-top:12px}' +
+    '.rcpt-thanks{display:flex;align-items:center;justify-content:center;gap:10px;padding:13px 20px;border:1px solid #EAE5F2;border-radius:14px;background:rgba(255,255,255,.68);box-shadow:0 4px 14px rgba(76,29,149,.03);margin-bottom:0;font-size:12px;color:#4C1D95;font-weight:700}' +
     '.rcpt-thanks-icon{color:#C9A036;font-size:9px}' +
-    '.rcpt-note{padding:11px 16px;border:1px solid #EDE9F6;border-radius:12px;background:#FAFAFD;margin-bottom:0;font-size:11.5px;color:#6B7280;font-weight:600}' +
-    '.rcpt-sigs{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;margin-top:auto;padding-top:44px}' +
+    '.rcpt-note{padding:12px 16px;border:1px solid #EAE5F2;border-radius:14px;background:rgba(255,255,255,.68);margin-bottom:0;font-size:11.5px;color:#6E6784;font-weight:600}' +
+    '.rcpt-sigs{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;margin-top:auto;padding-top:42px}' +
     '.rcpt-sig{text-align:center;flex:1}' +
-    '.rcpt-sig-line{width:136px;border-bottom:1.5px solid #1E1B4B;height:26px;margin:0 auto}' +
-    '.rcpt-sig .rcpt-sig-label{font-size:10px;color:#6B7280;font-weight:700;margin-top:3px}' +
-    '.rcpt-mid{text-align:center;flex:0 0 auto;padding:0 18px}' +
-    '.rcpt-mid img{height:40px;display:block;margin:0 auto 3px}' +
-    '.rcpt-mid span{font-size:8.5px;color:#9CA3AF;font-weight:700;letter-spacing:.4px}' +
-    '.rcpt-footer{border-top:1px solid #EDE9F6;margin-top:16px;padding-top:10px;text-align:center;font-size:8.5px;color:#9CA3AF;line-height:1.7}' +
-    '@media print{.rcpt-page{box-shadow:none;margin:0;padding:28px 40px;min-height:100vh}@page{size:A4 portrait;margin:0}}';
+    '.rcpt-sig-line{width:150px;border-bottom:1.5px solid #3E2A75;height:28px;margin:0 auto}' +
+    '.rcpt-sig .rcpt-sig-label{font-size:10px;color:#837C9C;font-weight:700;margin-top:3px}' +
+    '.rcpt-mid{text-align:center;flex:0 0 auto;padding:0 22px}' +
+    '.rcpt-mid img{height:42px;display:block;margin:0 auto 4px}' +
+    '.rcpt-mid span{font-size:8.5px;color:#8A83A3;font-weight:700;letter-spacing:.5px}' +
+    '.rcpt-footer{border-top:1px solid #E9E4F3;margin-top:16px;padding-top:11px;text-align:center;font-size:8.5px;color:#9A93B2;line-height:1.7}' +
+    '@media print{.rcpt-page{box-shadow:none;margin:0;padding:30px 42px;min-height:100vh}@page{size:A4 portrait;margin:0}}';
   }
 
   // تحويل المبلغ إلى حروف عربية (فقط لا غير) للصيغة الرسمية
@@ -355,7 +374,20 @@ window.TeacherFinance = (function () {
 
     return '' +
     '<div class="rcpt-page">' +
-      '<div class="rcpt-deco"></div>' +
+      '<div class="rcpt-bg" aria-hidden="true">' +
+        '<div class="bg-glow bg-glow-1"></div>' +
+        '<div class="bg-glow bg-glow-2"></div>' +
+        '<div class="bg-arc bg-arc-1"></div>' +
+        '<div class="bg-arc bg-arc-2"></div>' +
+        '<div class="bg-arc bg-arc-3"></div>' +
+        '<div class="bg-arc bg-arc-4"></div>' +
+        '<div class="bg-arc bg-arc-5"></div>' +
+        '<div class="bg-arc bg-arc-6"></div>' +
+        '<div class="bg-band"></div>' +
+        '<span class="bg-gem bg-gem-1"></span>' +
+        '<span class="bg-gem bg-gem-2"></span>' +
+        '<span class="bg-gem bg-gem-3"></span>' +
+      '</div>' +
       '<div class="rcpt-header">' +
         '<img class="rcpt-logo" src="schoollogo/schoollogoblack.PNG" alt="logo">' +
         '<div class="rcpt-brand"><div class="rcpt-brand-name">EDUCATION PLUS CENTER</div><div class="rcpt-brand-tag">أكاديمية التعليم والدعم المدرسي</div></div>' +
