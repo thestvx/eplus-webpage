@@ -1781,11 +1781,20 @@
   <div class="cm-box">
     <div class="cm-icon" id="cm-icon"></div>
     <div class="cm-title" id="cm-title"></div>
-    <div class="cm-desc" id="cm-desc"><div id="cm-pin-wrap"></div></div>
+    <div class="cm-desc" id="cm-desc"></div>
+    <div id="cm-pin-wrap" style="display:none"></div>
     <div class="cm-actions">
       <button class="cm-btn cm-btn-cancel" id="cm-cancel-btn" onclick="cmResolve(false)">إلغاء</button>
       <button class="cm-btn cm-btn-confirm" id="cm-confirm-btn" onclick="cmResolve(true)">تأكيد</button>
     </div>
+  </div>
+</div>
+
+<!-- GLOBAL BUSY OVERLAY (spinner أثناء المعالجة) -->
+<div id="subx-busy" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:15000;background:rgba(15,15,35,0.55);backdrop-filter:blur(3px);align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:18px;padding:30px 40px;text-align:center;box-shadow:0 18px 60px rgba(0,0,0,.28);max-width:90vw">
+    <div class="srt-spinner" style="width:52px;height:52px"></div>
+    <div id="subx-busy-text" style="margin-top:16px;font-weight:800;font-size:14px;color:#1e1e2e">جاري إنشاء الاشتراك…</div>
   </div>
 </div>
 
@@ -24236,8 +24245,11 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     const sessions = isPermanent ? '∞' : (isCustom ? (customPkg.sessions || 0) : pkg.sessions);
     const label = isPermanent ? '♾️ اشتراك دائم' : (isCustom ? ('باقة مخصصة — ' + sessions + ' حصة') : pkg.label);
     const btn = $x('subx-create-btn');
+    const origBtnHTML = btn ? btn.innerHTML : '';
     let start = $x('subx-start').value || SubscriptionService.today();
 
+    if (window._subxCreating) { srShowToast('⏳ جارٍ إنشاء الاشتراك…', 'error'); return; }
+    window._subxCreating = true;
     btn.disabled = true;
     try {
       // منع التداخل: نفس الطالب + نفس المادة + نفس الأستاذ فقط
@@ -24271,6 +24283,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         '</div>';
       const ok = await cmShow('📅', 'تأكيد الاشتراك', summary + '<div style="margin-top:8px;font-size:12px;color:var(--text-muted)">هل تريد تأكيد إنشاء هذا الاشتراك؟</div>', { confirmText: 'تأكيد الاشتراك', success: true });
       if (!ok) { btn.disabled = false; return; }
+
+      btn.innerHTML = '⏳ جاري إنشاء الاشتراك…';
+      subxBusy(true, 'جاري إنشاء الاشتراك…');
 
       const paymentId = 'SUBPAY-' + selectedStudent.id + '-' + (selectedSubject.subjectId || 'x') + '-' + start + '-' + months + (isPermanent ? '-PERM' : '');
       const created = await SubscriptionService.createSubscription({
@@ -24409,6 +24424,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
               SubscriptionService.buildPeriods(start, months).map(p => '<div><b>الشهر ' + p.monthNumber + ':</b> ' + ((trialDeducted > 0 || allowDeducted > 0) && p.monthNumber === 1 ? Math.max(0, _effective) : p.totalSessions || 8) + ' حصص</div>').join('') +
             '</div>' +
           '</div>';
+        subxBusy(false);
         await cmShow('✅', 'تم بنجاح', successHtml, { hideCancel: true, confirmText: 'موافق', success: true });
         subxCloseEditor();
         await subxLoadAll();
@@ -24416,20 +24432,26 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     } catch (e) {
       const msg = String((e && e.message) || e);
       console.error('[SUBSCRIPTIONS] create failed', e);
+      subxBusy(false);
       if ((e && e.code === '23505') || msg.indexOf('23505') >= 0 || /payment already exists/i.test(msg)) {
-        srShowToast('🔁 اشتراك مكرر — تحقق من قائمة الاشتراكات.', 'error');
+        srShowToast('🔁 تم إنشاء هذا الاشتراك مسبقاً — تم تحديث القائمة.', 'error');
         await subxLoadAll();
       } else if (/overlapping active subscription/i.test(msg)) {
         srShowToast('⏰ توجد اشتراك نشط متداخل لنفس المادة والأستاذ.', 'error');
+        await subxLoadAll();
       } else if (/student not enrolled for this subject\/teacher/i.test(msg)) {
         srShowToast('⚠️ الطالب غير مسجل نهائياً لدى هذا الأستاذ في هذه المادة.', 'error');
       } else if (/unauthorized|forbidden/i.test(msg)) {
         srShowToast('⚠️ جلسة الأدمن غير معتمدة — أعد تسجيل الدخول.', 'error');
       } else {
         srShowToast('تعذر إنشاء الاشتراك حالياً. حاول مرة أخرى.', 'error');
+        await subxLoadAll();
       }
     } finally {
+      window._subxCreating = false;
       btn.disabled = false;
+      if (btn) btn.innerHTML = origBtnHTML;
+      subxBusy(false);
       subxValidate();
     }
   };
@@ -27168,6 +27190,15 @@ function cmShow(icon, title, desc, opts = {}) {
 }
 function cmAlert(title, desc, icon = '✅') { return cmShow(icon, title, desc, { hideCancel: true, confirmText: 'موافق' }); }
 function cmConfirm(title, desc, icon = '⚠️', opts = {}) { return cmShow(icon, title, desc, { ...opts }); }
+
+// شاشة انتظار عامة (ستعمل أثناء إنشاء الاشتراك لمنع الضغط المزدوج وبين التأكيد والنجاح)
+function subxBusy(on, text) {
+  const el = document.getElementById('subx-busy');
+  if (!el) return;
+  const tx = document.getElementById('subx-busy-text');
+  if (tx && text) tx.textContent = text;
+  el.style.display = on ? 'flex' : 'none';
+}
 
 // ── نافذة إدخال PIN (للإجراءات الحساسة) ──
 const DELETE_TEACHER_PIN = '2019';
