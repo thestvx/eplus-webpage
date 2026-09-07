@@ -1079,7 +1079,7 @@ REVOKE ALL ON FUNCTION admin_remove_admin(TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_admins(TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION record_attendance(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION undo_attendance(TEXT, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, INT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, INT, TEXT, TEXT, TEXT, TEXT, TEXT, BOOLEAN) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_pause_subscription(TEXT, TEXT, BOOLEAN) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_subscriptions(TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION admin_list_subscriptions_rich(TEXT) FROM PUBLIC;
@@ -1138,6 +1138,22 @@ $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 GRANT EXECUTE ON FUNCTION get_teacher_active_subs(TEXT) TO anon, service_role;
 GRANT EXECUTE ON FUNCTION get_teacher_registered_students(TEXT, TEXT) TO anon, service_role;
 
+-- ملخص مالي للأستاذ (بوابة الأستاذ) — يستخدم أرقام teacher_balances الموثوقة،
+-- ويركز على المبلغ المتبقي المستحق (pending) دون الحاجة لصلاحيات الأدمن.
+DROP FUNCTION IF EXISTS get_teacher_finance_summary(TEXT);
+CREATE OR REPLACE FUNCTION get_teacher_finance_summary(p_teacher_id TEXT)
+RETURNS TABLE(total_due INT, total_paid INT, pending INT, rate INT) AS $$
+  SELECT
+    COALESCE(b.total_due,  0)::INT AS total_due,
+    COALESCE(b.total_paid, 0)::INT AS total_paid,
+    COALESCE(b.pending,    0)::INT AS pending,
+    COALESCE(b.rate,       0)::INT AS rate
+  FROM teacher_balances b
+  WHERE b.teacher_id = p_teacher_id
+  LIMIT 1;
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+GRANT EXECUTE ON FUNCTION get_teacher_finance_summary(TEXT) TO anon, service_role;
+
 -- الدوال الحسّاسة: service_role فقط (تستدعيها Edge Functions بمفتاح الخادم)
 GRANT EXECUTE ON FUNCTION admin_is_uid_admin(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_add_admin(TEXT, TEXT, TEXT) TO service_role;
@@ -1145,7 +1161,7 @@ GRANT EXECUTE ON FUNCTION admin_remove_admin(TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_admins(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION record_attendance(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION undo_attendance(TEXT, TEXT) TO service_role;
-GRANT EXECUTE ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, INT, TEXT, TEXT, TEXT, TEXT, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION admin_create_subscription(TEXT, TEXT, TEXT, INT, INT, TEXT, INT, TEXT, TEXT, TEXT, TEXT, TEXT, BOOLEAN) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_pause_subscription(TEXT, TEXT, BOOLEAN) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_subscriptions(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION admin_list_subscriptions_rich(TEXT) TO service_role;

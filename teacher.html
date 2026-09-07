@@ -1028,12 +1028,13 @@
         _variants.forEach(function(n){_attQ.push(db.collection(ATTENDANCE_COLLECTION).where('teacherName','==',n).get().catch(function(){return {docs:[]};}));_atcQ.push(db.collection('attendance_control').where('teacherName','==',n).get().catch(function(){return {docs:[]};}));});
         if(teacherId){_attQ.push(db.collection(ATTENDANCE_COLLECTION).where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}));_atcQ.push(db.collection('attendance_control').where('teacherId','==',teacherId).get().catch(function(){return {docs:[]};}));}
 
-        const [attResults,atcResults,finSnap,regSnap,teacherDoc,activeSubsSnap]=await Promise.all([
+        const [attResults,atcResults,finSnap,regSnap,teacherDoc,activeSubsSnap,finSummarySnap]=await Promise.all([
           Promise.all(_attQ),Promise.all(_atcQ),
           db.collection(FIN_COLLECTION).where('teacherId','==',teacherId).limit(1).get().catch(function(){return {docs:[]};}),
           fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_registered_students',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:teacherId,p_teacher_name:teacherName})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(){return [];}),
           db.collection(SRT_COLLECTION).doc((t&&t.id)||teacherId).get().catch(function(){return null;}),
           fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_active_subs',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:teacherId})}).then(function(r){return r.json();}).then(function(d){return Array.isArray(d)?d:[];}).catch(function(){return [];}),
+          fetch(SUPABASE_URL+'/rest/v1/rpc/get_teacher_finance_summary',{method:'POST',headers:subHeaders,body:JSON.stringify({p_teacher_id:teacherId})}).then(function(r){return r.json();}).then(function(d){return d&&typeof d==='object'&&!Array.isArray(d)&&d.pending!=null?d:null;}).catch(function(){return null;}),
         ]);
 
         var attSeen={};var atcSeen={};var atcDocs=[];var attAllDocs=[];
@@ -1098,8 +1099,11 @@
         const payments=Array.isArray(finDoc.payments)?finDoc.payments.slice().sort(function(a,b){return(b.timestamp||0)-(a.timestamp||0);}):[];
         const totalPaid=payments.reduce(function(s,p){return s+(p.amount||0);},0);
         const lastUpdate=finDoc.updatedAt?fmtDate(finDoc.updatedAt):'—';
-        const remainingDue=Math.max(0,(totalEarnings||0)-(totalPaid||0));
+        const remainingDue=(finSummarySnap&&finSummarySnap.pending!=null)
+          ?Math.max(0,Number(finSummarySnap.pending))
+          :Math.max(0,(totalEarnings||0)-(totalPaid||0));
         window._finRemaining=remainingDue;
+        console.log('[FIN] finSummary:',finSummarySnap,'remainingDue:',remainingDue);
 
         let paymentsHtml='';
         if(payments.length===0){
@@ -1257,7 +1261,7 @@
         '<div class="modal-body" style="padding:0;background:#e8e8ed;overflow:auto">'+
           TeacherFinance.buildReceiptHtml(payload)+
           '<div style="position:sticky;bottom:0;display:flex;justify-content:center;gap:10px;padding:14px;background:rgba(255,255,255,0.92);backdrop-filter:blur(6px)">'+
-            '<button onclick="tPrintPreview()" style="padding:12px 34px;border:none;border-radius:12px;background:#059669;color:#fff;font-size:14px;font-weight:800;cursor:pointer">🖨️ طباعة الإيصال</button>'+
+            '<div style="padding:10px 20px;border-radius:12px;background:rgba(245,158,11,0.12);border:1px solid rgba(217,119,6,0.3);color:#d97706;font-size:12px;font-weight:800;text-align:center">🔒 هذا الوصل للاطلاع فقط — لا يمكن طباعته أو تنزيله</div>'+
             '<button onclick="tClosePreview()" style="padding:12px 34px;border:1.5px solid var(--border-light);border-radius:12px;background:var(--card);color:var(--text);font-size:14px;font-weight:700;cursor:pointer">إغلاق</button>'+
           '</div>'+
         '</div>';
@@ -1266,9 +1270,8 @@
     }
 
     function tPrintPreview(){
-      const p=window._finPreview;
-      if(!p)return;
-      try{TeacherFinance.printReceipt(p);}catch(e){console.error('Print error:',e);}
+      // الوصل في بوابة الأستاذ للعرض فقط — الطباعة والتنزيل محظوران.
+      if(window.showToast){try{window.showToast('🔒 وصل للاطلاع فقط — الطباعة غير متاحة للأستاذ',true);}catch(e){}}
     }
 
     function tClosePreview(){

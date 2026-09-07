@@ -1781,7 +1781,7 @@
   <div class="cm-box">
     <div class="cm-icon" id="cm-icon"></div>
     <div class="cm-title" id="cm-title"></div>
-    <div class="cm-desc" id="cm-desc"></div>
+    <div class="cm-desc" id="cm-desc"><div id="cm-pin-wrap"></div></div>
     <div class="cm-actions">
       <button class="cm-btn cm-btn-cancel" id="cm-cancel-btn" onclick="cmResolve(false)">إلغاء</button>
       <button class="cm-btn cm-btn-confirm" id="cm-confirm-btn" onclick="cmResolve(true)">تأكيد</button>
@@ -24293,6 +24293,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         // so old trials before the subscription are excluded, but fresh trial records count.
         try {
           var trialDeducted = 0;
+          var allowDeducted = 0;
           var fs2 = window._firestore, fdb2 = window._db;
           if (fs2 && fdb2) {
             var _nrm = function (s) { var v = String(s || '').replace(/\s+/g, ' ').trim().toLowerCase(); v = v.replace(/عبد\s+الرحمان/g, 'عبدالرحمان'); v = v.replace(/عبد\s+ال/g, 'عبدال'); return v.split(' ').sort().join(' '); };
@@ -24335,17 +24336,20 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
               console.log('[SUBSCRIPTIONS] Trial query: id=' + _qStudentId + ' type=' + typeof _qStudentId + ' results=' + trialSnap.size);
               trialSnap.forEach(function (d) {
                 var r = d.data();
-                if (r.type !== 'trial_session') return;
+                if (r.type !== 'trial_session' && r.type !== 'allow_sub') return;
+                var isAllow = r.type === 'allow_sub';
                 var dk = _nrm(r.teacherName) + '___' + _nrm(r.subjectName);
                 if (dk !== tKey) return;
                 if (!r.date) return;
                 if (lastEnd && r.date <= lastEnd) return;
-                console.log('[SUBSCRIPTIONS] Trial match: ' + r.date + ' ' + r.teacherName + '/' + r.subjectName);
-                trialDeducted++;
+                console.log('[SUBSCRIPTIONS] Deduct match (' + r.type + '): ' + r.date + ' ' + r.teacherName + '/' + r.subjectName);
+                if (isAllow) allowDeducted++;
+                else trialDeducted++;
               });
             }
           }
-          if (trialDeducted > 0) {
+          if (trialDeducted > 0 || allowDeducted > 0) {
+            var deductTotal = trialDeducted + allowDeducted;
             var subPeriods = created.periods || [];
             if (!subPeriods.length && created.subscription && created.subscription.id) {
               try {
@@ -24365,8 +24369,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
               var firstPeriod = subPeriods[0];
               var pid = firstPeriod.period_id || firstPeriod.id;
               if (pid) {
-                var _incResult = await SubscriptionService.incrementPeriodUsage(pid, trialDeducted);
-                console.log('[SUBSCRIPTIONS] Trial deducted ' + trialDeducted + ' sessions from new subscription period ' + pid, _incResult);
+                var _incResult = await SubscriptionService.incrementPeriodUsage(pid, deductTotal);
+                console.log('[SUBSCRIPTIONS] Deducted ' + deductTotal + ' (' + trialDeducted + ' trial + ' + allowDeducted + ' allow_sub) sessions from new subscription period ' + pid, _incResult);
                 if (_incResult) {
                   console.log('[SUBSCRIPTIONS] RPC success — updated period:', JSON.stringify(_incResult));
                 } else {
@@ -24381,9 +24385,12 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           }
         } catch (e) { console.warn('[SUBSCRIPTIONS] trial deduct failed', e); }
 
-        var _effective = sessions - trialDeducted;
+        var _effective = sessions - trialDeducted - allowDeducted;
         var _trialLine = trialDeducted > 0
           ? '<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:6px 10px;margin-top:4px;color:#d97706;font-size:12px;font-weight:800">🟠 تم خصم ' + trialDeducted + ' حصة استثنائية سابقة → الحصص الفعلية: ' + _effective + '</div>'
+          : '';
+        var _allowLine = allowDeducted > 0
+          ? '<div style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.25);border-radius:8px;padding:6px 10px;margin-top:4px;color:#7c3aed;font-size:12px;font-weight:800">♻️ خُصم ' + allowDeducted + ' حصة (سُمح بالدخول سابقاً بدون اشتراك) → الحصص الفعلية: ' + Math.max(0, _effective) + '</div>'
           : '';
         const successHtml =
           '<div style="text-align:center;font-size:13px">' +
@@ -24396,9 +24403,10 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
               '<div><b>المبلغ:</b> ' + SubscriptionService.fmtPrice(price) + '</div>' +
               '<div><b>الإجمالي:</b> ' + sessions + ' حصة</div>' +
               (trialDeducted > 0 ? '<div><b>خصم حصص استثنائية:</b> ' + trialDeducted + ' حصة</div>' : '') +
-              (trialDeducted > 0 ? '<div style="font-weight:900;color:#059669"><b>المتبقي فعلياً:</b> ' + _effective + ' حصة</div>' : '') +
-              _trialLine +
-              SubscriptionService.buildPeriods(start, months).map(p => '<div><b>الشهر ' + p.monthNumber + ':</b> ' + (trialDeducted > 0 && p.monthNumber === 1 ? _effective : p.totalSessions || 8) + ' حصص</div>').join('') +
+              (allowDeducted > 0 ? '<div><b>دخول سابق بدون اشتراك:</b> ' + allowDeducted + ' حصة (خُصم من الاشتراك الجديد)</div>' : '') +
+              ((trialDeducted > 0 || allowDeducted > 0) ? '<div style="font-weight:900;color:#059669"><b>المتبقي فعلياً:</b> ' + Math.max(0, _effective) + ' حصة</div>' : '') +
+              _trialLine + _allowLine +
+              SubscriptionService.buildPeriods(start, months).map(p => '<div><b>الشهر ' + p.monthNumber + ':</b> ' + ((trialDeducted > 0 || allowDeducted > 0) && p.monthNumber === 1 ? Math.max(0, _effective) : p.totalSessions || 8) + ' حصص</div>').join('') +
             '</div>' +
           '</div>';
         await cmShow('✅', 'تم بنجاح', successHtml, { hideCancel: true, confirmText: 'موافق', success: true });
@@ -24840,10 +24848,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       rowNum++;
       const totalSubs = stu.subs.length;
       const activeSubs = stu.subs.filter(x => x.status === 'active').length;
-      const totalUsed = stu.subs.reduce((a, x) => a + x.periods.reduce((b, p) => b + (p.used_sessions || 0), 0), 0);
-      const totalSessions = stu.subs.reduce((a, x) => a + (x.sub.total_sessions || (x.sub.months || 1) * 8), 0);
+      const hasPermanent = stu.subs.some(x => SubscriptionService.isPermanent((x.sub || {})));
+      const nonPermSubs = stu.subs.filter(x => !SubscriptionService.isPermanent((x.sub || {})));
+      const totalUsed = nonPermSubs.reduce((a, x) => a + x.periods.reduce((b, p) => b + (p.used_sessions || 0), 0), 0);
+      const totalSessions = nonPermSubs.reduce((a, x) => a + (x.sub.total_sessions || (x.sub.months || 1) * 8), 0);
       let statusSummary = '';
-      if (activeSubs > 0) statusSummary += '<span style="color:#059669;font-weight:800">' + activeSubs + ' نشط</span>';
+      if (hasPermanent) statusSummary += '<span style="color:#7c3aed;font-weight:800">♾️ دائم</span>';
+      if (activeSubs > 0) statusSummary += (statusSummary ? ' · ' : '') + '<span style="color:#059669;font-weight:800">' + activeSubs + ' نشط</span>';
       const doneSubs = stu.subs.filter(x => x.status === 'done').length;
       const expiredSubs = stu.subs.filter(x => x.status === 'expired').length;
       const pausedSubs = stu.subs.filter(x => x.status === 'paused').length;
@@ -24851,6 +24862,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       if (expiredSubs > 0) statusSummary += (statusSummary ? ' · ' : '') + '<span style="color:#dc2626;font-weight:800">' + expiredSubs + ' انتهى</span>';
       if (pausedSubs > 0) statusSummary += (statusSummary ? ' · ' : '') + '<span style="color:#7c3aed;font-weight:800">' + pausedSubs + ' موقوف</span>';
       const remaining = Math.max(0, totalSessions - totalUsed);
+      const sessCell = hasPermanent
+        ? '<span style="display:inline-flex;align-items:center;gap:6px;font-weight:900;color:#7c3aed">♾️ اشتراك دائم</span> <span style="font-size:11px;color:var(--text-muted);font-weight:700">(حصص غير محدودة)</span>'
+        : '<span style="font-weight:800">' + totalUsed + ' / ' + totalSessions + '</span> <span style="font-size:11px;color:var(--text-muted);font-weight:700">(متبقي ' + remaining + ')</span>';
       html += '<tr ondblclick="subxShowStudentDetail(\'' + escX(sid) + '\')" style="cursor:pointer" title="اضغط مرتين لعرض تفاصيل الاشتراكات">' +
         '<td style="font-weight:800;color:var(--text-muted);font-size:12px">' + rowNum + '</td>' +
         '<td style="font-weight:800">' +
@@ -24860,7 +24874,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           '</div>' +
         '</td>' +
         '<td><span style="font-size:16px;font-weight:900;color:var(--primary)">' + totalSubs + '</span> <span style="font-size:11px;color:var(--text-muted);font-weight:700">اشتراك</span></td>' +
-        '<td><span style="font-weight:800">' + totalUsed + ' / ' + totalSessions + '</span> <span style="font-size:11px;color:var(--text-muted);font-weight:700">(متبقي ' + remaining + ')</span></td>' +
+        '<td>' + sessCell + '</td>' +
         '<td><div style="font-size:11px;line-height:1.8">' + statusSummary + '</div></td>' +
         '<td><button class="tbl-action" style="font-size:12px" onclick="subxShowStudentDetail(\'' + escX(sid) + '\')">👁️ عرض التفاصيل</button></td>' +
         '</tr>';
@@ -24886,6 +24900,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       const total = sub.total_sessions || (sub.months || 1) * 8;
       if (!sub.periods && periods.length) sub.periods = periods;
       const stNow = SubscriptionService.isPermanent(sub) ? 'permanent' : SubscriptionService.subscriptionStatus(sub, today);
+      const perm = SubscriptionService.isPermanent(sub);
       const stLabel = SubscriptionService.subscriptionStatusLabel(stNow);
       const stBg = stNow === 'active' ? 'background:rgba(16,185,129,0.12);color:#059669;border:1px solid rgba(16,185,129,0.25)'
         : stNow === 'paused' ? 'background:rgba(147,51,234,0.12);color:#7c3aed;border:1px solid rgba(147,51,234,0.25)'
@@ -24911,9 +24926,11 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         '<div class="subx-detail-cell"><span class="subx-detail-label">المستوى</span><span class="subx-detail-val">' + escX(stu.level || '—') + '</span></div>' +
         (stu.stream ? '<div class="subx-detail-cell"><span class="subx-detail-label">الشعبة</span><span class="subx-detail-val">' + escX(stu.stream) + '</span></div>' : '') +
         '<div class="subx-detail-cell"><span class="subx-detail-label">تاريخ البداية</span><span class="subx-detail-val">' + SubscriptionService.fmtAr(sub.start_date, true) + '</span></div>' +
-        '<div class="subx-detail-cell"><span class="subx-detail-label">تاريخ النهاية</span><span class="subx-detail-val">' + SubscriptionService.fmtAr(sub.end_date, true) + '</span></div>' +
-        '<div class="subx-detail-cell"><span class="subx-detail-label">إجمالي الحصص</span><span class="subx-detail-val">' + total + ' حصة</span></div>' +
-        '<div class="subx-detail-cell"><span class="subx-detail-label">المستخدمة / المتبقية</span><span class="subx-detail-val">' + used + ' / ' + Math.max(0, total - used) + '</span></div>' +
+        '<div class="subx-detail-cell"><span class="subx-detail-label">تاريخ النهاية</span><span class="subx-detail-val">' + (perm ? '♾️ دائم — لا ينتهي' : SubscriptionService.fmtAr(sub.end_date, true)) + '</span></div>' +
+        (perm
+          ? '<div class="subx-detail-cell" style="grid-column:span 2"><span class="subx-detail-label">إجمالي الحصص</span><span class="subx-detail-val" style="display:flex;align-items:center;gap:8px"><span style="font-size:20px;line-height:1">♾️</span><span><b style="font-size:15px;color:#7c3aed">اشتراك دائم</b><span style="display:block;font-size:11px;color:var(--text-muted)">حصص غير محدودة — حضور بلا حدود</span></span></span></div>'
+          : '<div class="subx-detail-cell"><span class="subx-detail-label">إجمالي الحصص</span><span class="subx-detail-val">' + total + ' حصة</span></div>' +
+            '<div class="subx-detail-cell"><span class="subx-detail-label">المستخدمة / المتبقية</span><span class="subx-detail-val">' + used + ' / ' + Math.max(0, total - used) + '</span></div>') +
       '</div>';
 
       // Monthly periods
@@ -24923,26 +24940,38 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           const ms = SubscriptionService.monthStatus(p, today);
           const u = p.used_sessions || 0;
           const t = p.total_sessions || 8;
-          const rem = Math.max(0, t - u);
-          const pct = t ? Math.round((u / t) * 100) : 0;
-          const msBg = ms === 'active' ? 'background:rgba(16,185,129,0.1);color:#059669'
-            : ms === 'full' ? 'background:rgba(239,68,68,0.1);color:#dc2626'
-            : ms === 'completed' ? 'background:rgba(16,185,129,0.1);color:#059669'
-            : ms === 'expired_remain' ? 'background:rgba(245,158,11,0.14);color:#d97706'
-            : 'background:var(--border);color:var(--text-muted)';
-          html += '<div class="subx-detail-month">' +
-            '<div class="subx-detail-month-num">الشهر ' + (p.month_number || '—') + '</div>' +
-            '<div class="subx-detail-month-dates">' + SubscriptionService.fmtAr(p.start_date, true) + ' → ' + SubscriptionService.fmtAr(p.end_date, true) + '</div>' +
-            '<span class="subx-status" style="' + msBg + ';padding:3px 10px;border-radius:8px;font-size:10.5px;font-weight:800">' + SubscriptionService.monthStatusLabel(ms) + '</span>' +
-          '</div>' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:0 14px 8px;font-size:11px;font-weight:800">' +
-            '<div class="subx-detail-month-stat">الحصص<b style="color:var(--text)">' + t + '</b></div>' +
-            '<div class="subx-detail-month-stat">حضر<b style="color:#2563eb" id="subx-used-' + (p.period_id || p.id || '') + '">' + u + '</b>' +
-            '<button onclick="subxEditSessions(\'' + escX(p.period_id || p.id || '') + '\',' + t + ',' + u + ')" style="background:none;border:none;cursor:pointer;font-size:11px;margin-inline-start:4px;vertical-align:middle;opacity:.6" title="تعديل عدد الحصص">✏️</button></div>' +
-            '<div class="subx-detail-month-stat">متبقي<b style="color:#059669" id="subx-rem-' + (p.period_id || p.id || '') + '">' + rem + '</b></div>' +
-          '</div>' +
-          '<div id="subx-edit-row-' + (p.period_id || p.id || '') + '" style="display:none;margin:0 14px 8px"></div>' +
-          '<div class="subx-detail-progress" style="margin:0 14px 12px"><div class="subx-detail-progress-bar" style="width:' + pct + '%"></div></div>';
+          if (perm) {
+            html += '<div class="subx-detail-month">' +
+              '<div class="subx-detail-month-num">فترة العضوية الدائمة</div>' +
+              '<div class="subx-detail-month-dates">' + SubscriptionService.fmtAr(p.start_date, true) + ' → ♾️ مستمرة</div>' +
+              '<span class="subx-status" style="background:rgba(124,58,237,0.12);color:#7c3aed;border:1px solid rgba(124,58,237,0.3);padding:3px 10px;border-radius:8px;font-size:10.5px;font-weight:800">بدون حدود — لا تُخصم الحصص</span>' +
+            '</div>' +
+            '<div style="margin:0 14px 12px;padding:16px;border:1.5px dashed rgba(124,58,237,0.35);border-radius:12px;background:rgba(124,58,237,0.06);text-align:center">' +
+              '<div style="font-size:15px;font-weight:900;color:#7c3aed">♾️ حصص غير محدودة — حضور مستمر</div>' +
+              '<div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-top:5px">حضر حتى الآن <b style="color:#2563eb;font-size:13px">' + u + '</b> حصة</div>' +
+            '</div>';
+          } else {
+            const rem = Math.max(0, t - u);
+            const pct = t ? Math.round((u / t) * 100) : 0;
+            const msBg = ms === 'active' ? 'background:rgba(16,185,129,0.1);color:#059669'
+              : ms === 'full' ? 'background:rgba(239,68,68,0.1);color:#dc2626'
+              : ms === 'completed' ? 'background:rgba(16,185,129,0.1);color:#059669'
+              : ms === 'expired_remain' ? 'background:rgba(245,158,11,0.14);color:#d97706'
+              : 'background:var(--border);color:var(--text-muted)';
+            html += '<div class="subx-detail-month">' +
+              '<div class="subx-detail-month-num">الشهر ' + (p.month_number || '—') + '</div>' +
+              '<div class="subx-detail-month-dates">' + SubscriptionService.fmtAr(p.start_date, true) + ' → ' + SubscriptionService.fmtAr(p.end_date, true) + '</div>' +
+              '<span class="subx-status" style="' + msBg + ';padding:3px 10px;border-radius:8px;font-size:10.5px;font-weight:800">' + SubscriptionService.monthStatusLabel(ms) + '</span>' +
+            '</div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:0 14px 8px;font-size:11px;font-weight:800">' +
+              '<div class="subx-detail-month-stat">الحصص<b style="color:var(--text)">' + t + '</b></div>' +
+              '<div class="subx-detail-month-stat">حضر<b style="color:#2563eb" id="subx-used-' + (p.period_id || p.id || '') + '">' + u + '</b>' +
+              '<button onclick="subxEditSessions(\'' + escX(p.period_id || p.id || '') + '\',' + t + ',' + u + ')" style="background:none;border:none;cursor:pointer;font-size:11px;margin-inline-start:4px;vertical-align:middle;opacity:.6" title="تعديل عدد الحصص">✏️</button></div>' +
+              '<div class="subx-detail-month-stat">متبقي<b style="color:#059669" id="subx-rem-' + (p.period_id || p.id || '') + '">' + rem + '</b></div>' +
+            '</div>' +
+            '<div id="subx-edit-row-' + (p.period_id || p.id || '') + '" style="display:none;margin:0 14px 8px"></div>' +
+            '<div class="subx-detail-progress" style="margin:0 14px 12px"><div class="subx-detail-progress-bar" style="width:' + pct + '%"></div></div>';
+          }
         });
       } else {
         html += '<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:12px;border:1px dashed var(--border);border-radius:12px">لا توجد بيانات فترات</div>';
@@ -25563,7 +25592,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       const total = sub.total_sessions || (sub.months || 1) * 8;
       const rem = Math.max(0, total - used);
       const pkg = SubscriptionService.packageByMonths(sub.months);
-      const st = SubscriptionService.isPermanent(sub) ? 'permanent' : SubscriptionService.subscriptionStatus(sub, SubscriptionService.today());
+      const permI = SubscriptionService.isPermanent(sub);
+      const st = permI ? 'permanent' : SubscriptionService.subscriptionStatus(sub, SubscriptionService.today());
       const stLbl = SubscriptionService.subscriptionStatusLabel(st);
       const price = (sub.total_price || 0).toLocaleString('ar-DZ') + ' دج';
 
@@ -25573,8 +25603,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         '<tr>' +
           '<td>' + (p.month_number || '—') + '</td>' +
           '<td>' + SubscriptionService.fmtAr(p.start_date, true) + '</td>' +
-          '<td>' + SubscriptionService.fmtAr(p.end_date, true) + '</td>' +
-          '<td>' + (p.used_sessions || 0) + ' / ' + (p.total_sessions || 8) + '</td>' +
+          '<td>' + (permI ? '♾️ مستمرة' : SubscriptionService.fmtAr(p.end_date, true)) + '</td>' +
+          '<td>' + (permI ? '♾️ غير محدود' : (p.used_sessions || 0) + ' / ' + (p.total_sessions || 8)) + '</td>' +
         '</tr>'
       ).join('');
       w.document.write(
@@ -25605,8 +25635,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           (stu.institution ? '<tr><td>المؤسسة:</td><td>' + escX(stu.institution) + '</td></tr>' : '') +
           '<tr><td>المادة — الأستاذ:</td><td>' + escX((sub.subject_name || '—') + ' — ' + (sub.teacher_name || '—')) + '</td></tr>' +
           '<tr><td>الباقة:</td><td>' + escX(pkg ? pkg.label : ((sub.months || '—') + ' شهر')) + '</td></tr>' +
-          '<tr><td>الفترة:</td><td>' + SubscriptionService.fmtAr(sub.start_date, true) + ' ← ' + SubscriptionService.fmtAr(sub.end_date, true) + '</td></tr>' +
-          '<tr><td>إجمالي الحصص:</td><td>' + total + ' حصة (المستخدمة: ' + used + '، المتبقية: ' + rem + ')</td></tr>' +
+          '<tr><td>الفترة:</td><td>' + (permI ? '♾️ دائمة — لا تنتهي (تبدأ من ' + SubscriptionService.fmtAr(sub.start_date, true) + ')' : SubscriptionService.fmtAr(sub.start_date, true) + ' ← ' + SubscriptionService.fmtAr(sub.end_date, true)) + '</td></tr>' +
+          '<tr><td>إجمالي الحصص:</td><td>' + (permI ? '♾️ غير محدود — اشتراك دائم (حضر حتى الآن: ' + used + ' حصة)' : total + ' حصة (المستخدمة: ' + used + '، المتبقية: ' + rem + ')') + '</td></tr>' +
           (sub.payment_id ? '<tr><td>رقم الدفع:</td><td>' + escX(sub.payment_id) + '</td></tr>' : '') +
           (sub.notes ? '<tr><td>ملاحظات:</td><td>' + escX(sub.notes) + '</td></tr>' : '') +
         '</table>' +
@@ -25687,6 +25717,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         const used = periods.reduce((a, p) => a + (p.used_sessions || 0), 0);
         const total = sub.total_sessions || (sub.months || 1) * 8;
         const st = SubscriptionService.isPermanent(sub) ? 'permanent' : SubscriptionService.subscriptionStatus(sub, today);
+        const permI = SubscriptionService.isPermanent(sub);
         const rem = Math.max(0, total - used);
         const pct = total ? Math.round((used / total) * 100) : 0;
         const stBg = st === 'permanent' ? 'background:rgba(124,58,237,0.12);color:#7c3aed;border:1px solid rgba(124,58,237,0.3)'
@@ -25718,11 +25749,19 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         html += '<div style="text-align:center"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">الباقة</div><div style="font-weight:900;font-size:13px">' + escX(pkg ? pkg.label : ((sub.months || '—') + ' شهر')) + '</div></div>';
         html += '<div style="text-align:center" class="subx-money"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">السعر</div><div style="font-weight:900;font-size:13px;direction:ltr">' + (sub.total_price || 0).toLocaleString('ar-DZ') + ' دج</div></div>';
         html += '<div style="text-align:center"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">البداية</div><div style="font-weight:900;font-size:13px">' + SubscriptionService.fmtAr(sub.start_date) + '</div></div>';
-        html += '<div style="text-align:center"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">النهاية</div><div style="font-weight:900;font-size:13px">' + SubscriptionService.fmtAr(sub.end_date) + '</div></div>';
+        html += '<div style="text-align:center"><div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:3px">النهاية</div><div style="font-weight:900;font-size:13px;color:#7c3aed">' + (permI ? '♾️ دائم' : SubscriptionService.fmtAr(sub.end_date)) + '</div></div>';
         html += '</div>';
 
-        // Sessions progress
-        html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">' +
+        // Sessions progress — للدائم عرض "غير محدود" بدل الأرقام
+        html += (permI
+          ? '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:14px 16px;border:1.5px dashed rgba(124,58,237,0.35);border-radius:14px;background:rgba(124,58,237,0.06)">' +
+            '<span style="font-size:26px;line-height:1">♾️</span>' +
+            '<div style="flex:1">' +
+              '<div style="font-weight:900;font-size:13px;color:#7c3aed">اشتراك دائم — حصص غير محدودة</div>' +
+              '<div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-top:2px">حضر حتى الآن <b style="color:#2563eb;font-size:13px">' + used + '</b> حصة · لا تُحتسب ضمن أي سقف</div>' +
+            '</div>' +
+          '</div>'
+          : '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">' +
           '<div style="flex:1">' +
             '<div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;margin-bottom:4px">' +
               '<span>الحضور: <b style="color:#2563eb">' + used + ' / ' + total + '</b></span>' +
@@ -25732,7 +25771,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
               '<div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:99px;transition:width .5s ease"></div>' +
             '</div>' +
           '</div>' +
-        '</div>';
+        '</div>');
 
         // Monthly periods (compact)
         if (periods.length) {
@@ -25745,9 +25784,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
               : ms === 'full' ? 'background:rgba(239,68,68,0.1);color:#dc2626'
               : ms === 'completed' ? 'background:rgba(16,185,129,0.1);color:#059669'
               : 'background:var(--border);color:var(--text-muted)';
-            html += '<div style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:8px;font-size:10px;font-weight:700;' + msBg + '">' +
-              '<span>شهر ' + (p.month_number || '—') + '</span>' +
-              '<span style="font-weight:900">' + pu + '/' + pt + '</span>' +
+            html += '<div style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:8px;font-size:10px;font-weight:700;' + (permI ? 'background:rgba(124,58,237,0.12);color:#7c3aed' : msBg) + '">' +
+              '<span>' + (permI ? 'دائم' : 'شهر ' + (p.month_number || '—')) + '</span>' +
+              '<span style="font-weight:900">' + (permI ? '♾️' : pu + '/' + pt) + '</span>' +
             '</div>';
           });
           html += '</div>';
@@ -27132,6 +27171,71 @@ function cmConfirm(title, desc, icon = '⚠️', opts = {}) { return cmShow(icon
 
 // ── نافذة إدخال PIN (للإجراءات الحساسة) ──
 const DELETE_TEACHER_PIN = '2019';
+function cmConfirmPin(title, desc, opts = {}) {
+  // تأكيد + تحقق PIN في نافذة واحدة: يظهر حقل PIN داخل التأكيد قبل الزر النهائي.
+  return new Promise(resolve => {
+    const overlay = document.getElementById('cm-overlay');
+    const iconEl = document.getElementById('cm-icon');
+    const titleEl = document.getElementById('cm-title');
+    const descEl = document.getElementById('cm-desc');
+    const cancelBtn = document.getElementById('cm-cancel-btn');
+    const confirmBtn = document.getElementById('cm-confirm-btn');
+    const pinWrap = document.getElementById('cm-pin-wrap');
+    const prevOncancel = cancelBtn.onclick, prevOnconfirm = confirmBtn.onclick;
+    let resolved = false;
+    const finish = (val) => {
+      resolved = true;
+      cancelBtn.onclick = prevOncancel; confirmBtn.onclick = prevOnconfirm;
+      if (pinWrap) pinWrap.innerHTML = '';
+      overlay.classList.remove('open');
+      resolve(val);
+    };
+    const pinErr = () => {
+      if (pinWrap) {
+        let e = pinWrap.querySelector('.cm-pin-err');
+        if (e) e.style.display = 'block';
+      }
+      const inp = pinWrap && pinWrap.querySelector('#cm-pin-input');
+      if (inp) { inp.value = ''; inp.focus(); }
+    };
+    const updateBtn = () => {
+      const inp = pinWrap && pinWrap.querySelector('#cm-pin-input');
+      const pin = inp ? (inp.value || '').trim() : '';
+      confirmBtn.disabled = !pin;
+    };
+    if (pinWrap) {
+      pinWrap.innerHTML =
+        '<style>.cm-pin-wrap{display:flex;flex-direction:column;gap:8px;align-items:center;margin-top:14px}.cm-pin-wrap input{width:180px;text-align:center;font-size:22px;letter-spacing:8px;padding:10px 12px;border:2px solid var(--border,rgba(0,0,0,.12));border-radius:12px;font-family:monospace;outline:none;transition:border-color .15s}.cm-pin-wrap input:focus{border-color:#7C3AED}.cm-pin-err{color:#dc2626;font-size:11.5px;font-weight:700;display:none}</style>' +
+        '<div class="cm-pin-wrap"><div style="font-size:12px;font-weight:800;color:var(--text-muted)">🔒 أدخل رمز PIN للتحقق</div><input type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••" id="cm-pin-input"><div class="cm-pin-err" id="cm-pin-err">الرمز غير صحيح، حاول مرة أخرى</div></div>';
+      pinWrap.style.display = 'block';
+    }
+    iconEl.textContent = opts.icon || '🔒';
+    titleEl.textContent = title || 'تأكيد الحذف نهائياً';
+    descEl.innerHTML = (desc || '');
+    cancelBtn.textContent = opts.cancelText || 'إلغاء';
+    cancelBtn.style.display = 'inline-block';
+    cancelBtn.onclick = () => { finish(false); };
+    confirmBtn.textContent = opts.confirmText || 'حذف نهائياً';
+    confirmBtn.className = 'cm-btn ' + (opts.danger ? 'cm-btn-danger' : 'cm-btn-success');
+    confirmBtn.disabled = true;
+    confirmBtn.onclick = () => {
+      const inp = pinWrap && pinWrap.querySelector('#cm-pin-input');
+      const v = inp ? (inp.value || '').trim() : '';
+      if (v === DELETE_TEACHER_PIN) { finish(true); }
+      else { pinErr(); }
+    };
+    if (pinWrap) {
+      const inp = pinWrap.querySelector('#cm-pin-input');
+      inp.addEventListener('input', updateBtn);
+      inp.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' && !confirmBtn.disabled) confirmBtn.onclick();
+        if (ev.key === 'Escape') finish(false);
+      });
+      setTimeout(() => inp.focus(), 100);
+    }
+    overlay.classList.add('open');
+  });
+}
 function cmPromptPin(title, desc, opts = {}) {
   return new Promise(resolve => {
     const overlay = document.getElementById('cm-overlay');
@@ -28305,24 +28409,17 @@ async function srtToggleStatus(id) {
 async function srtDelete(id) {
   const t = srtAllData.find(x => x.id === id);
   if (!t) return;
-  const ok = await cmConfirm(
+  // ── تأكيد + تحقق PIN في نافذة واحدة قبل الحذف النهائي ──
+  const ok = await cmConfirmPin(
     'حذف الأستاذ نهائياً؟',
-    `سيتم حذف "${t.name || ''}" نهائياً من القوائم النشطة:\n` +
-    `• تعطيل الحساب ومنع تسجيل الدخول\n` +
-    `• إخفاؤه من اختيارات التسجيل والإدارة\n` +
-    `• الاحتفاظ بسجلات التلاميذ والحضور والمالية السابقة\n\n` +
-    `لا يمكن التراجع عن هذا الإجراء.`,
-    '🗑️',
-    { danger: true, confirmText: 'حذف نهائياً', cancelText: 'إلغاء' }
+    `سيتم حذف "${t.name || ''}" نهائياً من القوائم النشطة:<br>` +
+    `• تعطيل الحساب ومنع تسجيل الدخول<br>` +
+    `• إخفاؤه من اختيارات التسجيل والإدارة<br>` +
+    `• الاحتفاظ بسجلات التلاميذ والحضور والمالية السابقة<br><br>` +
+    `أدخل رمز PIN للتحقق للسماح بالختم النهائي. لا يمكن التراجع عن هذا الإجراء.`,
+    { danger: true, icon: '🗑️', confirmText: 'حذف نهائياً', cancelText: 'إلغاء' }
   );
   if (!ok) return;
-  // ── تحقق PIN قبل الحذف (إجراء حساس) ──
-  const pinOk = await cmPromptPin(
-    'رمز الأمان — حذف الأستاذ',
-    `أدخل رمز PIN للتحقق قبل حذف "${t.name || ''}" نهائياً.`,
-    { danger: true, icon: '🔒', confirmText: 'حذف نهائياً' }
-  );
-  if (!pinOk) { srtShowToast('تم إلغاء عملية الحذف', 'error'); return; }
   const {updateDoc,doc:d}=srtFS(),db=srtDB();
   try {
     await updateDoc(d(db, SRT_COLLECTION, id), {
