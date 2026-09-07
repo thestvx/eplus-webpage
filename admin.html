@@ -24438,9 +24438,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
             '</div>' +
           '</div>';
         subxBusy(false);
-        await cmShow('✅', 'تم بنجاح', successHtml, { hideCancel: true, confirmText: 'موافق', success: true });
-        subxCloseEditor();
-        await subxLoadAll();
+        try { subxCloseEditor(); } catch (e) { console.warn('[SUBSCRIPTIONS] close editor failed', e); }
+        try { await subxLoadAll(); } catch (e) { console.warn('[SUBSCRIPTIONS] refresh after create failed', e); }
+        // نافذة النجاح تعرض فوق القائمة المحدّثة — لا توقف التحديث إذا تعطّلت
+        try {
+          await cmShow('✅', 'تم بنجاح', successHtml, { hideCancel: true, confirmText: 'موافق', success: true });
+        } catch (e) { console.warn('[SUBSCRIPTIONS] success modal failed', e); }
+        srShowToast('🎉 تم إنشاء اشتراك ' + label + ' للتلميذ ' + name + ' بنجاح — وهو ظاهر الآن في القائمة.', 'success');
       }
     } catch (e) {
       const msg = String((e && e.message) || e);
