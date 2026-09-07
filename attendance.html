@@ -559,7 +559,7 @@ main{flex:1;position:relative;overflow:hidden}
       var snap = await window.db.collection('support_teachers').where('status', '==', 'active').get();
       snap.forEach(function (doc) {
         var d = doc.data();
-        if (d.name && d.teacherId) _teacherIdByName[normalizeTeacherName(d.name)] = d.teacherId;
+        if (d.name) _teacherIdByName[normalizeTeacherName(d.name)] = d.teacherId || d.id || doc.id;
       });
     } catch (e) { logScanner('teacherId map load error: ' + e.message); }
     _teacherIdMapLoaded = true;
@@ -567,6 +567,7 @@ main{flex:1;position:relative;overflow:hidden}
   async function checkAttendanceControl() {
     var openMap = {};
     var openIdMap = {};
+    var openNameMap = {};
     try {
       var today = AttendanceService.today();
       var snap = await window.db.collection('attendance_control')
@@ -577,6 +578,7 @@ main{flex:1;position:relative;overflow:hidden}
         if (d.isOpen) {
           if (d.teacherName) {
             var nn = normalizeTeacherName(d.teacherName);
+            openNameMap[nn] = true;
             if (d.subjectName) {
               openMap[nn + '|||' + d.subjectName.trim().toLowerCase()] = true;
             } else {
@@ -587,15 +589,17 @@ main{flex:1;position:relative;overflow:hidden}
         }
       });
     } catch (e) { logScanner('atc check error: ' + e.message); }
-    return { openMap: openMap, openIdMap: openIdMap };
+    return { openMap: openMap, openIdMap: openIdMap, openNameMap: openNameMap };
   }
-  function isTeacherOpen(openMap, openIdMap, teacherName, subjectName) {
+  function isTeacherOpen(openMap, openIdMap, teacherName, subjectName, openNameMap) {
     var nn = normalizeTeacherName(teacherName);
     if (subjectName) {
       var sk = nn + '|||' + subjectName.trim().toLowerCase();
       if (openMap[sk]) return true;
     }
     if (!subjectName && openMap[nn]) return true;
+    // مفتوح أي حصة/مادة لهذا الأستاذ → يعتبر حضور الأستاذ مفتوحاً
+    if (openNameMap && openNameMap[nn]) return true;
     var tid = _teacherIdByName[nn];
     if (tid && openIdMap[tid]) return true;
     return false;
@@ -707,13 +711,13 @@ main{flex:1;position:relative;overflow:hidden}
     var trialUsage = await getTrialUsage(studentId);
     await loadTeacherIdMap();
     var atc = await checkAttendanceControl();
-    var openMap = atc.openMap, openIdMap = atc.openIdMap;
+    var openMap = atc.openMap, openIdMap = atc.openIdMap, openNameMap = atc.openNameMap;
     for (var i = 0; i < subjects.length; i++) {
       var s = subjects[i];
       var key = (s.teacher || '') + '|' + (s.subject || '');
       if (seen[key]) continue;
       seen[key] = true;
-      var isOpen = isTeacherOpen(openMap, openIdMap, s.teacher, s.subject);
+      var isOpen = isTeacherOpen(openMap, openIdMap, s.teacher, s.subject, openNameMap);
       var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, trialUsed: 0, trialRemaining: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length };
       try {
         var subResult = await SubscriptionService.getActiveSubscriptionForSubject(studentId, s.subject, s.teacher, today);
@@ -886,7 +890,7 @@ main{flex:1;position:relative;overflow:hidden}
     // ── Server-side gate: verify attendance is still open for this teacher ──
     try {
       var atc2 = await checkAttendanceControl();
-      if (!isTeacherOpen(atc2.openMap, atc2.openIdMap, session.teacher, session.subject)) {
+      if (!isTeacherOpen(atc2.openMap, atc2.openIdMap, session.teacher, session.subject, atc2.openNameMap)) {
         btnEl.classList.remove('loading');
         btnEl.innerHTML = '\uD83D\uDD12 الحضور مغلق';
         btnEl.classList.add('orange');
