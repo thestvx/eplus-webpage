@@ -309,11 +309,8 @@ window.TeacherFinance = (function () {
     '.bg-gem-1{top:64px;left:38px;width:11px;height:11px}' +
     '.bg-gem-2{bottom:96px;right:54px;opacity:.3}' +
     '.bg-gem-3{top:192px;left:58px;width:6px;height:6px;opacity:.25}' +
-    '.rcpt-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:15px}' +
-    '.rcpt-logo{height:54px;width:auto;display:block}' +
-    '.rcpt-brand{text-align:left;flex-shrink:0}' +
-    '.rcpt-brand-name{font-size:13px;font-weight:900;color:#4C1D95;letter-spacing:4px;text-transform:uppercase}' +
-    '.rcpt-brand-tag{font-size:9px;color:#837C9C;font-weight:600;letter-spacing:.4px;margin-top:2px}' +
+    '.rcpt-header{display:flex;align-items:center;justify-content:center;padding:6px 0 18px}' +
+    '.rcpt-logo{height:120px;width:auto;display:block;margin:0 auto}' +
     '.rcpt-rule{position:relative;height:1px;border:none;margin:0 0 20px;background:linear-gradient(90deg,transparent,rgba(76,29,149,.22) 22%,rgba(76,29,149,.22) 78%,transparent)}' +
     '.rcpt-rule::after{content:"";position:absolute;left:50%;top:-3px;width:7px;height:7px;background:#C9A036;opacity:.5;transform:translateX(-50%) rotate(45deg)}' +
     '.rcpt-kicker{text-align:center;font-size:8.5px;letter-spacing:5px;color:#8A83A3;font-weight:700;text-transform:uppercase;margin-bottom:6px}' +
@@ -349,7 +346,7 @@ window.TeacherFinance = (function () {
     '.rcpt-mid img{height:42px;display:block;margin:0 auto 4px}' +
     '.rcpt-mid span{font-size:8.5px;color:#8A83A3;font-weight:700;letter-spacing:.5px}' +
     '.rcpt-footer{border-top:1px solid #E9E4F3;margin-top:16px;padding-top:11px;text-align:center;font-size:8.5px;color:#9A93B2;line-height:1.7}' +
-    '@media print{.rcpt-page{box-shadow:none;margin:0;padding:30px 42px;min-height:100vh}@page{size:A4 portrait;margin:0}}';
+    '@media print{body{background:#fff!important}.rcpt-page{box-shadow:none;margin:0;padding:30px 42px;min-height:100vh;-webkit-print-color-adjust:exact;print-color-adjust:exact!important;background:radial-gradient(1100px 480px at 50% -120px,rgba(124,58,237,.09),transparent 62%),radial-gradient(900px 520px at 100% 108%,rgba(76,29,149,.11),transparent 60%),radial-gradient(760px 420px at 0% 115%,rgba(109,40,217,.08),transparent 55%),linear-gradient(180deg,#FDFCFF 0%,#FAF8FE 55%,#F6F2FB 100%)!important}@page{size:A4 portrait;margin:0}}';
   }
 
   // تحويل المبلغ إلى حروف عربية (فقط لا غير) للصيغة الرسمية
@@ -406,7 +403,9 @@ window.TeacherFinance = (function () {
     const card2 = [];
     if (Number(p.totalSessions)) card2.push(['عدد الحصص', fmt(p.totalSessions) + ' حصة']);
     if (Number(p.totalStudents)) card2.push(['عدد التلاميذ', fmt(p.totalStudents)]);
-    card2.push(['الحالة', 'مسدد بالكامل']);
+    const remainingDue = (p.remaining == null) ? Math.max(0, (Number(p.totalDue || 0) - Number(p.totalPaid || 0))) : Math.max(0, Number(p.remaining) || 0);
+    card2.push(['الحالة', remainingDue > 0 ? 'غير مسدد بالكامل' : 'مسدد بالكامل']);
+    if (remainingDue > 0) card2.push(['المبلغ المتبقي', fmt(remainingDue) + ' دج']);
 
     const row = r => '<div class="rcpt-card-row"><span class="rcpt-k">' + r[0] + '</span><span class="rcpt-v">' + r[1] + '</span></div>';
     const thanks = p.note
@@ -430,8 +429,7 @@ window.TeacherFinance = (function () {
         '<span class="bg-gem bg-gem-3"></span>' +
       '</div>' +
       '<div class="rcpt-header">' +
-        '<img class="rcpt-logo" src="schoollogo/schoollogoblack.PNG" alt="logo">' +
-        '<div class="rcpt-brand"><div class="rcpt-brand-name">EDUCATION PLUS CENTER</div><div class="rcpt-brand-tag">أكاديمية التعليم والدعم المدرسي</div></div>' +
+        '<img class="rcpt-logo" src="schoollogo/schoollogoblack.PNG" alt="EDUCATION PLUS CENTER logo">' +
       '</div>' +
       '<hr class="rcpt-rule">' +
       '<div class="rcpt-kicker">OFFICIAL PAYMENT RECEIPT</div>' +
@@ -453,7 +451,7 @@ window.TeacherFinance = (function () {
       thanks +
       '<div class="rcpt-sigs">' +
         '<div class="rcpt-sig"><div class="rcpt-sig-line"></div><div class="rcpt-sig-label">توقيع الأستاذ(ة)</div></div>' +
-        '<div class="rcpt-mid"><img src="schoollogo/schoollogoblack.PNG" alt="logo"><span>EDUCATION PLUS CENTER</span></div>' +
+        '<div class="rcpt-mid"><img src="schoollogo/schoollogoblack.PNG" alt="logo"></div>' +
         '<div class="rcpt-sig"><div class="rcpt-sig-line"></div><div class="rcpt-sig-label">الإدارة: ' + (p.adminName || '—') + '</div></div>' +
       '</div>' +
       '<div class="rcpt-footer">وصل إلكتروني رسمي صادر عبر نظام إدارة أكاديمية التعليم والدعم المدرسي — يُحتفظ به للرجوع إليه</div>' +

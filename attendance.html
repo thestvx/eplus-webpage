@@ -718,15 +718,20 @@ main{flex:1;position:relative;overflow:hidden}
       if (seen[key]) continue;
       seen[key] = true;
       var isOpen = isTeacherOpen(openMap, openIdMap, s.teacher, s.subject, openNameMap);
-      var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, trialUsed: 0, trialRemaining: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length };
+      var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, trialUsed: 0, trialRemaining: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length };
       try {
         var subResult = await SubscriptionService.getActiveSubscriptionForSubject(studentId, s.subject, s.teacher, today);
         if (subResult && subResult.subscription) {
           sess.sub = subResult.subscription;
           sess.periods = subResult.periods || [];
           var subStatus = SubscriptionService.subscriptionStatus(subResult.subscription);
+          sess.permanent = SubscriptionService.isPermanent(subResult.subscription);
           var ap = SubscriptionService.activePeriod(sess.periods);
-          if (subStatus === 'active' && ap) {
+          if (sess.permanent) {
+            sess.status = 'active';
+            sess.attended = 0;
+            sess.remaining = 100000;
+          } else if (subStatus === 'active' && ap) {
             sess.status = 'active';
             sess.attended = ap.used_sessions || 0;
             sess.remaining = Math.max(0, (ap.total_sessions || 8) - sess.attended);
@@ -826,6 +831,9 @@ main{flex:1;position:relative;overflow:hidden}
       if (s.alreadyCheckedIn) {
         stClass = badgeClass = 'green';
         badgeText = '\u2705 تم التسجيل';
+      } else if (hasActiveSub && s.permanent) {
+        stClass = badgeClass = 'green';
+        badgeText = '\u267F\uFE0F اشتراك دائم';
       } else if (hasActiveSub) {
         stClass = badgeClass = 'green';
         badgeText = '\uD83D\uDFE2 نشط';
@@ -847,7 +855,9 @@ main{flex:1;position:relative;overflow:hidden}
       html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) + '">' + esc(s.teacher) + '</div><div class="tc-subject">' + esc(s.subject) + '</div></div>';
       html += '<div class="tc-badge ' + badgeClass + '">' + badgeText + '</div>';
       html += '</div>';
-      if (hasActiveSub) {
+if (hasActiveSub && s.permanent) {
+        html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:26px">\u267F\uFE0F</div><div style="font-size:13px;font-weight:900;color:#059669">مسموح بالدراسة دائماً</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">اشتراك دائم بدون حد للحصص</div></div></div>';
+      } else if (hasActiveSub) {
         html += '<div class="tc-stats"><div class="tc-stat"><div class="tc-stat-num">' + attended + '</div><div class="tc-stat-label">حضر</div></div><div class="tc-stat"><div class="tc-stat-num">' + remaining + '</div><div class="tc-stat-label">متبقي</div></div><div class="tc-stat"><div class="tc-stat-num">' + total + '</div><div class="tc-stat-label">الإجمالي</div></div></div>';
         html += '<div class="tc-progress-wrap"><div class="tc-progress"><div class="tc-progress-fill ' + barClass + '" style="width:' + pct + '%"></div></div></div>';
       } else if (hasTrial) {

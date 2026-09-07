@@ -1098,6 +1098,8 @@
         const payments=Array.isArray(finDoc.payments)?finDoc.payments.slice().sort(function(a,b){return(b.timestamp||0)-(a.timestamp||0);}):[];
         const totalPaid=payments.reduce(function(s,p){return s+(p.amount||0);},0);
         const lastUpdate=finDoc.updatedAt?fmtDate(finDoc.updatedAt):'—';
+        const remainingDue=Math.max(0,(totalEarnings||0)-(totalPaid||0));
+        window._finRemaining=remainingDue;
 
         let paymentsHtml='';
         if(payments.length===0){
@@ -1132,7 +1134,7 @@
             <div style="font-size:12px;opacity:.5;margin-top:8px;position:relative;z-index:1">آخر تحديث: ${lastUpdate}</div>
           </div>
 
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px">
             <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
               <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">الحضور</div>
               <div style="font-size:26px;font-weight:900;color:var(--green)">${fmtNum(totalSessions)}</div>
@@ -1148,6 +1150,10 @@
             <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border-light);text-align:center">
               <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">سعر الحصة</div>
               <div style="font-size:26px;font-weight:900;color:var(--green)">${fmtNum(rate)} <span style="font-size:13px;color:var(--text-muted)">دج</span></div>
+            </div>
+            <div style="background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid ${remainingDue>0?'rgba(217,119,6,0.35)':'var(--border-light)'};text-align:center">
+              <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px">المبلغ المتبقي للأستاذ</div>
+              <div style="font-size:26px;font-weight:900;color:${remainingDue>0?'#d97706':'var(--green)'}">${fmtNum(remainingDue)} <span style="font-size:13px;color:var(--text-muted)">دج</span></div>
             </div>
           </div>
 
@@ -1219,7 +1225,8 @@
         adminName:p.adminName||'',
         note:p.note||'',
         totalSessions:window._finSessions||0,
-        totalStudents:window._finStudents||0
+        totalStudents:window._finStudents||0,
+        remaining:window._finRemaining||0
       };
       window._finPreview=payload;
       tRenderReceiptOverlay(payload);

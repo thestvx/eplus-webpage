@@ -30,6 +30,11 @@ const SubscriptionService = (function () {
     { months: 2, label: 'شهرين', price: 4000, sessions: 16 },
     { months: 3, label: '3 أشهر', price: 6000, sessions: 24 }
   ];
+  // الباقات الثابتة لنافذة اشتراك جديد (بفهرستها الظاهرة) — شهر 8 حصص + شهر 4 حصص
+  const PACKAGE_BY_INDEX = {
+    1: { months: 1, label: 'شهر — 8 حصص', price: 2000, sessions: 8 },
+    2: { months: 1, label: 'شهر — 4 حصص', price: 2000, sessions: 4 }
+  };
   const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'ماي', 'جوان', 'جويلية', 'أوت', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 
   let SUPABASE_URL = '';
@@ -56,6 +61,10 @@ const SubscriptionService = (function () {
 
   function packageByMonths(n) {
     return PACKAGES.find(p => p.months === (parseInt(n, 10) || 1)) || PACKAGES[0];
+  }
+
+  function packageByIndex(n) {
+    return PACKAGE_BY_INDEX[n] || null;
   }
 
   function endDateFor(startDate, months) {
@@ -277,9 +286,9 @@ const SubscriptionService = (function () {
     const months = parseInt(opts.months, 10) || 1;
     const start = opts.startDate || today();
     const pkg = packageByMonths(months);
-    const isCustom = !!(opts.totalSessions || opts.totalPrice);
-    const price = isCustom ? (opts.totalPrice || pkg.price) : pkg.price;
-    const paymentId = opts.paymentId || ('SUBPAY-' + opts.studentId + '-' + (opts.subjectId || '') + '-' + start + '-' + months);
+    const isCustom = !!opts.permanent || !!(opts.totalSessions || opts.totalPrice);
+    const price = opts.permanent ? (opts.totalPrice || 0) : (isCustom ? (opts.totalPrice || pkg.price) : pkg.price);
+    const paymentId = opts.paymentId || ('SUBPAY-' + opts.studentId + '-' + (opts.subjectId || '') + '-' + start + '-' + months + (opts.permanent ? '-PERM' : ''));
     const data = await _adminCall('create-subscription', {
       studentId: opts.studentId,
       months: months,
@@ -291,7 +300,7 @@ const SubscriptionService = (function () {
       teacherId: opts.teacherId || '',
       subjectName: opts.subjectName || '',
       teacherName: opts.teacherName || '',
-      ...(isCustom ? { totalSessions: opts.totalSessions || undefined } : {})
+      ...(opts.permanent ? { permanent: true, totalSessions: 100000 } : isCustom ? { totalSessions: opts.totalSessions || undefined } : {})
     });
     if (!data) throw new Error('create-subscription returned no data');
     return data;
@@ -358,6 +367,7 @@ const SubscriptionService = (function () {
     const r = refDate || today();
     if (sub.status === 'cancelled') return 'cancelled';
     if (sub.status === 'paused') return 'paused';
+    if (sub.status === 'permanent') return 'active';
     if (r < (sub.start_date || '')) return 'upcoming';
     if (r > (sub.end_date || '')) return 'expired';
     const periods = (sub.periods || []);
@@ -366,9 +376,14 @@ const SubscriptionService = (function () {
     return 'active';
   }
 
+  function isPermanent(sub) {
+    return !!(sub && sub.status === 'permanent');
+  }
+
   function subscriptionStatusLabel(st) {
     switch (st) {
       case 'active': return '🟢 نشط';
+      case 'permanent': return '♾️ دائم';
       case 'upcoming': return '⏳ لم يبدأ';
       case 'done': return '📌 مكتمل الحصص';
       case 'expired': return '⚪ انتهى';
@@ -443,10 +458,12 @@ const SubscriptionService = (function () {
     monthStatus,
     monthStatusLabel,
     packageByMonths,
+    packageByIndex,
     endDateFor,
     fmtAr,
     fmtPrice,
     statusLabel,
+    isPermanent,
     SESSIONS_PER_MONTH,
     PRICE_PER_MONTH,
     MONTH_PRICES,

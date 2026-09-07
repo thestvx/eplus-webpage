@@ -3926,27 +3926,27 @@
               <div style="display:flex;gap:12px;flex-wrap:wrap">
                 <div class="subx-pkg" id="subx-pkg-1" onclick="subxSelectPackage(1)">
                   <div class="p-check">✓</div>
-                  <div class="p-name">شهر واحد</div>
+                  <div class="p-name">شهر — 8 حصص</div>
                   <div class="p-price">2,000 دج</div>
                   <div class="p-sess">8 حصص</div>
                 </div>
                 <div class="subx-pkg" id="subx-pkg-2" onclick="subxSelectPackage(2)">
                   <div class="p-check">✓</div>
-                  <div class="p-name">شهرين</div>
-                  <div class="p-price">4,000 دج</div>
-                  <div class="p-sess">16 حصة</div>
-                </div>
-                <div class="subx-pkg" id="subx-pkg-3" onclick="subxSelectPackage(3)">
-                  <div class="p-check">✓</div>
-                  <div class="p-name">3 أشهر</div>
-                  <div class="p-price">6,000 دج</div>
-                  <div class="p-sess">24 حصة</div>
+                  <div class="p-name">شهر — 4 حصص</div>
+                  <div class="p-price">2,000 دج</div>
+                  <div class="p-sess">4 حصص</div>
                 </div>
                 <div class="subx-pkg" id="subx-pkg-custom" onclick="subxSelectPackage('custom')" style="border-style:dashed">
                   <div class="p-check">✓</div>
                   <div class="p-name">⚙️ باقة مخصصة</div>
                   <div class="p-price">—</div>
                   <div class="p-sess">حدد يدوياً</div>
+                </div>
+                <div class="subx-pkg" id="subx-pkg-permanent" onclick="subxSelectPackage('permanent')" style="border-style:dashed;border-color:rgba(124,58,237,0.45);background:rgba(124,58,237,0.06)">
+                  <div class="p-check">✓</div>
+                  <div class="p-name">♾️ اشتراك دائم</div>
+                  <div class="p-price" style="color:#7C3AED">—</div>
+                  <div class="p-sess">دائماً مسموح</div>
                 </div>
               </div>
               <div id="subx-custom-presets" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px"></div>
@@ -24056,7 +24056,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   // ── اختيار الباقة ──
   window.subxSelectPackage = function (n) {
     selectedPkg = n;
-    ['custom', 1, 2, 3].forEach(i => { const el = $x('subx-pkg-' + i); if (el) el.classList.toggle('sel', i === n); });
+    ['custom', 'permanent', 1, 2].forEach(i => { const el = $x('subx-pkg-' + i); if (el) el.classList.toggle('sel', i === n); });
     document.querySelectorAll('[id^="subx-pkg-sp-"]').forEach(el => el.classList.remove('sel'));
     var cf = $x('subx-custom-fields');
     if (cf) cf.style.display = n === 'custom' ? 'block' : 'none';
@@ -24123,7 +24123,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var p = list[idx];
     if (!p) return;
     selectedPkg = 'custom';
-    ['custom', 1, 2, 3].forEach(function (i) { var el = $x('subx-pkg-' + i); if (el) el.classList.remove('sel'); });
+    ['custom', 'permanent', 1, 2].forEach(function (i) { var el = $x('subx-pkg-' + i); if (el) el.classList.remove('sel'); });
     var cf = $x('subx-custom-fields');
     if (cf) cf.style.display = 'block';
     $x('subx-custom-sessions').value = p.sessions;
@@ -24152,8 +24152,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       var cp = _getCustomPkg();
       if (!cp.sessions || cp.sessions < 1) missing.push('عدد الحصص');
       if (!cp.price || cp.price < 0) missing.push('سعر الباقة');
-    } else {
-      if (!(selectedPkg >= 1 && selectedPkg <= 3)) missing.push('اختيار الباقة');
+    } else if (selectedPkg !== 'permanent') {
+      if (!(selectedPkg >= 1 && selectedPkg <= 2)) missing.push('اختيار الباقة');
     }
     if (!$x('subx-start').value) missing.push('تاريخ البداية');
     const el = $x('subx-valid-msg');
@@ -24174,14 +24174,15 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   // ── معاينة قبل التأكيد ──
   window.subxRenderPreview = function () {
     const isCustom = selectedPkg === 'custom';
-    const pkg = isCustom ? null : SubscriptionService.packageByMonths(selectedPkg);
+    const isPermanent = selectedPkg === 'permanent';
+    const pkg = (isCustom || isPermanent) ? null : SubscriptionService.packageByIndex(selectedPkg);
     const customPkg = isCustom ? _getCustomPkg() : null;
-    const months = isCustom ? Math.max(1, Math.ceil((customPkg.sessions || 8) / 8)) : pkg.months;
+    const months = isPermanent ? 1 : (isCustom ? Math.max(1, Math.ceil((customPkg.sessions || 8) / 8)) : pkg.months);
     const start = $x('subx-start').value || SubscriptionService.today();
-    const end = SubscriptionService.endDateFor(start, months);
-    const price = isCustom ? (customPkg.price || 0) : pkg.price;
-    const sessions = isCustom ? (customPkg.sessions || 0) : pkg.sessions;
-    const label = isCustom ? ('باقة مخصصة — ' + sessions + ' حصة') : pkg.label;
+    const end = isPermanent ? '2099-12-31' : SubscriptionService.endDateFor(start, months);
+    const price = isPermanent ? 0 : (isCustom ? (customPkg.price || 0) : pkg.price);
+    const sessions = isPermanent ? '∞' : (isCustom ? (customPkg.sessions || 0) : pkg.sessions);
+    const label = isPermanent ? '♾️ اشتراك دائم' : (isCustom ? ('باقة مخصصة — ' + sessions + ' حصة') : pkg.label);
     const body = $x('subx-preview-body');
     if (!selectedStudent) {
       body.innerHTML = '<div class="subx-note">اختر الطالب أولاً لعرض معاينة الاشتراك.</div>';
@@ -24193,19 +24194,25 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700;width:130px">الطالب</td><td style="padding:5px 6px;font-weight:800">' + escX(name) + ' <span style="font-family:monospace;font-size:11px;color:var(--text-muted)">' + escX(selectedStudent.id) + '</span></td></tr>';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">المادة — الأستاذ</td><td style="padding:5px 6px;font-weight:800">' + (selectedSubject ? escX(selectedSubject.icon + ' ' + selectedSubject.subjectName + ' — ' + (selectedSubject.teacherName || '—')) : '<span style="color:#b45309">لم تُختر بعد</span>') + '</td></tr>';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">الباقة</td><td style="padding:5px 6px;font-weight:800">' + escX(label) + '</td></tr>';
-    if (!(window._employeeRestrictions && window._employeeRestrictions.subxHideMoney)) {
+    if (!(window._employeeRestrictions && window._employeeRestrictions.subxHideMoney) && !isPermanent) {
       html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">السعر</td><td style="padding:5px 6px;font-weight:800;color:#059669">' + SubscriptionService.fmtPrice(price) + '</td></tr>';
     }
-    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">عدد الحصص</td><td style="padding:5px 6px;font-weight:800">' + sessions + ' حصة' + (isCustom ? '' : ' (' + pkg.months + ' × 8)') + '</td></tr>';
+    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">عدد الحصص</td><td style="padding:5px 6px;font-weight:800">' + sessions + (isPermanent ? ' — الحضور مسموح دائماً' : ' حصة') + '</td></tr>';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">تاريخ البداية</td><td style="padding:5px 6px;font-weight:800">' + SubscriptionService.fmtAr(start, true) + '</td></tr>';
-    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">تاريخ النهاية</td><td style="padding:5px 6px;font-weight:800">' + SubscriptionService.fmtAr(end, true) + '</td></tr>';
+    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">تاريخ النهاية</td><td style="padding:5px 6px;font-weight:800">' + (isPermanent ? '<span style="color:#7C3AED;font-weight:900">دائم (بلا نهاية)</span>' : SubscriptionService.fmtAr(end, true)) + '</td></tr>';
     html += '</table>';
+    if (isPermanent) {
+      html += '<div style="margin-top:10px;padding:12px;border-radius:10px;background:rgba(124,58,237,0.08);border:1.5px dashed rgba(124,58,237,0.4);text-align:center;font-size:12.5px;font-weight:800;color:#5B21B6">♾️ اشتراك دائم — الطالب يدرس دائماً ويسجل الحضور بشكل دائم من دون عدد حصص محدد</div>';
+      body.innerHTML = html;
+      subxValidate();
+      return;
+    }
     const periods = SubscriptionService.buildPeriods(start, months);
     html += '<div style="margin-top:10px;font-size:12px;font-weight:800;color:var(--text-muted)">الحصص حسب الشهر:</div>';
     html += '<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">';
     var sessLeft = sessions;
     periods.forEach(p => {
-      var perSess = isCustom ? Math.min(8, sessLeft) : 8;
+      var perSess = Math.min(8, sessLeft);
       sessLeft -= perSess;
       html += '<div style="flex:1;min-width:120px;background:var(--primary-light);border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:800">الشهر ' + p.monthNumber +
         '<div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-top:2px">' + SubscriptionService.fmtAr(p.startDate) + ' → ' + SubscriptionService.fmtAr(p.endDate) + '</div>' +
@@ -24221,12 +24228,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     if (!subxValidate()) { srShowToast('أكمل البيانات الناقصة أولاً', 'error'); return; }
     if (!selectedStudent || !selectedSubject) { srShowToast('أكمل البيانات الناقصة أولاً', 'error'); return; }
     const isCustom = selectedPkg === 'custom';
-    const pkg = isCustom ? null : SubscriptionService.packageByMonths(selectedPkg);
+    const isPermanent = selectedPkg === 'permanent';
+    const pkg = (isCustom || isPermanent) ? null : SubscriptionService.packageByIndex(selectedPkg);
     const customPkg = isCustom ? _getCustomPkg() : null;
-    const months = isCustom ? Math.max(1, Math.ceil((customPkg.sessions || 8) / 8)) : pkg.months;
-    const price = isCustom ? (customPkg.price || 0) : pkg.price;
-    const sessions = isCustom ? (customPkg.sessions || 0) : pkg.sessions;
-    const label = isCustom ? ('باقة مخصصة — ' + sessions + ' حصة') : pkg.label;
+    const months = isPermanent ? 1 : (isCustom ? Math.max(1, Math.ceil((customPkg.sessions || 8) / 8)) : pkg.months);
+    const price = isPermanent ? 0 : (isCustom ? (customPkg.price || 0) : pkg.price);
+    const sessions = isPermanent ? '∞' : (isCustom ? (customPkg.sessions || 0) : pkg.sessions);
+    const label = isPermanent ? '♾️ اشتراك دائم' : (isCustom ? ('باقة مخصصة — ' + sessions + ' حصة') : pkg.label);
     const btn = $x('subx-create-btn');
     let start = $x('subx-start').value || SubscriptionService.today();
 
@@ -24250,35 +24258,36 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       }
 
       const name = studentFullName(selectedStudent);
-      const end = SubscriptionService.endDateFor(start, months);
+      const end = isPermanent ? '2099-12-31' : SubscriptionService.endDateFor(start, months);
       const summary =
         '<div style="text-align:right;font-size:13px;line-height:2">' +
           '<div><b>الطالب:</b> ' + escX(name) + ' <span style="font-family:monospace;font-size:11px;color:var(--text-muted)">' + escX(selectedStudent.id) + '</span></div>' +
           '<div><b>المادة — الأستاذ:</b> ' + escX(selectedSubject.icon + ' ' + selectedSubject.subjectName + ' — ' + (selectedSubject.teacherName || '—')) + '</div>' +
           '<div><b>الباقة:</b> ' + escX(label) + '</div>' +
-          '<div><b>السعر:</b> ' + SubscriptionService.fmtPrice(price) + '</div>' +
-          '<div><b>الحصص:</b> ' + sessions + ' حصة</div>' +
+          (isPermanent ? '<div><b>الحالة:</b> <span style="color:#7C3AED;font-weight:900">♾️ دائم</span></div>' : '<div><b>السعر:</b> ' + SubscriptionService.fmtPrice(price) + '</div>') +
+          '<div><b>الحصص:</b> ' + (isPermanent ? 'بدون حد للأبد' : sessions + ' حصة') + '</div>' +
           '<div><b>البداية:</b> ' + SubscriptionService.fmtAr(start, true) + '</div>' +
-          '<div><b>النهاية:</b> ' + SubscriptionService.fmtAr(end, true) + '</div>' +
+          '<div><b>النهاية:</b> ' + (isPermanent ? '<span style="color:#7C3AED;font-weight:900">دائم (بلا نهاية)</span>' : SubscriptionService.fmtAr(end, true)) + '</div>' +
         '</div>';
       const ok = await cmShow('📅', 'تأكيد الاشتراك', summary + '<div style="margin-top:8px;font-size:12px;color:var(--text-muted)">هل تريد تأكيد إنشاء هذا الاشتراك؟</div>', { confirmText: 'تأكيد الاشتراك', success: true });
       if (!ok) { btn.disabled = false; return; }
 
-      const paymentId = 'SUBPAY-' + selectedStudent.id + '-' + (selectedSubject.subjectId || 'x') + '-' + start + '-' + months;
+      const paymentId = 'SUBPAY-' + selectedStudent.id + '-' + (selectedSubject.subjectId || 'x') + '-' + start + '-' + months + (isPermanent ? '-PERM' : '');
       const created = await SubscriptionService.createSubscription({
         studentId: selectedStudent.id,
         months: months,
         startDate: start,
         paymentId: paymentId,
-        notes: isCustom ? ('باقة مخصصة: ' + sessions + ' حصة بـ ' + price + ' دج') : 'أنشئ من لوحة الإدارة',
+        notes: isPermanent ? 'اشتراك دائم' : (isCustom ? ('باقة مخصصة: ' + sessions + ' حصة بـ ' + price + ' دج') : 'أنشئ من لوحة الإدارة'),
         subjectId: selectedSubject.subjectId,
         teacherId: selectedSubject.teacherId,
         subjectName: selectedSubject.subjectName,
         teacherName: selectedSubject.teacherName,
         totalPrice: price,
-        totalSessions: isCustom ? sessions : undefined
+        totalSessions: isPermanent ? 100000 : sessions,
+        permanent: isPermanent
       });
-      if (created && created.subscription) {
+      if (created && created.subscription && !isPermanent) {
         // ── Deduct trial sessions from first period (cycle-aware) ──
         // "Done" subs (remaining=0, date not expired): use start_date as cutoff
         // so old trials before the subscription are excluded, but fresh trial records count.
@@ -24876,7 +24885,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       const used = periods.reduce((a, p) => a + ((p.used_sessions || 0)), 0);
       const total = sub.total_sessions || (sub.months || 1) * 8;
       if (!sub.periods && periods.length) sub.periods = periods;
-      const stNow = SubscriptionService.subscriptionStatus(sub, today);
+      const stNow = SubscriptionService.isPermanent(sub) ? 'permanent' : SubscriptionService.subscriptionStatus(sub, today);
       const stLabel = SubscriptionService.subscriptionStatusLabel(stNow);
       const stBg = stNow === 'active' ? 'background:rgba(16,185,129,0.12);color:#059669;border:1px solid rgba(16,185,129,0.25)'
         : stNow === 'paused' ? 'background:rgba(147,51,234,0.12);color:#7c3aed;border:1px solid rgba(147,51,234,0.25)'
@@ -25554,7 +25563,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       const total = sub.total_sessions || (sub.months || 1) * 8;
       const rem = Math.max(0, total - used);
       const pkg = SubscriptionService.packageByMonths(sub.months);
-      const st = SubscriptionService.subscriptionStatus(sub, SubscriptionService.today());
+      const st = SubscriptionService.isPermanent(sub) ? 'permanent' : SubscriptionService.subscriptionStatus(sub, SubscriptionService.today());
       const stLbl = SubscriptionService.subscriptionStatusLabel(st);
       const price = (sub.total_price || 0).toLocaleString('ar-DZ') + ' دج';
 
@@ -25677,10 +25686,11 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         const pkg = SubscriptionService.packageByMonths(sub.months);
         const used = periods.reduce((a, p) => a + (p.used_sessions || 0), 0);
         const total = sub.total_sessions || (sub.months || 1) * 8;
-        const st = SubscriptionService.subscriptionStatus(sub, today);
+        const st = SubscriptionService.isPermanent(sub) ? 'permanent' : SubscriptionService.subscriptionStatus(sub, today);
         const rem = Math.max(0, total - used);
         const pct = total ? Math.round((used / total) * 100) : 0;
-        const stBg = st === 'active' ? 'background:rgba(16,185,129,0.12);color:#059669;border:1px solid rgba(16,185,129,0.25)'
+        const stBg = st === 'permanent' ? 'background:rgba(124,58,237,0.12);color:#7c3aed;border:1px solid rgba(124,58,237,0.3)'
+          : st === 'active' ? 'background:rgba(16,185,129,0.12);color:#059669;border:1px solid rgba(16,185,129,0.25)'
           : st === 'done' ? 'background:rgba(245,158,11,0.14);color:#d97706;border:1px solid rgba(245,158,11,0.2)'
           : st === 'upcoming' ? 'background:rgba(59,130,246,0.1);color:#2563eb;border:1px solid rgba(59,130,246,0.2)'
           : st === 'cancelled' ? 'background:rgba(239,68,68,0.12);color:#dc2626;border:1px solid rgba(239,68,68,0.2)'
@@ -27120,6 +27130,53 @@ function cmShow(icon, title, desc, opts = {}) {
 function cmAlert(title, desc, icon = '✅') { return cmShow(icon, title, desc, { hideCancel: true, confirmText: 'موافق' }); }
 function cmConfirm(title, desc, icon = '⚠️', opts = {}) { return cmShow(icon, title, desc, { ...opts }); }
 
+// ── نافذة إدخال PIN (للإجراءات الحساسة) ──
+const DELETE_TEACHER_PIN = '2019';
+function cmPromptPin(title, desc, opts = {}) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('cm-overlay');
+    const iconEl = document.getElementById('cm-icon');
+    const titleEl = document.getElementById('cm-title');
+    const descEl = document.getElementById('cm-desc');
+    const cancelBtn = document.getElementById('cm-cancel-btn');
+    const confirmBtn = document.getElementById('cm-confirm-btn');
+    const prevOncancel = cancelBtn.onclick, prevOnconfirm = confirmBtn.onclick, prevOnkey = null;
+    const finish = (val) => {
+      confirmBtn.onclick = prevOnconfirm; cancelBtn.onclick = prevOncancel;
+      if (prevOnkey && document.body.removeEventListener) document.body.removeEventListener('keydown', prevOnkey);
+      const wrap = descEl.querySelector('.cm-pin-wrap'); if (wrap) wrap.remove();
+      overlay.classList.remove('open');
+      resolve(val);
+    };
+    iconEl.textContent = opts.icon || '🔒';
+    titleEl.textContent = title || 'تأكيد الإجراء';
+    descEl.innerHTML = (desc || '');
+    descEl.insertAdjacentHTML('beforeend',
+      '<style>.cm-pin-wrap{display:flex;flex-direction:column;gap:8px;align-items:center;margin-top:14px}.cm-pin-wrap input{width:180px;text-align:center;font-size:22px;letter-spacing:8px;padding:10px 12px;border:2px solid var(--border,rgba(0,0,0,.12));border-radius:12px;font-family:monospace;outline:none;transition:border-color .15s}.cm-pin-wrap input:focus{border-color:#7C3AED}.cm-pin-err{color:#dc2626;font-size:11.5px;font-weight:700;display:none}</style>' +
+      '<div class="cm-pin-wrap"><input type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••" id="cm-pin-input"><div class="cm-pin-err" id="cm-pin-err">الرمز غير صحيح، حاول مرة أخرى</div></div>');
+    cancelBtn.style.display = 'none';
+    cancelBtn.onclick = () => { finish(false); };
+    confirmBtn.textContent = opts.confirmText || 'تأكيد';
+    confirmBtn.className = 'cm-btn ' + (opts.danger ? 'cm-btn-danger' : 'cm-btn-success');
+    confirmBtn.onclick = () => {
+      const v = (document.getElementById('cm-pin-input').value || '').trim();
+      if (!v) { document.getElementById('cm-pin-input').focus(); return; }
+      if (v === DELETE_TEACHER_PIN) { finish(true); }
+      else {
+        const err = document.getElementById('cm-pin-err');
+        if (err) err.style.display = 'block';
+        document.getElementById('cm-pin-input').value = '';
+        document.getElementById('cm-pin-input').focus();
+      }
+    };
+    overlay.classList.add('open');
+    setTimeout(() => {
+      const inp = document.getElementById('cm-pin-input');
+      if (inp) inp.focus();
+    }, 100);
+  });
+}
+
 // ═══════════════════════════════════════════════════════════
 //  INIT on page load
 // ═══════════════════════════════════════════════════════════
@@ -27629,10 +27686,11 @@ async function srtFinanceGetReceiptPayload(txId) {
   const t = _srtFinanceTeacher;
   if (!t) return null;
   const id = t.teacherId || t.id;
-  const [receipts, ledger, atcSnap] = await Promise.all([
+  const [receipts, ledger, atcSnap, bal] = await Promise.all([
     TeacherFinance.getReceipts(id),
     TeacherFinance.getLedger(id),
     (function(){try{const {getDocs:c2,collection:c3}=srtFS(),db2=srtDB();return getDocs(c3(db2,'attendance_control'));}catch(e){return Promise.resolve({docs:[]});}})().then(function(snap){var tName=String(t.name||'').replace(/\s+/g,' ').trim().toLowerCase().replace(/عبد\s+ال/g,'abd');return{docs:snap.docs.filter(function(d){var dd=d.data();var dn=String(dd.teacherName||'').replace(/\s+/g,' ').trim().toLowerCase().replace(/عبد\s+ال/g,'abd');return dn===tName;})};}).catch(function(){return {docs:[]};}),
+    TeacherFinance.getBalance(id).catch(function(){return {};}),
   ]);
   const rcpt = receipts.find(x => x.transaction_id === txId) || receipts[0];
   const tx = ledger.find(x => x.id === txId) || (rcpt ? { amount: rcpt.amount, date: rcpt.date, notes: rcpt.notes } : null);
@@ -27655,6 +27713,10 @@ async function srtFinanceGetReceiptPayload(txId) {
   const subjects = t.subjects || t.spec || '';
   const subjectNames = (typeof subjects === 'string' ? subjects : Array.isArray(subjects) ? subjects.map(function(s){return s.subject||s.name||s;}).join(', ') : '') || '';
 
+  const totalPaidAll = (receipts || []).reduce(function(s, r) { return s + (Number(r.amount) || 0); }, 0);
+  const totalDueAll = (bal && bal.total_due != null) ? Number(bal.total_due) : (ledger || []).filter(x => x.transaction_type === 'dues').reduce(function(s, d) { return s + (Number(d.amount) || 0); }, 0);
+  const remainingAll = (bal && bal.pending != null) ? Math.max(0, Number(bal.pending)) : Math.max(0, totalDueAll - totalPaidAll);
+
   return {
     receiptId: (rcpt && rcpt.id) || ('RCP-' + (tx.date || TeacherFinance.today()).replace(/-/g, '') + '-' + txId.slice(-4)),
     teacherName: t.name || tx.teacher_name || '',
@@ -27667,6 +27729,9 @@ async function srtFinanceGetReceiptPayload(txId) {
     studentBreakdown: studentBreakdown,
     totalStudents: new Set(studentBreakdown.map(s => s.name)).size,
     totalSessions: studentBreakdown.reduce((sum, s) => sum + s.sessions, 0),
+    remaining: remainingAll,
+    totalDue: totalDueAll,
+    totalPaid: totalPaidAll,
   };
 }
 
@@ -28251,6 +28316,13 @@ async function srtDelete(id) {
     { danger: true, confirmText: 'حذف نهائياً', cancelText: 'إلغاء' }
   );
   if (!ok) return;
+  // ── تحقق PIN قبل الحذف (إجراء حساس) ──
+  const pinOk = await cmPromptPin(
+    'رمز الأمان — حذف الأستاذ',
+    `أدخل رمز PIN للتحقق قبل حذف "${t.name || ''}" نهائياً.`,
+    { danger: true, icon: '🔒', confirmText: 'حذف نهائياً' }
+  );
+  if (!pinOk) { srtShowToast('تم إلغاء عملية الحذف', 'error'); return; }
   const {updateDoc,doc:d}=srtFS(),db=srtDB();
   try {
     await updateDoc(d(db, SRT_COLLECTION, id), {

@@ -446,7 +446,8 @@ CREATE OR REPLACE FUNCTION admin_create_subscription(
   p_teacher_id TEXT DEFAULT NULL,
   p_subject_id TEXT DEFAULT NULL,
   p_teacher_name TEXT DEFAULT NULL,
-  p_subject_name TEXT DEFAULT NULL
+  p_subject_name TEXT DEFAULT NULL,
+  p_permanent BOOLEAN DEFAULT FALSE
 )
 RETURNS JSONB AS $$
 DECLARE
@@ -467,7 +468,8 @@ BEGIN
   IF p_student_id IS NULL OR p_student_id = '' THEN RAISE EXCEPTION 'student_id required'; END IF;
   IF p_start_date IS NULL OR p_start_date !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN RAISE EXCEPTION 'invalid start_date (YYYY-MM-DD)'; END IF;
   v_months := COALESCE(p_months, 1);
-  IF v_months NOT IN (1, 2, 3) THEN RAISE EXCEPTION 'months must be 1, 2 or 3'; END IF;
+  IF NOT p_permanent AND v_months NOT IN (1, 2, 3) THEN RAISE EXCEPTION 'months must be 1, 2 or 3'; END IF;
+  IF p_permanent THEN v_months := 1; END IF;
   IF p_payment_id IS NULL OR p_payment_id = '' THEN RAISE EXCEPTION 'payment_id required (idempotency)'; END IF;
   IF EXISTS (SELECT 1 FROM student_subscriptions WHERE payment_id = p_payment_id) THEN
     RAISE EXCEPTION 'payment already exists: %', p_payment_id USING ERRCODE = '23505';
@@ -480,6 +482,7 @@ BEGIN
   -- الباقة المخصصة: عدد الحصص يأتي من p_total_sessions (المستخدم يحدده بنفسه).
   -- إذا لم يُوفَّر، يُحسب 8 حصص لكل شهر كافتراضي.
   v_total_sessions := COALESCE(p_total_sessions, v_months * 8);
+  IF p_permanent THEN v_total_sessions := COALESCE(v_total_sessions, 100000); END IF;
   IF v_total_sessions < 1 THEN RAISE EXCEPTION 'total_sessions must be >= 1'; END IF;
 
   -- الطالب مسجل فعلاً لدى هذا الأستاذ في هذه المادة (مصدر واحد للتسجيل).
@@ -506,8 +509,13 @@ BEGIN
 
   v_sub_id := 'SUB-' || p_student_id || '-' || to_char(now(), 'YYYYMMDDHH24MISSMS');
   v_cur := p_start_date::date;
-  v_next := v_cur + (v_months * interval '1 month');
-  v_end := to_char(v_next - interval '1 day', 'YYYY-MM-DD');
+  IF p_permanent THEN
+    v_next := NULL;
+    v_end := '2099-12-31';
+  ELSE
+    v_next := v_cur + (v_months * interval '1 month');
+    v_end := to_char(v_next - interval '1 day', 'YYYY-MM-DD');
+  END IF;
 
   -- منع التداخل: لا يتداخل اشتراك مع اشتراك آخر نشط لنفس الطالب
   -- في نفس المادة + نفس الأستاذ. (الطلبة قد يملكون اشتراكات مختلفة
@@ -528,17 +536,23 @@ BEGIN
   VALUES
     (v_sub_id, p_student_id, v_teacher_id, v_subject_id,
      COALESCE(p_teacher_name, ''), COALESCE(p_subject_name, ''),
-     p_start_date, v_end, v_months, v_total, v_total_sessions, 'active', p_payment_id, COALESCE(p_notes, ''));
+     p_start_date, v_end, v_months, v_total, v_total_sessions,
+     CASE WHEN p_permanent THEN 'permanent' ELSE 'active' END, p_payment_id, COALESCE(p_notes, ''));
 
   FOR i IN 1..v_months LOOP
     v_start := to_char(v_cur, 'YYYY-MM-DD');
-    v_next := v_cur + interval '1 month';
-    v_end := to_char(v_next - interval '1 day', 'YYYY-MM-DD');
-    -- توزيع الحصص على الأشهر: في الباقة المخصصة وزّع |استة الحصص المتبقية على
-    -- الأشهر المتبقية، وفي غيرها 8 حصص لكل شهر.
-    v_period := CASE WHEN p_total_sessions IS NOT NULL
-      THEN (SELECT COALESCE(floor((v_total_sessions - (i - 1) * (v_total_sessions / v_months)) / (v_months - (i - 1))), 0))
-      ELSE 8 END;
+    IF p_permanent THEN
+      v_end := '2099-12-31';
+      v_period := v_total_sessions;
+    ELSE
+      v_next := v_cur + interval '1 month';
+      v_end := to_char(v_next - interval '1 day', 'YYYY-MM-DD');
+      -- توزيع الحصص على الأشهر: في الباقة المخصصة وزّع |استة الحصص المتبقية على
+      -- الأشهر المتبقية، وفي غيرها 8 حصص لكل شهر.
+      v_period := CASE WHEN p_total_sessions IS NOT NULL
+        THEN (SELECT COALESCE(floor((v_total_sessions - (i - 1) * (v_total_sessions / v_months)) / (v_months - (i - 1))), 0))
+        ELSE 8 END;
+    END IF;
     INSERT INTO subscription_periods
       (id, subscription_id, month_number, start_date, end_date, total_sessions, used_sessions, remaining_sessions, status)
     VALUES
@@ -1097,15 +1111,7 @@ RETURNS TABLE(student_id TEXT, student_name TEXT, first_name TEXT, last_name TEX
          s.subject_name, s.subject_id, s.teacher_name
   FROM student_subscriptions s
   LEFT JOIN registrations r ON r.id::TEXT = s.student_id
-  WHERE s.teacher_id = p_teacher_id AND s.status = 'active';
-$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
-
--- سعر حصة الأستاذ الحالي وأرصدة (قراءة آمنة لبوابة الأستاذ — anon)
-CREATE OR REPLACE FUNCTION get_teacher_balance_rate(p_teacher_id TEXT)
-RETURNS TABLE(rate INTEGER, total_due INTEGER, total_paid INTEGER, pending INTEGER, updated_at TIMESTAMPTZ) AS $$
-  SELECT COALESCE(rate,0), COALESCE(total_due,0), COALESCE(total_paid,0), COALESCE(pending,0), updated_at
-  FROM teacher_balances
-  WHERE teacher_id = p_teacher_id;
+  WHERE s.teacher_id = p_teacher_id AND s.status IN ('active', 'permanent');
 $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
 -- قائمة الطلاب المسجلين نهائياً عند الأستاذ (من جدول التسجيلات مباشرة)
@@ -1131,7 +1137,6 @@ RETURNS TABLE(student_id TEXT, first_name TEXT, last_name TEXT, level TEXT, stre
 $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 GRANT EXECUTE ON FUNCTION get_teacher_active_subs(TEXT) TO anon, service_role;
 GRANT EXECUTE ON FUNCTION get_teacher_registered_students(TEXT, TEXT) TO anon, service_role;
-GRANT EXECUTE ON FUNCTION get_teacher_balance_rate(TEXT) TO anon, service_role;
 
 -- الدوال الحسّاسة: service_role فقط (تستدعيها Edge Functions بمفتاح الخادم)
 GRANT EXECUTE ON FUNCTION admin_is_uid_admin(TEXT) TO service_role;

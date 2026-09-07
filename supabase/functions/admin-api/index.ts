@@ -82,6 +82,7 @@ Deno.serve(async (req) => {
         p_months: Number(body.months) || 1,
         p_total_price: Number(body.totalPrice) ?? 0,
         p_total_sessions: body.totalSessions != null ? Number(body.totalSessions) : null,
+        p_permanent: body.permanent === true,
         p_payment_id: String(body.paymentId || ''),
         p_notes: body.notes == null ? null : String(body.notes),
         p_teacher_id: String(body.teacherId || ''),
