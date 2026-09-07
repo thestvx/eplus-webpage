@@ -1082,19 +1082,37 @@
           }
         });
 
-        var activeSidSet={};
-        (activeSubsSnap||[]).forEach(function(a){activeSidSet[a.student_id]=true;});
+        var activeSidSet={}, permanentSidSet={};
+        (activeSubsSnap||[]).forEach(function(a){if(!a||!a.student_id)return;activeSidSet[a.student_id]=true;if(a.status==='permanent')permanentSidSet[a.student_id]=true;});
+        // كشف الاشتراك الدائم على مستوى التلميذ — يعمل حتى لو لم يُضف عمود status بعد
+        // إلى get_teacher_active_subs (يستعمل get_student_subscription المتاح للقراءة)
+        var _permDetect=Object.keys(activeSidSet).map(function(sid){
+          return fetch(SUPABASE_URL+'/rest/v1/rpc/get_student_subscription',{method:'POST',headers:subHeaders,body:JSON.stringify({p_student_id:sid})})
+            .then(function(r){return r.json();})
+            .then(function(data){
+              if(!data)return;
+              var rows=Array.isArray(data)?data:[data];
+              rows.forEach(function(row){
+                var s=(row&&row.subscription)||{};
+                if(s.status==='permanent')permanentSidSet[sid]=true;
+              });
+            }).catch(function(){});
+        });
+        await Promise.all(_permDetect);
+        console.log('[FIN] permanent students:',Object.keys(permanentSidSet));
         const subStudentIds2=Object.keys(regStudents).filter(function(sid){return activeSidSet[sid];});
         const details=subStudentIds2.map(function(sid){
           const info=byStudent[sid]||{sessions:0,freeSessions:0,subjects:{}};
           const absent=0;
-          return {name:nameMap[sid]||sid,sessions:info.sessions,freeSessions:info.freeSessions,absent:absent,matchedSubjects:regStudents[sid].subjects,amount:info.sessions*rate};
+          const perm=!!permanentSidSet[sid];
+          return {name:nameMap[sid]||sid,sessions:info.sessions,freeSessions:info.freeSessions,absent:absent,permanent:perm,matchedSubjects:regStudents[sid].subjects,amount:perm?0:(info.sessions*rate)};
         }).sort(function(a,b){return b.amount-a.amount;});
 
         const totalSessions=details.reduce(function(s,d){return s+d.sessions;},0);
         const totalFreeSessions=details.reduce(function(s,d){return s+d.freeSessions;},0);
         const totalAbsent=details.reduce(function(s,d){return s+d.absent;},0);
-        const totalEarnings=totalSessions*rate;
+        const totalEarnings=details.reduce(function(s,d){return s+d.amount;},0);
+        const permanentCount=details.filter(function(d){return d.permanent;}).length;
         const finDoc=finSnap.docs.length>0?finSnap.docs[0].data():{};
         const payments=Array.isArray(finDoc.payments)?finDoc.payments.slice().sort(function(a,b){return(b.timestamp||0)-(a.timestamp||0);}):[];
         const totalPaid=payments.reduce(function(s,p){return s+(p.amount||0);},0);
@@ -1183,7 +1201,7 @@
                   var tArr=Array.isArray(tSubs)?tSubs.map(function(s){return (s&&(s.subject||s.name||s))||'';}).filter(Boolean):String(tSubs).split(',').map(function(x){return x.trim();}).filter(Boolean);
                   var matched=(d.matchedSubjects||[]).filter(function(m){return !tArr.length||tArr.indexOf(m)>-1;});
                   var subLines=(matched.length?matched:tArr).join(', ')||'—';
-                  return '<tr><td style="font-weight:800;color:var(--text-muted)">'+(i+1)+'</td><td style="font-weight:700">'+d.name+'</td><td style="font-size:11px;color:var(--text-muted)">'+subLines+'</td><td style="text-align:center;font-weight:800;color:var(--text)">'+fmtNum(rate)+' دج</td><td style="text-align:center;font-weight:800;color:var(--green)">'+d.sessions+'</td><td style="text-align:center;font-weight:800;color:#dc2626">'+d.absent+'</td><td style="text-align:center;font-weight:900;color:var(--green)">'+(payments.length>0?fmtNum(d.amount)+' دج':'<span style="color:var(--text-muted);font-weight:700">—</span>')+'</td></tr>';
+                  return '<tr><td style="font-weight:800;color:var(--text-muted)">'+(i+1)+'</td><td style="font-weight:700">'+d.name+(d.permanent?' <span style="display:inline-block;vertical-align:middle;background:rgba(124,58,237,0.1);color:#7C3AED;border:1px solid rgba(124,58,237,0.28);font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;margin-right:4px">\u267E\uFE0F دائم</span>':'')+'</td><td style="font-size:11px;color:var(--text-muted)">'+subLines+'</td><td style="text-align:center;font-weight:800;color:var(--text)">'+fmtNum(rate)+' دج</td><td style="text-align:center;font-weight:800;color:var(--green)">'+d.sessions+'</td><td style="text-align:center;font-weight:800;color:#dc2626">'+d.absent+'</td><td style="text-align:center;font-weight:900;color:var(--green)">'+(d.permanent?'<span style="background:rgba(16,185,129,0.1);padding:3px 10px;border-radius:20px">0 دج</span>':(payments.length>0?fmtNum(d.amount)+' دج':'<span style="color:var(--text-muted);font-weight:700">—</span>'))+'</td></tr>';
                 }).join('')}</tbody>
                 <tfoot><tr style="background:rgba(99,102,241,0.04)">
                   <td></td>
@@ -1195,7 +1213,9 @@
                   <td style="text-align:center;font-weight:900;color:var(--green)">${payments.length>0?fmtNum(totalEarnings)+' دج':'—'}</td>
                 </tr></tfoot>
               </table>
-            </div>`}
+            </div>
+            ${permanentCount>0?'<div style="padding:10px 16px;border-top:1px solid var(--border-light);font-size:11px;color:var(--text-muted);line-height:1.9">\u267E\uFE0F التلاميذ ذوو الاشتراك الدائم ('+permanentCount+'): حضورهم يُسجَّل دائماً والمستحق <b style="color:#059669">0 دج</b> — لا يدخلون في حساب المستحقات.</div>':''}
+            `}
           </div>
 
           <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);margin-bottom:24px">

@@ -1757,8 +1757,22 @@
     .cm-icon{font-size:48px;margin-bottom:12px;line-height:1}
     .cm-title{font-size:18px;font-weight:900;color:var(--text);margin-bottom:8px}
     .cm-desc{font-size:13px;color:var(--text-muted);line-height:1.7;margin-bottom:20px}
-    .cm-actions{display:flex;gap:10px;justify-content:center}
+    .cm-actions{display:flex;gap:12px;justify-content:center;margin-top:16px;padding-top:14px;border-top:1px solid rgba(0,0,0,0.06)}
     .cm-btn{padding:10px 28px;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;transition:all .2s;font-family:'Tajawal',sans-serif}
+    .cm-btn:disabled{opacity:.55;cursor:not-allowed}
+    /* نافذة النجاح المتحركة — دائرة + علامة صح مرسومة + ظهور نابض */
+    .cm-box.cm-pop{animation:cmPop .5s cubic-bezier(.22,1,.36,1) both}
+    @keyframes cmPop{0%{transform:scale(.78) translateY(16px);opacity:0}55%{transform:scale(1.045) translateY(-2px);opacity:1}100%{transform:scale(1) translateY(0);opacity:1}}
+    .cm-check{width:76px;height:76px;display:block;margin:0 auto}
+    .cm-check-circle,.cm-check-mark{fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+    .cm-check-circle{stroke:#10b981;stroke-dasharray:176;stroke-dashoffset:176;animation:cmDraw .45s ease .1s forwards}
+    .cm-check-mark{stroke:#10b981;stroke-dasharray:52;stroke-dashoffset:52;animation:cmDraw .3s ease .5s forwards;filter:drop-shadow(0 2px 6px rgba(16,185,129,0.35))}
+    @keyframes cmDraw{to{stroke-dashoffset:0}}
+    .cm-success-dots{display:flex;justify-content:center;gap:6px;margin-top:10px}
+    .cm-success-dots i{width:7px;height:7px;border-radius:50%;background:#10b981;opacity:.55;animation:cmDot 1s ease-in-out infinite}
+    .cm-success-dots i:nth-child(2){animation-delay:.12s;background:#7C3AED}
+    .cm-success-dots i:nth-child(3){animation-delay:.24s;background:#f59e0b}
+    @keyframes cmDot{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(-5px);opacity:1}}
     .cm-btn-cancel{background:var(--bg);color:var(--text-muted);border:1.5px solid var(--border)}.cm-btn-cancel:hover{background:var(--border)}
     .cm-btn-confirm{background:linear-gradient(135deg,var(--primary),var(--primary-2));color:#fff;box-shadow:0 4px 14px rgba(124,58,237,0.25)}.cm-btn-confirm:hover{transform:translateY(-1px)}
     .cm-btn-danger{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff}.cm-btn-danger:hover{transform:translateY(-1px)}
@@ -24409,7 +24423,6 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           : '';
         const successHtml =
           '<div style="text-align:center;font-size:13px">' +
-            '<div style="font-size:38px;margin-bottom:6px">✅</div>' +
             '<div style="font-weight:900;font-size:15px;margin-bottom:12px">تم إنشاء الاشتراك بنجاح</div>' +
             '<div style="text-align:right;line-height:2">' +
               '<div><b>الطالب:</b> ' + escX(name) + '</div>' +
@@ -26491,7 +26504,10 @@ async function srDoConfirm() {
     // Add registration fee to SRT treasury
     try {
       const {getDocs,collection:c,doc:d,setDoc,updateDoc}=srtFS(),db=srtDB();
-      const feeAmount = (r && r.fee_amount) || 500;
+      // «بدون رسوم» (fee_amount=0) لا يُضاف إلى الخزينة إطلاقاً — فقط الرسوم الفعلية تُحتسب
+      const feeAmount = (r && r.fee_amount != null)
+        ? Math.max(0, Number(r.fee_amount))
+        : 500;
       const treasurySnap = await getDocs(c(db, SRT_TREASURY_COLLECTION));
       if (!treasurySnap.empty) {
         const tDoc = treasurySnap.docs[0];
@@ -27174,7 +27190,17 @@ window.langRegPrint = function() {
 let cmResolve = null;
 function cmShow(icon, title, desc, opts = {}) {
   return new Promise(resolve => {
-    document.getElementById('cm-icon').textContent = icon;
+    const iconEl = document.getElementById('cm-icon');
+    const boxEl = document.querySelector('#cm-overlay .cm-box');
+    const isSuccess = !!(opts.success && !opts.plainIcon);
+    if (isSuccess) {
+      iconEl.innerHTML =
+        '<svg class="cm-check" viewBox="0 0 52 52"><circle class="cm-check-circle" cx="26" cy="26" r="23"></circle><path class="cm-check-mark" d="M14 27l8 8 16-16"></path></svg>' +
+        '<div class="cm-success-dots"><i></i><i></i><i></i></div>';
+    } else {
+      iconEl.textContent = icon;
+    }
+    if (boxEl) boxEl.classList.toggle('cm-pop', isSuccess);
     document.getElementById('cm-title').textContent = title;
     document.getElementById('cm-desc').innerHTML = desc;
     const cancelBtn = document.getElementById('cm-cancel-btn');
@@ -27184,7 +27210,12 @@ function cmShow(icon, title, desc, opts = {}) {
     confirmBtn.textContent = opts.confirmText || 'تأكيد';
     confirmBtn.className = 'cm-btn ' + (opts.danger ? 'cm-btn-danger' : opts.success ? 'cm-btn-success' : 'cm-btn-confirm');
     document.getElementById('cm-overlay').classList.add('open');
-    cmResolve = (val) => { document.getElementById('cm-overlay').classList.remove('open'); resolve(val); };
+    cmResolve = (val) => {
+      document.getElementById('cm-overlay').classList.remove('open');
+      if (boxEl) boxEl.classList.remove('cm-pop');
+      iconEl.textContent = '✅';
+      resolve(val);
+    };
     setTimeout(() => confirmBtn.focus(), 100);
   });
 }
@@ -28642,13 +28673,14 @@ async function sfAggregateRevenue() {
     } catch (e) { console.warn('[SF] subscriptions revenue failed', e); }
 
     const [feeRes, campRes, langRes] = await Promise.all([
-      sfFetch(`${SF_URL}/rest/v1/registrations?select=fee_amount,status`),
+      sfFetch(`${SF_URL}/rest/v1/registrations?select=fee_amount,status&deleted_at=is.null`),
       sfFetch(`${SF_URL}/rest/v1/summer_camp_registrations?select=total_amount`),
-      sfFetch(`${SF_URL}/rest/v1/language_registrations?select=fee_amount,status`),
+      sfFetch(`${SF_URL}/rest/v1/language_registrations?select=fee_amount,status&deleted_at=is.null`),
     ]);
     if (feeRes.ok) {
       const arr = await feeRes.json() || [];
-      arr.forEach(r => { if (r.status === 'مسجل نهائياً') fee += Number(r.fee_amount) || 0; });
+      // «بدون رسوم» ⇒ fee_amount=0 لا يدخل أبداً في إيرادات حقوق التسجيل، والمحذوفون (deleted_at) مستبعدون.
+      arr.forEach(r => { if (r.status === 'مسجل نهائياً' && Number(r.fee_amount) > 0) fee += Number(r.fee_amount); });
     }
     if (campRes.ok) {
       const arr = await campRes.json() || [];
@@ -28656,7 +28688,7 @@ async function sfAggregateRevenue() {
     }
     if (langRes.ok) {
       const arr = await langRes.json() || [];
-      arr.forEach(r => { if (r.status === 'مسجل نهائياً') lang += Number(r.fee_amount) || 0; });
+      arr.forEach(r => { if (r.status === 'مسجل نهائياً' && Number(r.fee_amount) > 0) lang += Number(r.fee_amount); });
     }
   } catch (e) { console.error('[SF] aggregate revenue failed', e); }
   document.getElementById('sf-rc-sub').textContent = sfMoney(sub);
@@ -28723,12 +28755,68 @@ function sfRenderTx() {
   body.innerHTML = html;
 }
 
-window.sfOpenDailyIncome = function () {
-  document.getElementById('sf-daily-income-modal').classList.add('open');
-  if (sfTxCache.length) sfRenderDailyIncome();
-  else {
-    sfLoadTx().then(() => sfRenderDailyIncome());
+async function sfLoadDailySources() {
+  const out = { txs: Array.isArray(sfTxCache) ? sfTxCache : [], subs: [], fees: [], camp: [], lang: [] };
+  // 1) الاشتراكات الشهرية (بوابة الاشتراكات — Edge Function)
+  try {
+    if (typeof SubscriptionService !== 'undefined' && SubscriptionService.adminListSubscriptions) {
+      const all = await SubscriptionService.adminListSubscriptions();
+      (Array.isArray(all) ? all : []).forEach(row => {
+        const s = row.subscription || {};
+        if ((s.status || 'active') === 'cancelled') return;
+        const amt = Number(s.total_price) || 0;
+        if (amt <= 0) return;
+        out.subs.push({
+          date: String(s.created_at || '').slice(0, 10),
+          amount: amt,
+          student: s.student_name || s.student_id || '',
+          subject: s.subject_name || '',
+        });
+      });
+    }
+  } catch (e) { console.warn('[SF] daily subscriptions failed', e); }
+  // 2) حقوق التسجيل + المخيم + دورات اللغات (بدون رسوم مستبعدة)
+  try {
+    const [feeRes, campRes, langRes] = await Promise.all([
+      sfFetch(`${SF_URL}/rest/v1/registrations?select=fee_amount,status,created_at&deleted_at=is.null`),
+      sfFetch(`${SF_URL}/rest/v1/summer_camp_registrations?select=total_amount,created_at`),
+      sfFetch(`${SF_URL}/rest/v1/language_registrations?select=fee_amount,status,created_at&deleted_at=is.null`),
+    ]);
+    if (feeRes.ok) {
+      const arr = await feeRes.json() || [];
+      arr.forEach(r => { if (r.status === 'مسجل نهائياً' && Number(r.fee_amount) > 0) out.fees.push({ date: String(r.created_at || '').slice(0, 10), amount: Number(r.fee_amount) }); });
+    }
+    if (campRes.ok) {
+      const arr = await campRes.json() || [];
+      arr.forEach(r => { const a = Number(r.fee_amount != null ? r.fee_amount : r.total_amount) || 0; if (a > 0) out.camp.push({ date: String(r.created_at || '').slice(0, 10), amount: a }); });
+    }
+    if (langRes.ok) {
+      const arr = await langRes.json() || [];
+      arr.forEach(r => { if (r.status === 'مسجل نهائياً' && Number(r.fee_amount) > 0) out.lang.push({ date: String(r.created_at || '').slice(0, 10), amount: Number(r.fee_amount) }); });
+    }
+  } catch (e) { console.warn('[SF] daily fees failed', e); }
+  return out;
+}
+
+window.sfOpenDailyIncome = async function () {
+  const modal = document.getElementById('sf-daily-income-modal');
+  if (modal) modal.classList.add('open');
+  const body = document.getElementById('sf-daily-income-body');
+  if (body) body.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;font-weight:700">⏳ جاري تجميع كل المدخولات…</div>';
+  const fromEl = document.getElementById('sf-daily-from');
+  const toEl = document.getElementById('sf-daily-to');
+  if (fromEl && !fromEl.value) {
+    try {
+      const since = new Date();
+      since.setDate(since.getDate() - 30);
+      fromEl.value = since.toLocaleDateString('sv-SE', { timeZone: 'Africa/Algiers' });
+    } catch (e) { fromEl.value = ''; }
   }
+  if (toEl && !toEl.value) toEl.value = '';
+  if (!sfTxCache.length) { try { await sfLoadTx(); } catch (e) {} }
+  try { window.__sfDaily = await sfLoadDailySources(); }
+  catch (e) { console.warn(e); window.__sfDaily = { txs: sfTxCache, subs: [], fees: [], camp: [], lang: [] }; }
+  sfRenderDailyIncome();
 };
 
 function sfRenderDailyIncome() {
@@ -28736,49 +28824,73 @@ function sfRenderDailyIncome() {
   if (!body) return;
   const from = document.getElementById('sf-daily-from') ? document.getElementById('sf-daily-from').value : '';
   const to = document.getElementById('sf-daily-to') ? document.getElementById('sf-daily-to').value : '';
-  const filtered = sfTxCache.filter(t => {
-    const d = t.date || '';
-    if (from && d < from) return false;
-    if (to && d > to) return false;
-    return true;
-  });
-  // Group by date
-  const byDate = {};
-  filtered.forEach(t => {
-    const d = t.date || '—';
-    if (!byDate[d]) byDate[d] = { in: 0, out: 0, tx: [] };
+  const src = window.__sfDaily || { txs: [], subs: [], fees: [], camp: [], lang: [] };
+  const inRange = d => { if (!d) return true; if (from && d < from) return false; if (to && d > to) return false; return true; };
+  const dateOf = x => String((x && x.date) || '').slice(0, 10);
+
+  // تجميع كل المدخولات في قائمة موحدة
+  const events = [];
+  (src.subs || []).forEach(s => { if (inRange(dateOf(s))) events.push({ date: dateOf(s), kind: 'اشتراك شهري', label: (s.student || '') + (s.subject ? ' — ' + s.subject : ''), amount: Number(s.amount) || 0, dir: 'in' }); });
+  (src.fees || []).forEach(s => { if (inRange(dateOf(s))) events.push({ date: dateOf(s), kind: 'حقوق تسجيل', label: '', amount: Number(s.amount) || 0, dir: 'in' }); });
+  (src.camp || []).forEach(s => { if (inRange(dateOf(s))) events.push({ date: dateOf(s), kind: 'مخيم صيفي', label: '', amount: Number(s.amount) || 0, dir: 'in' }); });
+  (src.lang || []).forEach(s => { if (inRange(dateOf(s))) events.push({ date: dateOf(s), kind: 'دورات لغات', label: '', amount: Number(s.amount) || 0, dir: 'in' }); });
+  (src.txs || []).forEach(t => {
+    const d = String(t.date || '').slice(0, 10);
+    if (!inRange(d)) return;
     const amt = Number(t.amount) || 0;
-    if (t.direction === 'out') byDate[d].out += amt; else byDate[d].in += amt;
-    byDate[d].tx.push(t);
+    if (t.direction === 'out') events.push({ date: d, kind: SF_TYPE_LABELS[t.source_type] || t.source_type || 'مصروف', label: (t.description || t.student_name || t.teacher_name || ''), amount: amt, dir: 'out' });
+    else if (amt > 0) events.push({ date: d, kind: SF_TYPE_LABELS[t.source_type] || t.source_type || 'إيراد', label: (t.description || t.student_name || t.teacher_name || ''), amount: amt, dir: 'in' });
+  });
+
+  const byDate = {};
+  events.forEach(ev => {
+    const d = ev.date || '—';
+    if (!byDate[d]) byDate[d] = { in: 0, out: 0, kinds: {}, tx: [] };
+    if (ev.dir === 'out') byDate[d].out += ev.amount; else byDate[d].in += ev.amount;
+    byDate[d].kinds[ev.kind] = (byDate[d].kinds[ev.kind] || 0) + ev.amount;
+    byDate[d].tx.push(ev);
   });
   const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
-  if (!dates.length) {
-    body.innerHTML = '<div style="text-align:center;padding:18px;color:var(--text-muted)">لا توجد معاملات في النطاق المحدد.</div>';
-    return;
-  }
+  let totIn = 0, totOut = 0, totEv = 0;
   const fmtD = d => {
     if (!d || d === '—') return '—';
     try { return new Date(d + 'T00:00:00').toLocaleDateString('ar-DZ', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (e) { return d; }
   };
-  let html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:separate;border-spacing:0;font-size:12px">';
+  let html = '';
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">';
+  html += '<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:12px;text-align:center"><div style="font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:4px">إجمالي المدخولات</div><div style="font-weight:900;color:#059669;font-size:15px;direction:ltr">' + sfMoney(events.filter(e => e.dir === 'in').reduce((a, e) => a + e.amount, 0)) + '</div></div>';
+  html += '<div style="background:rgba(220,38,38,0.07);border:1px solid rgba(220,38,38,0.22);border-radius:12px;padding:12px;text-align:center"><div style="font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:4px">المصروفات (خارج)</div><div style="font-weight:900;color:#dc2626;font-size:15px;direction:ltr">' + sfMoney(events.filter(e => e.dir === 'out').reduce((a, e) => a + e.amount, 0)) + '</div></div>';
+  html += '<div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:12px;padding:12px;text-align:center"><div style="font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:4px">الصافي</div><div style="font-weight:900;color:#d97706;font-size:15px;direction:ltr">' + sfMoney(events.reduce((a, e) => a + (e.dir === 'in' ? e.amount : -e.amount), 0)) + '</div></div>';
+  html += '</div>';
+
+  if (!dates.length) {
+    html += '<div style="text-align:center;padding:24px;color:var(--text-muted)">لا توجد مدخولات في النطاق المحدد.</div>';
+    html += '<div style="margin-top:12px;font-size:11px;color:var(--text-muted);text-align:center">المدخول يشمل: اشتراكات شهرية + حقوق تسجيل (بدون رسوم مستثناة) + مخيم صيفي + دورات لغات + معاملات واردة.</div>';
+    body.innerHTML = html;
+    return;
+  }
+
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:separate;border-spacing:0;font-size:12px">';
   html += '<thead><tr style="background:rgba(245,158,11,0.07)">';
   html += '<th style="padding:9px 12px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">التاريخ</th>';
   html += '<th style="padding:9px 12px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">المدخول (إيراد)</th>';
   html += '<th style="padding:9px 12px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">الخارج (مصروف)</th>';
   html += '<th style="padding:9px 12px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">الصافي اليوم</th>';
-  html += '<th style="padding:9px 12px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">عدد المعاملات</th>';
+  html += '<th style="padding:9px 12px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">تفصيل</th>';
   html += '</tr></thead><tbody>';
-  let totIn = 0, totOut = 0;
   dates.forEach(d => {
     const g = byDate[d];
-    totIn += g.in; totOut += g.out;
+    totIn += g.in; totOut += g.out; totEv += g.tx.length;
     const net = g.in - g.out;
+    const kindsHtml = Object.keys(g.kinds).map(k =>
+      '<span style="display:inline-block;background:' + (k === 'اشتراك شهري' ? 'rgba(124,58,237,0.09)' : k === 'حقوق تسجيل' ? 'rgba(16,185,129,0.09)' : k === 'مخيم صيفي' ? 'rgba(14,165,233,0.09)' : k === 'دورات لغات' ? 'rgba(245,158,11,0.09)' : 'rgba(107,114,128,0.08)') + ';color:' + (k === 'اشتراك شهري' ? '#7C3AED' : k === 'حقوق تسجيل' ? '#059669' : k === 'مخيم صيفي' ? '#0ea5e9' : k === 'دورات لغات' ? '#d97706' : 'var(--text-muted)') + ';border-radius:20px;padding:2px 9px;font-size:10.5px;font-weight:800;margin:1px;white-space:nowrap">' + sfEsc(k) + ' ' + (g.kinds[k] >= 0 ? '' : '-') + (Math.abs(g.kinds[k])).toLocaleString('ar-DZ') + ' دج</span>'
+    ).join(' ');
     html += '<tr style="border-bottom:1px solid var(--border)">'
       + '<td style="padding:9px 12px;font-weight:900;white-space:nowrap">' + sfEsc(fmtD(d)) + '</td>'
-      + '<td style="padding:9px 12px;text-align:center;font-weight:800;color:#059669;direction:ltr">' + sfMoney(g.in) + '</td>'
+      + '<td style="padding:9px 12px;text-align:center;font-weight:800;color:#059669;direction:ltr">' + (g.in ? sfMoney(g.in) : '—') + '</td>'
       + '<td style="padding:9px 12px;text-align:center;font-weight:800;color:#dc2626;direction:ltr">' + (g.out ? sfMoney(g.out) : '—') + '</td>'
       + '<td style="padding:9px 12px;text-align:center;font-weight:900;color:' + (net >= 0 ? '#059669' : '#dc2626') + ';direction:ltr">' + (net >= 0 ? '+' : '') + sfMoney(net) + '</td>'
-      + '<td style="padding:9px 12px;text-align:center;color:var(--text-muted)">' + g.tx.length + '</td>'
+      + '<td style="padding:9px 12px;max-width:280px;line-height:1.7">' + kindsHtml + '</td>'
       + '</tr>';
   });
   html += '<tr style="background:rgba(245,158,11,0.06)">'
@@ -28786,10 +28898,10 @@ function sfRenderDailyIncome() {
     + '<td style="padding:10px 12px;text-align:center;font-weight:900;color:#059669;direction:ltr">' + sfMoney(totIn) + '</td>'
     + '<td style="padding:10px 12px;text-align:center;font-weight:900;color:#dc2626;direction:ltr">' + (totOut ? sfMoney(totOut) : '—') + '</td>'
     + '<td style="padding:10px 12px;text-align:center;font-weight:900;color:' + ((totIn - totOut) >= 0 ? '#059669' : '#dc2626') + ';direction:ltr">' + ((totIn - totOut) >= 0 ? '+' : '') + sfMoney(totIn - totOut) + '</td>'
-    + '<td style="padding:10px 12px;text-align:center;color:var(--text-muted)">' + filtered.length + '</td>'
+    + '<td style="padding:10px 12px;color:var(--text-muted)">' + totEv + ' عملية</td>'
     + '</tr>';
   html += '</tbody></table></div>';
-  html += '<div style="margin-top:12px;font-size:11px;color:var(--text-muted);text-align:center">المدخول اليومي = مجموع المعاملات الواردة (direction=in) لكل تاريخ — المبالغ من سجل المعاملات.</div>';
+  html += '<div style="margin-top:12px;font-size:11px;color:var(--text-muted);text-align:center;line-height:1.8">المدخول اليومي يشمل <b>كل</b> المدخولات: اشتراكات شهرية + حقوق تسجيل (تلاميذ «بدون رسوم» مستثناة) + مخيم صيفي + دورات لغات + معاملات واردة.</div>';
   body.innerHTML = html;
 }
 

@@ -522,7 +522,9 @@
         if(lessonsEl)lessonsEl.textContent=lessonCount||'0';
         if(exercisesEl)exercisesEl.textContent=exerciseCount||'0';
         filtered=filtered.sort(function(a,b){return (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0);}).slice(0,3);
-        if(filtered.length===0){el.innerHTML='';return;}
+        // «آخر المحتوى المضاف» أُزيل من لوحة الطالب — تُحسب الإحصاءات (الدروس/التمارين) فقط
+        el.innerHTML='';
+        return;
         var TL={lesson:'📚 درس',exercise:'📝 تمارين',homework:'📋 واجبات',announcement:'📢 إعلان'};
         var TC={lesson:'blue',exercise:'green',homework:'gold',announcement:'purple'};
         el.innerHTML='<div class="section-header" style="margin-bottom:14px"><div class="section-title">📖 آخر المحتوى المضاف</div><div style="cursor:pointer;font-size:12px;font-weight:700;color:var(--primary);background:var(--primary-light);padding:6px 14px;border-radius:20px" onclick="navigateTo(\'content\')">عرض الكل ←</div></div>'+
@@ -564,6 +566,100 @@
             '</div>';
           }).join('')+'</div>';
       }catch(e){console.warn('Content preview load failed:',e);el.innerHTML='';}
+    }
+
+    /* ═══ فضاء الولي ═══ */
+    async function loadWaliSpace(r){
+      const el=document.getElementById('wali-space');
+      if(!el)return;
+      el.innerHTML='<div style="text-align:center;padding:28px;color:var(--text-muted)">⏳ جاري تحميل فضاء الولي…</div>';
+      const fullName=((r.first_name||'')+' '+(r.last_name||'')).trim();
+      let subData=null,events=[];
+      try{subData=await SubscriptionService.getActiveSubscription(r.id);}catch(e){console.warn('wali sub load failed',e);}
+      try{events=await fetchStudentAttendance(r.id);}catch(e){events=[];}
+      const today=SubscriptionService.today();
+      const sub=subData&&subData.subscription;
+      const isPerm=!!(sub&&SubscriptionService.isPermanent(sub));
+      const periods=(subData&&Array.isArray(subData.periods)?subData.periods:[])||[];
+      const activePeriod=SubscriptionService.activePeriod(periods,today);
+      const used=activePeriod?(Number(activePeriod.used_sessions)||0):0;
+      const total=isPerm?null:(activePeriod?(Number(activePeriod.total_sessions)||SubscriptionService.SESSIONS_PER_MONTH):SubscriptionService.SESSIONS_PER_MONTH);
+      const remain=isPerm?'∞':Math.max(0,(total||0)-used);
+      const remainNum=isPerm?Number.MAX_SAFE_INTEGER:Math.max(0,(total||0)-used);
+      const pctP=isPerm?100:((total||1)?Math.min(100,Math.round((used/(total||1))*100)):0);
+      let stLabel,stBg;
+      if(!sub){stLabel='لا يوجد اشتراك';stBg='#e5e7eb';}
+      else if(sub.status==='paused'){stLabel='⏸️ متوقف مؤقتاً';stBg='#fde68a';}
+      else if(isPerm){stLabel='♾️ اشتراك دائم';stBg='#c4b5fd';}
+      else if(activePeriod){stLabel=(used>=total)?'اكتملت حصص الشهر':'اشتراك نشط';stBg=(used>=total)?'#fecaca':'#a7f3d0';}
+      else {stLabel='لم يبدأ الاشتراك بعد';stBg='#fde68a';}
+      const month=String(today).slice(0,7);
+      const monthEvents=events.filter(function(ev){return String(ev.date||ev.createdAt||'').slice(0,7)===month;});
+      const lastEvents=events.slice().sort(function(a,b){return String(b.date||b.createdAt||'').localeCompare(String(a.date||a.createdAt||''));}).slice(0,3);
+      const subjects=Array.isArray(r.subjects)?r.subjects:[];
+      const teachersSet=[];
+      subjects.forEach(function(s){const t=s.teacher||s.teacherName||s.teachername;if(t&&teachersSet.indexOf(t)===-1)teachersSet.push(t);});
+      const phone=(r.parent_phone||'').trim();
+      const phoneShow=phone?phone.replace(/^(\d{2,3})(\d+)(\d{2})$/,'$1 •••• $3'):'—';
+
+      const hero='<div style="background:linear-gradient(135deg,#1e1b4b 0%,#312e81 55%,#6d28d9 130%);border-radius:var(--radius-lg);padding:26px 24px;color:#fff;margin-bottom:20px;position:relative;overflow:hidden;animation:fadeSlideUp .5s ease both">'
+        +'<div style="position:absolute;top:-50px;left:-30px;width:180px;height:180px;background:rgba(255,255,255,0.07);border-radius:50%"></div>'
+        +'<div style="position:absolute;bottom:-60px;right:-20px;width:150px;height:150px;background:rgba(255,255,255,0.05);border-radius:50%"></div>'
+        +'<div style="display:flex;align-items:center;gap:12px;position:relative;z-index:1">'
+        +'<div style="width:54px;height:54px;border-radius:16px;background:rgba(255,255,255,0.14);display:flex;align-items:center;justify-content:center;font-size:27px;border:1px solid rgba(255,255,255,0.22)">👨‍👩‍👧</div>'
+        +'<div style="flex:1"><div style="font-size:18px;font-weight:900">فضاء الولي</div><div style="font-size:12px;opacity:.78;font-weight:600;margin-top:2px">تابع تعليم '+subEsc(fullName)+'</div></div>'
+        +'<span style="flex-shrink:0;font-size:12px;font-weight:800;padding:7px 14px;border-radius:20px;background:'+stBg+';color:#1f2937;text-align:center;max-width:160px">'+subEsc(stLabel)+'</span>'
+        +'</div>'
+        +'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;position:relative;z-index:1">'
+        +'<span style="font-size:11px;font-weight:700;background:rgba(255,255,255,0.13);padding:4px 12px;border-radius:20px">🪪 ID: '+subEsc(String(r.id||'').slice(-8))+'</span>'
+        +'<span style="font-size:11px;font-weight:700;background:rgba(255,255,255,0.13);padding:4px 12px;border-radius:20px">📚 '+subEsc(r.level||'—')+(r.stream?' · '+subEsc(r.stream):'')+'</span>'
+        +'<span style="font-size:11px;font-weight:700;background:rgba(255,255,255,0.13);padding:4px 12px;border-radius:20px">🏫 '+subEsc(r.institution||'—')+'</span>'
+        +'</div>'
+        +'</div>';
+
+      const statsGrid='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px">'
+        +'<div class="stat-card c-purple" style="animation:fadeSlideUp .5s ease both .05s"><div class="stat-icon i-purple">📚</div><div class="stat-value">'+subjects.length+'</div><div class="stat-label">مادة مسجلة</div></div>'
+        +'<div class="stat-card c-gold" style="animation:fadeSlideUp .5s ease both .1s"><div class="stat-icon i-gold">📅</div><div class="stat-value">'+remain+'</div><div class="stat-label">'+(isPerm?'حصص (بدون حد)':'حصة متبقية')+'</div></div>'
+        +'<div class="stat-card c-green" style="animation:fadeSlideUp .5s ease both .15s"><div class="stat-icon i-green">✅</div><div class="stat-value">'+monthEvents.length+'</div><div class="stat-label">حضور هذا الشهر</div></div>'
+        +'<div class="stat-card c-blue" style="animation:fadeSlideUp .5s ease both .2s"><div class="stat-icon i-blue">👨‍🏫</div><div class="stat-value">'+teachersSet.length+'</div><div class="stat-label">أستاذ(ة)</div></div>'
+        +'</div>';
+
+      let subCard='';
+      if(sub){
+        const barColor=(isPerm||remainNum>0)?'var(--success)':'#dc2626';
+        subCard='<div style="background:var(--card);border:1px solid var(--border-light);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px;animation:fadeSlideUp .5s ease both .25s">'
+          +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="font-size:13px;font-weight:900;display:flex;align-items:center;gap:8px">📅 اشتراك الطالب</div>'+(isPerm?'<span style="font-size:11px;font-weight:800;color:#7C3AED;background:rgba(124,58,237,0.1);padding:5px 12px;border-radius:20px">♾️ اشتراك دائم</span>':'')+'</div>'
+          +(isPerm
+            ?'<div style="text-align:center;padding:6px 0;color:#059669;font-size:14px;font-weight:900">مسموح بالدراسة دائماً — بدون حد للحصص</div>'
+            :'<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px"><span>حضر: '+used+'</span><span>الإجمالي: '+(total||0)+'</span><span>المتبقي: '+remainNum+'</span></div>'
+            +'<div style="height:8px;background:rgba(0,0,0,0.06);border-radius:20px;overflow:hidden"><div style="height:100%;width:'+pctP+'%;background:'+barColor+';border-radius:20px;transition:width .5s ease"></div></div>')
+          +'</div>';
+      }
+
+      let eventsCard='<div style="background:var(--card);border:1px solid var(--border-light);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px;animation:fadeSlideUp .5s ease both .3s">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="font-size:13px;font-weight:900;display:flex;align-items:center;gap:8px">🕐 آخر الحضور</div><span style="font-size:11px;color:var(--text-muted);font-weight:700">'+monthEvents.length+' حضور هذا الشهر</span></div>';
+      if(lastEvents.length===0){eventsCard+='<div style="text-align:center;padding:14px;color:var(--text-muted);font-size:12px;font-weight:600">لا توجد جلسات مسجلة بعد</div>';}
+      else{
+        eventsCard+=lastEvents.map(function(ev){
+          const d=String(ev.date||ev.createdAt||'').slice(0,10);
+          const s=ev.subjectName||ev.subject||'';
+          const tch=ev.teacherName||ev.teacher||'';
+          const icon=SUBJECT_ICONS[s]||'📘';
+          return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--border-light)"><div style="width:34px;height:34px;border-radius:10px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">'+icon+'</div><div style="flex:1"><div style="font-size:12.5px;font-weight:800">'+subEsc(s||'جلسة')+'</div><div style="font-size:11px;color:var(--text-muted);font-weight:600">'+subEsc(tch||'')+'</div></div><div style="font-size:12px;font-weight:800;color:var(--primary)">'+(d?subEsc(subFmtAr(d)):'')+'</div></div>';
+        }).join('');
+      }
+      eventsCard+='</div>';
+
+      const contactCard='<div style="background:var(--card);border:1px solid var(--border-light);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px;animation:fadeSlideUp .5s ease both .35s">'
+        +'<div style="font-size:13px;font-weight:900;display:flex;align-items:center;gap:8px;margin-bottom:12px">📞 قناة أولياء الأمور</div>'
+        +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">'
+        +'<div style="background:var(--bg);border:1px dashed var(--border);border-radius:12px;padding:12px 14px;text-align:center"><div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:5px">هاتف ولي الأمر</div><div dir="ltr" style="font-weight:900;font-size:14px;color:var(--text);letter-spacing:1px">'+subEsc(phoneShow)+'</div></div>'
+        +'<div style="background:var(--bg);border:1px dashed var(--border);border-radius:12px;padding:12px 14px;text-align:center"><div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:5px">الإدارة</div><div style="font-weight:800;font-size:12px;color:var(--primary)">متاحة طيلة أيام الدراسة</div></div>'
+        +'</div>'
+        +'<div style="margin-top:12px;font-size:11px;color:var(--text-muted);line-height:1.8;text-align:center">لأي استفسار حول الحصص أو المستحقات أو الدروس، يرجى التواصل مع إدارة المركز مباشرة.</div>'
+        +'</div>';
+
+      el.innerHTML=hero+statsGrid+subCard+eventsCard+contactCard;
     }
 
     const SUBJECT_ICONS={'الرياضيات':'📐','الفيزياء':'⚡','علوم الطبيعة والحياة':'🌿','العلوم التجريبية':'🔬','التقني رياضي':'💻','تسيير واقتصاد':'📊','آداب ولغات':'📖','اللغة العربية':'🕌','اللغة الفرنسية':'🇫🇷','اللغة الإنجليزية':'🇬🇧','التاريخ والجغرافيا':'🌍','الفلسفة':'🧠','الدين الإسلامي':'📖','الموسيقى':'🎵'};
@@ -709,7 +805,8 @@
                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="sub-badge-st" id="student-sub-badge">—</span></div>
                 <div id="student-sub-content"><div class="sub-status-line">جاري تحميل الاشتراك…</div></div>
               </div>
-              <div id="stu-content-preview" style="margin-bottom:28px"></div>
+              <div id="stu-content-preview" style="display:none"></div>
+              <div id="wali-space" style="margin-bottom:28px"></div>
               <div class="section-header"><div class="section-title">📚 موادك المسجلة</div><div class="section-count">${subjects.length} مادة</div></div>
               <div class="subjects-grid">${subjectsHTML}</div>
               <div class="portal-footer">E-PLUS — أكاديمية التعليم والدعم المدرسي © 2025</div>
@@ -720,6 +817,7 @@
       loadStudentSubscription(r.id);
       var subNames=subjects.map(function(s){return s.subject||'';}).filter(Boolean);
       loadStudentContentPreview(subjects);
+      loadWaliSpace(r);
     }
 
     /* ═══ CARD PAGE (3D FLIP) ═══ */
