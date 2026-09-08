@@ -863,10 +863,39 @@
     }
 
     async function fetchStudentAttendance(studentId){
+      // المصدر الحقيقي: Firestore `support_attendance` (نفس سجل الأدمن في
+      // «الاشتراكات الشهرية» — سجلات كاملة بالتاريخ والوقت والمادة والأستاذ).
+      // إن لم يتوفر (مثل مهلة أو خطأ) نرجع لمصدر Supabase الاحتياطي.
+      try{
+        if(window._fdb){
+          await _fbAuthPromise;
+          const snap=await window._fdb.collection('support_attendance').where('studentId','==',String(studentId)).get();
+          const events=[];
+          snap.forEach(function(d){
+            const r=d.data();
+            if(String(r.studentId)!==String(studentId))return;
+            if(r.type==='grace'||r.type==='grace_session'||r.type==='trial_session'||r.type==='trial_usage')return;
+            if(r.cancelled)return;
+            if(!r.date)return;
+            events.push({
+              id:d.id,
+              date:String(r.date||''),
+              checkInTime:(r.checkInTime||r.time||''),
+              time:(r.checkInTime||r.time||''),
+              subjectName:(r.subjectName||''),
+              subject:(r.subjectName||''),
+              teacherName:(r.teacherName||''),
+              teacher:(r.teacherName||''),
+              createdAt:(r.createdAt||'')
+            });
+          });
+          if(events.length)return events;
+        }
+      }catch(e){console.warn('Firestore fetchStudentAttendance failed',e);}
       try{
         const events=await SubscriptionService.getStudentEvents(studentId);
         return Array.isArray(events)?events:[];
-      }catch(e){console.warn('fetchStudentAttendance failed',e);return[];}
+      }catch(e2){console.warn('fetchStudentAttendance failed',e2);return[];}
     }
 
     async function loadStudentSubscription(studentId){
