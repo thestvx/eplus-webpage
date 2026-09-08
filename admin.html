@@ -5566,6 +5566,7 @@ onAuthStateChanged(auth, async user => {
       navLoadLayout();
       switchNavSection(navFirstVisible());
       setTimeout(() => { if (typeof window.subxLoadAll === 'function') window.subxLoadAll(); }, 400);
+      setTimeout(() => { if (typeof window.dashAdminAutoSync === 'function') window.dashAdminAutoSync(); }, 2500);
     }
   } else {
     isTeacherMode = false;
@@ -7799,6 +7800,43 @@ window.dashAdminSyncSupabase = async () => {
     window.showToast && window.showToast('تم تفعيل ' + okCount + ' من ' + uids.length + ' حساباً', okCount === uids.length);
     if (okCount !== uids.length) { window.showToast && window.showToast('بعض الحسابات لم تُفعل — تحقق من صلاحياتك', true); }
   } catch(e) { console.error('dashAdminSyncSupabase error:', e); }
+};
+
+// ── مزامنة تلقائية عند دخول الأدمن الكامل: ضمان تفعيل كل حسابات الإدارة المنشأة في Supabase ──
+//    (بدونها يحصل أي أدمن مُنشأ من الداشبورد على 403 من admin-api في قسم الاشتراكات)
+window.dashAdminAutoSync = async () => {
+  try {
+    const auth0 = window._auth;
+    if (!auth0 || !auth0.currentUser) return 0;
+    const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
+    const accounts = snap.exists() ? (snap.data() || {}) : {};
+    const uids = Object.keys(accounts);
+    if (!uids.length) return 0;
+    let skip = new Set();
+    try {
+      const token = await auth0.currentUser.getIdToken();
+      const res = await fetch(SR_SUPABASE_URL + '/functions/v1/admin-api', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ action: 'list-admins' })
+      });
+      const r = await res.json().catch(() => null);
+      if (res.ok && r && r.ok === true && Array.isArray(r.data)) {
+        r.data.forEach(function (a) { if (a && a.uid) skip.add(a.uid); });
+      }
+    } catch (e) { console.warn('dashAdminAutoSync list-admins error:', e); }
+    let okCount = 0;
+    for (const u of uids) {
+      if (skip.has(u)) { okCount++; continue; }
+      if (await dashAdminGrantSupabase(u)) okCount++;
+    }
+    if (okCount < uids.length) {
+      console.warn('[admin-sync] تم تفعيل ' + okCount + ' من ' + uids.length + ' حسابات — بعض الحسابات لم يُفعَّل');
+    } else {
+      console.info('[admin-sync] كل حسابات الإدارة مفعّلة في Supabase (' + uids.length + ')');
+    }
+    return okCount;
+  } catch (e) { console.warn('dashAdminAutoSync error:', e); return 0; }
 };
 
 // ── إنشاء حساب إدارة جديد (صلاحيات admin كاملة) ──
@@ -25678,7 +25716,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     h += '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">إجراءات</th>';
     h += '</tr></thead><tbody>';
     rows.forEach(r => {
-      const typeLabel = r.type === 'grace_session' ? '<span style="color:#d97706">⚠️ حصّة مجانية</span>' : r.type === 'trial_session' ? '<span style="color:#f59e0b">🟠 حصة تجريبية</span>' : (r.confirmed === false ? '<span style="color:#2563eb">⏳ لم يُؤكَّد بعد</span>' : '<span style="color:#059669">✅ حضور</span>');
+      const typeLabel = r.type === 'grace_session' ? '<span style="color:#d97706">⚠️ حصّة مجانية</span>' : r.type === 'trial_session' ? '<span style="color:#f59e0b">🟠 حصة تجريبية</span>' : '<span style="color:#059669">✅ حضور</span>';
       h += '<tr style="border-bottom:1px solid var(--border)">';
       h += '<td style="padding:7px 10px;white-space:nowrap">' + escX(r.date) + '</td>';
       h += '<td style="padding:7px 10px;white-space:nowrap" dir="ltr">' + escX(r.time) + '</td>';
