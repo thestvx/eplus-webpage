@@ -635,13 +635,33 @@
     .wali-sub-progress .fill.perm{background:linear-gradient(90deg,var(--royal-2),var(--royal-4))}
     .wali-sub-progress .fill.free{background:linear-gradient(90deg,var(--ok),#2bb98b)}
 
-    .wali-events{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px dashed var(--line)}
-    .wali-events:last-child{border-bottom:none}
+    .wali-ev{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px dashed var(--line)}
+    .wali-ev:last-child{border-bottom:none}
     .wali-ev-icon{width:36px;height:36px;border-radius:10px;background:var(--lav);color:var(--royal);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
     .wali-ev-main{flex:1;min-width:0}
     .wali-ev-subj{font-size:12.5px;font-weight:800;color:var(--ink)}
     .wali-ev-meta{font-size:10.5px;color:var(--ink-3);font-weight:600;margin-top:2px}
-    .wali-ev-date{font-size:10.5px;font-weight:800;color:var(--royal);white-space:nowrap}
+    .wali-ev-date{font-size:11px;font-weight:800;color:var(--royal);white-space:nowrap}
+
+    /* ── مجموعات سجل الحضور: قادم/جديد/قديم ── */
+    .att-group{padding:var(--sp-2) 0 var(--sp-3);border-bottom:1px solid var(--line)}
+    .att-group:last-child{border-bottom:none;padding-bottom:0}
+    .att-group-head{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:900;color:var(--ink);margin-bottom:4px}
+    .att-gh-ic{width:24px;height:24px;border-radius:8px;background:var(--lav);color:var(--royal);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .att-gh-ic .ai{width:14px;height:14px}
+    .att-gh-note{font-size:10px;font-weight:700;color:var(--ink-3);background:#fff;border:1px solid var(--line);padding:2px 9px;border-radius:99px;margin-inline-start:auto}
+    .att-none{font-size:11.5px;color:var(--ink-3);font-weight:600;padding:10px 8px 12px}
+    .att-up{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px dashed var(--line)}
+    .att-up:last-child{border-bottom:none}
+    .att-up-ic{width:34px;height:34px;border-radius:10px;background:var(--lav);color:var(--royal);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .att-up-ic .ai{width:16px;height:16px}
+    .att-up-main{flex:1;min-width:0}
+    .att-up-subj{font-size:12.5px;font-weight:800;color:var(--ink)}
+    .att-up-tc{font-size:10.5px;font-weight:600;color:var(--ink-3)}
+    .att-up-range{font-size:10.5px;color:var(--ink-3);font-weight:600;margin-top:2px}
+    .att-up-rem{flex-shrink:0;display:flex;flex-direction:column;align-items:center;line-height:1.15}
+    .att-up-rem b{font-size:16px;font-weight:900;color:var(--royal)}
+    .att-up-rem span{font-size:9px;font-weight:700;color:var(--ink-3)}
 
     .wali-contact-box{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--sp-2)}
     .wali-contact-cell{background:var(--lav-2);border:1px dashed var(--line);border-radius:11px;padding:15px 14px;text-align:center}
@@ -735,6 +755,10 @@
       .wali-sub{padding:12px 13px}
       .wali-contact-box{grid-template-columns:1fr;gap:var(--sp-1)}
       .wali-contact-cell{padding:13px 12px}
+      .att-group{padding:var(--sp-1) 0 var(--sp-2)}
+      .att-group-head{font-size:12px}
+      .att-up{padding:9px 0}
+      .att-up-rem b{font-size:15px}
       .section-head{gap:8px;margin-bottom:var(--head-gap)}
       .section-head .sh-ic{width:28px;height:28px;border-radius:8px}
       .section-head .sh-ic .ai{width:15px;height:15px}
@@ -825,6 +849,15 @@
       return (+p[2])+' '+SUB_AR_MONTHS[(+p[1])-1]+' '+p[0];
     }
     function subEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    function fmtTime(t){
+      if(!t)return'';
+      const m=String(t).match(/^(\d{1,2}):(\d{2})/);
+      return m?(+m[1])+':'+m[2]:String(t);
+    }
+    function monthAr(ym){
+      if(!ym||!/^\d{4}-\d{2}$/.test(ym))return ym||'';
+      return SUB_AR_MONTHS[(+ym.slice(5,7))-1]+' '+ym.slice(0,4);
+    }
 
     async function fetchStudentAttendance(studentId){
       try{
@@ -1076,6 +1109,14 @@
         if(ka!==kb)return kb.localeCompare(ka);
         return String(b.checkInTime||b.time||'').localeCompare(String(a.checkInTime||a.time||''));
       }).slice(0,6);
+      var curYM=today.slice(0,7);
+      var allEvents=events.slice().sort(function(a,b){
+        var ka=String(a.date||a.createdAt||''),kb=String(b.date||b.createdAt||'');
+        if(ka!==kb)return kb.localeCompare(ka);
+        return String(b.checkInTime||b.time||'').localeCompare(String(a.checkInTime||a.time||''));
+      });
+      var oldEvents=allEvents.filter(function(ev){return String(ev.date||'').slice(0,7)<curYM;});
+      var newEvents=allEvents.filter(function(ev){return String(ev.date||'').slice(0,7)===curYM;});
       var teachersSet=[];
       subjects.forEach(function(s){var t=s.teacher||s.teacherName||s.teachername;if(t&&teachersSet.indexOf(t)===-1)teachersSet.push(t);});
 
@@ -1108,10 +1149,10 @@
       var actStat=(permActive?'∞':activeRows.length);
       var actLabel=activeRows.length===0?'لا يوجد اشتراك':(activeRows.length===1?'اشتراك نشط':'اشتراكات نشطة');
       html+='<div class="stats-wrap" style="margin-bottom:var(--sec-gap)">'
-        +'<div class="stat-cell strong"><div class="stat-top"><span class="stat-ic">'+sIcon('book')+'</span><span class="stat-label">مادة مسجلة</span></div><div class="stat-value">'+subjects.length+'</div><div class="stat-sub muted">موادك الحالية</div></div>'
-        +'<div class="stat-cell"><div class="stat-top"><span class="stat-ic">'+sIcon('card')+'</span><span class="stat-label">'+actLabel+'</span></div><div class="stat-value">'+actStat+'</div><div class="stat-sub muted">+</div></div>'
-        +'<div class="stat-cell"><div class="stat-top"><span class="stat-ic">'+sIcon('calendar')+'</span><span class="stat-label">حضور هذا الشهر</span></div><div class="stat-value">'+monthEvents.length+'</div><div class="stat-sub muted">حصص مسجلة</div></div>'
-        +'<div class="stat-cell"><div class="stat-top"><span class="stat-ic">'+sIcon('clock')+'</span><span class="stat-label">حصص متبقية</span></div><div class="stat-value">'+ (permActive?'∞':totalRemain) +'</div><div class="stat-sub muted">'+ (permActive?'اشتراك دائم':'من اشتراكك الحالي') +'</div></div>'
+        +'<div class="stat-cell strong"><div class="stat-top"><span class="stat-ic">'+sIcon('clock')+'</span><span class="stat-label">القادم</span></div><div class="stat-value">'+ (permActive?'∞':totalRemain) +'</div><div class="stat-sub muted">حصص متبقية</div></div>'
+        +'<div class="stat-cell"><div class="stat-top"><span class="stat-ic">'+sIcon('check')+'</span><span class="stat-label">الجديد — هذا الشهر</span></div><div class="stat-value">'+newEvents.length+'</div><div class="stat-sub muted">'+monthAr(curYM)+'</div></div>'
+        +'<div class="stat-cell"><div class="stat-top"><span class="stat-ic">'+sIcon('history')+'</span><span class="stat-label">القديم — السابق</span></div><div class="stat-value">'+oldEvents.length+'</div><div class="stat-sub muted">قبل '+monthAr(curYM)+'</div></div>'
+        +'<div class="stat-cell"><div class="stat-top"><span class="stat-ic">'+sIcon('book')+'</span><span class="stat-label">'+actLabel+'</span></div><div class="stat-value">'+ (permActive?'∞':activeRows.length) +'</div><div class="stat-sub muted">'+subjects.length+' مادة مسجلة</div></div>'
         +'</div>';
 
       // اشتراكات المواد
@@ -1167,25 +1208,90 @@
           }).join('')+'</div></div>';
       }
 
-      // آخر الحضور
-      html+='<div class="wali-card"><div class="wali-card-head"><span class="wc-ic">'+sIcon('clock')+'</span><span class="wc-top">آخر الحضور</span><span class="wc-count">'+monthEvents.length+' حضور هذا الشهر</span></div><div class="wali-card-body">';
-      if(lastEvents.length===0){
-        html+='<div class="wali-empty">لا توجد جلسات مسجلة بعد — تظهر الحصص هنا فور تسجيلها.</div>';
-      }else{
-        html+=lastEvents.map(function(ev){
-          var d=String(ev.date||ev.createdAt||'').slice(0,10);
-          var s=ev.subjectName||ev.subject||'';
-          var tch=ev.teacherName||ev.teacher||'';
-          var icon=SUBJECT_ICONS[s]||'📘';
-          var time=ev.checkInTime||ev.time||'';
-          return '<div class="wali-events">'
-            +'<div class="wali-ev-icon">'+icon+'</div>'
-            +'<div class="wali-ev-main"><div class="wali-ev-subj">'+subEsc(s||'جلسة')+'</div>'
-            +'<div class="wali-ev-meta">'+subEsc(tch||'')+(time?' · '+subEsc(time):'')+'</div></div>'
-            +'<div class="wali-ev-date">'+(d?subEsc(subFmtAr(d)):'—')+'</div></div>';
-        }).join('');
+      // ── سجل الحضور الكامل: قديم / جديد / قادم ──
+
+      // القادمة: الحصص المتبقية ضمن كل فترة اشتراك فعّال (ماذا بقي للولي/الطالب)
+      var upcoming=[];
+      activeRows.forEach(function(row){
+        var s=row.subscription||{};
+        if(SubscriptionService.isPermanent(s))return;
+        (row.periods||[]).forEach(function(p){
+          if(!p)return;
+          if(today>p.end_date)return;                       // منتهية
+          var total=Number(p.total_sessions)||SubscriptionService.SESSIONS_PER_MONTH;
+          var used=Number(p.used_sessions)||0;
+          var remain=Math.max(0,total-used);
+          if(remain>0||(today>=p.start_date&&today<=p.end_date)){
+            upcoming.push({subject:s.subject_name||'مادة',teacher:s.teacher_name||'—',type:s.subject_name?'دراسة':'',start:p.start_date,end:p.end_date,remain:remain,total:total,used:used,permanent:false});
+          }
+        });
+      });
+      // لو لا توجد فترات مفصّلة نستخدم الأرقام الإجمالية للاشتراك النشط
+      if(upcoming.length===0&&activeRows.length>0&&totalRemain>0){
+        activeRows.forEach(function(row){
+          var s=row.subscription||{};
+          if(SubscriptionService.isPermanent(s))return;
+          var ap=SubscriptionService.activePeriod((row.periods||[]),today);
+          var total=ap?(Number(ap.total_sessions)||SubscriptionService.SESSIONS_PER_MONTH):SubscriptionService.SESSIONS_PER_MONTH;
+          var used=ap?(Number(ap.used_sessions)||0):0;
+          var remain=Math.max(0,total-used);
+          if(remain>0)upcoming.push({subject:s.subject_name||'مادة',teacher:s.teacher_name||'—',start:ap?ap.start_date:'',end:ap?ap.end_date:'',remain:remain,total:total,used:used,permanent:false});
+        });
       }
-      html+='</div></div>';
+
+      function evRow(ev){
+        var d=String(ev.date||ev.createdAt||'').slice(0,10);
+        var s=ev.subjectName||ev.subject||'';
+        var tch=ev.teacherName||ev.teacher||'';
+        var icon=SUBJECT_ICONS[s]||'📘';
+        var time=fmtTime(ev.checkInTime||ev.time||'');
+        return '<div class="wali-ev">'
+          +'<div class="wali-ev-icon">'+icon+'</div>'
+          +'<div class="wali-ev-main"><div class="wali-ev-subj">'+subEsc(s||'جلسة')+'</div>'
+          +'<div class="wali-ev-meta">'+subEsc(tch||'')+(time?' · '+subEsc(time):'')+'</div></div>'
+          +'<div class="wali-ev-date">'+(d?subEsc(subFmtAr(d)):'—')+'</div></div>';
+      }
+
+      var attHTML='<div class="wali-card"><div class="wali-card-head"><span class="wc-ic">'+sIcon('clock')+'</span><span class="wc-top">سجل الحضور</span><span class="wc-count">'+allEvents.length+' إجمالي</span></div><div class="wali-card-body">';
+
+      if(allEvents.length===0&&upcoming.length===0){
+        attHTML+='<div class="wali-empty">لا توجد جلسات مسجلة بعد — تظهر الحصص هنا فور تسجيلها في الأكاديمية.</div>';
+      }else{
+        // 🔮 القادمة: حصص متبقية متوقعة
+        attHTML+='<div class="att-group"><div class="att-group-head"><span class="att-gh-ic">'+sIcon('sparkles')+'</span><span>القادمة</span><span class="att-gh-note">حصص متبقية ضمن اشتراكك</span></div>';
+        if(upcoming.length===0){
+          attHTML+='<div class="att-none">لا توجد حصص متبقية معلّقة حسب مواعيد الاشتراك الحالية.</div>';
+        }else{
+          attHTML+=upcoming.slice(0,8).map(function(u,i){
+            var range=(u.start?(subEsc(subFmtAr(u.start))+(u.end?' → '+subEsc(subFmtAr(u.end)):'')):'')||'غير محددة';
+            return '<div class="att-up"><div class="att-up-ic">'+sIcon('calendar')+'</div>'
+              +'<div class="att-up-main"><div class="att-up-subj">'+subEsc(u.subject)+(u.teacher&&u.teacher!=='—'?' <span class="att-up-tc">· '+subEsc(u.teacher)+'</span>':'')+'</div>'
+              +'<div class="att-up-range">'+range+'</div></div>'
+              +'<div class="att-up-rem"><b>'+u.remain+'</b><span>متبقية</span></div></div>';
+          }).join('');
+        }
+        attHTML+='</div>';
+
+        // 🔄 الجديدة: حضور هذا الشهر
+        attHTML+='<div class="att-group"><div class="att-group-head"><span class="att-gh-ic">'+sIcon('check')+'</span><span>جديدة — '+monthAr(curYM)+'</span><span class="att-gh-note">'+newEvents.length+' حصة</span></div>';
+        if(newEvents.length===0){
+          attHTML+='<div class="att-none">لم تُسجَّل أي حصة حضور هذا الشهر حتى الآن.</div>';
+        }else{
+          attHTML+=newEvents.map(function(ev){return evRow(ev);}).join('');
+        }
+        attHTML+='</div>';
+
+        // 🕘 القديمة: السجل السابق
+        attHTML+='<div class="att-group"><div class="att-group-head"><span class="att-gh-ic">'+sIcon('history')+'</span><span>القديمة — السجل السابق</span><span class="att-gh-note">'+oldEvents.length+' حصة</span></div>';
+        if(oldEvents.length===0){
+          attHTML+='<div class="att-none">لا توجد حصص سابقة قبل هذا الشهر.</div>';
+        }else{
+          attHTML+=oldEvents.map(function(ev){return evRow(ev);}).join('');
+        }
+        attHTML+='</div>';
+      }
+      attHTML+='</div></div>';
+      html+=attHTML;
 
       // قناة أولياء الأمور
       html+='<div class="wali-card">'
@@ -1286,7 +1392,10 @@
       box:'<path d="M12 3.2 21 7.5v9L12 20.8 3 16.5v-9Z"/><path d="m3 7.5 9 4.5 9-4.5"/><path d="M12 12v8.8"/>',
       doc:'<path d="M13.8 4.8H6.8A2.2 2.2 0 0 0 4.6 7v10a2.2 2.2 0 0 0 2.2 2.2h10.4A2.2 2.2 0 0 0 19.4 17v-7Z"/><path d="M13.8 4.8v4.2h4"/><path d="m8.6 14.6 1.5 1.5 3.6-3.8"/>',
       clock:'<circle cx="12" cy="12" r="8.4"/><path d="M12 7.4V12l3.1 2"/>',
-      calendar:'<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.6h17"/><path d="M8 2.8V6"/><path d="M16 2.8V6"/><path d="m14.4 13.7-2.7 2.7-1.2-1.2"/>'
+      calendar:'<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.6h17"/><path d="M8 2.8V6"/><path d="M16 2.8V6"/><path d="m14.4 13.7-2.7 2.7-1.2-1.2"/>',
+      check:'<path d="m5 12.5 4.2 4L19 7.5"/>',
+      history:'<path d="M4.6 12A7.4 7.4 0 1 0 6 7"/><path d="M3.8 4.6V8h3.4"/><path d="M12 7.8V12l2.7 1.9"/>',
+      sparkles:'<path d="m12 3 1.5 3.6L17 8l-3.5 1.4L12 13l-1.5-3.6L7 8l3.5-1.4Z"/><path d="m18.5 14 1 2.4 2.4 1-2.4 1-1 2.4-1-2.4-2.4-1 2.4-1Z"/><path d="m6 14.5.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8Z"/>'
     };
     function sIcon(n,extra){
       if(!STU_ICONS[n])return '';
