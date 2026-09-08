@@ -2933,7 +2933,7 @@
             <div class="finance-hero-title">💰 الموارد المالية</div>
             <div class="finance-hero-sub">إدارة خزينة الأكاديمية — المصاريف والإيرادات ورواتب الأساتذة</div>
           </div>
-          <button onclick="openTreasuryModal()" style="padding:10px 20px;border-radius:13px;border:1.5px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:white;font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;backdrop-filter:blur(6px)">
+          <button onclick="openTreasuryModal()" id="fin-treasury-edit-btn" style="display:none">
             ⚙️ تعديل رصيد الخزينة
           </button>
         </div>
@@ -2971,7 +2971,7 @@
         </div>
 
         <!-- ☀️ بطاقة إيرادات المخيم الصيفي -->
-        <div style="background:linear-gradient(135deg,rgba(249,115,22,0.08),rgba(234,88,12,0.04));border:1.5px solid rgba(249,115,22,0.22);border-radius:var(--radius-sm);padding:20px 24px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;position:relative;overflow:hidden">
+        <div id="fin-summer-old-card" style="display:none;background:linear-gradient(135deg,rgba(249,115,22,0.08),rgba(234,88,12,0.04));border:1.5px solid rgba(249,115,22,0.22);border-radius:var(--radius-sm);padding:20px 24px;margin-bottom:20px;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;position:relative;overflow:hidden">
           <div style="position:absolute;left:-20px;top:-20px;width:100px;height:100px;background:radial-gradient(circle,rgba(249,115,22,0.15),transparent);border-radius:50%;pointer-events:none"></div>
           <div style="display:flex;align-items:center;gap:16px">
             <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#FED7AA,#FDBA74);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;box-shadow:0 4px 14px rgba(249,115,22,0.25)">☀️</div>
@@ -21079,25 +21079,12 @@ function getFinDb() { return _db || window._mainDb; }
 
 // تحميل البيانات من Firestore — real-time
 window.loadFinanceSection = async function loadFinanceSection() {
-  const finDb = getFinDb();
-  if (!finDb) { console.error('Finance: db not ready'); showToast && showToast('❌ خطأ في الاتصال بقاعدة البيانات', true); return; }
   try {
-    // تحميل رصيد الخزينة
-    const tSnap = await getDoc(doc(finDb, 'settings', 'treasury'));
-    _finTreasury = tSnap.exists() ? (tSnap.data().balance || 0) : 0;
-
-    // إلغاء الاستماع السابق إن وُجد
-    if (_finUnsubTx) { _finUnsubTx(); _finUnsubTx = null; }
-
-    // real-time listener — يضمن ظهور كل تعديل فوراً
-    _finUnsubTx = onSnapshot(query(collection(finDb, 'financeTx'), orderBy('date','desc')), snap => {
-      _finTxs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      renderFinanceKPIs();
-      renderFinanceTable();
-    }, e => {
-      console.error('financeTx listener:', e);
-      showToast && showToast('❌ خطأ في الاتصال بقاعدة البيانات المالية', true);
-    });
+    // الموحّد مع «موارد مالية الدعم المدرسي» (sf) — مصدر الحقيقة الوحيد
+    if (typeof sfLoadTx === 'function') await sfLoadTx();
+    if (typeof sfAggregateRevenue === 'function') await sfAggregateRevenue();
+    if (window.renderFinanceKPIs) renderFinanceKPIs();
+    if (window.renderFinanceTable) renderFinanceTable();
   } catch(e) {
     console.error('loadFinanceSection:', e);
     showToast && showToast('❌ خطأ في تحميل البيانات المالية', true);
@@ -21105,56 +21092,46 @@ window.loadFinanceSection = async function loadFinanceSection() {
 }
 
 window.renderFinanceKPIs = function renderFinanceKPIs() {
-  const totalExpense = _finTxs.filter(t => t.type === 'expense').reduce((a,t) => a + (t.amount||0), 0);
-  const totalIncome  = _finTxs.filter(t => t.type === 'income' ).reduce((a,t) => a + (t.amount||0), 0);
-  const totalSalary  = _finTxs.filter(t => t.type === 'salary' ).reduce((a,t) => a + (t.amount||0), 0);
-  const balance = _finTreasury + totalIncome - totalExpense - totalSalary;
+  // نفس حساب «إجمالي الخزينة» في قسم «موارد مالية الدعم المدرسي» (sf-balance):
+  // الخزينة = مجموع الإيرادات (اشتراكات+تسجيل+مخيم+لغات) − كل المدفوعات الخارجة (مصروفات+رواتب)
+  const rev = window.__sfRevenue || { sub: 0, fee: 0, camp: 0, lang: 0 };
+  const gross = (Number(rev.sub)||0) + (Number(rev.fee)||0) + (Number(rev.camp)||0) + (Number(rev.lang)||0);
+  const txs = (typeof sfTxCache !== 'undefined' ? sfTxCache : []) || [];
+  let totalExpense = 0, totalSalary = 0, outT = 0;
+  txs.forEach(t => {
+    const a = Number(t.amount) || 0;
+    if (t.direction === 'out') {
+      outT += a;
+      if (t.source_type === 'salary') totalSalary += a;
+      else if (t.source_type === 'expense') totalExpense += a;
+    }
+  });
+  const balance = Math.max(0, gross - outT);
 
   const fmt = n => n.toLocaleString('ar-DZ') + ' دج';
-  document.getElementById('fin-treasury').textContent = fmt(balance);
-  document.getElementById('fin-treasury').style.color = balance >= 0 ? '#059669' : '#DC2626';
-  document.getElementById('fin-total-expense').textContent = fmt(totalExpense);
-  document.getElementById('fin-total-income').textContent  = fmt(totalIncome);
-  document.getElementById('fin-total-salary').textContent  = fmt(totalSalary);
+  const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setEl('fin-treasury', fmt(balance));
+  const tel = document.getElementById('fin-treasury');
+  if (tel) tel.style.color = balance >= 0 ? '#059669' : '#DC2626';
+  setEl('fin-total-expense', fmt(totalExpense));
+  setEl('fin-total-income',  fmt(gross));
+  setEl('fin-total-salary',  fmt(totalSalary));
 
-  // ── KPI تذاكر المخيم الصيفي ──
-  const summerTxs = _finTxs.filter(t => t.type === 'income' && t.source === 'summer_ticket');
-  const summerTotal = summerTxs.reduce((a,t) => a + (t.amount||0), 0);
-  const importedReceipts = new Set(summerTxs.map(t => t.receipt).filter(Boolean));
-
-  // حساب التذاكر المدفوعة غير المستوردة بعد
-  const allTickets = window._allTicketsData || [];
-  const pendingImport = allTickets.filter(t =>
-    t.status === 'paid' && Number(t.amount || 0) > 0 && !importedReceipts.has(t.receipt)
-  );
-
-  const sumTotalEl  = document.getElementById('fin-summer-total');
-  const sumMetaEl   = document.getElementById('fin-summer-meta');
-  const importBtn   = document.getElementById('btn-import-summer');
-  if (sumTotalEl)  sumTotalEl.textContent  = fmt(summerTotal);
-  if (sumMetaEl)   sumMetaEl.textContent   = `${importedReceipts.size} تذكرة مسجّلة كمدخول — ${pendingImport.length} بانتظار الاستيراد`;
-  if (importBtn) {
-    if (pendingImport.length > 0) {
-      importBtn.style.opacity = '1';
-      importBtn.style.pointerEvents = '';
-      importBtn.innerHTML = `☀️ استيراد ${pendingImport.length} تذكرة غير مسجّلة`;
-    } else {
-      importBtn.style.opacity = '0.5';
-      importBtn.style.pointerEvents = 'none';
-      importBtn.innerHTML = `✅ جميع التذاكر مسجّلة`;
-    }
-  }
+  // إخفاء أدوات النظام القديم (أصبحت زائدة بعد التوحيد)
+  const tb = document.getElementById('fin-treasury-edit-btn');
+  if (tb) tb.style.display = 'none';
+  const sc = document.getElementById('fin-summer-old-card');
+  if (sc) sc.style.display = 'none';
 }
 
 window.renderFinanceTable = function renderFinanceTable() {
-  const filter = document.getElementById('fin-filter')?.value || '';
-  let rows;
-  if (filter === 'income_summer') {
-    rows = _finTxs.filter(t => t.type === 'income' && t.source === 'summer_ticket');
-  } else if (filter) {
-    rows = _finTxs.filter(t => t.type === filter);
-  } else {
-    rows = _finTxs;
+  const filter = (document.getElementById('fin-filter') && document.getElementById('fin-filter').value) || '';
+  let rows = (typeof sfTxCache !== 'undefined' ? sfTxCache : []) || [];
+  rows = rows.slice();
+  if (filter) {
+    if (filter === 'income_summer') rows = rows.filter(t => t.source_type === 'camp_v2');
+    else if (filter === 'income') rows = rows.filter(t => t.direction === 'in');
+    else rows = rows.filter(t => t.source_type === filter);
   }
   const body = document.getElementById('fin-tx-body');
   if (!body) return;
@@ -21164,41 +21141,28 @@ window.renderFinanceTable = function renderFinanceTable() {
     return;
   }
 
-  const typeLabels = {
-    expense: { label:'مصروف', icon:'📤' },
-    income:  { label:'إيراد', icon:'📥' },
-    salary:  { label:'راتب', icon:'👨‍🏫' }
-  };
+  const labels = (typeof SF_TYPE_LABELS !== 'undefined' ? SF_TYPE_LABELS : {}) || {};
+  const icons = { subscription:'📅', support_fee:'📚', camp_v2:'☀️', language:'🌍', expense:'📤', salary:'👨‍🏫', adjustment:'💰' };
 
   body.innerHTML = rows.map(t => {
-    const isSummerTicket = t.type === 'income' && t.source === 'summer_ticket';
-    const info = isSummerTicket
-      ? { label: 'تذكرة مخيم', icon: '☀️' }
-      : (typeLabels[t.type] || { label: t.type, icon: '💰' });
-
+    const isOut = t.direction === 'out';
+    const typeLabel = labels[t.source_type] || t.source_type || '—';
+    const icon = icons[t.source_type] || '💰';
     const dateStr = t.date
-      ? new Date(t.date + 'T00:00:00').toLocaleDateString('ar-DZ', {day:'2-digit', month:'2-digit', year:'numeric'})
+      ? new Date(t.date + (String(t.date).length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('ar-DZ', {day:'2-digit', month:'2-digit', year:'numeric'})
       : '—';
-    const amountColor = t.type === 'income' ? (isSummerTicket ? '#C2410C' : '#059669') : '#DC2626';
-    const amountSign  = t.type === 'income' ? '+' : '-';
+    const amountColor = isOut ? '#DC2626' : '#059669';
+    const amountSign  = isOut ? '-' : '+';
+    const person = t.student_name || t.teacher_name || '';
 
-    const receiptBadge = t.receipt
-      ? `<span style="font-size:10px;font-family:monospace;color:var(--primary);background:var(--primary-light);padding:2px 7px;border-radius:6px;display:inline-block;margin-top:3px">${t.receipt}</span>`
-      : '';
-
-    const rowBg = isSummerTicket
-      ? 'background:linear-gradient(135deg,rgba(249,115,22,0.04),rgba(234,88,12,0.02));'
-      : '';
-
-    return `<div class="finance-tx-row" style="${rowBg}">
+    return `<div class="finance-tx-row">
       <div style="font-size:12px;color:var(--text-muted);font-weight:700">${dateStr}</div>
       <div style="font-weight:700;color:var(--text)">
-        ${t.desc || '—'}
-        ${t.teacher ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">👨‍🏫 ${t.teacher}</div>` : ''}
-        ${receiptBadge}
+        ${(t.description || '—')}
+        ${person ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">👤 ${person}</div>` : ''}
       </div>
       <div>
-        <span class="finance-tx-type ${t.type}${isSummerTicket ? ' summer-ticket' : ''}">${info.icon} ${info.label}</span>
+        <span class="finance-tx-type ${isOut ? 'expense' : 'income'}">${icon} ${typeLabel}</span>
       </div>
       <div style="font-weight:900;color:${amountColor}">${amountSign}${(t.amount||0).toLocaleString('ar-DZ')} دج</div>
       <div><button class="finance-tx-del" onclick="deleteFinanceTx('${t.id}')" title="حذف">🗑️</button></div>
@@ -21208,14 +21172,13 @@ window.renderFinanceTable = function renderFinanceTable() {
 
 // ── تصدير CSV حسب الفلتر المحدد ──
 window.exportFinanceCSV = () => {
-  const filter = document.getElementById('fin-filter')?.value || '';
-  let filtered;
-  if (filter === 'income_summer') {
-    filtered = _finTxs.filter(t => t.type === 'income' && t.source === 'summer_ticket');
-  } else if (filter) {
-    filtered = _finTxs.filter(t => t.type === filter);
-  } else {
-    filtered = _finTxs;
+  const filter = (document.getElementById('fin-filter') && document.getElementById('fin-filter').value) || '';
+  let filtered = (typeof sfTxCache !== 'undefined' ? sfTxCache : []) || [];
+  filtered = filtered.slice();
+  if (filter) {
+    if (filter === 'income_summer') filtered = filtered.filter(t => t.source_type === 'camp_v2');
+    else if (filter === 'income') filtered = filtered.filter(t => t.direction === 'in');
+    else filtered = filtered.filter(t => t.source_type === filter);
   }
 
   if (!filtered.length) { showToast('⚠️ لا توجد معاملات للتصدير', true); return; }
@@ -21228,40 +21191,35 @@ window.exportFinanceCSV = () => {
     salary: 'رواتب'
   };
   const filterName = filterLabels[filter] || filter;
+  const labels = (typeof SF_TYPE_LABELS !== 'undefined' ? SF_TYPE_LABELS : {}) || {};
 
   const rows = [
-    ['التاريخ', 'التفاصيل', 'النوع', 'المبلغ (دج)', 'الأستاذ', 'رقم الوصل', 'المصدر']
+    ['التاريخ', 'التفاصيل', 'النوع', 'المبلغ (دج)', 'الطالب/الأستاذ', 'الجهة']
   ];
 
   let totalIncome = 0, totalExpense = 0;
   filtered.forEach(t => {
-    const typeLabels = {
-      expense: 'مصروف',
-      income: 'إيراد',
-      salary: 'راتب'
-    };
-    const isSummer = t.type === 'income' && t.source === 'summer_ticket';
-    const typeStr = isSummer ? 'تذكرة مخيم' : (typeLabels[t.type] || t.type);
-    const amt = t.amount || 0;
-    const amountSign = t.type === 'income' ? '+' : '-';
+    const isOut = t.direction === 'out';
+    const typeStr = labels[t.source_type] || t.source_type || '—';
+    const amt = Number(t.amount) || 0;
+    const amountSign = isOut ? '-' : '+';
     const amountStr = `${amountSign}${amt.toLocaleString('ar-DZ')} دج`;
-    if (t.type === 'income') totalIncome += amt; else totalExpense += amt;
+    if (isOut) totalExpense += amt; else totalIncome += amt;
     rows.push([
-      t.date ? new Date(t.date + 'T00:00:00').toLocaleDateString('ar-DZ') : '—',
-      t.desc || '—',
+      t.date ? new Date(String(t.date).length <= 10 ? t.date + 'T00:00:00' : t.date).toLocaleDateString('ar-DZ') : '—',
+      t.description || '—',
       typeStr,
       amountStr,
-      t.teacher || '',
-      t.receipt || '',
-      isSummer ? 'المخيم الصيفي' : (t.source || 'يدوي')
+      t.student_name || t.teacher_name || '',
+      isOut ? 'مصروف' : 'إيراد'
     ]);
   });
 
   rows.push([]);
-  rows.push(['', '', 'إجمالي الإيرادات', `+${totalIncome.toLocaleString('ar-DZ')} دج`, '', '', '']);
-  rows.push(['', '', 'إجمالي المصاريف', `-${totalExpense.toLocaleString('ar-DZ')} دج`, '', '', '']);
+  rows.push(['', '', 'إجمالي الإيرادات', `+${totalIncome.toLocaleString('ar-DZ')} دج`, '', '']);
+  rows.push(['', '', 'إجمالي المصاريف (مصروفات+رواتب)', `-${totalExpense.toLocaleString('ar-DZ')} دج`, '', '']);
   const netBalance = totalIncome - totalExpense;
-  rows.push(['', '', 'صافي الرصيد', `${netBalance >= 0 ? '+' : ''}${netBalance.toLocaleString('ar-DZ')} دج`, '', '', '']);
+  rows.push(['', '', 'صافي الرصيد', `${netBalance >= 0 ? '+' : ''}${netBalance.toLocaleString('ar-DZ')} دج`, '', '']);
 
   const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const bom = '\uFEFF';
@@ -21303,7 +21261,7 @@ window.openFinanceModal = (type) => {
 };
 window.closeFinanceModal = () => document.getElementById('finance-tx-modal').classList.remove('open');
 
-// ── حفظ المعاملة ──
+// ── حفظ المعاملة (موحّد مع قسم «موارد مالية الدعم المدرسي» عبر Supabase) ──
 window.saveFinanceTx = async () => {
   const type   = document.getElementById('fin-tx-type').value;
   const desc   = document.getElementById('fin-tx-desc').value.trim();
@@ -21318,120 +21276,60 @@ window.saveFinanceTx = async () => {
   const btn = document.getElementById('fin-save-btn');
   btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
 
+  const map = {
+    expense: { source_type: 'expense', direction: 'out' },
+    income:  { source_type: 'adjustment', direction: 'in' },
+    salary:  { source_type: 'salary', direction: 'out' }
+  };
+  const m = map[type] || { source_type: 'adjustment', direction: 'in' };
+
   try {
-    const tx = { type, desc, amount, date, createdAt: serverTimestamp() };
-    if (teacher) tx.teacher = teacher;
-    await addDoc(collection(getFinDb(), 'financeTx'), tx);
-    // onSnapshot سيحدّث _finTxs تلقائياً
+    await sfInsertTx({
+      source_type: m.source_type,
+      direction: m.direction,
+      amount: amount,
+      description: desc,
+      teacher_name: (m.source_type === 'salary' || m.source_type === 'expense') ? teacher : '',
+      admin_name: (window._auth && window._auth.currentUser && window._auth.currentUser.email) || 'admin',
+      date: date || sfToday(),
+    });
+    if (typeof sfLoadTx === 'function') await sfLoadTx();
     closeFinanceModal();
+    renderFinanceKPIs();
+    renderFinanceTable();
     showToast && showToast('✅ تم حفظ المعاملة');
   } catch(e) {
+    console.error('saveFinanceTx error:', e);
     showToast && showToast('❌ خطأ في الحفظ: ' + e.message, true);
   } finally {
     btn.disabled = false; btn.innerHTML = '💾 حفظ';
   }
 };
 
-// ── حذف معاملة ──
+// ── حذف معاملة (موحّد مع Supabase) ──
 window.deleteFinanceTx = async (txId) => {
-  if (!(await cmConfirm('حذف معاملة', 'حذف هذه المعاملة نهائياً؟', '🗑️', {danger:true, confirmText:'حذف'}))) return;
-  try {
-    await deleteDoc(doc(getFinDb(), 'financeTx', txId));
-    // onSnapshot سيحدّث الجدول تلقائياً
-    showToast && showToast('🗑️ تم الحذف');
-  } catch(e) {
-    showToast && showToast('❌ خطأ: ' + e.message, true);
-  }
-};
-
-// ── استيراد تذاكر المخيم الصيفي المدفوعة إلى الموارد المالية ──
-window.importSummerTicketsToFinance = async () => {
-  const finDb = getFinDb();
-  if (!finDb) { showToast && showToast('❌ خطأ في الاتصال', true); return; }
-
-  const allTickets = window._allTicketsData || [];
-  if (!allTickets.length) { showToast && showToast('⚠️ لا توجد تذاكر بعد', true); return; }
-
-  // التذاكر المستوردة مسبقاً (بناءً على رقم الوصل)
-  const importedReceipts = new Set(
-    _finTxs
-      .filter(t => t.type === 'income' && t.source === 'summer_ticket' && t.receipt)
-      .map(t => t.receipt)
-  );
-
-  // التذاكر المدفوعة التي لم تُستورد بعد
-  const toImport = allTickets.filter(t =>
-    t.status === 'paid' &&
-    Number(t.amount || 0) > 0 &&
-    t.receipt &&
-    !importedReceipts.has(t.receipt)
-  );
-
-  if (!toImport.length) {
-    showToast && showToast('✅ جميع التذاكر المدفوعة مسجَّلة بالفعل في الموارد المالية');
+  if (typeof sfDeleteTx === 'function') {
+    await sfDeleteTx(txId);
     return;
   }
-
-  const confirmed = await cmConfirm('استيراد التذاكر',
-    `☀️ استيراد تذاكر المخيم الصيفي\n\nسيتم إضافة ${toImport.length} تذكرة كمدخول في الموارد المالية:\n` +
-    toImport.slice(0, 5).map(t => `• ${t.name} — ${Number(t.amount).toLocaleString('ar-DZ')} دج`).join('\n') +
-    (toImport.length > 5 ? `\n... و${toImport.length - 5} تذاكر أخرى` : '') +
-    '\n\nهل تريد المتابعة؟',
-    '📦'
-  );
-  if (!confirmed) return;
-
-  const btn = document.getElementById('btn-import-summer');
-  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ جاري الاستيراد...'; }
-
-  let successCount = 0, errorCount = 0;
-  const today = new Date().toISOString().split('T')[0];
-
-  for (const ticket of toImport) {
-    try {
-      await addDoc(collection(finDb, 'financeTx'), {
-        type: 'income',
-        source: 'summer_ticket',
-        desc: `☀️ تذكرة مخيم — ${ticket.name}${ticket.pack ? ' (' + ticket.pack + ')' : ''}`,
-        amount: Number(ticket.amount),
-        date: ticket.date || today,
-        receipt: ticket.receipt || '',
-        createdAt: serverTimestamp()
-      });
-      successCount++;
-    } catch(e) {
-      console.error('Import error for', ticket.name, e.message);
-      errorCount++;
-    }
-  }
-
-  if (btn) { btn.disabled = false; }
-
-  if (successCount > 0) {
-    showToast && showToast(`✅ تم استيراد ${successCount} تذكرة بنجاح${errorCount > 0 ? ` — ${errorCount} فشلت` : ''}`);
-  } else {
-    showToast && showToast('❌ فشل الاستيراد — تحقق من صلاحيات Firebase', true);
-  }
+  showToast && showToast('⚠️ خدمة الحذف غير متاحة', true);
 };
 
-// ── تعديل رصيد الخزينة ──
+// ── استيراد تذاكر المخيم الصيفي — لم يعد مطلوباً بعد التوحيد مع قسم «موارد مالية الدعم المدرسي»
+//    (إيراد المخيم يُحتسب مباشرة من summer_camp_registrations عبر sfAggregateRevenue)
+window.importSummerTicketsToFinance = async () => {
+  showToast && showToast('ℹ️ إيراد المخيم الصيفي محتسب تلقائياً في الخزينة');
+};
+
+// ── تعديل رصيد الخزينة — معطّل بعد التوحيد (الخزينة تُحتسب تلقائياً من الإيرادات − المصروفات/الرواتب)
 window.openTreasuryModal = () => {
-  document.getElementById('treasury-amount').value = _finTreasury;
-  document.getElementById('treasury-modal').classList.add('open');
+  showToast && showToast('ℹ️ الخزينة تُحتسب تلقائياً — لا حاجة لتعديل يدوي', true);
 };
 window.closeTreasuryModal = () => document.getElementById('treasury-modal').classList.remove('open');
 
 window.saveTreasuryBalance = async () => {
-  const amount = parseFloat(document.getElementById('treasury-amount').value) || 0;
-  try {
-    await setDoc(doc(getFinDb(), 'settings', 'treasury'), { balance: amount, updatedAt: serverTimestamp() });
-    _finTreasury = amount;
-    renderFinanceKPIs();
-    closeTreasuryModal();
-    showToast && showToast('✅ تم تحديث رصيد الخزينة');
-  } catch(e) {
-    showToast && showToast('❌ خطأ: ' + e.message, true);
-  }
+  closeTreasuryModal();
+  showToast && showToast('ℹ️ الخزينة تُحتسب تلقائياً من قسم الموارد المالية', true);
 };
 
 // ══════════════════════════════════════════════
