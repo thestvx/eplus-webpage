@@ -336,7 +336,7 @@ window.TeacherFinance = (function () {
     '.rcpt-amount-cur{font-size:16px;font-weight:800;color:#6D28D9}' +
     '.rcpt-amount-words{font-size:12.5px;color:#6E6784;font-weight:700;margin-top:12px}' +
     '.rcpt-thanks{display:flex;align-items:center;justify-content:center;gap:10px;padding:13px 20px;border:1px solid #EAE5F2;border-radius:14px;background:rgba(255,255,255,.68);box-shadow:0 4px 14px rgba(76,29,149,.03);margin-bottom:0;font-size:12px;color:#4C1D95;font-weight:700}' +
-    '.rcpt-thanks-icon{color:#C9A036;font-size:9px}' +
+    '.rcpt-thanks-icon{width:7px;height:7px;background:#C9A036;opacity:.55;display:inline-block;transform:rotate(45deg)}' +
     '.rcpt-note{padding:12px 16px;border:1px solid #EAE5F2;border-radius:14px;background:rgba(255,255,255,.68);margin-bottom:0;font-size:11.5px;color:#6E6784;font-weight:600}' +
     '.rcpt-sigs{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;margin-top:auto;padding-top:42px}' +
     '.rcpt-sig{text-align:center;flex:1}' +
@@ -410,7 +410,7 @@ window.TeacherFinance = (function () {
     const row = r => '<div class="rcpt-card-row"><span class="rcpt-k">' + r[0] + '</span><span class="rcpt-v">' + r[1] + '</span></div>';
     const thanks = p.note
       ? '<div class="rcpt-note">ملاحظة: ' + p.note + '</div>'
-      : '<div class="rcpt-thanks"><span class="rcpt-thanks-icon">✦&nbsp;✦</span> نُشكر الأستاذ(ة) على ثقته في المركز التعليمي.</div>';
+      : '<div class="rcpt-thanks"><span class="rcpt-thanks-icon"></span> نُشكر الأستاذ(ة) على ثقته في المركز التعليمي.</div>';
 
     return '' +
     '<div class="rcpt-page">' +
@@ -471,7 +471,7 @@ window.TeacherFinance = (function () {
       '@media print{.no-print{display:none!important}}';
     const doc = '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>وصل ' + ((payload && payload.receiptId) || '').toUpperCase() + '</title><style>' + styles + '</style></head><body style="background:#e8e8ed">' +
       _receiptBody(payload || {}) +
-      '<button class="print-btn no-print" onclick="window.print()">🖨️ طباعة</button>' +
+      '<button class="print-btn no-print" onclick="window.print()">طباعة</button>' +
       '<script>window.onafterprint=function(){setTimeout(function(){window.close();},200)};' +
       'if(window.matchMedia){try{window.matchMedia("print").addEventListener("change",function(m){if(!m.matches)setTimeout(function(){window.close()},200)})}catch(e){}}</' + 'script>' +
       '</body></html>';

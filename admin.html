@@ -16,7 +16,7 @@
   <script src="js/subjectService.js?v=4"></script>
   <script src="js/attendanceService.js?v=2"></script>
   <script src="js/barcodeScanner.js?v=1"></script>
-  <script src="js/teacherFinance.js?v=4"></script>
+  <script src="js/teacherFinance.js?v=6"></script>
   <script src="js/subscriptionService.js?v=2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
@@ -925,6 +925,25 @@
     .settings-maint-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .2s}
     .settings-maint-dot.on{background:var(--danger);box-shadow:0 0 8px rgba(239,68,68,.3)}
     .settings-maint-dot.off{background:var(--success);box-shadow:0 0 8px rgba(16,185,129,.3)}
+
+    /* ===== SETTINGS — SECURITY / LOGS ===== */
+    .sec-inp{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:12.5px;font-family:'Tajawal',sans-serif;background:var(--card-bg);color:var(--text);outline:none;transition:border-color .15s,box-shadow .15s}
+    .sec-inp:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+    .sec-inp::placeholder{color:var(--text-muted);opacity:.7}
+    .sec-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media(max-width:700px){.sec-grid{grid-template-columns:1fr}}
+    .sec-btn{padding:11px 22px;border:none;border-radius:11px;font-size:13px;font-weight:800;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all .2s;background:linear-gradient(135deg,var(--primary),color-mix(in srgb,var(--primary) 70%,#fff));color:#fff;box-shadow:0 4px 14px var(--primary-light)}
+    .sec-btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px var(--primary-light)}
+    .sec-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+    .sec-hint{font-size:11px;color:var(--text-muted);font-weight:600;line-height:1.7}
+    .dashlog-item{display:flex;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:11px;background:var(--card-bg);transition:border-color .15s}
+    .dashlog-item+.dashlog-item{margin-top:8px}
+    .dashlog-dot{width:38px;height:38px;flex-shrink:0;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;background:var(--primary-light);color:var(--primary)}
+    .dashlog-main{flex:1;min-width:0}
+    .dashlog-line{font-size:12.5px;font-weight:700;color:var(--text);line-height:1.5}
+    .dashlog-meta{font-size:11px;color:var(--text-muted);font-weight:600;margin-top:3px}
+    .dashlog-actor{display:inline-block;padding:2px 9px;border-radius:7px;background:rgba(16,185,129,.1);color:#059669;font-size:10.5px;font-weight:800}
+    .dashlog-ph{text-align:center;padding:26px;color:var(--text-muted);font-size:12.5px;background:var(--bg);border:1px dashed var(--border);border-radius:12px}
     .btn-toggle{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:10px;border:1.5px solid rgba(239,68,68,.25);background:rgba(239,68,68,.06);color:#dc2626;font-size:12.5px;font-weight:700;font-family:'Tajawal',sans-serif;cursor:pointer;transition:all .15s}
     .btn-toggle:hover{background:rgba(239,68,68,.12);transform:translateY(-1px);box-shadow:0 4px 12px rgba(239,68,68,.15)}
     .is-on .btn-toggle{border-color:rgba(16,185,129,.25);background:rgba(16,185,129,.06);color:#059669}
@@ -3060,6 +3079,10 @@
               <span class="settings-nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12" r="2.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.8 1.7-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7H16c3.3 0 6-2.7 6-6 0-5.5-4.5-9.8-10-9.8z"/></svg></span>
               المظهر
             </button>
+            <button type="button" class="settings-nav-item" data-settings-tab="security" onclick="switchSettingsTab('security')">
+              <span class="settings-nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>
+              الحسابات والسجلات
+            </button>
           </div>
 
           <!-- Content Area -->
@@ -3192,6 +3215,50 @@
                     <div class="setting-soon-desc" data-i18n="setting_theme_desc">تغيير الألوان الرئيسية والشعار للموقع.</div>
                   </div>
                   <span class="setting-soon-badge">قريباً</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Panel: Security (Accounts + Logs) -->
+            <div class="settings-panel" data-panel="security">
+              <div class="settings-section" data-search="الحسابات الإداريين إدارة الادارة المدير المشرفون إنشاء حساب جديد صلاحيات admin">
+                <div class="settings-section-head">
+                  <div>
+                    <div class="settings-section-title">حسابات الإدارة</div>
+                    <div class="settings-section-desc">إنشاء حسابات أدمن جديدة بصلاحيات كاملة (اسم، لقب، بريد، هاتف)</div>
+                  </div>
+                </div>
+                <div class="settings-card">
+                  <div class="sec-grid">
+                    <div><label class="sec-hint">الاسم الأول</label><input type="text" class="sec-inp" id="adm-first-name" placeholder="مثال: أحمد" style="margin-top:6px"></div>
+                    <div><label class="sec-hint">اللقب</label><input type="text" class="sec-inp" id="adm-last-name" placeholder="مثال: بن يوسف" style="margin-top:6px"></div>
+                    <div><label class="sec-hint">البريد الإلكتروني (للدخول)</label><input type="email" class="sec-inp" id="adm-email" placeholder="admin@epluscenter.com" dir="ltr" style="margin-top:6px;text-align:left"></div>
+                    <div><label class="sec-hint">الهاتف</label><input type="tel" class="sec-inp" id="adm-phone" placeholder="0550000000" dir="ltr" style="margin-top:6px;text-align:left"></div>
+                    <div><label class="sec-hint">كلمة المرور</label><input type="password" class="sec-inp" id="adm-password" placeholder="6 أحرف على الأقل" dir="ltr" style="margin-top:6px;text-align:left"></div>
+                    <div><label class="sec-hint">تأكيد كلمة المرور</label><input type="password" class="sec-inp" id="adm-password-confirm" placeholder="أعد كتابة كلمة المرور" dir="ltr" style="margin-top:6px;text-align:left"></div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:14px;margin-top:16px;flex-wrap:wrap">
+                    <button type="button" class="sec-btn" id="adm-create-btn" onclick="dashAdminCreate()">إنشاء حساب الإدارة</button>
+                    <span class="sec-hint" id="adm-form-msg" style="opacity:0">تم</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-section" data-search="سجلات الداشبورد التتبع الحركة السجل النشاطات الحذف المدفوعات">
+                <div class="settings-section-head">
+                  <div>
+                    <div class="settings-section-title">سجلات الداشبورد</div>
+                    <div class="settings-section-desc">كل حركة في الداشبورد (حذف، مدفوعات، أي إجراء) مع اسم منفّذها</div>
+                  </div>
+                </div>
+                <div class="settings-card" style="padding:16px">
+                  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+                    <input type="text" class="sec-inp" id="dashlog-search" placeholder="بحث باسم المنفّذ أو نوع الحركة..." oninput="dashLogsFilter()" style="flex:1;min-width:200px">
+                    <button type="button" class="sec-btn" onclick="dashLogsRefresh()" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 4px 14px rgba(99,102,241,.25)">تحديث السجلات</button>
+                  </div>
+                  <div id="dashlog-list" style="max-height:420px;overflow-y:auto">
+                    <div class="dashlog-ph">جارِ تحميل سجلات الداشبورد…</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -5439,7 +5506,17 @@ onAuthStateChanged(auth, async user => {
     ls.classList.add('hidden');
     setTimeout(() => ls.style.display = 'none', 600);
     dash.style.display = 'flex';
-    const uname = empCfg ? empCfg.name : String(user.email || '').split('@')[0] || 'مشرف';
+    let uname = empCfg ? empCfg.name : String(user.email || '').split('@')[0] || 'مشرف';
+    // إن كان أدمن مُنشأ من قبل (عبر إعدادات الداشبورد) — استخدم اسمه الكامل
+    if (!empCfg) {
+      try {
+        const accSnap = await getDoc(doc(db, 'admin_accounts', user.uid));
+        if (accSnap.exists()) {
+          const acc = accSnap.data();
+          if (acc.fullName) uname = acc.fullName;
+        }
+      } catch(e) { /* ignore – fall back to email prefix */ }
+    }
     document.getElementById('admin-name').textContent = uname;
     window.setGreeting(uname);
     document.querySelector('.admin-role').textContent = empCfg ? ('👔 ' + empCfg.role) : 'مشرف النظام';
@@ -5847,6 +5924,7 @@ function switchSettingsTab(tab) {
   const nav = document.querySelector('.settings-nav-item[data-settings-tab="' + tab + '"]');
   if (panel) panel.classList.add('active');
   if (nav) nav.classList.add('active');
+  if (tab === 'security' && typeof window.dashLogsRefresh === 'function') window.dashLogsRefresh();
 }
 window.switchSettingsTab = switchSettingsTab;
 
@@ -7624,6 +7702,148 @@ async function logActivity(action, ticketId, details) {
   } catch(e) { console.warn('logActivity error:', e); }
 }
 
+// ── سجلات الداشبورد: منفّذ الحركة الحالي ──
+function dashActorName() {
+  const el = document.getElementById('topbar-greeting');
+  const name = el && el.getAttribute('data-name');
+  if (name) return name;
+  const nm = document.getElementById('admin-name');
+  return (nm && nm.textContent) || 'مشرف';
+}
+
+// ── سجلات الداشبورد: تسجيل أي حركة (حذف، مدفوعات، أي إجراء) مع اسم منفّذها ──
+async function dashLog(category, action, detail) {
+  try {
+    const actor = dashActorName();
+    const actorEmail = (window._auth && window._auth.currentUser && window._auth.currentUser.email) || '';
+    await addDoc(collection(db, 'dashboard_logs'), {
+      category, action, detail,
+      actor,
+      actorEmail,
+      createdAt: serverTimestamp()
+    });
+  } catch(e) { console.warn('dashLog error:', e); }
+}
+window.dashLog = dashLog;
+window.dashActorName = dashActorName;
+
+// ── إنشاء حساب إدارة جديد (صلاحيات admin كاملة) ──
+window.dashAdminCreate = async () => {
+  const firstName = document.getElementById('adm-first-name').value.trim();
+  const lastName  = document.getElementById('adm-last-name').value.trim();
+  const email     = document.getElementById('adm-email').value.trim().toLowerCase();
+  const phone     = document.getElementById('adm-phone').value.trim();
+  const password  = document.getElementById('adm-password').value;
+  const confirm   = document.getElementById('adm-password-confirm').value;
+  const msgEl     = document.getElementById('adm-form-msg');
+
+  const setMsg = (txt, ok) => {
+    if (!msgEl) return;
+    msgEl.textContent = txt;
+    msgEl.style.opacity = 1;
+    msgEl.style.color = ok ? '#059669' : '#dc2626';
+  };
+
+  if (!firstName || !lastName) { setMsg('أدخل الاسم الأول واللقب', false); return; }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setMsg('أدخل بريداً إلكترونياً صحيحاً', false); return; }
+  if (!phone || !/^\d{9,12}$/.test(phone)) { setMsg('أدخل رقم هاتف صحيح (9-12 رقم)', false); return; }
+  if (password.length < 6) { setMsg('كلمة المرور 6 أحرف على الأقل', false); return; }
+  if (password !== confirm) { setMsg('كلمتا المرور غير متطابقتين', false); return; }
+
+  const btn = document.getElementById('adm-create-btn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الإنشاء…';
+  try {
+    // إنشاء الحساب عبر التطبيق الثانوي حتى لا تتأثر جلسة الأدمن الحالية
+    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    const uid = cred.user.uid;
+    await signOut(secondaryAuth);
+    // حفظ الملف الشخصي والصلاحيات
+    await setDoc(doc(db, 'admin_accounts', uid), {
+      userId: uid,
+      firstName, lastName,
+      fullName: firstName + ' ' + lastName,
+      email, phone,
+      role: 'admin',
+      status: 'active',
+      createdBy: dashActorName(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    setMsg('تم إنشاء حساب الإدارة بنجاح: ' + firstName + ' ' + lastName, true);
+    document.getElementById('adm-first-name').value = '';
+    document.getElementById('adm-last-name').value = '';
+    document.getElementById('adm-email').value = '';
+    document.getElementById('adm-phone').value = '';
+    document.getElementById('adm-password').value = '';
+    document.getElementById('adm-password-confirm').value = '';
+    await dashLog('accounts', 'إنشاء حساب إدارة', 'تم إنشاء حساب admin لـ ' + firstName + ' ' + lastName + ' (' + email + ')');
+  } catch(e) {
+    console.error('dashAdminCreate error:', e);
+    let msg = e.message;
+    if (e.code === 'auth/email-already-in-use') msg = 'البريد الإلكتروني مستخدم بالفعل';
+    else if (e.code === 'auth/invalid-email') msg = 'البريد الإلكتروني غير صالح';
+    else if (e.code === 'auth/weak-password') msg = 'كلمة المرور ضعيفة جداً';
+    setMsg('فشل إنشاء الحساب: ' + msg, false);
+  }
+  btn.disabled = false;
+  btn.textContent = 'إنشاء حساب الإدارة';
+};
+
+// ── تحميل وعرض سجلات الداشبورد ──
+let _dashLogsData = [];
+window.dashLogsRefresh = async () => {
+  const list = document.getElementById('dashlog-list');
+  if (!list) return;
+  list.innerHTML = '<div class="dashlog-ph">جارِ تحميل سجلات الداشبورد…</div>';
+  try {
+    const snap = await getDocs(query(collection(db, 'dashboard_logs'), orderBy('createdAt', 'desc'), limit(200)));
+    _dashLogsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    dashLogsFilter();
+  } catch(e) {
+    console.error('dashLogsRefresh error:', e);
+    list.innerHTML = '<div class="dashlog-ph">تعذر تحميل السجلات</div>';
+  }
+};
+
+window.dashLogsFilter = () => {
+  const list = document.getElementById('dashlog-list');
+  if (!list) return;
+  const secEsc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const q = (document.getElementById('dashlog-search').value || '').trim().toLowerCase();
+  const rows = _dashLogsData.filter(r => {
+    if (!q) return true;
+    return (r.actor + ' ' + r.category + ' ' + r.action + ' ' + (r.detail || '')).toLowerCase().includes(q);
+  });
+  if (!rows.length) {
+    list.innerHTML = '<div class="dashlog-ph">لا توجد حركات مسجلة</div>';
+    return;
+  }
+  list.innerHTML = rows.map(r => {
+    const who = '<span class="dashlog-actor">' + secEsc(r.actor || 'مشرف') + '</span>';
+    const when = r.createdAt && r.createdAt.toDate
+      ? r.createdAt.toDate().toLocaleString('ar-DZ')
+      : (r.timestampStr || '');
+    return '<div class="dashlog-item">' +
+      '<div class="dashlog-dot">' + dashCatIcon(r.category) + '</div>' +
+      '<div class="dashlog-main">' +
+        '<div class="dashlog-line">' + secEsc(r.action || r.category || 'حركة') + (r.detail ? ' — ' + secEsc(r.detail) : '') + '</div>' +
+        '<div class="dashlog-meta">' + who + ' &nbsp;•&nbsp; ' + (r.category || '') + ' &nbsp;•&nbsp; <span dir="ltr">' + secEsc(when) + '</span></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+};
+
+function dashCatIcon(cat) {
+  const c = String(cat || '');
+  if (c.includes('حذف') || c.includes('مسح') || c.includes('أستاذ') || c.includes('معاملة')) return '✕';
+  if (c.includes('دفع') || c.includes('مالية') || c.includes('إيراد') || c.includes('مصروف')) return 'دج';
+  if (c.includes('حساب') || c.includes('admin')) return 'إد';
+  if (c.includes('تأكيد') || c.includes('حضور')) return '✓';
+  if (c.includes('تسجيل')) return '✦';
+  return '•';
+}
+
 // ── Soft Delete: حذف آمن بدل الحذف النهائي ──
 window.deleteTicket = async (id) => {
   const confirmed = await showDeleteConfirm();
@@ -7638,6 +7858,7 @@ window.deleteTicket = async (id) => {
       deletedBy: adminName
     });
     await logActivity('delete', id, { name: data.name, receipt: data.receipt, pack: data.pack });
+    if (window.dashLog) window.dashLog('حذف', 'حذف تذكرة مخيم', 'تم نقل تذكرة ' + (data.name || id) + ' لسلة المحذوفات');
     showToast('🗑️ تم نقل التذكرة لسلة المحذوفات');
   } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
@@ -7653,6 +7874,7 @@ window.restoreTicket = async (id) => {
       deletedBy: null
     });
     await logActivity('restore', id, { name: data.name, receipt: data.receipt });
+    if (window.dashLog) window.dashLog('استرجاع', 'استرجاع تذكرة مخيم', 'تم استرجاع تذكرة ' + (data.name || id) + ' من السلة');
     showToast('✅ تم استرجاع التذكرة بنجاح');
   } catch(e) { showToast('خطأ: ' + e.message, true); }
 };
@@ -8129,6 +8351,7 @@ window.addTeacher = async () => {
     };
     await setDoc(doc(db, 'teachers', uid), payload);
     await addLog('➕ أستاذ جديد', `تم إنشاء حساب للأستاذ ${name} (${teacherId})`, '👨‍🏫');
+    if (window.dashLog) window.dashLog('إضافة', 'إنشاء حساب أستاذ', 'تم إنشاء حساب الأستاذ ' + name + ' (' + teacherId + ')');
     showToast(`✅ تم إنشاء حساب الأستاذ ${name} بنجاح! — يمكنه الدخول الآن بالبريد وكلمة المرور`);
     // إعادة ضبط النموذج
     document.getElementById('t-name').value = '';
@@ -21303,6 +21526,7 @@ window.saveFinanceTx = async () => {
     renderFinanceKPIs();
     renderFinanceTable();
     showToast && showToast('✅ تم حفظ المعاملة');
+    if (window.dashLog) window.dashLog('مالية', type === 'income' ? 'إضافة إيراد' : (type === 'salary' ? 'تسجيل راتب' : 'تسجيل مصروف'), desc + ' — ' + amount.toLocaleString('ar-DZ') + ' دج');
   } catch(e) {
     console.error('saveFinanceTx error:', e);
     showToast && showToast('❌ خطأ في الحفظ: ' + e.message, true);
@@ -21315,6 +21539,7 @@ window.saveFinanceTx = async () => {
 window.deleteFinanceTx = async (txId) => {
   if (typeof sfDeleteTx === 'function') {
     await sfDeleteTx(txId);
+    if (window.dashLog) window.dashLog('حذف', 'حذف معاملة مالية', 'تم حذف معاملة مالية رقم ' + txId);
     return;
   }
   showToast && showToast('⚠️ خدمة الحذف غير متاحة', true);
@@ -25135,6 +25360,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       showToast('✔️ تم حذف الاشتراك بنجاح.');
       $x('subx-detail-modal').classList.remove('open');
       subxLoadAll();
+      if (window.dashLog) window.dashLog('حذف', 'حذف اشتراك', 'تم حذف الاشتراك رقم ' + id);
     } catch (e) {
       console.error('[SUBSCRIPTIONS] delete failed', e);
       showToast('❌ ' + ((e && e.message) || 'تعذر حذف الاشتراك'), true);
@@ -25155,8 +25381,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         const r = d.data();
         if (r.type === 'grace') return;
         if (!r.date) return;
-        if (r.confirmed === false) return;
-        rows.push({ id: d.id, studentId: r.studentId || '', studentName: r.studentName || '', date: r.date, time: r.checkInTime || r.createdAt || '', teacherName: r.teacherName || '', subjectName: r.subjectName || '', type: r.type || '', cancelled: r.cancelled || false });
+        rows.push({ id: d.id, studentId: r.studentId || '', studentName: r.studentName || '', date: r.date, time: r.checkInTime || r.createdAt || '', teacherName: r.teacherName || '', subjectName: r.subjectName || '', type: r.type || '', cancelled: r.cancelled || false, confirmed: r.confirmed !== false });
       });
       rows.sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
       window._subxLogsData = rows;
@@ -25324,6 +25549,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       if (skipped > 0) msg += ' (تم تخطي ' + skipped + ' سجل لا يطابق الفلتر)';
       showToast(msg);
       subxShowAllLogs();
+      if (window.dashLog) window.dashLog('حذف', 'مسح سجلات الحضور', 'تم حذف ' + count + ' سجل حضور' + (skipped > 0 ? ' (تخطّى ' + skipped + ')' : ''));
     } catch (e) { console.error('[SUBSCRIPTIONS] clear logs failed', e); showToast('❌ تعذر مسح السجلات', true); }
   };
 
@@ -25357,7 +25583,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     h += '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">إجراءات</th>';
     h += '</tr></thead><tbody>';
     rows.forEach(r => {
-      const typeLabel = r.type === 'grace_session' ? '<span style="color:#d97706">⚠️ حصّة مجانية</span>' : r.type === 'trial_session' ? '<span style="color:#f59e0b">🟠 حصة تجريبية</span>' : '<span style="color:#059669">✅ حضور</span>';
+      const typeLabel = r.type === 'grace_session' ? '<span style="color:#d97706">⚠️ حصّة مجانية</span>' : r.type === 'trial_session' ? '<span style="color:#f59e0b">🟠 حصة تجريبية</span>' : (r.confirmed === false ? '<span style="color:#2563eb">⏳ لم يُؤكَّد بعد</span>' : '<span style="color:#059669">✅ حضور</span>');
       h += '<tr style="border-bottom:1px solid var(--border)">';
       h += '<td style="padding:7px 10px;white-space:nowrap">' + escX(r.date) + '</td>';
       h += '<td style="padding:7px 10px;white-space:nowrap" dir="ltr">' + escX(r.time) + '</td>';
@@ -25405,6 +25631,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       if (typeof subxShowAllLogs === 'function') {
         await subxShowAllLogs();
       }
+      if (window.dashLog) window.dashLog('حذف', 'حذف سجل حضور', 'تم حذف حضور ' + (studentName || 'طالب') + ' يوم ' + (attDate || ''));
     } catch (e) {
       console.error('[SUBSCRIPTIONS] delete log failed', e);
       showToast('❌ ' + ((e && e.message) || 'تعذر حذف السجل'), true);
@@ -25439,13 +25666,15 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           backup: true
         });
       });
-      // Also surface soft-deleted (cancelled) and unconfirmed live records here, so
+      // Also surface soft-deleted (cancelled) live records here, so
       // no attendance can silently vanish from both windows at the same time.
+      // Unconfirmed (confirmed===false) sessions are NOT deleted — they belong
+      // in the official log and stay visible there.
       const liveSnap = await fs.getDocs(fs.collection(fdb, 'support_attendance'));
       liveSnap.forEach(function (d) {
         const r = d.data();
         if (r.type === 'grace') return;
-        if (r.cancelled === true || r.confirmed === false) {
+        if (r.cancelled === true) {
           rows.push({
             id: d.id,
             studentId: r.studentId || '',
@@ -25457,7 +25686,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
             type: r.type || '',
             deletedAt: r.cancelledAt || '',
             deletedDate: r.cancelledAt ? new Date(r.cancelledAt).toLocaleString('ar-DZ') : '',
-            reason: r.cancelled === true ? 'soft' : 'unconfirmed',
+            reason: 'soft',
             backup: false
           });
         }
@@ -26696,6 +26925,7 @@ async function srDoConfirm() {
     await srLoadData();
     const updated = srAllData.find(x => x.id === srConfirmTarget) || r || { id: srConfirmTarget, first_name: '', last_name: '' };
     srShowCard(updated);
+    if (window.dashLog) window.dashLog('تأكيد', 'تأكيد تسجيل نهائي', 'تم تأكيد تسجيل ' + ((r && r.first_name) || '') + ' ' + ((r && r.last_name) || '') + ' نهائياً');
   } catch (e) {
     srShowToast('فشل تأكيد التسجيل: ' + e.message, 'error');
   }
@@ -26725,6 +26955,7 @@ async function srConfirmFree(id) {
     await srLoadData();
     const updated = srAllData.find(x => x.id === id) || r || { id, first_name: '', last_name: '' };
     srShowCard(updated);
+    if (window.dashLog) window.dashLog('تأكيد', 'تأكيد تسجيل مجاني', 'تم تأكيد تسجيل ' + ((r && r.first_name) || '') + ' ' + ((r && r.last_name) || '') + ' بدون رسوم');
   } catch (e) {
     srShowToast('فشل التأكيد: ' + e.message, 'error');
   }
@@ -26975,6 +27206,7 @@ async function srDelete(id) {
     }
     srShowToast('🗑️ تم حذف الطالب من القائمة النشطة', 'success');
     await srLoadData();
+    if (window.dashLog) window.dashLog('حذف', 'حذف تسجيل طالب', 'تم حذف تسجيل ' + ((r && r.first_name) || '') + ' ' + ((r && r.last_name) || ''));
   } catch (e) {
     srShowToast('فشل حذف الطالب: ' + e.message, 'error');
   }
@@ -27015,6 +27247,7 @@ async function srUnregister(id) {
     } catch (treasuryErr) { console.warn('Treasury reverse failed:', treasuryErr); }
     srShowToast('✅ تم إلغاء التأكيد بنجاح. الحالة: مسجل مبدئياً', 'success');
     await srLoadData();
+    if (window.dashLog) window.dashLog('تعديل', 'إلغاء تأكيد تسجيل', 'تم إلغاء تأكيد تسجيل ' + ((r && r.first_name) || '') + ' ' + ((r && r.last_name) || ''));
   } catch (e) {
     srShowToast('فشل إلغاء التأكيد: ' + e.message, 'error');
   }
@@ -27866,6 +28099,7 @@ async function srtFinanceAddPayment() {
     srtFinanceRefresh();
     srtShowToast('تم تسجيل دفعة ' + amount.toLocaleString('ar-DZ') + ' دج وإصدار إيصال ' + res.receiptId, 'success');
     const print = await cmConfirm('الإيصال', 'هل تريد طباعة إيصال الدفع الآن؟\n\nرقم الإيصال: ' + res.receiptId, '🧾');
+    if (window.dashLog) window.dashLog('مدفوعات', 'تسجيل دفعة', 'تم تسجيل دفعة ' + amount.toLocaleString('ar-DZ') + ' دج للأستاذ ' + t.name + ' (إيصال ' + res.receiptId + ')');
     if (print) srtFinancePrintReceipt(res.txId);
   } catch (e) {
     console.error('Payment edge function error:', e);
@@ -28245,6 +28479,7 @@ async function srtFinanceDeleteTx(txId) {
     // 3) إعادة تعبئة القائمة + نتيجة صادقة
     await srtFinanceRefresh();
     srtShowToast(ok ? '✅ تم حذف المعاملة وإعادة حساب الرصيد' : '⚠️ لم تُحذف سجل من المصدر الأساسي، أُزيلت النسخة المحلية', ok ? 'success' : 'warning');
+    if (window.dashLog) window.dashLog('حذف', 'حذف معاملة مالية', 'تم حذف معاملة للأستاذ ' + t.name + ' (رقم ' + txId + ')');
   } catch (e) {
     console.error('Delete tx error:', e);
     srtShowToast('فشل حذف المعاملة: ' + e.message, 'error');
@@ -28610,6 +28845,7 @@ async function srtSave() {
     }
     srtCloseModal();
     await srtLoadData();
+    if (window.dashLog) window.dashLog(editId ? 'تعديل' : 'إضافة', editId ? 'تعديل بيانات أستاذ دعم' : 'إضافة أستاذ دعم', (editId ? 'تعديل بيانات ' : 'إضافة أستاذ جديد: ') + name);
   } catch (e) { console.error('SRT save error:', e); srShowToast('حدث خطأ أثناء الحفظ', 'error'); }
   btn.disabled = false; btn.textContent = '💾 حفظ';
 }
@@ -28627,6 +28863,7 @@ async function srtToggleStatus(id) {
       await updateDoc(d(db, USERS_COLLECTION, t.userId), { status: newStatus, updatedAt: new Date().toISOString() });
     }
     await srtLoadData();
+    if (window.dashLog) window.dashLog('تعديل', label + ' أستاذ دعم', 'تم ' + label + ' أستاذ الدعم ' + t.name);
   } catch (e) { console.error('SRT toggle error:', e); }
 }
 
@@ -28664,6 +28901,7 @@ async function srtDelete(id) {
     }
     srtShowToast('🗑️ تم حذف الأستاذ نهائياً من القوائم النشطة', 'success');
     await srtLoadData();
+    if (window.dashLog) window.dashLog('حذف', 'حذف أستاذ دعم', 'تم حذف أستاذ الدعم ' + t.name + ' نهائياً');
   } catch (e) { console.error('SRT delete error:', e); srtShowToast('فشل حذف الأستاذ: ' + e.message, 'error'); }
 }
 
