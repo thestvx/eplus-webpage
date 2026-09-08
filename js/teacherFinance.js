@@ -17,6 +17,8 @@
 
 window.TeacherFinance = (function () {
   const ATT_COLLECTION = 'support_attendance';
+  // أنواع سجلات الحضور المجانية/التجريبية — لا تُحتسب أبداً مستحقات
+  const FREE_TYPES = ['grace', 'grace_session', 'trial', 'trial_session', 'trial_usage', 'allow_sub'];
 
   let ADMIN_API_URL = '';
   let AUTH_TOKEN_PROVIDER = null;
@@ -79,7 +81,7 @@ window.TeacherFinance = (function () {
       let count = 0;
       snap.forEach(d => {
         const r = d.data();
-        if (r.type === 'grace' || r.type === 'grace_session') return;
+        if (r.type && FREE_TYPES.indexOf(String(r.type)) !== -1) return;
         if (teacherName && r.teacherName && _norm(r.teacherName) !== _norm(teacherName)) return;
         if (subjectName && r.subjectName && _norm(r.subjectName) !== _norm(subjectName)) return;
         count++;

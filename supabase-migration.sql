@@ -874,11 +874,12 @@ BEGIN
 END; $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- ────────────────────────────────────────────────────────────────
--- مسح جماعي لكل دفعات الأستاذ (زر «مسح سجل الدفعات»).
---   يحذف كل صفوف payment (لا يلمس dues) من teacher_transactions،
---   الإيصالات المرتبطة teacher_receipts، ويعكس أثرها على الخزينة
---   (support_finance_tx + support_finance_balance) تماماً كما يفعل
---   admin_delete_transaction لكل دفعة، ثم يعيد حساب الرصيد.
+-- مسح جماعي لسجل دفعات الأستاذ (زر «مسح سجل الدفعات»).
+--   يحذف صفوف payment فقط (لا يمسّ المستحقات dues) من
+--   teacher_transactions، والإيصالات المرتبطة teacher_receipts،
+--   ويعكس أثرها على الخزينة (support_finance_tx +
+--   support_finance_balance) تماماً كما يفعل admin_delete_transaction
+--   لكل دفعة، ثم يعيد حساب الرصيد. تُبقى سجلات المستحقات كما هي.
 --   ينفَّذ داخل معاملة واحدة لضمان الذرية.
 -- ────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION admin_clear_teacher_payments(
@@ -917,8 +918,9 @@ BEGIN
     RETURN jsonb_build_object('deleted', 0, 'dues_removed', 0, 'receipts_removed', 0, 'amount_reversed', 0);
   END IF;
 
-  -- 3) حذف كل معاملات الأستاذ من الدفتر (دفعات ومستحقات على حد سواء)
-  DELETE FROM teacher_transactions WHERE teacher_id = p_teacher_id;
+  -- 3) حذف صفوف الدفعات فقط من الدفتر (مستحقات dues تبقى دون مساس)
+  DELETE FROM teacher_transactions
+   WHERE teacher_id = p_teacher_id AND transaction_type = 'payment';
 
   -- 4) حذف كل إيصالات الأستاذ (المرتبطة بالدفعات واليتيمة على حد سواء)
   DELETE FROM teacher_receipts WHERE teacher_id = p_teacher_id;
@@ -940,7 +942,8 @@ BEGIN
 
   RETURN jsonb_build_object(
     'deleted', v_count,
-    'dues_removed', v_dues,
+    'dues_removed', 0,
+    'dues_kept', v_dues,
     'receipts_removed', v_receipts,
     'amount_reversed', v_amount
   );

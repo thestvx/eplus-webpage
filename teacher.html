@@ -655,7 +655,7 @@
         var exercises=allContent.filter(function(c){return c.type==='exercise'||c.type==='homework';});
         var announcements=allContent.filter(function(c){return c.type==='announcement';});
         var studentCount=regRpc.length||0;
-        var attDocs=attSnap.docs.map(function(d){return d.data();}).filter(function(a){return a.type!=='grace'&&a.type!=='grace_session';});
+        var attDocs=attSnap.docs.map(function(d){return d.data();}).filter(function(a){return ['grace','grace_session','trial','trial_session','trial_usage'].indexOf(a.type)===-1;});
         var attendanceCount=attDocs.length||0;
         var finDoc=finSnap.docs.length>0?finSnap.docs[0].data():{};
         var payments=Array.isArray(finDoc.payments)?finDoc.payments:[];
@@ -1049,6 +1049,9 @@
 
         if(teacherDoc&&teacherDoc.exists){var td=teacherDoc.data();if(td.rate){rate=td.rate;currentTeacher.rate=td.rate;}}
         if((!rate||rate<=0)&&t.rate){rate=Number(t.rate)||0;}
+        // سعر الحصة المعتمد = سعر الدفتر (أحدث سعر مستحقات مُحتسبة) — يحاذي أرقام الإدارة
+        var summRate=(finSummarySnap&&Number(finSummarySnap.rate)>0)?Number(finSummarySnap.rate):0;
+        if(summRate)rate=summRate;
 
         var nameMap={};
         var regStudents={};
@@ -1063,7 +1066,7 @@
           }
         }
 
-        const allAttendance=attAllDocs.map(function(d){return Object.assign({id:d.id},d.data());}).filter(function(a){return a.type!=='grace'&&a.type!=='grace_session';});
+        const allAttendance=attAllDocs.map(function(d){return Object.assign({id:d.id},d.data());}).filter(function(a){return ['grace','grace_session','trial','trial_session','trial_usage'].indexOf(a.type)===-1;});
         const totalSessionsOffered=atcDocs.length;
 
         const byStudent={};
@@ -1117,9 +1120,13 @@
         const payments=Array.isArray(finDoc.payments)?finDoc.payments.slice().sort(function(a,b){return(b.timestamp||0)-(a.timestamp||0);}):[];
         const totalPaid=payments.reduce(function(s,p){return s+(p.amount||0);},0);
         const lastUpdate=finDoc.updatedAt?fmtDate(finDoc.updatedAt):'—';
-        const remainingDue=(finSummarySnap&&finSummarySnap.pending!=null)
+        // الأرقام الموثوقة من ملخص الدفتر (get_teacher_finance_summary) — وليست إعادة حساب محلية
+        const finSummaryValid=!!(finSummarySnap&&typeof finSummarySnap==='object');
+        const totalDueAuth=(finSummaryValid&&finSummarySnap.total_due!=null)?Math.max(0,Number(finSummarySnap.total_due)):totalEarnings;
+        const totalPaidAuth=(finSummaryValid&&finSummarySnap.total_paid!=null)?Math.max(0,Number(finSummarySnap.total_paid)):totalPaid;
+        const remainingDue=(finSummaryValid&&finSummarySnap.pending!=null)
           ?Math.max(0,Number(finSummarySnap.pending))
-          :Math.max(0,(totalEarnings||0)-(totalPaid||0));
+          :Math.max(0,totalDueAuth-totalPaidAuth);
         window._finRemaining=remainingDue;
         console.log('[FIN] finSummary:',finSummarySnap,'remainingDue:',remainingDue);
 
@@ -1152,7 +1159,7 @@
             <div style="position:absolute;top:-40px;right:-40px;width:180px;height:180px;background:rgba(255,255,255,0.08);border-radius:50%;pointer-events:none"></div>
             <div style="position:absolute;bottom:-30px;left:10%;width:120px;height:120px;background:rgba(255,255,255,0.05);border-radius:50%;pointer-events:none"></div>
             <div style="font-size:14px;font-weight:600;opacity:.7;margin-bottom:8px;position:relative;z-index:1">المبلغ المدفوع</div>
-            <div style="font-size:48px;font-weight:900;position:relative;z-index:1">${fmtNum(totalPaid)} <span style="font-size:18px;opacity:.6">دج</span></div>
+            <div style="font-size:48px;font-weight:900;position:relative;z-index:1">${fmtNum(totalPaidAuth)} <span style="font-size:18px;opacity:.6">دج</span></div>
             <div style="font-size:12px;opacity:.5;margin-top:8px;position:relative;z-index:1">آخر تحديث: ${lastUpdate}</div>
           </div>
 
@@ -1210,7 +1217,7 @@
                   <td></td>
                   <td style="text-align:center;font-weight:900;color:var(--green)">${totalSessions}</td>
                   <td style="text-align:center;font-weight:900;color:#dc2626">${totalAbsent}</td>
-                  <td style="text-align:center;font-weight:900;color:var(--green)">${payments.length>0?fmtNum(totalEarnings)+' دج':'—'}</td>
+                  <td style="text-align:center;font-weight:900;color:var(--green)">${payments.length>0?fmtNum(totalDueAuth)+' دج':'—'}</td>
                 </tr></tfoot>
               </table>
             </div>
