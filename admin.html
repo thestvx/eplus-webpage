@@ -5557,6 +5557,9 @@ onAuthStateChanged(auth, async user => {
     }).catch(() => {});
     const isEmpAdmin = !empCfg; // الأدمين الحقيقي فقط
     setTimeout(() => { if (window.initMessaging) window.initMessaging(user.uid, empCfg ? empCfg.name : 'الإدارة', isEmpAdmin); }, 800);
+    // المزامنة التلقائية لتفعيل حسابات الإدارة المنشأة في Supabase — تعمل لأي حساب مُفوَّض
+    // (أهمها حساب المدير: الحفناوي/support) وتتعامل مع الحسابات المنشأة من الداشبورد داخل الدالة.
+    setTimeout(() => { if (typeof window.dashAdminAutoSync === 'function') window.dashAdminAutoSync(); }, 2500);
     if (empCfg) {
       // وضع الموظف — تطبيق الصلاحيات بعد تحميل البيانات
       setTimeout(() => applyEmployeeMode(empCfg), 500);
@@ -5566,7 +5569,6 @@ onAuthStateChanged(auth, async user => {
       navLoadLayout();
       switchNavSection(navFirstVisible());
       setTimeout(() => { if (typeof window.subxLoadAll === 'function') window.subxLoadAll(); }, 400);
-      setTimeout(() => { if (typeof window.dashAdminAutoSync === 'function') window.dashAdminAutoSync(); }, 2500);
     }
   } else {
     isTeacherMode = false;
@@ -7812,6 +7814,9 @@ window.dashAdminAutoSync = async () => {
     const accounts = snap.exists() ? (snap.data() || {}) : {};
     const uids = Object.keys(accounts);
     if (!uids.length) return 0;
+    // حساب مُنشأ من الداشبورد لا يستطيع تفعيل نفسه (guard في admin_add_admin يرفض مُضيفاً غير مُفوَّض)
+    // — نُسكت المزامنة له لتفادي ضجيج 403 في وحدة التحكم؛ التفعيل يتم من حساب المدير المُفوَّض.
+    if (accounts[auth0.currentUser.uid]) return 0;
     let skip = new Set();
     try {
       const token = await auth0.currentUser.getIdToken();
