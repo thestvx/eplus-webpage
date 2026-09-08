@@ -24316,13 +24316,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         totalSessions: isPermanent ? 100000 : sessions,
         permanent: isPermanent
       });
-      if (created && created.subscription && !isPermanent) {
+      var trialDeducted = 0, allowDeducted = 0, _deductExcess = 0;
+      var subObj = created && created.subscription ? created.subscription : (Array.isArray(created) && created[0] ? (created[0].subscription || created[0]) : null);
+      if (subObj && !isPermanent) {
         // ── Deduct trial sessions from first period (cycle-aware) ──
         // "Done" subs (remaining=0, date not expired): use start_date as cutoff
         // so old trials before the subscription are excluded, but fresh trial records count.
         try {
-          var trialDeducted = 0;
-          var allowDeducted = 0;
           var fs2 = window._firestore, fdb2 = window._db;
           if (fs2 && fdb2) {
             var _nrm = function (s) { var v = String(s || '').replace(/\s+/g, ' ').trim().toLowerCase(); v = v.replace(/عبد\s+الرحمان/g, 'عبدالرحمان'); v = v.replace(/عبد\s+ال/g, 'عبدال'); return v.split(' ').sort().join(' '); };
@@ -24331,7 +24331,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
             var todayStr = SubscriptionService.today();
             try {
               var prevSubs = await SubscriptionService.getSubscriptions(String(selectedStudent.id));
-              var _newSubId = created.subscription ? String(created.subscription.id) : '';
+              var _newSubId = subObj ? String(subObj.id) : '';
               for (var pi = 0; pi < prevSubs.length; pi++) {
                 var ps = (prevSubs[pi].subscription || {});
                 if (String(ps.id) === _newSubId) continue;
@@ -24380,17 +24380,17 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           if (trialDeducted > 0 || allowDeducted > 0) {
             var deductTotal = trialDeducted + allowDeducted;
             var _deductExcess = 0;
-            var subPeriods = created.periods || [];
-            if (!subPeriods.length && created.subscription && created.subscription.id) {
+            var subPeriods = (created && created.periods) || (Array.isArray(created) && created[0] && created[0].periods) || [];
+            if (!subPeriods.length && subObj && subObj.id) {
               try {
-                var detail = await SubscriptionService.adminSubscriptionDetail(created.subscription.id);
+                var detail = await SubscriptionService.adminSubscriptionDetail(subObj.id);
                 subPeriods = (detail && detail.periods) || [];
               } catch (e) {}
             }
-            if (!subPeriods.length && created.subscription && created.subscription.id) {
+            if (!subPeriods.length && subObj && subObj.id) {
               try {
                 await new Promise(function (res) { setTimeout(res, 1200); });
-                var detail2 = await SubscriptionService.adminSubscriptionDetail(created.subscription.id);
+                var detail2 = await SubscriptionService.adminSubscriptionDetail(subObj.id);
                 subPeriods = (detail2 && detail2.periods) || [];
                 console.log('[SUBSCRIPTIONS] Periods retry: found ' + subPeriods.length + ' periods');
               } catch (e) { console.warn('[SUBSCRIPTIONS] period retry failed', e); }
@@ -24422,46 +24422,49 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
                 console.warn('[SUBSCRIPTIONS] No period_id found in first period:', JSON.stringify(firstPeriod));
               }
             } else {
-              console.warn('[SUBSCRIPTIONS] No periods found for subscription ' + (created.subscription ? created.subscription.id : '?') + ' — trial deduction skipped');
+              console.warn('[SUBSCRIPTIONS] No periods found for subscription ' + (subObj ? subObj.id : '?') + ' — trial deduction skipped');
             }
           }
         } catch (e) { console.warn('[SUBSCRIPTIONS] trial deduct failed', e); }
 
-        var _effective = sessions - trialDeducted - allowDeducted;
-        var _trialLine = trialDeducted > 0
-          ? '<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:6px 10px;margin-top:4px;color:#d97706;font-size:12px;font-weight:800">🟠 تم خصم ' + trialDeducted + ' حصة استثنائية سابقة → الحصص الفعلية: ' + _effective + '</div>'
-          : '';
-        var _allowLine = allowDeducted > 0
-          ? '<div style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.25);border-radius:8px;padding:6px 10px;margin-top:4px;color:#7c3aed;font-size:12px;font-weight:800">♻️ خُصم ' + allowDeducted + ' حصة (سُمح بالدخول سابقاً بدون اشتراك) → الحصص الفعلية: ' + Math.max(0, _effective) + '</div>'
-          : '';
-        var _excessLine = _deductExcess > 0
-          ? '<div style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);border-radius:8px;padding:6px 10px;margin-top:4px;color:#dc2626;font-size:12px;font-weight:800">⚠️ لم تُخصم ' + _deductExcess + ' حصة — تجاوزت سعة باقة الاشتراك الجديدة</div>'
-          : '';
-        const successHtml =
-          '<div style="text-align:center;font-size:13px">' +
-            '<div style="font-weight:900;font-size:15px;margin-bottom:12px">تم إنشاء الاشتراك بنجاح</div>' +
-            '<div style="text-align:right;line-height:2">' +
-              '<div><b>الطالب:</b> ' + escX(name) + '</div>' +
-              '<div><b>المادة — الأستاذ:</b> ' + escX(selectedSubject.icon + ' ' + selectedSubject.subjectName + ' — ' + (selectedSubject.teacherName || '—')) + '</div>' +
-              '<div><b>الباقة:</b> ' + escX(label) + '</div>' +
-              '<div><b>المبلغ:</b> ' + SubscriptionService.fmtPrice(price) + '</div>' +
-              '<div><b>الإجمالي:</b> ' + sessions + ' حصة</div>' +
-              (trialDeducted > 0 ? '<div><b>خصم حصص استثنائية:</b> ' + trialDeducted + ' حصة</div>' : '') +
-              (allowDeducted > 0 ? '<div><b>دخول سابق بدون اشتراك:</b> ' + allowDeducted + ' حصة (خُصم من الاشتراك الجديد)</div>' : '') +
-              ((trialDeducted > 0 || allowDeducted > 0) ? '<div style="font-weight:900;color:#059669"><b>المتبقي فعلياً:</b> ' + Math.max(0, _effective) + ' حصة</div>' : '') +
-              _trialLine + _allowLine + _excessLine +
-              SubscriptionService.buildPeriods(start, months).map(p => '<div><b>الشهر ' + p.monthNumber + ':</b> ' + ((trialDeducted > 0 || allowDeducted > 0) && p.monthNumber === 1 ? Math.max(0, _effective) : p.totalSessions || 8) + ' حصص</div>').join('') +
-            '</div>' +
-          '</div>';
-        subxBusy(false);
-        try { subxCloseEditor(); } catch (e) { console.warn('[SUBSCRIPTIONS] close editor failed', e); }
-        try { await subxLoadAll(); } catch (e) { console.warn('[SUBSCRIPTIONS] refresh after create failed', e); }
-        // نافذة النجاح تعرض فوق القائمة المحدّثة — لا توقف التحديث إذا تعطّلت
-        try {
-          await cmShow('✅', 'تم بنجاح', successHtml, { hideCancel: true, confirmText: 'موافق', success: true });
-        } catch (e) { console.warn('[SUBSCRIPTIONS] success modal failed', e); }
-        srShowToast('🎉 تم إنشاء اشتراك ' + label + ' للتلميذ ' + name + ' بنجاح — وهو ظاهر الآن في القائمة.', 'success');
-      }
+        }
+      var _effective = Math.max(0, (Number(sessions) || 0) - trialDeducted - allowDeducted);
+      var _trialLine = trialDeducted > 0
+        ? '<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:6px 10px;margin-top:4px;color:#d97706;font-size:12px;font-weight:800">🟠 تم خصم ' + trialDeducted + ' حصة استثنائية سابقة → الحصص الفعلية: ' + _effective + '</div>'
+        : '';
+      var _allowLine = allowDeducted > 0
+        ? '<div style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.25);border-radius:8px;padding:6px 10px;margin-top:4px;color:#7c3aed;font-size:12px;font-weight:800">♻️ خُصم ' + allowDeducted + ' حصة (سُمح بالدخول سابقاً بدون اشتراك) → الحصص الفعلية: ' + _effective + '</div>'
+        : '';
+      var _excessLine = _deductExcess > 0
+        ? '<div style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);border-radius:8px;padding:6px 10px;margin-top:4px;color:#dc2626;font-size:12px;font-weight:800">⚠️ لم تُخصم ' + _deductExcess + ' حصة — تجاوزت سعة باقة الاشتراك الجديدة</div>'
+        : '';
+      var _monthsLine = isPermanent
+        ? '<div><b>المدة:</b> <span style="color:#7C3AED;font-weight:900">♾️ دائم (بلا نهاية)</span></div>'
+        : SubscriptionService.buildPeriods(start, months).map(p => '<div><b>الشهر ' + p.monthNumber + ':</b> ' + ((trialDeducted > 0 || allowDeducted > 0) && p.monthNumber === 1 ? _effective : (p.totalSessions || 8)) + ' حصص</div>').join('');
+      const successHtml =
+        '<div style="text-align:center;font-size:13px">' +
+          '<div style="font-weight:900;font-size:15px;margin-bottom:12px">تم إنشاء الاشتراك بنجاح</div>' +
+          '<div style="text-align:right;line-height:2">' +
+            '<div><b>الطالب:</b> ' + escX(name) + '</div>' +
+            '<div><b>المادة — الأستاذ:</b> ' + escX(selectedSubject.icon + ' ' + selectedSubject.subjectName + ' — ' + (selectedSubject.teacherName || '—')) + '</div>' +
+            '<div><b>الباقة:</b> ' + escX(label) + '</div>' +
+            (isPermanent ? '<div><b>الحالة:</b> <span style="color:#7C3AED;font-weight:900">♾️ دائم</span></div>' : '<div><b>المبلغ:</b> ' + SubscriptionService.fmtPrice(price) + '</div>') +
+            '<div><b>الحصص:</b> ' + (isPermanent ? 'بدون حد للأبد' : sessions + ' حصة') + '</div>' +
+            '<div><b>البداية:</b> ' + SubscriptionService.fmtAr(start, true) + '</div>' +
+            '<div><b>النهاية:</b> ' + (isPermanent ? '<span style="color:#7C3AED;font-weight:900">دائم (بلا نهاية)</span>' : SubscriptionService.fmtAr(end, true)) + '</div>' +
+            ((trialDeducted > 0 || allowDeducted > 0) ? '<div style="font-weight:900;color:#059669"><b>المتبقي فعلياً:</b> ' + _effective + ' حصة</div>' : '') +
+            _trialLine + _allowLine + _excessLine +
+            _monthsLine +
+          '</div>' +
+        '</div>';
+      subxBusy(false);
+      try { subxCloseEditor(); } catch (e) { console.warn('[SUBSCRIPTIONS] close editor failed', e); }
+      try { await subxLoadAll(); } catch (e) { console.warn('[SUBSCRIPTIONS] refresh after create failed', e); }
+      // نافذة النجاح تعرض فوق القائمة المحدّثة — ثم تنغلق ويظهر الاشتراك في القائمة مباشرة
+      try {
+        await cmShow('✅', 'تم بنجاح', successHtml, { hideCancel: true, confirmText: 'موافق', success: true });
+      } catch (e) { console.warn('[SUBSCRIPTIONS] success modal failed', e); }
+      srShowToast('🎉 تم إنشاء اشتراك ' + label + ' للتلميذ ' + name + ' بنجاح — وهو ظاهر الآن في القائمة.', 'success');
     } catch (e) {
       const msg = String((e && e.message) || e);
       console.error('[SUBSCRIPTIONS] create failed', e);
