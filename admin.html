@@ -3245,6 +3245,12 @@
                     <button type="button" class="sec-btn" id="adm-create-btn" onclick="dashAdminCreate()">إنشاء حساب الإدارة</button>
                     <span class="sec-hint" id="adm-form-msg" style="opacity:0">تم</span>
                   </div>
+                  <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--border)">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                      <button type="button" class="sec-btn" onclick="dashAdminSyncSupabase()" style="background:linear-gradient(135deg,#059669,#10b981);box-shadow:0 4px 14px rgba(16,185,129,.25)">تفعيل صلاحيات الاشتراكات للحسابات</button>
+                      <span class="sec-hint">يُفعل وصول الاشتراكات الشهرية والموارد المالية لكل حسابات الإدارة المنشأة (بما فيها الحسابات الموجودة).</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -7761,6 +7767,40 @@ async function dashLog(category, action, detail) {
 window.dashLog = dashLog;
 window.dashActorName = dashActorName;
 
+// ── تفعيل صلاحيات الاشتراكات في Supabase (admin-users) لـ UID — أساسي لدخول الأقسام المؤمّنة ──
+async function dashAdminGrantSupabase(targetUid) {
+  try {
+    const auth0 = window._auth;
+    if (!auth0 || !auth0.currentUser) return false;
+    const token = await auth0.currentUser.getIdToken();
+    const res = await fetch(SR_SUPABASE_URL + '/functions/v1/admin-api', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ action: 'add-admin', uid: targetUid, role: 'admin' })
+    });
+    const r = await res.json().catch(() => null);
+    return !!(res.ok && r && r.ok === true);
+  } catch(e) { console.warn('dashAdminGrantSupabase error:', e); return false; }
+}
+window.dashAdminGrantSupabase = dashAdminGrantSupabase;
+
+// ── مزامنة: تفعيل صلاحيات الاشتراكات لكل حسابات الإدارة المنشأة (بما فيها القديمة) ──
+window.dashAdminSyncSupabase = async () => {
+  if (!(window._auth && window._auth.currentUser)) { window.showToast && window.showToast('سجّل الدخول أولاً', true); return; }
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
+    const accounts = snap.exists() ? (snap.data() || {}) : {};
+    const uids = Object.keys(accounts);
+    if (!uids.length) { window.showToast && window.showToast('لا توجد حسابات إدارة منشأة بعد', true); return; }
+    let okCount = 0;
+    for (const u of uids) {
+      if (await dashAdminGrantSupabase(u)) okCount++;
+    }
+    window.showToast && window.showToast('تم تفعيل ' + okCount + ' من ' + uids.length + ' حساباً', okCount === uids.length);
+    if (okCount !== uids.length) { window.showToast && window.showToast('بعض الحسابات لم تُفعل — تحقق من صلاحياتك', true); }
+  } catch(e) { console.error('dashAdminSyncSupabase error:', e); }
+};
+
 // ── إنشاء حساب إدارة جديد (صلاحيات admin كاملة) ──
 window.dashAdminCreate = async () => {
   const firstName = document.getElementById('adm-first-name').value.trim();
@@ -7795,6 +7835,9 @@ window.dashAdminCreate = async () => {
     // إنشاء الحساب عبر التطبيق الثانوي حتى لا تتأثر جلسة الأدمن الحالية
     createdCred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
     const uid = createdCred.user.uid;
+    // تفعيله كأدمن في Supabase (بدونه يُمنع من الاشتراكات/الموارد المالية)
+    const granted = await dashAdminGrantSupabase(uid);
+    if (!granted) throw new Error('تعذر تفعيل صلاحيات الاشتراكات — يرجى المحاولة لاحقاً');
     // حفظ الملف الشخصي والصلاحيات ضمن settings/adminAccounts — مسموح للأدمن بالكتابة بقواعد المنشورة حالياً
     await setDoc(doc(db, 'settings', 'adminAccounts'), {
       [uid]: {
