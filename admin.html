@@ -5514,10 +5514,10 @@ onAuthStateChanged(auth, async user => {
     // إن كان أدمن مُنشأ من قبل (عبر إعدادات الداشبورد) — استخدم اسمه الكامل
     if (!empCfg) {
       try {
-        const accSnap = await getDoc(doc(db, 'admin_accounts', user.uid));
+        const accSnap = await getDoc(doc(db, 'settings', 'adminAccounts'));
         if (accSnap.exists()) {
-          const acc = accSnap.data();
-          if (acc.fullName) uname = acc.fullName;
+          const acc = accSnap.data()[user.uid];
+          if (acc && acc.fullName) uname = acc.fullName;
         }
       } catch(e) { /* ignore – fall back to email prefix */ }
     }
@@ -7790,23 +7790,26 @@ window.dashAdminCreate = async () => {
   const btn = document.getElementById('adm-create-btn');
   btn.disabled = true;
   btn.textContent = 'جارِ الإنشاء…';
+  let createdCred = null;
   try {
     // إنشاء الحساب عبر التطبيق الثانوي حتى لا تتأثر جلسة الأدمن الحالية
-    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-    const uid = cred.user.uid;
+    createdCred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    const uid = createdCred.user.uid;
+    // حفظ الملف الشخصي والصلاحيات ضمن settings/adminAccounts — مسموح للأدمن بالكتابة بقواعد المنشورة حالياً
+    await setDoc(doc(db, 'settings', 'adminAccounts'), {
+      [uid]: {
+        userId: uid,
+        firstName, lastName,
+        fullName: firstName + ' ' + lastName,
+        email, phone: phoneClean,
+        role: 'admin',
+        status: 'active',
+        createdBy: dashActorName(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }
+    }, { merge: true });
     await signOut(secondaryAuth);
-    // حفظ الملف الشخصي والصلاحيات
-    await setDoc(doc(db, 'admin_accounts', uid), {
-      userId: uid,
-      firstName, lastName,
-      fullName: firstName + ' ' + lastName,
-      email, phone: phoneClean,
-      role: 'admin',
-      status: 'active',
-      createdBy: dashActorName(),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
     setMsg('تم إنشاء حساب الإدارة بنجاح: ' + firstName + ' ' + lastName, true);
     document.getElementById('adm-first-name').value = '';
     document.getElementById('adm-last-name').value = '';
@@ -7817,6 +7820,10 @@ window.dashAdminCreate = async () => {
     await dashLog('accounts', 'إنشاء حساب إدارة', 'تم إنشاء حساب admin لـ ' + firstName + ' ' + lastName + ' (' + email + ')');
   } catch(e) {
     console.error('dashAdminCreate error:', e);
+    // لو فشل حفظ الملف بعد إنشاء الحساب — احذف الحساب لتفادي حساب يتيم بلا بيانات
+    if (createdCred) {
+      try { await createdCred.user.delete(); } catch(_) {}
+    }
     let msg = e.message;
     if (e.code === 'auth/email-already-in-use') msg = 'البريد الإلكتروني مستخدم بالفعل';
     else if (e.code === 'auth/invalid-email') msg = 'البريد الإلكتروني غير صالح';
