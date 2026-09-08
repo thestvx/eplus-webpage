@@ -24379,6 +24379,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           }
           if (trialDeducted > 0 || allowDeducted > 0) {
             var deductTotal = trialDeducted + allowDeducted;
+            var _deductExcess = 0;
             var subPeriods = created.periods || [];
             if (!subPeriods.length && created.subscription && created.subscription.id) {
               try {
@@ -24397,6 +24398,18 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
             if (subPeriods.length) {
               var firstPeriod = subPeriods[0];
               var pid = firstPeriod.period_id || firstPeriod.id;
+              // لا تتجاوز سعة باقة الاشتراك الجديدة — الخصم بالتناسب حتى لا تصبح
+              // الحصص سالبة (تسجيل «بدون اشتراك» يتجاوز عدد حصص الباقة).
+              var _capLimit = Math.max(0, (firstPeriod.total_sessions || firstPeriod.totalSessions || sessions || 8));
+              if (deductTotal > _capLimit) {
+                var _ratioN = _capLimit / deductTotal;
+                var _newT = Math.floor(trialDeducted * _ratioN);
+                var _newA = Math.min(allowDeducted, Math.max(0, _capLimit - _newT));
+                trialDeducted = _newT;
+                allowDeducted = _newA;
+                _deductExcess = deductTotal - (trialDeducted + allowDeducted);
+                deductTotal = trialDeducted + allowDeducted;
+              }
               if (pid) {
                 var _incResult = await SubscriptionService.incrementPeriodUsage(pid, deductTotal);
                 console.log('[SUBSCRIPTIONS] Deducted ' + deductTotal + ' (' + trialDeducted + ' trial + ' + allowDeducted + ' allow_sub) sessions from new subscription period ' + pid, _incResult);
@@ -24421,6 +24434,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         var _allowLine = allowDeducted > 0
           ? '<div style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.25);border-radius:8px;padding:6px 10px;margin-top:4px;color:#7c3aed;font-size:12px;font-weight:800">♻️ خُصم ' + allowDeducted + ' حصة (سُمح بالدخول سابقاً بدون اشتراك) → الحصص الفعلية: ' + Math.max(0, _effective) + '</div>'
           : '';
+        var _excessLine = _deductExcess > 0
+          ? '<div style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);border-radius:8px;padding:6px 10px;margin-top:4px;color:#dc2626;font-size:12px;font-weight:800">⚠️ لم تُخصم ' + _deductExcess + ' حصة — تجاوزت سعة باقة الاشتراك الجديدة</div>'
+          : '';
         const successHtml =
           '<div style="text-align:center;font-size:13px">' +
             '<div style="font-weight:900;font-size:15px;margin-bottom:12px">تم إنشاء الاشتراك بنجاح</div>' +
@@ -24433,7 +24449,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
               (trialDeducted > 0 ? '<div><b>خصم حصص استثنائية:</b> ' + trialDeducted + ' حصة</div>' : '') +
               (allowDeducted > 0 ? '<div><b>دخول سابق بدون اشتراك:</b> ' + allowDeducted + ' حصة (خُصم من الاشتراك الجديد)</div>' : '') +
               ((trialDeducted > 0 || allowDeducted > 0) ? '<div style="font-weight:900;color:#059669"><b>المتبقي فعلياً:</b> ' + Math.max(0, _effective) + ' حصة</div>' : '') +
-              _trialLine + _allowLine +
+              _trialLine + _allowLine + _excessLine +
               SubscriptionService.buildPeriods(start, months).map(p => '<div><b>الشهر ' + p.monthNumber + ':</b> ' + ((trialDeducted > 0 || allowDeducted > 0) && p.monthNumber === 1 ? Math.max(0, _effective) : p.totalSessions || 8) + ' حصص</div>').join('') +
             '</div>' +
           '</div>';

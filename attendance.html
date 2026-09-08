@@ -723,10 +723,11 @@ main{flex:1;position:relative;overflow:hidden}
       if (seen[key]) continue;
       seen[key] = true;
       var isOpen = isTeacherOpen(openMap, openIdMap, s.teacher, s.subject, openNameMap);
-      var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, trialUsed: 0, trialRemaining: 0, allowed: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length };
+      var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, trialUsed: 0, trialRemaining: 0, allowed: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length, hasSubscription: false };
       try {
         var subResult = await SubscriptionService.getActiveSubscriptionForSubject(studentId, s.subject, s.teacher, today);
         if (subResult && subResult.subscription) {
+          sess.hasSubscription = true;
           sess.sub = subResult.subscription;
           sess.periods = subResult.periods || [];
           var subStatus = SubscriptionService.subscriptionStatus(subResult.subscription);
@@ -760,7 +761,7 @@ main{flex:1;position:relative;overflow:hidden}
           .where('date', '==', today).get();
         attSnap.forEach(function (doc) {
           var d = doc.data();
-          if (d.teacherName === s.teacher && d.subjectName === s.subject && d.type !== 'grace' && d.type !== 'grace_session' && !d.cancelled && d.confirmed !== true) {
+          if (d.teacherName === s.teacher && d.subjectName === s.subject && d.type !== 'grace' && d.type !== 'grace_session' && !d.cancelled) {
             sess.alreadyCheckedIn = true;
           }
         });
@@ -832,6 +833,7 @@ main{flex:1;position:relative;overflow:hidden}
 
       var hasActiveSub = s.status === 'active';
       var hasTrial = !hasActiveSub && s.trialRemaining > 0;
+      var hasStaleSub = !hasActiveSub && !hasTrial && s.hasSubscription;
       var stClass, badgeClass, badgeText;
       if (s.alreadyCheckedIn) {
         stClass = badgeClass = 'green';
@@ -845,6 +847,9 @@ main{flex:1;position:relative;overflow:hidden}
       } else if (hasTrial) {
         stClass = badgeClass = 'orange';
         badgeText = '\uD83D\uDFE0 حصص تجريبية: ' + s.trialRemaining + '/' + TRIAL_MAX;
+      } else if (hasStaleSub) {
+        stClass = badgeClass = 'red';
+        badgeText = '\u26A0\uFE0F اشتراك مستنفد';
       } else {
         stClass = badgeClass = 'purple';
         badgeText = '\uD83D\uDFE3 بدون اشتراك';
@@ -870,6 +875,8 @@ if (hasActiveSub && s.permanent) {
         var trialPct = Math.min(100, Math.round((s.trialUsed / TRIAL_MAX) * 100));
         html += '<div class="tc-progress-wrap"><div class="tc-progress"><div class="tc-progress-fill orange" style="width:' + trialPct + '%"></div></div></div>';
         html += '<div style="text-align:center;font-size:11px;font-weight:700;color:#f59e0b;padding:2px 0 6px">هذه حصة تجريبية بدون اشتراك</div>';
+      } else if (hasStaleSub) {
+        html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:13px;font-weight:900;color:#ef4444">اكتملت حصص الاشتراك</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">انتهت الحصص الاستثنائية والمجانية<br>يرجى تجديد الاشتراك للدخول</div></div></div>';
       } else {
         html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:13px;font-weight:900;color:#c4b5fd">ليس له اشتراك</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">' + (s.allowed > 0 ? 'سُمح بالدخول اليوم (<b style="color:#c4b5fd">' + s.allowed + '</b>) — يُخصم عند الاشتراك' : 'يحتاج موافقة الإدارة للدخول · سيُخصم من اشتراكه عند إنشائه') + '</div></div></div>';
       }
@@ -880,6 +887,8 @@ if (hasActiveSub && s.permanent) {
         html += '<button class="tc-btn green" data-sidx="' + i + '">تسجيل الحضور</button>';
       } else if (hasTrial) {
         html += '<button class="tc-btn orange" data-sidx="' + i + '">سجّل (حصة تجريبية)</button>';
+      } else if (hasStaleSub) {
+        html += '<button class="tc-btn red" disabled>جدّد الاشتراك للدخول</button>';
       } else {
         html += '<button class="tc-btn purple" data-sidx="' + i + '">السماح بالدخول (بدون اشتراك)</button>';
       }
@@ -932,8 +941,10 @@ if (hasActiveSub && s.permanent) {
         // الاشتراك الدائم يُسجَّل حضوره دائماً — يُسمح له بالدخول بدون حدود
         _subHasRemaining = true;
       } else if (subStatus === 'active') {
-        var _totals = SubscriptionService.computeSubscriptionTotals(subCheck.periods);
-        _subHasRemaining = _totals.remainingSessions > 0;
+        // الحسم من حصة الاشتراك الحالية (فترة الشهر النشط) — وليس مجموع كل الفترات،
+        // حتى لا يُحتسب حضور بمدة مستقبلية وتتفاقم الشهور دون فائض.
+        var _apChk = SubscriptionService.activePeriod(subCheck.periods);
+        _subHasRemaining = !!(_apChk && ((_apChk.total_sessions || 8) - (_apChk.used_sessions || 0)) > 0);
       }
       if (subStatus === 'active' && _subHasRemaining) {
         // ── GREEN: active subscription with remaining sessions ──
