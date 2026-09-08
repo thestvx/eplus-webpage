@@ -833,7 +833,6 @@ main{flex:1;position:relative;overflow:hidden}
 
       var hasActiveSub = s.status === 'active';
       var hasTrial = !hasActiveSub && s.trialRemaining > 0;
-      var hasStaleSub = !hasActiveSub && !hasTrial && s.hasSubscription;
       var stClass, badgeClass, badgeText;
       if (s.alreadyCheckedIn) {
         stClass = badgeClass = 'green';
@@ -846,13 +845,10 @@ main{flex:1;position:relative;overflow:hidden}
         badgeText = '\uD83D\uDFE2 نشط';
       } else if (hasTrial) {
         stClass = badgeClass = 'orange';
-        badgeText = '\uD83D\uDFE0 حصص تجريبية: ' + s.trialRemaining + '/' + TRIAL_MAX;
-      } else if (hasStaleSub) {
-        stClass = badgeClass = 'red';
-        badgeText = '\u26A0\uFE0F اشتراك مستنفد';
+        badgeText = '\uD83D\uDFE0 حصص مجانية: ' + s.trialRemaining + '/' + TRIAL_MAX;
       } else {
-        stClass = badgeClass = 'purple';
-        badgeText = '\uD83D\uDFE3 بدون اشتراك';
+        stClass = badgeClass = 'red';
+        badgeText = '\u26A0\uFE0F انتهت الحصص المجانية';
       }
       var attended = s.attended;
       var total = hasActiveSub ? Math.max(1, (s.remaining + s.attended)) : TRIAL_MAX;
@@ -871,14 +867,12 @@ if (hasActiveSub && s.permanent) {
         html += '<div class="tc-stats"><div class="tc-stat"><div class="tc-stat-num">' + attended + '</div><div class="tc-stat-label">حضر</div></div><div class="tc-stat"><div class="tc-stat-num">' + remaining + '</div><div class="tc-stat-label">متبقي</div></div><div class="tc-stat"><div class="tc-stat-num">' + total + '</div><div class="tc-stat-label">الإجمالي</div></div></div>';
         html += '<div class="tc-progress-wrap"><div class="tc-progress"><div class="tc-progress-fill ' + barClass + '" style="width:' + pct + '%"></div></div></div>';
       } else if (hasTrial) {
-        html += '<div class="tc-stats"><div class="tc-stat"><div class="tc-stat-num" style="color:#f59e0b">' + s.trialUsed + '</div><div class="tc-stat-label">مستخدمة</div></div><div class="tc-stat"><div class="tc-stat-num" style="color:#059669">' + s.trialRemaining + '</div><div class="tc-stat-label">متبقية</div></div><div class="tc-stat"><div class="tc-stat-num">' + TRIAL_MAX + '</div><div class="tc-stat-label">الإجمالي</div></div></div>';
+        html += '<div class="tc-stats"><div class="tc-stat"><div class="tc-stat-num" style="color:#f59e0b">' + s.trialUsed + '</div><div class="tc-stat-label">مستهلكة</div></div><div class="tc-stat"><div class="tc-stat-num" style="color:#059669">' + s.trialRemaining + '</div><div class="tc-stat-label">متبقية</div></div><div class="tc-stat"><div class="tc-stat-num">' + TRIAL_MAX + '</div><div class="tc-stat-label">الإجمالي</div></div></div>';
         var trialPct = Math.min(100, Math.round((s.trialUsed / TRIAL_MAX) * 100));
         html += '<div class="tc-progress-wrap"><div class="tc-progress"><div class="tc-progress-fill orange" style="width:' + trialPct + '%"></div></div></div>';
-        html += '<div style="text-align:center;font-size:11px;font-weight:700;color:#f59e0b;padding:2px 0 6px">هذه حصة تجريبية بدون اشتراك</div>';
-      } else if (hasStaleSub) {
-        html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:13px;font-weight:900;color:#ef4444">اكتملت حصص الاشتراك</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">انتهت الحصص الاستثنائية والمجانية<br>يرجى تجديد الاشتراك للدخول</div></div></div>';
+        html += '<div style="text-align:center;font-size:11px;font-weight:700;color:#f59e0b;padding:2px 0 6px">حصة مجانية من الحصتين المجانيتين</div>';
       } else {
-        html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:13px;font-weight:900;color:#c4b5fd">ليس له اشتراك</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">' + (s.allowed > 0 ? 'سُمح بالدخول اليوم (<b style="color:#c4b5fd">' + s.allowed + '</b>) — يُخصم عند الاشتراك' : 'يحتاج موافقة الإدارة للدخول · سيُخصم من اشتراكه عند إنشائه') + '</div></div></div>';
+        html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:13px;font-weight:900;color:#ef4444">انتهت الحصتان المجانيتان</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">لم يعد مسموحاً بالتسجيل<br>يرجى الاشتراك الشهري للدخول</div></div></div>';
       }
       html += '<div class="tc-btn-wrap">';
       if (s.alreadyCheckedIn) {
@@ -886,11 +880,9 @@ if (hasActiveSub && s.permanent) {
       } else if (hasActiveSub) {
         html += '<button class="tc-btn green" data-sidx="' + i + '">تسجيل الحضور</button>';
       } else if (hasTrial) {
-        html += '<button class="tc-btn orange" data-sidx="' + i + '">سجّل (حصة تجريبية)</button>';
-      } else if (hasStaleSub) {
-        html += '<button class="tc-btn red" disabled>جدّد الاشتراك للدخول</button>';
+        html += '<button class="tc-btn orange" data-sidx="' + i + '">سجّل (حصة مجانية)</button>';
       } else {
-        html += '<button class="tc-btn purple" data-sidx="' + i + '">السماح بالدخول (بدون اشتراك)</button>';
+        html += '<button class="tc-btn red" disabled>سجّل اشتراكاً شهرياً للدخول</button>';
       }
       html += '</div></div>';
     }
@@ -996,20 +988,8 @@ if (hasActiveSub && s.permanent) {
           await recordTrialUsage(pendingStudentId, pendingName, session.teacher, session.subject, pendingBarcode);
         }
       } else {
-        // ── سماح إداري بالدخول بدون اشتراك (يُخصم تلقائياً عند إنشاء الاشتراك لاحقاً) ──
-        type = 'allow';
-        if (fbReady && authState.signedIn) {
-          try {
-            await AttendanceService.writeMirror({
-              studentId: pendingStudentId, studentName: pendingName, studentType: pendingReg.student_type || '',
-              sessionNumber: 1, date: AttendanceService.today(), checkInTime: AttendanceService.nowTime(),
-              barcodeValue: pendingBarcode, source: 'eplus-attendance', type: 'allow_sub',
-              teacherName: session.teacher, subjectName: session.subject,
-              note: 'سمح الإدارة بالدخول بدون اشتراك — سيُخصم من الاشتراك عند إنشائه',
-              createdAt: AttendanceService.nowTime()
-            });
-          } catch (e) { logScanner('allow mirror write error: ' + e.message); }
-        }
+        // ── استهلكت الحصتان المجانيتان ولم يسجّل اشتراكاً → رفض الدخول ──
+        type = 'red';
       }
     }
 
@@ -1025,29 +1005,20 @@ if (hasActiveSub && s.permanent) {
       postCheckin(session, type);
       var newTrialRemain = Math.max(0, freshTrialRemaining - 1);
       showCheckinAnimation('orange', session.subject, session.teacher);
-      showScanOverlay('orange', '🟠', 'تم السماح بتسجيل الحضور', pendingName,
-        'هذه حصة استثنائية بدون اشتراك<br>المتبقي: <b>' + newTrialRemain + ' / ' + TRIAL_MAX + '</b> حصة', 3000);
-    } else if (type === 'allow') {
-      playSoundCorrect();
-      attendedCount++; updateCounter();
-      postCheckin(session, type);
-      showCheckinAnimation('green', session.subject, session.teacher);
-      showScanOverlay('purple', '♻️', 'تم السماح بالدخول', pendingName,
-        'دخول بدون اشتراك — سُمح به من الإدارة<br>سيُخصم من الاشتراك عند تفعيله لاحقاً', 3000);
+      showScanOverlay('orange', '🟠', 'تم تسجيل الحضور', pendingName,
+        'هذه حصة مجانية (من الحصتين المجانيتين)<br>المتبقي: <b>' + newTrialRemain + ' / ' + TRIAL_MAX + '</b> حصة', 3000);
     } else {
       playSoundIncorrect();
       postCheckin(session, type);
       showScanOverlay('red', '🚫', 'لا يمكن تسجيل الحضور', pendingName,
-        session.teacher + ' — ' + session.subject + '<br>انتهت الحصص الاستثنائية — يرجى الاشتراك', 3500);
+        session.teacher + ' — ' + session.subject + '<br>انتهت الحصتان المجانيتان — سجّل اشتراكاً شهرياً للدخول', 3500);
     }
   }
 
   function postCheckin(session, type) {
     if (type !== 'red') {
       session.alreadyCheckedIn = true;
-      if (type === 'allow') {
-        session.allowed = (session.allowed || 0) + 1;
-      } else if (type === 'orange') {
+      if (type === 'orange') {
         session.trialUsed = Math.min(TRIAL_MAX, (session.trialUsed || 0) + 1);
         session.trialRemaining = Math.max(0, TRIAL_MAX - session.trialUsed);
       } else {
