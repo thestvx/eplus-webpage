@@ -668,6 +668,8 @@
     .wali-contact-cell .k{font-size:10.5px;color:var(--ink-3);font-weight:700;margin-bottom:5px}
     .wali-contact-cell .v{font-weight:900;font-size:14px;color:var(--ink);letter-spacing:1px}
     .wali-contact-cell .v-sub{font-weight:800;font-size:12px;color:var(--royal)}
+    .wali-contact-cell a.v.phl{display:inline-block;color:var(--royal);font-family:ui-monospace,Consolas,monospace;font-size:18px;font-weight:900;letter-spacing:1.5px;padding:6px 16px;background:var(--lav);border:1px solid var(--royal-2);border-radius:10px;text-decoration:none}
+    .wali-contact-cell a.v.phl:active{transform:scale(.97)}
     .wali-empty{text-align:center;padding:26px 18px;color:var(--ink-3);font-size:12.5px;font-weight:600}
     .wali-hint{margin-top:var(--sp-3);font-size:11px;color:var(--ink-3);line-height:1.8;text-align:center;padding:0 6px 10px}
     .wali-other-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px dashed var(--line)}
@@ -851,8 +853,9 @@
     function subEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
     function fmtTime(t){
       if(!t)return'';
-      const m=String(t).match(/^(\d{1,2}):(\d{2})/);
-      return m?(+m[1])+':'+m[2]:String(t);
+      const m=String(t).match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+      if(!m)return String(t);
+      return (+m[1])+':'+m[2]+(m[3]!==undefined&&m[3]!=='00'?':'+m[3]:'');
     }
     function monthAr(ym){
       if(!ym||!/^\d{4}-\d{2}$/.test(ym))return ym||'';
@@ -1100,8 +1103,6 @@
 
       var today=SubscriptionService.today();
       var subjects=Array.isArray(r.subjects)?r.subjects:[];
-      var phone=(r.parent_phone||'').trim();
-      var phoneShow=phone?phone.replace(/^(\d{2,3})(\d+)(\d{2})$/,'$1 •••• $3'):'—';
       var month=String(today).slice(0,7);
       var monthEvents=events.filter(function(ev){return String(ev.date||ev.createdAt||'').slice(0,7)===month;});
       var lastEvents=events.slice().sort(function(a,b){
@@ -1259,7 +1260,16 @@
       }else{
         // 🔮 القادمة: حصص متبقية متوقعة
         attHTML+='<div class="att-group"><div class="att-group-head"><span class="att-gh-ic">'+sIcon('sparkles')+'</span><span>القادمة</span><span class="att-gh-note">حصص متبقية ضمن اشتراكك</span></div>';
-        if(upcoming.length===0){
+        if(permActive){
+          attHTML+=activeRows.map(function(row){
+            var s=row.subscription||{};
+            if(!SubscriptionService.isPermanent(s))return'';
+            return '<div class="att-up"><div class="att-up-ic">'+sIcon('sparkles')+'</div>'
+              +'<div class="att-up-main"><div class="att-up-subj">'+subEsc(s.subject_name||'مادة')+(s.teacher_name&&s.teacher_name!=='—'?' <span class="att-up-tc">· '+subEsc(s.teacher_name)+'</span>':'')+'</div>'
+              +'<div class="att-up-range">دراسة دائمة — بدون نهاية</div></div>'
+              +'<div class="att-up-rem"><b dir="ltr">∞</b><span>دائم</span></div></div>';
+          }).join('')||'<div class="att-none">اشتراك دائم — حصص غير محدودة.</div>';
+        }else if(upcoming.length===0){
           attHTML+='<div class="att-none">لا توجد حصص متبقية معلّقة حسب مواعيد الاشتراك الحالية.</div>';
         }else{
           attHTML+=upcoming.slice(0,8).map(function(u,i){
@@ -1293,14 +1303,14 @@
       attHTML+='</div></div>';
       html+=attHTML;
 
-      // قناة أولياء الأمور
+      // رقم المركز التعليمي للاستفسار
       html+='<div class="wali-card">'
-        +'<div class="wali-card-head"><span class="wc-ic">'+sIcon('users')+'</span><span class="wc-top">قناة أولياء الأمور</span></div>'
+        +'<div class="wali-card-head"><span class="wc-ic">'+sIcon('users')+'</span><span class="wc-top">رقم المركز التعليمي للاستفسار</span></div>'
         +'<div class="wali-card-body"><div class="wali-contact-box">'
-        +'<div class="wali-contact-cell"><div class="k">هاتف ولي الأمر</div><div class="v" dir="ltr">'+subEsc(phoneShow)+'</div></div>'
-        +'<div class="wali-contact-cell"><div class="k">الإدارة</div><div class="v-sub">متاحة طيلة أيام الدراسة</div></div>'
+        +'<div class="wali-contact-cell"><div class="k">هاتف المركز التعليمي</div><a class="v phl" dir="ltr" href="tel:0676431474">0676431474</a></div>'
+        +'<div class="wali-contact-cell"><div class="k">أوقات الاتصال</div><div class="v-sub">متاحة طيلة أيام الدراسة</div></div>'
         +'</div>'
-        +'<div class="wali-hint">لأي استفسار حول الحصص أو المستحقات أو الدروس، يرجى التواصل مع إدارة المركز مباشرة.</div>'
+        +'<div class="wali-hint">لأي استفسار حول الحصص أو المستحقات أو الدروس، يرجى الاتصال بالمركز على الرقم أعلاه خلال أوقات الدراسة.</div>'
         +'</div></div>';
 
       var loadEl=document.getElementById('wali-loading');
