@@ -4084,7 +4084,7 @@
               <button class="tbl-action" onclick="subxShowDeletedLogs()" style="font-size:12px;border-color:rgba(16,185,129,0.3);color:#059669">🔄 تحديث</button>
               <button class="tbl-action" onclick="subxRestoreAllDeletedLogs()" style="font-size:12px;border-color:rgba(59,130,246,0.3);color:#2563eb">↩️ استعادة الكل</button>
             </div>
-            <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;padding:10px 14px;background:rgba(245,158,11,0.06);border:1px dashed rgba(245,158,11,0.25);border-radius:10px;line-height:1.7">سجلات الحضور المحذوفة تُحفظ هنا مع <b>تاريخ ووقت الحذف</b> تلقائياً، وتُزال من القائمة الرئيسية. يمكنك استعادتها في أي وقت.</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;padding:10px 14px;background:rgba(245,158,11,0.06);border:1px dashed rgba(245,158,11,0.25);border-radius:10px;line-height:1.7">سجلات الحضور المحذوفة تُحفظ هنا مع <b>تاريخ ووقت الحذف</b> تلقائياً، وتُزال من القائمة الرئيسية. يمكنك استعادتها في أي وقت.<br><span style="font-size:11px;color:#d97706">كما تُعرض هنا السجلات المُلغاة أو غير المؤكّدة حتى لا يختفي أي حضور نهائياً.</span></div>
             <div id="subx-deleted-logs-body" style="font-size:12px;color:var(--text-muted)">جارٍ تحميل السجلات المحذوفة…</div>
           </div>
         </div>
@@ -25157,16 +25157,29 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   };
 
   window.subxCancelAttendance = async function (attId, studentId, attDate, subjectName, teacherName, subId) {
-    const ok = await cmConfirm('إلغاء الحضور', 'هل أنت متأكد من إلغاء حضور هذا التلميذ في يوم <b>' + SubscriptionService.fmtAr(attDate, true) + '</b>؟<br><span style="color:#dc2626;font-size:11px;font-weight:800">⚠️ لن يُحذف الاشتراك ولا بيانات الدفع</span>', '❌', { confirmText: 'نعم، ألغي الحضور' });
+    const ok = await cmConfirm('إلغاء الحضور', 'هل أنت متأكد من إلغاء حضور هذا التلميذ في يوم <b>' + SubscriptionService.fmtAr(attDate, true) + '</b>؟<br><span style="color:#d97706;font-size:11px;font-weight:800">⚠️ سيُحفظ السجل في «المحذوفة» ويمكن استعادته لاحقاً، ولن يُحذف الاشتراك ولا بيانات الدفع</span>', '❌', { confirmText: 'نعم، ألغي الحضور' });
     if (!ok) return;
     try {
       const { _db: fdb, _firestore: fs } = window;
+      // Save a mandatory backup copy (with deletion time) BEFORE deleting, so the
+      // record always appears in the «المحذوفة» window and can be restored.
+      const srcRef = fs.doc(fdb, 'support_attendance', attId);
+      const srcSnap = await fs.getDoc(srcRef);
+      if (srcSnap.exists()) {
+        const nowBk = new Date();
+        const bkDoc = Object.assign({}, srcSnap.data(), {
+          _backupDeletedAt: nowBk.toISOString(),
+          _backupDeletedDate: nowBk.toLocaleString('ar-DZ'),
+          _backupReason: 'subscancel'
+        });
+        await fs.setDoc(fs.doc(fdb, 'support_attendance_backup', 'b_' + attId + '_' + nowBk.getTime()), bkDoc);
+      }
       // Try hard delete first, fall back to soft-delete (cancelled flag)
       try {
-        await fs.deleteDoc(fs.doc(fdb, 'support_attendance', attId));
+        await fs.deleteDoc(srcRef);
       } catch (delErr) {
         console.warn('[SUBSCRIPTIONS] hard delete failed, trying soft-delete:', delErr);
-        await fs.updateDoc(fs.doc(fdb, 'support_attendance', attId), { cancelled: true, cancelledAt: new Date().toISOString() });
+        await fs.updateDoc(srcRef, { cancelled: true, cancelledAt: new Date().toISOString() });
       }
       // Decrement used_sessions for the matching period
       if (subId) {
@@ -25185,7 +25198,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       if (subId) {
         subxShowDetail(subId);
       }
-      showToast('✔️ تم إلغاء الحضور بنجاح.');
+      showToast('✔️ تم إلغاء الحضور وحفظ نسخة احتياطية.');
     } catch (e) {
       console.error('[SUBSCRIPTIONS] cancel attendance failed', e);
       showToast('❌ ' + ((e && e.message) || 'تعذر إلغاء الحضور'), true);
@@ -25444,22 +25457,21 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     if (!ok) return;
     try {
       const { _db: fdb, _firestore: fs } = window;
-      // Save backup copy with deletion time before removing
+      // Save backup copy with deletion time before removing — this write MUST
+      // succeed; if it fails we abort so a record is never lost without a copy.
       const srcRef = fs.doc(fdb, 'support_attendance', attId);
-      try {
-        const srcSnap = await fs.getDoc(srcRef);
-        if (srcSnap.exists()) {
-          const now = new Date();
-          const data = srcSnap.data();
-          const backupDoc = Object.assign({}, data, {
-            _backupDeletedAt: now.toISOString(),
-            _backupDeletedDate: now.toLocaleString('ar-DZ'),
-            _backupReason: 'deleted'
-          });
-          const bid = 'b_' + attId + '_' + now.getTime();
-          await fs.setDoc(fs.doc(fdb, 'support_attendance_backup', bid), backupDoc);
-        }
-      } catch (bkErr) { console.warn('[SUBSCRIPTIONS] backup failed', bkErr); }
+      const srcSnap = await fs.getDoc(srcRef);
+      if (srcSnap.exists()) {
+        const now = new Date();
+        const data = srcSnap.data();
+        const backupDoc = Object.assign({}, data, {
+          _backupDeletedAt: now.toISOString(),
+          _backupDeletedDate: now.toLocaleString('ar-DZ'),
+          _backupReason: 'deleted'
+        });
+        const bid = 'b_' + attId + '_' + now.getTime();
+        await fs.setDoc(fs.doc(fdb, 'support_attendance_backup', bid), backupDoc);
+      }
       // Try hard delete first, fall back to soft-delete
       try {
         await fs.deleteDoc(srcRef);
@@ -25500,8 +25512,33 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           subjectName: r.subjectName || '',
           type: r.type || '',
           deletedAt: r._backupDeletedAt || '',
-          deletedDate: r._backupDeletedDate || ''
+          deletedDate: r._backupDeletedDate || '',
+          reason: r._backupReason || 'deleted',
+          backup: true
         });
+      });
+      // Also surface soft-deleted (cancelled) and unconfirmed live records here, so
+      // no attendance can silently vanish from both windows at the same time.
+      const liveSnap = await fs.getDocs(fs.collection(fdb, 'support_attendance'));
+      liveSnap.forEach(function (d) {
+        const r = d.data();
+        if (r.type === 'grace') return;
+        if (r.cancelled === true || r.confirmed === false) {
+          rows.push({
+            id: d.id,
+            studentId: r.studentId || '',
+            studentName: r.studentName || '',
+            date: r.date || '',
+            time: r.checkInTime || r.createdAt || '',
+            teacherName: r.teacherName || '',
+            subjectName: r.subjectName || '',
+            type: r.type || '',
+            deletedAt: r.cancelledAt || '',
+            deletedDate: r.cancelledAt ? new Date(r.cancelledAt).toLocaleString('ar-DZ') : '',
+            reason: r.cancelled === true ? 'soft' : 'unconfirmed',
+            backup: false
+          });
+        }
       });
       rows.sort((a, b) => (b.deletedAt || '').localeCompare(a.deletedAt || ''));
       window._subxDeletedData = rows;
@@ -25529,6 +25566,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       'grace_session': '<span style="color:#d97706">⚠️ حصّة مجانية</span>',
       'trial_session': '<span style="color:#f59e0b">🟠 حصة تجريبية</span>'
     };
+    function deletedTypeLabel(r) {
+      if (r.reason === 'soft') return '<span style="color:#dc2626">❌ مُلغى (حضور)</span>';
+      if (r.reason === 'unconfirmed') return '<span style="color:#2563eb">⏳ لم يُؤكَّد بعد</span>';
+      if (r.reason === 'subscancel') return '<span style="color:#ea580c">❌ مُلغى (اشتراك)</span>';
+      if (r.reason === 'bulk_clear') return '<span style="color:#dc2626">🗑️ مسح جماعي</span>';
+      return (typeLabel[r.type] || '<span style="color:#059669">✅ حضور</span>');
+    }
     let h = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px">';
     h += '<thead><tr style="background:rgba(245,158,11,0.06)">';
     h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">تاريخ الحذف</th>';
@@ -25548,7 +25592,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       h += '<td style="padding:7px 10px;font-family:monospace" dir="ltr">' + escX(r.studentId) + '</td>';
       h += '<td style="padding:7px 10px">' + escX(r.subjectName || '—') + '</td>';
       h += '<td style="padding:7px 10px">' + escX(r.teacherName || '—') + '</td>';
-      h += '<td style="padding:7px 10px;text-align:center">' + (typeLabel[r.type] || '<span style="color:#059669">✅ حضور</span>') + '</td>';
+      h += '<td style="padding:7px 10px;text-align:center">' + deletedTypeLabel(r) + '</td>';
       h += '<td style="padding:7px 10px;text-align:center"><button onclick="subxRestoreDeletedLog(\'' + r.id + '\')" style="background:rgba(59,130,246,0.1);color:#2563eb;border:1px solid rgba(59,130,246,0.25);border-radius:8px;padding:4px 12px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.background=\'rgba(59,130,246,0.2)\'" onmouseout="this.style.background=\'rgba(59,130,246,0.1)\'">↩️ استعادة</button></td>';
       h += '</tr>';
     });
@@ -25561,8 +25605,22 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     const { _db: fdb, _firestore: fs } = window;
     if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); return; }
     try {
-      const bkSnap = await fs.getDoc(fs.doc(fdb, 'support_attendance_backup', backupId));
-      if (!bkSnap.exists()) { showToast('⚠️ السجل غير موجود في النسخ الاحتياطي', true); return; }
+      const bkRef = fs.doc(fdb, 'support_attendance_backup', backupId);
+      const bkSnap = await fs.getDoc(bkRef);
+      if (!bkSnap.exists()) {
+        // Not a backup entry — maybe a soft-deleted / unconfirmed live record
+        const liveRef = fs.doc(fdb, 'support_attendance', backupId);
+        const liveSnap = await fs.getDoc(liveRef);
+        if (liveSnap.exists() && (liveSnap.data().cancelled === true || liveSnap.data().confirmed === false)) {
+          await fs.updateDoc(liveRef, { cancelled: false, cancelledAt: fs.deleteField(), confirmed: true, restoredAt: new Date().toISOString() });
+          showToast('↩️ تمت استعادة السجل المُخفى.');
+        } else {
+          showToast('⚠️ السجل غير موجود في النسخ الاحتياطي ولا في سجلات الحضور', true);
+        }
+        if (typeof subxShowAllLogs === 'function') await subxShowAllLogs();
+        await subxShowDeletedLogs();
+        return;
+      }
       const data = bkSnap.data();
       const isLive = await fs.getDoc(fs.doc(fdb, 'support_attendance', backupId.replace(/^b_/, '')));
       if (isLive.exists()) {
@@ -25598,6 +25656,15 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       let restored = 0;
       let skipped = 0;
       for (const r of rows) {
+        if (r.backup === false) {
+          const liveRef = fs.doc(fdb, 'support_attendance', r.id);
+          const liveSnap = await fs.getDoc(liveRef);
+          if (liveSnap.exists() && (liveSnap.data().cancelled === true || liveSnap.data().confirmed === false)) {
+            await fs.updateDoc(liveRef, { cancelled: false, cancelledAt: fs.deleteField(), confirmed: true, restoredAt: new Date().toISOString() });
+            restored++;
+          } else { skipped++; }
+          continue;
+        }
         const origId = r.id.replace(/^b_/, '');
         const liveSnap = await fs.getDoc(fs.doc(fdb, 'support_attendance', origId));
         if (liveSnap.exists()) { skipped++; continue; }
