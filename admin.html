@@ -5371,7 +5371,7 @@ function applyEmployeeMode(cfg) {
       if (cfg.restrictions.srtReadOnly)
         document.querySelectorAll('button[onclick*="srtOpenAddModal"], button[onclick*="srtOpenEditModal"], button[onclick*="srtResetPassword"], button[onclick*="srtConfirmResetPassword"], button[onclick*="srtToggleStatus"], button[onclick*="srtDelete"], button[onclick*="srtOpenFinance"], button[onclick*="srtFinanceAddPayment"], button[onclick*="srtFinanceDeleteTx"], button[onclick*="srtFinanceComputeDues"], button[onclick*="srtTreasuryAdjust"], button[onclick*="srtFinanceSaveRate"], button[onclick*="srtAddSubjectRow"]').forEach(b => b.style.display = 'none');
       if (cfg.restrictions.subxHideAttendance)
-        document.querySelectorAll('button[onclick*="subxCancelAttendance"]').forEach(b => b.style.display = 'none');
+        document.querySelectorAll('button[onclick*="subxCancelAttendance"], button[onclick*="subxShowAllLogs"], button[onclick*="subxShowDeletedLogs"], button[onclick*="subxExportLogsCSV"], button[onclick*="subxDeleteLog"]').forEach(b => b.style.display = 'none');
       if (cfg.restrictions.attNoSessionControl)
         document.querySelectorAll('[onclick*="openCtrlModal"]').forEach(b => b.style.display = 'none');
     });
@@ -5423,6 +5423,16 @@ if (cfg.restrictions.srNoConfirmFree) {
   }
   if (cfg.restrictions.subxHideAttendance) {
     window.subxCancelAttendance = () => showToast('⛔ ليس لديك صلاحية إلغاء الحضور', true);
+    window.subxShowAllLogs = () => showToast('⛔ ليس لديك صلاحية فتح سجلات الحضور', true);
+    window.subxDeleteLog = () => showToast('⛔ ليس لديك صلاحية حذف سجلات الحضور', true);
+    window.subxExportLogsCSV = () => showToast('⛔ ليس لديك صلاحية تصدير سجلات الحضور', true);
+    window.subxShowDeletedLogs = () => showToast('⛔ ليس لديك صلاحية فتح السجلات المحذوفة', true);
+    window.subxRestoreDeletedLog = () => showToast('⛔ ليس لديك صلاحية استعادة سجلات الحضور', true);
+    window.subxRestoreAllDeletedLogs = () => showToast('⛔ ليس لديك صلاحية استعادة سجلات الحضور', true);
+    window.subxShowClearPinModal = () => showToast('⛔ ليس لديك صلاحية مسح سجلات الحضور', true);
+    window.subxConfirmClearLogs = () => showToast('⛔ ليس لديك صلاحية مسح سجلات الحضور', true);
+    const _sm = document.getElementById('subx-logs-modal');
+    if (_sm) { _sm.style.display = 'none'; }
   }
   if (cfg.restrictions.attNoSessionControl) {
     const blockCtrl = (m) => () => showToast(m, true);
@@ -26252,11 +26262,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       }
 
       // Attendance records placeholder (loaded async)
-      const _subxR = (window._employeeRestrictions || {});
-      if (!_subxR.subxHideAttendance) {
-        html += '<div class="subx-detail-block-title" style="margin-top:8px">📋 سجل الحضور</div>';
-        html += '<div id="subx-att-container"><div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px">جارٍ تحميل سجل الحضور…</div></div>';
-      }
+      html += '<div class="subx-detail-block-title" style="margin-top:8px">📋 سجل الحضور</div>';
+      html += '<div id="subx-att-container"><div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px">جارٍ تحميل سجل الحضور…</div></div>';
 
       // Total
       html += '<div class="subx-detail-total"><span>السعر الإجمالي</span><strong>' + SubscriptionService.fmtPrice(sub.total_price) + '</strong></div>';
@@ -26281,7 +26288,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       body.innerHTML = html;
 
       // Load attendance records asynchronously
-      if (sub.student_id && !((window._employeeRestrictions || {}).subxHideAttendance)) {
+      if (sub.student_id) {
         subxLoadAttendance(sub.student_id, sub.subject_name, sub.teacher_name, periods, sub.id);
       }
     } catch (e) {
@@ -26377,7 +26384,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الوقت</th>';
       h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">المادة</th>';
       h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الأستاذ</th>';
-      h += '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">إجراء</th>';
+      if (!((window._employeeRestrictions || {}).subxHideAttendance)) {
+        h += '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">إجراء</th>';
+      }
       h += '</tr></thead><tbody>';
       records.forEach(r => {
         h += '<tr style="border-bottom:1px solid var(--border)" id="subx-att-row-' + r.id + '">';
@@ -26385,7 +26394,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         h += '<td style="padding:7px 10px;white-space:nowrap" dir="ltr">' + escX(r.time) + '</td>';
         h += '<td style="padding:7px 10px">' + escX(r.subjectName || '—') + '</td>';
         h += '<td style="padding:7px 10px">' + escX(r.teacherName || '—') + '</td>';
-        h += '<td style="padding:7px 10px;text-align:center"><button onclick="subxCancelAttendance(\'' + escX(r.id) + '\',\'' + escX(studentId) + '\',\'' + escX(r.date) + '\',\'' + escX(subjectName || '') + '\',\'' + escX(teacherName || '') + '\',\'' + escX(subId || '') + '\')" style="background:rgba(239,68,68,0.08);color:#dc2626;border:1px solid rgba(239,68,68,0.2);border-radius:6px;padding:4px 10px;font-size:10px;font-weight:800;font-family:inherit;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'rgba(239,68,68,0.18)\'" onmouseout="this.style.background=\'rgba(239,68,68,0.08)\'">❌ إلغاء الحضور</button></td>';
+        if (!((window._employeeRestrictions || {}).subxHideAttendance)) {
+          h += '<td style="padding:7px 10px;text-align:center"><button onclick="subxCancelAttendance(\'' + escX(r.id) + '\',\'' + escX(studentId) + '\',\'' + escX(r.date) + '\',\'' + escX(subjectName || '') + '\',\'' + escX(teacherName || '') + '\',\'' + escX(subId || '') + '\')" style="background:rgba(239,68,68,0.08);color:#dc2626;border:1px solid rgba(239,68,68,0.2);border-radius:6px;padding:4px 10px;font-size:10px;font-weight:800;font-family:inherit;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'rgba(239,68,68,0.18)\'" onmouseout="this.style.background=\'rgba(239,68,68,0.08)\'">❌ إلغاء الحضور</button></td>';
+        }
         h += '</tr>';
       });
       h += '</tbody></table></div>';
