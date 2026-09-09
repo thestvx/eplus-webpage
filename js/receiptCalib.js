@@ -349,6 +349,8 @@
     var doc = '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8">' +
       '<title>وصل اشتراك — ' + esc(t.centerName || 'E-PLUS') + '</title>' +
       '<style>@page{size:' + W_MM + 'mm auto;margin:0}html,body{margin:0;padding:0;background:#fff}' + receiptCSS(t) +
+      '.receipt *{-webkit-print-color-adjust:exact;print-color-adjust:exact;color:#000!important;text-rendering:optimizeSpeed}' +
+      '.rb-logo-img,.rb-sig-logo,.rb-bc svg{image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges}' +
       '.no-print{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);padding:9px 22px;border:none;border-radius:8px;background:#111;color:#fff;font-size:13px;font-family:inherit;font-weight:700;cursor:pointer;z-index:9;box-shadow:0 4px 14px rgba(0,0,0,.25);-webkit-print-color-adjust:exact}@media print{.no-print{display:none!important}}' +
       '</style></head><body>' +
       renderReceiptHTML(t, rec, { scale: 1 }) +
