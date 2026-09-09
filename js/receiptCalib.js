@@ -25,6 +25,22 @@
     }
     return s;
   }
+  function hasArabic(s) { return /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDCF\uFDF0-\uFDFF]/.test(s); }
+  function isArLetters(s) { return hasArabic(s.replace(/[\u0660-\u0669]/g, '')); }
+  function numSpan(v, t) {
+    var s = String(v == null ? '' : v);
+    if (!s) return '';
+    var parts = s.split(/([\u0600-\u06FF\u0750-\u077F\uFB50-\uFDCF\uFDF0-\uFDFF]+)/g);
+    var out = '';
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      if (!p) continue;
+      var dc = t && t.digits === 'ar' ? toDigits(p, 'ar') : p;
+      if (isArLetters(dc)) out += esc(dc);
+      else out += '<span dir="ltr" style="unicode-bidi:isolate">' + esc(dc) + '</span>';
+    }
+    return out;
+  }
 
   function defaultBlocks() {
     return [
@@ -79,6 +95,7 @@
       receiptTitle: 'وصل دفع اشتراك شهري',
       footerText: 'شكراً لثقتكم بالمركز التعليمي — هذا الوصل إلكتروني رسمي',
       adminLabel: 'الإدارة',
+      deleted: [],
       adminEmail: '',
       logo: { show: true, src: 'schoollogo/schoollogoblack.PNG', w: 30, align: 'center' },
       moneyWordsShow: true,
@@ -97,6 +114,7 @@
     ['widthMm', 'paddingMm', 'digits', 'centerName', 'receiptTitle', 'footerText', 'adminLabel', 'adminEmail', 'moneyWordsShow', 'periodsShow', 'signatureShow', 'barcodeShow', 'barcodeContent'].forEach(function (k) {
       if (tpl[k] !== undefined) out[k] = tpl[k];
     });
+    if (Array.isArray(tpl.deleted)) out.deleted = tpl.deleted.filter(function (k) { return typeof k === 'string'; });
     if (tpl.fontFamily && typeof tpl.fontFamily === 'string') out.fontFamily = tpl.fontFamily;
     if (tpl.logo && typeof tpl.logo === 'object') out.logo = Object.assign({}, out.logo, tpl.logo);
     var byKey = {};
@@ -111,7 +129,7 @@
       merged.push(base ? Object.assign({}, base, b) : clone(b));
     });
     def.blocks.forEach(function (b) {
-      if (!keysSeen[b.key]) merged.push(clone(b));
+      if (!keysSeen[b.key] && out.deleted.indexOf(b.key) === -1) merged.push(clone(b));
     });
     out.blocks = merged;
     out.widthMm = num(out.widthMm) || W_MM;
@@ -206,7 +224,7 @@
       if (b.type === 'table') {
         if (!t.periodsShow || !rec.table || !rec.table.length) return;
         var rows = rec.table.map(function (r) {
-          return '<tr><td>' + esc(toDigits(r[0], t.digits)) + '</td><td>' + esc(toDigits(r[1], t.digits)) + '</td><td>' + esc(toDigits(r[2], t.digits)) + '</td></tr>';
+          return '<tr><td>' + numSpan(r[0], t) + '</td><td>' + numSpan(r[1], t) + '</td><td>' + numSpan(r[2], t) + '</td></tr>';
         }).join('');
         html += '<div data-rb="' + b.key + '" class="rb rb-table" style="' + fs(b) + ';' + sTop(b) + '">' +
           '<table><thead><tr><th>الشهر</th><th>الفترة</th><th>الحصص</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
@@ -229,7 +247,7 @@
         return;
       }
       if (b.type === 'footer') {
-        html += '<div data-rb="' + b.key + '" class="rb rb-footer" style="' + fs(b) + ';' + sTop(b) + '">' + esc(rec.footerText != null ? rec.footerText : t.footerText) + '</div>';
+        html += '<div data-rb="' + b.key + '" class="rb rb-footer" style="' + fs(b) + ';' + sTop(b) + '">' + numSpan(rec.footerText != null ? rec.footerText : t.footerText, t) + '</div>';
         return;
       }
       var isTitle = b.type === 'title';
@@ -239,26 +257,26 @@
         if (!value) return;
         var stT = fs(b) + ';' + sTop(b) + ';' + ls(b) + ';line-height:' + (b.lh || 1.3) + ';text-align:' + (b.align || 'center') + ';' + ind(b);
         html += '<div data-rb="' + b.key + '" class="rb rb-info rb-title" style="' + stT + '">' +
-          '<span class="rb-val" style="font-weight:' + (b.bold ? '900' : '400') + '">' + esc(value) + '</span></div>';
+          '<span class="rb-val" style="font-weight:' + (b.bold ? '900' : '400') + '">' + numSpan(value, t) + '</span></div>';
         return;
       }
       if (b.key === 'amount') {
         html += '<div data-rb="' + b.key + '" class="rb rb-info rb-amount" style="' + fs(b) + ';' + sTop(b) + ';line-height:' + (b.lh || 1.2) + ';text-align:' + (b.align || 'center') + ';' + ind(b) + '">' +
           (b.showLabel ? '<span class="rb-lbl">' + esc(b.label) + ': </span>' : '') +
-          '<span class="rb-val" style="font-weight:' + (b.valueBold ? '900' : '400') + '">' + toDigits(value, t.digits) + ' <span class="rb-cur" style="font-size:0.55em">دج</span></span></div>';
+          '<span class="rb-val"><span dir="ltr" style="unicode-bidi:isolate">' + toDigits(value, t.digits) + ' <span class="rb-cur" style="font-size:0.55em">دج</span></span></span></div>';
         return;
       }
       if (b.key === 'amountWords') {
         if (!t.moneyWordsShow || !value) return;
         html += '<div data-rb="' + b.key + '" class="rb rb-info rb-words" style="' + fs(b) + ';' + sTop(b) + ';line-height:' + (b.lh || 1.6) + ';text-align:' + (b.align || 'center') + ';' + ind(b) + '">' +
-          '<span class="rb-val">' + esc(value) + '</span></div>';
+          '<span class="rb-val">' + numSpan(value, t) + '</span></div>';
         return;
       }
       if (!value) return;
       var st = fs(b) + ';' + sTop(b) + ';' + ls(b) + ';line-height:' + (b.lh || 1.5) + ';text-align:' + (b.align || 'right') + ';' + ind(b);
       var lbl = (b.showLabel && b.label) ? '<span class="rb-lbl">' + esc(b.label) + ': </span>' : '';
       html += '<div data-rb="' + b.key + '" class="rb rb-info" style="' + st + '">' + lbl +
-        '<span class="rb-val" style="font-weight:' + (b.valueBold ? '900' : '400') + '">' + toDigits(value, t.digits) + '</span></div>';
+        '<span class="rb-val" style="font-weight:' + (b.valueBold ? '900' : '400') + '">' + numSpan(value, t) + '</span></div>';
     });
     return '<div class="receipt" dir="rtl" style="--s:' + (opts.scale || 1) + '">' + html + '</div>';
   }
@@ -271,7 +289,6 @@
       '.rb{max-width:100%}' +
       '.rb-info{font-weight:400;word-wrap:break-word;overflow-wrap:break-word}' +
       '.rb-lbl{font-weight:400}' +
-      '.rb-val,.rb-sig-lbl,.rb-sig-mail,.rb-footer,.rb-table td,.rb-table th{unicode-bidi:plaintext}' +
       '.rb-title .rb-val{letter-spacing:.2px}' +
       '.rb-amount .rb-val{letter-spacing:-.5px}' +
       '.rb-cur{font-weight:900}' +
@@ -355,14 +372,14 @@
       teacher: 'الأستاذ عبد الله',
       months: 'شهر واحد',
       sessions: '8 حصص',
-      period: '01 سبتمبر 2026 ← 30 سبتمبر 2026',
+      period: 'من 01 سبتمبر 2026 إلى 30 سبتمبر 2026',
       status: 'نشط',
       amount: '5 000',
       amountWords: 'خمسة آلاف دينار جزائري',
       date: '09 سبتمبر 2026',
       table: [
-        ['شهر 1', '01/09 ← 30/09', '2 / 8'],
-        ['شهر 2', '01/10 ← 31/10', '5 / 8']
+        ['شهر 1', 'من 01/09 إلى 30/09', '2 / 8'],
+        ['شهر 2', 'من 01/10 إلى 31/10', '5 / 8']
       ]
     };
   }
