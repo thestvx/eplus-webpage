@@ -13,9 +13,11 @@
     try { return JSON.parse(JSON.stringify(x)); } catch (e) { return null; }
   }
   function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
+    return String(s == null ? '' : s)
+      .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{23E9}-\u{23FA}\u{2B50}\u{FE0F}\u{200D}\uFFFD]/gu, '')
+      .replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
   }
   function toDigits(s, mode) {
     s = String(s == null ? '' : s);
@@ -45,32 +47,32 @@
   function defaultBlocks() {
     return [
       { key: 'logo', type: 'logo', hide: false, spacingTop: 0, },
-      { key: 'centerName', type: 'title', hide: false, fs: 3.6, bold: true, align: 'center', indent: 0, spacingTop: 1, lh: 1.3 },
-      { key: 'receiptTitle', type: 'title', hide: false, fs: 2.9, bold: true, align: 'center', indent: 0, spacingTop: 0.5, lh: 1.3 },
+      { key: 'centerName', type: 'title', hide: false, fs: 4.6, bold: true, align: 'center', indent: 0, spacingTop: 1, lh: 1.3 },
+      { key: 'receiptTitle', type: 'title', hide: false, fs: 3.7, bold: true, align: 'center', indent: 0, spacingTop: 0.5, lh: 1.3 },
       { key: 'div1', type: 'divider', hide: false, thick: 0.5, dash: false, spacingTop: 1 },
-      { key: 'orderId', type: 'text', label: 'رقم الوصل', hide: false, fs: 2.4, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
-      { key: 'studentName', type: 'text', label: 'التلميذ', hide: false, fs: 2.9, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
-      { key: 'studentId', type: 'text', label: 'رقم التسجيل', hide: false, fs: 2.4, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
-      { key: 'studentLevel', type: 'text', label: 'المستوى', hide: false, fs: 2.4, valueBold: false, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
-      { key: 'parentName', type: 'text', label: 'ولي الأمر', hide: false, fs: 2.4, valueBold: false, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
-      { key: 'parentPhone', type: 'text', label: 'هاتف ولي الأمر', hide: false, fs: 2.4, valueBold: false, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
+      { key: 'orderId', type: 'text', label: 'رقم الوصل', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
+      { key: 'studentName', type: 'text', label: 'التلميذ', hide: false, fs: 3.6, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
+      { key: 'studentId', type: 'text', label: 'رقم التسجيل', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
+      { key: 'studentLevel', type: 'text', label: 'المستوى', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
+      { key: 'parentName', type: 'text', label: 'ولي الأمر', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
+      { key: 'parentPhone', type: 'text', label: 'هاتف ولي الأمر', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
       { key: 'div2', type: 'divider', hide: false, thick: 0.2, dash: true, spacingTop: 1 },
-      { key: 'subject', type: 'text', label: 'المادة', hide: false, fs: 2.4, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
-      { key: 'teacher', type: 'text', label: 'الأستاذ', hide: false, fs: 2.4, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
-      { key: 'months', type: 'text', label: 'المدة', hide: false, fs: 2.4, valueBold: false, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
-      { key: 'sessions', type: 'text', label: 'الحصص', hide: false, fs: 2.4, valueBold: false, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
-      { key: 'period', type: 'text', label: 'الفترة', hide: false, fs: 2.4, valueBold: false, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
-      { key: 'status', type: 'text', label: 'الحالة', hide: false, fs: 2.4, valueBold: false, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
+      { key: 'subject', type: 'text', label: 'المادة', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
+      { key: 'teacher', type: 'text', label: 'الأستاذ', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
+      { key: 'months', type: 'text', label: 'المدة', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
+      { key: 'sessions', type: 'text', label: 'الحصص', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
+      { key: 'period', type: 'text', label: 'الفترة', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
+      { key: 'status', type: 'text', label: 'الحالة', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
       { key: 'div3', type: 'divider', hide: false, thick: 0.5, dash: false, spacingTop: 1 },
-      { key: 'table', type: 'table', hide: false, fs: 2.3, spacingTop: 0.5 },
+      { key: 'table', type: 'table', hide: false, fs: 2.9, spacingTop: 0.5 },
       { key: 'div4', type: 'divider', hide: false, thick: 0.2, dash: true, spacingTop: 1 },
-      { key: 'amount', type: 'text', label: 'المبلغ', hide: false, fs: 3.8, valueBold: true, align: 'center', indent: 0, spacingTop: 1.4, lh: 1.2, showLabel: false },
-      { key: 'amountWords', type: 'text', label: '', hide: false, fs: 2.2, valueBold: false, align: 'center', indent: 0, spacingTop: 0.3, lh: 1.6, showLabel: false },
-      { key: 'date', type: 'text', label: 'تاريخ الإصدار', hide: false, fs: 2.4, valueBold: false, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
+      { key: 'amount', type: 'text', label: 'المبلغ', hide: false, fs: 4.6, valueBold: true, align: 'center', indent: 0, spacingTop: 1.4, lh: 1.2, showLabel: false },
+      { key: 'amountWords', type: 'text', label: '', hide: false, fs: 2.8, valueBold: true, align: 'center', indent: 0, spacingTop: 0.3, lh: 1.6, showLabel: false },
+      { key: 'date', type: 'text', label: 'تاريخ الإصدار', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
       { key: 'div5', type: 'divider', hide: false, thick: 0.5, dash: false, spacingTop: 1.2 },
       { key: 'barcode', type: 'barcode', hide: false, spacingTop: 1 },
-      { key: 'signature', type: 'signature', hide: false, fs: 2.2, spacingTop: 2 },
-      { key: 'footer', type: 'footer', hide: false, fs: 2.1, spacingTop: 1.3, lh: 1.6 }
+      { key: 'signature', type: 'signature', hide: false, fs: 2.8, spacingTop: 2 },
+      { key: 'footer', type: 'footer', hide: false, fs: 2.6, spacingTop: 1.3, lh: 1.6 }
     ];
   }
 
@@ -86,7 +88,7 @@
 
   function defaultTemplate() {
     return {
-      v: 1,
+      v: 2,
       widthMm: W_MM,
       paddingMm: 2,
       fontFamily: "Tajawal, 'Segoe UI', Arial, sans-serif",
@@ -111,10 +113,11 @@
     var def = defaultTemplate();
     var out = clone(def);
     if (!tpl || typeof tpl !== 'object') return out;
-    ['widthMm', 'paddingMm', 'digits', 'centerName', 'receiptTitle', 'footerText', 'adminLabel', 'adminEmail', 'moneyWordsShow', 'periodsShow', 'signatureShow', 'barcodeShow', 'barcodeContent'].forEach(function (k) {
+    ['v', 'widthMm', 'paddingMm', 'digits', 'centerName', 'receiptTitle', 'footerText', 'adminLabel', 'adminEmail', 'moneyWordsShow', 'periodsShow', 'signatureShow', 'barcodeShow', 'barcodeContent'].forEach(function (k) {
       if (tpl[k] !== undefined) out[k] = tpl[k];
     });
     if (Array.isArray(tpl.deleted)) out.deleted = tpl.deleted.filter(function (k) { return typeof k === 'string'; });
+    var fontUpgrade = (tpl.v || 1) < 2;
     if (tpl.fontFamily && typeof tpl.fontFamily === 'string') out.fontFamily = tpl.fontFamily;
     if (tpl.logo && typeof tpl.logo === 'object') out.logo = Object.assign({}, out.logo, tpl.logo);
     var byKey = {};
@@ -126,13 +129,16 @@
       if (!b || !b.key) return;
       keysSeen[b.key] = true;
       var base = byKey[b.key];
-      merged.push(base ? Object.assign({}, base, b) : clone(b));
+      var mergedItem = base ? Object.assign({}, base, b) : clone(b);
+      if (fontUpgrade && base) mergedItem.fs = base.fs;
+      merged.push(mergedItem);
     });
     def.blocks.forEach(function (b) {
       if (!keysSeen[b.key] && out.deleted.indexOf(b.key) === -1) merged.push(clone(b));
     });
     out.blocks = merged;
     out.widthMm = num(out.widthMm) || W_MM;
+    out.v = 2;
     return out;
   }
 
@@ -294,7 +300,7 @@
       '.receipt *{box-sizing:border-box;margin:0;padding:0}' +
       '.rb{max-width:100%}' +
       '.rb-info{font-weight:400;word-wrap:break-word;overflow-wrap:break-word}' +
-      '.rb-lbl{font-weight:400}' +
+      '.rb-lbl{font-weight:700}' +
       '.rb-title .rb-val{letter-spacing:.2px}' +
       '.rb-amount .rb-val{letter-spacing:-.5px}' +
       '.rb-cur{font-weight:900}' +
