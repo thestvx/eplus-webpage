@@ -3320,6 +3320,14 @@
                     <input type="text" class="sec-inp" id="dashlog-search" placeholder="بحث باسم المنفّذ أو نوع الحركة..." oninput="dashLogsFilter()" style="flex:1;min-width:200px">
                     <button type="button" class="sec-btn" onclick="dashLogsRefresh()" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 4px 14px rgba(99,102,241,.25)">تحديث السجلات</button>
                   </div>
+                  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap" id="dashlog-filter-chips">
+                    <button type="button" class="sec-btn dashlog-filter-chip" data-cat="" onclick="dashLogsSetCat('')" style="padding:7px 14px;border-radius:10px;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;border:1.5px solid var(--border-2);background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;box-shadow:0 4px 12px rgba(99,102,241,.25)">الكل</button>
+                    <button type="button" class="sec-btn dashlog-filter-chip" data-cat="دخول" onclick="dashLogsSetCat('دخول')" style="padding:7px 14px;border-radius:10px;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;border:1.5px solid var(--border-2);background:var(--card);color:var(--text)">🔐 تسجيلات الدخول</button>
+                    <button type="button" class="sec-btn dashlog-filter-chip" data-cat="حذف" onclick="dashLogsSetCat('حذف')" style="padding:7px 14px;border-radius:10px;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;border:1.5px solid var(--border-2);background:var(--card);color:var(--text)">🗑️ الحذف</button>
+                    <button type="button" class="sec-btn dashlog-filter-chip" data-cat="تأكيد" onclick="dashLogsSetCat('تأكيد')" style="padding:7px 14px;border-radius:10px;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;border:1.5px solid var(--border-2);background:var(--card);color:var(--text)">✅ التأكيد النهائي</button>
+                    <button type="button" class="sec-btn dashlog-filter-chip" data-cat="اشتراكات" onclick="dashLogsSetCat('اشتراكات')" style="padding:7px 14px;border-radius:10px;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;border:1.5px solid var(--border-2);background:var(--card);color:var(--text)">📋 الاشتراكات الشهرية</button>
+                    <button type="button" class="sec-btn dashlog-filter-chip" data-cat="طباعة" onclick="dashLogsSetCat('طباعة')" style="padding:7px 14px;border-radius:10px;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;border:1.5px solid var(--border-2);background:var(--card);color:var(--text)">🧾 طباعة الوصل</button>
+                  </div>
                   <div id="dashlog-list" style="max-height:420px;overflow-y:auto">
                     <div class="dashlog-ph">جارِ تحميل سجلات الداشبورد…</div>
                   </div>
@@ -5379,6 +5387,11 @@ function applyEmployeeMode(cfg) {
         document.querySelectorAll('button[onclick*="subxCancelAttendance"], button[onclick*="subxShowAllLogs"], button[onclick*="subxShowDeletedLogs"], button[onclick*="subxExportLogsCSV"], button[onclick*="subxDeleteLog"]').forEach(b => b.style.display = 'none');
       if (cfg.restrictions.attNoSessionControl)
         document.querySelectorAll('[onclick*="openCtrlModal"], [onclick*="showOpenChoiceFromTable"], [onclick*="setCtrlNowFromTable"], [onclick*="openCtrlFromTable"], [onclick*="setCtrlNow("], [onclick*="setCtrlStatus("], [onclick*="openNow("], [onclick*="showOpenChoice("], [onclick*="showOpenDatePicker"], [onclick*="openByDateConfirmed"], [onclick*="saveCtrlSettings"], [onclick*="toggleCtrlField"]').forEach(b => b.style.display = 'none');
+      if (cfg.restrictions.attNoSessionControl) {
+        const _atcSec = document.getElementById('atc-section');
+        if (_atcSec) _atcSec.style.display = 'none';
+        document.querySelectorAll('[onclick*="atcToggleSelected"], [onclick*="atcLoad"], [onclick*="atcCloseFromBar"]').forEach(b => b.style.display = 'none');
+      }
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }
@@ -5455,6 +5468,10 @@ if (cfg.restrictions.srNoConfirmFree) {
     window.showOpenChoiceFromTable = blockCtrl('⛔ ليس لديك صلاحية فتح الحصة');
     window.setCtrlNowFromTable = blockCtrl('⛔ ليس لديك صلاحية فتح وإغلاق الحصة');
     window.openCtrlFromTable = blockCtrl('⛔ ليس لديك صلاحية فتح وإغلاق الحصص');
+    window.atcToggleSelected = blockCtrl('⛔ ليس لديك صلاحية فتح الحضور');
+    window.atcCloseFromBar = blockCtrl('⛔ ليس لديك صلاحية إغلاق الحضور');
+    window.atcLoad = blockCtrl('⛔ ليس لديك صلاحية فتح الحضور');
+    window.atcUpdateStatus = blockCtrl('⛔ ليس لديك صلاحية فتح الحضور');
   }
 
   // ── أساتذة الدعم المدرسي: عرض فقط (منع كل الإجراءات الإدارية) ──
@@ -8866,12 +8883,31 @@ window.dashLogsRefresh = async () => {
   dashLogsFilter();
 };
 
+window._dashlogCatFilter = '';
+window._dashlogCatKeys = { 'دخول': ['دخول'], 'حذف': ['حذف', 'مسح'], 'تأكيد': ['تأكيد'], 'اشتراكات': ['اشتراكات'], 'طباعة': ['طباعة'] };
+window.dashLogsSetCat = (cat) => {
+  window._dashlogCatFilter = cat || '';
+  document.querySelectorAll('#dashlog-filter-chips .dashlog-filter-chip').forEach(btn => {
+    const on = (btn.getAttribute('data-cat') || '') === window._dashlogCatFilter;
+    btn.style.background = on ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'var(--card)';
+    btn.style.color = on ? '#fff' : 'var(--text)';
+    btn.style.borderColor = on ? 'transparent' : 'var(--border-2)';
+    btn.style.boxShadow = on ? '0 4px 12px rgba(99,102,241,.25)' : 'none';
+  });
+  dashLogsFilter();
+};
+
 window.dashLogsFilter = () => {
   const list = document.getElementById('dashlog-list');
   if (!list) return;
   const secEsc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const q = (document.getElementById('dashlog-search').value || '').trim().toLowerCase();
+  const catKeys = window._dashlogCatKeys[(window._dashlogCatFilter || '')] || null;
   const rows = _dashLogsData.filter(r => {
+    if (catKeys) {
+      const c = String(r.category || '');
+      if (!catKeys.some(k => c.includes(k))) return false;
+    }
     if (!q) return true;
     return (r.actor + ' ' + r.category + ' ' + r.action + ' ' + (r.detail || '')).toLowerCase().includes(q);
   });
@@ -27185,6 +27221,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       w.document.close();
       w.focus();
       setTimeout(function () { w.print(); }, 250);
+      if (window.dashLog) window.dashLog('طباعة', 'طباعة وصل اشتراك', 'تمت طباعة وصل الاشتراك رقم ' + sub.id + ' — ' + (sub.student_name || sub.student_id || ''));
     } catch (e) {
       console.error('[SUBSCRIPTIONS] print failed', e);
       showToast('❌ تعذر تجهيز الوصل للطباعة', true);
@@ -27241,6 +27278,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         ])
       };
       const opened = ReceiptCalib.printThermal(tpl, record);
+      if (window.dashLog) window.dashLog('طباعة', 'طباعة وصل اشتراك', 'تمت طباعة وصل الاشتراك رقم ' + sub.id + ' — ' + studentName);
       if (!opened) showToast('⚠️ تعذّر فتح نافذة الطباعة (مانع النوافذ المنبثقة)', true);
     } catch (e) {
       console.error('[SUBSCRIPTIONS] thermal print failed', e);
