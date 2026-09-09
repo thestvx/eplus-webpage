@@ -8238,11 +8238,12 @@ window.dashAdminPwModal = async (uid) => {
             <div style="font-size:11px;color:var(--text-muted)">الحساب: ${_admEsc(a.fullName || '')} — <b dir="ltr">${_admEsc(_admEmailOf(a))}</b></div>
           </div>
         </div>
-        <div style="font-size:11px;color:var(--text-muted);padding:10px 12px;background:var(--bg-2);border:1px solid var(--border-2);border-radius:10px;margin-bottom:14px">لا حاجة للباسوورد القديم — يُضبط الباسوورد الجديد مباشرة لهذا الحساب. (أو أرسل رابط إعادة تعيين إلى البريد الإلكتروني.)</div>
+        <div style="font-size:11px;color:var(--text-muted);padding:10px 12px;background:var(--bg-2);border:1px solid var(--border-2);border-radius:10px;margin-bottom:14px">للضبط المباشر أُدخل الباسوورد الحالي للحساب (تسجيل دخول مؤقت). أو استخدم زر "رابط إعادة تعيين للبريد" إن لم تعرف الباسوورد الحالي.</div>
+        <div style="margin-bottom:12px"><label class="sec-hint">الباسوورد الحالي للحساب</label><div class="sec-pw"><input type="password" class="sec-inp" id="adm-pw-current" placeholder="الباسوورد الحالي" dir="ltr" style="margin-top:6px;text-align:left"><button type="button" class="sec-eye" onclick="secTogglePw('adm-pw-current',this)" title="إظهار/إخفاء">👁️</button></div></div>
         <div style="margin-bottom:12px"><label class="sec-hint">الباسوورد الجديد</label><div class="sec-pw"><input type="password" class="sec-inp" id="adm-pw-new" placeholder="6 أحرف على الأقل" dir="ltr" style="margin-top:6px;text-align:left"><button type="button" class="sec-eye" onclick="secTogglePw('adm-pw-new',this)" title="إظهار/إخفاء">👁️</button></div></div>
         <div style="margin-bottom:14px"><label class="sec-hint">تأكيد الباسوورد الجديد</label><div class="sec-pw"><input type="password" class="sec-inp" id="adm-pw-confirm" placeholder="أعد كتابته" dir="ltr" style="margin-top:6px;text-align:left"><button type="button" class="sec-eye" onclick="secTogglePw('adm-pw-confirm',this)" title="إظهار/إخفاء">👁️</button></div></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-          <button type="button" class="sec-btn" id="adm-pw-save" onclick="dashAdminChangePwSave()" style="flex:1;min-width:200px;background:linear-gradient(135deg,#7C3AED,#A78BFA);justify-content:center">🔐 ضبط كلمة المرور الجديدة</button>
+          <button type="button" class="sec-btn" id="adm-pw-save" onclick="dashAdminChangePwSave()" style="flex:1;min-width:200px;background:linear-gradient(135deg,#7C3AED,#A78BFA);justify-content:center">🔐 تغيير كلمة المرور</button>
           <button type="button" class="sec-btn" id="adm-pw-reset" onclick="dashAdminSendResetEmail()" style="flex:1;min-width:150px;justify-content:center;background:transparent;border:1.5px solid var(--border-2);color:var(--text)">📧 رابط إعادة تعيين للبريد</button>
         </div>
         <button type="button" class="sec-btn" onclick="document.getElementById('adm-pw-modal').remove()" style="width:100%;justify-content:center;background:transparent;border:1.5px solid var(--border-2);color:var(--text)">إغلاق</button>
@@ -8250,7 +8251,7 @@ window.dashAdminPwModal = async (uid) => {
     </div>`;
     document.body.appendChild(modal);
     modal.style.display = 'flex';
-    setTimeout(() => { const i = document.getElementById('adm-pw-new'); if (i) i.focus(); }, 60);
+    setTimeout(() => { const i = document.getElementById('adm-pw-current'); if (i) i.focus(); }, 60);
   } catch(e) {
     console.error('dashAdminPwModal error:', e);
     try { showToast('تعذر فتح نافذة كلمة المرور: ' + (e && e.message ? e.message : e), true); } catch(_) {}
@@ -8260,8 +8261,11 @@ window.dashAdminPwModal = async (uid) => {
 window.dashAdminChangePwSave = async () => {
   const uid = admPwUid;
   if (!uid) return;
+  const curr = document.getElementById('adm-pw-current').value;
   const next = document.getElementById('adm-pw-new').value;
   const conf = document.getElementById('adm-pw-confirm').value;
+  const btn = document.getElementById('adm-pw-save');
+  if (!curr) { showToast('أدخل الباسوورد الحالي للحساب', true); return; }
   if (next.length < 6) { showToast('الباسوورد الجديد 6 أحرف على الأقل', true); return; }
   if (next !== conf) { showToast('الباسووردان غير متطابقين', true); return; }
   let acc = null;
@@ -8269,49 +8273,46 @@ window.dashAdminChangePwSave = async () => {
     const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
     if (snap.exists()) acc = (snap.data() || {})[uid];
   } catch(e) {}
-  if (!acc) { showToast('الحساب غير موجود أو بدون بريد', true); return; }
+  if (!acc) { showToast('الحساب غير موجود', true); return; }
   const email = _admEmailOf(acc);
-  if (!email) { showToast('الحساب بدون بريد أو يوزر — لا يمكن ضبط الباسوورد', true); return; }
-  const btn = document.getElementById('adm-pw-save');
+  if (!email) { showToast('الحساب بدون بريد أو يوزر', true); return; }
   btn.disabled = true;
-  btn.textContent = 'جارِ الضبط…';
+  btn.textContent = 'جارِ التغيير…';
   try {
-    // 1) أنشئ رمز إعادة التعيين عبر sendOobCode (لا يُرسل بريد، نستعمل الرابط فقط)
-    const oobResp = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=' + ADM_TOOL_KEY, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestType: 'PASSWORD_RESET', email: email, returnOobLink: true })
-    });
-    const oobData = await oobResp.json().catch(() => null);
-    if (!oobData || oobData.error) {
-      throw new Error((oobData && oobData.error && oobData.error.message) || 'تعذر إنشاء رمز إعادة التعيين');
+    // تسجيل دخول مؤقت لحساب الأدمن نفسه (ثانوي) ثم تغيير الباسوورد عبر idToken
+    let cred;
+    try {
+      cred = await signInWithEmailAndPassword(secondaryAuth, email, curr);
+    } catch(authErr) {
+      if (authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/wrong-password') {
+        throw new Error('الباسوورد الحالي غير صحيح');
+      }
+      throw authErr;
     }
-    const m = String(oobData.oobLink || '').match(/[?&]oobCode=([^&]+)/);
-    if (!m) throw new Error('تعذر استخراج رمز إعادة التعيين');
-    const oobCode = decodeURIComponent(m[1]);
-    // 2) اضبط الباسوورد الجديد مباشرة دون الحاجة للباسوورد القديم
-    const upResp = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:resetPassword?key=' + ADM_TOOL_KEY, {
+    const idToken = await cred.user.getIdToken();
+    await signOut(secondaryAuth).catch(() => {});
+    const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:update?key=' + ADM_TOOL_KEY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ oobCode: oobCode, newPassword: next })
+      body: JSON.stringify({ idToken: idToken, password: next, returnSecureToken: false })
     });
-    const upData = await upResp.json().catch(() => null);
-    if (!upData || upData.error) {
-      const em = upData && upData.error && String(upData.error.message || '');
+    const data = await r.json().catch(() => null);
+    if (!data || data.error) {
+      const em = data && data.error && String(data.error.message || '');
       if (em && em.includes('WEAK_PASSWORD')) throw new Error('الباسوورد ضعيف، استخدم 6 أحرف أو أكثر');
-      throw new Error(em || 'تعذر ضبط الباسوورد');
+      throw new Error((data && data.error && data.error.message) || 'تعذر التغيير');
     }
     await updateDoc(doc(db, 'settings', 'adminAccounts'), { [uid + '.updatedAt']: serverTimestamp() }).catch(() => {});
-    await dashLog('accounts', 'تغيير كلمة مرور أدمن', 'تم ضبط كلمة مرور جديدة لـ ' + (acc.fullName || acc.email));
+    await dashLog('accounts', 'تغيير كلمة مرور أدمن', 'تم تغيير كلمة مرور ' + (acc.fullName || email));
     const modal = document.getElementById('adm-pw-modal');
     if (modal) modal.remove();
-    showToast('تم ضبط كلمة المرور الجديدة بنجاح');
+    showToast('تم تغيير كلمة المرور بنجاح');
   } catch(e) {
     console.error('dashAdminChangePwSave error:', e);
-    showToast('فشل الضبط: ' + e.message, true);
+    showToast('فشل التغيير: ' + e.message, true);
   }
   btn.disabled = false;
-  btn.textContent = '🔐 ضبط كلمة المرور الجديدة';
+  btn.textContent = '🔐 تغيير كلمة المرور';
 };
 
 window.dashAdminSendResetEmail = async () => {
