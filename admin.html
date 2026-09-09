@@ -5159,6 +5159,19 @@ window._signOut = signOut;
 window._signInWithEmailAndPassword = signInWithEmailAndPassword;
 window._mainDb = db; // مشاركة db مع باقي الـ modules (Finance, etc.)
 
+// ملتقط أخطاء عام: يعرض أي خطأ JS بصرياً بدلاً من الفشل الصامت (يُستخدم للاكتشاف؛ محدود بـ 5 مرة)
+window.__dbgN = 0;
+window.addEventListener('error', function _admOnErr(ev) {
+  if (window.__dbgN >= 5) return;
+  window.__dbgN++;
+  try { if (window.showToast) window.showToast('⚠️ خطأ في النظام: ' + (ev && ev.message ? ev.message : 'غير معروف'), true); } catch(_) {}
+});
+window.addEventListener('unhandledrejection', function _admOnRej(ev) {
+  if (window.__dbgN >= 5) return;
+  window.__dbgN++;
+  try { if (window.showToast) window.showToast('⚠️ خطأ غير معالج: ' + (ev && ev.reason && ev.reason.message ? ev.reason.message : 'غير معروف'), true); } catch(_) {}
+});
+
 // Date in topbar
 const now = new Date();
 const dateRaw = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
@@ -8023,6 +8036,12 @@ function _admFmtTs(ts) {
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   } catch(e) { return ''; }
 }
+function _admEmailOf(a) {
+  if (a && String(a.email || '').trim()) return String(a.email).trim();
+  const u = String((a && a.username) || '').trim();
+  if (u) return u + '@epluscenter.com';
+  return '';
+}
 function _admInitials(name) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
   return (parts[0] ? parts[0][0] : '') + (parts[1] ? parts[1][0] : '');
@@ -8056,10 +8075,12 @@ window.dashAdminLoadProfiles = async () => {
     const uname = String(a.username || '').trim() || String(a.email || '').split('@')[0] || '—';
     const createdTxt = _admFmtTs(a.createdAt);
     const meta =
-      '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center">'
+      '<div style="display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center">'
       + '<span style="color:var(--primary);font-weight:800;direction:ltr" dir="ltr">@' + _admEsc(uname) + '</span>'
-      + (a.email ? '<span dir="ltr" style="direction:ltr;color:var(--text-2);font-weight:700">' + _admEsc(a.email) + '</span>' : '')
-      + (a.phone ? '<span style="white-space:nowrap">📞 <b dir="ltr" style="direction:ltr">' + _admEsc(a.phone) + '</b></span>' : '')
+      + (a.email || a.username
+          ? '<span dir="ltr" style="direction:ltr;color:var(--text-2);font-weight:700">· ' + _admEsc(_admEmailOf(a)) + '</span>'
+          : '')
+      + (a.phone ? '<span style="white-space:nowrap;color:var(--text-2)">📞 <b dir="ltr" style="direction:ltr">' + _admEsc(a.phone) + '</b></span>' : '')
       + (a.createdBy ? '<span style="white-space:nowrap">بإنشاء: <b style="color:var(--text-2)">' + _admEsc(a.createdBy) + '</b></span>' : '')
       + (createdTxt ? '<span style="white-space:nowrap;color:var(--text-muted)">منذ: <b style="color:var(--text-2)">' + _admEsc(createdTxt) + '</b></span>' : '')
       + '</div>';
@@ -8191,29 +8212,30 @@ window.dashAdminSaveProfile = async () => {
 };
 
 window.dashAdminPwModal = async (uid) => {
-  let accounts = {};
   try {
-    const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
-    if (snap.exists()) accounts = snap.data() || {};
-  } catch(e) { showToast('تعذر تحميل بيانات الحساب', true); return; }
-  const a = accounts[uid];
-  if (!a) { showToast('الحساب غير موجود', true); return; }
-  admPwUid = uid;
-  const existing = document.getElementById('adm-pw-modal');
-  if (existing) existing.remove();
-  const modal = document.createElement('div');
-  modal.id = 'adm-pw-modal';
-  modal.className = 'modal-overlay';
-  modal.style.cssText = 'display:none;align-items:center;justify-content:center;padding:20px;position:fixed;inset:0;z-index:9999;background:rgba(15,10,40,0.68);backdrop-filter:blur(6px);overflow-y:auto';
-  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-  modal.innerHTML = `
+    let accounts = {};
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
+      if (snap.exists()) accounts = snap.data() || {};
+    } catch(e) { showToast('تعذر تحميل بيانات الحساب', true); return; }
+    const a = accounts[uid];
+    if (!a) { showToast('الحساب غير موجود', true); return; }
+    admPwUid = uid;
+    const existing = document.getElementById('adm-pw-modal');
+    if (existing) existing.remove();
+    const modal = document.createElement('div');
+    modal.id = 'adm-pw-modal';
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'display:none;align-items:center;justify-content:center;padding:20px;position:fixed;inset:0;z-index:9999;background:rgba(15,10,40,0.68);backdrop-filter:blur(6px);overflow-y:auto';
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    modal.innerHTML = `
     <div class="modal-box" style="width:100%;max-width:460px;background:var(--card-bg);border-radius:20px;box-shadow:var(--shadow);overflow-y:auto;max-height:90vh;animation:modalIn 0.25s ease">
       <div style="padding:24px 28px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
           <span style="font-size:26px">🔑</span>
           <div>
             <div style="font-weight:900;font-size:16px;color:var(--text)">تغيير كلمة المرور</div>
-            <div style="font-size:11px;color:var(--text-muted)">الحساب: ${_admEsc(a.fullName || '')} — <b dir="ltr">${_admEsc(a.email || '')}</b></div>
+            <div style="font-size:11px;color:var(--text-muted)">الحساب: ${_admEsc(a.fullName || '')} — <b dir="ltr">${_admEsc(_admEmailOf(a))}</b></div>
           </div>
         </div>
         <div style="font-size:11px;color:var(--text-muted);padding:10px 12px;background:var(--bg-2);border:1px solid var(--border-2);border-radius:10px;margin-bottom:14px">لا حاجة للباسوورد القديم — يُضبط الباسوورد الجديد مباشرة لهذا الحساب. (أو أرسل رابط إعادة تعيين إلى البريد الإلكتروني.)</div>
@@ -8226,8 +8248,13 @@ window.dashAdminPwModal = async (uid) => {
         <button type="button" class="sec-btn" onclick="document.getElementById('adm-pw-modal').remove()" style="width:100%;justify-content:center;background:transparent;border:1.5px solid var(--border-2);color:var(--text)">إغلاق</button>
       </div>
     </div>`;
-  document.body.appendChild(modal);
-  setTimeout(() => { const i = document.getElementById('adm-pw-new'); if (i) i.focus(); }, 60);
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    setTimeout(() => { const i = document.getElementById('adm-pw-new'); if (i) i.focus(); }, 60);
+  } catch(e) {
+    console.error('dashAdminPwModal error:', e);
+    try { showToast('تعذر فتح نافذة كلمة المرور: ' + (e && e.message ? e.message : e), true); } catch(_) {}
+  }
 };
 
 window.dashAdminChangePwSave = async () => {
@@ -8242,7 +8269,9 @@ window.dashAdminChangePwSave = async () => {
     const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
     if (snap.exists()) acc = (snap.data() || {})[uid];
   } catch(e) {}
-  if (!acc || !acc.email) { showToast('الحساب غير موجود أو بدون بريد', true); return; }
+  if (!acc) { showToast('الحساب غير موجود أو بدون بريد', true); return; }
+  const email = _admEmailOf(acc);
+  if (!email) { showToast('الحساب بدون بريد أو يوزر — لا يمكن ضبط الباسوورد', true); return; }
   const btn = document.getElementById('adm-pw-save');
   btn.disabled = true;
   btn.textContent = 'جارِ الضبط…';
@@ -8251,7 +8280,7 @@ window.dashAdminChangePwSave = async () => {
     const oobResp = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=' + ADM_TOOL_KEY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestType: 'PASSWORD_RESET', email: acc.email, returnOobLink: true })
+      body: JSON.stringify({ requestType: 'PASSWORD_RESET', email: email, returnOobLink: true })
     });
     const oobData = await oobResp.json().catch(() => null);
     if (!oobData || oobData.error) {
@@ -8293,18 +8322,20 @@ window.dashAdminSendResetEmail = async () => {
     const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
     if (snap.exists()) acc = (snap.data() || {})[uid];
   } catch(e) {}
-  if (!acc || !acc.email) { showToast('الحساب غير موجود أو بدون بريد', true); return; }
-  const btn = document.getElementById('adm-pw-reset');
-  if (btn) { btn.disabled = true; btn.textContent = 'جارِ الإرسال…'; }
+  if (!acc) { showToast('الحساب غير موجود أو بدون بريد', true); return; }
+  const email = _admEmailOf(acc);
+  if (!email) { showToast('الحساب بدون بريد أو يوزر', true); return; }
+  const btnEl = document.getElementById('adm-pw-reset');
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = 'جارِ الإرسال…'; }
   try {
     const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=' + ADM_TOOL_KEY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestType: 'PASSWORD_RESET', email: acc.email })
+      body: JSON.stringify({ requestType: 'PASSWORD_RESET', email: email })
     });
     const data = await r.json().catch(() => null);
     if (data && data.error) throw new Error(data.error.message);
-    await dashLog('accounts', 'إرسال رابط إعادة تعيين كلمة مرور', 'أُرسل رابط إعادة تعيين إلى ' + acc.email);
+    await dashLog('accounts', 'إرسال رابط إعادة تعيين كلمة مرور', 'أُرسل رابط إعادة تعيين إلى ' + email);
     showToast('أُرسل رابط إعادة التعيين إلى البريد');
   } catch(e) {
     console.error('dashAdminSendResetEmail error:', e);
