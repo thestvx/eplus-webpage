@@ -5288,7 +5288,7 @@ function receptionCfgFrom(acc, uid) {
     role: RECEPTION_ROLE_NAME,
     allowedSections: (base.allowedSections || []).slice(),
     showWebsite: false,
-    restrictions: Object.assign({}, base.restrictions || {})
+    restrictions: Object.assign({ subxHideAttendance: true }, base.restrictions || {})
   };
 }
 window.RECEPTION_ROLE_NAME = RECEPTION_ROLE_NAME;
@@ -5348,7 +5348,8 @@ function applyEmployeeMode(cfg) {
   // ── تعطيل تعديل وحذف الأساتذة من جدول الأساتذة ──
   if (cfg.restrictions.noEditTeacher || cfg.restrictions.noDeleteTeacher ||
       cfg.restrictions.srReadOnly || cfg.restrictions.srtReadOnly ||
-      cfg.restrictions.srNoDelete || cfg.restrictions.srNoUnregister || cfg.restrictions.srNoConfirmFree) {
+      cfg.restrictions.srNoDelete || cfg.restrictions.srNoUnregister || cfg.restrictions.srNoConfirmFree ||
+      cfg.restrictions.subxHideAttendance) {
     // نراقب تحديثات DOM في قسم الأساتذة
     const observer = new MutationObserver(() => {
       if (cfg.restrictions.noDeleteTeacher)
@@ -5369,6 +5370,8 @@ function applyEmployeeMode(cfg) {
         document.querySelectorAll('button[onclick*="srDelete"]').forEach(b => b.style.display = 'none');
       if (cfg.restrictions.srtReadOnly)
         document.querySelectorAll('button[onclick*="srtOpenAddModal"], button[onclick*="srtOpenEditModal"], button[onclick*="srtResetPassword"], button[onclick*="srtConfirmResetPassword"], button[onclick*="srtToggleStatus"], button[onclick*="srtDelete"], button[onclick*="srtOpenFinance"], button[onclick*="srtFinanceAddPayment"], button[onclick*="srtFinanceDeleteTx"], button[onclick*="srtFinanceComputeDues"], button[onclick*="srtTreasuryAdjust"], button[onclick*="srtFinanceSaveRate"], button[onclick*="srtAddSubjectRow"]').forEach(b => b.style.display = 'none');
+      if (cfg.restrictions.subxHideAttendance)
+        document.querySelectorAll('button[onclick*="subxCancelAttendance"]').forEach(b => b.style.display = 'none');
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }
@@ -5413,8 +5416,11 @@ function applyEmployeeMode(cfg) {
   if (cfg.restrictions.srNoUnregister) {
     window.srUnregister = () => showToast('⛔ ليس لديك صلاحية إلغاء تأكيد التسجيل', true);
   }
-  if (cfg.restrictions.srNoConfirmFree) {
-    window.srConfirmFree = () => showToast('⛔ ليس لديك صلاحية التأكيد بدون قبض الرسوم', true);
+if (cfg.restrictions.srNoConfirmFree) {
+    window.srConfirmFree = () => showToast('⛔ ليس لديك صلاحية تأكيد التسجيل المجاني', true);
+  }
+  if (cfg.restrictions.subxHideAttendance) {
+    window.subxCancelAttendance = () => showToast('⛔ ليس لديك صلاحية إلغاء الحضور', true);
   }
 
   // ── أساتذة الدعم المدرسي: عرض فقط (منع كل الإجراءات الإدارية) ──
@@ -26210,8 +26216,11 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       }
 
       // Attendance records placeholder (loaded async)
-      html += '<div class="subx-detail-block-title" style="margin-top:8px">📋 سجل الحضور</div>';
-      html += '<div id="subx-att-container"><div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px">جارٍ تحميل سجل الحضور…</div></div>';
+      const _subxR = (window._employeeRestrictions || {});
+      if (!_subxR.subxHideAttendance) {
+        html += '<div class="subx-detail-block-title" style="margin-top:8px">📋 سجل الحضور</div>';
+        html += '<div id="subx-att-container"><div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px">جارٍ تحميل سجل الحضور…</div></div>';
+      }
 
       // Total
       html += '<div class="subx-detail-total"><span>السعر الإجمالي</span><strong>' + SubscriptionService.fmtPrice(sub.total_price) + '</strong></div>';
@@ -26236,7 +26245,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       body.innerHTML = html;
 
       // Load attendance records asynchronously
-      if (sub.student_id) {
+      if (sub.student_id && !((window._employeeRestrictions || {}).subxHideAttendance)) {
         subxLoadAttendance(sub.student_id, sub.subject_name, sub.teacher_name, periods, sub.id);
       }
     } catch (e) {
