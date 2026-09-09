@@ -3251,6 +3251,18 @@
                       <span class="sec-hint">يُفعل وصول الاشتراكات الشهرية والموارد المالية لكل حسابات الإدارة المنشأة (بما فيها الحسابات الموجودة).</span>
                     </div>
                   </div>
+                  <div style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border)">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+                      <div style="flex:1;min-width:200px">
+                        <div style="font-weight:900;font-size:13px;color:var(--text)">حسابات الإدارة الحالية (البروفايلات)</div>
+                        <div class="sec-hint">عرض وتعديل أسماء اليوزر وكلمات المرور والحالة لكل حسابات الأدمن المنشأة</div>
+                      </div>
+                      <button type="button" class="sec-btn" onclick="dashAdminLoadProfiles()" style="background:linear-gradient(135deg,#7C3AED,#A78BFA);box-shadow:0 4px 14px rgba(124,58,237,.2)">تحديث القائمة</button>
+                    </div>
+                    <div id="admin-accounts-list">
+                      <div class="dashlog-ph">جارِ تحميل حسابات الإدارة…</div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -5524,6 +5536,18 @@ onAuthStateChanged(auth, async user => {
         if (accSnap.exists()) {
           const acc = accSnap.data()[user.uid];
           if (acc && acc.fullName) uname = acc.fullName;
+          // حساب مُنشأ من الداشبورد ومعطّل — منع الدخول
+          if (acc && acc.status === 'disabled') {
+            await signOut(auth);
+            dash.style.display = 'none';
+            ls.classList.remove('hidden');
+            ls.style.display = 'flex';
+            const errEl = document.getElementById('login-error');
+            if (errEl) { errEl.textContent = '⛔ تم تعطيل حسابك — راجع مدير النظام'; errEl.style.display = 'block'; }
+            // تجاوز إخفاء شاشة الدخول المجدول من مسار الدخول العادي (يتأخر 600ms)
+            setTimeout(() => { const ls0 = document.getElementById('login-screen'); if (ls0) ls0.style.display = 'flex'; }, 750);
+            return;
+          }
         }
       } catch(e) { /* ignore – fall back to email prefix */ }
     }
@@ -5893,14 +5917,48 @@ window.togglePassVisibility = (inputId, btn) => {
 };
 
 window.doLogin = async () => {
-  syncEmailInp();
-  const email = document.getElementById('email-inp').value.trim();
-  const pass = document.getElementById('password-inp').value;
   const errEl = document.getElementById('login-error');
+  const userInp = document.getElementById('email-user-inp');
+  const raw = (userInp ? userInp.value : '').trim();
+  const pass = document.getElementById('password-inp').value;
   errEl.style.display = 'none';
+  if (!raw) { errEl.style.display = 'block'; return; }
+  let email = '';
+  const looksEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw);
+  if (looksEmail) {
+    email = raw.toLowerCase();
+  } else {
+    // يوزر بدل بريد: ابحث في حسابات الإدارة المنشأة ثم اعتمد @epluscenter.com
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
+      if (snap.exists()) {
+        const accounts = snap.data() || {};
+        const needle = raw.toLowerCase();
+        let hit = null;
+        for (const k of Object.keys(accounts)) {
+          const a = accounts[k] || {};
+          if (String(a.username || '').trim().toLowerCase() === needle) { hit = a; break; }
+        }
+        if (hit) {
+          if (hit.email && hit.status !== 'disabled') {
+            email = String(hit.email).toLowerCase();
+          } else if (!hit.email) {
+            // لا بريد مسجل — المنطق غير مكتمل، توقف
+            throw new Error('no-email');
+          } else {
+            errEl.textContent = '⛔ تم تعطيل هذا الحساب — راجع مدير النظام';
+            errEl.style.display = 'block';
+            return;
+          }
+        }
+      }
+    } catch(e) { console.warn('doLogin username lookup:', e); }
+    if (!email) email = raw.toLowerCase() + '@epluscenter.com';
+  }
   try {
     await signInWithEmailAndPassword(auth, email, pass);
-  } catch {
+  } catch(e) {
+    errEl.textContent = '❌ بيانات غير صحيحة، حاول مجدداً.';
     errEl.style.display = 'block';
   }
 };
@@ -5940,7 +5998,10 @@ function switchSettingsTab(tab) {
   const nav = document.querySelector('.settings-nav-item[data-settings-tab="' + tab + '"]');
   if (panel) panel.classList.add('active');
   if (nav) nav.classList.add('active');
-  if (tab === 'security' && typeof window.dashLogsRefresh === 'function') window.dashLogsRefresh();
+  if (tab === 'security') {
+    if (typeof window.dashLogsRefresh === 'function') window.dashLogsRefresh();
+    if (typeof window.dashAdminLoadProfiles === 'function') window.dashAdminLoadProfiles();
+  }
 }
 window.switchSettingsTab = switchSettingsTab;
 
@@ -7905,6 +7966,7 @@ window.dashAdminCreate = async () => {
         firstName, lastName,
         fullName: firstName + ' ' + lastName,
         email, phone: phoneClean,
+        username: String(email).split('@')[0],
         role: 'admin',
         status: 'active',
         createdBy: dashActorName(),
@@ -7921,6 +7983,7 @@ window.dashAdminCreate = async () => {
     document.getElementById('adm-password').value = '';
     document.getElementById('adm-password-confirm').value = '';
     await dashLog('accounts', 'إنشاء حساب إدارة', 'تم إنشاء حساب admin لـ ' + firstName + ' ' + lastName + ' (' + email + ')');
+    if (typeof window.dashAdminLoadProfiles === 'function') window.dashAdminLoadProfiles();
   } catch(e) {
     console.error('dashAdminCreate error:', e);
     // لو فشل حفظ الملف بعد إنشاء الحساب — احذف الحساب لتفادي حساب يتيم بلا بيانات
@@ -7935,6 +7998,327 @@ window.dashAdminCreate = async () => {
   }
   btn.disabled = false;
   btn.textContent = 'إنشاء حساب الإدارة';
+};
+
+// ══════════════════════════════════════════════
+// إدارة البروفايلات: حسابات الإدارة الحالية (الاسم / اليوزر / كلمة المرور / الحالة)
+// ══════════════════════════════════════════════
+const ADM_TOOL_KEY = 'AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo';
+
+let admEditUid = null;
+let admPwUid = null;
+
+function _admEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function _admFmtTs(ts) {
+  try {
+    const d = (ts && ts.toDate) ? ts.toDate() : new Date(ts);
+    if (isNaN(d.getTime())) return '';
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  } catch(e) { return ''; }
+}
+function _admInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  return (parts[0] ? parts[0][0] : '') + (parts[1] ? parts[1][0] : '');
+}
+
+window.dashAdminLoadProfiles = async () => {
+  const list = document.getElementById('admin-accounts-list');
+  if (!list) return;
+  const uid = (window._auth && window._auth.currentUser) ? window._auth.currentUser.uid : null;
+  list.innerHTML = '<div class="dashlog-ph">جارِ تحميل حسابات الإدارة…</div>';
+  let accounts = {};
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
+    if (snap.exists()) accounts = snap.data() || {};
+  } catch(e) { console.error('dashAdminLoadProfiles error:', e); }
+  const keys = Object.keys(accounts);
+  if (!keys.length) {
+    list.innerHTML = '<div class="dashlog-ph">لا توجد حسابات إدارة منشأة بعد — أنشئ أول حساب من النموذج أعلاه.</div>';
+    return;
+  }
+  const rows = keys
+    .map(k => ({ uid: k, ...(accounts[k] || {}) }))
+    .sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || ''), 'ar'));
+  list.innerHTML = rows.map(a => {
+    const isSelf = uid && a.uid === uid;
+    const isDisabled = a.status === 'disabled';
+    const statusTag = isDisabled
+      ? '<span style="font-size:10px;font-weight:800;color:#DC2626;background:#FEF2F2;border:1px solid #FECACA;border-radius:999px;padding:2px 8px">معطّل</span>'
+      : '<span style="font-size:10px;font-weight:800;color:#059669;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:999px;padding:2px 8px">نشط</span>';
+    const selfTag = isSelf ? '<span style="font-size:10px;font-weight:800;color:#6D28D9;background:#EDE9FE;border:1px solid #C4B5FD;border-radius:999px;padding:2px 8px">أنت</span>' : '';
+    const uname = String(a.username || '').trim() || String(a.email || '').split('@')[0] || '—';
+    const meta = [
+      '<span style="color:var(--primary);font-weight:700;direction:ltr">@' + _admEsc(uname) + '</span>',
+      _admEsc(a.email || '—'),
+      a.phone ? _admEsc('📞 ' + a.phone) : '',
+      a.createdBy ? _admEsc('بإنشاء: ' + a.createdBy) : '',
+      _admFmtTs(a.createdAt) ? _admEsc('منذ ' + _admFmtTs(a.createdAt)) : ''
+    ].filter(Boolean).join(' • ');
+    const toggleLabel = isDisabled ? 'تفعيل' : 'تعطيل';
+    const toggleStyle = isDisabled
+      ? 'background:linear-gradient(135deg,#059669,#10b981);'
+      : 'background:linear-gradient(135deg,#f59e0b,#d97706);';
+    return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:var(--card);margin-bottom:10px">'
+      + '<div style="width:44px;height:44px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;color:#fff;background:linear-gradient(135deg,#7C3AED,#A78BFA);' + (isDisabled ? 'opacity:.5;' : '') + '">' + _admEsc(_admInitials(a.fullName)) + '</div>'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+      +     '<span style="font-weight:900;font-size:14px;color:var(--text)">' + _admEsc(a.fullName || '—') + '</span>'
+      +     selfTag
+      +     statusTag
+      +   '</div>'
+      +   '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;overflow-wrap:anywhere">' + meta + '</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap">'
+      +   '<button type="button" class="sec-btn" onclick="dashAdminEditProfile(\'' + a.uid + '\')" style="font-size:11px;padding:7px 12px">✏️ تعديل</button>'
+      +   '<button type="button" class="sec-btn" onclick="dashAdminPwModal(\'' + a.uid + '\')" style="font-size:11px;padding:7px 12px;background:linear-gradient(135deg,#6366f1,#8b5cf6)">🔑 كلمة المرور</button>'
+      +   '<button type="button" class="sec-btn" onclick="dashAdminToggleStatus(\'' + a.uid + '\')" style="font-size:11px;padding:7px 12px;' + toggleStyle + '">' + toggleLabel + '</button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+};
+
+window.dashAdminEditProfile = async (uid) => {
+  let accounts = {};
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
+    if (snap.exists()) accounts = snap.data() || {};
+  } catch(e) { showToast('تعذر تحميل بيانات الحساب', true); return; }
+  const a = accounts[uid];
+  if (!a) { showToast('الحساب غير موجود', true); return; }
+  admEditUid = uid;
+  const existing = document.getElementById('adm-account-modal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'adm-account-modal';
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:480px;background:var(--card);border-radius:20px;box-shadow:var(--shadow-xl);overflow:hidden;animation:modalIn 0.25s ease">
+      <div style="padding:24px 28px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+          <span style="font-size:26px">✏️</span>
+          <div>
+            <div style="font-weight:900;font-size:16px;color:var(--text)">تعديل بروفايل الأدمن</div>
+            <div style="font-size:11px;color:var(--text-muted)">تعديل الاسم واليوزر والهاتف والحالة</div>
+          </div>
+        </div>
+        <div class="sec-grid">
+          <div><label class="sec-hint">الاسم الأول</label><input type="text" class="sec-inp" id="adm-ed-first" placeholder="أحمد" style="margin-top:6px" value="${_admEsc(a.firstName || '')}"></div>
+          <div><label class="sec-hint">اللقب</label><input type="text" class="sec-inp" id="adm-ed-last" placeholder="بن يوسف" style="margin-top:6px" value="${_admEsc(a.lastName || '')}"></div>
+          <div><label class="sec-hint">اليوزر (اسم الدخول)</label><input type="text" class="sec-inp" id="adm-ed-username" placeholder="ahmed" dir="ltr" style="margin-top:6px;text-align:left" value="${_admEsc(a.username || String(a.email || '').split('@')[0])}"></div>
+          <div><label class="sec-hint">الهاتف</label><input type="tel" class="sec-inp" id="adm-ed-phone" placeholder="0550000000" dir="ltr" style="margin-top:6px;text-align:left" value="${_admEsc(a.phone || '')}"></div>
+        </div>
+        <div style="margin-top:14px">
+          <label class="sec-hint">حالة الحساب</label>
+          <div style="margin-top:6px">
+            <select class="sec-inp" id="adm-ed-status" style="width:100%">
+              <option value="active" ${a.status === 'disabled' ? '' : 'selected'}>نشط — يمكنه الدخول</option>
+              <option value="disabled" ${a.status === 'disabled' ? 'selected' : ''}>معطّل — ممنوع من الدخول</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:14px;font-size:11px;color:var(--text-muted)">البريد الإلكتروني للدخول ثابت ولا يُعدّل هنا: <b dir="ltr" style="color:var(--text)">${_admEsc(a.email || '')}</b></div>
+        <div style="display:flex;gap:10px;margin-top:18px">
+          <button type="button" class="sec-btn" id="adm-ed-save" onclick="dashAdminSaveProfile()" style="flex:1;background:linear-gradient(135deg,#7C3AED,#A78BFA);justify-content:center">💾 حفظ التغييرات</button>
+          <button type="button" class="sec-btn" onclick="document.getElementById('adm-account-modal').remove()" style="flex:1;justify-content:center;background:transparent;border-color:var(--border-2)">إلغاء</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  setTimeout(() => modal.classList.add('open'), 50);
+};
+
+window.dashAdminSaveProfile = async () => {
+  const uid = admEditUid;
+  if (!uid) return;
+  const firstName = document.getElementById('adm-ed-first').value.trim();
+  const lastName  = document.getElementById('adm-ed-last').value.trim();
+  let username = document.getElementById('adm-ed-username').value.trim().toLowerCase().replace(/\s+/g, '');
+  const phoneClean = String(document.getElementById('adm-ed-phone').value || '').trim().replace(/[\s\-().]/g, '');
+  const status = document.getElementById('adm-ed-status').value;
+  const btn = document.getElementById('adm-ed-save');
+  if (!firstName || !lastName) { showToast('أدخل الاسم الأول واللقب', true); return; }
+  if (!username) { showToast('أدخل اليوزر (اسم الدخول)', true); return; }
+  if (!/^[a-z0-9_.-]+$/.test(username)) { showToast('اليوزر: حروف إنجليزية وأرقام و _ . - فقط', true); return; }
+  // فحص تفرد اليوزر بين حسابات الإدارة
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
+    if (snap.exists()) {
+      const accounts = snap.data() || {};
+      for (const k of Object.keys(accounts)) {
+        if (k === uid) continue;
+        const a = accounts[k] || {};
+        if (String(a.username || '').trim().toLowerCase() === username
+            || String(a.email || '').split('@')[0].toLowerCase() === username) {
+          showToast('هذا اليوزر مستخدم من حساب إدارة آخر', true);
+          return;
+        }
+      }
+    }
+  } catch(e) { console.warn('username uniqueness check:', e); }
+  btn.disabled = true;
+  try {
+    await setDoc(doc(db, 'settings', 'adminAccounts'), {
+      [uid]: {
+        firstName, lastName, fullName: firstName + ' ' + lastName,
+        username, phone: phoneClean, status,
+        updatedAt: serverTimestamp()
+      }
+    }, { merge: true });
+    await dashLog('accounts', 'تعديل بروفايل أدمن', 'تم تحديث بيانات ' + firstName + ' ' + lastName + ' (الحالة: ' + (status === 'disabled' ? 'معطّل' : 'نشط') + ')');
+    const modal = document.getElementById('adm-account-modal');
+    if (modal) modal.remove();
+    showToast('تم حفظ التغييرات');
+    if (typeof window.dashAdminLoadProfiles === 'function') window.dashAdminLoadProfiles();
+  } catch(e) {
+    console.error('dashAdminSaveProfile error:', e);
+    showToast('فشل الحفظ: ' + e.message, true);
+  }
+  btn.disabled = false;
+};
+
+window.dashAdminPwModal = async (uid) => {
+  let accounts = {};
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
+    if (snap.exists()) accounts = snap.data() || {};
+  } catch(e) { showToast('تعذر تحميل بيانات الحساب', true); return; }
+  const a = accounts[uid];
+  if (!a) { showToast('الحساب غير موجود', true); return; }
+  admPwUid = uid;
+  const existing = document.getElementById('adm-pw-modal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'adm-pw-modal';
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:460px;background:var(--card);border-radius:20px;box-shadow:var(--shadow-xl);overflow:hidden;animation:modalIn 0.25s ease">
+      <div style="padding:24px 28px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+          <span style="font-size:26px">🔑</span>
+          <div>
+            <div style="font-weight:900;font-size:16px;color:var(--text)">تغيير كلمة المرور</div>
+            <div style="font-size:11px;color:var(--text-muted)">الحساب: ${_admEsc(a.fullName || '')} — <b dir="ltr">${_admEsc(a.email || '')}</b></div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);padding:10px 12px;background:#F5F3FF;border:1px solid #E9D5FF;border-radius:10px;margin-bottom:14px">للحماية يُطلب الباسوورد الحالي للحساب نفسه (المدير الذي أنشأه يعرفه). أو أرسل رابط إعادة تعيين إلى البريد الإلكتروني.</div>
+        <div style="margin-bottom:12px"><label class="sec-hint">الباسوورد الحالي للحساب</label><div class="sec-pw"><input type="password" class="sec-inp" id="adm-pw-current" placeholder="الباسوورد الحالي" dir="ltr" style="margin-top:6px;text-align:left"><button type="button" class="sec-eye" onclick="secTogglePw('adm-pw-current',this)" title="إظهار/إخفاء">👁️</button></div></div>
+        <div style="margin-bottom:12px"><label class="sec-hint">الباسوورد الجديد</label><div class="sec-pw"><input type="password" class="sec-inp" id="adm-pw-new" placeholder="6 أحرف على الأقل" dir="ltr" style="margin-top:6px;text-align:left"><button type="button" class="sec-eye" onclick="secTogglePw('adm-pw-new',this)" title="إظهار/إخفاء">👁️</button></div></div>
+        <div style="margin-bottom:14px"><label class="sec-hint">تأكيد الباسوورد الجديد</label><div class="sec-pw"><input type="password" class="sec-inp" id="adm-pw-confirm" placeholder="أعد كتابته" dir="ltr" style="margin-top:6px;text-align:left"><button type="button" class="sec-eye" onclick="secTogglePw('adm-pw-confirm',this)" title="إظهار/إخفاء">👁️</button></div></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <button type="button" class="sec-btn" id="adm-pw-save" onclick="dashAdminChangePwSave()" style="flex:1;min-width:200px;background:linear-gradient(135deg,#7C3AED,#A78BFA);justify-content:center">💾 تغيير كلمة المرور</button>
+          <button type="button" class="sec-btn" id="adm-pw-reset" onclick="dashAdminSendResetEmail()" style="flex:1;min-width:150px;justify-content:center;background:transparent;border-color:var(--border-2)">📧 رابط إعادة تعيين للبريد</button>
+        </div>
+        <button type="button" class="sec-btn" onclick="document.getElementById('adm-pw-modal').remove()" style="width:100%;justify-content:center;background:transparent;border-color:var(--border-2)">إغلاق</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  setTimeout(() => modal.classList.add('open'), 50);
+};
+
+window.dashAdminChangePwSave = async () => {
+  const uid = admPwUid;
+  if (!uid) return;
+  const curr = document.getElementById('adm-pw-current').value;
+  const next = document.getElementById('adm-pw-new').value;
+  const conf = document.getElementById('adm-pw-confirm').value;
+  const btn = document.getElementById('adm-pw-save');
+  if (!curr) { showToast('أدخل الباسوورد الحالي للحساب', true); return; }
+  if (next.length < 6) { showToast('الباسوورد الجديد 6 أحرف على الأقل', true); return; }
+  if (next !== conf) { showToast('الباسووردان غير متطابقين', true); return; }
+  let acc = null;
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
+    if (snap.exists()) acc = (snap.data() || {})[uid];
+  } catch(e) {}
+  if (!acc || !acc.email) { showToast('الحساب غير موجود أو بدون بريد', true); return; }
+  btn.disabled = true;
+  btn.textContent = 'جارِ التغيير…';
+  try {
+    let cred;
+    try {
+      cred = await signInWithEmailAndPassword(secondaryAuth, acc.email, curr);
+    } catch(authErr) {
+      if (authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/wrong-password') {
+        throw new Error('الباسوورد الحالي غير صحيح');
+      }
+      throw authErr;
+    }
+    const idToken = await cred.user.getIdToken();
+    await signOut(secondaryAuth).catch(() => {});
+    const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:update?key=' + ADM_TOOL_KEY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken, password: next, returnSecureToken: false })
+    });
+    const data = await r.json().catch(() => null);
+    if (data && data.error) {
+      if (String(data.error.message || '').includes('WEAK_PASSWORD')) throw new Error('الباسوورد ضعيف، استخدم 6 أحرف أو أكثر');
+      throw new Error(data.error.message);
+    }
+    await updateDoc(doc(db, 'settings', 'adminAccounts'), { [uid]: { updatedAt: serverTimestamp() } }).catch(() => {});
+    await dashLog('accounts', 'تغيير كلمة مرور أدمن', 'تم تغيير كلمة مرور ' + (acc.fullName || acc.email));
+    const modal = document.getElementById('adm-pw-modal');
+    if (modal) modal.remove();
+    showToast('تم تغيير كلمة المرور بنجاح');
+  } catch(e) {
+    console.error('dashAdminChangePwSave error:', e);
+    showToast('فشل التغيير: ' + e.message, true);
+  }
+  btn.disabled = false;
+  btn.textContent = '💾 تغيير كلمة المرور';
+};
+
+window.dashAdminSendResetEmail = async () => {
+  const uid = admPwUid;
+  if (!uid) return;
+  let acc = null;
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
+    if (snap.exists()) acc = (snap.data() || {})[uid];
+  } catch(e) {}
+  if (!acc || !acc.email) { showToast('الحساب غير موجود أو بدون بريد', true); return; }
+  const btn = document.getElementById('adm-pw-reset');
+  if (btn) { btn.disabled = true; btn.textContent = 'جارِ الإرسال…'; }
+  try {
+    const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=' + ADM_TOOL_KEY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestType: 'PASSWORD_RESET', email: acc.email })
+    });
+    const data = await r.json().catch(() => null);
+    if (data && data.error) throw new Error(data.error.message);
+    await dashLog('accounts', 'إرسال رابط إعادة تعيين كلمة مرور', 'أُرسل رابط إعادة تعيين إلى ' + acc.email);
+    showToast('أُرسل رابط إعادة التعيين إلى البريد');
+  } catch(e) {
+    console.error('dashAdminSendResetEmail error:', e);
+    showToast('فشل الإرسال: ' + e.message, true);
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '📧 رابط إعادة تعيين للبريد'; }
+};
+
+window.dashAdminToggleStatus = async (uid) => {
+  const self = window._auth && window._auth.currentUser;
+  if (self && uid === self.uid) { showToast('لا يمكنك تعطيل حسابك الحالي', true); return; }
+  let accounts = {};
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
+    if (snap.exists()) accounts = snap.data() || {};
+  } catch(e) { showToast('تعذر تحميل بيانات الحساب', true); return; }
+  const a = accounts[uid];
+  if (!a) { showToast('الحساب غير موجود', true); return; }
+  const newStatus = a.status === 'disabled' ? 'active' : 'disabled';
+  try {
+    await updateDoc(doc(db, 'settings', 'adminAccounts'), { [uid]: { status: newStatus, updatedAt: serverTimestamp() } });
+    await dashLog('accounts', newStatus === 'disabled' ? 'تعطيل حساب إدارة' : 'تفعيل حساب إدارة',
+      (a.fullName || a.email) + (newStatus === 'disabled' ? ' — معطّل' : ' — مفعّل'));
+    showToast(newStatus === 'disabled' ? 'تم تعطيل ' + (a.fullName || a.email) : 'تم تفعيل ' + (a.fullName || a.email));
+    if (typeof window.dashAdminLoadProfiles === 'function') window.dashAdminLoadProfiles();
+  } catch(e) {
+    console.error('dashAdminToggleStatus error:', e);
+    showToast('فشل التحديث: ' + e.message, true);
+  }
 };
 
 // ── تحميل وعرض سجلات الداشبورد ──
