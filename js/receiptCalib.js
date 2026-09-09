@@ -72,7 +72,7 @@
       { key: 'div5', type: 'divider', hide: false, thick: 0.5, dash: false, spacingTop: 1.2 },
       { key: 'barcode', type: 'barcode', hide: false, spacingTop: 1 },
       { key: 'signature', type: 'signature', hide: false, fs: 2.8, spacingTop: 2 },
-      { key: 'footer', type: 'footer', hide: false, fs: 2.6, spacingTop: 1.3, lh: 1.6 }
+      { key: 'footer', type: 'footer', hide: false, fs: 2.6, spacingTop: 1.3, lh: 1.6, align: 'center', spacingBottom: 3 }
     ];
   }
 
@@ -259,7 +259,8 @@
         return;
       }
       if (b.type === 'footer') {
-        html += '<div data-rb="' + b.key + '" class="rb rb-footer" style="' + fs(b) + ';' + sTop(b) + '">' + numSpan(rec.footerText != null ? rec.footerText : t.footerText, t) + '</div>';
+        var _fbPad = num(b.spacingBottom) > 0 ? 'padding-bottom:calc(var(--s)*' + fmtNum(b.spacingBottom) + 'mm);' : '';
+        html += '<div data-rb="' + b.key + '" class="rb rb-footer" style="' + fs(b) + ';' + sTop(b) + ';text-align:' + (b.align || 'center') + ';' + _fbPad + '">' + numSpan(rec.footerText != null ? rec.footerText : t.footerText, t) + '</div>';
         return;
       }
       var isTitle = b.type === 'title';
