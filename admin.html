@@ -443,6 +443,8 @@
     body.emp-hide-money #subx-revenue-modal,
     body.emp-hide-money .subx-custom-price-field,
     body.emp-hide-money button[onclick*="subxPrintReceipt"] { display:none !important; }
+    /* ── استثناء موظفي الاستقبال: زر طباعة وصل الاشتراك يبقى ظاهراً رغم إخفاء المبالغ ── */
+    body.emp-hide-money.rec-print-receipt button[onclick*="subxPrintReceipt"] { display:inline-block !important; }
 
     /* ===== CAMP V2 DETAIL MODAL ===== */
     .camp2-detail-hero{display:flex;align-items:center;gap:14px;padding:16px 18px;margin-bottom:16px;background:linear-gradient(135deg,rgba(249,115,22,0.14),rgba(249,115,22,0.05));border:1px solid rgba(249,115,22,0.28);border-radius:16px}
@@ -5288,7 +5290,7 @@ function receptionCfgFrom(acc, uid) {
     role: RECEPTION_ROLE_NAME,
     allowedSections: (base.allowedSections || []).slice(),
     showWebsite: false,
-    restrictions: Object.assign({ subxHideAttendance: true, attNoSessionControl: true }, base.restrictions || {})
+    restrictions: Object.assign({ subxHideAttendance: true, attNoSessionControl: true, subxAllowPrint: true }, base.restrictions || {})
   };
 }
 window.RECEPTION_ROLE_NAME = RECEPTION_ROLE_NAME;
@@ -5299,6 +5301,9 @@ function applyEmployeeMode(cfg) {
 
   if (cfg.restrictions.srHideMoney || cfg.restrictions.srtHideMoney || cfg.restrictions.camp2HideMoney || cfg.restrictions.subxHideMoney) {
     document.body.classList.add('emp-hide-money');
+  }
+  if (cfg.restrictions.subxAllowPrint) {
+    document.body.classList.add('rec-print-receipt');
   }
 
   // ── الـ sidebar: إظهار الأقسام المسموحة فقط ──
@@ -5373,7 +5378,7 @@ function applyEmployeeMode(cfg) {
       if (cfg.restrictions.subxHideAttendance)
         document.querySelectorAll('button[onclick*="subxCancelAttendance"], button[onclick*="subxShowAllLogs"], button[onclick*="subxShowDeletedLogs"], button[onclick*="subxExportLogsCSV"], button[onclick*="subxDeleteLog"]').forEach(b => b.style.display = 'none');
       if (cfg.restrictions.attNoSessionControl)
-        document.querySelectorAll('[onclick*="openCtrlModal"]').forEach(b => b.style.display = 'none');
+        document.querySelectorAll('[onclick*="openCtrlModal"], [onclick*="showOpenChoiceFromTable"], [onclick*="setCtrlNowFromTable"], [onclick*="openCtrlFromTable"], [onclick*="setCtrlNow("], [onclick*="setCtrlStatus("], [onclick*="openNow("], [onclick*="showOpenChoice("], [onclick*="showOpenDatePicker"], [onclick*="openByDateConfirmed"], [onclick*="saveCtrlSettings"], [onclick*="toggleCtrlField"]').forEach(b => b.style.display = 'none');
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }
@@ -5447,6 +5452,9 @@ if (cfg.restrictions.srNoConfirmFree) {
     window.closeOpenChoice = blockCtrl('⛔ ليس لديك صلاحية فتح الحصة');
     window.saveCtrlSettings = blockCtrl('⛔ ليس لديك صلاحية حفظ إعدادات الحصة');
     window.toggleCtrlField = blockCtrl('⛔ ليس لديك صلاحية تعديل إعدادات الحصة');
+    window.showOpenChoiceFromTable = blockCtrl('⛔ ليس لديك صلاحية فتح الحصة');
+    window.setCtrlNowFromTable = blockCtrl('⛔ ليس لديك صلاحية فتح وإغلاق الحصة');
+    window.openCtrlFromTable = blockCtrl('⛔ ليس لديك صلاحية فتح وإغلاق الحصص');
   }
 
   // ── أساتذة الدعم المدرسي: عرض فقط (منع كل الإجراءات الإدارية) ──
