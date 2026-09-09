@@ -345,6 +345,86 @@
   <div class="color-grid" id="color-grid"></div>
   <div class="color-hint">«شفاف» متاح للخلفيات فقط (لن يُرسم مستطيل). «لون مخصص» يفتح منتقي الألوان / إدخال HEX يدوي. حفظ إعدادات الألوان يخزّن القيم في نفس مكان حفظ معايرة البطاقة.</div>
 
+  <h2 class="sec-title"><span class="step">و</span> وصل اشتراك شهري — طباعة حرارية 50 مم (أبيض وأسود)</h2>
+  <div class="note">
+    نموذج خاص بوصل <b>الاشتراك الشهري للتلميذ</b> على <b>الطابعة الحرارية</b>: عرض الطباعة <b>50 مم</b> فقط (أبيض وأسود) والطول حر حسب المحتوى.
+    السطور مكدَّسة من الأعلى بلا تداخل — <b>اسحب أي سطر</b> أو عدّل قيمه في اللوحة الجانبية: الترتيب (▲▼)، الإظهار/الإخفاء (👁)، حجم الخط، التباعد فوق السطر، الإزاحة، العريض، المحاذاة، ونصّ التسمية.
+    زر <b>«حفظ إعدادات الوصل»</b> يرفع القالب فوراً إلى المصدر المركزي (Supabase) ويُطبَّق <b>تلقائياً</b> على زر «طباعة حرارية 50مم» داخل قسم الاشتراكات الشهرية في لوحة الإدارة.
+  </div>
+  <div class="toolbar">
+    <button id="rc-save-btn" class="save">💾 حفظ إعدادات الوصل</button>
+    <button id="rc-test-btn" class="primary">🖨️ طباعة تجريبية 50مم</button>
+    <button id="rc-reload-btn">🔄 تحميل من المصدر المركزي</button>
+    <button id="rc-reset-btn" class="danger">↩️ إعادة الوضع الافتراضي</button>
+    <span class="spacer"></span>
+    <span id="rc-status" style="font-size:12px;color:#8494bd">—</span>
+  </div>
+  <style>
+    .rc-settings { display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-end;background:#fff;border:1px solid #dbe4f5;border-radius:12px;padding:12px 14px;margin:10px 0 14px; }
+    .rc-settings label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:800;color:#334; }
+    .rc-settings input[type=text], .rc-settings input[type=number], .rc-settings select{ font-family:inherit;font-size:12.5px;padding:6px 8px;border:1px solid #c4d0ea;border-radius:8px; }
+    .rc-settings input[type=text]{width:190px} .rc-settings input[type=number]{width:60px}
+    .rc-settings input[type=checkbox]{width:16px;height:16px}
+    .rc-wrap{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+    .rc-stage{background:#fff;border:1px solid #dbe4f5;border-radius:14px;padding:16px 18px;flex:1 1 520px}
+    .rc-stage .scale-cap{text-align:center;margin-bottom:10px}
+    .rc-preview-box{display:flex;justify-content:center;padding:10px;background:#0f1420;border-radius:10px;min-height:260px;overflow:auto}
+    .rc-preview-box .receipt{background:#fff;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+    .rc-preview [data-rb]{cursor:move;position:relative}
+    .rc-preview [data-rb]:hover{outline:1.5px dashed #4f8cff;outline-offset:1px}
+    .rc-preview [data-rb].on{outline:2px dashed #e53935;outline-offset:2px;background:rgba(229,57,53,.05)}
+    .rc-side{flex:0 0 260px;background:#fff;border:1px solid #dbe4f5;border-radius:14px;padding:12px}
+    .rc-list-cap{font-size:12px;font-weight:900;color:#1E3C86;margin-bottom:8px}
+    .rc-item{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:8px;font-size:12px;color:#334;cursor:pointer}
+    .rc-item:hover{background:#eef2fb}
+    .rc-item.on{background:#e8edfb;font-weight:900}
+    .rc-item .nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .rc-item button{font-family:inherit;font-size:11px;font-weight:800;padding:2px 6px;border:1px solid #c4d0ea;border-radius:6px;background:#fff;color:#2548A1;cursor:pointer}
+    .rc-item button.hid{color:#b3362f}
+    .rc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+    .rc-grid label{display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:#5b6b96}
+    .rc-grid input,.rc-grid select{font-family:inherit;font-size:12.5px;padding:5px 7px;border:1px solid #c4d0ea;border-radius:8px}
+    .rc-grid input[type=number]{direction:ltr}
+    .rc-grid input[type=text]{direction:rtl}
+    .rc-grid input[type=checkbox]{width:16px;height:16px;margin-top:4px}
+  </style>
+  <div class="rc-settings">
+    <label>الأرقام <select id="rc-digits"><option value="western">غربية 0-9</option><option value="ar">عربية ٠-٩</option></select></label>
+    <label>اسم المركز <input type="text" id="rc-centerName"></label>
+    <label>عنوان الوصل <input type="text" id="rc-receiptTitle"></label>
+    <label>التذييل السفلي <input type="text" id="rc-footerText"></label>
+    <label>تسمية الإدارة <input type="text" id="rc-adminLabel"></label>
+    <label>الشعار <select id="rc-logo-src">
+      <option value="schoollogo/schoollogoblack.PNG">شعار أسود</option>
+      <option value="schoollogo/schoollogowhite.PNG">شعار أبيض</option>
+      <option value="">بدون شعار</option>
+    </select></label>
+    <label>رابط شعار مخصص (اختياري) <input type="text" id="rc-logo-url" placeholder="images/my-logo.png"></label>
+    <label>عرض الشعار (مم) <input type="number" id="rc-logo-w" step="0.5" min="5" max="50"></label>
+    <label>👁 الشعار <input type="checkbox" id="rc-logo-show" checked></label>
+    <label>📊 جدول الأشهر <input type="checkbox" id="rc-periodsShow" checked></label>
+    <label>💰 المبلغ كتابةً <input type="checkbox" id="rc-moneyWordsShow" checked></label>
+    <label>✍️ التوقيع <input type="checkbox" id="rc-signatureShow" checked></label>
+    <label>▮▯ باركود <input type="checkbox" id="rc-barcodeShow"></label>
+    <label>محتوى الباركود <select id="rc-barcodeContent"><option value="orderId">رقم الوصل</option><option value="studentId">رقم التلميذ</option></select></label>
+  </div>
+  <div class="rc-wrap">
+    <div class="rc-stage">
+      <div class="scale-cap">معاينة العرض الفعلي 50 مم (مضاعفة للتكييف على الشاشة) — اسحب السطر عمودياً للتباعد وأفقياً للإزاحة</div>
+      <div class="rc-preview-box"><div id="rc-preview" class="rc-preview"></div></div>
+    </div>
+    <div class="rc-side">
+      <div class="rc-list-cap">السطور المطبوعة — اضغط للإختيار ثم عدّل:</div>
+      <div id="rc-list"></div>
+    </div>
+  </div>
+  <div class="inspector">
+    <h2>لوحة تحكم السطر المحدد</h2>
+    <div class="insp-name" id="rc-insp-name">لم يتم اختيار سطر — انقر على أي سطر في المعاينة أو القائمة</div>
+    <div class="rc-grid" id="rc-insp-grid"></div>
+    <div class="insp-hint">تباعد = المسافة فوق السطر (مم). الإزاحة = المسافة من الحافة (مم). مفاتيح الأسهم تضبطها بدقة 0.1 مم (مع Shift 1 مم).</div>
+  </div>
+
   <h2 class="sec-title"><span class="step">هـ</span> سجل التعديلات — استرجاع إعدادات الأيام السابقة</h2>
   <div class="note">
     كل حفظ يُسجَّل هنا تلقائياً مع التاريخ والوقت. يمكنك <b>استرجاع</b> أي إعداد سابق أو <b>حذفه</b>.
@@ -444,6 +524,7 @@
 <script src="js/qrcode.min.js?v=1"></script>
 <script src="js/JsBarcode.all.min.js?v=1"></script>
   <script src="js/studentCardRenderer.js?v=21"></script>
+  <script src="js/receiptCalib.js?v=1"></script>
 <script>
   // ═══ مصدر واحد مركزي لإعدادات المعايرة ═══
   // نفس حساب Supabase المستخدم في لوحة الإدارة — تُحفظ المعايرة وتُقرأ من
@@ -1578,6 +1659,258 @@
     }).then(function() {
       renderHistList();
     });
+  });
+})();
+</script>
+<script>
+(function () {
+  'use strict';
+  var RC = window.ReceiptCalib;
+  if (!RC) return;
+  var tpl = RC.defaultTemplate();
+  var SEL = null;
+  var PREV_S = 4;
+  var drag = null;
+  var box = document.getElementById('rc-preview');
+  var MM_PX = RC.PX_PER_MM * PREV_S;
+  var toastTimer = null;
+
+  function findBlock(key) {
+    for (var i = 0; i < tpl.blocks.length; i++) if (tpl.blocks[i].key === key) return tpl.blocks[i];
+    return null;
+  }
+  function nameOf(key) { return RC.blockNames[key] || key; }
+  function toast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
+  }
+
+  function renderPreview() {
+    box.style.setProperty('--s', PREV_S);
+    box.innerHTML = RC.renderReceiptHTML(tpl, RC.sample(tpl), { scale: PREV_S });
+    RC.hydrateBarcodes(box);
+    Array.prototype.forEach.call(box.querySelectorAll('.rb'), function (el) {
+      el.addEventListener('pointerdown', function (e) {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        e.preventDefault();
+        var key = el.getAttribute('data-rb');
+        select(key);
+        var b = findBlock(key);
+        drag = { key: key, x: e.clientX, y: e.clientY, st: b && b.spacingTop != null ? b.spacingTop : 0, in: b && b.indent != null ? b.indent : 0 };
+        try { box.setPointerCapture(e.pointerId); } catch (err) {}
+      });
+    });
+    renderList();
+  }
+  box.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var b = findBlock(drag.key);
+    if (!b) return;
+    var dy = (e.clientY - drag.y) / MM_PX;
+    var dx = (e.clientX - drag.x) / MM_PX;
+    if (b.spacingTop != null) b.spacingTop = Math.max(0, Math.round((drag.st + dy) * 100) / 100);
+    if (b.indent != null) b.indent = Math.max(0, Math.round((drag.in + dx) * 100) / 100);
+    renderPreview();
+  });
+  box.addEventListener('pointerup', function () { drag = null; });
+  box.addEventListener('pointercancel', function () { drag = null; });
+
+  function select(key) {
+    SEL = key;
+    Array.prototype.forEach.call(box.querySelectorAll('.rb'), function (el) {
+      el.classList.toggle('on', el.getAttribute('data-rb') === SEL);
+    });
+    renderList();
+    updateInspector();
+  }
+
+  function renderList() {
+    var el = document.getElementById('rc-list');
+    var html = tpl.blocks.map(function (b, i) {
+      return '<div class="rc-item' + (b.key === SEL ? ' on' : '') + '" data-k="' + b.key + '">' +
+        '<button data-a="up" title="الأعلى">▲</button>' +
+        '<button data-a="dn" title="الأسفل">▼</button>' +
+        '<span class="nm">' + nameOf(b.key) + '</span>' +
+        '<button data-a="hid" class="' + 'hid' + '">' + (b.hide ? '🔒' : '👁') + '</button>' +
+        '</div>';
+    }).join('');
+    el.innerHTML = html;
+    Array.prototype.forEach.call(el.querySelectorAll('.rc-item'), function (row) {
+      row.addEventListener('click', function (e) {
+        if (!e.target.getAttribute || !e.target.getAttribute('data-a')) { select(row.getAttribute('data-k')); return; }
+        var a = e.target.getAttribute('data-a');
+        var idx = tpl.blocks.findIndex(function (b) { return b.key === row.getAttribute('data-k'); });
+        if (idx < 0) return;
+        if (a === 'up' && idx > 0) { var t = tpl.blocks[idx - 1]; tpl.blocks[idx - 1] = tpl.blocks[idx]; tpl.blocks[idx] = t; }
+        if (a === 'dn' && idx < tpl.blocks.length - 1) { var u = tpl.blocks[idx + 1]; tpl.blocks[idx + 1] = tpl.blocks[idx]; tpl.blocks[idx] = u; }
+        if (a === 'hid') { tpl.blocks[idx].hide = !tpl.blocks[idx].hide; }
+        renderPreview();
+      });
+    });
+  }
+
+  function gi(id) { return document.getElementById(id); }
+  function updateInspector() {
+    var nameEl = gi('rc-insp-name');
+    var grid = gi('rc-insp-grid');
+    var b = SEL ? findBlock(SEL) : null;
+    if (!b) {
+      nameEl.textContent = 'لم يتم اختيار سطر — انقر على أي سطر في المعاينة أو القائمة';
+      nameEl.style.color = '';
+      grid.innerHTML = '';
+      return;
+    }
+    nameEl.textContent = nameOf(b.key) + (b.hide ? ' (مخفي)' : '');
+    nameEl.style.color = '#b3362f';
+    var f = [];
+    function numField(id, label, val, fn, step) {
+      f.push('<label>' + label + '<input id="rc-i-' + id + '" type="number" step="' + (step || 0.1) + '" value="' + val + '"></label>');
+    }
+    function txtField(id, label, val, fn) {
+      f.push('<label>' + label + '<input id="rc-i-' + id + '" type="text" value="' + String(val == null ? '' : val).replace(/"/g, '&quot;') + '"></label>');
+    }
+    function selField(id, label, val, opts) {
+      f.push('<label>' + label + '<select id="rc-i-' + id + '">' + opts.map(function (o) { return '<option value="' + o[0] + '"' + (String(val) === String(o[0]) ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>');
+    }
+    function ckField(id, label, val) {
+      f.push('<label>' + label + '<input id="rc-i-' + id + '" type="checkbox"' + (val ? ' checked' : '') + '></label>');
+    }
+    if (b.spacingTop != null) numField('sp', 'التباعد فوق (مم)', b.spacingTop);
+    if (b.fs != null) numField('fs', 'حجم الخط (مم)', b.fs, null, 0.1);
+    if (b.type === 'text' || b.type === 'title') {
+      if (b.type === 'text' && b.showLabel != null) ckField('sl', 'إظهار التسمية', b.showLabel);
+      if (b.type === 'text' && b.label !== undefined) txtField('lb', 'نص التسمية', b.label);
+      if ('valueBold' in b) ckField('vb', 'عريض', b.valueBold);
+      if ('bold' in b) ckField('bd', 'عريض', b.bold);
+      selField('al', 'المحاذاة', b.align || 'right', [['right', 'يمين'], ['center', 'وسط'], ['left', 'يسار']]);
+      numField('in', 'الإزاحة (مم)', b.indent || 0, null, 0.1);
+      numField('lh', 'ارتفاع السطر', b.lh || 1.5, null, 0.1);
+    }
+    if (b.type === 'divider') {
+      numField('th', 'السمك (مم)', b.thick || 0.3, null, 0.05);
+      ckField('ds', 'متقطع', b.dash);
+    }
+    grid.innerHTML = f.join('');
+    function bind(id, fn) {
+      var el = gi('rc-i-' + id);
+      if (!el) return;
+      el.addEventListener('input', function () { fn(el); renderPreview(); });
+    }
+    if (b.spacingTop != null) bind('sp', function (el) { b.spacingTop = parseFloat(el.value) || 0; });
+    if (b.fs != null) bind('fs', function (el) { b.fs = parseFloat(el.value) || 1; });
+    if (b.type === 'text' || b.type === 'title') {
+      if (b.type === 'text' && b.showLabel != null) bind('sl', function (el) { b.showLabel = el.checked; });
+      if (b.type === 'text' && b.label !== undefined) bind('lb', function (el) { b.label = el.value; });
+      bind('vb', function (el) { b.valueBold = el.checked; });
+      bind('bd', function (el) { b.bold = el.checked; });
+      bind('al', function (el) { b.align = el.value; });
+      bind('in', function (el) { b.indent = parseFloat(el.value) || 0; });
+      bind('lh', function (el) { b.lh = parseFloat(el.value) || 1.4; });
+    }
+    if (b.type === 'divider') {
+      bind('th', function (el) { b.thick = parseFloat(el.value) || 0.1; });
+      bind('ds', function (el) { b.dash = el.checked; });
+    }
+  }
+
+  function syncSettingsFromTpl() {
+    gi('rc-digits').value = tpl.digits;
+    gi('rc-centerName').value = tpl.centerName;
+    gi('rc-receiptTitle').value = tpl.receiptTitle;
+    gi('rc-footerText').value = tpl.footerText;
+    gi('rc-adminLabel').value = tpl.adminLabel;
+    gi('rc-logo-src').value = (tpl.logo.src === 'schoollogo/schoollogoblack.PNG' || tpl.logo.src === 'schoollogo/schoollogowhite.PNG' || tpl.logo.src === '') ? tpl.logo.src : 'schoollogo/schoollogoblack.PNG';
+    gi('rc-logo-url').value = (tpl.logo.src !== 'schoollogo/schoollogoblack.PNG' && tpl.logo.src !== 'schoollogo/schoollogowhite.PNG') ? (tpl.logo.src || '') : '';
+    gi('rc-logo-w').value = tpl.logo.w;
+    gi('rc-logo-show').checked = tpl.logo.show;
+    gi('rc-periodsShow').checked = tpl.periodsShow;
+    gi('rc-moneyWordsShow').checked = tpl.moneyWordsShow;
+    gi('rc-signatureShow').checked = tpl.signatureShow;
+    gi('rc-barcodeShow').checked = tpl.barcodeShow;
+    gi('rc-barcodeContent').value = tpl.barcodeContent;
+  }
+  function bindSettings() {
+    gi('rc-digits').addEventListener('change', function () { tpl.digits = this.value; renderPreview(); });
+    gi('rc-centerName').addEventListener('input', function () { tpl.centerName = this.value; renderPreview(); });
+    gi('rc-receiptTitle').addEventListener('input', function () { tpl.receiptTitle = this.value; renderPreview(); });
+    gi('rc-footerText').addEventListener('input', function () { tpl.footerText = this.value; renderPreview(); });
+    gi('rc-adminLabel').addEventListener('input', function () { tpl.adminLabel = this.value; renderPreview(); });
+    gi('rc-logo-src').addEventListener('change', function () {
+      tpl.logo.src = gi('rc-logo-url').value.trim() || this.value;
+      gi('rc-logo-url').value = (this.value !== 'schoollogo/schoollogoblack.PNG' && this.value !== 'schoollogo/schoollogowhite.PNG' && gi('rc-logo-url').value) ? gi('rc-logo-url').value : '';
+      renderPreview();
+    });
+    gi('rc-logo-url').addEventListener('input', function () {
+      tpl.logo.src = this.value.trim() || gi('rc-logo-src').value;
+      renderPreview();
+    });
+    gi('rc-logo-w').addEventListener('input', function () { tpl.logo.w = Math.max(5, parseFloat(this.value) || 20); renderPreview(); });
+    gi('rc-logo-show').addEventListener('change', function () { tpl.logo.show = this.checked; renderPreview(); });
+    gi('rc-periodsShow').addEventListener('change', function () { tpl.periodsShow = this.checked; renderPreview(); });
+    gi('rc-moneyWordsShow').addEventListener('change', function () { tpl.moneyWordsShow = this.checked; renderPreview(); });
+    gi('rc-signatureShow').addEventListener('change', function () { tpl.signatureShow = this.checked; renderPreview(); });
+    gi('rc-barcodeShow').addEventListener('change', function () { tpl.barcodeShow = this.checked; renderPreview(); });
+    gi('rc-barcodeContent').addEventListener('change', function () { tpl.barcodeContent = this.value; renderPreview(); });
+  }
+
+  gi('rc-save-btn').addEventListener('click', function () {
+    var btn = this;
+    btn.disabled = true;
+    RC.saveCentral(tpl).then(function (ok) {
+      btn.disabled = false;
+      gi('rc-status').textContent = ok ? '☁️ محفوظ في المصدر المركزي، ويُطبَّق على لوحة الإدارة فوراً' : '⚠️ تعذّر الاتصال بالمركزي — حُفظ محلياً';
+      toast(ok ? 'تم حفظ نموذج الوصل الحراري بنجاح' : 'تم الحفظ محلياً — تعذّر الاتصال بالخادم المركزي');
+    });
+  });
+  gi('rc-test-btn').addEventListener('click', function () {
+    var ok = RC.printThermal(tpl, RC.sample(tpl));
+    if (!ok) toast('الرجاء السماح بالنوافذ المنبثقة');
+  });
+  gi('rc-reload-btn').addEventListener('click', function () {
+    RC.loadCentral().then(function (t) {
+      if (t) {
+        tpl = RC.normalize(t);
+        syncSettingsFromTpl();
+        renderPreview();
+        toast('تم تحميل النموذج من المصدر المركزي');
+      } else {
+        toast('لا يوجد نموذج مركزي محفوظ — تُستخدم القيم الحالية');
+      }
+    });
+  });
+  gi('rc-reset-btn').addEventListener('click', function () {
+    tpl = RC.defaultTemplate();
+    syncSettingsFromTpl();
+    SEL = null;
+    renderPreview();
+    toast('تمت إعادة الوضع الافتراضي (احفظ لرفعه للمصدر المركزي)');
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (!SEL) return;
+    var b = findBlock(SEL);
+    if (!b) return;
+    if (e.key === 'Escape') { select(null); return; }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      var step = e.shiftKey ? 1 : 0.1;
+      if (e.key === 'ArrowUp' && b.spacingTop != null) b.spacingTop = Math.max(0, Math.round((b.spacingTop - step) * 100) / 100);
+      if (e.key === 'ArrowDown' && b.spacingTop != null) b.spacingTop = Math.round((b.spacingTop + step) * 100) / 100;
+      if (e.key === 'ArrowRight' && b.indent != null) b.indent = Math.max(0, Math.round((b.indent + step) * 100) / 100);
+      if (e.key === 'ArrowLeft' && b.indent != null) b.indent = Math.max(0, Math.round((b.indent - step) * 100) / 100);
+      renderPreview();
+    }
+  });
+
+  RC.getTemplate().then(function (t) {
+    if (t) tpl = RC.normalize(t);
+    syncSettingsFromTpl();
+    bindSettings();
+    renderPreview();
+    gi('rc-status').textContent = RC.centralReady() ? '☁️ المصدر المركزي متاح' : '⚡ بدون مصدر مركزي — إعدادات هذا الجهاز';
   });
 })();
 </script>

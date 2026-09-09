@@ -18,6 +18,7 @@
   <script src="js/barcodeScanner.js?v=1"></script>
   <script src="js/teacherFinance.js?v=6"></script>
   <script src="js/subscriptionService.js?v=2"></script>
+<script src="js/receiptCalib.js?v=1"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
@@ -26067,6 +26068,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         }
       }
       html += '<button class="btn btn-primary" onclick="subxPrintReceipt(\'' + escX(sub.id) + '\')">🖨️ طباعة وصل</button>';
+      html += '<button class="btn btn-primary" onclick="subxPrintReceiptThermal(\'' + escX(sub.id) + '\')" style="background:linear-gradient(135deg,#18181b,#3f3f46)">🧾 طباعة حرارية 50مم</button>';
       html += '<button class="tbl-action del" onclick="subxDelete(\'' + escX(sub.id) + '\')" style="border-color:rgba(239,68,68,0.3);color:#dc2626;font-weight:800;padding:8px 20px;font-size:12px">🗑️ حذف الاشتراك</button>';
       html += '</div>';
 
@@ -26961,6 +26963,62 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     } catch (e) {
       console.error('[SUBSCRIPTIONS] print failed', e);
       showToast('❌ تعذر تجهيز الوصل للطباعة', true);
+    }
+  };
+
+  window.subxPrintReceiptThermal = async function (id) {
+    try {
+      const d = await SubscriptionService.adminSubscriptionDetail(id);
+      const sub = (d && d.subscription) || {};
+      const periods = (d && d.periods) || [];
+      const stu = (d && d.student) || regs.find(r => String(r.id) === String(sub.student_id)) || {};
+      const used = periods.reduce((a, p) => a + ((p.used_sessions || 0)), 0);
+      const total = sub.total_sessions || (sub.months || 1) * 8;
+      const permI = SubscriptionService.isPermanent(sub);
+      const st = permI ? 'permanent' : SubscriptionService.subscriptionStatus(sub, SubscriptionService.today());
+      const stLbl = SubscriptionService.subscriptionStatusLabel(st);
+      const words = _numArWords(sub.total_price);
+      const studentName = studentFullName(stu) || (sub.student_name || sub.student_id || '—');
+      const today = SubscriptionService.fmtAr(SubscriptionService.today(), true);
+      const fmtAr = ar => {
+        const s = String(ar == null ? '' : ar);
+        if (s.length <= 10) return (s || '—');
+        try { return new Date(s).toLocaleDateString('ar-DZ', { year: 'numeric', month: 'long', day: 'numeric' }); } catch (e) { return s; }
+      };
+      const tpl = await ReceiptCalib.getTemplate();
+      const record = {
+        centerName: tpl.centerName,
+        receiptTitle: tpl.receiptTitle,
+        footerText: tpl.footerText,
+        adminEmail: (window._auth && window._auth.currentUser && window._auth.currentUser.email) || '',
+        orderId: sub.id || '',
+        studentName: studentName,
+        studentId: sub.student_id || '',
+        studentLevel: ((stu.level || '') + (stu.stream ? ' — شعبة ' + stu.stream : '')).trim(),
+        parentName: stu.parent_name || '',
+        parentPhone: stu.parent_phone || '',
+        subject: sub.subject_name || '—',
+        teacher: sub.teacher_name || '—',
+        months: permI ? 'دائمة' : _monthsTxt(sub.months),
+        sessions: permI ? 'غير محدود' : (total + ' حصة'),
+        period: permI
+          ? 'دائمة — تبدأ من ' + fmtAr(sub.start_date)
+          : fmtAr(sub.start_date) + ' ← ' + fmtAr(sub.end_date),
+        status: stLbl,
+        amount: (Number(sub.total_price) || 0).toLocaleString('en-US'),
+        amountWords: words ? words + ' دينار جزائري' : '',
+        date: today,
+        table: periods.map(p => [
+          'شهر ' + (p.month_number || '—'),
+          fmtAr(p.start_date) + ' ← ' + fmtAr(p.end_date),
+          (permI ? 'مستمرة' : ((p.used_sessions || 0) + ' / ' + (p.total_sessions || 8)))
+        ])
+      };
+      const opened = ReceiptCalib.printThermal(tpl, record);
+      if (!opened) showToast('⚠️ تعذّر فتح نافذة الطباعة (مانع النوافذ المنبثقة)', true);
+    } catch (e) {
+      console.error('[SUBSCRIPTIONS] thermal print failed', e);
+      showToast('❌ تعذر تجهيز الوصل الحراري للطباعة', true);
     }
   };
 
