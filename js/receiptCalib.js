@@ -222,9 +222,9 @@
       if (b.type === 'signature') {
         if (!t.signatureShow) return;
         html += '<div data-rb="' + b.key + '" class="rb rb-sig" style="' + fs(b) + ';' + sTop(b) + '">' +
-          '<div class="rb-sig-col"><span class="rb-sig-lbl">توقيع ولي التلميذ</span><span class="rb-sig-ln"></span></div>' +
-          (t.logo && t.logo.show && t.logo.src ? '<div class="rb-sig-mid"><img src="' + esc(t.logo.src) + '" alt="" style="width:calc(var(--s)*' + Math.min(12, fmtNum(t.logo.w)) + 'mm)"></div>' : '') +
-          '<div class="rb-sig-col"><span class="rb-sig-lbl">' + esc(t.adminLabel || 'الإدارة') + (rec.adminEmail ? '<span class="rb-sig-mail">' + esc(rec.adminEmail) + '</span>' : '') + '</span><span class="rb-sig-ln"></span></div>' +
+          (t.logo && t.logo.show && t.logo.src ? '<img class="rb-sig-logo" src="' + esc(t.logo.src) + '" alt="" style="width:calc(var(--s)*' + Math.min(12, fmtNum(t.logo.w)) + 'mm)">' : '') +
+          '<span class="rb-sig-lbl">' + esc(t.adminLabel || 'الإدارة') + (rec.adminEmail ? '<span class="rb-sig-mail">' + esc(rec.adminEmail) + '</span>' : '') + '</span>' +
+          '<span class="rb-sig-ln"></span>' +
           '</div>';
         return;
       }
@@ -271,6 +271,7 @@
       '.rb{max-width:100%}' +
       '.rb-info{font-weight:400;word-wrap:break-word;overflow-wrap:break-word}' +
       '.rb-lbl{font-weight:400}' +
+      '.rb-val,.rb-sig-lbl,.rb-sig-mail,.rb-footer,.rb-table td,.rb-table th{unicode-bidi:plaintext}' +
       '.rb-title .rb-val{letter-spacing:.2px}' +
       '.rb-amount .rb-val{letter-spacing:-.5px}' +
       '.rb-cur{font-weight:900}' +
@@ -279,10 +280,9 @@
       '.rb-table th,.rb-table td{border:calc(var(--s)*0.12mm) solid #000;padding:calc(var(--s)*0.6mm) calc(var(--s)*0.8mm);text-align:center}' +
       '.rb-table th{font-weight:900}' +
       '.rb-bc svg{max-width:100%;display:block;margin:0 auto}' +
-      '.rb-sig{width:100%;display:flex;align-items:flex-end;justify-content:space-between;gap:calc(var(--s)*2mm)}' +
-      '.rb-sig-col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1;text-align:center;gap:calc(var(--s)*0.4mm)}' +
-      '.rb-sig-ln{width:100%;border-bottom:calc(var(--s)*0.15mm) solid #000;min-height:calc(var(--s)*6mm)}' +
-      '.rb-sig-mid{flex:0 0 auto}.rb-sig-mid img{display:block;margin:0 auto}' +
+      '.rb-sig{width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--s)*0.5mm);text-align:center}' +
+      '.rb-sig-logo{display:block;margin:0 auto}' +
+      '.rb-sig-ln{width:100%;border-bottom:calc(var(--s)*0.15mm) solid #000;min-height:calc(var(--s)*5mm)}' +
       '.rb-sig-lbl{font-weight:900}' +
       '.rb-sig-mail{display:block;font-size:0.62em;direction:ltr}' +
       '.rb-footer{font-weight:400}' +
