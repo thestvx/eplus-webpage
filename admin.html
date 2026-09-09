@@ -3225,7 +3225,7 @@
 
             <!-- Panel: Security (Accounts + Logs) -->
             <div class="settings-panel" data-panel="security">
-              <div class="settings-section" data-search="الحسابات الإداريين إدارة الادارة المدير المشرفون إنشاء حساب جديد صلاحيات admin">
+              <div class="settings-section" id="adm-accounts-section" data-search="الحسابات الإداريين إدارة الادارة المدير المشرفون إنشاء حساب جديد صلاحيات admin">
                 <div class="settings-section-head">
                   <div>
                     <div class="settings-section-title">حسابات الإدارة</div>
@@ -5554,6 +5554,10 @@ onAuthStateChanged(auth, async user => {
     document.getElementById('admin-name').textContent = uname;
     window.setGreeting(uname);
     document.querySelector('.admin-role').textContent = empCfg ? ('👔 ' + empCfg.role) : 'مشرف النظام';
+    // قسم "حسابات الإدارة" ظاهر لمدير النظام (الحساب في EMPLOYEES) فقط؛ حسابات الأدمن المنشأة ترى سجل الداشبورد فقط
+    const _isMainAdmin = !!(EMPLOYEES[String(user.email || '').toLowerCase()]);
+    const _admSecEl = document.getElementById('adm-accounts-section');
+    if (_admSecEl) _admSecEl.style.display = _isMainAdmin ? '' : 'none';
     // إعادة إظهار جميع عناصر الأدمين
     document.querySelectorAll('.nav-item').forEach(el => el.style.display = '');
     document.querySelectorAll('.nav-section').forEach(el => el.style.display = '');
@@ -8049,26 +8053,28 @@ window.dashAdminLoadProfiles = async () => {
       : '<span style="font-size:10px;font-weight:800;color:#059669;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:999px;padding:2px 8px">نشط</span>';
     const selfTag = isSelf ? '<span style="font-size:10px;font-weight:800;color:#6D28D9;background:#EDE9FE;border:1px solid #C4B5FD;border-radius:999px;padding:2px 8px">أنت</span>' : '';
     const uname = String(a.username || '').trim() || String(a.email || '').split('@')[0] || '—';
-    const meta = [
-      '<span style="color:var(--primary);font-weight:700;direction:ltr">@' + _admEsc(uname) + '</span>',
-      _admEsc(a.email || '—'),
-      a.phone ? _admEsc('📞 ' + a.phone) : '',
-      a.createdBy ? _admEsc('بإنشاء: ' + a.createdBy) : '',
-      _admFmtTs(a.createdAt) ? _admEsc('منذ ' + _admFmtTs(a.createdAt)) : ''
-    ].filter(Boolean).join(' • ');
+    const createdTxt = _admFmtTs(a.createdAt);
+    const meta =
+      '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center">'
+      + '<span style="color:var(--primary);font-weight:800;direction:ltr" dir="ltr">@' + _admEsc(uname) + '</span>'
+      + (a.email ? '<span dir="ltr" style="direction:ltr;color:var(--text-2);font-weight:700">' + _admEsc(a.email) + '</span>' : '')
+      + (a.phone ? '<span style="white-space:nowrap">📞 <b dir="ltr" style="direction:ltr">' + _admEsc(a.phone) + '</b></span>' : '')
+      + (a.createdBy ? '<span style="white-space:nowrap">بإنشاء: <b style="color:var(--text-2)">' + _admEsc(a.createdBy) + '</b></span>' : '')
+      + (createdTxt ? '<span style="white-space:nowrap;color:var(--text-muted)">منذ: <b style="color:var(--text-2)">' + _admEsc(createdTxt) + '</b></span>' : '')
+      + '</div>';
     const toggleLabel = isDisabled ? 'تفعيل' : 'تعطيل';
     const toggleStyle = isDisabled
       ? 'background:linear-gradient(135deg,#059669,#10b981);'
       : 'background:linear-gradient(135deg,#f59e0b,#d97706);';
     return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:var(--card);margin-bottom:10px">'
-      + '<div style="width:44px;height:44px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;color:#fff;background:linear-gradient(135deg,#7C3AED,#A78BFA);' + (isDisabled ? 'opacity:.5;' : '') + '">' + _admEsc(_admInitials(a.fullName)) + '</div>'
+      + '<div style="width:44px;height:44px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,#7C3AED,#A78BFA);' + (isDisabled ? 'opacity:.5;' : '') + '"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>'
       + '<div style="flex:1;min-width:0">'
       +   '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
       +     '<span style="font-weight:900;font-size:14px;color:var(--text)">' + _admEsc(a.fullName || '—') + '</span>'
       +     selfTag
       +     statusTag
       +   '</div>'
-      +   '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;overflow-wrap:anywhere">' + meta + '</div>'
+      +   '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">' + meta + '</div>'
       + '</div>'
       + '<div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap">'
       +   '<button type="button" class="sec-btn" onclick="dashAdminEditProfile(\'' + a.uid + '\')" style="font-size:11px;padding:7px 12px">✏️ تعديل</button>'
@@ -8093,8 +8099,10 @@ window.dashAdminEditProfile = async (uid) => {
   const modal = document.createElement('div');
   modal.id = 'adm-account-modal';
   modal.className = 'modal-overlay';
+  modal.style.cssText = 'display:none;align-items:center;justify-content:center;padding:20px;position:fixed;inset:0;z-index:9999;background:rgba(15,10,40,0.68);backdrop-filter:blur(6px);overflow-y:auto';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
   modal.innerHTML = `
-    <div class="modal-box" style="max-width:480px;background:var(--card);border-radius:20px;box-shadow:var(--shadow-xl);overflow:hidden;animation:modalIn 0.25s ease">
+    <div class="modal-box" style="width:100%;max-width:480px;background:var(--card);border-radius:20px;box-shadow:var(--shadow-xl);overflow-y:auto;max-height:90vh;animation:modalIn 0.25s ease">
       <div style="padding:24px 28px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
           <span style="font-size:26px">✏️</span>
@@ -8126,7 +8134,7 @@ window.dashAdminEditProfile = async (uid) => {
       </div>
     </div>`;
   document.body.appendChild(modal);
-  setTimeout(() => modal.classList.add('open'), 50);
+  modal.style.display = 'flex';
 };
 
 window.dashAdminSaveProfile = async () => {
@@ -8159,13 +8167,16 @@ window.dashAdminSaveProfile = async () => {
   } catch(e) { console.warn('username uniqueness check:', e); }
   btn.disabled = true;
   try {
-    await setDoc(doc(db, 'settings', 'adminAccounts'), {
-      [uid]: {
-        firstName, lastName, fullName: firstName + ' ' + lastName,
-        username, phone: phoneClean, status,
-        updatedAt: serverTimestamp()
-      }
-    }, { merge: true });
+    // مسارات نقطية لدمج الحقول داخل ماب الحساب من دون مسح باقي البيانات (البريد، createdBy...)
+    await updateDoc(doc(db, 'settings', 'adminAccounts'), {
+      [uid + '.firstName']: firstName,
+      [uid + '.lastName']: lastName,
+      [uid + '.fullName']: firstName + ' ' + lastName,
+      [uid + '.username']: username,
+      [uid + '.phone']: phoneClean,
+      [uid + '.status']: status,
+      [uid + '.updatedAt']: serverTimestamp()
+    });
     await dashLog('accounts', 'تعديل بروفايل أدمن', 'تم تحديث بيانات ' + firstName + ' ' + lastName + ' (الحالة: ' + (status === 'disabled' ? 'معطّل' : 'نشط') + ')');
     const modal = document.getElementById('adm-account-modal');
     if (modal) modal.remove();
@@ -8192,8 +8203,10 @@ window.dashAdminPwModal = async (uid) => {
   const modal = document.createElement('div');
   modal.id = 'adm-pw-modal';
   modal.className = 'modal-overlay';
+  modal.style.cssText = 'display:none;align-items:center;justify-content:center;padding:20px;position:fixed;inset:0;z-index:9999;background:rgba(15,10,40,0.68);backdrop-filter:blur(6px);overflow-y:auto';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
   modal.innerHTML = `
-    <div class="modal-box" style="max-width:460px;background:var(--card);border-radius:20px;box-shadow:var(--shadow-xl);overflow:hidden;animation:modalIn 0.25s ease">
+    <div class="modal-box" style="width:100%;max-width:460px;background:var(--card);border-radius:20px;box-shadow:var(--shadow-xl);overflow-y:auto;max-height:90vh;animation:modalIn 0.25s ease">
       <div style="padding:24px 28px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
           <span style="font-size:26px">🔑</span>
@@ -8214,7 +8227,7 @@ window.dashAdminPwModal = async (uid) => {
       </div>
     </div>`;
   document.body.appendChild(modal);
-  setTimeout(() => modal.classList.add('open'), 50);
+  setTimeout(() => { const i = document.getElementById('adm-pw-current'); if (i) i.focus(); }, 60);
 };
 
 window.dashAdminChangePwSave = async () => {
@@ -8257,7 +8270,7 @@ window.dashAdminChangePwSave = async () => {
       if (String(data.error.message || '').includes('WEAK_PASSWORD')) throw new Error('الباسوورد ضعيف، استخدم 6 أحرف أو أكثر');
       throw new Error(data.error.message);
     }
-    await updateDoc(doc(db, 'settings', 'adminAccounts'), { [uid]: { updatedAt: serverTimestamp() } }).catch(() => {});
+    await updateDoc(doc(db, 'settings', 'adminAccounts'), { [uid + '.updatedAt']: serverTimestamp() }).catch(() => {});
     await dashLog('accounts', 'تغيير كلمة مرور أدمن', 'تم تغيير كلمة مرور ' + (acc.fullName || acc.email));
     const modal = document.getElementById('adm-pw-modal');
     if (modal) modal.remove();
@@ -8308,15 +8321,86 @@ window.dashAdminToggleStatus = async (uid) => {
   } catch(e) { showToast('تعذر تحميل بيانات الحساب', true); return; }
   const a = accounts[uid];
   if (!a) { showToast('الحساب غير موجود', true); return; }
-  const newStatus = a.status === 'disabled' ? 'active' : 'disabled';
+  if (a.status !== 'disabled') {
+    // تعطيل — تحقق بخطوتين: رمز PIN ثم تأكيد
+    dashAdminDisableConfirm(uid, a.fullName || a.email || 'الحساب');
+    return;
+  }
+  // تفعيل — مباشر
+  await dashAdminSetStatus(uid, a, 'active');
+};
+
+// ── تعطيل بأمان: نافذة PIN (رمز ثابت) ثم تأكيد التعطيل ──
+const ADM_DISABLE_PIN = '2019';
+let admPinUid = null;
+
+window.dashAdminDisableConfirm = (uid, displayName) => {
+  admPinUid = uid;
+  const existing = document.getElementById('adm-pin-modal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'adm-pin-modal';
+  modal.className = 'modal-overlay';
+  modal.style.cssText = 'display:none;align-items:center;justify-content:center;padding:20px;position:fixed;inset:0;z-index:9999;background:rgba(15,10,40,0.72);backdrop-filter:blur(6px)';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-box" style="width:100%;max-width:400px;background:var(--card);border-radius:20px;box-shadow:var(--shadow-xl);overflow:hidden;animation:modalIn 0.25s ease">
+      <div style="padding:24px 28px;text-align:center">
+        <div style="width:52px;height:52px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;background:#FEF2F2;border:1px solid #FECACA;color:#DC2626"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg></div>
+        <div style="font-weight:900;font-size:16px;color:var(--text);margin-top:12px">تأكيد تعطيل الحساب</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">الحساب: <b style="color:var(--text)">${_admEsc(displayName)}</b></div>
+        <div style="font-size:12px;color:var(--text-muted);margin:10px 0 14px">أدخل رمز الأمان (PIN) لتأكيد التعطيل</div>
+        <input type="password" inputmode="numeric" dir="ltr" id="adm-pin-input" placeholder="••••" maxlength="10"
+          style="width:100%;padding:13px;text-align:center;font-size:20px;font-weight:900;letter-spacing:8px;border:2px solid var(--border);border-radius:12px;background:#fff;color:var(--text);outline:none;font-family:monospace;box-sizing:border-box"
+          onkeydown="if(event.key==='Enter')dashAdminVerifyDisable()">
+        <div id="adm-pin-err" style="font-size:11px;color:#DC2626;height:14px;margin-top:6px;opacity:0">رمز خاطئ — أعد المحاولة</div>
+        <div style="display:flex;gap:10px;margin-top:12px">
+          <button type="button" class="sec-btn" id="adm-pin-ok" onclick="dashAdminVerifyDisable()" style="flex:1;justify-content:center;background:linear-gradient(135deg,#DC2626,#991B1B);box-shadow:0 4px 14px rgba(220,38,38,.3)">تأكيد التعطيل</button>
+          <button type="button" class="sec-btn" onclick="document.getElementById('adm-pin-modal').remove()" style="flex:1;justify-content:center;background:transparent;border-color:var(--border-2)">إلغاء</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.style.display = 'flex';
+  setTimeout(() => { const i = document.getElementById('adm-pin-input'); if (i) i.focus(); }, 60);
+};
+
+window.dashAdminVerifyDisable = async () => {
+  const pin = document.getElementById('adm-pin-input').value.trim();
+  const err = document.getElementById('adm-pin-err');
+  const okBtn = document.getElementById('adm-pin-ok');
+  const modal = document.getElementById('adm-pin-modal');
+  if (pin !== ADM_DISABLE_PIN) {
+    if (err) err.style.opacity = '1';
+    const inp = document.getElementById('adm-pin-input');
+    if (inp) { inp.value = ''; inp.focus(); }
+    return;
+  }
+  if (err) err.style.opacity = '0';
+  if (okBtn) { okBtn.disabled = true; okBtn.textContent = 'جارِ التعطيل…'; }
+  const uid = admPinUid;
+  let acc = null;
   try {
-    await updateDoc(doc(db, 'settings', 'adminAccounts'), { [uid]: { status: newStatus, updatedAt: serverTimestamp() } });
-    await dashLog('accounts', newStatus === 'disabled' ? 'تعطيل حساب إدارة' : 'تفعيل حساب إدارة',
-      (a.fullName || a.email) + (newStatus === 'disabled' ? ' — معطّل' : ' — مفعّل'));
-    showToast(newStatus === 'disabled' ? 'تم تعطيل ' + (a.fullName || a.email) : 'تم تفعيل ' + (a.fullName || a.email));
+    const snap = await getDoc(doc(db, 'settings', 'adminAccounts'));
+    if (snap.exists()) acc = (snap.data() || {})[uid];
+  } catch(e) {}
+  if (acc) await dashAdminSetStatus(uid, acc, 'disabled');
+  if (modal) modal.remove();
+};
+
+window.dashAdminSetStatus = async (uid, acc, newStatus) => {
+  try {
+    // مسار نقطي لدمج الحقل داخل ماب الحساب من دون مسح باقي البيانات
+    await updateDoc(doc(db, 'settings', 'adminAccounts'), {
+      [uid + '.status']: newStatus,
+      [uid + '.updatedAt']: serverTimestamp()
+    });
+    const who = (acc && (acc.fullName || acc.email)) || 'حساب';
+    await dashLog('accounts', newStatus === 'disabled' ? 'تعطيل حساب إدارة' : 'تفعيل حساب إدارة', who + (newStatus === 'disabled' ? ' — معطّل' : ' — مفعّل'));
+    showToast(newStatus === 'disabled' ? 'تم تعطيل ' + who : 'تم تفعيل ' + who);
     if (typeof window.dashAdminLoadProfiles === 'function') window.dashAdminLoadProfiles();
   } catch(e) {
-    console.error('dashAdminToggleStatus error:', e);
+    console.error('dashAdminSetStatus error:', e);
     showToast('فشل التحديث: ' + e.message, true);
   }
 };
@@ -8360,14 +8444,20 @@ window.dashLogsFilter = () => {
   }
   list.innerHTML = rows.map(r => {
     const who = '<span class="dashlog-actor">' + secEsc(r.actor || 'مشرف') + '</span>';
-    const when = r.createdAt && r.createdAt.toDate
-      ? r.createdAt.toDate().toLocaleString('ar-DZ')
-      : (r.timestampStr || '');
+    let when = r.timestampStr || '';
+    try {
+      const d = r.createdAt && r.createdAt.toDate ? r.createdAt.toDate() : (r.createdAt instanceof Date ? r.createdAt : null);
+      if (d && !isNaN(d.getTime())) {
+        when = d.getFullYear() + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0')
+          + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0');
+      }
+    } catch(e) { /* keep timestampStr */ }
     return '<div class="dashlog-item">' +
       '<div class="dashlog-dot">' + dashCatIcon(r.category) + '</div>' +
       '<div class="dashlog-main">' +
         '<div class="dashlog-line">' + secEsc(r.action || r.category || 'حركة') + (r.detail ? ' — ' + secEsc(r.detail) : '') + '</div>' +
-        '<div class="dashlog-meta">' + who + ' &nbsp;•&nbsp; ' + (r.category || '') + ' &nbsp;•&nbsp; <span dir="ltr">' + secEsc(when) + '</span></div>' +
+        '<div class="dashlog-meta">' + who + ' &nbsp;•&nbsp; ' + secEsc(r.category || '') + '</div>' +
+        '<div dir="ltr" style="text-align:left;font-size:10.5px;font-weight:800;color:var(--text-muted);opacity:.9;margin-top:2px">' + secEsc(when) + '</div>' +
       '</div>' +
     '</div>';
   }).join('');
