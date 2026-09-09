@@ -1705,6 +1705,31 @@
         try { box.setPointerCapture(e.pointerId); } catch (err) {}
       });
     });
+    var amtCur = box.querySelector('.rb-amount .rb-cur');
+    if (amtCur) {
+      amtCur.addEventListener('pointerdown', function (e) {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        e.preventDefault();
+        e.stopPropagation();
+        var b = findBlock('amount');
+        if (!b) return;
+        var sx = e.clientX, start = b.curOffset == null ? 0.6 : b.curOffset;
+        function mv(ev) {
+          b.curOffset = Math.round((start + (ev.clientX - sx) / MM_PX) * 100) / 100;
+          renderPreview();
+        }
+        function up() {
+          window.removeEventListener('pointermove', mv);
+          window.removeEventListener('pointerup', up);
+          window.removeEventListener('pointercancel', up);
+          var f = gi('rc-i-co');
+          if (f) f.value = b.curOffset;
+        }
+        window.addEventListener('pointermove', mv);
+        window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', up);
+      });
+    }
     renderList();
   }
   box.addEventListener('pointermove', function (e) {
@@ -1807,6 +1832,9 @@
       numField('in', 'الموضع الأفقي من الحافة اليمنى (مم)', b.indent || 0, null, 0.1);
       numField('lh', 'ارتفاع السطر', b.lh || 1.5, null, 0.1);
       numField('ls', 'تباعد الحروف (مم)', b.ls || 0, null, 0.05);
+      if (b.key === 'amount') {
+        f.push('<label>تحريك «دج» (مم)<input id="rc-i-co" type="number" step="0.2" value="' + (b.curOffset == null ? 0.6 : b.curOffset) + '"><span style="display:block;font-size:10px;color:#888;font-weight:400">سالب لليسار / موجب لليمين — أو اسحب كلمة «دج» في المعاينة</span></label>');
+      }
     }
     if (b.type === 'divider') {
       numField('th', 'السمك (مم)', b.thick || 0.3, null, 0.05);
@@ -1833,6 +1861,7 @@
       bind('in', function (el) { b.indent = parseFloat(el.value) || 0; });
       bind('lh', function (el) { b.lh = parseFloat(el.value) || 1.4; });
       bind('ls', function (el) { b.ls = parseFloat(el.value) || 0; });
+      if (b.key === 'amount') bind('co', function (el) { b.curOffset = parseFloat(el.value) || 0; });
     }
     if (b.type === 'divider') {
       bind('th', function (el) { b.thick = parseFloat(el.value) || 0.1; });
@@ -1954,6 +1983,8 @@
       if (e.key === 'ArrowDown' && b.spacingTop != null) b.spacingTop = Math.round((b.spacingTop + step) * 100) / 100;
       if (e.key === 'ArrowRight' && b.indent != null) b.indent = Math.max(0, Math.round((b.indent - step) * 100) / 100);
       if (e.key === 'ArrowLeft' && b.indent != null) b.indent = Math.max(0, Math.round((b.indent + step) * 100) / 100);
+      if (b.key === 'amount' && e.key === 'ArrowRight') b.curOffset = Math.round(((b.curOffset == null ? 0.6 : b.curOffset) + step) * 100) / 100;
+      if (b.key === 'amount' && e.key === 'ArrowLeft') b.curOffset = Math.round(((b.curOffset == null ? 0.6 : b.curOffset) - step) * 100) / 100;
       renderPreview();
     }
   });

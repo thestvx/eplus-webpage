@@ -66,7 +66,7 @@
       { key: 'div3', type: 'divider', hide: false, thick: 0.5, dash: false, spacingTop: 1 },
       { key: 'table', type: 'table', hide: false, fs: 2.9, spacingTop: 0.5 },
       { key: 'div4', type: 'divider', hide: false, thick: 0.2, dash: true, spacingTop: 1 },
-      { key: 'amount', type: 'text', label: 'المبلغ', hide: false, fs: 4.6, valueBold: true, align: 'center', indent: 0, spacingTop: 1.4, lh: 1.2, showLabel: false },
+      { key: 'amount', type: 'text', label: 'المبلغ', hide: false, fs: 4.6, valueBold: true, align: 'center', indent: 0, spacingTop: 1.4, lh: 1.2, showLabel: false, curOffset: 0.6 },
       { key: 'amountWords', type: 'text', label: '', hide: false, fs: 2.8, valueBold: true, align: 'center', indent: 0, spacingTop: 0.3, lh: 1.6, showLabel: false },
       { key: 'date', type: 'text', label: 'تاريخ الإصدار', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
       { key: 'div5', type: 'divider', hide: false, thick: 0.5, dash: false, spacingTop: 1.2 },
@@ -274,9 +274,13 @@
         return;
       }
       if (b.key === 'amount') {
+        var coV = b.curOffset == null ? 0.6 : Math.round(num(b.curOffset) * 100) / 100;
         html += '<div data-rb="' + b.key + '" class="rb rb-info rb-amount" style="' + fs(b) + ';' + sTop(b) + ';line-height:' + (b.lh || 1.2) + ';text-align:' + (b.align || 'center') + ';' + ind(b) + '">' +
           (b.showLabel ? '<span class="rb-lbl">' + esc(b.label) + ': </span>' : '') +
-          '<span class="rb-val"><span dir="ltr" style="unicode-bidi:bidi-override">\u202A' + toDigits(value, t.digits) + '\u00A0<span class="rb-cur" style="font-size:0.55em">دج</span>\u202C</span></span></div>';
+          '<span class="rb-val" style="position:relative;display:inline-block">' +
+          '<span class="rb-amt-num" dir="ltr" style="unicode-bidi:isolate">' + toDigits(value, t.digits) + '</span>' +
+          '<span class="rb-cur" style="font-size:0.55em;position:absolute;top:50%;transform:translateY(-50%);left:100%;margin-left:calc(var(--s)*' + fmtNum(coV) + 'mm)">دج</span>' +
+          '</span></div>';
         return;
       }
       if (b.key === 'amountWords') {
