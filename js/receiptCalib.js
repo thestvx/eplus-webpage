@@ -106,10 +106,9 @@
     var merged = [];
     saved.forEach(function (b) {
       if (!b || !b.key) return;
-      var base = byKey[b.key];
-      if (!base) return;
       keysSeen[b.key] = true;
-      merged.push(Object.assign({}, base, b));
+      var base = byKey[b.key];
+      merged.push(base ? Object.assign({}, base, b) : clone(b));
     });
     def.blocks.forEach(function (b) {
       if (!keysSeen[b.key]) merged.push(clone(b));
@@ -181,6 +180,7 @@
 
   function sTop(b) { return 'margin-top:calc(var(--s)*' + fmtNum(b.spacingTop) + 'mm);'; }
   function fs(b) { return b.fs != null ? 'font-size:calc(var(--s)*' + fmtNum(b.fs) + 'mm);' : ''; }
+  function ls(b) { return b.ls ? 'letter-spacing:calc(var(--s)*' + fmtNum(b.ls) + 'mm);' : ''; }
   function ind(b) {
     if (b.align === 'left') return num(b.indent) ? 'padding-left:calc(var(--s)*' + fmtNum(b.indent) + 'mm);' : '';
     return num(b.indent) ? 'padding-right:calc(var(--s)*' + fmtNum(b.indent) + 'mm);' : '';
@@ -237,7 +237,7 @@
       if (b.key === 'amount' && value === '') value = '0';
       if (isTitle) {
         if (!value) return;
-        var stT = fs(b) + ';' + sTop(b) + ';line-height:' + (b.lh || 1.3) + ';text-align:' + (b.align || 'center') + ';' + ind(b);
+        var stT = fs(b) + ';' + sTop(b) + ';' + ls(b) + ';line-height:' + (b.lh || 1.3) + ';text-align:' + (b.align || 'center') + ';' + ind(b);
         html += '<div data-rb="' + b.key + '" class="rb rb-info rb-title" style="' + stT + '">' +
           '<span class="rb-val" style="font-weight:' + (b.bold ? '900' : '400') + '">' + esc(value) + '</span></div>';
         return;
@@ -255,7 +255,7 @@
         return;
       }
       if (!value) return;
-      var st = fs(b) + ';' + sTop(b) + ';line-height:' + (b.lh || 1.5) + ';text-align:' + (b.align || 'right') + ';' + ind(b);
+      var st = fs(b) + ';' + sTop(b) + ';' + ls(b) + ';line-height:' + (b.lh || 1.5) + ';text-align:' + (b.align || 'right') + ';' + ind(b);
       var lbl = (b.showLabel && b.label) ? '<span class="rb-lbl">' + esc(b.label) + ': </span>' : '';
       html += '<div data-rb="' + b.key + '" class="rb rb-info" style="' + st + '">' + lbl +
         '<span class="rb-val" style="font-weight:' + (b.valueBold ? '900' : '400') + '">' + toDigits(value, t.digits) + '</span></div>';

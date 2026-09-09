@@ -416,13 +416,15 @@
     <div class="rc-side">
       <div class="rc-list-cap">السطور المطبوعة — اضغط للإختيار ثم عدّل:</div>
       <div id="rc-list"></div>
+      <button id="rc-add-div-btn" style="width:100%;margin-top:8px;font-family:inherit;font-size:12px;font-weight:800;padding:6px;border:1px solid #c4d0ea;border-radius:8px;background:#fff;color:#2548A1;cursor:pointer">➕ إضافة فاصل</button>
     </div>
   </div>
   <div class="inspector">
     <h2>لوحة تحكم السطر المحدد</h2>
     <div class="insp-name" id="rc-insp-name">لم يتم اختيار سطر — انقر على أي سطر في المعاينة أو القائمة</div>
     <div class="rc-grid" id="rc-insp-grid"></div>
-    <div class="insp-hint">تباعد = المسافة فوق السطر (مم). الإزاحة = المسافة من الحافة (مم). مفاتيح الأسهم تضبطها بدقة 0.1 مم (مع Shift 1 مم).</div>
+    <button id="rc-del-btn" class="hidden" style="margin-top:10px;width:100%;font-family:inherit;font-size:13px;font-weight:900;padding:8px;border:1px solid #e2a1a1;border-radius:9px;background:#fff;color:#b3362f;cursor:pointer">🗑️ حذف هذا السطر</button>
+    <div class="insp-hint">تباعد = المسافة فوق السطر (مم). الموضع الأفقي = المسافة من الحافة اليمنى (مم): حرّك السطر بسحب أفقي أو مفاتيح ← →. احذف بالزر أو زر ✕ في القائمة. Shift + سهم = خطوة 1 مم.</div>
   </div>
 
   <h2 class="sec-title"><span class="step">هـ</span> سجل التعديلات — استرجاع إعدادات الأيام السابقة</h2>
@@ -1712,7 +1714,10 @@
     var dy = (e.clientY - drag.y) / MM_PX;
     var dx = (e.clientX - drag.x) / MM_PX;
     if (b.spacingTop != null) b.spacingTop = Math.max(0, Math.round((drag.st + dy) * 100) / 100);
-    if (b.indent != null) b.indent = Math.max(0, Math.round((drag.in + dx) * 100) / 100);
+    if (b.indent != null) {
+      var mx = Math.max(1, tpl.widthMm - 2 * (tpl.paddingMm || 0));
+      b.indent = Math.max(0, Math.min(mx, Math.round((drag.in - dx) * 100) / 100));
+    }
     renderPreview();
   });
   box.addEventListener('pointerup', function () { drag = null; });
@@ -1735,6 +1740,7 @@
         '<button data-a="dn" title="الأسفل">▼</button>' +
         '<span class="nm">' + nameOf(b.key) + '</span>' +
         '<button data-a="hid" class="' + 'hid' + '">' + (b.hide ? '🔒' : '👁') + '</button>' +
+        '<button data-a="del" title="حذف">✕</button>' +
         '</div>';
     }).join('');
     el.innerHTML = html;
@@ -1747,6 +1753,15 @@
         if (a === 'up' && idx > 0) { var t = tpl.blocks[idx - 1]; tpl.blocks[idx - 1] = tpl.blocks[idx]; tpl.blocks[idx] = t; }
         if (a === 'dn' && idx < tpl.blocks.length - 1) { var u = tpl.blocks[idx + 1]; tpl.blocks[idx + 1] = tpl.blocks[idx]; tpl.blocks[idx] = u; }
         if (a === 'hid') { tpl.blocks[idx].hide = !tpl.blocks[idx].hide; }
+        if (a === 'del') {
+          var nm = nameOf(tpl.blocks[idx].key);
+          var wasSel = tpl.blocks[idx].key === SEL;
+          tpl.blocks.splice(idx, 1);
+          if (wasSel) select(null);
+          renderPreview();
+          toast('تم حذف «' + nm + '» — استخدم إعادة الضبط لاسترجاعه');
+          return;
+        }
         renderPreview();
       });
     });
@@ -1761,6 +1776,8 @@
       nameEl.textContent = 'لم يتم اختيار سطر — انقر على أي سطر في المعاينة أو القائمة';
       nameEl.style.color = '';
       grid.innerHTML = '';
+      var dbh = gi('rc-del-btn');
+      if (dbh) dbh.classList.add('hidden');
       return;
     }
     nameEl.textContent = nameOf(b.key) + (b.hide ? ' (مخفي)' : '');
@@ -1786,8 +1803,9 @@
       if ('valueBold' in b) ckField('vb', 'عريض', b.valueBold);
       if ('bold' in b) ckField('bd', 'عريض', b.bold);
       selField('al', 'المحاذاة', b.align || 'right', [['right', 'يمين'], ['center', 'وسط'], ['left', 'يسار']]);
-      numField('in', 'الإزاحة (مم)', b.indent || 0, null, 0.1);
+      numField('in', 'الموضع الأفقي من الحافة اليمنى (مم)', b.indent || 0, null, 0.1);
       numField('lh', 'ارتفاع السطر', b.lh || 1.5, null, 0.1);
+      numField('ls', 'تباعد الحروف (مم)', b.ls || 0, null, 0.05);
     }
     if (b.type === 'divider') {
       numField('th', 'السمك (مم)', b.thick || 0.3, null, 0.05);
@@ -1809,11 +1827,14 @@
       bind('al', function (el) { b.align = el.value; });
       bind('in', function (el) { b.indent = parseFloat(el.value) || 0; });
       bind('lh', function (el) { b.lh = parseFloat(el.value) || 1.4; });
+      bind('ls', function (el) { b.ls = parseFloat(el.value) || 0; });
     }
     if (b.type === 'divider') {
       bind('th', function (el) { b.thick = parseFloat(el.value) || 0.1; });
       bind('ds', function (el) { b.dash = el.checked; });
     }
+    var delBtn = gi('rc-del-btn');
+    if (delBtn) delBtn.classList.toggle('hidden', false);
   }
 
   function syncSettingsFromTpl() {
@@ -1889,6 +1910,26 @@
     toast('تمت إعادة الوضع الافتراضي (احفظ لرفعه للمصدر المركزي)');
   });
 
+  gi('rc-del-btn').addEventListener('click', function () {
+    if (!SEL) return;
+    var b = findBlock(SEL);
+    if (!b) return;
+    var nm = nameOf(b.key);
+    var idx = tpl.blocks.indexOf(b);
+    if (idx >= 0) tpl.blocks.splice(idx, 1);
+    select(null);
+    renderPreview();
+    toast('تم حذف «' + nm + '» — استخدم إعادة الضبط لاسترجاعه');
+  });
+
+  gi('rc-add-div-btn').addEventListener('click', function () {
+    var key = 'div-c' + Date.now().toString(36);
+    tpl.blocks.push({ key: key, type: 'divider', hide: false, thick: 0.3, dash: false, spacingTop: 1 });
+    select(key);
+    renderPreview();
+    toast('أُضيف فاصل — عدّل سمكه واختر متقطعاً إن أردت');
+  });
+
   document.addEventListener('keydown', function (e) {
     if (!SEL) return;
     var b = findBlock(SEL);
@@ -1899,8 +1940,8 @@
       var step = e.shiftKey ? 1 : 0.1;
       if (e.key === 'ArrowUp' && b.spacingTop != null) b.spacingTop = Math.max(0, Math.round((b.spacingTop - step) * 100) / 100);
       if (e.key === 'ArrowDown' && b.spacingTop != null) b.spacingTop = Math.round((b.spacingTop + step) * 100) / 100;
-      if (e.key === 'ArrowRight' && b.indent != null) b.indent = Math.max(0, Math.round((b.indent + step) * 100) / 100);
-      if (e.key === 'ArrowLeft' && b.indent != null) b.indent = Math.max(0, Math.round((b.indent - step) * 100) / 100);
+      if (e.key === 'ArrowRight' && b.indent != null) b.indent = Math.max(0, Math.round((b.indent - step) * 100) / 100);
+      if (e.key === 'ArrowLeft' && b.indent != null) b.indent = Math.max(0, Math.round((b.indent + step) * 100) / 100);
       renderPreview();
     }
   });
