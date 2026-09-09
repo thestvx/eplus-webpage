@@ -5288,7 +5288,7 @@ function receptionCfgFrom(acc, uid) {
     role: RECEPTION_ROLE_NAME,
     allowedSections: (base.allowedSections || []).slice(),
     showWebsite: false,
-    restrictions: Object.assign({ subxHideAttendance: true }, base.restrictions || {})
+    restrictions: Object.assign({ subxHideAttendance: true, attNoSessionControl: true }, base.restrictions || {})
   };
 }
 window.RECEPTION_ROLE_NAME = RECEPTION_ROLE_NAME;
@@ -5349,7 +5349,7 @@ function applyEmployeeMode(cfg) {
   if (cfg.restrictions.noEditTeacher || cfg.restrictions.noDeleteTeacher ||
       cfg.restrictions.srReadOnly || cfg.restrictions.srtReadOnly ||
       cfg.restrictions.srNoDelete || cfg.restrictions.srNoUnregister || cfg.restrictions.srNoConfirmFree ||
-      cfg.restrictions.subxHideAttendance) {
+      cfg.restrictions.subxHideAttendance || cfg.restrictions.attNoSessionControl) {
     // نراقب تحديثات DOM في قسم الأساتذة
     const observer = new MutationObserver(() => {
       if (cfg.restrictions.noDeleteTeacher)
@@ -5372,6 +5372,8 @@ function applyEmployeeMode(cfg) {
         document.querySelectorAll('button[onclick*="srtOpenAddModal"], button[onclick*="srtOpenEditModal"], button[onclick*="srtResetPassword"], button[onclick*="srtConfirmResetPassword"], button[onclick*="srtToggleStatus"], button[onclick*="srtDelete"], button[onclick*="srtOpenFinance"], button[onclick*="srtFinanceAddPayment"], button[onclick*="srtFinanceDeleteTx"], button[onclick*="srtFinanceComputeDues"], button[onclick*="srtTreasuryAdjust"], button[onclick*="srtFinanceSaveRate"], button[onclick*="srtAddSubjectRow"]').forEach(b => b.style.display = 'none');
       if (cfg.restrictions.subxHideAttendance)
         document.querySelectorAll('button[onclick*="subxCancelAttendance"]').forEach(b => b.style.display = 'none');
+      if (cfg.restrictions.attNoSessionControl)
+        document.querySelectorAll('[onclick*="openCtrlModal"]').forEach(b => b.style.display = 'none');
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }
@@ -5421,6 +5423,20 @@ if (cfg.restrictions.srNoConfirmFree) {
   }
   if (cfg.restrictions.subxHideAttendance) {
     window.subxCancelAttendance = () => showToast('⛔ ليس لديك صلاحية إلغاء الحضور', true);
+  }
+  if (cfg.restrictions.attNoSessionControl) {
+    const blockCtrl = (m) => () => showToast(m, true);
+    window.openCtrlModal = blockCtrl('⛔ ليس لديك صلاحية فتح وإغلاق الحصص');
+    window.setCtrlNow = blockCtrl('⛔ ليس لديك صلاحية فتح وإغلاق الحصة');
+    window.setCtrlStatus = blockCtrl('⛔ ليس لديك صلاحية تغيير حالة الحصة');
+    window.openNow = blockCtrl('⛔ ليس لديك صلاحية فتح الحصة');
+    window.showOpenChoice = blockCtrl('⛔ ليس لديك صلاحية فتح الحصة');
+    window.showOpenDatePicker = blockCtrl('⛔ ليس لديك صلاحية فتح الحصة');
+    window.openByDateConfirmed = blockCtrl('⛔ ليس لديك صلاحية فتح الحصة');
+    window.backToOpenChoice = blockCtrl('⛔ ليس لديك صلاحية فتح الحصة');
+    window.closeOpenChoice = blockCtrl('⛔ ليس لديك صلاحية فتح الحصة');
+    window.saveCtrlSettings = blockCtrl('⛔ ليس لديك صلاحية حفظ إعدادات الحصة');
+    window.toggleCtrlField = blockCtrl('⛔ ليس لديك صلاحية تعديل إعدادات الحصة');
   }
 
   // ── أساتذة الدعم المدرسي: عرض فقط (منع كل الإجراءات الإدارية) ──
@@ -17996,6 +18012,26 @@ async function loadAllSessionControls(teacherId, gi) {
 function renderCtrlContent(sessionNum, gi) {
   const teacherId = currentAttTeacherId;
   if (!teacherId) return '<div style="text-align:center;padding:24px;color:var(--text-muted)">' + t('no_teacher_selected_ctrl') + '</div>';
+
+  if ((window._employeeRestrictions || {}).attNoSessionControl) {
+    const tData = allTeachers.find(x => x.id === teacherId) || {};
+    const gList = tData.groups || [];
+    const gd = gList[gi] || {};
+    const gDays = (gd.days && gd.days.length) ? gd.days : (tData.days || []);
+    const sDay = gDays[(sessionNum - 1) % (gDays.length || 1)] || '—';
+    const cache = _sessionControlCache[gi] || {};
+    const ctrl = cache[sessionNum] || {};
+    const stKey = ctrl.status || 'scheduled';
+    const stLbls = { open: '✅ مفتوحة', scheduled: '🟡 مجدولة', closed: '🔴 مغلقة', locked: '⚫ مقفلة' };
+    const openTxt = ctrl.openAt ? (ctrl.openAt.toDate ? ctrl.openAt.toDate().toLocaleString('ar-DZ') : ctrl.openAt) : '—';
+    const closeTxt = ctrl.closeAt ? (ctrl.closeAt.toDate ? ctrl.closeAt.toDate().toLocaleString('ar-DZ') : ctrl.closeAt) : '—';
+    return '<div style="padding:18px;border-radius:14px;background:var(--bg);border:1px solid var(--border);text-align:center">' +
+      '<div style="font-size:14px;font-weight:900;color:var(--text)">الحصة ' + sessionNum + ' — ' + sDay + '</div>' +
+      '<div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-top:6px">الحالة: ' + (stLbls[stKey] || stKey) + '</div>' +
+      '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">الفتح: ' + openTxt + ' · الإغلاق: ' + closeTxt + '</div>' +
+      '<div style="margin-top:14px;padding:10px 12px;border-radius:10px;background:rgba(245,158,11,0.1);border:1px dashed rgba(245,158,11,0.4);color:#b45309;font-size:11.5px;font-weight:800">⛔ فتح وإغلاق الحصص متاح للإدارة فقط — يمكنك الاطلاع فقط</div>' +
+    '</div>';
+  }
 
   const teacherData = allTeachers.find(x => x.id === teacherId) || {};
   const groups = teacherData.groups || [];
