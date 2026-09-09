@@ -223,15 +223,17 @@
       }
       if (b.type === 'table') {
         if (!t.periodsShow || !rec.table || !rec.table.length) return;
-        var rows = rec.table.map(function (r) {
+        var cards = rec.table.map(function (r) {
           var mon = String(r[0] == null ? '' : r[0]).replace(/^شهر\s*/, '');
           var per = r[1] == null ? '' : String(r[1]);
           var ss = r[2] == null ? '' : String(r[2]);
-          return '<tr class="rb-trow"><td>' + numSpan(mon, t) + '</td><td>' + numSpan(ss, t) + '</td></tr>' +
-            (per ? '<tr class="rb-tper"><td colspan="2"><span class="rb-tper-lbl">الفترة:</span> ' + numSpan(per, t) + '</td></tr>' : '');
+          return '<div class="rb-mrow">' +
+            '<div class="rb-mhead">' + (mon && mon !== '—' ? 'الشهر ' + numSpan(mon, t) : 'اشتراك شهري') + '</div>' +
+            (per ? '<div class="rb-mline"><span class="rb-mlbl">الفترة:</span> ' + numSpan(per, t) + '</div>' : '') +
+            '<div class="rb-mline"><span class="rb-mlbl">الحصص:</span> ' + numSpan(ss, t) + '</div>' +
+            '</div>';
         }).join('');
-        html += '<div data-rb="' + b.key + '" class="rb rb-table" style="' + fs(b) + ';' + sTop(b) + '">' +
-          '<table><thead><tr><th>الشهر</th><th>الحصص</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+        html += '<div data-rb="' + b.key + '" class="rb rb-table" style="' + fs(b) + ';' + sTop(b) + '">' + cards + '</div>';
         return;
       }
       if (b.type === 'barcode') {
@@ -297,11 +299,11 @@
       '.rb-amount .rb-val{letter-spacing:-.5px}' +
       '.rb-cur{font-weight:900}' +
       '.rb-div{width:100%;height:0}' +
-      '.rb-table table{width:100%;border-collapse:collapse;border:calc(var(--s)*0.15mm) solid #000}' +
-      '.rb-table th,.rb-table td{border:calc(var(--s)*0.12mm) solid #000;padding:calc(var(--s)*0.6mm) calc(var(--s)*0.8mm);text-align:center}' +
-      '.rb-table th{font-weight:900}' +
-      '.rb-table .rb-tper td{text-align:right;font-size:0.9em}' +
-      '.rb-table .rb-tper .rb-tper-lbl{font-weight:900}' +
+      '.rb-table{display:flex;flex-direction:column;gap:calc(var(--s)*1.5mm)}' +
+      '.rb-mrow{border:calc(var(--s)*0.15mm) solid #000;padding:calc(var(--s)*0.8mm);display:flex;flex-direction:column;gap:calc(var(--s)*0.5mm)}' +
+      '.rb-mhead{font-weight:900;text-align:center}' +
+      '.rb-mline{text-align:right}' +
+      '.rb-mlbl{font-weight:900}' +
       '.rb-bc svg{max-width:100%;display:block;margin:0 auto}' +
       '.rb-sig{width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--s)*0.5mm);text-align:center}' +
       '.rb-sig-logo{display:block;margin:0 auto}' +
