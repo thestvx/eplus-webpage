@@ -7970,10 +7970,37 @@ window.dashAdminCreate = async () => {
   btn.disabled = true;
   btn.textContent = 'جارِ الإنشاء…';
   let createdCred = null;
+  let adoptMode = false;
   try {
     // إنشاء الحساب عبر التطبيق الثانوي حتى لا تتأثر جلسة الأدمن الحالية
-    createdCred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-    const uid = createdCred.user.uid;
+    let uid;
+    try {
+      createdCred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      uid = createdCred.user.uid;
+    } catch(createErr) {
+      if (createErr.code !== 'auth/email-already-in-use') throw createErr;
+      // البريد مسجل في Firebase — تحقق: حساب إدارة موجود أم حساب قديم بلا ملف (يتيم) نتبنّاه؟
+      const snap2 = await getDoc(doc(db, 'settings', 'adminAccounts'));
+      const accounts2 = snap2.exists() ? (snap2.data() || {}) : {};
+      const existing = Object.keys(accounts2)
+        .map(k => accounts2[k] || {})
+        .find(x => String(x.email || '').trim().toLowerCase() === email);
+      if (existing) {
+        throw new Error('البريد الإلكتروني مسجل لحساب إدارة أصلاً — Firebase يفرض بريداً فريداً لكل حساب دخول، استخدم بريداً آخر');
+      }
+      // حساب قديم يتيم (موجود في Firebase بدون ملف): تبنَّه بنفس الباسوورد المُدخل
+      adoptMode = true;
+      try {
+        const adoptionCred = await signInWithEmailAndPassword(secondaryAuth, email, password);
+        uid = adoptionCred.user.uid;
+        createdCred = adoptionCred;
+      } catch(pwErr) {
+        if (pwErr.code === 'auth/invalid-credential' || pwErr.code === 'auth/wrong-password') {
+          throw new Error('هذا البريد مسجل في Firebase بحساب قديم بلا ملف — أدخل الباسوورد الصحيح لذلك الحساب ليتم تبنّيه، أو استخدم بريداً آخر');
+        }
+        throw pwErr;
+      }
+    }
     // تفعيله كأدمن في Supabase (بدونه يُمنع من الاشتراكات/الموارد المالية)
     const granted = await dashAdminGrantSupabase(uid);
     if (!granted) throw new Error('تعذر تفعيل صلاحيات الاشتراكات — يرجى المحاولة لاحقاً');
@@ -7993,19 +8020,21 @@ window.dashAdminCreate = async () => {
       }
     }, { merge: true });
     await signOut(secondaryAuth);
-    setMsg('تم إنشاء حساب الإدارة بنجاح: ' + firstName + ' ' + lastName, true);
+    setMsg(adoptMode
+      ? 'تم تبنّي الحساب القديم وربطه بالإدارة بنجاح: ' + firstName + ' ' + lastName
+      : 'تم إنشاء حساب الإدارة بنجاح: ' + firstName + ' ' + lastName, true);
     document.getElementById('adm-first-name').value = '';
     document.getElementById('adm-last-name').value = '';
     document.getElementById('adm-email').value = '';
     document.getElementById('adm-phone').value = '';
     document.getElementById('adm-password').value = '';
     document.getElementById('adm-password-confirm').value = '';
-    await dashLog('accounts', 'إنشاء حساب إدارة', 'تم إنشاء حساب admin لـ ' + firstName + ' ' + lastName + ' (' + email + ')');
+    await dashLog('accounts', adoptMode ? 'تبنّي حساب إدارة قديم' : 'إنشاء حساب إدارة', 'تم ' + (adoptMode ? 'تبنّي حساب قديم (' : 'إنشاء حساب admin لـ ') + email + ')');
     if (typeof window.dashAdminLoadProfiles === 'function') window.dashAdminLoadProfiles();
   } catch(e) {
     console.error('dashAdminCreate error:', e);
-    // لو فشل حفظ الملف بعد إنشاء الحساب — احذف الحساب لتفادي حساب يتيم بلا بيانات
-    if (createdCred) {
+    // لو فشل حفظ الملف بعد إنشاء حساب جديد — احذفه لتفادي حساب يتيم بلا بيانات (لا نحذف حساباً مُتبنّى أصلاً)
+    if (createdCred && !adoptMode) {
       try { await createdCred.user.delete(); } catch(_) {}
     }
     let msg = e.message;
