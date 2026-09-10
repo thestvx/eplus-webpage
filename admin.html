@@ -4413,6 +4413,7 @@
           .sr-pool-teacher{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-2);margin-bottom:8px;cursor:grab;transition:all 0.2s}
           .sr-pool-teacher:active{cursor:grabbing}
           .sr-pool-teacher.assigned{opacity:0.5;border-style:dashed}
+          .sr-pool-teacher.disabled{opacity:0.55;border-style:dashed;pointer-events:none}
           @media(max-width:800px){.sr-room-wrap{grid-template-columns:1fr!important}.sr-room-teachers-panel{position:static;max-height:none}}
         </style>
         <div class="section-header">
@@ -30654,14 +30655,26 @@ window.sfExportCSV = function () {
 
     const pool=document.getElementById('sr-room-teachers-list');
     if(pool){
-      pool.innerHTML=teachers.map(t=>{const id=t.teacherId||t.id;const isAssigned=assignedSet.has(id);const assignedRoom=isAssigned?srRoomByTeacher[id].room:'';const subjects=Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):'';const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-room-teacher-photo" alt="">`:`<div class="sr-room-teacher-photo">👤</div>`;return `<div class="sr-pool-teacher ${isAssigned?'assigned':''}" draggable="true" data-teacher-id="${id}" title="${t.name}${isAssigned?' (القاعة '+assignedRoom+')':''}">`+photo+`<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name||'—'}</div>`+`<div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${subjects}${isAssigned?' — القاعة '+assignedRoom:''}</div></div></div>`;}).join('');
+      pool.innerHTML=teachers.map(t=>{
+        const id=t.teacherId||t.id;
+        const isAssigned=assignedSet.has(id);
+        const assignedRoom=isAssigned?srRoomByTeacher[id].room:'';
+        const isDisabled=t.status==='disabled';
+        const subjects=Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):'';
+        const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-room-teacher-photo" alt="">`:`<div class="sr-room-teacher-photo">👤</div>`;
+        const statusBadge=isDisabled?'<span style="margin-right:6px;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:800;background:rgba(220,38,38,0.08);color:#dc2626">🔴 معطّل</span>':'';
+        return `<div class="sr-pool-teacher ${isAssigned?'assigned':''} ${isDisabled?'disabled':''}" draggable="${isDisabled?'false':'true'}" data-teacher-id="${id}" title="${t.name}${isAssigned?' (القاعة '+assignedRoom+')':''}${isDisabled?' (معطّل)':''}">`+
+          photo+
+          `<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name||'—'}${statusBadge}</div>`+
+          `<div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${subjects}${isAssigned?' — القاعة '+assignedRoom:''}</div></div></div>`;
+      }).join('');
       pool.querySelectorAll('.sr-pool-teacher').forEach(el=>{el.addEventListener('dragstart',e=>{srRoomDragging=el.getAttribute('data-teacher-id');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',srRoomDragging);el.style.opacity='0.5';});el.addEventListener('dragend',()=>{el.style.opacity='';srRoomDragging=null;});});
     }
 
     const grid=document.getElementById('sr-room-grid');
     if(grid){
       let html='';
-      for(let n=1;n<=TOTAL_ROOMS;n++){const list=srRoomTeachersForRoom(n);const head=`<div class="sr-room-head"><span class="sr-room-num">القاعة ${n}</span><span class="sr-room-count">${list.length}</span></div>`;let body='';if(list.length===0){body=`<div class="sr-room-empty">اسحب أستاذ هنا</div>`;}else{body=list.map(a=>{const t=teachers.find(x=>(x.teacherId||x.id)===a.teacherId)||{};const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-room-teacher-photo" alt="">`:`<div class="sr-room-teacher-photo">👤</div>`;return `<div class="sr-room-teacher-card" draggable="true" data-teacher-id="${a.teacherId}">`+photo+`<div class="sr-room-teacher-info"><div class="sr-room-teacher-name">${t.name||a.teacherId}</div>`+`<div class="sr-room-teacher-meta">${Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):''}</div></div>`+`<span class="sr-room-teacher-hours">${a.hours||1} س</span>`+`<button class="sr-room-teacher-remove" title="إزالة الأستاذ من القاعة" data-action="remove-room" data-teacher-id="${a.teacherId}">×</button></div>`;}).join('');}
+      for(let n=1;n<=TOTAL_ROOMS;n++){const list=srRoomTeachersForRoom(n);const head=`<div class="sr-room-head"><span class="sr-room-num">القاعة ${n}</span><span class="sr-room-count">${list.length}</span></div>`;let body='';if(list.length===0){body=`<div class="sr-room-empty">اسحب أستاذ هنا</div>`;}else{body=list.map(a=>{const t=teachers.find(x=>(x.teacherId||x.id)===a.teacherId)||{};const isDisabled=t.status==='disabled';const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-room-teacher-photo" alt="">`:`<div class="sr-room-teacher-photo">👤</div>`;return `<div class="sr-room-teacher-card" draggable="${isDisabled?'false':'true'}" data-teacher-id="${a.teacherId}" style="${isDisabled?'opacity:0.55;cursor:default':''}">`+photo+`<div class="sr-room-teacher-info"><div class="sr-room-teacher-name">${t.name||a.teacherId}${isDisabled?' <span style="font-size:9px;color:#dc2626;font-weight:800;margin-right:4px">🔴 معطّل</span>':''}</div>`+`<div class="sr-room-teacher-meta">${Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):''}</div></div>`+`<span class="sr-room-teacher-hours">${a.hours||1} س</span>`+`<button class="sr-room-teacher-remove" title="إزالة الأستاذ من القاعة" data-action="remove-room" data-teacher-id="${a.teacherId}">×</button></div>`;}).join('');}
         html+=`<div class="sr-room-card" data-room="${n}">${head}${body}</div>`;
       }
       grid.innerHTML=html;
