@@ -4394,8 +4394,15 @@
       <!-- ===== SECTION: ATTENDANCE ROOMS ===== -->
       <div id="section-support-rooms" style="display:none">
         <style>
-          .sr-rooms-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px}
-          .sr-rooms-stats{display:flex;gap:12px;flex-wrap:wrap}
+          .sr-days-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;padding:14px 18px;background:var(--card-bg);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.04));align-items:center}
+          .sr-days-bar-label{font-size:13px;font-weight:800;color:var(--text);margin-left:8px;white-space:nowrap;display:flex;align-items:center;gap:6px}
+          .sr-days-bar-label span{font-size:16px}
+          .sr-day-tab{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:12px;border:2px solid var(--border);background:var(--bg-2);cursor:pointer;transition:all 0.2s ease;font-size:13px;font-weight:700;color:var(--text-muted);white-space:nowrap;user-select:none}
+          .sr-day-tab:hover{border-color:rgba(124,58,237,0.3);color:var(--text);background:var(--primary-light)}
+          .sr-day-tab.active{border-color:#7c3aed;background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;box-shadow:0 4px 12px rgba(124,58,237,0.3)}
+          .sr-day-tab.active:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(124,58,237,0.35)}
+          .sr-day-badge{font-size:10px;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;border-radius:6px;font-weight:800;background:var(--border);color:var(--text-muted);padding:0 5px}
+          .sr-day-tab.active .sr-day-badge{background:rgba(255,255,255,0.25);color:#fff}
           .sr-stat-pill{display:flex;align-items:center;gap:8px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:10px 16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.04))}
           .sr-stat-pill-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
           .sr-stat-pill-num{font-size:20px;font-weight:900;color:var(--text);line-height:1}
@@ -4447,28 +4454,30 @@
           .sr-room-teacher-remove{cursor:pointer;color:#dc2626;font-size:18px;padding:4px;border:none;background:transparent;font-weight:900;border-radius:6px;transition:all 0.15s;opacity:0.5}
           .sr-room-teacher-remove:hover{opacity:1;background:rgba(220,38,38,0.1);transform:scale(1.1)}
           @media(max-width:900px){.sr-main-layout{grid-template-columns:1fr!important}.sr-pool-panel{position:static;max-height:none}.sr-pool-body{max-height:250px}}
-          @media(max-width:600px){.sr-rooms-grid{grid-template-columns:1fr!important}.sr-rooms-stats{flex-direction:column}.sr-stat-pill{width:100%}}
+          @media(max-width:600px){.sr-rooms-grid{grid-template-columns:1fr!important}.sr-days-bar{flex-direction:column;align-items:stretch}.sr-day-tab{justify-content:center}}
         </style>
-        <div class="sr-rooms-header">
-          <div class="section-header" style="margin:0">
-            <div class="section-title">
-              <div class="section-icon" style="background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(139,92,246,0.1));border-color:rgba(124,58,237,0.2)">🏫</div>
-              <span>قاعات الحضور</span>
-            </div>
+        <div class="section-header">
+          <div class="section-title">
+            <div class="section-icon" style="background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(139,92,246,0.1));border-color:rgba(124,58,237,0.2)">🏫</div>
+            <span>قاعات الحضور</span>
           </div>
-          <div class="sr-rooms-stats">
-            <div class="sr-stat-pill">
-              <div class="sr-stat-pill-icon" style="background:linear-gradient(135deg,rgba(124,58,237,0.12),rgba(139,92,246,0.08))">🏫</div>
-              <div><div class="sr-stat-pill-num" id="sr-rooms-used">0</div><div class="sr-stat-pill-label">قاعات مستخدمة</div></div>
-            </div>
-            <div class="sr-stat-pill">
-              <div class="sr-stat-pill-icon" style="background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(20,184,166,0.08))">👨‍🏫</div>
-              <div><div class="sr-stat-pill-num" id="sr-rooms-assigned-teachers">0</div><div class="sr-stat-pill-label">أساتذة معيّنون</div></div>
-            </div>
-            <div class="sr-stat-pill">
-              <div class="sr-stat-pill-icon" style="background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(251,191,36,0.08))">⏱️</div>
-              <div><div class="sr-stat-pill-num" id="sr-rooms-total-hours">0</div><div class="sr-stat-pill-label">إجمالي الساعات</div></div>
-            </div>
+        </div>
+        <div class="sr-days-bar">
+          <div class="sr-days-bar-label"><span>📅</span> اليوم:</div>
+          <div id="sr-days-tabs"></div>
+        </div>
+        <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+          <div class="sr-stat-pill">
+            <div class="sr-stat-pill-icon" style="background:linear-gradient(135deg,rgba(124,58,237,0.12),rgba(139,92,246,0.08))">🏫</div>
+            <div><div class="sr-stat-pill-num" id="sr-rooms-used">0</div><div class="sr-stat-pill-label">قاعات مستخدمة</div></div>
+          </div>
+          <div class="sr-stat-pill">
+            <div class="sr-stat-pill-icon" style="background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(20,184,166,0.08))">👨‍🏫</div>
+            <div><div class="sr-stat-pill-num" id="sr-rooms-assigned-teachers">0</div><div class="sr-stat-pill-label">أساتذة معيّنون</div></div>
+          </div>
+          <div class="sr-stat-pill">
+            <div class="sr-stat-pill-icon" style="background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(251,191,36,0.08))">⏱️</div>
+            <div><div class="sr-stat-pill-num" id="sr-rooms-total-hours">0</div><div class="sr-stat-pill-label">إجمالي الساعات</div></div>
           </div>
         </div>
         <div class="sr-main-layout">
@@ -30671,34 +30680,92 @@ window.sfExportCSV = function () {
 </script>
 
 <script>
-/* ===== ATTENDANCE ROOMS (قاعات الحضور) ===== */
+/* ===== ATTENDANCE ROOMS (قاعات الحضور) — byDay model ===== */
 (function(){
   const ROOMS_COLLECTION='support_rooms', ROOMS_DOC_ID='config', TOTAL_ROOMS=8;
-  let srRoomByTeacher={}, srRoomDragging=null, srRoomTeachers=[];
+  const DAYS=[
+    {key:'0',name:'الأحد',short:'أحد'},
+    {key:'1',name:'الإثنين',short:'ثن'},
+    {key:'2',name:'الثلاثاء',short:'ثل'},
+    {key:'3',name:'الأربعاء',short:'رب'},
+    {key:'4',name:'الخميس',short:'خم'},
+    {key:'5',name:'الجمعة',short:'جم'},
+    {key:'6',name:'السبت',short:'سب'}
+  ];
+  const DAY_NAMES=['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  let srRoomByDay={}, srRoomCurrentDay=null, srRoomDragging=null, srRoomTeachers=[];
+
   function fs(){return window._firestore}
   function db(){return window._db}
   function toast(m,e){try{window.showToast(m,e)}catch(x){}}
+
+  function srDayKey(d){return String(d);}
+  function srToday(){return new Date().getDay();}
+  function srGetCurrentAssignments(){return srRoomByDay[srDayKey(srRoomCurrentDay)]||{};}
 
   async function srRoomLoadData(){
     try{
       const{getDoc,doc:dd}=fs(),d=db();
       const roomsSnap=await getDoc(dd(d,ROOMS_COLLECTION,ROOMS_DOC_ID));
-      srRoomByTeacher=roomsSnap.exists()?(roomsSnap.data().byTeacher||{}):{};
-    }catch(e){console.error('[ROOMS] load failed',e);srRoomByTeacher={};}
-    // استدعاء بيانات الأساتذة من مصدر قسم «أساتذة الدعم المدرسي»
+      if(roomsSnap.exists()){
+        const data=roomsSnap.data();
+        if(data.byDay){
+          srRoomByDay=data.byDay;
+        } else if(data.byTeacher){
+          srRoomByDay={'0':data.byTeacher};
+        } else {
+          srRoomByDay={};
+        }
+      } else {
+        srRoomByDay={};
+      }
+    }catch(e){console.error('[ROOMS] load failed',e);srRoomByDay={};}
+    srRoomCurrentDay=srToday();
     if(!window.srtAllData||!window.srtAllData.length){if(typeof window.srtLoadData==='function') await window.srtLoadData();}
     srRoomTeachers=(window.srtAllData||[]).filter(t=>t.status!=='deleted');
     srRoomRender();
   }
   window.srRoomLoad=srRoomLoadData;
 
-  function srRoomTeachersForRoom(n){const list=[];Object.keys(srRoomByTeacher).forEach(tid=>{const a=srRoomByTeacher[tid];if(a&&a.room==n) list.push({...a,teacherId:tid});});return list;}
+  function srRoomTeachersForRoom(n){
+    const asg=srGetCurrentAssignments();
+    const list=[];
+    Object.keys(asg).forEach(tid=>{
+      const a=asg[tid];
+      if(a&&a.room==n) list.push({...a,teacherId:tid});
+    });
+    return list;
+  }
+
+  function srRoomRenderDayTabs(){
+    const container=document.getElementById('sr-days-tabs');
+    if(!container)return;
+    let html='';
+    DAYS.forEach(d=>{
+      const asg=srRoomByDay[d.key]||{};
+      const count=Object.keys(asg).length;
+      const isActive=Number(srRoomCurrentDay)===Number(d.key);
+      html+=`<div class="sr-day-tab ${isActive?'active':''}" data-day="${d.key}">
+        ${d.name}
+        <span class="sr-day-badge">${count}</span>
+      </div>`;
+    });
+    container.innerHTML=html;
+    container.querySelectorAll('.sr-day-tab').forEach(tab=>{
+      tab.addEventListener('click',()=>{
+        srRoomCurrentDay=Number(tab.getAttribute('data-day'));
+        srRoomRender();
+      });
+    });
+  }
 
   function srRoomRender(){
+    srRoomRenderDayTabs();
     const teachers=srRoomTeachers.filter(t=>t.status!=='disabled');
-    const assignedSet=new Set(Object.keys(srRoomByTeacher));
+    const asg=srGetCurrentAssignments();
+    const assignedSet=new Set(Object.keys(asg));
     const usedRooms=new Set();let totalHours=0;
-    Object.values(srRoomByTeacher).forEach(a=>{if(a&&a.room){usedRooms.add(String(a.room));totalHours+=Number(a.hours)||0;}});
+    Object.values(asg).forEach(a=>{if(a&&a.room){usedRooms.add(String(a.room));totalHours+=Number(a.hours)||0;}});
     const elU=document.getElementById('sr-rooms-used'),elT=document.getElementById('sr-rooms-assigned-teachers'),elH=document.getElementById('sr-rooms-total-hours');
     if(elU)elU.textContent=usedRooms.size;if(elT)elT.textContent=assignedSet.size;if(elH)elH.textContent=totalHours;
 
@@ -30707,13 +30774,13 @@ window.sfExportCSV = function () {
       pool.innerHTML=teachers.map(t=>{
         const id=t.teacherId||t.id;
         const isAssigned=assignedSet.has(id);
-        const assignedRoom=isAssigned?srRoomByTeacher[id].room:'';
+        const assignedRoom=isAssigned?asg[id].room:'';
         const isDisabled=t.status==='disabled';
         const subjects=Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):'';
         const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-pool-photo" alt="">`:`<div class="sr-pool-photo">👤</div>`;
         const statusBadge=isDisabled?'<span style="padding:2px 6px;border-radius:6px;font-size:9px;font-weight:800;background:rgba(220,38,38,0.1);color:#dc2626">🔴 معطّل</span>':'';
         const assignedBadge=isAssigned?`<span class="sr-pool-badge">قاعة ${assignedRoom}</span>`:'';
-        return `<div class="sr-pool-teacher ${isAssigned?'assigned':''} ${isDisabled?'disabled':''}" draggable="${isDisabled?'false':'true'}" data-teacher-id="${id}" title="${t.name}${isAssigned?' (القاعة '+assignedRoom+')':''}${isDisabled?' (معطّل)':''}">`+
+        return `<div class="sr-pool-teacher ${isAssigned?'assigned':''} ${isDisabled?'disabled':''}" draggable="${isDisabled?'false':'true'}" data-teacher-id="${id}" title="${t.name}${isAssigned?' (قاعة '+assignedRoom+' — '+DAY_NAMES[srRoomCurrentDay]+')':''}${isDisabled?' (معطّل)':''}">`+
           assignedBadge+photo+
           `<div class="sr-pool-info"><div class="sr-pool-name">${t.name||'—'} ${statusBadge}</div>`+
           `<div class="sr-pool-subjects">${subjects}</div></div></div>`;
@@ -30726,7 +30793,7 @@ window.sfExportCSV = function () {
     const grid=document.getElementById('sr-room-grid');
     if(grid){
       let html='';
-      for(let n=1;n<=TOTAL_ROOMS;n++){const list=srRoomTeachersForRoom(n);const hasTeachers=list.length>0;const top=`<div class="sr-room-card-top"><div class="sr-room-title"><div class="sr-room-icon">${n}</div><div><div class="sr-room-label">القاعة ${n}</div><div class="sr-room-sublabel">${hasTeachers?list.reduce((s,a)=>s+(Number(a.hours)||0),0)+' ساعة':''}</div></div></div><div class="sr-room-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>${list.length}</div></div>`;let body='';if(!hasTeachers){body=`<div class="sr-room-empty"><div class="sr-room-empty-icon">📥</div><div class="sr-room-empty-text">اسحب أستاذ هنا</div></div>`;}else{body=list.map(a=>{const t=teachers.find(x=>(x.teacherId||x.id)===a.teacherId)||{};const isDisabled=t.status==='disabled';const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-room-teacher-photo" alt="">`:`<div class="sr-room-teacher-photo">👤</div>`;return `<div class="sr-room-teacher-card" draggable="${isDisabled?'false':'true'}" data-teacher-id="${a.teacherId}" style="${isDisabled?'opacity:0.55;cursor:default':''}">`+photo+`<div class="sr-room-teacher-info"><div class="sr-room-teacher-name">${t.name||a.teacherId}${isDisabled?' <span style="font-size:9px;color:#dc2626;font-weight:800;margin-right:4px">🔴 معطّل</span>':''}</div>`+`<div class="sr-room-teacher-meta">${Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):''}</div></div>`+`<span class="sr-room-teacher-hours">⏱ ${a.hours||1} س</span>`+`<button class="sr-room-teacher-remove" title="إزالة" data-action="remove-room" data-teacher-id="${a.teacherId}">×</button></div>`;}).join('');}
+      for(let n=1;n<=TOTAL_ROOMS;n++){const list=srRoomTeachersForRoom(n);const hasTeachers=list.length>0;const totalH=list.reduce((s,a)=>s+(Number(a.hours)||0),0);const top=`<div class="sr-room-card-top"><div class="sr-room-title"><div class="sr-room-icon">${n}</div><div><div class="sr-room-label">القاعة ${n}</div><div class="sr-room-sublabel">${hasTeachers?totalH+' ساعة':''}</div></div></div><div class="sr-room-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>${list.length}</div></div>`;let body='';if(!hasTeachers){body=`<div class="sr-room-empty"><div class="sr-room-empty-icon">📥</div><div class="sr-room-empty-text">اسحب أستاذ هنا</div></div>`;}else{body=list.map(a=>{const t=teachers.find(x=>(x.teacherId||x.id)===a.teacherId)||{};const isDisabled=t.status==='disabled';const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-room-teacher-photo" alt="">`:`<div class="sr-room-teacher-photo">👤</div>`;return `<div class="sr-room-teacher-card" draggable="${isDisabled?'false':'true'}" data-teacher-id="${a.teacherId}" style="${isDisabled?'opacity:0.55;cursor:default':''}">`+photo+`<div class="sr-room-teacher-info"><div class="sr-room-teacher-name">${t.name||a.teacherId}${isDisabled?' <span style="font-size:9px;color:#dc2626;font-weight:800;margin-right:4px">🔴 معطّل</span>':''}</div>`+`<div class="sr-room-teacher-meta">${Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):''}</div></div>`+`<span class="sr-room-teacher-hours">⏱ ${a.hours||1} س</span>`+`<button class="sr-room-teacher-remove" title="إزالة" data-action="remove-room" data-teacher-id="${a.teacherId}">×</button></div>`;}).join('');}
         html+=`<div class="sr-room-card ${hasTeachers?'has-teachers':''}" data-room="${n}">${top}<div class="sr-room-body">${body}</div></div>`;
       }
       grid.innerHTML=html;
@@ -30741,19 +30808,40 @@ window.sfExportCSV = function () {
     const t=srRoomTeachers.find(x=>(x.teacherId||x.id)===teacherId);
     if(!t){toast('الأستاذ غير موجود',true);return;}
     if(t.status==='disabled'){toast('الأستاذ معطّل حالياً',true);return;}
-    const existing=srRoomByTeacher[teacherId];
-    srRoomPromptHours(t.name||teacherId,roomNum,existing?existing.hours:1,newH=>{if(newH===null)return;srRoomByTeacher[teacherId]={room:roomNum,hours:newH};srRoomSave();});
+    const dk=srDayKey(srRoomCurrentDay);
+    const asg=srRoomByDay[dk]||{};
+    const existing=asg[teacherId];
+    srRoomPromptHours(t.name||teacherId,roomNum,existing?existing.hours:1,newH=>{
+      if(newH===null)return;
+      if(!srRoomByDay[dk]) srRoomByDay[dk]={};
+      srRoomByDay[dk][teacherId]={room:roomNum,hours:newH};
+      srRoomSave();
+    });
   }
 
-  function srRoomRemoveTeacher(teacherId){if(!teacherId||!srRoomByTeacher[teacherId])return;delete srRoomByTeacher[teacherId];srRoomSave();}
+  function srRoomRemoveTeacher(teacherId){
+    const dk=srDayKey(srRoomCurrentDay);
+    if(!teacherId||!srRoomByDay[dk]||!srRoomByDay[dk][teacherId])return;
+    delete srRoomByDay[dk][teacherId];
+    if(Object.keys(srRoomByDay[dk]).length===0) delete srRoomByDay[dk];
+    srRoomSave();
+  }
 
-  async function srRoomSave(){try{const{setDoc,doc:dd}=fs(),d=db();await setDoc(dd(d,ROOMS_COLLECTION,ROOMS_DOC_ID),{byTeacher:srRoomByTeacher});srRoomRender();toast('✅ تم الحفظ');}catch(e){console.error('[ROOMS] save failed',e);toast('حدث خطأ أثناء الحفظ',true);}}
+  async function srRoomSave(){
+    try{
+      const{setDoc,doc:dd}=fs(),d=db();
+      await setDoc(dd(d,ROOMS_COLLECTION,ROOMS_DOC_ID),{byDay:srRoomByDay});
+      srRoomRender();
+      toast('✅ تم الحفظ — '+DAY_NAMES[srRoomCurrentDay]);
+    }catch(e){console.error('[ROOMS] save failed',e);toast('حدث خطأ أثناء الحفظ',true);}
+  }
 
   function srRoomPromptHours(teacherName,roomNum,currentVal,cb){
     const ov=document.createElement('div');
     ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center';
-    ov.innerHTML=`<div style="background:var(--card-bg,#fff);border-radius:16px;padding:24px;width:340px;max-width:92vw;text-align:center;border:1px solid var(--border,#e5e7eb)">`+
-      `<h3 style="margin:0 0 8px;font-size:15px;font-weight:900;color:var(--text,#111827)">📐 القاعة ${roomNum}</h3>`+
+    ov.innerHTML=`<div style="background:var(--card-bg,#fff);border-radius:16px;padding:24px;width:360px;max-width:92vw;text-align:center;border:1px solid var(--border,#e5e7eb)">`+
+      `<h3 style="margin:0 0 4px;font-size:16px;font-weight:900;color:var(--text,#111827)">📐 القاعة ${roomNum}</h3>`+
+      `<p style="margin:0 0 6px;font-size:11px;color:var(--text-muted,#6b7280)">${DAY_NAMES[srRoomCurrentDay]}</p>`+
       `<p style="margin:0 0 16px;font-size:13px;color:var(--text-muted,#6b7280)">عدد ساعات التدريس للأستاذ <strong style="color:var(--text,#111827)">${teacherName}</strong>:</p>`+
       `<input id="sr-room-hours-inp" type="number" min="0.5" step="0.5" value="${Number(currentVal)||1}" style="width:100%;text-align:center;font-size:24px;padding:12px;border:2px solid var(--border,#d1d5db);border-radius:12px;font-weight:900;background:var(--bg-2,#f9fafb);color:var(--text,#111827)">`+
       `<div style="display:flex;gap:10px;margin-top:16px"><button id="sr-room-hours-ok" style="flex:1;padding:10px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-weight:800;cursor:pointer">تأكيد</button>`+
