@@ -1990,6 +1990,10 @@
         <span class="nav-label">موارد مالية الدعم المدرسي</span>
         <span class="nav-badge" id="nav-badge-sfinance">0</span>
       </div>
+      <div class="nav-item" data-nav="support-rooms" onclick="switchNavSection('support-rooms')">
+        <span class="nav-icon">🏫</span>
+        <span class="nav-label">قاعات الحضور</span>
+      </div>
       <div class="nav-section" data-nav-cat="mail" data-i18n="mail_service">خدمات البريد</div>
       <div class="nav-item" data-nav="notifications" onclick="switchNavSection('notifications')">
         <span class="nav-icon">📨</span>
@@ -4387,6 +4391,50 @@
         </div>
       </div>
 
+      <!-- ===== SECTION: ATTENDANCE ROOMS ===== -->
+      <div id="section-support-rooms" style="display:none">
+        <style>
+          .sr-room-wrap{display:grid;grid-template-columns:220px 1fr;gap:24px;align-items:start}
+          .sr-room-teachers-panel{position:sticky;top:16px;background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:var(--shadow);max-height:calc(100vh - 120px);overflow-y:auto}
+          .sr-room-card{background:var(--card-bg);border:2px dashed var(--border);border-radius:14px;padding:14px;min-height:120px;transition:all 0.2s}
+          .sr-room-card.drag-over{border-color:#7c3aed;background:rgba(124,58,237,0.04)}
+          .sr-room-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+          .sr-room-num{font-weight:900;font-size:15px;color:#7c3aed}
+          .sr-room-count{font-size:11px;background:#7c3aed;color:#fff;padding:2px 8px;border-radius:10px;font-weight:700}
+          .sr-room-empty{font-size:12px;color:var(--text-muted);border:1px dashed var(--border);border-radius:10px;padding:20px 10px;text-align:center}
+          .sr-room-teacher-card{display:flex;align-items:center;gap:10px;background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;cursor:grab}
+          .sr-room-teacher-card:active{cursor:grabbing}
+          .sr-room-teacher-photo{width:32px;height:32px;border-radius:8px;object-fit:cover;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+          .sr-room-teacher-info{flex:1;min-width:0}
+          .sr-room-teacher-name{font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+          .sr-room-teacher-meta{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+          .sr-room-teacher-hours{background:rgba(124,58,237,0.1);color:#7c3aed;padding:2px 8px;border-radius:8px;font-weight:800;font-size:11px;white-space:nowrap}
+          .sr-room-teacher-remove{cursor:pointer;color:#dc2626;font-size:16px;padding:4px;border:none;background:transparent;font-weight:900}
+          .sr-pool-teacher{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-2);margin-bottom:8px;cursor:grab;transition:all 0.2s}
+          .sr-pool-teacher:active{cursor:grabbing}
+          .sr-pool-teacher.assigned{opacity:0.5;border-style:dashed}
+          @media(max-width:800px){.sr-room-wrap{grid-template-columns:1fr!important}.sr-room-teachers-panel{position:static;max-height:none}}
+        </style>
+        <div class="section-header">
+          <div class="section-title">
+            <div class="section-icon">🏫</div>
+            <span>قاعات الحضور</span>
+          </div>
+        </div>
+        <div class="stats-grid" style="margin-bottom:20px">
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(124,58,237,0.1)">🏫</div></div><div class="stat-num" id="sr-rooms-used">0</div><div class="stat-label">قاعات مستخدمة</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(16,185,129,0.1)">👨‍🏫</div></div><div class="stat-num" id="sr-rooms-assigned-teachers">0</div><div class="stat-label">أساتذة معيّنون</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(245,158,11,0.1)">⏱️</div></div><div class="stat-num" id="sr-rooms-total-hours">0</div><div class="stat-label">إجمالي الساعات</div></div>
+        </div>
+        <div class="sr-room-wrap">
+          <div class="sr-room-teachers-panel">
+            <h4 style="margin:0 0 12px;font-size:13px;font-weight:900;color:var(--text)">👨‍🏫 اسحب الأستاذ إلى القاعة</h4>
+            <div id="sr-room-teachers-list"></div>
+          </div>
+          <div id="sr-room-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;align-content:start"></div>
+        </div>
+      </div>
+
       <!-- ===== SECTION: SUPPORT TEACHERS ===== -->
       <div id="section-support-teachers" style="display:none">
         <div class="section-header">
@@ -5755,7 +5803,7 @@ window.NAV_CATS = [
   { key: 'communication', label: 'التواصل', items: ['msgs'] },
   { key: 'finance', label: 'المالية', items: ['finance'] },
   { key: 'system', label: 'النظام', items: ['settings'] },
-  { key: 'support', label: 'الدعم المدرسي', items: ['support-registrations', 'language-registrations', 'support-teachers', 'subscriptions', 'support-finance'] },
+  { key: 'support', label: 'الدعم المدرسي', items: ['support-registrations', 'language-registrations', 'support-teachers', 'subscriptions', 'support-finance', 'support-rooms'] },
   { key: 'mail', label: 'خدمات البريد', items: ['notifications'] },
 ];
 window.NAV_ITEMS = {
@@ -5773,6 +5821,7 @@ window.NAV_ITEMS = {
   'support-teachers': { icon: '👨‍🏫', label: 'أساتذة الدعم المدرسي' },
   subscriptions: { icon: '📅', label: 'الاشتراكات الشهرية' },
   'support-finance': { icon: '💰', label: 'موارد مالية الدعم المدرسي' },
+  'support-rooms': { icon: '🏫', label: 'قاعات الحضور' },
   notifications: { icon: '📨', label: 'مركز الإشعارات' },
 };
 const NAV_FORCED_CATS = ['system'];
@@ -6164,7 +6213,7 @@ window.switchNavSection = (section) => {
     if (typeof renderRegStats === 'function') renderRegStats();
     if (typeof updateSiteStats === 'function') updateSiteStats();
   }
-  ['home','announcements','summer','camp-v2','students','teachers','finance','settings','notifications','support-registrations','language-registrations','support-teachers','subscriptions','support-finance'].forEach(s => {
+  ['home','announcements','summer','camp-v2','students','teachers','finance','settings','notifications','support-registrations','language-registrations','support-teachers','subscriptions','support-finance','support-rooms'].forEach(s => {
     const el = document.getElementById('section-' + s);
     if (el) el.style.display = s === section ? 'block' : 'none';
   });
@@ -6226,6 +6275,9 @@ window.switchNavSection = (section) => {
   }
   if (section === 'support-finance') {
     if (typeof window.sfLoad === 'function') window.sfLoad();
+  }
+  if (section === 'support-rooms') {
+    if (typeof srRoomLoad === 'function') srRoomLoad();
   }
 };
 
@@ -30568,6 +30620,88 @@ window.sfExportCSV = function () {
   a.click();
 };
 
+</script>
+
+<script>
+/* ===== ATTENDANCE ROOMS (قاعات الحضور) ===== */
+(function(){
+  const ROOMS_COLLECTION='support_rooms', ROOMS_DOC_ID='config', TOTAL_ROOMS=8, TEACHERS_COLLECTION='support_teachers';
+  let srRoomByTeacher={}, srRoomDragging=null, srRoomTeachers=[];
+  function fs(){return window._firestore}
+  function db(){return window._db}
+  function toast(m,e){try{window.showToast(m,e)}catch(x){}}
+
+  async function srRoomLoadData(){
+    try{
+      const{getDoc,getDocs,collection:cc,doc:dd}=fs(),d=db();
+      const[roomsSnap,teachersSnap]=await Promise.all([getDoc(dd(d,ROOMS_COLLECTION,ROOMS_DOC_ID)),getDocs(cc(d,TEACHERS_COLLECTION))]);
+      srRoomByTeacher=roomsSnap.exists()?(roomsSnap.data().byTeacher||{}):{};
+      srRoomTeachers=teachersSnap.docs.map(x=>({id:x.id,...x.data()})).filter(t=>t.status!=='deleted');
+    }catch(e){console.error('[ROOMS] load failed',e);srRoomByTeacher={};srRoomTeachers=[];}
+    srRoomRender();
+  }
+  window.srRoomLoad=srRoomLoadData;
+
+  function srRoomTeachersForRoom(n){const list=[];Object.keys(srRoomByTeacher).forEach(tid=>{const a=srRoomByTeacher[tid];if(a&&a.room==n) list.push({...a,teacherId:tid});});return list;}
+
+  function srRoomRender(){
+    const teachers=srRoomTeachers.filter(t=>t.status!=='disabled');
+    const assignedSet=new Set(Object.keys(srRoomByTeacher));
+    const usedRooms=new Set();let totalHours=0;
+    Object.values(srRoomByTeacher).forEach(a=>{if(a&&a.room){usedRooms.add(String(a.room));totalHours+=Number(a.hours)||0;}});
+    const elU=document.getElementById('sr-rooms-used'),elT=document.getElementById('sr-rooms-assigned-teachers'),elH=document.getElementById('sr-rooms-total-hours');
+    if(elU)elU.textContent=usedRooms.size;if(elT)elT.textContent=assignedSet.size;if(elH)elH.textContent=totalHours;
+
+    const pool=document.getElementById('sr-room-teachers-list');
+    if(pool){
+      pool.innerHTML=teachers.map(t=>{const id=t.teacherId||t.id;const isAssigned=assignedSet.has(id);const assignedRoom=isAssigned?srRoomByTeacher[id].room:'';const subjects=Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):'';const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-room-teacher-photo" alt="">`:`<div class="sr-room-teacher-photo">👤</div>`;return `<div class="sr-pool-teacher ${isAssigned?'assigned':''}" draggable="true" data-teacher-id="${id}" title="${t.name}${isAssigned?' (القاعة '+assignedRoom+')':''}">`+photo+`<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name||'—'}</div>`+`<div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${subjects}${isAssigned?' — القاعة '+assignedRoom:''}</div></div></div>`;}).join('');
+      pool.querySelectorAll('.sr-pool-teacher').forEach(el=>{el.addEventListener('dragstart',e=>{srRoomDragging=el.getAttribute('data-teacher-id');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',srRoomDragging);el.style.opacity='0.5';});el.addEventListener('dragend',()=>{el.style.opacity='';srRoomDragging=null;});});
+    }
+
+    const grid=document.getElementById('sr-room-grid');
+    if(grid){
+      let html='';
+      for(let n=1;n<=TOTAL_ROOMS;n++){const list=srRoomTeachersForRoom(n);const head=`<div class="sr-room-head"><span class="sr-room-num">القاعة ${n}</span><span class="sr-room-count">${list.length}</span></div>`;let body='';if(list.length===0){body=`<div class="sr-room-empty">اسحب أستاذ هنا</div>`;}else{body=list.map(a=>{const t=teachers.find(x=>(x.teacherId||x.id)===a.teacherId)||{};const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-room-teacher-photo" alt="">`:`<div class="sr-room-teacher-photo">👤</div>`;return `<div class="sr-room-teacher-card" draggable="true" data-teacher-id="${a.teacherId}">`+photo+`<div class="sr-room-teacher-info"><div class="sr-room-teacher-name">${t.name||a.teacherId}</div>`+`<div class="sr-room-teacher-meta">${Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):''}</div></div>`+`<span class="sr-room-teacher-hours">${a.hours||1} س</span>`+`<button class="sr-room-teacher-remove" title="إزالة الأستاذ من القاعة" data-action="remove-room" data-teacher-id="${a.teacherId}">×</button></div>`;}).join('');}
+        html+=`<div class="sr-room-card" data-room="${n}">${head}${body}</div>`;
+      }
+      grid.innerHTML=html;
+      grid.querySelectorAll('.sr-room-card').forEach(card=>{card.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';card.classList.add('drag-over');});card.addEventListener('dragleave',()=>card.classList.remove('drag-over'));card.addEventListener('drop',e=>{e.preventDefault();card.classList.remove('drag-over');const teacherId=e.dataTransfer.getData('text/plain')||srRoomDragging;if(!teacherId) return;srRoomHandleDrop(teacherId,Number(card.getAttribute('data-room')));});});
+      grid.querySelectorAll('[data-action="remove-room"]').forEach(btn=>{btn.addEventListener('click',e=>{e.stopPropagation();srRoomRemoveTeacher(btn.getAttribute('data-teacher-id'));});});
+      grid.querySelectorAll('.sr-room-teacher-card').forEach(card=>{card.addEventListener('dragstart',e=>{srRoomDragging=card.getAttribute('data-teacher-id');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',srRoomDragging);setTimeout(()=>card.style.opacity='0.4',0);});card.addEventListener('dragend',()=>{card.style.opacity='';srRoomDragging=null;});});
+    }
+  }
+
+  async function srRoomHandleDrop(teacherId,roomNum){
+    if(!teacherId||roomNum<1||roomNum>TOTAL_ROOMS)return;
+    const t=srRoomTeachers.find(x=>(x.teacherId||x.id)===teacherId);
+    if(!t){toast('الأستاذ غير موجود',true);return;}
+    if(t.status==='disabled'){toast('الأستاذ معطّل حالياً',true);return;}
+    const existing=srRoomByTeacher[teacherId];
+    srRoomPromptHours(t.name||teacherId,roomNum,existing?existing.hours:1,newH=>{if(newH===null)return;srRoomByTeacher[teacherId]={room:roomNum,hours:newH};srRoomSave();});
+  }
+
+  function srRoomRemoveTeacher(teacherId){if(!teacherId||!srRoomByTeacher[teacherId])return;delete srRoomByTeacher[teacherId];srRoomSave();}
+
+  async function srRoomSave(){try{const{setDoc,doc:dd}=fs(),d=db();await setDoc(dd(d,ROOMS_COLLECTION,ROOMS_DOC_ID),{byTeacher:srRoomByTeacher});srRoomRender();toast('✅ تم الحفظ');}catch(e){console.error('[ROOMS] save failed',e);toast('حدث خطأ أثناء الحفظ',true);}}
+
+  function srRoomPromptHours(teacherName,roomNum,currentVal,cb){
+    const ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center';
+    ov.innerHTML=`<div style="background:var(--card-bg,#fff);border-radius:16px;padding:24px;width:340px;max-width:92vw;text-align:center;border:1px solid var(--border,#e5e7eb)">`+
+      `<h3 style="margin:0 0 8px;font-size:15px;font-weight:900;color:var(--text,#111827)">📐 القاعة ${roomNum}</h3>`+
+      `<p style="margin:0 0 16px;font-size:13px;color:var(--text-muted,#6b7280)">عدد ساعات التدريس للأستاذ <strong style="color:var(--text,#111827)">${teacherName}</strong>:</p>`+
+      `<input id="sr-room-hours-inp" type="number" min="0.5" step="0.5" value="${Number(currentVal)||1}" style="width:100%;text-align:center;font-size:24px;padding:12px;border:2px solid var(--border,#d1d5db);border-radius:12px;font-weight:900;background:var(--bg-2,#f9fafb);color:var(--text,#111827)">`+
+      `<div style="display:flex;gap:10px;margin-top:16px"><button id="sr-room-hours-ok" style="flex:1;padding:10px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-weight:800;cursor:pointer">تأكيد</button>`+
+      `<button id="sr-room-hours-cancel" style="flex:1;padding:10px;border:1px solid var(--border,#d1d5db);border-radius:10px;background:var(--card-bg,#fff);color:var(--text,#374151);font-weight:700;cursor:pointer">إلغاء</button></div></div>`;
+    document.body.appendChild(ov);
+    setTimeout(()=>{const inp=document.getElementById('sr-room-hours-inp');if(inp){inp.focus();inp.select();}},30);
+    const finish=v=>{ov.remove();cb(v);};
+    ov.addEventListener('click',e=>{if(e.target.id==='sr-room-hours-cancel'||e.target===ov)finish(null);});
+    document.getElementById('sr-room-hours-ok').addEventListener('click',()=>finish(parseFloat(document.getElementById('sr-room-hours-inp').value)||1));
+    document.getElementById('sr-room-hours-inp').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('sr-room-hours-ok').click();if(e.key==='Escape')finish(null);});
+  }
+
+})();
 </script>
 
 <script src="js/camp-programs.js?v=1"></script>
