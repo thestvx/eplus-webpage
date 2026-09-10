@@ -4394,45 +4394,91 @@
       <!-- ===== SECTION: ATTENDANCE ROOMS ===== -->
       <div id="section-support-rooms" style="display:none">
         <style>
-          .sr-room-wrap{display:grid;grid-template-columns:220px 1fr;gap:24px;align-items:start}
-          .sr-room-teachers-panel{position:sticky;top:16px;background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:var(--shadow);max-height:calc(100vh - 120px);overflow-y:auto}
-          .sr-room-card{background:var(--card-bg);border:2px dashed var(--border);border-radius:14px;padding:14px;min-height:120px;transition:all 0.2s}
-          .sr-room-card.drag-over{border-color:#7c3aed;background:rgba(124,58,237,0.04)}
-          .sr-room-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
-          .sr-room-num{font-weight:900;font-size:15px;color:#7c3aed}
-          .sr-room-count{font-size:11px;background:#7c3aed;color:#fff;padding:2px 8px;border-radius:10px;font-weight:700}
-          .sr-room-empty{font-size:12px;color:var(--text-muted);border:1px dashed var(--border);border-radius:10px;padding:20px 10px;text-align:center}
-          .sr-room-teacher-card{display:flex;align-items:center;gap:10px;background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;cursor:grab}
-          .sr-room-teacher-card:active{cursor:grabbing}
-          .sr-room-teacher-photo{width:32px;height:32px;border-radius:8px;object-fit:cover;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+          .sr-rooms-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px}
+          .sr-rooms-stats{display:flex;gap:12px;flex-wrap:wrap}
+          .sr-stat-pill{display:flex;align-items:center;gap:8px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:10px 16px;box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,0.04))}
+          .sr-stat-pill-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+          .sr-stat-pill-num{font-size:20px;font-weight:900;color:var(--text);line-height:1}
+          .sr-stat-pill-label{font-size:11px;color:var(--text-muted);font-weight:600}
+          .sr-main-layout{display:grid;grid-template-columns:280px 1fr;gap:24px;align-items:start}
+          .sr-pool-panel{position:sticky;top:16px;background:var(--card-bg);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
+          .sr-pool-header{padding:16px 18px 12px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(124,58,237,0.04),rgba(139,92,246,0.02))}
+          .sr-pool-header h4{margin:0;font-size:14px;font-weight:900;color:var(--text);display:flex;align-items:center;gap:8px}
+          .sr-pool-header .sr-pool-count{font-size:11px;background:var(--primary);color:#fff;padding:2px 8px;border-radius:8px;font-weight:700}
+          .sr-pool-body{padding:12px;max-height:calc(100vh - 240px);overflow-y:auto;scrollbar-width:thin}
+          .sr-pool-body::-webkit-scrollbar{width:5px}
+          .sr-pool-body::-webkit-scrollbar-track{background:transparent}
+          .sr-pool-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px}
+          .sr-pool-teacher{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:12px;background:var(--bg-2);margin-bottom:8px;cursor:grab;transition:all 0.2s ease;position:relative}
+          .sr-pool-teacher:hover{border-color:var(--primary);background:var(--primary-light);transform:translateY(-1px);box-shadow:0 4px 12px rgba(124,58,237,0.1)}
+          .sr-pool-teacher:active{cursor:grabbing;transform:scale(0.98)}
+          .sr-pool-teacher.assigned{opacity:0.45;border-style:dashed;background:var(--bg-2)}
+          .sr-pool-teacher.assigned:hover{opacity:0.7;border-color:var(--primary)}
+          .sr-pool-teacher.disabled{opacity:0.5;border-style:dashed;pointer-events:none;background:var(--bg-2)}
+          .sr-pool-photo{width:36px;height:36px;border-radius:10px;object-fit:cover;background:linear-gradient(135deg,var(--primary-light),rgba(139,92,246,0.15));display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;border:2px solid var(--border)}
+          .sr-pool-info{flex:1;min-width:0}
+          .sr-pool-name{font-weight:800;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+          .sr-pool-subjects{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+          .sr-pool-badge{position:absolute;top:-4px;left:-4px;font-size:9px;background:#7c3aed;color:#fff;padding:2px 6px;border-radius:6px;font-weight:800;box-shadow:0 2px 6px rgba(124,58,237,0.3)}
+          .sr-rooms-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;align-content:start}
+          .sr-room-card{background:var(--card-bg);border:2px solid var(--border);border-radius:18px;padding:0;min-height:180px;transition:all 0.3s ease;overflow:hidden;position:relative}
+          .sr-room-card:hover{border-color:rgba(124,58,237,0.3);box-shadow:0 8px 24px rgba(124,58,237,0.08)}
+          .sr-room-card.drag-over{border-color:#7c3aed;background:rgba(124,58,237,0.03);box-shadow:0 0 0 4px rgba(124,58,237,0.1),0 8px 24px rgba(124,58,237,0.12);transform:scale(1.02)}
+          .sr-room-card.has-teachers{border-color:rgba(124,58,237,0.2)}
+          .sr-room-card-top{padding:16px 18px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(124,58,237,0.03),rgba(139,92,246,0.01))}
+          .sr-room-title{display:flex;align-items:center;gap:10px}
+          .sr-room-icon{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;font-weight:900;box-shadow:0 4px 12px rgba(124,58,237,0.25)}
+          .sr-room-label{font-weight:900;font-size:15px;color:var(--text)}
+          .sr-room-sublabel{font-size:11px;color:var(--text-muted);font-weight:600}
+          .sr-room-badge{display:flex;align-items:center;gap:4px;background:var(--primary-light);color:var(--primary);padding:4px 10px;border-radius:10px;font-size:12px;font-weight:800}
+          .sr-room-badge svg{width:14px;height:14px}
+          .sr-room-body{padding:14px 16px;min-height:100px}
+          .sr-room-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100px;border:2px dashed var(--border);border-radius:12px;color:var(--text-muted);font-size:12px;gap:8px;transition:all 0.2s}
+          .sr-room-empty-icon{font-size:28px;opacity:0.4}
+          .sr-room-empty-text{font-weight:600}
+          .sr-room-teacher-card{display:flex;align-items:center;gap:10px;background:var(--bg-2);border:1.5px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;cursor:grab;transition:all 0.2s ease;position:relative}
+          .sr-room-teacher-card:hover{border-color:rgba(124,58,237,0.3);background:var(--primary-light)}
+          .sr-room-teacher-card:active{cursor:grabbing;transform:scale(0.98)}
+          .sr-room-teacher-photo{width:34px;height:34px;border-radius:10px;object-fit:cover;background:linear-gradient(135deg,var(--primary-light),rgba(139,92,246,0.15));display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;border:2px solid var(--border)}
           .sr-room-teacher-info{flex:1;min-width:0}
-          .sr-room-teacher-name{font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-          .sr-room-teacher-meta{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-          .sr-room-teacher-hours{background:rgba(124,58,237,0.1);color:#7c3aed;padding:2px 8px;border-radius:8px;font-weight:800;font-size:11px;white-space:nowrap}
-          .sr-room-teacher-remove{cursor:pointer;color:#dc2626;font-size:16px;padding:4px;border:none;background:transparent;font-weight:900}
-          .sr-pool-teacher{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-2);margin-bottom:8px;cursor:grab;transition:all 0.2s}
-          .sr-pool-teacher:active{cursor:grabbing}
-          .sr-pool-teacher.assigned{opacity:0.5;border-style:dashed}
-          .sr-pool-teacher.disabled{opacity:0.55;border-style:dashed;pointer-events:none}
-          @media(max-width:800px){.sr-room-wrap{grid-template-columns:1fr!important}.sr-room-teachers-panel{position:static;max-height:none}}
+          .sr-room-teacher-name{font-weight:800;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+          .sr-room-teacher-meta{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+          .sr-room-teacher-hours{display:flex;align-items:center;gap:4px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;padding:4px 10px;border-radius:8px;font-weight:800;font-size:11px;white-space:nowrap;box-shadow:0 2px 6px rgba(124,58,237,0.2)}
+          .sr-room-teacher-remove{cursor:pointer;color:#dc2626;font-size:18px;padding:4px;border:none;background:transparent;font-weight:900;border-radius:6px;transition:all 0.15s;opacity:0.5}
+          .sr-room-teacher-remove:hover{opacity:1;background:rgba(220,38,38,0.1);transform:scale(1.1)}
+          @media(max-width:900px){.sr-main-layout{grid-template-columns:1fr!important}.sr-pool-panel{position:static;max-height:none}.sr-pool-body{max-height:250px}}
+          @media(max-width:600px){.sr-rooms-grid{grid-template-columns:1fr!important}.sr-rooms-stats{flex-direction:column}.sr-stat-pill{width:100%}}
         </style>
-        <div class="section-header">
-          <div class="section-title">
-            <div class="section-icon">🏫</div>
-            <span>قاعات الحضور</span>
+        <div class="sr-rooms-header">
+          <div class="section-header" style="margin:0">
+            <div class="section-title">
+              <div class="section-icon" style="background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(139,92,246,0.1));border-color:rgba(124,58,237,0.2)">🏫</div>
+              <span>قاعات الحضور</span>
+            </div>
+          </div>
+          <div class="sr-rooms-stats">
+            <div class="sr-stat-pill">
+              <div class="sr-stat-pill-icon" style="background:linear-gradient(135deg,rgba(124,58,237,0.12),rgba(139,92,246,0.08))">🏫</div>
+              <div><div class="sr-stat-pill-num" id="sr-rooms-used">0</div><div class="sr-stat-pill-label">قاعات مستخدمة</div></div>
+            </div>
+            <div class="sr-stat-pill">
+              <div class="sr-stat-pill-icon" style="background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(20,184,166,0.08))">👨‍🏫</div>
+              <div><div class="sr-stat-pill-num" id="sr-rooms-assigned-teachers">0</div><div class="sr-stat-pill-label">أساتذة معيّنون</div></div>
+            </div>
+            <div class="sr-stat-pill">
+              <div class="sr-stat-pill-icon" style="background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(251,191,36,0.08))">⏱️</div>
+              <div><div class="sr-stat-pill-num" id="sr-rooms-total-hours">0</div><div class="sr-stat-pill-label">إجمالي الساعات</div></div>
+            </div>
           </div>
         </div>
-        <div class="stats-grid" style="margin-bottom:20px">
-          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(124,58,237,0.1)">🏫</div></div><div class="stat-num" id="sr-rooms-used">0</div><div class="stat-label">قاعات مستخدمة</div></div>
-          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(16,185,129,0.1)">👨‍🏫</div></div><div class="stat-num" id="sr-rooms-assigned-teachers">0</div><div class="stat-label">أساتذة معيّنون</div></div>
-          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(245,158,11,0.1)">⏱️</div></div><div class="stat-num" id="sr-rooms-total-hours">0</div><div class="stat-label">إجمالي الساعات</div></div>
-        </div>
-        <div class="sr-room-wrap">
-          <div class="sr-room-teachers-panel">
-            <h4 style="margin:0 0 12px;font-size:13px;font-weight:900;color:var(--text)">👨‍🏫 اسحب الأستاذ إلى القاعة</h4>
-            <div id="sr-room-teachers-list"></div>
+        <div class="sr-main-layout">
+          <div class="sr-pool-panel">
+            <div class="sr-pool-header">
+              <h4>👨‍🏫 الأساتذة <span class="sr-pool-count" id="sr-pool-count">0</span></h4>
+            </div>
+            <div class="sr-pool-body" id="sr-room-teachers-list"></div>
           </div>
-          <div id="sr-room-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;align-content:start"></div>
+          <div class="sr-rooms-grid" id="sr-room-grid"></div>
         </div>
       </div>
 
@@ -30664,21 +30710,24 @@ window.sfExportCSV = function () {
         const assignedRoom=isAssigned?srRoomByTeacher[id].room:'';
         const isDisabled=t.status==='disabled';
         const subjects=Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):'';
-        const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-room-teacher-photo" alt="">`:`<div class="sr-room-teacher-photo">👤</div>`;
-        const statusBadge=isDisabled?'<span style="margin-right:6px;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:800;background:rgba(220,38,38,0.08);color:#dc2626">🔴 معطّل</span>':'';
+        const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-pool-photo" alt="">`:`<div class="sr-pool-photo">👤</div>`;
+        const statusBadge=isDisabled?'<span style="padding:2px 6px;border-radius:6px;font-size:9px;font-weight:800;background:rgba(220,38,38,0.1);color:#dc2626">🔴 معطّل</span>':'';
+        const assignedBadge=isAssigned?`<span class="sr-pool-badge">قاعة ${assignedRoom}</span>`:'';
         return `<div class="sr-pool-teacher ${isAssigned?'assigned':''} ${isDisabled?'disabled':''}" draggable="${isDisabled?'false':'true'}" data-teacher-id="${id}" title="${t.name}${isAssigned?' (القاعة '+assignedRoom+')':''}${isDisabled?' (معطّل)':''}">`+
-          photo+
-          `<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name||'—'}${statusBadge}</div>`+
-          `<div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${subjects}${isAssigned?' — القاعة '+assignedRoom:''}</div></div></div>`;
+          assignedBadge+photo+
+          `<div class="sr-pool-info"><div class="sr-pool-name">${t.name||'—'} ${statusBadge}</div>`+
+          `<div class="sr-pool-subjects">${subjects}</div></div></div>`;
       }).join('');
+      const poolCount=document.getElementById('sr-pool-count');
+      if(poolCount) poolCount.textContent=teachers.length;
       pool.querySelectorAll('.sr-pool-teacher').forEach(el=>{el.addEventListener('dragstart',e=>{srRoomDragging=el.getAttribute('data-teacher-id');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',srRoomDragging);el.style.opacity='0.5';});el.addEventListener('dragend',()=>{el.style.opacity='';srRoomDragging=null;});});
     }
 
     const grid=document.getElementById('sr-room-grid');
     if(grid){
       let html='';
-      for(let n=1;n<=TOTAL_ROOMS;n++){const list=srRoomTeachersForRoom(n);const head=`<div class="sr-room-head"><span class="sr-room-num">القاعة ${n}</span><span class="sr-room-count">${list.length}</span></div>`;let body='';if(list.length===0){body=`<div class="sr-room-empty">اسحب أستاذ هنا</div>`;}else{body=list.map(a=>{const t=teachers.find(x=>(x.teacherId||x.id)===a.teacherId)||{};const isDisabled=t.status==='disabled';const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-room-teacher-photo" alt="">`:`<div class="sr-room-teacher-photo">👤</div>`;return `<div class="sr-room-teacher-card" draggable="${isDisabled?'false':'true'}" data-teacher-id="${a.teacherId}" style="${isDisabled?'opacity:0.55;cursor:default':''}">`+photo+`<div class="sr-room-teacher-info"><div class="sr-room-teacher-name">${t.name||a.teacherId}${isDisabled?' <span style="font-size:9px;color:#dc2626;font-weight:800;margin-right:4px">🔴 معطّل</span>':''}</div>`+`<div class="sr-room-teacher-meta">${Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):''}</div></div>`+`<span class="sr-room-teacher-hours">${a.hours||1} س</span>`+`<button class="sr-room-teacher-remove" title="إزالة الأستاذ من القاعة" data-action="remove-room" data-teacher-id="${a.teacherId}">×</button></div>`;}).join('');}
-        html+=`<div class="sr-room-card" data-room="${n}">${head}${body}</div>`;
+      for(let n=1;n<=TOTAL_ROOMS;n++){const list=srRoomTeachersForRoom(n);const hasTeachers=list.length>0;const top=`<div class="sr-room-card-top"><div class="sr-room-title"><div class="sr-room-icon">${n}</div><div><div class="sr-room-label">القاعة ${n}</div><div class="sr-room-sublabel">${hasTeachers?list.reduce((s,a)=>s+(Number(a.hours)||0),0)+' ساعة':''}</div></div></div><div class="sr-room-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>${list.length}</div></div>`;let body='';if(!hasTeachers){body=`<div class="sr-room-empty"><div class="sr-room-empty-icon">📥</div><div class="sr-room-empty-text">اسحب أستاذ هنا</div></div>`;}else{body=list.map(a=>{const t=teachers.find(x=>(x.teacherId||x.id)===a.teacherId)||{};const isDisabled=t.status==='disabled';const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-room-teacher-photo" alt="">`:`<div class="sr-room-teacher-photo">👤</div>`;return `<div class="sr-room-teacher-card" draggable="${isDisabled?'false':'true'}" data-teacher-id="${a.teacherId}" style="${isDisabled?'opacity:0.55;cursor:default':''}">`+photo+`<div class="sr-room-teacher-info"><div class="sr-room-teacher-name">${t.name||a.teacherId}${isDisabled?' <span style="font-size:9px;color:#dc2626;font-weight:800;margin-right:4px">🔴 معطّل</span>':''}</div>`+`<div class="sr-room-teacher-meta">${Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):''}</div></div>`+`<span class="sr-room-teacher-hours">⏱ ${a.hours||1} س</span>`+`<button class="sr-room-teacher-remove" title="إزالة" data-action="remove-room" data-teacher-id="${a.teacherId}">×</button></div>`;}).join('');}
+        html+=`<div class="sr-room-card ${hasTeachers?'has-teachers':''}" data-room="${n}">${top}<div class="sr-room-body">${body}</div></div>`;
       }
       grid.innerHTML=html;
       grid.querySelectorAll('.sr-room-card').forEach(card=>{card.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';card.classList.add('drag-over');});card.addEventListener('dragleave',()=>card.classList.remove('drag-over'));card.addEventListener('drop',e=>{e.preventDefault();card.classList.remove('drag-over');const teacherId=e.dataTransfer.getData('text/plain')||srRoomDragging;if(!teacherId) return;srRoomHandleDrop(teacherId,Number(card.getAttribute('data-room')));});});
