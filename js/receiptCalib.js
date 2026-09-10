@@ -64,15 +64,15 @@
       { key: 'period', type: 'text', label: 'الفترة', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
       { key: 'status', type: 'text', label: 'الحالة', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
       { key: 'div3', type: 'divider', hide: false, thick: 0.5, dash: false, spacingTop: 1 },
-      { key: 'table', type: 'table', hide: false, fs: 2.9, spacingTop: 0.5 },
+      { key: 'table', type: 'table', hide: false, fs: 2.9, spacingTop: 0.5, bold: true },
       { key: 'div4', type: 'divider', hide: false, thick: 0.2, dash: true, spacingTop: 1 },
       { key: 'amount', type: 'text', label: 'المبلغ', hide: false, fs: 4.6, valueBold: true, align: 'center', indent: 0, spacingTop: 1.4, lh: 1.2, showLabel: false, curOffset: 0.6 },
       { key: 'amountWords', type: 'text', label: '', hide: false, fs: 2.8, valueBold: true, align: 'center', indent: 0, spacingTop: 0.3, lh: 1.6, showLabel: false },
       { key: 'date', type: 'text', label: 'تاريخ الإصدار', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
       { key: 'div5', type: 'divider', hide: false, thick: 0.5, dash: false, spacingTop: 1.2 },
       { key: 'barcode', type: 'barcode', hide: false, spacingTop: 1 },
-      { key: 'signature', type: 'signature', hide: false, fs: 2.8, spacingTop: 2 },
-      { key: 'footer', type: 'footer', hide: false, fs: 2.6, spacingTop: 1.3, lh: 1.6, align: 'center', spacingBottom: 3 }
+      { key: 'signature', type: 'signature', hide: false, fs: 2.8, spacingTop: 2, bold: true },
+      { key: 'footer', type: 'footer', hide: false, fs: 2.6, spacingTop: 1.3, lh: 1.6, align: 'center', spacingBottom: 3, bold: true }
     ];
   }
 
@@ -239,7 +239,7 @@
             '<div class="rb-mline"><span class="rb-mlbl">الحصص:</span> ' + numSpan(ss, t) + '</div>' +
             '</div>';
         }).join('');
-        html += '<div data-rb="' + b.key + '" class="rb rb-table" style="' + fs(b) + ';' + sTop(b) + '">' + cards + '</div>';
+        html += '<div data-rb="' + b.key + '" class="rb rb-table" style="' + fs(b) + ';' + sTop(b) + ';font-weight:' + (b.bold ? '900' : '400') + '">' + cards + '</div>';
         return;
       }
       if (b.type === 'barcode') {
@@ -251,7 +251,7 @@
       }
       if (b.type === 'signature') {
         if (!t.signatureShow) return;
-        html += '<div data-rb="' + b.key + '" class="rb rb-sig" style="' + fs(b) + ';' + sTop(b) + '">' +
+        html += '<div data-rb="' + b.key + '" class="rb rb-sig" style="' + fs(b) + ';' + sTop(b) + ';font-weight:' + (b.bold ? '900' : '400') + '">' +
           (t.logo && t.logo.show && t.logo.src ? '<img class="rb-sig-logo" src="' + esc(t.logo.src) + '" alt="" style="width:calc(var(--s)*' + Math.min(12, fmtNum(t.logo.w)) + 'mm)">' : '') +
           '<span class="rb-sig-lbl">' + esc(t.adminLabel || 'الإدارة') + (rec.adminEmail ? '<span class="rb-sig-mail">' + esc(rec.adminEmail) + '</span>' : '') + '</span>' +
           '<span class="rb-sig-ln"></span>' +
@@ -260,7 +260,7 @@
       }
       if (b.type === 'footer') {
         var _fbPad = num(b.spacingBottom) > 0 ? 'padding-bottom:calc(var(--s)*' + fmtNum(b.spacingBottom) + 'mm);' : '';
-        html += '<div data-rb="' + b.key + '" class="rb rb-footer" style="' + fs(b) + ';' + sTop(b) + ';text-align:' + (b.align || 'center') + ';' + _fbPad + '">' + numSpan(rec.footerText != null ? rec.footerText : t.footerText, t) + '</div>';
+        html += '<div data-rb="' + b.key + '" class="rb rb-footer" style="' + fs(b) + ';' + sTop(b) + ';text-align:' + (b.align || 'center') + ';font-weight:' + (b.bold ? '900' : '400') + ';' + _fbPad + '">' + numSpan(rec.footerText != null ? rec.footerText : t.footerText, t) + '</div>';
         return;
       }
       var isTitle = b.type === 'title';
@@ -278,7 +278,7 @@
         html += '<div data-rb="' + b.key + '" class="rb rb-info rb-amount" style="' + fs(b) + ';' + sTop(b) + ';line-height:' + (b.lh || 1.2) + ';text-align:' + (b.align || 'center') + ';' + ind(b) + '">' +
           (b.showLabel ? '<span class="rb-lbl">' + esc(b.label) + ': </span>' : '') +
           '<span class="rb-val" style="position:relative;display:inline-block">' +
-          '<span class="rb-amt-num" dir="ltr" style="unicode-bidi:isolate">' + toDigits(value, t.digits) + '</span>' +
+          '<span class="rb-amt-num" dir="ltr" style="unicode-bidi:isolate;font-weight:' + (b.valueBold ? '900' : '400') + '">' + toDigits(value, t.digits) + '</span>' +
           '<span class="rb-cur" style="font-size:0.55em;position:absolute;top:50%;transform:translateY(-50%);left:100%;margin-left:calc(var(--s)*' + fmtNum(coV) + 'mm)">دج</span>' +
           '</span></div>';
         return;
@@ -286,7 +286,7 @@
       if (b.key === 'amountWords') {
         if (!t.moneyWordsShow || !value) return;
         html += '<div data-rb="' + b.key + '" class="rb rb-info rb-words" style="' + fs(b) + ';' + sTop(b) + ';line-height:' + (b.lh || 1.6) + ';text-align:' + (b.align || 'center') + ';' + ind(b) + '">' +
-          '<span class="rb-val">' + numSpan(value, t) + '</span></div>';
+          '<span class="rb-val" style="font-weight:' + (b.valueBold ? '900' : '400') + '">' + numSpan(value, t) + '</span></div>';
         return;
       }
       if (!value) return;
@@ -312,14 +312,14 @@
       '.rb-div{width:100%;height:0}' +
       '.rb-table{display:flex;flex-direction:column;gap:calc(var(--s)*1.5mm)}' +
       '.rb-mrow{border:calc(var(--s)*0.15mm) solid #000;padding:calc(var(--s)*0.8mm);display:flex;flex-direction:column;gap:calc(var(--s)*0.5mm)}' +
-      '.rb-mhead{font-weight:900;text-align:center}' +
+      '.rb-mhead{font-weight:inherit;text-align:center}' +
       '.rb-mline{text-align:right}' +
-      '.rb-mlbl{font-weight:900}' +
+      '.rb-mlbl{font-weight:inherit}' +
       '.rb-bc svg{max-width:100%;display:block;margin:0 auto}' +
       '.rb-sig{width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--s)*0.5mm);text-align:center}' +
       '.rb-sig-logo{display:block;margin:0 auto}' +
       '.rb-sig-ln{width:100%;border-bottom:calc(var(--s)*0.15mm) solid #000;min-height:calc(var(--s)*5mm)}' +
-      '.rb-sig-lbl{font-weight:900}' +
+      '.rb-sig-lbl{font-weight:inherit}' +
       '.rb-sig-mail{display:block;font-size:0.62em;direction:ltr}' +
       '.rb-footer{font-weight:400}' +
       '.rb-logo-img{width:' + (function(){ return 'calc(var(--s)*' + fmtNum(t.logo.w) + 'mm)'; })() + ';display:block;margin:0 auto}';
