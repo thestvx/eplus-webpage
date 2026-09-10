@@ -29790,6 +29790,7 @@ async function srtLoadData() {
     srtRenderTable(srtAllData);
     srtLoadTreasuryBalance();
   } catch (e) { console.error('SRT load error:', e); srtAllData = []; srtRenderStats(); srtRenderTable([]); }
+  window.srtAllData = srtAllData;
 }
 
 function srtRenderStats() {
@@ -30626,7 +30627,7 @@ window.sfExportCSV = function () {
 <script>
 /* ===== ATTENDANCE ROOMS (قاعات الحضور) ===== */
 (function(){
-  const ROOMS_COLLECTION='support_rooms', ROOMS_DOC_ID='config', TOTAL_ROOMS=8, TEACHERS_COLLECTION='support_teachers';
+  const ROOMS_COLLECTION='support_rooms', ROOMS_DOC_ID='config', TOTAL_ROOMS=8;
   let srRoomByTeacher={}, srRoomDragging=null, srRoomTeachers=[];
   function fs(){return window._firestore}
   function db(){return window._db}
@@ -30634,11 +30635,13 @@ window.sfExportCSV = function () {
 
   async function srRoomLoadData(){
     try{
-      const{getDoc,getDocs,collection:cc,doc:dd}=fs(),d=db();
-      const[roomsSnap,teachersSnap]=await Promise.all([getDoc(dd(d,ROOMS_COLLECTION,ROOMS_DOC_ID)),getDocs(cc(d,TEACHERS_COLLECTION))]);
+      const{getDoc,doc:dd}=fs(),d=db();
+      const roomsSnap=await getDoc(dd(d,ROOMS_COLLECTION,ROOMS_DOC_ID));
       srRoomByTeacher=roomsSnap.exists()?(roomsSnap.data().byTeacher||{}):{};
-      srRoomTeachers=teachersSnap.docs.map(x=>({id:x.id,...x.data()})).filter(t=>t.status!=='deleted');
-    }catch(e){console.error('[ROOMS] load failed',e);srRoomByTeacher={};srRoomTeachers=[];}
+    }catch(e){console.error('[ROOMS] load failed',e);srRoomByTeacher={};}
+    // استدعاء بيانات الأساتذة من مصدر قسم «أساتذة الدعم المدرسي»
+    if(!window.srtAllData||!window.srtAllData.length){if(typeof window.srtLoadData==='function') await window.srtLoadData();}
+    srRoomTeachers=(window.srtAllData||[]).filter(t=>t.status!=='deleted');
     srRoomRender();
   }
   window.srRoomLoad=srRoomLoadData;
