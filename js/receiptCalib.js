@@ -276,7 +276,7 @@
       if (b.key === 'amount') {
         var coV = b.curOffset == null ? 0.6 : Math.round(num(b.curOffset) * 100) / 100;
         html += '<div data-rb="' + b.key + '" class="rb rb-info rb-amount" style="' + fs(b) + ';' + sTop(b) + ';line-height:' + (b.lh || 1.2) + ';text-align:' + (b.align || 'center') + ';' + ind(b) + '">' +
-          (b.showLabel ? '<span class="rb-lbl">' + esc(b.label) + ': </span>' : '') +
+          (b.showLabel ? '<span class="rb-lbl" style="font-weight:' + (b.labelBold !== false ? '900' : '400') + '">' + esc(b.label) + ': </span>' : '') +
           '<span class="rb-val" style="position:relative;display:inline-block">' +
           '<span class="rb-amt-num" dir="ltr" style="unicode-bidi:isolate;font-weight:' + (b.valueBold ? '900' : '400') + '">' + toDigits(value, t.digits) + '</span>' +
           '<span class="rb-cur" style="font-size:0.55em;position:absolute;top:50%;transform:translateY(-50%);left:100%;margin-left:calc(var(--s)*' + fmtNum(coV) + 'mm)">دج</span>' +
@@ -291,7 +291,7 @@
       }
       if (!value) return;
       var st = fs(b) + ';' + sTop(b) + ';' + ls(b) + ';line-height:' + (b.lh || 1.5) + ';text-align:' + (b.align || 'right') + ';' + ind(b);
-      var lbl = (b.showLabel && b.label) ? '<span class="rb-lbl">' + esc(b.label) + ': </span>' : '';
+      var lbl = (b.showLabel && b.label) ? '<span class="rb-lbl" style="font-weight:' + (b.labelBold !== false ? '900' : '400') + '">' + esc(b.label) + ': </span>' : '';
       html += '<div data-rb="' + b.key + '" class="rb rb-info" style="' + st + '">' + lbl +
         '<span class="rb-val" style="font-weight:' + (b.valueBold ? '900' : '400') + '">' + numSpan(value, t) + '</span></div>';
     });
@@ -305,7 +305,7 @@
       '.receipt *{box-sizing:border-box;margin:0;padding:0}' +
       '.rb{max-width:100%}' +
       '.rb-info{font-weight:400;word-wrap:break-word;overflow-wrap:break-word}' +
-      '.rb-lbl{font-weight:700}' +
+      '.rb-lbl{font-weight:400}' +
       '.rb-title .rb-val{letter-spacing:.2px}' +
       '.rb-amount .rb-val{letter-spacing:-.5px}' +
       '.rb-cur{font-weight:900}' +
