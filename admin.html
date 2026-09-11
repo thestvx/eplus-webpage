@@ -4454,6 +4454,33 @@
           .sr-room-teacher-hours{display:flex;align-items:center;gap:4px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;padding:4px 10px;border-radius:8px;font-weight:800;font-size:11px;white-space:nowrap;box-shadow:0 2px 6px rgba(124,58,237,0.2)}
           .sr-room-teacher-remove{cursor:pointer;color:#dc2626;font-size:18px;padding:4px;border:none;background:transparent;font-weight:900;border-radius:6px;transition:all 0.15s;opacity:0.5}
           .sr-room-teacher-remove:hover{opacity:1;background:rgba(220,38,38,0.1);transform:scale(1.1)}
+          .sr-book-overlay{position:fixed;inset:0;background:rgba(2,6,23,0.6);backdrop-filter:blur(4px);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px}
+          .sr-book-modal{background:var(--card-bg,#fff);border-radius:20px;width:420px;max-width:94vw;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.25);animation:srSlotPop .25s ease}
+          @keyframes srSlotPop{from{transform:translateY(14px) scale(.97);opacity:0}to{transform:none;opacity:1}}
+          .sr-book-head{display:flex;align-items:center;gap:14px;padding:20px 22px 16px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff}
+          .sr-book-room-icon{width:46px;height:46px;border-radius:14px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900}
+          .sr-book-title{font-size:17px;font-weight:900}
+          .sr-book-sub{font-size:12px;opacity:.85;margin-top:2px}
+          .sr-book-body{padding:18px 22px 8px}
+          .sr-book-label{font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+          .sr-book-period-toggle{display:flex;gap:6px;margin-bottom:14px;background:var(--bg-2);border:1.5px solid var(--border);border-radius:12px;padding:4px}
+          .sr-book-period-toggle button{flex:1;padding:9px;border:none;border-radius:9px;background:transparent;font-family:'Tajawal',sans-serif;font-weight:800;font-size:13px;color:var(--text-muted);cursor:pointer;transition:all .2s}
+          .sr-book-period-toggle button.active{background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;box-shadow:0 2px 8px rgba(124,58,237,.25)}
+          .sr-book-range{display:flex;align-items:flex-end;gap:8px;margin-bottom:10px}
+          .sr-book-col{flex:1}
+          .sr-book-col label{display:block;font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:6px;text-align:center}
+          .sr-book-col select{width:100%;padding:10px;border-radius:12px;border:2px solid var(--border);background:var(--bg-2);font-family:'Tajawal',sans-serif;font-weight:800;font-size:15px;color:var(--text);cursor:pointer;text-align:center;appearance:none;-webkit-appearance:none}
+          .sr-book-col select:focus{border-color:#7c3aed;outline:none}
+          .sr-book-arrow{font-size:20px;color:var(--text-muted);font-weight:900;padding-bottom:10px}
+          .sr-book-preview{display:flex;align-items:center;justify-content:center;gap:8px;margin:2px 0 12px;background:rgba(124,58,237,.07);border:1.5px dashed rgba(124,58,237,.35);border-radius:12px;padding:10px;font-size:14px;font-weight:900;color:#7c3aed}
+          .sr-book-bookings{margin-bottom:6px}
+          .sr-book-booking-item{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--text-muted);background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:7px 10px;margin-bottom:6px;line-height:1.6}
+          .sr-book-booking-item b{color:var(--text);font-weight:800}
+          .sr-book-actions{display:flex;gap:10px;padding:12px 22px 20px}
+          .sr-book-actions button{flex:1;padding:12px;border:none;border-radius:12px;font-family:'Tajawal',sans-serif;font-weight:900;font-size:14px;cursor:pointer;transition:all .2s}
+          #sr-book-ok{background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;box-shadow:0 4px 12px rgba(124,58,237,.25)}
+          #sr-book-ok:hover{transform:translateY(-1px)}
+          #sr-book-cancel{background:var(--bg-2);color:var(--text);border:1.5px solid var(--border)}
           @media(max-width:900px){.sr-main-layout{grid-template-columns:1fr!important}.sr-pool-panel{position:static;max-height:none}.sr-pool-body{max-height:250px}}
           @media(max-width:600px){.sr-rooms-grid{grid-template-columns:1fr!important}.sr-days-bar{flex-direction:column;align-items:stretch}.sr-day-tab{justify-content:center}}
         </style>
@@ -30711,9 +30738,10 @@ window.sfExportCSV = function () {
       if(roomsSnap.exists()){
         const data=roomsSnap.data();
         if(data.byDay){
-          srRoomByDay=data.byDay;
+          srRoomByDay={};
+          Object.keys(data.byDay).forEach(dk=>{srRoomByDay[String(dk)]=srNormalizeDay(data.byDay[dk]||{});});
         } else if(data.byTeacher){
-          srRoomByDay={'0':data.byTeacher};
+          srRoomByDay={'0':srNormalizeDay(data.byTeacher)};
         } else {
           srRoomByDay={};
         }
@@ -30727,6 +30755,36 @@ window.sfExportCSV = function () {
     srRoomRender();
   }
   window.srRoomLoad=srRoomLoadData;
+
+  function srFmtTime(min){if(!Number.isFinite(min))return'--:--';const h=Math.floor(min/60);const m=Math.round(min%60);return (h<10?'0':'')+h+':'+(m<10?'0':'')+m;}
+  function srSlotDur(a){return Math.max(0,(Number(a.end)-Number(a.start))/60)||0;}
+  function srTeacherName(tid){const t=srRoomTeachers.find(x=>x&&(x.teacherId||x.id)===tid);return t?(t.name||tid):tid;}
+  function srNormalizeDay(m){
+    const out={};
+    for(const tid in m){
+      const a=m[tid]||{};
+      if(typeof a.start==='number'&&typeof a.end==='number'){
+        out[tid]={room:a.room,start:a.start,end:a.end,period:a.period||(a.start<720?'AM':'PM')};
+      } else {
+        const h=Number(a.hours)||1;
+        const st=(typeof a.startHour==='number'?a.startHour*60:8*60);
+        out[tid]={room:a.room,start:st,end:st+h*60,period:st<720?'AM':'PM'};
+      }
+    }
+    return out;
+  }
+  function srRoomConflicts(dk,teacherId,roomNum,start,end){
+    const asg=srRoomByDay[dk]||{};
+    const out=[];
+    for(const tid in asg){
+      const a=asg[tid];
+      if(!a||typeof a.start!=='number'||typeof a.end!=='number')continue;
+      if(a.end<=start||a.start>=end)continue;
+      if(tid===teacherId&&a.room===roomNum)continue;
+      out.push({tid,room:a.room});
+    }
+    return out;
+  }
 
   function srRoomTeachersForRoom(n){
     const asg=srGetCurrentAssignments();
@@ -30766,7 +30824,7 @@ window.sfExportCSV = function () {
     const asg=srGetCurrentAssignments();
     const assignedSet=new Set(Object.keys(asg));
     const usedRooms=new Set();let totalHours=0;
-    Object.values(asg).forEach(a=>{if(a&&a.room){usedRooms.add(String(a.room));totalHours+=Number(a.hours)||0;}});
+    Object.values(asg).forEach(a=>{if(a&&a.room){usedRooms.add(String(a.room));totalHours+=(typeof a.start==='number'&&typeof a.end==='number')?srSlotDur(a):(Number(a.hours)||0);}});
     const elU=document.getElementById('sr-rooms-used'),elT=document.getElementById('sr-rooms-assigned-teachers'),elH=document.getElementById('sr-rooms-total-hours');
     if(elU)elU.textContent=usedRooms.size;if(elT)elT.textContent=assignedSet.size;if(elH)elH.textContent=totalHours;
 
@@ -30780,8 +30838,9 @@ window.sfExportCSV = function () {
         const subjects=Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):'';
         const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-pool-photo" alt="">`:`<div class="sr-pool-photo">👤</div>`;
         const statusBadge=isDisabled?'<span style="padding:2px 6px;border-radius:6px;font-size:9px;font-weight:800;background:rgba(220,38,38,0.1);color:#dc2626">🔴 معطّل</span>':'';
-        const assignedBadge=isAssigned?`<span class="sr-pool-badge">قاعة ${assignedRoom}</span>`:'';
-        return `<div class="sr-pool-teacher ${isAssigned?'assigned':''} ${isDisabled?'disabled':''}" draggable="${isDisabled?'false':'true'}" data-teacher-id="${id}" title="${t.name}${isAssigned?' (قاعة '+assignedRoom+' — '+DAY_NAMES[srRoomCurrentDay]+')':''}${isDisabled?' (معطّل)':''}">`+
+        const slotDesc=isAssigned&&typeof asg[id].start==='number'?srFmtTime(asg[id].start)+'–'+srFmtTime(asg[id].end):'';
+        const assignedBadge=isAssigned?`<span class="sr-pool-badge">قاعة ${assignedRoom}${slotDesc?' • '+slotDesc:''}</span>`:'';
+        return `<div class="sr-pool-teacher ${isAssigned?'assigned':''} ${isDisabled?'disabled':''}" draggable="${isDisabled?'false':'true'}" data-teacher-id="${id}" title="${t.name}${isAssigned?' (قاعة '+assignedRoom+' • '+slotDesc+' — '+DAY_NAMES[srRoomCurrentDay]+')':''}${isDisabled?' (معطّل)':''}">`+
           assignedBadge+photo+
           `<div class="sr-pool-info"><div class="sr-pool-name">${t.name||'—'} ${statusBadge}</div>`+
           `<div class="sr-pool-subjects">${subjects}</div></div></div>`;
@@ -30794,7 +30853,7 @@ window.sfExportCSV = function () {
     const grid=document.getElementById('sr-room-grid');
     if(grid){
       let html='';
-      for(let n=1;n<=TOTAL_ROOMS;n++){const list=srRoomTeachersForRoom(n);const hasTeachers=list.length>0;const totalH=list.reduce((s,a)=>s+(Number(a.hours)||0),0);const top=`<div class="sr-room-card-top"><div class="sr-room-title"><div class="sr-room-icon">${n}</div><div><div class="sr-room-label">القاعة ${n}</div><div class="sr-room-sublabel">${hasTeachers?totalH+' ساعة':''}</div></div></div><div class="sr-room-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>${list.length}</div></div>`;let body='';if(!hasTeachers){body=`<div class="sr-room-empty"><div class="sr-room-empty-icon">📥</div><div class="sr-room-empty-text">اسحب أستاذ هنا</div></div>`;}else{body=list.map(a=>{const t=teachers.find(x=>(x.teacherId||x.id)===a.teacherId)||{};const isDisabled=t.status==='disabled';const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-room-teacher-photo" alt="">`:`<div class="sr-room-teacher-photo">👤</div>`;return `<div class="sr-room-teacher-card" draggable="${isDisabled?'false':'true'}" data-teacher-id="${a.teacherId}" style="${isDisabled?'opacity:0.55;cursor:default':''}">`+photo+`<div class="sr-room-teacher-info"><div class="sr-room-teacher-name">${t.name||a.teacherId}${isDisabled?' <span style="font-size:9px;color:#dc2626;font-weight:800;margin-right:4px">🔴 معطّل</span>':''}</div>`+`<div class="sr-room-teacher-meta">${Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):''}</div></div>`+`<span class="sr-room-teacher-hours">⏱ ${a.hours||1} س</span>`+`<button class="sr-room-teacher-remove" title="إزالة" data-action="remove-room" data-teacher-id="${a.teacherId}">×</button></div>`;}).join('');}
+      for(let n=1;n<=TOTAL_ROOMS;n++){const list=srRoomTeachersForRoom(n);const hasTeachers=list.length>0;const totalH=list.reduce((s,a)=>s+((typeof a.start==='number'&&typeof a.end==='number')?srSlotDur(a):(Number(a.hours)||0)),0);const top=`<div class="sr-room-card-top"><div class="sr-room-title"><div class="sr-room-icon">${n}</div><div><div class="sr-room-label">القاعة ${n}</div><div class="sr-room-sublabel">${hasTeachers?totalH+' ساعة':''}</div></div></div><div class="sr-room-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>${list.length}</div></div>`;let body='';if(!hasTeachers){body=`<div class="sr-room-empty"><div class="sr-room-empty-icon">📥</div><div class="sr-room-empty-text">اسحب أستاذ هنا</div></div>`;}else{body=list.map(a=>{const t=teachers.find(x=>(x.teacherId||x.id)===a.teacherId)||{};const isDisabled=t.status==='disabled';const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-room-teacher-photo" alt="">`:`<div class="sr-room-teacher-photo">👤</div>`;return `<div class="sr-room-teacher-card" draggable="${isDisabled?'false':'true'}" data-teacher-id="${a.teacherId}" style="${isDisabled?'opacity:0.55;cursor:default':''}">`+photo+`<div class="sr-room-teacher-info"><div class="sr-room-teacher-name">${t.name||a.teacherId}${isDisabled?' <span style="font-size:9px;color:#dc2626;font-weight:800;margin-right:4px">🔴 معطّل</span>':''}</div>`+`<div class="sr-room-teacher-meta">${Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):''}</div></div>`+`<span class="sr-room-teacher-hours">${(typeof a.start==='number'&&typeof a.end==='number')?'⏰ '+srFmtTime(a.start)+'–'+srFmtTime(a.end):'⏱ '+(a.hours||1)+' س'}</span>`+`<button class="sr-room-teacher-remove" title="إزالة" data-action="remove-room" data-teacher-id="${a.teacherId}">×</button></div>`;}).join('');}
         html+=`<div class="sr-room-card ${hasTeachers?'has-teachers':''}" data-room="${n}">${top}<div class="sr-room-body">${body}</div></div>`;
       }
       grid.innerHTML=html;
@@ -30811,11 +30870,18 @@ window.sfExportCSV = function () {
     if(t.status==='disabled'){toast('الأستاذ معطّل حالياً',true);return;}
     const dk=srDayKey(srRoomCurrentDay);
     const asg=srRoomByDay[dk]||{};
-    const existing=asg[teacherId];
-    srRoomPromptHours(t.name||teacherId,roomNum,existing?existing.hours:1,newH=>{
-      if(newH===null)return;
+    const existing=(asg[teacherId]&&asg[teacherId].room===roomNum)?asg[teacherId]:null;
+    srRoomPromptSlot(t.name||teacherId,dk,roomNum,existing,teacherId,(slot)=>{
+      if(!slot)return;
+      const conflicts=srRoomConflicts(dk,teacherId,roomNum,slot.start,slot.end);
+      if(conflicts.length){
+        const c=conflicts[0];
+        if(c.tid===teacherId)toast('⛔ '+srTeacherName(teacherId)+' مبرمج في القاعة '+c.room+' في نفس التوقيت',true);
+        else toast('⛔ هذا التوقيت محجوز في القاعة '+roomNum+' للأستاذ '+srTeacherName(c.tid),true);
+        return;
+      }
       if(!srRoomByDay[dk]) srRoomByDay[dk]={};
-      srRoomByDay[dk][teacherId]={room:roomNum,hours:newH};
+      srRoomByDay[dk][teacherId]={room:roomNum,start:slot.start,end:slot.end,period:slot.period||(slot.start<720?'AM':'PM')};
       srRoomSave();
     });
   }
@@ -30837,22 +30903,98 @@ window.sfExportCSV = function () {
     }catch(e){console.error('[ROOMS] save failed',e);toast('حدث خطأ أثناء الحفظ',true);}
   }
 
-  function srRoomPromptHours(teacherName,roomNum,currentVal,cb){
+  function srRoomPromptSlot(teacherName,dayKey,roomNum,existing,teacherId,cb){
+    const dk=String(dayKey);
+    const dayName=DAY_NAMES[Number(dk)]||'';
+    const asg=srRoomByDay[dk]||{};
+    const defStart=(existing&&typeof existing.start==='number')?existing.start:8*60;
+    const defEnd=(existing&&typeof existing.end==='number')?existing.end:defStart+120;
+    let selPeriod=(existing&&existing.period)?existing.period:(defStart<720?'AM':'PM');
+    const isEdit=!!existing;
+
+    const fromOpts=[];for(let h=6;h<=23;h++){fromOpts.push(`<option value="${h*60}"${h*60===defStart?' selected':''}>${srFmtTime(h*60)}</option>`);}
+    let toOpts='';for(let h=Math.min(24,(defStart/60)+1);h<=24;h++){toOpts+=`<option value="${h*60}"${h*60===defEnd?' selected':''}>${srFmtTime(h*60)}</option>`;}
+
+    let bookingsHtml='';
+    const roomBookings=[];
+    for(const tid in asg){
+      const a=asg[tid];
+      if(a&&a.room===roomNum&&tid!==teacherId&&typeof a.start==='number'){
+        roomBookings.push({name:srTeacherName(tid),a});
+      }
+    }
+
     const ov=document.createElement('div');
-    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center';
-    ov.innerHTML=`<div style="background:var(--card-bg,#fff);border-radius:16px;padding:24px;width:360px;max-width:92vw;text-align:center;border:1px solid var(--border,#e5e7eb)">`+
-      `<h3 style="margin:0 0 4px;font-size:16px;font-weight:900;color:var(--text,#111827)">📐 القاعة ${roomNum}</h3>`+
-      `<p style="margin:0 0 6px;font-size:11px;color:var(--text-muted,#6b7280)">${DAY_NAMES[srRoomCurrentDay]}</p>`+
-      `<p style="margin:0 0 16px;font-size:13px;color:var(--text-muted,#6b7280)">عدد ساعات التدريس للأستاذ <strong style="color:var(--text,#111827)">${teacherName}</strong>:</p>`+
-      `<input id="sr-room-hours-inp" type="number" min="0.5" step="0.5" value="${Number(currentVal)||1}" style="width:100%;text-align:center;font-size:24px;padding:12px;border:2px solid var(--border,#d1d5db);border-radius:12px;font-weight:900;background:var(--bg-2,#f9fafb);color:var(--text,#111827)">`+
-      `<div style="display:flex;gap:10px;margin-top:16px"><button id="sr-room-hours-ok" style="flex:1;padding:10px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-weight:800;cursor:pointer">تأكيد</button>`+
-      `<button id="sr-room-hours-cancel" style="flex:1;padding:10px;border:1px solid var(--border,#d1d5db);border-radius:10px;background:var(--card-bg,#fff);color:var(--text,#374151);font-weight:700;cursor:pointer">إلغاء</button></div></div>`;
+    ov.className='sr-book-overlay';
+    ov.innerHTML=`<div class="sr-book-modal">
+      <div class="sr-slot-head">
+        <div class="sr-slot-room-icon">${roomNum}</div>
+        <div>
+          <div class="sr-slot-title">القاعة ${roomNum} • ${dayName}</div>
+          <div class="sr-slot-sub">${teacherName.replace(/<[^>]+>/g,'')}</div>
+        </div>
+      </div>
+      <div class="sr-slot-body">
+        <div class="sr-slot-label">🌅 / 🌇 الفترة</div>
+        <div class="sr-slot-period-toggle">
+          <button data-p="AM" class="${selPeriod==='AM'?'active':''}">🌅 صباحاً</button>
+          <button data-p="PM" class="${selPeriod==='PM'?'active':''}">🌇 مساءً</button>
+        </div>
+        <div class="sr-slot-label">⏰ وقت التدريس</div>
+        <div class="sr-slot-range">
+          <div class="sr-slot-col"><label>من</label><select id="sr-book-from">${fromOpts}</select></div>
+          <div class="sr-slot-arrow">←</div>
+          <div class="sr-slot-col"><label>إلى</label><select id="sr-book-to">${toOpts}</select></div>
+        </div>
+        <div class="sr-slot-preview"><span id="sr-book-preview-text">${srFmtTime(defStart)} — ${srFmtTime(defEnd)} • ${selPeriod==='PM'?'مساءً':'صباحاً'}</span></div>
+        ${roomBookings.length?`<div class="sr-slot-bookings"><div class="sr-slot-label">📌 محجوزات هذه القاعة</div>${roomBookings.map(b=>`<div class="sr-slot-booking-item">🔒 <b>${srFmtTime(b.a.start)} – ${srFmtTime(b.a.end)}</b> &nbsp;•&nbsp; ${b.name}</div>`).join('')}</div>`:''}
+      </div>
+      <div class="sr-slot-actions">
+        <button id="sr-book-ok">${isEdit?'✅ تحديث الحجز':'💾 تأكيد الحجز'}</button>
+        <button id="sr-book-cancel">إلغاء</button>
+      </div>
+    </div>`;
     document.body.appendChild(ov);
-    setTimeout(()=>{const inp=document.getElementById('sr-room-hours-inp');if(inp){inp.focus();inp.select();}},30);
+
+    const fromSel=ov.querySelector('#sr-book-from'), toSel=ov.querySelector('#sr-book-to');
+    const periodBtns=ov.querySelectorAll('.sr-book-period-toggle button');
+
+    function renderPreview(){
+      const st=Number(fromSel.value), en=Number(toSel.value);
+      const p=selPeriod==='PM'?'مساءً':'صباحاً';
+      const pt=ov.querySelector('#sr-book-preview-text');
+      if(pt)pt.textContent=`${srFmtTime(st)} — ${srFmtTime(en)} • ${p}`;
+    }
+    function rebuildTo(){
+      const st=Number(fromSel.value);
+      let html='';
+      for(let h=Math.min(24,(st/60)+1);h<=24;h++){
+        const m=h*60;
+        html+=`<option value="${m}"${m===Number(toSel.value)?' selected':''}>${srFmtTime(m)}</option>`;
+      }
+      toSel.innerHTML=html;
+    }
+
+    fromSel.addEventListener('change',()=>setTimeout(()=>{rebuildTo();renderPreview();},0));
+    toSel.addEventListener('change',renderPreview);
+    periodBtns.forEach(b=>{
+      b.addEventListener('click',()=>{
+        periodBtns.forEach(x=>x.classList.remove('active'));
+        b.classList.add('active');
+        selPeriod=b.getAttribute('data-p');
+        renderPreview();
+      });
+    });
+
     const finish=v=>{ov.remove();cb(v);};
-    ov.addEventListener('click',e=>{if(e.target.id==='sr-room-hours-cancel'||e.target===ov)finish(null);});
-    document.getElementById('sr-room-hours-ok').addEventListener('click',()=>finish(parseFloat(document.getElementById('sr-room-hours-inp').value)||1));
-    document.getElementById('sr-room-hours-inp').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('sr-room-hours-ok').click();if(e.key==='Escape')finish(null);});
+    ov.addEventListener('click',e=>{if(e.target===ov||e.target.id==='sr-book-cancel')finish(null);});
+    ov.querySelector('#sr-book-ok').addEventListener('click',()=>{
+      const st=Number(fromSel.value), en=Number(toSel.value);
+      if(en<=st){toast('⚠️ ساعة الانتهاء يجب أن تكون بعد ساعة البداية',true);return;}
+      finish({start:st,end:en,period:selPeriod});
+    });
+    ov.querySelector('#sr-book-from').addEventListener('keydown',e=>{if(e.key==='Escape')finish(null);});
+    ov.querySelector('#sr-book-to').addEventListener('keydown',e=>{if(e.key==='Escape')finish(null);});
   }
 
 })();
