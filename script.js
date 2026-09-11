@@ -2292,6 +2292,8 @@ function showSuccessModal(title, message, regNumber = null) {
 function closeSuccessModal() {
   const modal = byId('success-popup');
   if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
+  const sModal = byId('success-modal');
+  if (sModal) { sModal.style.display = 'none'; sModal.classList.remove('active'); }
   unlockPageScroll();
 }
 

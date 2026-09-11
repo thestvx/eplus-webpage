@@ -767,6 +767,9 @@ function openSuccessModal(id) {
 function closeSuccessModal() {
   const modal = byId('success-modal');
   if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
+  const popup = byId('success-popup');
+  if (popup) { popup.style.display = 'none'; popup.classList.remove('active'); }
+  try { if (typeof unlockPageScroll === 'function') unlockPageScroll(); } catch (e) {}
   sFormData = null;
 }
 
