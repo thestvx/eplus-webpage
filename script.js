@@ -1719,6 +1719,16 @@ function onLangLevelChange() {
    SUPPORT FLOW
 ────────────────────────────────────────────────────────── */
 function onBirthDateChange() {}
+function onProgBirthDate() {
+  const d = byId('progBdDay')?.value;
+  const m = byId('progBdMonth')?.value;
+  const y = byId('progBdYear')?.value;
+  const el = byId('birthDate');
+  if (!el) return;
+  el.value = (d && m && y)
+    ? y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0')
+    : '';
+}
 
 function onSupportTypeChange() {
   const selected = $('input[name="supportType"]:checked')?.value;
@@ -1949,6 +1959,11 @@ async function submitForm(e) {
 
   // ── التحقق من حقول البرنامج المطلوبة حسب نوع التسجيل ──
   const reqErr = [];
+  if (['vip', 'ielts', 'online', 'takwini'].includes(currentModalType)) {
+    if (!birthDate) reqErr.push('تاريخ الميلاد');
+    if (!birthPlace) reqErr.push('مكان الميلاد / العنوان');
+    if (!phone) reqErr.push('رقم الهاتف');
+  }
   if (currentModalType === 'vip') {
     const vipT = $('input[name="vipType"]:checked')?.value || '';
     if (!vipT) reqErr.push('نوع VIP');
@@ -2780,6 +2795,7 @@ window.openModal = openModal;
 window.closeModal = closeModal;
 window.closeModalOutside = closeModalOutside;
 window.onBirthDateChange = onBirthDateChange;
+window.onProgBirthDate = onProgBirthDate;
 window.onSupportTypeChange = onSupportTypeChange;
 window.onEduLevelChange = onEduLevelChange;
 window.onCandidateTypeChange = onCandidateTypeChange;
