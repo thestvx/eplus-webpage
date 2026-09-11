@@ -1994,6 +1994,27 @@
         <span class="nav-icon">🏫</span>
         <span class="nav-label">قاعات الحضور</span>
       </div>
+      <div class="nav-section" data-nav-cat="programs">تسجيلات البرامج</div>
+      <div class="nav-item" data-nav="vip-registrations" onclick="switchNavSection('vip-registrations')">
+        <span class="nav-icon">⭐</span>
+        <span class="nav-label">دروس VIP</span>
+        <span class="nav-badge" id="nav-badge-vip">0</span>
+      </div>
+      <div class="nav-item" data-nav="ielts-registrations" onclick="switchNavSection('ielts-registrations')">
+        <span class="nav-icon">🎯</span>
+        <span class="nav-label">التحضير لاختبار IELTS</span>
+        <span class="nav-badge" id="nav-badge-ielts">0</span>
+      </div>
+      <div class="nav-item" data-nav="online-registrations" onclick="switchNavSection('online-registrations')">
+        <span class="nav-icon">💻</span>
+        <span class="nav-label">الدورات الأونلاين</span>
+        <span class="nav-badge" id="nav-badge-online">0</span>
+      </div>
+      <div class="nav-item" data-nav="takwini-registrations" onclick="switchNavSection('takwini-registrations')">
+        <span class="nav-icon">🛠️</span>
+        <span class="nav-label">الدورات التكوينية</span>
+        <span class="nav-badge" id="nav-badge-takwini">0</span>
+      </div>
       <div class="nav-section" data-nav-cat="mail" data-i18n="mail_service">خدمات البريد</div>
       <div class="nav-item" data-nav="notifications" onclick="switchNavSection('notifications')">
         <span class="nav-icon">📨</span>
@@ -4523,6 +4544,227 @@
         </div>
       </div>
 
+      <!-- ===== SECTION: PROG REGISTRATIONS — دروس VIP ===== -->
+      <div id="section-vip-registrations" style="display:none">
+        <div class="section-header">
+          <div class="section-title">
+            <div class="section-icon">⭐</div>
+            <span>دروس VIP</span>
+          </div>
+        </div>
+        <div class="stats-grid" style="margin-bottom:24px">
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--primary-light)">📋</div></div><div class="stat-num" id="preg-vip-total">0</div><div class="stat-label">إجمالي التسجيلات</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--accent-soft)">🟡</div></div><div class="stat-num" id="preg-vip-initial" style="color:var(--warning)">0</div><div class="stat-label">مسجل مبدئياً</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--success-soft)">🟢</div></div><div class="stat-num" id="preg-vip-confirmed" style="color:var(--success)">0</div><div class="stat-label">مسجل نهائياً</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(124,58,237,0.1)">💰</div></div><div class="stat-num" id="preg-vip-fees">0</div><div class="stat-label">الرسوم المحصلة (دج)</div></div>
+        </div>
+        <div class="panel" style="padding:16px 20px;margin-bottom:16px">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <input class="inp" id="preg-vip-search" placeholder="🔍 ابحث بالاسم / الهاتف / الرقم..." style="width:230px;padding:8px 14px" oninput="pregApply('vip')" />
+              <select class="inp" id="preg-vip-status" style="width:auto;min-width:150px;padding:8px 14px" onchange="pregApply('vip')">
+                <option value="">كل الحالات</option>
+                <option value="مسجل مبدئياً">🟡 مسجل مبدئياً</option>
+                <option value="مسجل نهائياً">🟢 مسجل نهائياً</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="tbl-action" onclick="pregExportCSV('vip')" style="padding:8px 16px;font-size:12px">📥 CSV</button>
+              <button class="tbl-action" onclick="pregExportExcel('vip')" style="padding:8px 16px;font-size:12px">📊 Excel</button>
+              <button class="tbl-action" onclick="pregPrint('vip')" style="padding:8px 16px;font-size:12px">🖨️ طباعة</button>
+              <button class="tbl-action" onclick="pregRefresh('vip')" style="padding:8px 16px;font-size:12px">🔄 تحديث</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel" style="padding:0;overflow:auto">
+          <table class="tbl" id="preg-vip-table" style="min-width:860px">
+            <thead><tr><th>#</th><th>الاسم الكامل</th><th>الهاتف</th><th>تفاصيل البرنامج</th><th>تاريخ الميلاد</th><th>تاريخ التسجيل</th><th>الحالة</th><th>الرسوم</th><th>إجراءات</th></tr></thead>
+            <tbody id="preg-vip-tbody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:12px;color:var(--text-muted);font-weight:600" id="preg-vip-pagination-info"></div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap" id="preg-vip-pagination-btns"></div>
+        </div>
+      </div>
+
+      <!-- ===== SECTION: PROG REGISTRATIONS — التحضير لاختبار IELTS ===== -->
+      <div id="section-ielts-registrations" style="display:none">
+        <div class="section-header">
+          <div class="section-title">
+            <div class="section-icon">🎯</div>
+            <span>التحضير لاختبار IELTS</span>
+          </div>
+        </div>
+        <div class="stats-grid" style="margin-bottom:24px">
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--primary-light)">📋</div></div><div class="stat-num" id="preg-ielts-total">0</div><div class="stat-label">إجمالي التسجيلات</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--accent-soft)">🟡</div></div><div class="stat-num" id="preg-ielts-initial" style="color:var(--warning)">0</div><div class="stat-label">مسجل مبدئياً</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--success-soft)">🟢</div></div><div class="stat-num" id="preg-ielts-confirmed" style="color:var(--success)">0</div><div class="stat-label">مسجل نهائياً</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(124,58,237,0.1)">💰</div></div><div class="stat-num" id="preg-ielts-fees">0</div><div class="stat-label">الرسوم المحصلة (دج)</div></div>
+        </div>
+        <div class="panel" style="padding:16px 20px;margin-bottom:16px">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <input class="inp" id="preg-ielts-search" placeholder="🔍 ابحث بالاسم / الهاتف / الرقم..." style="width:230px;padding:8px 14px" oninput="pregApply('ielts')" />
+              <select class="inp" id="preg-ielts-status" style="width:auto;min-width:150px;padding:8px 14px" onchange="pregApply('ielts')">
+                <option value="">كل الحالات</option>
+                <option value="مسجل مبدئياً">🟡 مسجل مبدئياً</option>
+                <option value="مسجل نهائياً">🟢 مسجل نهائياً</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="tbl-action" onclick="pregExportCSV('ielts')" style="padding:8px 16px;font-size:12px">📥 CSV</button>
+              <button class="tbl-action" onclick="pregExportExcel('ielts')" style="padding:8px 16px;font-size:12px">📊 Excel</button>
+              <button class="tbl-action" onclick="pregPrint('ielts')" style="padding:8px 16px;font-size:12px">🖨️ طباعة</button>
+              <button class="tbl-action" onclick="pregRefresh('ielts')" style="padding:8px 16px;font-size:12px">🔄 تحديث</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel" style="padding:0;overflow:auto">
+          <table class="tbl" id="preg-ielts-table" style="min-width:860px">
+            <thead><tr><th>#</th><th>الاسم الكامل</th><th>الهاتف</th><th>تفاصيل البرنامج</th><th>تاريخ الميلاد</th><th>تاريخ التسجيل</th><th>الحالة</th><th>الرسوم</th><th>إجراءات</th></tr></thead>
+            <tbody id="preg-ielts-tbody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:12px;color:var(--text-muted);font-weight:600" id="preg-ielts-pagination-info"></div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap" id="preg-ielts-pagination-btns"></div>
+        </div>
+      </div>
+
+      <!-- ===== SECTION: PROG REGISTRATIONS — الدورات الأونلاين ===== -->
+      <div id="section-online-registrations" style="display:none">
+        <div class="section-header">
+          <div class="section-title">
+            <div class="section-icon">💻</div>
+            <span>الدورات الأونلاين</span>
+          </div>
+        </div>
+        <div class="stats-grid" style="margin-bottom:24px">
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--primary-light)">📋</div></div><div class="stat-num" id="preg-online-total">0</div><div class="stat-label">إجمالي التسجيلات</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--accent-soft)">🟡</div></div><div class="stat-num" id="preg-online-initial" style="color:var(--warning)">0</div><div class="stat-label">مسجل مبدئياً</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--success-soft)">🟢</div></div><div class="stat-num" id="preg-online-confirmed" style="color:var(--success)">0</div><div class="stat-label">مسجل نهائياً</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(124,58,237,0.1)">💰</div></div><div class="stat-num" id="preg-online-fees">0</div><div class="stat-label">الرسوم المحصلة (دج)</div></div>
+        </div>
+        <div class="panel" style="padding:16px 20px;margin-bottom:16px">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <input class="inp" id="preg-online-search" placeholder="🔍 ابحث بالاسم / الهاتف / الرقم..." style="width:230px;padding:8px 14px" oninput="pregApply('online')" />
+              <select class="inp" id="preg-online-status" style="width:auto;min-width:150px;padding:8px 14px" onchange="pregApply('online')">
+                <option value="">كل الحالات</option>
+                <option value="مسجل مبدئياً">🟡 مسجل مبدئياً</option>
+                <option value="مسجل نهائياً">🟢 مسجل نهائياً</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="tbl-action" onclick="pregExportCSV('online')" style="padding:8px 16px;font-size:12px">📥 CSV</button>
+              <button class="tbl-action" onclick="pregExportExcel('online')" style="padding:8px 16px;font-size:12px">📊 Excel</button>
+              <button class="tbl-action" onclick="pregPrint('online')" style="padding:8px 16px;font-size:12px">🖨️ طباعة</button>
+              <button class="tbl-action" onclick="pregRefresh('online')" style="padding:8px 16px;font-size:12px">🔄 تحديث</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel" style="padding:0;overflow:auto">
+          <table class="tbl" id="preg-online-table" style="min-width:860px">
+            <thead><tr><th>#</th><th>الاسم الكامل</th><th>الهاتف</th><th>تفاصيل البرنامج</th><th>تاريخ الميلاد</th><th>تاريخ التسجيل</th><th>الحالة</th><th>الرسوم</th><th>إجراءات</th></tr></thead>
+            <tbody id="preg-online-tbody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:12px;color:var(--text-muted);font-weight:600" id="preg-online-pagination-info"></div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap" id="preg-online-pagination-btns"></div>
+        </div>
+      </div>
+
+      <!-- ===== SECTION: PROG REGISTRATIONS — الدورات التكوينية ===== -->
+      <div id="section-takwini-registrations" style="display:none">
+        <div class="section-header">
+          <div class="section-title">
+            <div class="section-icon">🛠️</div>
+            <span>الدورات التكوينية</span>
+          </div>
+        </div>
+        <div class="stats-grid" style="margin-bottom:24px">
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--primary-light)">📋</div></div><div class="stat-num" id="preg-takwini-total">0</div><div class="stat-label">إجمالي التسجيلات</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--accent-soft)">🟡</div></div><div class="stat-num" id="preg-takwini-initial" style="color:var(--warning)">0</div><div class="stat-label">مسجل مبدئياً</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--success-soft)">🟢</div></div><div class="stat-num" id="preg-takwini-confirmed" style="color:var(--success)">0</div><div class="stat-label">مسجل نهائياً</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(124,58,237,0.1)">💰</div></div><div class="stat-num" id="preg-takwini-fees">0</div><div class="stat-label">الرسوم المحصلة (دج)</div></div>
+        </div>
+        <div class="panel" style="padding:16px 20px;margin-bottom:16px">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <input class="inp" id="preg-takwini-search" placeholder="🔍 ابحث بالاسم / الهاتف / الرقم..." style="width:230px;padding:8px 14px" oninput="pregApply('takwini')" />
+              <select class="inp" id="preg-takwini-status" style="width:auto;min-width:150px;padding:8px 14px" onchange="pregApply('takwini')">
+                <option value="">كل الحالات</option>
+                <option value="مسجل مبدئياً">🟡 مسجل مبدئياً</option>
+                <option value="مسجل نهائياً">🟢 مسجل نهائياً</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="tbl-action" onclick="pregExportCSV('takwini')" style="padding:8px 16px;font-size:12px">📥 CSV</button>
+              <button class="tbl-action" onclick="pregExportExcel('takwini')" style="padding:8px 16px;font-size:12px">📊 Excel</button>
+              <button class="tbl-action" onclick="pregPrint('takwini')" style="padding:8px 16px;font-size:12px">🖨️ طباعة</button>
+              <button class="tbl-action" onclick="pregRefresh('takwini')" style="padding:8px 16px;font-size:12px">🔄 تحديث</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel" style="padding:0;overflow:auto">
+          <table class="tbl" id="preg-takwini-table" style="min-width:860px">
+            <thead><tr><th>#</th><th>الاسم الكامل</th><th>الهاتف</th><th>تفاصيل البرنامج</th><th>تاريخ الميلاد</th><th>تاريخ التسجيل</th><th>الحالة</th><th>الرسوم</th><th>إجراءات</th></tr></thead>
+            <tbody id="preg-takwini-tbody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:12px;color:var(--text-muted);font-weight:600" id="preg-takwini-pagination-info"></div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap" id="preg-takwini-pagination-btns"></div>
+        </div>
+      </div>
+
+      <!-- ═══ PROGRAM REG DETAIL MODAL ═══ -->
+      <div class="teacher-modal-bg" id="preg-detail-modal">
+        <div class="teacher-modal" style="max-width:760px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:rgba(79,70,229,0.1);border-color:rgba(79,70,229,0.2)">📋</div>
+            <div class="teacher-modal-title">تفاصيل التسجيل</div>
+            <button class="att-modal-close" onclick="pregCloseDetail()">✕</button>
+          </div>
+          <div class="teacher-modal-body" id="preg-detail-body"></div>
+        </div>
+      </div>
+
+      <!-- ═══ PROGRAM REG EDIT MODAL ═══ -->
+      <div class="teacher-modal-bg" id="preg-edit-modal">
+        <div class="teacher-modal" style="max-width:520px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.2)">✏️</div>
+            <div class="teacher-modal-title">تعديل التسجيل</div>
+            <button class="att-modal-close" onclick="pregCloseEdit()">✕</button>
+          </div>
+          <div class="teacher-modal-body" style="display:flex;flex-direction:column;gap:12px">
+            <div>
+              <label class="form-label">الهاتف</label>
+              <input class="inp" id="preg-edit-phone" style="width:100%;padding:10px" />
+            </div>
+            <div>
+              <label class="form-label">العنوان</label>
+              <input class="inp" id="preg-edit-address" style="width:100%;padding:10px" />
+            </div>
+            <div>
+              <label class="form-label">الحالة</label>
+              <select class="inp" id="preg-edit-status" style="width:100%;padding:10px">
+                <option value="مسجل مبدئياً">🟡 مسجل مبدئياً</option>
+                <option value="مسجل نهائياً">🟢 مسجل نهائياً</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">رسوم التسجيل (دج)</label>
+              <input class="inp" id="preg-edit-fee" type="number" min="0" style="width:100%;padding:10px" />
+            </div>
+            <button class="tbl-action" onclick="pregSaveEdit()" style="border-color:rgba(16,185,129,0.3);color:#059669;font-weight:800;padding:12px 20px;font-size:13px">💾 حفظ التعديلات</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ===== SECTION: SUPPORT TEACHERS ===== -->
       <div id="section-support-teachers" style="display:none">
         <div class="section-header">
@@ -6301,7 +6543,7 @@ window.switchNavSection = (section) => {
     if (typeof renderRegStats === 'function') renderRegStats();
     if (typeof updateSiteStats === 'function') updateSiteStats();
   }
-  ['home','announcements','summer','camp-v2','students','teachers','finance','settings','notifications','support-registrations','language-registrations','support-teachers','subscriptions','support-finance','support-rooms'].forEach(s => {
+  ['home','announcements','summer','camp-v2','students','teachers','finance','settings','notifications','support-registrations','language-registrations','support-teachers','subscriptions','support-finance','support-rooms','vip-registrations','ielts-registrations','online-registrations','takwini-registrations'].forEach(s => {
     const el = document.getElementById('section-' + s);
     if (el) el.style.display = s === section ? 'block' : 'none';
   });
@@ -6366,6 +6608,9 @@ window.switchNavSection = (section) => {
   }
   if (section === 'support-rooms') {
     if (typeof srRoomLoad === 'function') srRoomLoad();
+  }
+  if (section === 'vip-registrations' || section === 'ielts-registrations' || section === 'online-registrations' || section === 'takwini-registrations') {
+    if (typeof pregLoadData === 'function') pregLoadData();
   }
 };
 
@@ -28706,6 +28951,434 @@ function srShowToast(msg, type = 'success') {
   t.textContent = msg;
   t.style.transform = 'translate(-50%, 0)';
   setTimeout(() => { t.style.transform = 'translate(-50%, 120px)'; }, 3000);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PROGRAM REGISTRATIONS (تسجيلات البرامج)
+//  VIP / IELTS / أونلاين / تكوينية — نفس آلية جداول الدعم المدرسي
+// ═══════════════════════════════════════════════════════════
+const PREG_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
+const PREG_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
+const PREG_TABLE = 'program_registrations';
+const PREG_TITLES = {
+  vip: 'دروس VIP',
+  ielts: 'التحضير لاختبار IELTS',
+  online: 'الدورات الأونلاين',
+  takwini: 'الدورات التكوينية'
+};
+
+let pregAllData = [];
+const pregState = {
+  vip:     { search: '', status: '', page: 1 },
+  ielts:   { search: '', status: '', page: 1 },
+  online:  { search: '', status: '', page: 1 },
+  takwini: { search: '', status: '', page: 1 }
+};
+let pregCurrentType = '';
+let pregCurrentId = null;
+
+async function pregFetch(url, opts) {
+  return fetch(url, Object.assign({}, opts, {
+    headers: Object.assign({
+      'Content-Type': 'application/json',
+      'apikey': PREG_KEY,
+      'Authorization': 'Bearer ' + PREG_KEY
+    }, (opts || {}).headers || {})
+  }));
+}
+
+function pregEsc(v) {
+  return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function pregDate(d) {
+  if (!d) return '';
+  try { return new Date(d).toLocaleDateString('ar-DZ', { year: 'numeric', month: 'short', day: 'numeric' }); }
+  catch (e) { return d; }
+}
+function pregDateTime(d) {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleDateString('ar-DZ', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+  catch (e) { return d; }
+}
+
+function pregDetailLabel(typeKey, r) {
+  const e = (r && r.extra) || {};
+  if (typeKey === 'vip') {
+    if (e.vipType === 'support') {
+      const sub = (Array.isArray(r.subjects) && r.subjects[0])
+        ? ((r.subjects[0].subject || '') + ' — ' + (r.subjects[0].teacher || ''))
+        : (e.subject || '');
+      return 'VIP دعم دراسي' + (e.vipEduLevel ? ' · ' + e.vipEduLevel : '') + (sub ? ' · ' + sub : '');
+    }
+    return 'VIP لغات' + (e.langType ? ' · ' + e.langType : '') + (e.langLevel ? ' (' + e.langLevel + ')' : '');
+  }
+  if (typeKey === 'ielts') {
+    return 'المستوى الدراسي: ' + (e.eduLevel || '—') + (e.levelTest ? ' · تحديد المستوى: ' + (e.levelTest === 'yes' ? 'نعم' : 'لا') : '');
+  }
+  if (typeKey === 'online') {
+    return (e.langType || '—') + ' · المستوى: ' + (e.langLevel || '—') + (e.levelTest ? ' · تحديد المستوى: ' + (e.levelTest === 'yes' ? 'نعم' : 'لا') : '');
+  }
+  if (typeKey === 'takwini') {
+    return [e.course, e.courseLevel, e.courseMode].filter(Boolean).join(' · ') || '—';
+  }
+  return '';
+}
+
+function pregRows(typeKey) {
+  const st = pregState[typeKey];
+  let rows = pregAllData.filter(r => r.type === typeKey);
+  const q = (st.search || '').trim().toLowerCase();
+  if (q) {
+    rows = rows.filter(r => {
+      const name = ((r.first_name || '') + ' ' + (r.last_name || '')).toLowerCase();
+      const phone = String(r.phone || '').toLowerCase();
+      const id = String(r.id || '').toLowerCase();
+      return name.includes(q) || phone.includes(q) || id.includes(q);
+    });
+  }
+  if (st.status) rows = rows.filter(r => r.status === st.status);
+  return rows;
+}
+
+function pregUpdateStats(typeKey, rows) {
+  const confirmed = rows.filter(r => r.status === 'مسجل نهائياً').length;
+  const fees = rows.filter(r => r.status === 'مسجل نهائياً').reduce((s, r2) => s + (parseInt(r2.fee_amount || 0, 10) || 0), 0);
+  document.getElementById('preg-' + typeKey + '-total').textContent = rows.length;
+  document.getElementById('preg-' + typeKey + '-initial').textContent = rows.length - confirmed;
+  document.getElementById('preg-' + typeKey + '-confirmed').textContent = confirmed;
+  document.getElementById('preg-' + typeKey + '-fees').textContent = fees ? fees.toLocaleString('ar-DZ') : '0';
+}
+
+function pregRenderTable(typeKey) {
+  const rows = pregRows(typeKey);
+  const st = pregState[typeKey];
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  st.page = Math.min(Math.max(1, st.page), totalPages);
+  const start = (st.page - 1) * pageSize;
+  const end = Math.min(start + pageSize, rows.length);
+  const slice = rows.slice(start, end);
+  const tbody = document.getElementById('preg-' + typeKey + '-tbody');
+  const info = document.getElementById('preg-' + typeKey + '-pagination-info');
+  const btns = document.getElementById('preg-' + typeKey + '-pagination-btns');
+  if (!tbody) return;
+
+  if (slice.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">📭 لا توجد تسجيلات مطابقة</td></tr>';
+    if (info) info.textContent = '';
+    if (btns) btns.innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = slice.map((r, idx) => {
+    const rowNum = start + idx + 1;
+    const statusBadge = r.status === 'مسجل نهائياً'
+      ? '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:99px;background:rgba(16,185,129,0.1);color:#059669;border:1px solid rgba(16,185,129,0.25);font-size:11px;font-weight:800">🟢 مسجل نهائياً</span>'
+      : '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:99px;background:rgba(245,158,11,0.1);color:#92400E;border:1px solid rgba(245,158,11,0.25);font-size:11px;font-weight:800">🟡 مسجل مبدئياً</span>';
+    const freeTag = (r.status === 'مسجل نهائياً' && (r.fee_amount === 0 || r.fee_amount === null))
+      ? ' <span style="display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:99px;background:rgba(124,58,237,0.1);color:#7c3aed;border:1px solid rgba(124,58,237,0.25);font-size:10px;font-weight:800;margin-inline-start:4px">🎁 بدون رسوم</span>'
+      : '';
+    const name = ((r.last_name || '') + ' ' + (r.first_name || '')).trim() || '—';
+    return '<tr ondblclick="pregShowDetail(\'' + typeKey + '\',\'' + r.id + '\')" style="cursor:pointer" title="انقر مرتين لعرض التفاصيل">'
+      + '<td style="font-size:11px;color:var(--text-muted);font-weight:700">' + rowNum + '</td>'
+      + '<td style="font-weight:800">' + pregEsc(name) + '</td>'
+      + '<td style="direction:ltr;text-align:right;font-family:monospace">' + pregEsc(r.phone || '') + '</td>'
+      + '<td style="font-size:12px">' + pregEsc(pregDetailLabel(typeKey, r)) + '</td>'
+      + '<td style="font-size:12px;white-space:nowrap">' + pregEsc(r.birth_date || '') + '</td>'
+      + '<td style="font-size:12px;white-space:nowrap">' + pregEsc(pregDate(r.created_at)) + '</td>'
+      + '<td>' + statusBadge + freeTag + '</td>'
+      + '<td style="font-size:12px;font-weight:700">' + ((r.fee_amount === 0 || r.fee_amount === null) ? '🎁 مجاني' : pregEsc(r.fee_amount) + ' دج') + '</td>'
+      + '<td><button class="tbl-action" onclick="pregShowDetail(\'' + typeKey + '\',\'' + r.id + '\')" style="padding:5px 12px">👁️ عرض</button></td>'
+      + '</tr>';
+  }).join('');
+
+  if (info) info.textContent = 'عرض ' + (start + 1) + '-' + end + ' من ' + rows.length + ' تسجيل';
+  if (btns) {
+    let pb = '';
+    if (st.page > 1) pb += '<button class="tbl-action" onclick="pregApply(\'' + typeKey + '\',' + (st.page - 1) + ')">‹ السابق</button>';
+    for (let i = Math.max(1, st.page - 2); i <= Math.min(totalPages, st.page + 2); i++) {
+      pb += '<button class="tbl-action" onclick="pregApply(\'' + typeKey + '\',' + i + ')"' + (i === st.page ? ' style="background:var(--primary);color:white;border-color:var(--primary)"' : '') + '>' + i + '</button>';
+    }
+    if (st.page < totalPages) pb += '<button class="tbl-action" onclick="pregApply(\'' + typeKey + '\',' + (st.page + 1) + ')">التالي ›</button>';
+    btns.innerHTML = pb;
+  }
+}
+
+function pregApply(typeKey, page) {
+  const s = document.getElementById('preg-' + typeKey + '-search');
+  const st = document.getElementById('preg-' + typeKey + '-status');
+  if (s) pregState[typeKey].search = s.value;
+  if (st) pregState[typeKey].status = st.value;
+  pregState[typeKey].page = page || 1;
+  pregUpdateStats(typeKey, pregRows(typeKey));
+  pregRenderTable(typeKey);
+}
+
+async function pregLoadData() {
+  try {
+    const res = await pregFetch(PREG_URL + '/rest/v1/' + PREG_TABLE + '?select=*&order=created_at.desc');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    pregAllData = (await res.json()).filter(r => !r.deleted_at);
+    Object.keys(PREG_TITLES).forEach(tk => {
+      const b = document.getElementById('nav-badge-' + tk);
+      if (b) b.textContent = pregAllData.filter(r => r.type === tk).length;
+    });
+    Object.keys(PREG_TITLES).forEach(tk => {
+      pregUpdateStats(tk, pregRows(tk));
+      pregRenderTable(tk);
+    });
+  } catch (e) {
+    console.error('pregLoadData error:', e);
+    srShowToast('خطأ في تحميل تسجيلات البرامج: ' + e.message, 'error');
+  }
+}
+
+// ═══ DETAIL ═══
+function pregShowDetail(typeKey, id) {
+  const r = pregAllData.find(x => String(x.id) === String(id));
+  if (!r) return;
+  pregCurrentType = typeKey;
+  pregCurrentId = id;
+  const e = (r.extra || {});
+  const isInitial = r.status !== 'مسجل نهائياً';
+  const statusBg = r.status === 'مسجل نهائياً'
+    ? 'background:rgba(16,185,129,0.12);color:#059669;border:1px solid rgba(16,185,129,0.25)'
+    : 'background:rgba(245,158,11,0.14);color:#d97706;border:1px solid rgba(245,158,11,0.3)';
+  const initial = String((r.first_name || '?').charAt(0) || '?');
+  const name = ((r.first_name || '') + ' ' + (r.last_name || '')).trim() || '—';
+
+  const subjectsHtml = (Array.isArray(r.subjects) && r.subjects.length)
+    ? r.subjects.map(s => '<div class="sr-detail-subject"><span class="sr-detail-subject-name">🎓 ' + pregEsc(s.subject || '') + ' — ' + pregEsc(s.teacher || '') + '</span></div>').join('')
+    : '<div class="sr-detail-empty">لا توجد مواد محددة</div>';
+
+  let actions = '';
+  if (isInitial) {
+    actions += '<button class="tbl-action" onclick="pregConfirm(\'' + typeKey + '\',\'' + r.id + '\')" style="border-color:rgba(16,185,129,0.3);color:#059669;font-weight:800;padding:8px 20px;font-size:12px">✅ تأكيد وقبض الرسوم</button>';
+    actions += '<button class="tbl-action" onclick="pregConfirmFree(\'' + typeKey + '\',\'' + r.id + '\')" style="border-color:rgba(245,158,11,0.3);color:#d97706;font-weight:800;padding:8px 20px;font-size:12px">🎁 تأكيد بدون رسوم</button>';
+  } else {
+    actions += '<button class="tbl-action" onclick="pregUnregister(\'' + typeKey + '\',\'' + r.id + '\')" style="border-color:rgba(220,38,38,0.3);color:#dc2626;font-weight:800;padding:8px 20px;font-size:12px">↩️ إلغاء التأكيد</button>';
+  }
+  actions += '<button class="tbl-action" onclick="pregEdit(\'' + typeKey + '\',\'' + r.id + '\')" style="padding:8px 20px;font-size:12px">✏️ تعديل</button>';
+  actions += '<button class="tbl-action del" onclick="pregDelete(\'' + typeKey + '\',\'' + r.id + '\')" style="padding:8px 20px;font-size:12px">🗑️ حذف</button>';
+
+  let html = '';
+  html += '<div class="sr-detail-hero">'
+    + '<div class="sr-detail-avatar">' + pregEsc(initial) + '</div>'
+    + '<div style="min-width:0">'
+    + '<div class="sr-detail-hero-name">' + pregEsc(name) + '</div>'
+    + '<div class="sr-detail-hero-id" dir="ltr">' + pregEsc(r.id) + ' · ' + pregEsc(PREG_TITLES[typeKey] || '') + '</div>'
+    + '</div>'
+    + '<span class="sr-detail-status-badge" style="' + statusBg + '">' + pregEsc(r.status || '') + '</span>'
+    + '</div>';
+
+  html += '<div class="sr-detail-grid">'
+    + '<div class="sr-detail-cell"><span class="sr-detail-label">رقم الهاتف</span><span class="sr-detail-val" dir="ltr">' + pregEsc(r.phone || '—') + '</span></div>'
+    + '<div class="sr-detail-cell"><span class="sr-detail-label">تاريخ الميلاد</span><span class="sr-detail-val">' + pregEsc(r.birth_date || '—') + '</span></div>'
+    + '<div class="sr-detail-cell"><span class="sr-detail-label">العنوان / مكان الميلاد</span><span class="sr-detail-val">' + pregEsc(r.address || '—') + '</span></div>'
+    + '<div class="sr-detail-cell"><span class="sr-detail-label">ولي الأمر</span><span class="sr-detail-val">' + pregEsc(r.parent_name || '—') + '</span></div>'
+    + '<div class="sr-detail-cell"><span class="sr-detail-label">هاتف ولي الأمر</span><span class="sr-detail-val" dir="ltr">' + pregEsc(r.parent_phone || '—') + '</span></div>'
+    + '<div class="sr-detail-cell"><span class="sr-detail-label">تفاصيل البرنامج</span><span class="sr-detail-val">' + pregEsc(pregDetailLabel(typeKey, r)) + '</span></div>'
+    + '<div class="sr-detail-cell"><span class="sr-detail-label">تاريخ التسجيل</span><span class="sr-detail-val">' + pregEsc(pregDateTime(r.created_at)) + '</span></div>'
+    + '<div class="sr-detail-cell"><span class="sr-detail-label">رسوم التسجيل</span><span class="sr-detail-val">' + ((r.fee_amount === 0 || r.fee_amount === null) ? '🎁 بدون رسوم' : pregEsc(r.fee_amount) + ' دج') + '</span></div>'
+    + '</div>';
+
+  if (e.motivation) {
+    html += '<div class="sr-detail-block-title">ما الذي دفعك للاختيار؟</div><div class="sr-detail-empty" style="text-align:right">' + pregEsc(e.motivation) + '</div>';
+  }
+
+  if (typeKey === 'vip' && e.vipType === 'support') {
+    html += '<div class="sr-detail-block-title">المواد المطلوبة</div>' + subjectsHtml;
+  }
+
+  html += '<div class="sr-detail-actions">' + actions + '</div>';
+
+  document.getElementById('preg-detail-body').innerHTML = html;
+  document.getElementById('preg-detail-modal').classList.add('open');
+}
+
+function pregCloseDetail() {
+  document.getElementById('preg-detail-modal')?.classList.remove('open');
+}
+
+// ═══ STATUS TOGGLES ═══
+async function pregConfirm(typeKey, id) {
+  const r = pregAllData.find(x => String(x.id) === String(id));
+  if (!r) return;
+  if (!(await cmConfirm('تأكيد التسجيل النهائي', 'هل أنت متأكد من تأكيد تسجيل ' + ((r.first_name || '') + ' ' + (r.last_name || '')).trim() + ' نهائياً وقبض الرسوم (' + (r.fee_amount || 500) + ' دج)؟', '✅'))) return;
+  try {
+    const res = await pregFetch(PREG_URL + '/rest/v1/' + PREG_TABLE + '?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'مسجل نهائياً' })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    srShowToast('✅ تم تأكيد التسجيل وقبض الرسوم', 'success');
+    if (window.dashLog) window.dashLog('تسجيلات البرامج', 'تأكيد', 'تأكيد ' + PREG_TITLES[typeKey] + ' — ' + ((r.first_name || '') + ' ' + (r.last_name || '')));
+    pregCloseDetail();
+    await pregLoadData();
+  } catch (e) {
+    srShowToast('فشل التأكيد: ' + e.message, 'error');
+  }
+}
+
+async function pregConfirmFree(typeKey, id) {
+  const r = pregAllData.find(x => String(x.id) === String(id));
+  if (!r) return;
+  if (!(await cmConfirm('تأكيد بدون رسوم', 'تأكيد تسجيل ' + ((r.first_name || '') + ' ' + (r.last_name || '')).trim() + ' نهائياً بدون رسوم؟', '🎁'))) return;
+  try {
+    const res = await pregFetch(PREG_URL + '/rest/v1/' + PREG_TABLE + '?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'مسجل نهائياً', fee_amount: 0 })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    srShowToast('🎁 تم التأكيد بدون رسوم', 'success');
+    if (window.dashLog) window.dashLog('تسجيلات البرامج', 'تأكيد مجاني', 'تأكيد مجاني ' + PREG_TITLES[typeKey] + ' — ' + ((r.first_name || '') + ' ' + (r.last_name || '')));
+    pregCloseDetail();
+    await pregLoadData();
+  } catch (e) {
+    srShowToast('فشل التأكيد: ' + e.message, 'error');
+  }
+}
+
+async function pregUnregister(typeKey, id) {
+  const r = pregAllData.find(x => String(x.id) === String(id));
+  if (!r) return;
+  if (!(await cmConfirm('إلغاء التأكيد', 'هل أنت متأكد من إلغاء تأكيد تسجيل ' + ((r.first_name || '') + ' ' + (r.last_name || '')).trim() + '؟\n\nسيتم تحويل الحالة إلى "مسجل مبدئياً".', '⚠️'))) return;
+  try {
+    const res = await pregFetch(PREG_URL + '/rest/v1/' + PREG_TABLE + '?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'مسجل مبدئياً' })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    srShowToast('🔄 تم إلغاء التأكيد. الحالة: مسجل مبدئياً', 'success');
+    if (window.dashLog) window.dashLog('تسجيلات البرامج', 'إلغاء تأكيد', 'إلغاء تأكيد ' + PREG_TITLES[typeKey] + ' — ' + ((r.first_name || '') + ' ' + (r.last_name || '')));
+    pregCloseDetail();
+    await pregLoadData();
+  } catch (e) {
+    srShowToast('فشل إلغاء التأكيد: ' + e.message, 'error');
+  }
+}
+
+async function pregDelete(typeKey, id) {
+  const r = pregAllData.find(x => String(x.id) === String(id));
+  if (!r) return;
+  if (!(await cmConfirm('حذف التسجيل', 'هل أنت متأكد من حذف تسجيل ' + ((r.first_name || '') + ' ' + (r.last_name || '')).trim() + ' من القائمة النشطة؟\n\nسيتم تطبيق الحذف الناعم (يبقى السجل التاريخي محفوظاً).', '🗑️'))) return;
+  try {
+    const res = await pregFetch(PREG_URL + '/rest/v1/' + PREG_TABLE + '?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      body: JSON.stringify({ deleted_at: new Date().toISOString() })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    srShowToast('🗑️ تم حذف التسجيل من القائمة النشطة', 'success');
+    if (window.dashLog) window.dashLog('تسجيلات البرامج', 'حذف', 'حذف ' + PREG_TITLES[typeKey] + ' — ' + ((r.first_name || '') + ' ' + (r.last_name || '')));
+    pregCloseDetail();
+    await pregLoadData();
+  } catch (e) {
+    srShowToast('فشل حذف التسجيل: ' + e.message, 'error');
+  }
+}
+
+// ═══ EDIT ═══
+function pregEdit(typeKey, id) {
+  const r = pregAllData.find(x => String(x.id) === String(id));
+  if (!r) return;
+  pregCurrentType = typeKey;
+  pregCurrentId = id;
+  document.getElementById('preg-edit-phone').value = r.phone || '';
+  document.getElementById('preg-edit-address').value = r.address || '';
+  document.getElementById('preg-edit-status').value = r.status || 'مسجل مبدئياً';
+  document.getElementById('preg-edit-fee').value = (r.fee_amount === null || r.fee_amount === undefined) ? 500 : r.fee_amount;
+  document.getElementById('preg-edit-modal').classList.add('open');
+}
+
+function pregCloseEdit() {
+  document.getElementById('preg-edit-modal')?.classList.remove('open');
+}
+
+async function pregSaveEdit() {
+  if (!pregCurrentId) return;
+  const fee = parseInt(document.getElementById('preg-edit-fee').value, 10);
+  const data = {
+    phone: document.getElementById('preg-edit-phone').value.trim(),
+    address: document.getElementById('preg-edit-address').value.trim(),
+    status: document.getElementById('preg-edit-status').value,
+    fee_amount: (isNaN(fee) || fee < 0) ? 500 : fee
+  };
+  try {
+    const res = await pregFetch(PREG_URL + '/rest/v1/' + PREG_TABLE + '?id=eq.' + encodeURIComponent(pregCurrentId), {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    srShowToast('✅ تم حفظ التعديلات بنجاح', 'success');
+    if (window.dashLog) window.dashLog('تسجيلات البرامج', 'تعديل', 'تعديل ' + PREG_TITLES[pregCurrentType] + ' — ' + pregCurrentId);
+    pregCloseEdit();
+    pregCloseDetail();
+    await pregLoadData();
+  } catch (e) {
+    srShowToast('فشل حفظ التعديلات: ' + e.message, 'error');
+  }
+}
+
+// ═══ REFRESH / EXPORT / PRINT ═══
+function pregRefresh(typeKey) {
+  pregLoadData();
+  srShowToast('🔄 تم تحديث البيانات', 'success');
+}
+
+function pregExportCSV(typeKey) {
+  const headers = ['الحالة', 'ID', 'اللقب', 'الاسم', 'الهاتف', 'تاريخ الميلاد', 'العنوان', 'ولي الأمر', 'هاتف ولي الأمر', 'المادة', 'الأستاذ', 'تفاصيل البرنامج', 'الرسوم', 'تاريخ التسجيل'];
+  const rows = pregRows(typeKey).map(r => {
+    const sub = (Array.isArray(r.subjects) && r.subjects[0]) ? (r.subjects[0].subject || '') : '';
+    const teach = (Array.isArray(r.subjects) && r.subjects[0]) ? (r.subjects[0].teacher || '') : '';
+    return [r.status, r.id, r.last_name, r.first_name, r.phone, r.birth_date, r.address, r.parent_name, r.parent_phone, sub, teach, pregDetailLabel(typeKey, r), r.fee_amount == null ? '' : r.fee_amount, r.created_at];
+  });
+  let csv = '\uFEFF' + headers.join(';') + '\n';
+  csv += rows.map(row => row.map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(';')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'program-' + typeKey + '-registrations.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function pregExportExcel(typeKey) {
+  const table = document.getElementById('preg-' + typeKey + '-table').cloneNode(true);
+  const html = table.outerHTML;
+  const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'program-' + typeKey + '-registrations.xls';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function pregPrint(typeKey) {
+  const win = window.open('', '_blank');
+  const rows = pregRows(typeKey).map((r, i) => '<tr>'
+    + '<td>' + (i + 1) + '</td><td>' + pregEsc(r.status || '') + '</td><td>' + pregEsc(r.id || '') + '</td>'
+    + '<td>' + pregEsc((r.last_name || '') + ' ' + (r.first_name || '')) + '</td><td>' + pregEsc(r.phone || '') + '</td>'
+    + '<td>' + pregEsc(pregDetailLabel(typeKey, r)) + '</td>'
+    + '<td>' + pregEsc(pregDate(r.created_at)) + '</td><td>' + pregEsc(r.fee_amount || '') + '</td>'
+    + '</tr>').join('');
+  win.document.write('<html dir="rtl"><head><meta charset="utf-8"><title>' + PREG_TITLES[typeKey] + '</title>'
+    + '<style>body{font-family:Tajawal,sans-serif;padding:20px}'
+    + 'table{width:100%;border-collapse:collapse;font-size:12px}'
+    + 'th,td{border:1px solid #ddd;padding:6px 8px;text-align:right}'
+    + 'th{background:#f5f3ff;font-weight:800}'
+    + 'h2{text-align:center;margin-bottom:20px}</style></head><body>'
+    + '<h2>' + PREG_TITLES[typeKey] + '</h2>'
+    + '<table><thead><tr><th>#</th><th>الحالة</th><th>ID</th><th>الاسم الكامل</th><th>الهاتف</th><th>التفاصيل</th><th>تاريخ التسجيل</th><th>الرسوم</th></tr></thead><tbody>' + rows + '</tbody></table>'
+    + '<p style="text-align:center;margin-top:20px;color:#999;font-size:11px">تم التصدير من لوحة إدارة E-PLUS</p>'
+    + '</body></html>');
+  win.document.close();
+  const closeWin = () => { try { win.close(); } catch (e) {} window.focus(); };
+  win.onafterprint = closeWin;
+  try { win.matchMedia('print').addEventListener('change', mql => { if (!mql.matches) closeWin(); }); } catch (e) {}
+  setTimeout(() => { try { win.focus(); win.print(); } catch (e) {} }, 300);
+  setTimeout(closeWin, 60000);
 }
 
 // ═══════════════════════════════════════════════════════════

@@ -91,22 +91,31 @@ const JOIN_APPS_SCRIPT_URL =
   'https://script.google.com/macros/s/AKfycbzo7_3ElBeyt88Cv6PsTDEp_DMu5i_PO-t54t8WAdRitoUf7HLzx9VF_GyEHPs9QcQx/exec';
 
 /* ──────────────────────────────────────────────────────────
+   SUPABASE (تسجيلات برامج المركز)
+   ─ note: names are distinct (PREG_*) so they don't collide
+   with other scripts loaded in the same global scope.
+────────────────────────────────────────────────────────── */
+const PREG_SUPABASE_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
+const PREG_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
+
+/* ──────────────────────────────────────────────────────────
    LABELS
 ────────────────────────────────────────────────────────── */
 const typeLabelsAr = {
   support: 'تسجيلات الدعم',
   lang: 'دورات اللغات',
   vip: 'دروس VIP',
-  ielts: 'اختبار IELTS',
-  online: 'دورات أونلاين',
-  takwini: 'دورات تكوينية'
+  ielts: 'التحضير لاختبار IELTS',
+  online: 'الدورات الأونلاين',
+  takwini: 'الدورات التكوينية'
 };
 
 const typeLabelsEn = {
   support: 'Academic Support',
   lang: 'Language Courses',
   vip: 'VIP Lessons',
-  ielts: 'IELTS Test',
+  ielts: 'IELTS Preparation',
   online: 'Online Courses',
   takwini: 'Training Courses'
 };
@@ -115,7 +124,7 @@ const typeLabelsFr = {
   support: 'Soutien Scolaire',
   lang: 'Cours de Langues',
   vip: 'Leçons VIP',
-  ielts: 'Test IELTS',
+  ielts: 'Préparation IELTS',
   online: 'Cours en Ligne',
   takwini: 'Formations'
 };
@@ -1391,12 +1400,6 @@ const coursesCurriculum = {
   ]
 };
 
-const takwiniOptions = [
-  '📸 تصوير بالهاتف',
-  '🎨 جرافيكس ديزاين',
-  '💻 تطوير الويب'
-];
-
 const needsParent = [
   'تحضيري',
   'أولى ابتدائي',
@@ -1469,7 +1472,7 @@ function openModal(type) {
   currentModalType = type;
   resetForm();
   const modalTitles = {
-    ar: { support: 'تسجيل — دعم دراسي', lang: 'تسجيل — دورات اللغات', vip: 'تسجيل — دروس VIP', ielts: 'تسجيل — اختبار IELTS', online: 'تسجيل — دورات أونلاين', takwini: 'تسجيل — دورات تكوينية' },
+    ar: { support: 'تسجيل — دعم دراسي', lang: 'تسجيل — دورات اللغات', vip: 'تسجيل — دروس VIP', ielts: 'تسجيل — التحضير لاختبار IELTS', online: 'تسجيل — الدورات الأونلاين', takwini: 'تسجيل — الدورات التكوينية' },
     en: { support: 'Registration — Academic Support', lang: 'Registration — Language Courses', vip: 'Registration — VIP Lessons', ielts: 'Registration — IELTS Test', online: 'Registration — Online Courses', takwini: 'Registration — Training Courses' },
     fr: { support: 'Inscription — Soutien Scolaire', lang: 'Inscription — Cours de Langues', vip: 'Inscription — Leçons VIP', ielts: 'Inscription — Test IELTS', online: 'Inscription — Cours en Ligne', takwini: 'Inscription — Formations' }
   };
@@ -1497,11 +1500,10 @@ function openModal(type) {
   } else if (type === 'vip') {
     animateShow(vipTypeGrp);
   } else if (type === 'ielts') {
-    const daysCountGrp = byId('vipDaysCountGroup');
-    animateShow(daysCountGrp);
-    daysCountGrp?.querySelector('select')?.setAttribute('required', 'required');
+    animateShow(byId('eduLevelGroup'));
+    byId('eduLevel')?.setAttribute('required', 'required');
   } else if (type === 'takwini') {
-    showTakwiniOptions();
+    showTakwiniCourseCards();
   }
   const modal = byId('program-modal');
   if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
@@ -1531,7 +1533,8 @@ function resetForm() {
     'specialtyGroup', 'subjectGroup', 'teacherGroup', 'parentGroup',
     'langTypeGroup', 'langLevelGroup', 'levelTestGroup',
     'vipTypeGroup', 'vipEduLevelGroup', 'professionGroup',
-    'vipDaysCountGroup', 'daysGroup'
+    'vipDaysCountGroup', 'daysGroup',
+    'trainingCourseGroup', 'trainingLevelGroup', 'trainingModeGroup'
   ];
   groups.forEach(id => {
     const el = byId(id);
@@ -1543,8 +1546,11 @@ function resetForm() {
   $$('input[name="vipType"]').forEach(r => (r.checked = false));
   $$('input[name="candidateType"]').forEach(r => (r.checked = false));
   $$('input[name="levelTest"]').forEach(r => (r.checked = false));
-  $$('input[name="takwiniOption"]').forEach(r => (r.checked = false));
   $$('input[name="supportType"]').forEach(r => (r.checked = false));
+  $$('input[name="trainingCourse"]').forEach(r => (r.checked = false));
+  $$('input[name="trainingLevel"]').forEach(r => (r.checked = false));
+  $$('input[name="trainingMode"]').forEach(r => (r.checked = false));
+  document.querySelectorAll('.training-course-card').forEach(c => c.classList.remove('selected'));
   ['langType', 'langLevel', 'eduLevel', 'specialty', 'subject', 'teacher',
    'vipDaysCount', 'vipEduLevel', 'profession'].forEach(id => {
     const el = byId(id);
@@ -1752,6 +1758,7 @@ function onEduLevelChange() {
   parentPhone?.removeAttribute('required');
   $$('input[name="candidateType"]').forEach(r => (r.checked = false));
   if (!level) return;
+  if (currentModalType === 'ielts') return;
   if (supportType === 'دورات مدرسية') {
     const courses = coursesCurriculum[level];
     if (!courses || courses.length === 0) {
@@ -1903,31 +1910,20 @@ function onVipEduLevelChange() {
 /* ──────────────────────────────────────────────────────────
    TAKWINI OPTIONS
 ────────────────────────────────────────────────────────── */
-function showTakwiniOptions() {
-  byId('takwiniOptionsGroup')?.remove();
-  const wrap = document.createElement('div');
-  wrap.id = 'takwiniOptionsGroup';
-  wrap.className = 'form-group field-appear';
-  const label = document.createElement('label');
-  label.className = 'form-label';
-  label.innerHTML = `<span>${__('form_training_title', 'Training Course')}</span><span>*</span>`;
-  wrap.appendChild(label);
-  const radioWrap = document.createElement('div');
-  radioWrap.className = 'check-options';
-  takwiniOptions.forEach(opt => {
-    const lbl = document.createElement('label');
-    lbl.className = 'check-option';
-    lbl.innerHTML = `
-      <input type="radio" name="takwiniOption" value="${opt}">
-      <span class="check-box"></span>
-      <span class="check-label">${opt}</span>
-    `;
-    radioWrap.appendChild(lbl);
-  });
-  wrap.appendChild(radioWrap);
-  const birthInput = byId('birthDate');
-  const birthGroup = birthInput?.closest('.form-group');
-  birthGroup?.insertAdjacentElement('afterend', wrap);
+function showTakwiniCourseCards() {
+  const tg = byId('trainingCourseGroup');
+  if (tg) {
+    tg.style.display = 'block';
+    tg.classList.remove('allow-fade');
+  }
+  document.querySelectorAll('.training-course-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('input[name="trainingCourse"]').forEach(r => (r.checked = false));
+  document.querySelectorAll('input[name="trainingLevel"]').forEach(r => (r.checked = false));
+  document.querySelectorAll('input[name="trainingMode"]').forEach(r => (r.checked = false));
+  const lvlG = byId('trainingLevelGroup');
+  const modeG = byId('trainingModeGroup');
+  if (lvlG) lvlG.style.display = 'none';
+  if (modeG) modeG.style.display = 'none';
 }
 
 /* ──────────────────────────────────────────────────────────
@@ -1950,19 +1946,55 @@ async function submitForm(e) {
     }
   });
   if (hasError) return;
+
+  // ── التحقق من حقول البرنامج المطلوبة حسب نوع التسجيل ──
+  const reqErr = [];
+  if (currentModalType === 'vip') {
+    const vipT = $('input[name="vipType"]:checked')?.value || '';
+    if (!vipT) reqErr.push('نوع VIP');
+    else if (vipT === 'support') {
+      if (!byId('vipEduLevel')?.value) reqErr.push('المستوى الدراسي (VIP)');
+      if (!byId('subject')?.value) reqErr.push('المادة');
+      if (!byId('teacher')?.value) reqErr.push('الأستاذ');
+    } else if (vipT === 'lang') {
+      if (!byId('langType')?.value) reqErr.push('اللغة');
+      if (!byId('langLevel')?.value) reqErr.push('مستواك الحالي في اللغة');
+    }
+  } else if (currentModalType === 'ielts') {
+    if (!byId('eduLevel')?.value) reqErr.push('المستوى الدراسي');
+  } else if (currentModalType === 'online') {
+    if (!byId('langType')?.value) reqErr.push('اللغة');
+    if (!byId('langLevel')?.value) reqErr.push('مستواك الحالي في اللغة');
+  } else if (currentModalType === 'takwini') {
+    if (!$('input[name="trainingCourse"]:checked')?.value) reqErr.push('الدورة التكوينية');
+    if (!$('input[name="trainingLevel"]:checked')?.value) reqErr.push('مستواك في الدورة');
+    if (!$('input[name="trainingMode"]:checked')?.value) reqErr.push('طريقة التعلم المفضلة');
+  }
+  if (reqErr.length) {
+    if (typeof EPUI !== 'undefined' && EPUI.alert) {
+      EPUI.alert('يرجى إكمال الحقول المطلوبة التالية:\n\n' + reqErr.map(x => '▪ ' + x).join('\n'));
+    } else {
+      alert('يرجى إكمال الحقول المطلوبة التالية:\n\n' + reqErr.map(x => '▪ ' + x).join('\n'));
+    }
+    return;
+  }
+
   const selectedDays = $$('input[name="days"]:checked').map(c => c.value).join('، ');
   const vipTypeVal    = $('input[name="vipType"]:checked')?.value || '';
   const vipEduLevel   = byId('vipEduLevel')?.value || '';
   const professionVal = byId('profession')?.value || '';
   const supportType   = $('input[name="supportType"]:checked')?.value || '';
   const courseSelect  = byId('courseSelect')?.value || '';
-  const takwiniOption = $('input[name="takwiniOption"]:checked')?.value || '';
+  const trainingCourse = $('input[name="trainingCourse"]:checked')?.value || '';
+  const trainingLevel  = $('input[name="trainingLevel"]:checked')?.value || '';
+  const trainingMode   = $('input[name="trainingMode"]:checked')?.value || '';
   const data = {
     type: currentModalType,
     firstName, lastName, birthDate, birthPlace, phone,
     motivation: byId('motivation')?.value.trim() || '',
     timestamp: new Date().toISOString(),
-    supportType, courseSelect, takwiniOption,
+    supportType, courseSelect,
+    trainingCourse, trainingLevel, trainingMode,
     eduLevel: byId('eduLevel')?.value || '',
     specialty: byId('specialty')?.value || '',
     subject: byId('subject')?.value || '',
@@ -2073,11 +2105,71 @@ async function proceedToRegister() {
     __('loading_wait_moment')
   );
   try {
-    const formData = new FormData();
-    Object.entries(pendingFormData).forEach(([key, value]) => {
-      formData.append(key, value ?? '');
-    });
-    await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formData });
+    const d = pendingFormData;
+    const isVipSchool = d.type === 'vip' && d.vipType === 'support';
+    const payload = {
+      id: _genProgramRegId(),
+      type: d.type || '',
+      first_name: d.firstName || '',
+      last_name: d.lastName || '',
+      birth_date: d.birthDate || '',
+      phone: d.phone || '',
+      address: d.birthPlace || '',
+      parent_name: isVipSchool ? (d.parentName || '') : '',
+      parent_phone: isVipSchool ? (d.parentPhone || '') : '',
+      subjects: (isVipSchool && d.subject && d.teacher) ? [{ subject: d.subject, teacher: d.teacher }] : [],
+      extra: {
+        vipType: d.vipType || '',
+        vipEduLevel: d.vipEduLevel || '',
+        profession: d.profession || '',
+        eduLevel: d.eduLevel || '',
+        specialty: d.specialty || '',
+        subject: d.subject || '',
+        teacher: d.teacher || '',
+        candidateType: d.candidateType || '',
+        langType: d.langType || '',
+        langLevel: d.langLevel || '',
+        levelTest: d.levelTest || '',
+        course: d.trainingCourse || '',
+        courseLevel: d.trainingLevel || '',
+        courseMode: d.trainingMode || '',
+        supportType: d.supportType || '',
+        courseSelect: d.courseSelect || '',
+        days: d.days || '',
+        daysCount: d.daysCount || '',
+        motivation: d.motivation || ''
+      },
+      fee_amount: 500,
+      status: 'مسجل مبدئياً',
+      terms_accepted: true,
+      student_token: _genStudentToken(32),
+      created_at: new Date().toISOString()
+    };
+    let saved = false;
+    try {
+      const res = await fetch(`${PREG_SUPABASE_URL}/rest/v1/program_registrations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': PREG_SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${PREG_SUPABASE_ANON_KEY}`,
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify(payload)
+      });
+      saved = res.ok || res.status === 201 || res.status === 204;
+    } catch (sbErr) {
+      console.error('⚠️ Supabase insert failed, fallback to Sheet:', sbErr);
+      saved = false;
+    }
+    if (!saved) {
+      // احتياطي: إرسال إلى جدول Google Sheet القديم
+      const formData = new FormData();
+      Object.entries(pendingFormData).forEach(([key, value]) => {
+        formData.append(key, value ?? '');
+      });
+      await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formData });
+    }
     const typeLabelsAll = { ar: typeLabelsAr, en: typeLabelsEn, fr: typeLabelsFr };
     const regTypeLabel = (typeLabelsAll[currentLang]?.[pendingFormData.type]) || __('requested_service', 'Requested service');
     btn?.classList.remove('loading');
@@ -2101,6 +2193,17 @@ async function proceedToRegister() {
     EPUI.alert(__('submit_error', 'An error occurred, please try again.'));
     unlockPageScroll();
   }
+}
+
+/* ── مولدات المعرّف والتوكن الخاصتين بتسجيلات البرامج ── */
+function _genProgramRegId() {
+  return 'prep' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+function _genStudentToken(len) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let s = '';
+  for (let i = 0; i < (len || 32); i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
 }
 
 /* ──────────────────────────────────────────────────────────
