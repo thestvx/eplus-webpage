@@ -3711,20 +3711,28 @@
 
         <!-- Filters -->
         <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;align-items:center">
-          <select class="inp" id="lang-filter-language" onchange="langRegApplyFilters()" style="min-width:140px">
+          <select class="inp" id="lang-filter-status" onchange="langRegApplyFilters()" style="min-width:150px;padding:8px 14px">
+            <option value="">كل الحالات</option>
+            <option value="مسجل مبدئياً">🟡 مسجل مبدئياً</option>
+            <option value="مسجل نهائياً">🟢 مسجل نهائياً</option>
+          </select>
+          <select class="inp" id="lang-filter-language" onchange="langRegApplyFilters()" style="min-width:140px;padding:8px 14px">
             <option value="">كل اللغات</option>
             <option value="الإنجليزية">🇬🇧 الإنجليزية</option>
             <option value="الفرنسية">🇫🇷 الفرنسية</option>
             <option value="الإسبانية">🇪🇸 الإسبانية</option>
             <option value="الألمانية">🇩🇪 الألمانية</option>
+            <option value="الإيطالية">🇮🇹 الإيطالية</option>
+            <option value="التركية">🇹🇷 التركية</option>
           </select>
-          <select class="inp" id="lang-filter-level" onchange="langRegApplyFilters()" style="min-width:120px">
+          <select class="inp" id="lang-filter-level" onchange="langRegApplyFilters()" style="min-width:120px;padding:8px 14px">
             <option value="">كل المستويات</option>
             <option value="A0">A0</option><option value="A1">A1</option><option value="A2">A2</option>
             <option value="B1">B1</option><option value="B2">B2</option>
             <option value="C1">C1</option><option value="C2">C2</option>
           </select>
-          <input class="inp" id="lang-search" placeholder="بحث بالاسم أو الرقم..." oninput="langRegApplyFilters()" style="flex:1;min-width:200px" />
+          <input class="inp" id="lang-search" placeholder="🔍 ابحث بالاسم / الهاتف / الرقم..." oninput="langRegApplyFilters()" style="flex:1;min-width:200px" />
+          <button class="tbl-action" onclick="langRegResetFilters()" style="padding:8px 12px;font-size:12px;border-color:rgba(245,158,11,0.3);color:var(--warning)">🧹 مسح الفلاتر</button>
         </div>
 
         <!-- Table -->
@@ -29539,10 +29547,12 @@ window.langRegLoadData = async function() {
 window.langRegApplyFilters = function() {
   const lang = (document.getElementById('lang-filter-language')||{}).value || '';
   const lvl = (document.getElementById('lang-filter-level')||{}).value || '';
+  const status = (document.getElementById('lang-filter-status')||{}).value || '';
   const q = ((document.getElementById('lang-search')||{}).value || '').trim().toLowerCase();
   lrFilteredData = lrAllData.filter(r => {
     if (lang && r.language !== lang) return false;
     if (lvl && r.cefr_level !== lvl) return false;
+    if (status && r.status !== status) return false;
     if (q) {
       const hay = ((r.id||'')+' '+(r.first_name||'')+' '+(r.last_name||'')+' '+(r.parent_phone||'')+' '+(r.language||'')).toLowerCase();
       if (hay.indexOf(q) === -1) return false;
@@ -29552,6 +29562,14 @@ window.langRegApplyFilters = function() {
   lrPage = 1;
   langRegUpdateStats();
   langRegRenderTable();
+};
+
+window.langRegResetFilters = function() {
+  ['lang-filter-status','lang-filter-language','lang-filter-level','lang-search'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  langRegApplyFilters();
 };
 
 window.langRegUpdateStats = function() {
