@@ -79,9 +79,42 @@ const SUPPORT_MIDDLE_SCHOOL = [
   { subject: 'علوم الطبيعة والحياة', teacher: 'خنوفة علي' },
 ];
 
+// ── العلوم الثانوية (السنة الأولى / الثانية ثانوي) ──
+// المفتاح = المستوى، ثم الشعبة، ثم قائمة {المادة، الأستاذ} المعتمدة.
+const SUPPORT_SECONDARY = {
+  'السنة الأولى ثانوي': {
+    'علوم تجريبية': [
+      { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+      { subject: 'العلوم الفيزيائية', teacher: 'لكموته لمين' },
+    ],
+    'آداب ولغات': [
+      { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+    ],
+  },
+  'السنة الثانية ثانوي': {
+    'علوم تجريبية': [
+      { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+      { subject: 'العلوم الفيزيائية', teacher: 'لكموته لمين' },
+    ],
+    'آداب ولغات': [
+      { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+    ],
+    'تقني رياضي': [
+      { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+      { subject: 'العلوم الفيزيائية', teacher: 'لكموته لمين' },
+    ],
+    'تسيير واقتصاد': [
+      { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+      { subject: 'المحاسبة', teacher: 'سرهود عبدالرحمان' },
+      { subject: 'اقتصاد وقانون', teacher: 'سرهود عبدالرحمان' },
+    ],
+  },
+};
+
 // Expose on window so register-support.js (index.html) reads the SAME data
 window.SUPPORT_STREAMS = SUPPORT_STREAMS;
 window.SUPPORT_MIDDLE_SCHOOL = SUPPORT_MIDDLE_SCHOOL;
+window.SUPPORT_SECONDARY = SUPPORT_SECONDARY;
 
 const SubjectService = (function () {
 
@@ -188,6 +221,16 @@ const SubjectService = (function () {
       'تسيير واقتصاد': ['اللغة العربية', 'اللغة الإنجليزية', 'اللغة الإنجليزية ( دورة )', 'المحاسبة', 'اقتصاد وقانون', 'العلوم الإسلامية ( دورة )', 'التاريخ ( دورة )', 'الفلسفة', 'الرياضيات'],
       'تقني رياضي': ['العلوم الفيزيائية', 'الرياضيات', 'اللغة الإنجليزية', 'اللغة الإنجليزية ( دورة )', 'العلوم الإسلامية ( دورة )', 'التاريخ ( دورة )'],
       'آداب ولغات': ['اللغة العربية', 'الفلسفة', 'اللغة الفرنسية', 'اللغة الإنجليزية', 'اللغة الإنجليزية ( دورة )', 'اللغة الألمانية', 'اللغة الإسبانية', 'العلوم الإسلامية ( دورة )', 'التاريخ ( دورة )']
+    },
+    'السنة الأولى ثانوي': {
+      'علوم تجريبية': ['اللغة الفرنسية', 'العلوم الفيزيائية'],
+      'آداب ولغات': ['اللغة الفرنسية']
+    },
+    'السنة الثانية ثانوي': {
+      'علوم تجريبية': ['اللغة الفرنسية', 'العلوم الفيزيائية'],
+      'آداب ولغات': ['اللغة الفرنسية'],
+      'تقني رياضي': ['اللغة الفرنسية', 'العلوم الفيزيائية'],
+      'تسيير واقتصاد': ['اللغة الفرنسية', 'المحاسبة', 'اقتصاد وقانون']
     }
   };
 
@@ -215,6 +258,8 @@ const SubjectService = (function () {
     let pairs;
     if (level === 'السنة الرابعة متوسط') {
       pairs = Array.isArray(SUPPORT_MIDDLE_SCHOOL) ? SUPPORT_MIDDLE_SCHOOL : [];
+    } else if (level !== 'السنة الثالثة ثانوي (بكالوريا)' && stream && SUPPORT_SECONDARY[level] && SUPPORT_SECONDARY[level][stream]) {
+      pairs = SUPPORT_SECONDARY[level][stream] || [];
     } else if (level === 'السنة الثالثة ثانوي (بكالوريا)' && stream && SUPPORT_STREAMS[stream]) {
       pairs = SUPPORT_STREAMS[stream] || [];
     } else {
@@ -232,6 +277,15 @@ const SubjectService = (function () {
     if (level === 'السنة الثالثة ثانوي (بكالوريا)' && stream) {
       return SUBJECTS_BY_LEVEL['السنة الثالثة ثانوي (بكالوريا)'][stream] || [];
     }
+    if (SUPPORT_SECONDARY[level] && stream && SUBJECTS_BY_LEVEL[level] && SUBJECTS_BY_LEVEL[level][stream]) {
+      return SUBJECTS_BY_LEVEL[level][stream] || [];
+    }
+    return [];
+  }
+
+  function getStreamsForLevel(level) {
+    if (SUPPORT_SECONDARY[level]) return Object.keys(SUPPORT_SECONDARY[level]);
+    if (level === 'السنة الثالثة ثانوي (بكالوريا)') return Object.keys(SUPPORT_STREAMS);
     return [];
   }
 
@@ -481,11 +535,13 @@ const SubjectService = (function () {
     SUBJECTS_BY_LEVEL,
     SUPPORT_STREAMS,
     SUPPORT_MIDDLE_SCHOOL,
+    SUPPORT_SECONDARY,
     getSubjectId,
     getSubjectName,
     getSubjectIcon,
     getSubjectTeacherPairs,
     getSubjectsForLevel,
+    getStreamsForLevel,
     getTeachersForSubject,
     getTeachersForLevel,
     resolveTeacherId,

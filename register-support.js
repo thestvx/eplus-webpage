@@ -42,6 +42,22 @@ const SUPPORT_INSTITUTIONS = {
     'ثانوية الشهيد علية محمد بغمرة',
     'أخرى',
   ],
+  'السنة الثانية ثانوي': [
+    'ثانوية هالي عبدالكريم بقمار',
+    'متقنة عبدالقادر الياجوري بقمار',
+    'ثانوية العلامة أبو القاسم سعد الله بقمار',
+    'ثانوية بوضياف بوضياف بتغزوت',
+    'ثانوية الشهيد علية محمد بغمرة',
+    'أخرى',
+  ],
+  'السنة الأولى ثانوي': [
+    'ثانوية هالي عبدالكريم بقمار',
+    'متقنة عبدالقادر الياجوري بقمار',
+    'ثانوية العلامة أبو القاسم سعد الله بقمار',
+    'ثانوية بوضياف بوضياف بتغزوت',
+    'ثانوية الشهيد علية محمد بغمرة',
+    'أخرى',
+  ],
   'السنة الرابعة متوسط': [
     'متوسطة خليفة بن حسن بقمار',
     'متوسطة أحمد عربية بقمار',
@@ -114,9 +130,16 @@ function _pairKey(p) {
 
 // المواد المسموح عرضها/اختيارها حالياً (مع استثناءات نموذج التسجيل)
 function currentSubjectItems() {
-  return registrationFormItems(sLevel === 'السنة الرابعة متوسط'
-    ? supportMiddleSchool()
-    : (supportStreams()[sStream] || []));
+  if (sLevel === 'السنة الرابعة متوسط') {
+    return registrationFormItems(supportMiddleSchool());
+  }
+  if (sLevel && sStream) {
+    if (window.SubjectService && typeof SubjectService.getSubjectTeacherPairs === 'function') {
+      return registrationFormItems(SubjectService.getSubjectTeacherPairs(sLevel, sStream));
+    }
+    return registrationFormItems((supportStreams()[sStream] || []));
+  }
+  return [];
 }
 
 // توليد ID ثلاثي الأرقام (000–999)
@@ -362,7 +385,10 @@ function showStream() {
 function renderStreams() {
   const c = byId('s-streams-container');
   if (!c) return;
-  c.innerHTML = Object.keys(supportStreams()).map(s =>
+  const streams = (window.SubjectService && typeof SubjectService.getStreamsForLevel === 'function')
+    ? SubjectService.getStreamsForLevel(sLevel)
+    : Object.keys(supportStreams());
+  c.innerHTML = streams.map(s =>
     `<label class="check-option">
       <input type="radio" name="sStream" value="${s}" onchange="onStreamChange('${s}')" ${s === sStream ? 'checked' : ''} />
       <span class="check-box"></span>
@@ -476,7 +502,7 @@ function onSubmitClick() {
       if (!instInp) { regAlert('⚠️ الرجاء إدخال اسم المؤسسة التعليمية'); return; }
     }
   }
-  if (sLevel === 'السنة الثالثة ثانوي (بكالوريا)' && !sStream) {
+  if (sLevel && sLevel !== 'السنة الرابعة متوسط' && !sStream) {
     regAlert('⚠️ الرجاء اختيار الشعبة'); return;
   }
   if (sLevel === 'السنة الرابعة متوسط' || sStream) {
