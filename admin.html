@@ -3454,7 +3454,7 @@
         <div class="panel" style="padding:16px 20px;margin-bottom:16px">
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
             <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-              <select class="inp" id="sr-filter-level" style="width:auto;min-width:140px;padding:8px 14px" onchange="srApplyFilters()">
+              <select class="inp" id="sr-filter-level" style="width:auto;min-width:140px;padding:8px 14px" onchange="srSyncStreamOptions();srApplyFilters()">
                 <option value="">كل المستويات</option>
                 <option value="السنة الثالثة ثانوي (بكالوريا)">السنة الثالثة ثانوي (بكالوريا)</option>
                 <option value="السنة الثانية ثانوي">السنة الثانية ثانوي</option>
@@ -27905,6 +27905,7 @@ async function srLoadData() {
     srCurrentPage = 1;
     document.getElementById('nav-badge-support').textContent = srAllData.length;
     srPopulateTeacherFilter();
+    srSyncStreamOptions();
     srApplyFilters();
   } catch (e) {
     console.error('SR load error:', e);
@@ -27927,6 +27928,40 @@ function srPopulateTeacherFilter() {
     sel.innerHTML += `<option value="${name}">${name}</option>`;
   });
   sel.value = current;
+}
+
+// ── مزامنة قائمة الشعب مع المستوى المختار ──
+// عند اختيار مستوى (أولى/ثانية/بكالوريا) تظهر شعب هذا المستوى فقط،
+// وعند اختيار المتوسط لا شعب (تُعرض بدون تصفية بالشعبة).
+function srSyncStreamOptions() {
+  const levelSel = document.getElementById('sr-filter-level');
+  const streamSel = document.getElementById('sr-filter-stream');
+  if (!levelSel || !streamSel) return;
+  const lvl = levelSel.value;
+  const allStreams = [];
+  if (window.SubjectService && typeof SubjectService.getStreamsForLevel === 'function') {
+    ['السنة الثالثة ثانوي (بكالوريا)', 'السنة الثانية ثانوي', 'السنة الأولى ثانوي'].forEach(l => {
+      allStreams.push(...SubjectService.getStreamsForLevel(l));
+    });
+  }
+  const union = [...new Set(allStreams)];
+  if (!union.length) {
+    union.push('علوم تجريبية', 'رياضيات', 'تسيير واقتصاد', 'تقني رياضي', 'آداب ولغات');
+  }
+  const last = streamSel.value;
+  if (lvl === '') {
+    streamSel.innerHTML = '<option value="">كل الشعب</option>' + union.map(s => `<option value="${s}">${s}</option>`).join('');
+  } else if (lvl === 'السنة الرابعة متوسط') {
+    streamSel.innerHTML = '<option value="">بدون شعب (المتوسط)</option>';
+  } else {
+    const streams = SubjectService.getStreamsForLevel(lvl) || [];
+    streamSel.innerHTML = '<option value="">كل الشعب</option>' + streams.map(s => `<option value="${s}">${s}</option>`).join('');
+  }
+  if (lvl === '' || ((lvl !== 'السنة الرابعة متوسط') && last && (SubjectService.getStreamsForLevel(lvl) || []).indexOf(last) !== -1)) {
+    streamSel.value = last;
+  } else {
+    streamSel.value = '';
+  }
 }
 
 function srGetValue(obj, field) {
