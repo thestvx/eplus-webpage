@@ -4775,6 +4775,15 @@
           .sr-room-card:hover{border-color:rgba(124,58,237,0.3);box-shadow:0 8px 24px rgba(124,58,237,0.08)}
           .sr-room-card.drag-over{border-color:#7c3aed;background:rgba(124,58,237,0.03);box-shadow:0 0 0 4px rgba(124,58,237,0.1),0 8px 24px rgba(124,58,237,0.12);transform:scale(1.02)}
           .sr-room-card.has-teachers{border-color:rgba(124,58,237,0.2)}
+          .sr-room-card.cframe{border-color:var(--rc,var(--border))}
+          .sr-room-card.cframe:hover{border-color:var(--rc,var(--border));box-shadow:0 8px 24px rgba(0,0,0,0.08)}
+          .sr-room-card.cframe.dual{background:linear-gradient(var(--card-bg),var(--card-bg)) padding-box,linear-gradient(90deg,var(--rc),var(--rc2)) border-box;border-color:transparent}
+          .sr-room-card.cframe.dual:hover{border-color:transparent}
+          .sr-room-card.cframe.drag-over{border-color:#7c3aed!important;background:rgba(124,58,237,0.03)}
+          .sr-room-card.cframe.dual.drag-over{border-color:transparent!important;background:linear-gradient(rgba(124,58,237,0.03),rgba(124,58,237,0.03)) padding-box,linear-gradient(90deg,var(--rc),var(--rc2)) border-box}
+          .sr-teacher-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;display:inline-block;box-shadow:0 0 0 2px rgba(0,0,0,0.07)}
+          .sr-room-teacher-dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex-shrink:0;box-shadow:0 0 0 2px rgba(0,0,0,0.07)}
+          .sr-avatar-ico{width:18px;height:18px}
           .sr-room-card-top{padding:16px 18px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(124,58,237,0.03),rgba(139,92,246,0.01))}
           .sr-room-title{display:flex;align-items:center;gap:10px}
           .sr-room-icon{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;font-weight:900;box-shadow:0 4px 12px rgba(124,58,237,0.25)}
@@ -32386,7 +32395,16 @@ window.sfExportCSV = function () {
 
   function srDayKey(d){return String(d);}
   function srToday(){return new Date().getDay();}
-  function srGetCurrentAssignments(){return srRoomByDay[srDayKey(srRoomCurrentDay)]||{};}
+  function srGetCurrentAssignments(){return srRoomByDay[srDayKey(srRoomCurrentDay)]||[];}
+
+  // ── لون ثابت لكل أستاذ (مشتق عشوائياً من معرفه) ──
+  function srTeacherColor(tid){
+    const s=String(tid||'');
+    let h=0;
+    for(let i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0;}
+    return 'hsl('+(h%360)+',62%,42%)';
+  }
+  const SR_ICO_PERSON='<svg class="sr-avatar-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
 
   async function srRoomLoadData(){
     try{
@@ -32417,28 +32435,32 @@ window.sfExportCSV = function () {
   function srSlotDur(a){return Math.max(0,(Number(a.end)-Number(a.start))/60)||0;}
   function srTeacherName(tid){const t=srRoomTeachers.find(x=>x&&(x.teacherId||x.id)===tid);return t?(t.name||tid):tid;}
   function srNormalizeDay(m){
-    const out={};
+    if(Array.isArray(m)){
+      return m.map(a=>{
+        if(!a||!a.teacherId) return null;
+        const st=(typeof a.start==='number')?a.start:((typeof a.startHour==='number'?a.startHour*60:8*60));
+        const et=(typeof a.end==='number')?a.end:(st+(Number(a.hours)||1)*60);
+        return {teacherId:String(a.teacherId),room:a.room,start:st,end:et,period:a.period||(st<720?'AM':'PM')};
+      }).filter(Boolean);
+    }
+    const out=[];
     for(const tid in m){
       const a=m[tid]||{};
-      if(typeof a.start==='number'&&typeof a.end==='number'){
-        out[tid]={room:a.room,start:a.start,end:a.end,period:a.period||(a.start<720?'AM':'PM')};
-      } else {
-        const h=Number(a.hours)||1;
-        const st=(typeof a.startHour==='number'?a.startHour*60:8*60);
-        out[tid]={room:a.room,start:st,end:st+h*60,period:st<720?'AM':'PM'};
-      }
+      let st,et;
+      if(typeof a.start==='number'&&typeof a.end==='number'){st=a.start;et=a.end;}
+      else {st=(typeof a.startHour==='number'?a.startHour*60:8*60);et=st+(Number(a.hours)||1)*60;}
+      out.push({teacherId:String(tid),room:a.room,start:st,end:et,period:a.period||(st<720?'AM':'PM')});
     }
     return out;
   }
   function srRoomConflicts(dk,teacherId,roomNum,start,end){
-    const asg=srRoomByDay[dk]||{};
+    const asg=srRoomByDay[dk]||[];
     const out=[];
-    for(const tid in asg){
-      const a=asg[tid];
+    for(let i=0;i<asg.length;i++){
+      const a=asg[i];
       if(!a||typeof a.start!=='number'||typeof a.end!=='number')continue;
       if(a.end<=start||a.start>=end)continue;
-      if(tid===teacherId&&a.room===roomNum)continue;
-      out.push({tid,room:a.room});
+      out.push({tid:a.teacherId,room:a.room,start:a.start,end:a.end});
     }
     return out;
   }
@@ -32446,10 +32468,10 @@ window.sfExportCSV = function () {
   function srRoomTeachersForRoom(n){
     const asg=srGetCurrentAssignments();
     const list=[];
-    Object.keys(asg).forEach(tid=>{
-      const a=asg[tid];
-      if(a&&a.room==n) list.push({...a,teacherId:tid});
-    });
+    for(let i=0;i<asg.length;i++){
+      const a=asg[i];
+      if(a&&a.room==n) list.push(Object.assign({},a,{index:i}));
+    }
     return list;
   }
 
@@ -32458,8 +32480,8 @@ window.sfExportCSV = function () {
     if(!container)return;
     let html='';
     DAYS.forEach(d=>{
-      const asg=srRoomByDay[d.key]||{};
-      const count=Object.keys(asg).length;
+      const asg=srRoomByDay[d.key]||[];
+      const count=asg.length;
       const isActive=Number(srRoomCurrentDay)===Number(d.key);
       html+=`<div class="sr-day-tab ${isActive?'active':''}" data-day="${d.key}">
         ${d.name}
@@ -32479,9 +32501,9 @@ window.sfExportCSV = function () {
     srRoomRenderDayTabs();
     const teachers=srRoomTeachers.filter(t=>t.status!=='disabled');
     const asg=srGetCurrentAssignments();
-    const assignedSet=new Set(Object.keys(asg));
+    const assignedSet=new Set(asg.filter(a=>a&&a.teacherId).map(a=>a.teacherId));
     const usedRooms=new Set();let totalHours=0;
-    Object.values(asg).forEach(a=>{if(a&&a.room){usedRooms.add(String(a.room));totalHours+=(typeof a.start==='number'&&typeof a.end==='number')?srSlotDur(a):(Number(a.hours)||0);}});
+    for(const a of asg){if(a&&a.room){usedRooms.add(String(a.room));totalHours+=(typeof a.start==='number'&&typeof a.end==='number')?srSlotDur(a):(Number(a.hours)||0);}}
     const elU=document.getElementById('sr-rooms-used'),elT=document.getElementById('sr-rooms-assigned-teachers'),elH=document.getElementById('sr-rooms-total-hours');
     if(elU)elU.textContent=usedRooms.size;if(elT)elT.textContent=assignedSet.size;if(elH)elH.textContent=totalHours;
 
@@ -32489,16 +32511,18 @@ window.sfExportCSV = function () {
     if(pool){
       pool.innerHTML=teachers.map(t=>{
         const id=t.teacherId||t.id;
-        const isAssigned=assignedSet.has(id);
-        const assignedRoom=isAssigned?asg[id].room:'';
+        const c=srTeacherColor(id);
+        const slots=asg.filter(a=>a&&a.teacherId===id);
+        const isAssigned=slots.length>0;
+        const first=slots[0];
         const isDisabled=t.status==='disabled';
         const subjects=Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):'';
-        const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-pool-photo" alt="">`:`<div class="sr-pool-photo">👤</div>`;
+        const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-pool-photo" style="border-color:${c}" alt="">`:`<div class="sr-pool-photo" style="border-color:${c};color:${c}">${SR_ICO_PERSON}</div>`;
         const statusBadge=isDisabled?'<span style="padding:2px 6px;border-radius:6px;font-size:9px;font-weight:800;background:rgba(220,38,38,0.1);color:#dc2626">🔴 معطّل</span>':'';
-        const slotDesc=isAssigned&&typeof asg[id].start==='number'?srFmtTime(asg[id].start)+'–'+srFmtTime(asg[id].end):'';
-        const assignedBadge=isAssigned?`<span class="sr-pool-badge">قاعة ${assignedRoom}${slotDesc?' • '+slotDesc:''}</span>`:'';
-        return `<div class="sr-pool-teacher ${isAssigned?'assigned':''} ${isDisabled?'disabled':''}" draggable="${isDisabled?'false':'true'}" data-teacher-id="${id}" title="${t.name}${isAssigned?' (قاعة '+assignedRoom+' • '+slotDesc+' — '+DAY_NAMES[srRoomCurrentDay]+')':''}${isDisabled?' (معطّل)':''}">`+
-          assignedBadge+photo+
+        const slotDesc=first&&typeof first.start==='number'?srFmtTime(first.start)+'–'+srFmtTime(first.end):'';
+        const assignedBadge=isAssigned?`<span class="sr-pool-badge">قاعة ${first?first.room:''}${slots.length>1?' ×'+slots.length:''}${slotDesc?' • '+slotDesc:''}</span>`:'';
+        return `<div class="sr-pool-teacher ${isAssigned?'assigned':''} ${isDisabled?'disabled':''}" draggable="${isDisabled?'false':'true'}" data-teacher-id="${id}" title="${t.name}${slots.length?' ('+slots.map(s=>'قاعة '+s.room+(typeof s.start==='number'?' '+srFmtTime(s.start)+'–'+srFmtTime(s.end):'')).join('، ')+')':''}${isDisabled?' (معطّل)':''}">`+
+          assignedBadge+`<span class="sr-teacher-dot" style="background:${c}"></span>`+photo+
           `<div class="sr-pool-info"><div class="sr-pool-name">${t.name||'—'} ${statusBadge}</div>`+
           `<div class="sr-pool-subjects">${subjects}</div></div></div>`;
       }).join('');
@@ -32510,12 +32534,12 @@ window.sfExportCSV = function () {
     const grid=document.getElementById('sr-room-grid');
     if(grid){
       let html='';
-      for(let n=1;n<=TOTAL_ROOMS;n++){const list=srRoomTeachersForRoom(n);const hasTeachers=list.length>0;const totalH=list.reduce((s,a)=>s+((typeof a.start==='number'&&typeof a.end==='number')?srSlotDur(a):(Number(a.hours)||0)),0);const top=`<div class="sr-room-card-top"><div class="sr-room-title"><div class="sr-room-icon">${n}</div><div><div class="sr-room-label">القاعة ${n}</div><div class="sr-room-sublabel">${hasTeachers?totalH+' ساعة':''}</div></div></div><div class="sr-room-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>${list.length}</div></div>`;let body='';if(!hasTeachers){body=`<div class="sr-room-empty"><div class="sr-room-empty-icon">📥</div><div class="sr-room-empty-text">اسحب أستاذ هنا</div></div>`;}else{body=list.map(a=>{const t=teachers.find(x=>(x.teacherId||x.id)===a.teacherId)||{};const isDisabled=t.status==='disabled';const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-room-teacher-photo" alt="">`:`<div class="sr-room-teacher-photo">👤</div>`;return `<div class="sr-room-teacher-card" draggable="${isDisabled?'false':'true'}" data-teacher-id="${a.teacherId}" style="${isDisabled?'opacity:0.55;cursor:default':''}">`+photo+`<div class="sr-room-teacher-info"><div class="sr-room-teacher-name">${t.name||a.teacherId}${isDisabled?' <span style="font-size:9px;color:#dc2626;font-weight:800;margin-right:4px">🔴 معطّل</span>':''}</div>`+`<div class="sr-room-teacher-meta">${Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):''}</div></div>`+`<span class="sr-room-teacher-hours">${(typeof a.start==='number'&&typeof a.end==='number')?'⏰ '+srFmtTime(a.start)+'–'+srFmtTime(a.end):'⏱ '+(a.hours||1)+' س'}</span>`+`<button class="sr-room-teacher-remove" title="إزالة" data-action="remove-room" data-teacher-id="${a.teacherId}">×</button></div>`;}).join('');}
-        html+=`<div class="sr-room-card ${hasTeachers?'has-teachers':''}" data-room="${n}">${top}<div class="sr-room-body">${body}</div></div>`;
+      for(let n=1;n<=TOTAL_ROOMS;n++){const list=srRoomTeachersForRoom(n);const hasTeachers=list.length>0;const totalH=list.reduce((s,a)=>s+((typeof a.start==='number'&&typeof a.end==='number')?srSlotDur(a):(Number(a.hours)||0)),0);const colors=list.map(a=>srTeacherColor(a.teacherId));const frameStyle=colors.length===1?`--rc:${colors[0]}`:`--rc:${colors[0]};--rc2:${colors[colors.length-1]}`;const top=`<div class="sr-room-card-top"><div class="sr-room-title"><div class="sr-room-icon">${n}</div><div><div class="sr-room-label">القاعة ${n}</div><div class="sr-room-sublabel">${hasTeachers?totalH+' ساعة':''}</div></div></div><div class="sr-room-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>${list.length}</div></div>`;let body='';if(!hasTeachers){body=`<div class="sr-room-empty"><div class="sr-room-empty-icon">📥</div><div class="sr-room-empty-text">اسحب أستاذ هنا</div></div>`;}else{body=list.map(a=>{const t=teachers.find(x=>(x.teacherId||x.id)===a.teacherId)||{};const isDisabled=t.status==='disabled';const c=srTeacherColor(a.teacherId);const photo=t.photoURL?`<img src="${t.photoURL}" class="sr-room-teacher-photo" style="border-color:${c}" alt="">`:`<div class="sr-room-teacher-photo" style="border-color:${c};color:${c}">${SR_ICO_PERSON}</div>`;return `<div class="sr-room-teacher-card" draggable="${isDisabled?'false':'true'}" data-teacher-id="${a.teacherId}" style="${isDisabled?'opacity:0.55;cursor:default':''}">`+`<span class="sr-room-teacher-dot" style="background:${c}"></span>`+photo+`<div class="sr-room-teacher-info"><div class="sr-room-teacher-name">${t.name||a.teacherId}${isDisabled?' <span style="font-size:9px;color:#dc2626;font-weight:800;margin-right:4px">🔴 معطّل</span>':''}</div>`+`<div class="sr-room-teacher-meta">${Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join('، '):''}</div></div>`+`<span class="sr-room-teacher-hours">${(typeof a.start==='number'&&typeof a.end==='number')?'⏰ '+srFmtTime(a.start)+'–'+srFmtTime(a.end):'⏱ '+(a.hours||1)+' س'}</span>`+`<button class="sr-room-teacher-remove" title="إزالة" data-remove-idx="${a.index}">×</button></div>`;}).join('');}
+        html+=`<div class="sr-room-card ${hasTeachers?'has-teachers':''}${hasTeachers?(colors.length>=2?' cframe dual':' cframe'):''}" data-room="${n}" ${hasTeachers?'style="'+frameStyle+'"':''}>${top}<div class="sr-room-body">${body}</div></div>`;
       }
       grid.innerHTML=html;
       grid.querySelectorAll('.sr-room-card').forEach(card=>{card.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';card.classList.add('drag-over');});card.addEventListener('dragleave',()=>card.classList.remove('drag-over'));card.addEventListener('drop',e=>{e.preventDefault();card.classList.remove('drag-over');const teacherId=e.dataTransfer.getData('text/plain')||srRoomDragging;if(!teacherId) return;srRoomHandleDrop(teacherId,Number(card.getAttribute('data-room')));});});
-      grid.querySelectorAll('[data-action="remove-room"]').forEach(btn=>{btn.addEventListener('click',e=>{e.stopPropagation();srRoomRemoveTeacher(btn.getAttribute('data-teacher-id'));});});
+      grid.querySelectorAll('[data-remove-idx]').forEach(btn=>{btn.addEventListener('click',e=>{e.stopPropagation();srRoomRemoveTeacher(Number(btn.getAttribute('data-remove-idx')));});});
       grid.querySelectorAll('.sr-room-teacher-card').forEach(card=>{card.addEventListener('dragstart',e=>{srRoomDragging=card.getAttribute('data-teacher-id');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',srRoomDragging);setTimeout(()=>card.style.opacity='0.4',0);});card.addEventListener('dragend',()=>{card.style.opacity='';srRoomDragging=null;});});
     }
   }
@@ -32526,9 +32550,9 @@ window.sfExportCSV = function () {
     if(!t){toast('الأستاذ غير موجود',true);return;}
     if(t.status==='disabled'){toast('الأستاذ معطّل حالياً',true);return;}
     const dk=srDayKey(srRoomCurrentDay);
-    const asg=srRoomByDay[dk]||{};
-    const existing=(asg[teacherId]&&asg[teacherId].room===roomNum)?asg[teacherId]:null;
-    srRoomPromptSlot(t.name||teacherId,dk,roomNum,existing,teacherId,(slot)=>{
+    const asg=srRoomByDay[dk]||[];
+    const prev=asg.filter(a=>a&&a.teacherId===teacherId&&a.room===roomNum).pop()||null;
+    srRoomPromptSlot(t.name||teacherId,dk,roomNum,prev,teacherId,(slot)=>{
       if(!slot)return;
       const conflicts=srRoomConflicts(dk,teacherId,roomNum,slot.start,slot.end);
       if(conflicts.length){
@@ -32537,17 +32561,18 @@ window.sfExportCSV = function () {
         else toast('⛔ هذا التوقيت محجوز في القاعة '+roomNum+' للأستاذ '+srTeacherName(c.tid),true);
         return;
       }
-      if(!srRoomByDay[dk]) srRoomByDay[dk]={};
-      srRoomByDay[dk][teacherId]={room:roomNum,start:slot.start,end:slot.end,period:slot.period||(slot.start<720?'AM':'PM')};
+      if(!Array.isArray(srRoomByDay[dk])) srRoomByDay[dk]=[];
+      srRoomByDay[dk].push({teacherId,room:roomNum,start:slot.start,end:slot.end,period:slot.period||(slot.start<720?'AM':'PM')});
       srRoomSave();
     });
   }
 
-  function srRoomRemoveTeacher(teacherId){
+  function srRoomRemoveTeacher(idx){
     const dk=srDayKey(srRoomCurrentDay);
-    if(!teacherId||!srRoomByDay[dk]||!srRoomByDay[dk][teacherId])return;
-    delete srRoomByDay[dk][teacherId];
-    if(Object.keys(srRoomByDay[dk]).length===0) delete srRoomByDay[dk];
+    const asg=srRoomByDay[dk];
+    if(!Array.isArray(asg)||typeof idx!=='number'||idx<0||idx>=asg.length)return;
+    asg.splice(idx,1);
+    if(asg.length===0) delete srRoomByDay[dk];
     srRoomSave();
   }
 
@@ -32563,7 +32588,7 @@ window.sfExportCSV = function () {
   function srRoomPromptSlot(teacherName,dayKey,roomNum,existing,teacherId,cb){
     const dk=String(dayKey);
     const dayName=DAY_NAMES[Number(dk)]||'';
-    const asg=srRoomByDay[dk]||{};
+    const asg=srRoomByDay[dk]||[];
     const defStart=(existing&&typeof existing.start==='number')?existing.start:8*60;
     const defEnd=(existing&&typeof existing.end==='number')?existing.end:defStart+120;
     let selPeriod=(existing&&existing.period)?existing.period:(defStart<720?'AM':'PM');
@@ -32574,10 +32599,9 @@ window.sfExportCSV = function () {
 
     let bookingsHtml='';
     const roomBookings=[];
-    for(const tid in asg){
-      const a=asg[tid];
-      if(a&&a.room===roomNum&&tid!==teacherId&&typeof a.start==='number'){
-        roomBookings.push({name:srTeacherName(tid),a});
+    for(const a of asg){
+      if(a&&a.room===roomNum&&a.teacherId!==teacherId&&typeof a.start==='number'){
+        roomBookings.push({name:srTeacherName(a.teacherId),a});
       }
     }
 
