@@ -6531,11 +6531,11 @@ window.NAV_CATS = [
   { key: 'students', label: 'إدارة التلاميذ', items: ['students'] },
   { key: 'teachers', label: 'إدارة الأساتذة', items: ['teachers'] },
   { key: 'support', label: 'الدعم المدرسي', items: ['support-registrations', 'support-teachers', 'subscriptions', 'support-finance', 'support-rooms'] },
+  { key: 'programs', label: 'تسجيلات البرامج', items: ['program-registrations'] },
   { key: 'communication', label: 'التواصل', items: ['msgs'] },
   { key: 'finance', label: 'المالية', items: ['finance'] },
   { key: 'system', label: 'النظام', items: ['settings'] },
   { key: 'mail', label: 'خدمات البريد', items: ['notifications'] },
-  { key: 'programs', label: 'تسجيلات البرامج', items: ['program-registrations'] },
 ];
 window.NAV_ITEMS = {
   home: { icon: '📊', label: 'لوحة الإحصائيات' },
@@ -6567,7 +6567,7 @@ window.navLayoutDefault = () => ({
 
 // ── نسخة محفوظة محلياً من التخطيط: تُطبَّق فوراً عند فتح الصفحة
 //    حتى لا تومض الأقسام بالترتيب الافتراضي قبل تحميل Firestore ──
-const NAV_CACHE_KEY = 'eplus_nav_layout_v2';
+const NAV_CACHE_KEY = 'eplus_nav_layout_v3';
 function navSaveCache(cfg) {
   try { localStorage.setItem(NAV_CACHE_KEY, JSON.stringify(cfg)); } catch (e) {}
 }
@@ -6587,6 +6587,12 @@ function navMerge(cfg) {
   if (!cfg || typeof cfg !== 'object') cfg = {};
   cfg.catOrder = Array.isArray(cfg.catOrder) ? cfg.catOrder.filter(k => d.catOrder.includes(k)) : [];
   d.catOrder.forEach(k => { if (!cfg.catOrder.includes(k)) cfg.catOrder.push(k); });
+  const _pi = cfg.catOrder.indexOf('programs');
+  const _ci = cfg.catOrder.indexOf('communication');
+  if (_pi > -1 && _ci > -1 && _pi > _ci) {
+    cfg.catOrder.splice(_pi, 1);
+    cfg.catOrder.splice(_ci, 0, 'programs');
+  }
   if (!cfg.itemOrder || typeof cfg.itemOrder !== 'object') cfg.itemOrder = {};
   Object.keys(d.itemOrder).forEach(cat => {
     if (!Array.isArray(cfg.itemOrder[cat])) cfg.itemOrder[cat] = [];
