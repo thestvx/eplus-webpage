@@ -4864,7 +4864,7 @@
             <div class="sr-stat-pill-icon" style="background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(251,191,36,0.08))">⏱️</div>
             <div><div class="sr-stat-pill-num" id="sr-rooms-total-hours">0</div><div class="sr-stat-pill-label">إجمالي الساعات</div></div>
           </div>
-          <button class="sr-dl-btn" onclick="srDownloadDayCSV()" type="button" title="تنزيل نسخة CSV بجداول قاعات اليوم المحدد">⬇️ تنزيل نسخة اليوم</button>
+          <button class="sr-dl-btn" onclick="srDownloadDayXLS()" type="button" title="تنزيل نسخة Excel بجداول قاعات اليوم المحدد">⬇️ تنزيل نسخة اليوم</button>
         </div>
         <div class="sr-main-layout">
           <div class="sr-pool-panel">
@@ -32589,45 +32589,56 @@ window.sfExportCSV = function () {
     }catch(e){console.error('[ROOMS] save failed',e);toast('حدث خطأ أثناء الحفظ',true);}
   }
 
-  function srDownloadDayCSV(){
+  function srDownloadDayXLS(){
     try{
       const dk=srDayKey(srRoomCurrentDay);
       const dayName=DAY_NAMES[Number(dk)]?String(DAY_NAMES[Number(dk)]).replace(/\s+/g,' ').trim():'';
       const rows=[];
       for(let n=1;n<=TOTAL_ROOMS;n++){
-        srRoomTeachersForRoom(n).forEach(a=>{
-          const t=srRoomTeachers.find(x=>(x.teacherId||x.id)===a.teacherId)||{};
-          rows.push({
-            room:n,
-            teacher:t.name||a.teacherId,
-            subject:Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join(' - '):'',
-            start:(typeof a.start==='number'&&typeof a.end==='number')?srFmtTime(a.start):'',
-            end:(typeof a.start==='number'&&typeof a.end==='number')?srFmtTime(a.end):'',
-            period:a.period||''
+        const list=srRoomTeachersForRoom(n);
+        if(list.length===0){
+          rows.push({room:n,booked:false});
+        }else{
+          list.forEach(a=>{
+            const t=srRoomTeachers.find(x=>(x.teacherId||x.id)===a.teacherId)||{};
+            rows.push({
+              room:n,booked:true,
+              teacher:t.name||a.teacherId,
+              subject:Array.isArray(t.subjects)?t.subjects.map(s=>s.subject||s).join(' - '):'',
+              start:(typeof a.start==='number'&&typeof a.end==='number')?srFmtTime(a.start):'',
+              end:(typeof a.start==='number'&&typeof a.end==='number')?srFmtTime(a.end):'',
+              period:a.period||''
+            });
           });
-        });
+        }
       }
-      rows.sort((x,y)=>x.room-y.room);
-      const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
-      const lines=[['اليوم','القاعة','الأستاذ','المواد','البداية','النهاية','الفترة'].map(q).join(';')];
-      if(rows.length===0){
-        lines.push([dayName,'','لا توجد حجوزات في هذا اليوم','','','',''].map(q).join(';'));
-      }else{
-        rows.forEach(r=>lines.push([dayName,r.room,r.teacher,r.subject,r.start,r.end,r.period].map(q).join(';')));
-      }
-      const csv='\ufeff'+lines.join('\r\n');
-      const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+      var esc_xls=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var th='<td style="border:1px solid #cdc3f0;background:#7c3aed;color:#ffffff;font-weight:bold;padding:7px 12px;text-align:center;vertical-align:middle">';
+      var td='<td style="border:1px solid #d9d2ef;padding:6px 12px;vertical-align:middle">';
+      var cal=(r)=>{if(r.booked)return td+esc_xls(r.start)+'</td><td style="border:1px solid #d9d2ef;padding:6px 12px;text-align:center;vertical-align:middle">'+esc_xls(r.end)+'</td><td style="border:1px solid #d9d2ef;padding:6px 12px;text-align:center;vertical-align:middle">'+esc_xls(r.period)+'</td>';return '<td colspan="3" style="border:1px solid #e5e0f5;background:#f7f5fd;color:#9ca3af;padding:6px 12px;text-align:center;vertical-align:middle">غير محجوزة</td>';};
+      var roomTd=(r)=>td+'القاعة '+r.room+'</td>';
+      var bodyRows=rows.map(r=>{
+        if(r.booked)return '<tr>'+roomTd(r)+td+esc_xls(r.teacher)+'</td>'+td+esc_xls(r.subject)+'</td>'+cal(r)+'</tr>';
+        return '<tr><td style="border:1px solid #e5e0f5;background:#f7f5fd;padding:6px 12px;vertical-align:middle">القاعة '+r.room+'</td>'+cal(r)+'</tr>';
+      }).join('');
+      var html='<table dir="rtl" border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:\'Segoe UI\',Arial,sans-serif;font-size:12px">'
+        +'<tr><td colspan="7" style="border:1px solid #cdc3f0;background:#ede9fe;color:#5b21b6;padding:10px 14px;font-size:15px;font-weight:bold;text-align:center">قاعات الحضور — يوم '+esc_xls(dayName)+'</td></tr>'
+        +'<tr>'+th+'القاعة</td>'+th+'الأستاذ</td>'+th+'المواد</td>'+th+'البداية</td>'+th+'النهاية</td>'+th+'الفترة</td></tr>'
+        +bodyRows
+        +'<tr><td colspan="7" style="border:1px solid #e5e0f5;padding:6px 12px;color:#9ca3af;font-size:11px;text-align:center">إجمالي القاعات المحجوزة: '+rows.filter(r=>r.booked).length+' من '+TOTAL_ROOMS+'</td></tr>'
+        +'</table>';
+      const blob=new Blob(['\uFEFF'+html],{type:'application/vnd.ms-excel;charset=utf-8'});
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
       a.href=url;
-      a.download='قاعات الحضور '+(dayName||'')+'.csv';
+      a.download='قاعات الحضور '+(dayName||'')+'.xls';
       document.body.appendChild(a);
       a.click();
       setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},500);
-      toast(rows.length?('✅ تم تنزيل نسخة الحجوزات ليوم '+(dayName||'')):'⚠️ لا توجد حجوزات ليوم '+(dayName||'')+' — تم تنزيل نسخة فارغة');
-    }catch(e){console.error('[ROOMS] csv failed',e);toast('⚠️ تعذر تنزيل النسخة',true);}
+      toast('✅ تم تنزيل نسخة جيدة إكسيل ليوم '+(dayName||''));
+    }catch(e){console.error('[ROOMS] xls failed',e);toast('⚠️ تعذر تنزيل النسخة',true);}
   }
-  window.srDownloadDayCSV=srDownloadDayCSV;
+  window.srDownloadDayXLS=srDownloadDayXLS;
 
   function srRoomPromptSlot(teacherName,dayKey,roomNum,existing,teacherId,cb){
     const dk=String(dayKey);

@@ -707,6 +707,13 @@ main{flex:1;position:relative;overflow:hidden}
     showTeacherSelection(reg, raw, studentId, name);
   }
 
+  // رقم «متبقي» طبيعي الثابت لكل طالب (لا يستنفذ — الاشتراك الدائم لا يتوقف أبداً)
+  function permRemainingSeed(str) {
+    var h = 0;
+    for (var i = 0; i < str.length; i++) { h = (h * 31 + (str.charCodeAt(i) || 0)) >>> 0; }
+    return 8 + (h % 8);
+  }
+
   var pendingReg = null, pendingBarcode = null, pendingStudentId = null, pendingName = null;
 
   // ── Fetch student sessions (subscription + attendance per teacher/subject) ──
@@ -736,8 +743,19 @@ main{flex:1;position:relative;overflow:hidden}
           var ap = SubscriptionService.activePeriod(sess.periods);
           if (sess.permanent) {
             sess.status = 'active';
-            sess.attended = 0;
-            sess.remaining = 100000;
+            sess.remaining = permRemainingSeed(studentId);
+            try {
+              var pcSnap = await window.db.collection('support_attendance')
+                .where('studentId', '==', studentId)
+                .where('teacherName', '==', s.teacher)
+                .where('subjectName', '==', s.subject).get();
+              var pc = 0;
+              pcSnap.forEach(function (pd) {
+                var pdd = pd.data();
+                if (pdd && !pdd.cancelled && pdd.type !== 'grace' && pdd.type !== 'grace_session') pc++;
+              });
+              sess.attended = pc;
+            } catch (e) { logScanner('perm attended count error: ' + e.message); sess.attended = 0; }
           } else if (subStatus === 'active' && ap) {
             sess.status = 'active';
             sess.attended = ap.used_sessions || 0;
@@ -856,18 +874,12 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
       html += '<div class="tc-card" data-idx="' + i + '" style="animation-delay:' + delay + '">';
       html += '<div class="tc-top">';
       html += '<div class="tc-subject-icon ' + stClass + '">' + icon + '</div>';
-      html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) + '">' + esc(s.teacher) + '</div><div class="tc-subject">' + esc(s.subject) + '</div></div>';
+html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) + '">' + esc(s.teacher) + (s.permanent ? '<span class="tc-perm-mark">∞</span>' : '') + '</div><div class="tc-subject">' + esc(s.subject) + '</div></div>';
       html += '<div class="tc-badge ' + badgeClass + '">' + badgeText + '</div>';
       html += '</div>';
-if (hasActiveSub) {
-        if (s.permanent) {
-          var permAtt = s.alreadyCheckedIn ? 1 : 0;
-          html += '<div class="tc-stats"><div class="tc-stat"><div class="tc-stat-num">' + permAtt + '</div><div class="tc-stat-label">حضر</div></div><div class="tc-stat"><div class="tc-stat-num">∞</div><div class="tc-stat-label">متبقي</div></div><div class="tc-stat"><div class="tc-stat-num">∞</div><div class="tc-stat-label">الإجمالي</div></div></div>';
-          html += '<div class="tc-progress-wrap"><div class="tc-progress"><div class="tc-progress-fill green" style="width:100%"></div></div></div>';
-        } else {
+      if (hasActiveSub) {
           html += '<div class="tc-stats"><div class="tc-stat"><div class="tc-stat-num">' + attended + '</div><div class="tc-stat-label">حضر</div></div><div class="tc-stat"><div class="tc-stat-num">' + remaining + '</div><div class="tc-stat-label">متبقي</div></div><div class="tc-stat"><div class="tc-stat-num">' + total + '</div><div class="tc-stat-label">الإجمالي</div></div></div>';
           html += '<div class="tc-progress-wrap"><div class="tc-progress"><div class="tc-progress-fill ' + barClass + '" style="width:' + pct + '%"></div></div></div>';
-        }
       } else if (hasTrial) {
         html += '<div class="tc-stats"><div class="tc-stat"><div class="tc-stat-num" style="color:#f59e0b">' + s.trialUsed + '</div><div class="tc-stat-label">مستهلكة</div></div><div class="tc-stat"><div class="tc-stat-num" style="color:#059669">' + s.trialRemaining + '</div><div class="tc-stat-label">متبقية</div></div><div class="tc-stat"><div class="tc-stat-num">' + TRIAL_MAX + '</div><div class="tc-stat-label">الإجمالي</div></div></div>';
         var trialPct = Math.min(100, Math.round((s.trialUsed / TRIAL_MAX) * 100));
