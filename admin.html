@@ -32457,14 +32457,17 @@ window.sfExportCSV = function () {
     }
     return out;
   }
-  function srRoomConflicts(dk,teacherId,roomNum,start,end){
+  function srRoomConflicts(dk,teacherId,roomNum,start,end,exclude){
     const asg=srRoomByDay[dk]||[];
     const out=[];
     for(let i=0;i<asg.length;i++){
       const a=asg[i];
-      if(!a||typeof a.start!=='number'||typeof a.end!=='number')continue;
+      if(!a||a===exclude)continue;
+      if(typeof a.start!=='number'||typeof a.end!=='number')continue;
       if(a.end<=start||a.start>=end)continue;
-      out.push({tid:a.teacherId,room:a.room,start:a.start,end:a.end});
+      if(a.room===roomNum||a.teacherId===teacherId){
+        out.push({tid:a.teacherId,room:a.room,start:a.start,end:a.end});
+      }
     }
     return out;
   }
@@ -32558,7 +32561,7 @@ window.sfExportCSV = function () {
     const prev=asg.filter(a=>a&&a.teacherId===teacherId&&a.room===roomNum).pop()||null;
     srRoomPromptSlot(t.name||teacherId,dk,roomNum,prev,teacherId,(slot)=>{
       if(!slot)return;
-      const conflicts=srRoomConflicts(dk,teacherId,roomNum,slot.start,slot.end);
+      const conflicts=srRoomConflicts(dk,teacherId,roomNum,slot.start,slot.end,prev);
       if(conflicts.length){
         const c=conflicts[0];
         if(c.tid===teacherId)toast('⛔ '+srTeacherName(teacherId)+' مبرمج في القاعة '+c.room+' في نفس التوقيت',true);
