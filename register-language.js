@@ -49,6 +49,7 @@ const LANG_LAWS = [
 
 // ── State ──
 let lLanguage = null;
+let lAcademicLevel = null;
 let lCefrLevel = null;
 let lFormData = null;
 
@@ -87,12 +88,14 @@ function langToast(msg, type) {
 
 // ── Open / Close ──
 window.openLangReg = function() {
-  lLanguage = null; lCefrLevel = null; lFormData = null;
+  lLanguage = null; lAcademicLevel = null; lCefrLevel = null; lFormData = null;
   const f = $id('lang-reg-form');
   if (f) f.reset();
-  [$id('l-cefr-group'), $id('l-test-group'), $id('l-submit-btn')].forEach(el => {
+  [$id('l-academic-group'), $id('l-cefr-group'), $id('l-test-group'), $id('l-submit-btn')].forEach(el => {
     if (el) el.style.display = 'none';
   });
+  const acSel = $id('lAcademicLevel');
+  if (acSel) acSel.value = '';
   document.querySelectorAll('input[name="lLang"]').forEach(r => r.checked = false);
   document.querySelectorAll('input[name="lLevelTest"]').forEach(r => r.checked = false);
   const modal = $id('lang-reg-modal');
@@ -112,18 +115,36 @@ window.closeLangRegOutside = function(e) {
 window.onLangSelectChange = function() {
   const sel = $id('lLanguageSelect');
   lLanguage = sel ? sel.value : null;
+  lAcademicLevel = null;
+  lCefrLevel = null;
+  [$id('l-academic-group'), $id('l-cefr-group'), $id('l-test-group'), $id('l-submit-btn')].forEach(el => {
+    if (el) el.style.display = 'none';
+  });
+  const acSel = $id('lAcademicLevel');
+  if (acSel) acSel.value = '';
+  document.querySelectorAll('input[name="lLevelTest"]').forEach(r => r.checked = false);
+  if (lLanguage) {
+    const acEl = $id('l-academic-group');
+    if (acEl) acEl.style.display = 'block';
+  }
+};
+
+// ── Step 2: Academic level (المستوى الدراسي) ──
+window.onAcademicChange = function() {
+  const sel = $id('lAcademicLevel');
+  lAcademicLevel = sel ? sel.value : null;
   lCefrLevel = null;
   [$id('l-cefr-group'), $id('l-test-group'), $id('l-submit-btn')].forEach(el => {
     if (el) el.style.display = 'none';
   });
   document.querySelectorAll('input[name="lLevelTest"]').forEach(r => r.checked = false);
-  if (lLanguage) {
+  if (lAcademicLevel) {
     const cefrEl = $id('l-cefr-group');
     if (cefrEl) cefrEl.style.display = 'block';
   }
 };
 
-// ── Step 2: CEFR level ──
+// ── Step 3: CEFR level ──
 window.onCefrChange = function(val) {
   lCefrLevel = val;
   [$id('l-test-group'), $id('l-submit-btn')].forEach(el => {
@@ -161,6 +182,7 @@ function validateForm() {
   if (!lLanguage) { langAlert('الرجاء اختيار اللغة'); return null; }
   var availLangs = ['الإنجليزية','الفرنسية','الإسبانية','الألمانية'];
   if (availLangs.indexOf(lLanguage) === -1) { langAlert('هذه اللغة غير متاحة حالياً. الرجاء اختيار لغة أخرى.'); return null; }
+  if (!lAcademicLevel) { langAlert('الرجاء اختيار المستوى الدراسي'); return null; }
   if (!lCefrLevel) { langAlert('الرجاء اختيار مستواك'); return null; }
   if (!levelTest) { langAlert('الرجاء الرد على سؤال اختبار التعيين'); return null; }
 
@@ -172,6 +194,7 @@ function validateForm() {
     parent_name: parentName.trim(),
     parent_phone: parentPhone.trim(),
     language: lLanguage,
+    academic_level: lAcademicLevel,
     cefr_level: lCefrLevel,
     level_test: levelTest.value,
     motivation: ($id('lMotivation') || {}).value || '',
@@ -294,7 +317,7 @@ async function doLangSubmit() {
       });
       if (res.ok) {
         if (loading) { loading.style.display = 'none'; loading.classList.remove('active'); }
-        openLangSuccess(payload.id, lLanguage, lCefrLevel);
+        openLangSuccess(payload.id, lLanguage, lAcademicLevel, lCefrLevel);
         lFormData = null;
         return;
       }
@@ -311,13 +334,15 @@ async function doLangSubmit() {
 }
 
 // ── Success Modal ──
-function openLangSuccess(id, language, level) {
+function openLangSuccess(id, language, academic, level) {
   const modal = $id('lang-success-modal');
   const idEl = $id('lang-success-id');
   const langEl = $id('lang-success-lang');
+  const acadEl = $id('lang-success-academic');
   const lvlEl = $id('lang-success-level');
   if (idEl) idEl.textContent = id;
   if (langEl) langEl.textContent = language;
+  if (acadEl) acadEl.textContent = academic || '—';
   if (lvlEl) lvlEl.textContent = level;
   if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
 }

@@ -189,6 +189,7 @@ CREATE TABLE IF NOT EXISTS language_registrations (
   parent_name TEXT DEFAULT '',
   parent_phone TEXT DEFAULT '',
   language TEXT DEFAULT '',
+  academic_level TEXT DEFAULT '',
   cefr_level TEXT DEFAULT '',
   level_test TEXT DEFAULT '',
   motivation TEXT DEFAULT '',
@@ -206,6 +207,9 @@ CREATE INDEX IF NOT EXISTS idx_lang_reg_status ON language_registrations(status)
 CREATE INDEX IF NOT EXISTS idx_lang_reg_language ON language_registrations(language);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_lang_reg_barcode ON language_registrations(barcode_value) WHERE barcode_value != '';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_lang_reg_token ON language_registrations(student_token) WHERE student_token != '';
+
+-- Add academic_level column to existing installations (idempotent)
+ALTER TABLE language_registrations ADD COLUMN IF NOT EXISTS academic_level TEXT DEFAULT '';
 
 ALTER TABLE language_registrations ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "anon_insert_lang_reg" ON language_registrations;

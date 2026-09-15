@@ -3709,6 +3709,30 @@
                 <option value="B1">B1</option><option value="B2">B2</option>
                 <option value="C1">C1</option><option value="C2">C2</option>
               </select>
+              <select class="inp" id="lang-filter-academic" style="width:auto;min-width:160px;padding:8px 14px" onchange="langRegApplyFilters()">
+                <option value="">كل المستويات الدراسية</option>
+                <optgroup label="الابتدائي">
+                  <option value="الأولى ابتدائي">الأولى ابتدائي</option>
+                  <option value="الثانية ابتدائي">الثانية ابتدائي</option>
+                  <option value="الثالثة ابتدائي">الثالثة ابتدائي</option>
+                  <option value="الرابعة ابتدائي">الرابعة ابتدائي</option>
+                  <option value="الخامسة ابتدائي">الخامسة ابتدائي</option>
+                </optgroup>
+                <optgroup label="المتوسط">
+                  <option value="الأولى متوسط">الأولى متوسط</option>
+                  <option value="الثانية متوسط">الثانية متوسط</option>
+                  <option value="الثالثة متوسط">الثالثة متوسط</option>
+                  <option value="الرابعة متوسط">الرابعة متوسط</option>
+                </optgroup>
+                <optgroup label="الثانوي">
+                  <option value="الأولى ثانوي">الأولى ثانوي</option>
+                  <option value="الثانية ثانوي">الثانية ثانوي</option>
+                  <option value="الثالثة ثانوي">الثالثة ثانوي</option>
+                </optgroup>
+                <optgroup label="الجامعي">
+                  <option value="مستوى جامعي أو خرّيج">مستوى جامعي أو خرّيج</option>
+                </optgroup>
+              </select>
               <button class="tbl-action" onclick="langRegResetFilters()" style="padding:8px 12px;font-size:12px;border-color:rgba(245,158,11,0.3);color:var(--warning)">🧹 مسح الفلاتر</button>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -3730,6 +3754,7 @@
               <th onclick="langRegSort('first_name')" style="cursor:pointer">الاسم ↕</th>
               <th>هاتف ولي الأمر</th>
               <th onclick="langRegSort('language')" style="cursor:pointer">اللغة ↕</th>
+              <th onclick="langRegSort('academic_level')" style="cursor:pointer">المستوى الدراسي ↕</th>
               <th onclick="langRegSort('cefr_level')" style="cursor:pointer">المستوى ↕</th>
               <th onclick="langRegSort('created_at')" style="cursor:pointer">تاريخ التسجيل ↕</th>
             </tr></thead>
@@ -29871,14 +29896,16 @@ window.langRegLoadData = async function() {
 window.langRegApplyFilters = function() {
   const lang = (document.getElementById('lang-filter-language')||{}).value || '';
   const lvl = (document.getElementById('lang-filter-level')||{}).value || '';
+  const acac = (document.getElementById('lang-filter-academic')||{}).value || '';
   const status = (document.getElementById('lang-filter-status')||{}).value || '';
   const q = ((document.getElementById('lang-search')||{}).value || '').trim().toLowerCase();
   lrFilteredData = lrAllData.filter(r => {
     if (lang && r.language !== lang) return false;
     if (lvl && r.cefr_level !== lvl) return false;
+    if (acac && r.academic_level !== acac) return false;
     if (status && r.status !== status) return false;
     if (q) {
-      const hay = ((r.id||'')+' '+(r.first_name||'')+' '+(r.last_name||'')+' '+(r.parent_phone||'')+' '+(r.language||'')).toLowerCase();
+      const hay = ((r.id||'')+' '+(r.first_name||'')+' '+(r.last_name||'')+' '+(r.parent_phone||'')+' '+(r.language||'')+' '+(r.academic_level||'')).toLowerCase();
       if (hay.indexOf(q) === -1) return false;
     }
     return true;
@@ -29889,7 +29916,7 @@ window.langRegApplyFilters = function() {
 };
 
 window.langRegResetFilters = function() {
-  ['lang-filter-status','lang-filter-language','lang-filter-level','lang-search'].forEach(id => {
+  ['lang-filter-status','lang-filter-language','lang-filter-academic','lang-filter-level','lang-search'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -29929,7 +29956,7 @@ window.langRegRenderTable = function() {
   const langIcons = {'الإنجليزية':'🇬🇧','الفرنسية':'🇫🇷','الإسبانية':'🇪🇸','الألمانية':'🇩🇪','الإيطالية':'🇮🇹','التركية':'🇹🇷'};
 
   tbody.innerHTML = page.length === 0
-    ? '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);font-weight:600">لا توجد تسجيلات</td></tr>'
+    ? '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted);font-weight:600">لا توجد تسجيلات</td></tr>'
     : page.map((r, i) => {
       const row = start + i + 1;
       const icon = langIcons[r.language] || '🌍';
@@ -29940,6 +29967,7 @@ window.langRegRenderTable = function() {
         +'<td>'+(r.first_name||'')+'</td>'
         +'<td dir="ltr">'+(r.parent_phone||'')+'</td>'
         +'<td>'+icon+' '+(r.language||'')+'</td>'
+        +'<td>'+(r.academic_level||'')+'</td>'
         +'<td><strong>'+(r.cefr_level||'')+'</strong></td>'
         +'<td>'+lrFmtDate(r.created_at)+'</td>'
         +'</tr>';
@@ -30004,6 +30032,7 @@ window.langRegShowDetail = function(id) {
     <div class="sr-detail-cell"><span class="sr-detail-label">تاريخ الميلاد</span><span class="sr-detail-val">${birthStr}</span></div>
     <div class="sr-detail-cell"><span class="sr-detail-label">ولي الأمر</span><span class="sr-detail-val">${r.parent_name || '—'}</span></div>
     <div class="sr-detail-cell"><span class="sr-detail-label">هاتف ولي الأمر</span><span class="sr-detail-val" dir="ltr">${r.parent_phone || '—'}</span></div>
+    <div class="sr-detail-cell"><span class="sr-detail-label">المستوى الدراسي</span><span class="sr-detail-val">${r.academic_level || '—'}</span></div>
     <div class="sr-detail-cell"><span class="sr-detail-label">اختبار التعيين</span><span class="sr-detail-val">${r.level_test || '—'}</span></div>
     <div class="sr-detail-cell"><span class="sr-detail-label">تاريخ التسجيل</span><span class="sr-detail-val">${lrFmtDate(r.created_at)}</span></div>
     <div class="sr-detail-cell"><span class="sr-detail-label">رسوم التسجيل</span><span class="sr-detail-val">${r.fee_amount || 500} دج</span></div>
@@ -30039,6 +30068,13 @@ window.langRegEdit = function(id) {
     +'<div style="margin-top:12px"><label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px">اللغة</label><select class="inp" id="lr-edit-lang" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:13px">'
     +['الإنجليزية','الفرنسية','الإسبانية','الألمانية','الإيطالية','التركية'].map(l=>'<option value="'+l+'"'+(r.language===l?' selected':'')+'>'+l+'</option>').join('')
     +'</select></div>'
+    +'<div style="margin-top:12px"><label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px">المستوى الدراسي</label><select class="inp" id="lr-edit-acac" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:13px">'
+    +'<option value=""'+(r.academic_level?'':' selected')+'>— اختر —</option>'
+    +'<optgroup label="الابتدائي">'+['الأولى ابتدائي','الثانية ابتدائي','الثالثة ابتدائي','الرابعة ابتدائي','الخامسة ابتدائي'].map(l=>'<option value="'+l+'"'+(r.academic_level===l?' selected':'')+'>'+l+'</option>').join('')+'</optgroup>'
+    +'<optgroup label="المتوسط">'+['الأولى متوسط','الثانية متوسط','الثالثة متوسط','الرابعة متوسط'].map(l=>'<option value="'+l+'"'+(r.academic_level===l?' selected':'')+'>'+l+'</option>').join('')+'</optgroup>'
+    +'<optgroup label="الثانوي">'+['الأولى ثانوي','الثانية ثانوي','الثالثة ثانوي'].map(l=>'<option value="'+l+'"'+(r.academic_level===l?' selected':'')+'>'+l+'</option>').join('')+'</optgroup>'
+    +'<optgroup label="الجامعي"><option value="مستوى جامعي أو خرّيج"'+(r.academic_level==='مستوى جامعي أو خرّيج'?' selected':'')+'>مستوى جامعي أو خرّيج</option></optgroup>'
+    +'</select></div>'
     +'<div style="margin-top:12px"><label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px">المستوى (CEFR)</label><select class="inp" id="lr-edit-lvl" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:13px">'
     +['A0','A1','A2','B1','B2','C1','C2'].map(l=>'<option value="'+l+'"'+(r.cefr_level===l?' selected':'')+'>'+l+'</option>').join('')
     +'</select></div>'
@@ -30059,6 +30095,7 @@ window.langRegSaveEdit = async function() {
     parent_name: (document.getElementById('lr-edit-pn')||{}).value || '',
     parent_phone: (document.getElementById('lr-edit-pp')||{}).value || '',
     language: (document.getElementById('lr-edit-lang')||{}).value || '',
+    academic_level: (document.getElementById('lr-edit-acac')||{}).value || '',
     cefr_level: (document.getElementById('lr-edit-lvl')||{}).value || '',
   };
   try {
@@ -30081,8 +30118,8 @@ window.langRegDelete = async function(id) {
 };
 
 window.langRegExportCSV = function() {
-  const headers = ['ID','الاسم','اللقب','ولي الأمر','هاتف ولي الأمر','اللغة','المستوى','اختبار التعيين','الحالة','تاريخ التسجيل'];
-  const rows = lrFilteredData.map(r => [r.id,r.first_name,r.last_name,r.parent_name,r.parent_phone,r.language,r.cefr_level,r.level_test,r.status,r.created_at]);
+  const headers = ['ID','الاسم','اللقب','ولي الأمر','هاتف ولي الأمر','اللغة','المستوى الدراسي','المستوى','اختبار التعيين','الحالة','تاريخ التسجيل'];
+  const rows = lrFilteredData.map(r => [r.id,r.first_name,r.last_name,r.parent_name,r.parent_phone,r.language,r.academic_level,r.cefr_level,r.level_test,r.status,r.created_at]);
   const csv = '\uFEFF'+headers.join(',')+'\n'+rows.map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
   const blob = new Blob([csv],{type:'text/csv;charset=utf-8'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'lang_registrations.csv'; a.click();
@@ -30104,9 +30141,9 @@ window.langRegPrint = function() {
   w.document.write('<html><head><title>طباعة تسجيلات دورات اللغات</title><style>body{font-family:Tajawal,sans-serif;padding:20px;direction:rtl}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px 12px;text-align:right;font-size:12px}th{background:#f0f0f0;font-weight:800}tr:nth-child(even){background:#fafafa}</style></head><body>');
   w.document.write('<h2 style="text-align:center">🌍 تسجيلات دورات اللغات — E-PLUS</h2>');
   w.document.write('<p style="text-align:center;color:#666">'+new Date().toLocaleDateString('ar-DZ')+' — '+lrFilteredData.length+' سجل</p>');
-  w.document.write('<table><thead><tr><th>#</th><th>ID</th><th>الاسم</th><th>ولي الأمر</th><th>الهاتف</th><th>اللغة</th><th>المستوى</th><th>الحالة</th></tr></thead><tbody>');
+  w.document.write('<table><thead><tr><th>#</th><th>ID</th><th>الاسم</th><th>ولي الأمر</th><th>الهاتف</th><th>اللغة</th><th>المستوى الدراسي</th><th>المستوى</th><th>الحالة</th></tr></thead><tbody>');
   lrFilteredData.forEach((r,i) => {
-    w.document.write('<tr><td>'+(i+1)+'</td><td>'+r.id+'</td><td>'+(r.first_name||'')+' '+(r.last_name||'')+'</td><td>'+(r.parent_name||'')+'</td><td dir="ltr">'+(r.parent_phone||'')+'</td><td>'+(r.language||'')+'</td><td>'+(r.cefr_level||'')+'</td><td>'+(r.status||'')+'</td></tr>');
+    w.document.write('<tr><td>'+(i+1)+'</td><td>'+r.id+'</td><td>'+(r.first_name||'')+' '+(r.last_name||'')+'</td><td>'+(r.parent_name||'')+'</td><td dir="ltr">'+(r.parent_phone||'')+'</td><td>'+(r.language||'')+'</td><td>'+(r.academic_level||'')+'</td><td>'+(r.cefr_level||'')+'</td><td>'+(r.status||'')+'</td></tr>');
   });
   w.document.write('</tbody></table></body></html>');
   w.document.close(); w.print();
