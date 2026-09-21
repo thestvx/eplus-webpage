@@ -61,7 +61,7 @@ const SUPPORT_STREAMS = {
     { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
     { subject: 'اللغة الإنجليزية', teacher: 'كرام الصادق' },
     { subject: 'اللغة الإنجليزية ( دورة )', teacher: 'تليلي راضية' },
-    { subject: 'اللغة الألمانية', teacher: 'علال حمزة' },
+    { subject: 'اللغة الألمانية', teacher: 'علالي حمزة' },
     { subject: 'اللغة الإسبانية', teacher: 'طوالبية ابراهيم' },
     { subject: 'الرياضيات', teacher: 'هبيته ربيع' },
     { subject: 'العلوم الإسلامية ( دورة )', teacher: 'هبيته ربيع' },
