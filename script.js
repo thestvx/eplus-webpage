@@ -31,7 +31,9 @@ function byId(id) {
 
   /* ── 1) Scroll reveal — عناصر .reveal تصبح .visible ── */
   safe('reveal', function () {
-    const els = document.querySelectorAll('.reveal');
+    const gsapHero = document.documentElement.classList.contains('gsap-hero');
+    const els = [...document.querySelectorAll('.reveal')]
+      .filter(el => !(gsapHero && (el.classList.contains('ep-hero-card') || el.classList.contains('ep-hero-stats-wrap'))));
     if (!els.length) return;
 
     if (reducedMotion) {
@@ -51,7 +53,7 @@ function byId(id) {
 
   /* ── 2) Stagger — أطفال الشبكات تدخل بشكل متتابع ── */
   safe('stagger', function () {
-    const GRIDS = '.ep-programs-grid, .ep-teachers-grid, .ep-paths-grid, .ep-steps-grid, .ep-trust-strip, .ep-gallery-grid';
+    const GRIDS = '.ep-programs-grid, .ep-teachers-grid, .ep-paths-grid, .ep-trust-strip, .ep-gallery-grid';
     document.querySelectorAll(GRIDS).forEach(grid => {
       [...grid.children].forEach(child => child.classList.add('stagger-item'));
     });
@@ -134,7 +136,10 @@ function byId(id) {
     }
     if (backBtn && !backBtn.dataset.bound) {
       backBtn.dataset.bound = '1';
-      backBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' }));
+      backBtn.addEventListener('click', () => {
+        if (window.__lenis && window.__lenis.scrollTo) { window.__lenis.scrollTo(0); return; }
+        window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
+      });
     }
 
     let requesting = false;
@@ -1603,10 +1608,12 @@ function hideField(el, ...ids) {
 
 function lockPageScroll() {
   document.body.style.overflow = 'hidden';
+  if (window.__lenis && window.__lenis.stop) window.__lenis.stop();
 }
 
 function unlockPageScroll() {
   document.body.style.overflow = '';
+  if (window.__lenis && window.__lenis.start) window.__lenis.start();
 }
 
 /* ──────────────────────────────────────────────────────────
@@ -2921,12 +2928,12 @@ window.goToAnnouncement = goToAnnouncement;
     lbImg.alt = photos[current].alt;
     lbCounter.textContent = (current + 1) + ' / ' + photos.length;
     lightbox.classList.add('open');
-    document.body.style.overflow = 'hidden';
+    lockPageScroll();
   }
 
   function closeLightbox() {
     lightbox.classList.remove('open');
-    document.body.style.overflow = '';
+    unlockPageScroll();
     lbImg.src = '';
   }
 
