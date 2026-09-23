@@ -3460,6 +3460,12 @@
                 <option value="السنة الثانية ثانوي">السنة الثانية ثانوي</option>
                 <option value="السنة الأولى ثانوي">السنة الأولى ثانوي</option>
                 <option value="السنة الرابعة متوسط">السنة الرابعة متوسط</option>
+                <option value="السنة الثالثة متوسط">السنة الثالثة متوسط</option>
+                <option value="السنة الثانية متوسط">السنة الثانية متوسط</option>
+                <option value="السنة الأولى متوسط">السنة الأولى متوسط</option>
+                <option value="السنة الخامسة ابتدائي">السنة الخامسة ابتدائي</option>
+                <option value="السنة الرابعة ابتدائي">السنة الرابعة ابتدائي</option>
+                <option value="السنة الثالثة ابتدائي">السنة الثالثة ابتدائي</option>
               </select>
               <select class="inp" id="sr-filter-stream" style="width:auto;min-width:140px;padding:8px 14px" onchange="srApplyFilters()">
                 <option value="">كل الشعب</option>
@@ -28625,6 +28631,10 @@ function srSyncStreamOptions() {
   const streamSel = document.getElementById('sr-filter-stream');
   if (!levelSel || !streamSel) return;
   const lvl = levelSel.value;
+  function srIsNoStreamLevel(l) {
+    return ['السنة الثالثة ابتدائي','السنة الرابعة ابتدائي','السنة الخامسة ابتدائي',
+      'السنة الأولى متوسط','السنة الثانية متوسط','السنة الثالثة متوسط','السنة الرابعة متوسط'].indexOf(l) !== -1;
+  }
   const allStreams = [];
   if (window.SubjectService && typeof SubjectService.getStreamsForLevel === 'function') {
     ['السنة الثالثة ثانوي (بكالوريا)', 'السنة الثانية ثانوي', 'السنة الأولى ثانوي'].forEach(l => {
@@ -28638,13 +28648,13 @@ function srSyncStreamOptions() {
   const last = streamSel.value;
   if (lvl === '') {
     streamSel.innerHTML = '<option value="">كل الشعب</option>' + union.map(s => `<option value="${s}">${s}</option>`).join('');
-  } else if (lvl === 'السنة الرابعة متوسط') {
-    streamSel.innerHTML = '<option value="">بدون شعب (المتوسط)</option>';
+  } else if (srIsNoStreamLevel(lvl)) {
+    streamSel.innerHTML = '<option value="">بدون شعب (الابتدائي/المتوسط)</option>';
   } else {
     const streams = SubjectService.getStreamsForLevel(lvl) || [];
     streamSel.innerHTML = '<option value="">كل الشعب</option>' + streams.map(s => `<option value="${s}">${s}</option>`).join('');
   }
-  if (lvl === '' || ((lvl !== 'السنة الرابعة متوسط') && last && (SubjectService.getStreamsForLevel(lvl) || []).indexOf(last) !== -1)) {
+  if (lvl === '' || ((!srIsNoStreamLevel(lvl)) && last && (SubjectService.getStreamsForLevel(lvl) || []).indexOf(last) !== -1)) {
     streamSel.value = last;
   } else {
     streamSel.value = '';

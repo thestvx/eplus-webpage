@@ -18,10 +18,6 @@ const supportStreams = () => {
   }
   return raw;
 };
-const supportMiddleSchool = () => {
-  const raw = window.SUPPORT_MIDDLE_SCHOOL || [];
-  return (window.SubjectService && SubjectService.filterActiveTeachers) ? SubjectService.filterActiveTeachers(raw) : raw;
-};
 
 // ── استثناءات نموذج التسجيل فقط ──
 // مادة معينة عند أستاذ معين لا تُعرض للتسجيلات الجديدة، بينما التلاميذ
@@ -34,6 +30,63 @@ function registrationFormItems(pairs) {
 }
 
 const SUPPORT_INSTITUTIONS = {
+  'السنة الثالثة ابتدائي': [
+    'ابتدائية الخنساء بقمار',
+    'ابتدائية رضا حوحو بقمار',
+    'ابتدائية الشمندي العزوزي بقمار',
+    'ابتدائية قط الصادق بقمار',
+    'ابتدائية احمد بلحسن بقمار',
+    'ابتدائية الاخوين بن ناصر بتغزوت',
+    'ابتدائية دوال عمار بقمار',
+    'ابتدائية علي شكيري بقمار',
+    'ابتدائية العربي بني بقمار',
+    'أخرى',
+  ],
+  'السنة الرابعة ابتدائي': [
+    'ابتدائية الخنساء بقمار',
+    'ابتدائية رضا حوحو بقمار',
+    'ابتدائية الشمندي العزوزي بقمار',
+    'ابتدائية قط الصادق بقمار',
+    'ابتدائية احمد بلحسن بقمار',
+    'ابتدائية الاخوين بن ناصر بتغزوت',
+    'ابتدائية دوال عمار بقمار',
+    'ابتدائية علي شكيري بقمار',
+    'ابتدائية العربي بني بقمار',
+    'أخرى',
+  ],
+  'السنة الخامسة ابتدائي': [
+    'ابتدائية الخنساء بقمار',
+    'ابتدائية رضا حوحو بقمار',
+    'ابتدائية الشمندي العزوزي بقمار',
+    'ابتدائية قط الصادق بقمار',
+    'ابتدائية احمد بلحسن بقمار',
+    'ابتدائية الاخوين بن ناصر بتغزوت',
+    'ابتدائية دوال عمار بقمار',
+    'ابتدائية علي شكيري بقمار',
+    'ابتدائية العربي بني بقمار',
+    'أخرى',
+  ],
+  'السنة الأولى متوسط': [
+    'متوسطة خليفة بن حسن بقمار',
+    'متوسطة أحمد عربية بقمار',
+    'متوسطة البشير الإبراهيمي بقمار',
+    'متوسطة الرويسي بلقاسم بقمار',
+    'أخرى',
+  ],
+  'السنة الثانية متوسط': [
+    'متوسطة خليفة بن حسن بقمار',
+    'متوسطة أحمد عربية بقمار',
+    'متوسطة البشير الإبراهيمي بقمار',
+    'متوسطة الرويسي بلقاسم بقمار',
+    'أخرى',
+  ],
+  'السنة الثالثة متوسط': [
+    'متوسطة خليفة بن حسن بقمار',
+    'متوسطة أحمد عربية بقمار',
+    'متوسطة البشير الإبراهيمي بقمار',
+    'متوسطة الرويسي بلقاسم بقمار',
+    'أخرى',
+  ],
   'السنة الثالثة ثانوي (بكالوريا)': [
     'ثانوية هالي عبدالكريم بقمار',
     'متقنة عبدالقادر الياجوري بقمار',
@@ -129,15 +182,19 @@ function _pairKey(p) {
 }
 
 // المواد المسموح عرضها/اختيارها حالياً (مع استثناءات نموذج التسجيل)
+function isLevelWithoutStream(level) {
+  if (!level) return false;
+  const list = (window.SUPPORT_NO_STREAM_LEVELS && window.SUPPORT_NO_STREAM_LEVELS.length)
+    ? window.SUPPORT_NO_STREAM_LEVELS
+    : ['السنة الثالثة ابتدائي', 'السنة الرابعة ابتدائي', 'السنة الخامسة ابتدائي',
+       'السنة الأولى متوسط', 'السنة الثانية متوسط', 'السنة الثالثة متوسط', 'السنة الرابعة متوسط'];
+  return list.indexOf(level) !== -1;
+}
+
 function currentSubjectItems() {
-  if (sLevel === 'السنة الرابعة متوسط') {
-    return registrationFormItems(supportMiddleSchool());
-  }
-  if (sLevel && sStream) {
-    if (window.SubjectService && typeof SubjectService.getSubjectTeacherPairs === 'function') {
-      return registrationFormItems(SubjectService.getSubjectTeacherPairs(sLevel, sStream));
-    }
-    return registrationFormItems((supportStreams()[sStream] || []));
+  if (!sLevel) return [];
+  if (window.SubjectService && typeof SubjectService.getSubjectTeacherPairs === 'function') {
+    return registrationFormItems(SubjectService.getSubjectTeacherPairs(sLevel, sStream));
   }
   return [];
 }
@@ -330,8 +387,8 @@ function onInstitutionChange() {
   }
   byId('s-institution-input-group')&&(byId('s-institution-input-group').style.display='none');
 
-  if (sLevel === 'السنة الرابعة متوسط') {
-    showMiddleSchoolSubjects();
+  if (isLevelWithoutStream(sLevel)) {
+    showSubjectsDirect();
   } else {
     showStream();
   }
@@ -340,8 +397,8 @@ function onInstitutionChange() {
 function onInstitutionInputChange() {
   const inp = byId('sInstitutionInput');
   if (inp && inp.value.trim().length >= 2) {
-    if (sLevel === 'السنة الرابعة متوسط') {
-      showMiddleSchoolSubjects();
+    if (isLevelWithoutStream(sLevel)) {
+      showSubjectsDirect();
     } else {
       showStream();
     }
@@ -351,24 +408,13 @@ function onInstitutionInputChange() {
   }
 }
 
-function showMiddleSchoolSubjects() {
+function showSubjectsDirect() {
   revalidateSubjects();
   byId('msDropdown')&&(byId('msDropdown').style.display='none');
   const sg = byId('s-subjects-group');
   if (sg) sg.style.display = 'block';
-  renderMiddleSchoolSubjects();
+  renderSubjects();
   sScrollToPhase(sg, { offset: 32 });
-}
-
-function renderMiddleSchoolSubjects() {
-  const opts = byId('ms-options');
-  if (!opts) return;
-  const items = registrationFormItems(supportMiddleSchool());
-  opts.innerHTML = items.map((item, i) => {
-    const sel = sSubjects.some(p => p.subject === item.subject && p.teacher === item.teacher);
-    return `<div class="ms-opt ${sel?'selected':''}" data-idx="${i}" onclick="msSelect(${i})"><strong>${item.subject}</strong> <span style="opacity:0.6;font-weight:400;">— 🎓 ${item.teacher}</span></div>`;
-  }).join('');
-  updateMsUI();
 }
 
 // ── Step 4: Stream ──
@@ -502,10 +548,10 @@ function onSubmitClick() {
       if (!instInp) { regAlert('⚠️ الرجاء إدخال اسم المؤسسة التعليمية'); return; }
     }
   }
-  if (sLevel && sLevel !== 'السنة الرابعة متوسط' && !sStream) {
+  if (sLevel && !isLevelWithoutStream(sLevel) && !sStream) {
     regAlert('⚠️ الرجاء اختيار الشعبة'); return;
   }
-  if (sLevel === 'السنة الرابعة متوسط' || sStream) {
+  if (isLevelWithoutStream(sLevel) || sStream) {
     if (sSubjects.length === 0) { regAlert('⚠️ الرجاء اختيار مادة واحدة على الأقل'); return; }
   }
 
@@ -857,7 +903,7 @@ async function updateRegistration(id, data) {
     SubjectService.loadDeletedTeachers().then(() => {
       try {
         if (byId('s-subjects-group')?.style.display === 'block') {
-          if (sLevel === 'السنة الرابعة متوسط') { renderMiddleSchoolSubjects(); }
+          if (isLevelWithoutStream(sLevel)) { renderSubjects(); }
           else if (sStream) { onStreamChange(sStream, { skipScroll: true }); }
         }
       } catch (e) { console.warn('Re-render after deleted-teachers load failed:', e); }

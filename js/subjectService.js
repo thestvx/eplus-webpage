@@ -81,6 +81,43 @@ const SUPPORT_MIDDLE_SCHOOL = [
   { subject: 'علوم الطبيعة والحياة', teacher: 'شيخة زكرياء' },
 ];
 
+// ── الابتدائي (الدعم المدرسي) ──
+// المفتاح = المستوى، والقيمة = قائمة {المادة، الأستاذ} المعتمدة.
+const SUPPORT_PRIMARY = {
+  'السنة الثالثة ابتدائي': [
+    { subject: 'اللغة العربية', teacher: 'بريبش منال' },
+    { subject: 'اللغة الفرنسية', teacher: 'خلف ايمان' },
+    { subject: 'اللغة الإنجليزية', teacher: 'كشيدة خديجة' },
+  ],
+  'السنة الرابعة ابتدائي': [
+    { subject: 'اللغة العربية', teacher: 'بريبش منال' },
+    { subject: 'اللغة الفرنسية', teacher: 'خلف ايمان' },
+    { subject: 'اللغة الإنجليزية', teacher: 'كشيدة خديجة' },
+  ],
+  'السنة الخامسة ابتدائي': [
+    { subject: 'اللغة العربية', teacher: 'بريبش منال' },
+    { subject: 'اللغة الفرنسية', teacher: 'خلف ايمان' },
+    { subject: 'اللغة الإنجليزية', teacher: 'كشيدة خديجة' },
+    { subject: 'دعم اللغات', teacher: 'كرام اسراء' },
+  ],
+};
+
+// ── المتوسط (الأولى/الثانية/الثالثة) — نفس القائمة للمستويات الثلاثة ──
+const SUPPORT_MIDDLE_LOW = [
+  { subject: 'علوم الطبيعة والحياة', teacher: 'زيراوي حفصة' },
+  { subject: 'اللغة الإنجليزية', teacher: 'خادم الله نور الهدى' },
+  { subject: 'اللغة الإنجليزية', teacher: 'بادة العربي' },
+  { subject: 'اللغة الفرنسية', teacher: 'لمحنط ام السعد' },
+  { subject: 'اللغة الفرنسية', teacher: 'مرغني ريهام' },
+  { subject: 'اللغة الفرنسية', teacher: 'حميدي بلقيس' },
+];
+
+// المستويات دون شعبة: المواد تُختار مباشرة دون المرور بالشعبة
+const SUPPORT_NO_STREAM_LEVELS = [
+  'السنة الثالثة ابتدائي', 'السنة الرابعة ابتدائي', 'السنة الخامسة ابتدائي',
+  'السنة الأولى متوسط', 'السنة الثانية متوسط', 'السنة الثالثة متوسط', 'السنة الرابعة متوسط',
+];
+
 // ── العلوم الثانوية (السنة الأولى / الثانية ثانوي) ──
 // المفتاح = المستوى، ثم الشعبة، ثم قائمة {المادة، الأستاذ} المعتمدة.
 const SUPPORT_SECONDARY = {
@@ -88,27 +125,39 @@ const SUPPORT_SECONDARY = {
     'علوم تجريبية': [
       { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
       { subject: 'العلوم الفيزيائية', teacher: 'لكموته لمين' },
+      { subject: 'علوم الطبيعة والحياة', teacher: 'شكري صحراوي' },
+      { subject: 'الرياضيات', teacher: 'كرام فخر الدين' },
     ],
     'آداب ولغات': [
       { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+      { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
+      { subject: 'اللغة الإسبانية', teacher: 'طوالبية ابراهيم' },
+      { subject: 'اللغة الألمانية', teacher: 'غندير مبروك' },
     ],
   },
   'السنة الثانية ثانوي': {
     'علوم تجريبية': [
       { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
       { subject: 'العلوم الفيزيائية', teacher: 'لكموته لمين' },
+      { subject: 'علوم الطبيعة والحياة', teacher: 'شكري صحراوي' },
+      { subject: 'الرياضيات', teacher: 'كرام فخر الدين' },
     ],
     'آداب ولغات': [
       { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
+      { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
+      { subject: 'اللغة الإسبانية', teacher: 'طوالبية ابراهيم' },
+      { subject: 'اللغة الألمانية', teacher: 'غندير مبروك' },
     ],
     'تقني رياضي': [
       { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
       { subject: 'العلوم الفيزيائية', teacher: 'لكموته لمين' },
+      { subject: 'الرياضيات', teacher: 'كرام فخر الدين' },
     ],
     'تسيير واقتصاد': [
       { subject: 'اللغة الفرنسية', teacher: 'كروش شمس الهدى' },
       { subject: 'المحاسبة', teacher: 'سرهود عبدالرحمان' },
       { subject: 'اقتصاد وقانون', teacher: 'سرهود عبدالرحمان' },
+      { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
     ],
   },
 };
@@ -116,6 +165,9 @@ const SUPPORT_SECONDARY = {
 // Expose on window so register-support.js (index.html) reads the SAME data
 window.SUPPORT_STREAMS = SUPPORT_STREAMS;
 window.SUPPORT_MIDDLE_SCHOOL = SUPPORT_MIDDLE_SCHOOL;
+window.SUPPORT_PRIMARY = SUPPORT_PRIMARY;
+window.SUPPORT_MIDDLE_LOW = SUPPORT_MIDDLE_LOW;
+window.SUPPORT_NO_STREAM_LEVELS = SUPPORT_NO_STREAM_LEVELS;
 window.SUPPORT_SECONDARY = SUPPORT_SECONDARY;
 
 const SubjectService = (function () {
@@ -187,6 +239,7 @@ const SubjectService = (function () {
     'اقتصاد وقانون': 'law',
     'اللغة الألمانية': 'german',
     'اللغة الإسبانية': 'spanish',
+    'دعم اللغات': 'langs_support',
     'رياضيات (للأدبيين)': 'math_lit'
   };
 
@@ -210,6 +263,7 @@ const SubjectService = (function () {
     'اقتصاد وقانون': '⚖️',
     'اللغة الألمانية': '🇩🇪',
     'اللغة الإسبانية': '🇪🇸',
+    'دعم اللغات': '🗣️',
     'رياضيات (للأدبيين)': '📐'
   };
 
@@ -227,14 +281,14 @@ const SubjectService = (function () {
       'آداب ولغات': ['اللغة العربية', 'الفلسفة', 'اللغة الفرنسية', 'اللغة الإنجليزية', 'اللغة الإنجليزية ( دورة )', 'اللغة الألمانية', 'اللغة الإسبانية', 'الرياضيات', 'العلوم الإسلامية ( دورة )', 'اجتماعيات ( دورة )']
     },
     'السنة الأولى ثانوي': {
-      'علوم تجريبية': ['اللغة الفرنسية', 'العلوم الفيزيائية'],
-      'آداب ولغات': ['اللغة الفرنسية']
+      'علوم تجريبية': ['اللغة الفرنسية', 'العلوم الفيزيائية', 'علوم الطبيعة والحياة', 'الرياضيات'],
+      'آداب ولغات': ['اللغة الفرنسية', 'الفلسفة', 'اللغة الإسبانية', 'اللغة الألمانية']
     },
     'السنة الثانية ثانوي': {
-      'علوم تجريبية': ['اللغة الفرنسية', 'العلوم الفيزيائية'],
-      'آداب ولغات': ['اللغة الفرنسية'],
-      'تقني رياضي': ['اللغة الفرنسية', 'العلوم الفيزيائية'],
-      'تسيير واقتصاد': ['اللغة الفرنسية', 'المحاسبة', 'اقتصاد وقانون']
+      'علوم تجريبية': ['اللغة الفرنسية', 'العلوم الفيزيائية', 'علوم الطبيعة والحياة', 'الرياضيات'],
+      'آداب ولغات': ['اللغة الفرنسية', 'الفلسفة', 'اللغة الإسبانية', 'اللغة الألمانية'],
+      'تقني رياضي': ['اللغة الفرنسية', 'العلوم الفيزيائية', 'الرياضيات'],
+      'تسيير واقتصاد': ['اللغة الفرنسية', 'المحاسبة', 'اقتصاد وقانون', 'الفلسفة']
     }
   };
 
@@ -260,8 +314,12 @@ const SubjectService = (function () {
   // initial registration (index.html) for a given level/stream.
   function getSubjectTeacherPairs(level, stream) {
     let pairs;
-    if (level === 'السنة الرابعة متوسط') {
+    if (SUPPORT_PRIMARY && SUPPORT_PRIMARY[level]) {
+      pairs = SUPPORT_PRIMARY[level] || [];
+    } else if (level === 'السنة الرابعة متوسط') {
       pairs = Array.isArray(SUPPORT_MIDDLE_SCHOOL) ? SUPPORT_MIDDLE_SCHOOL : [];
+    } else if (SUPPORT_NO_STREAM_LEVELS.indexOf(level) !== -1) {
+      pairs = Array.isArray(SUPPORT_MIDDLE_LOW) ? SUPPORT_MIDDLE_LOW : [];
     } else if (level !== 'السنة الثالثة ثانوي (بكالوريا)' && stream && SUPPORT_SECONDARY[level] && SUPPORT_SECONDARY[level][stream]) {
       pairs = SUPPORT_SECONDARY[level][stream] || [];
     } else if (level === 'السنة الثالثة ثانوي (بكالوريا)' && stream && SUPPORT_STREAMS[stream]) {
@@ -275,8 +333,14 @@ const SubjectService = (function () {
   // ── Level Subject Lists ───────────────────────────────
 
   function getSubjectsForLevel(level, stream) {
+    if (SUPPORT_PRIMARY && SUPPORT_PRIMARY[level]) {
+      return [...new Set(SUPPORT_PRIMARY[level].map(p => p.subject))];
+    }
     if (level === 'السنة الرابعة متوسط') {
       return SUBJECTS_BY_LEVEL['السنة الرابعة متوسط'] || [];
+    }
+    if (SUPPORT_NO_STREAM_LEVELS.indexOf(level) !== -1) {
+      return [...new Set(SUPPORT_MIDDLE_LOW.map(p => p.subject))];
     }
     if (level === 'السنة الثالثة ثانوي (بكالوريا)' && stream) {
       return SUBJECTS_BY_LEVEL['السنة الثالثة ثانوي (بكالوريا)'][stream] || [];
@@ -539,6 +603,9 @@ const SubjectService = (function () {
     SUBJECTS_BY_LEVEL,
     SUPPORT_STREAMS,
     SUPPORT_MIDDLE_SCHOOL,
+    SUPPORT_PRIMARY,
+    SUPPORT_MIDDLE_LOW,
+    SUPPORT_NO_STREAM_LEVELS,
     SUPPORT_SECONDARY,
     getSubjectId,
     getSubjectName,
