@@ -1,93 +1,19 @@
-/* E-PLUS homepage — Lenis smooth scroll + GSAP hero/scroll (Apple-like, progressive) */
-/* إذا فشل تحميل GSAP/Lenis أو أراد المستخدم تقليل الحركة، يبقى المحتوى ظاهراً ومقرأً بشكل طبيعي. */
+/* E-PLUS homepage scroll animations (steps + why-us) — progressive enhancement */
+/* حركة إضافية احترافية بخفة: إذا فشل تحميل GSAP أو أراد المستخدم تقليل الحركة،
+   يبقى المحتوى ظاهراً ومقرأً بشكل طبيعي (الأنيميشن تكميلي فقط). */
 (function () {
   'use strict';
 
-  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var hasGsap = !!(window.gsap && window.ScrollTrigger);
-  var hasLenis = !!window.Lenis;
-
-  var lenis = null;
-
-  /* ═══ LENIS — super-smooth inerrtial scrolling (Apple feel) ═══ */
-  if (!reduceMotion && hasLenis) {
-    lenis = new Lenis({
-      lerp: 0.1,
-      smoothWheel: true,
-      wheelMultiplier: 1,
-      touchMultiplier: 1
-    });
-    window.__lenis = lenis;
-
-    if (hasGsap) {
-      lenis.on('scroll', ScrollTrigger.update);
-      gsap.ticker.add(function (time) { lenis.raf(time * 1000); });
-      gsap.ticker.lagSmoothing(0);
-    } else {
-      requestAnimationFrame(function raf(time) { lenis.raf(time); requestAnimationFrame(raf); });
-    }
-
-    /* Smooth anchor navigation through Lenis */
-    document.addEventListener('click', function (e) {
-      var a = e.target && e.target.closest ? e.target.closest('a[href^="#"]') : null;
-      if (!a) return;
-      var href = a.getAttribute('href');
-      if (!href || href.length < 2) return;
-      var target = document.querySelector(href);
-      if (!target) return;
-      e.preventDefault();
-      lenis.scrollTo(target, { offset: -84, duration: 1.1 });
-    });
+  var reduceMotion = false;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    reduceMotion = true;
   }
-
-  if (!hasGsap || reduceMotion) return;
+  if (!window.gsap || !window.ScrollTrigger || reduceMotion) return;
 
   gsap.registerPlugin(ScrollTrigger);
 
-  /* Mark hero as GSAP-driven → CSS entrance animations off (GSAP owns them) */
-  document.documentElement.classList.add('gsap-hero');
-
-  /* ═══ HERI ENTRANCE + parallax ═══ */
-  function initHero() {
-    var hero = document.getElementById('home');
-    if (!hero) return;
-
-    var bg = hero.querySelector('.ep-hero-bg');
-    var copy = hero.querySelector('.ep-hero-copy');
-    var card = hero.querySelector('.ep-hero-card');
-    var stats = document.querySelector('.ep-hero-stats-wrap');
-    var tag = hero.querySelector('.ep-hero-tag');
-    var title = hero.querySelector('.ep-hero-title');
-    var divider = hero.querySelector('.ep-hero-divider');
-    var sub = hero.querySelector('.ep-hero-sub');
-    var btnRow = hero.querySelector('.ep-hero-btns');
-    var mini = hero.querySelector('.ep-hero-mini-actions');
-    var tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-
-    if (tag)     tl.fromTo(tag,     { y: 26, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7 }, 0.05);
-    if (title)   tl.fromTo(title,   { y: 42, opacity: 0 }, { y: 0, opacity: 1, duration: 0.9 }, 0.16);
-    if (divider) tl.fromTo(divider, { scaleX: 0 }, { scaleX: 1, duration: 0.8, ease: 'power2.inOut' }, 0.3);
-    if (sub)     tl.fromTo(sub,     { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.8 }, 0.36);
-    if (btnRow)  tl.fromTo(btnRow,  { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7 }, 0.48);
-    if (mini)    tl.fromTo(mini,    { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7 }, 0.6);
-    if (card)    tl.fromTo(card,    { y: 52, opacity: 0, scale: 0.96 }, { y: 0, opacity: 1, scale: 1, duration: 1.0, ease: 'power2.out' }, 0.42);
-    if (stats)   tl.fromTo(stats,   { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.8 }, 0.72);
-
-    if (bg) {
-      gsap.to(bg, {
-        yPercent: 12, scale: 1.04, ease: 'none',
-        scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: true }
-      });
-    }
-    if (copy) {
-      gsap.to(copy, {
-        yPercent: -16, opacity: 0.25, ease: 'none',
-        scrollTrigger: { trigger: hero, start: 'top top', end: '55% top', scrub: true }
-      });
-    }
-  }
-
-  function sectionHead(head) {
+  function sectionHead(triggerEl, staggerExtra) {
+    var head = typeof triggerEl === 'string' ? document.querySelector(triggerEl) : triggerEl;
     if (!head) return;
     var tt = head.querySelector('.ep-section-pretitle');
     var title = head.querySelector('.ep-section-title');
@@ -112,29 +38,14 @@
     }
   }
 
-  /* All section heads → GSAP scroll reveal (steps/why included via generic loop) */
-  var documentDone = function (fn) {
-    if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', fn);
-    else fn();
-  };
-
-  documentDone(function () {
-    initHero();
-
-    document.querySelectorAll('.ep-section-head').forEach(sectionHead);
-    initSteps();
-    initWhy();
-    ScrollTrigger.refresh();
-  });
-
-  window.addEventListener('load', function () { ScrollTrigger.refresh(); });
-
   /* ═══ كيف تنضم إلينا (#steps) ═══ */
   function initSteps() {
     var grid = document.querySelector('#steps .ep-steps-grid');
     if (!grid) return;
     var line = grid.querySelector('.ep-steps-line');
     var cards = gsap.utils.toArray(grid.querySelectorAll('.ep-step-card'));
+
+    sectionHead('#steps .ep-section-head', 0.16);
 
     // الخط الرابط يرسم تدريجياً من اليمين لليسار
     if (line) {
@@ -167,6 +78,8 @@
         y: -7, duration: 1.9, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: i * 0.35
       });
     });
+
+    // لمعة خفيفة تتحرك عبر البطاقة عند العرض
   }
 
   /* ═══ لماذا E-PLUS؟ (#why-us) ═══ */
@@ -175,6 +88,8 @@
     if (!section) return;
     var grid = section.querySelector('.ep-why-grid');
     if (!grid) return;
+
+    sectionHead(section.querySelector('.ep-section-head'), 0.08);
 
     // اللوحة الرئيسية
     var main = grid.querySelector('.ep-why-main');
@@ -217,5 +132,17 @@
         gsap.to(orb, { y: move, duration: 2.4, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: i * 0.4 });
       }
     });
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function () {
+      initSteps();
+      initWhy();
+      ScrollTrigger.refresh();
+    });
+  } else {
+    initSteps();
+    initWhy();
+    ScrollTrigger.refresh();
   }
 })();
