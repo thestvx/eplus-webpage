@@ -28588,12 +28588,42 @@ async function srFetch(url, options) {
   });
 }
 
+// ── توحيد أسماء الأساتذة (قراءة فقط، دون المساس بقاعدة البيانات) ──
+// ظهر نفس الأستاذ كخيارين في فلتر الأساتذة لأن السجلات التاريخية خزّنت اسمه بترتيبين
+// مختلفين ("عبد الرحمان سرهود" / "سرهود عبدالرحمان"). الحل غير مدمر: نطبّق اسماً موحّداً
+// في الذاكرة عند القراءة فقط، فلا يُلمس التخزين ولا سجلات الحضور، ويتوحّد الفلتر في خيار
+// واحد اسمه "سرهود عبدالرحمان" مع دمج تلاميذ الترتيبين تحت نفس الخيار دون تكرار أي تلميذ.
+function srCanonTeacher(name) {
+  var s = String(name == null ? '' : name).replace(/\s+/g, ' ').trim();
+  var alias = {
+    'عبد الرحمان سرهود': 'سرهود عبدالرحمان',
+    'عبدالرحمان سرهود': 'سرهود عبدالرحمان',
+    'سرهود عبدالرحمان': 'سرهود عبدالرحمان',
+    'عبد الرحمن سرهود': 'سرهود عبدالرحمان',
+    'عبدالرحمن سرهود': 'سرهود عبدالرحمان',
+    'سرهود عبد الرحمان': 'سرهود عبدالرحمان',
+    'سرهود عبدالرحمن': 'سرهود عبدالرحمان'
+  };
+  return (alias[s] || s);
+}
+function srNormalizeTeacherInData(list) {
+  (list || []).forEach(r => {
+    if (Array.isArray(r.subjects)) {
+      r.subjects.forEach(sub => {
+        if (sub && sub.teacher) sub.teacher = srCanonTeacher(sub.teacher);
+      });
+    }
+  });
+  return list;
+}
+
 async function srLoadData() {
   try {
     const res = await srFetch(`${SR_SUPABASE_URL}/rest/v1/registrations?select=*&order=created_at.desc`);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     srAllData = await res.json();
     srAllData = (srAllData || []).filter(r => !r.deleted_at);
+    srNormalizeTeacherInData(srAllData);
     srFilteredData = [...srAllData];
     srCurrentPage = 1;
     document.getElementById('nav-badge-support').textContent = srAllData.length;
