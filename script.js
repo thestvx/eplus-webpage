@@ -13,6 +13,148 @@ function byId(id) {
   return document.getElementById(id);
 }
 
+/* ══════════════════════════════════════════════════════════
+   SITE MOTION ENGINE
+   يعمل مباشرة بعد DOM helpers وقبل أي كود آخر، حتى لا تمنع
+   أي مشكلة لاحقة ظهور المحتوى أو تشغيل الحركات.
+   كل وحدة معزولة بـ try/catch، وتراعي prefers-reduced-motion.
+   ══════════════════════════════════════════════════════════ */
+(function initSiteMotion() {
+  'use strict';
+
+  const reducedMotion = window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  document.documentElement.classList.add('js');
+
+  const safe = (name, fn) => { try { fn(); } catch (e) { if (window.console) console.warn('[motion:' + name + ']', e); } };
+
+  /* ── 1) Scroll reveal — عناصر .reveal تصبح .visible ── */
+  safe('reveal', function () {
+    const els = document.querySelectorAll('.reveal');
+    if (!els.length) return;
+
+    if (reducedMotion) {
+      els.forEach(el => el.classList.add('visible'));
+      return;
+    }
+
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('visible');
+        io.unobserve(entry.target);
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -36px 0px' });
+    els.forEach(el => io.observe(el));
+  });
+
+  /* ── 2) Stagger — أطفال الشبكات تدخل بشكل متتابع ── */
+  safe('stagger', function () {
+    const GRIDS = '.ep-programs-grid, .ep-teachers-grid, .ep-paths-grid, .ep-steps-grid, .ep-trust-strip, .ep-gallery-grid';
+    document.querySelectorAll(GRIDS).forEach(grid => {
+      [...grid.children].forEach(child => child.classList.add('stagger-item'));
+    });
+
+    const items = document.querySelectorAll('.stagger-item');
+    if (!items.length) return;
+
+    if (reducedMotion) {
+      items.forEach(el => el.classList.add('stagger-visible'));
+      return;
+    }
+
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const el = entry.target;
+        const sibs = el.parentElement ? [...el.parentElement.querySelectorAll('.stagger-item')] : [el];
+        const idx = sibs.indexOf(el);
+        el.style.transitionDelay = Math.min(idx * 80, 400) + 'ms';
+        el.classList.add('stagger-visible');
+        io.unobserve(el);
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -30px 0px' });
+    items.forEach(el => io.observe(el));
+  });
+
+  /* ── 3) Counters — .ep-stat-num[data-target] يعدّ للأعلى ── */
+  safe('counters', function () {
+    const els = document.querySelectorAll('.ep-stat-num[data-target]');
+    if (!els.length) return;
+
+    const finish = (el, target) => { el.textContent = target.toLocaleString('ar') + (target >= 100 ? '+' : ''); };
+
+    if (reducedMotion) {
+      els.forEach(el => finish(el, parseInt(el.getAttribute('data-target'), 10)));
+      return;
+    }
+
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const el = entry.target;
+        const target = parseInt(el.getAttribute('data-target'), 10);
+        if (!target || el.dataset.counted) return;
+        el.dataset.counted = '1';
+        io.unobserve(el);
+        const duration = 1600;
+        const start = performance.now();
+        (function tick(now) {
+          const p = Math.min((now - start) / duration, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = Math.round(eased * target).toLocaleString('ar');
+          if (p < 1) requestAnimationFrame(tick);
+          else finish(el, target);
+        })(performance.now());
+      });
+    }, { threshold: 0.4 });
+    els.forEach(el => io.observe(el));
+  });
+
+  /* ── 4) Navbar scrolled + back-to-top + scroll progress bar ── */
+  safe('scroll-fx', function () {
+    const navbar = byId('ep-navbar');
+
+    let progressEl = byId('ep-scroll-progress');
+    if (!progressEl) {
+      progressEl = document.createElement('div');
+      progressEl.className = 'ep-scroll-progress';
+      progressEl.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(progressEl);
+    }
+
+    let backBtn = document.querySelector('.ep-back-to-top');
+    if (!backBtn) {
+      backBtn = document.createElement('button');
+      backBtn.className = 'ep-back-to-top';
+      backBtn.setAttribute('aria-label', 'العودة للأعلى');
+      backBtn.innerHTML = '↑';
+      document.body.appendChild(backBtn);
+    }
+    if (backBtn && !backBtn.dataset.bound) {
+      backBtn.dataset.bound = '1';
+      backBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' }));
+    }
+
+    let requesting = false;
+    const onScroll = () => {
+      requesting = false;
+      const y = window.scrollY;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      if (navbar) navbar.classList.toggle('scrolled', y > 50);
+      if (backBtn) backBtn.classList.toggle('visible', y > 400);
+      if (progressEl) progressEl.style.transform = 'scaleX(' + (max > 0 ? Math.min(y / max, 1) : 0) + ')';
+    };
+    window.addEventListener('scroll', () => {
+      if (requesting) return;
+      requesting = true;
+      requestAnimationFrame(() => { onScroll(); });
+    }, { passive: true });
+    onScroll();
+  });
+})();
+
 /* ──────────────────────────────────────────────────────────
    BACKGROUND CANVAS — Lightweight particles (GPU-only)
 ────────────────────────────────────────────────────────── */
@@ -2604,45 +2746,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => { epLoader.classList.add('hidden'); }, 2000);
   }
 
-  /* ── REVEAL ON SCROLL — smooth with rootMargin ── */
-  const revealObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
-        revealObserver.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.06, rootMargin: '0px 0px -60px 0px' });
-  document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
-
-  /* ── STAGGER children inside reveal sections ── */
-  document.querySelectorAll(
-    '.ep-programs-grid, .ep-teachers-grid, .ep-paths-grid, .ep-steps-grid, .ep-trust-strip, .ep-gallery-grid'
-  ).forEach(grid => {
-    [...grid.children].forEach((child, i) => {
-      child.classList.add('stagger-item');
-    });
-  });
-
-  /* ── NAVBAR SCROLL ── */
-  const navbar = byId('ep-navbar');
-  window.addEventListener('scroll', () => {
-    if (navbar) navbar.classList.toggle('scrolled', window.scrollY > 50);
-    const topBtn = document.querySelector('.ep-back-to-top');
-    if (topBtn) topBtn.classList.toggle('visible', window.scrollY > 400);
-  }, { passive: true });
-
-  /* ── BACK TO TOP — أنشئه ديناميكياً إذا ما موجود في HTML ── */
-  let backBtn = document.querySelector('.ep-back-to-top');
-  if (!backBtn) {
-    backBtn = document.createElement('button');
-    backBtn.className = 'ep-back-to-top';
-    backBtn.setAttribute('aria-label', 'العودة للأعلى');
-    backBtn.innerHTML = '↑';
-    document.body.appendChild(backBtn);
-  }
-  if (backBtn) backBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
-
   /* ── HAMBURGER ── */
   const hamburger = byId('ep-hamburger');
   const mobileMenu = byId('ep-mobile-menu');
@@ -2731,48 +2834,6 @@ document.addEventListener('DOMContentLoaded', () => {
     cursorDot.style.left = cursorDot.style.top = '0';
     cursorOutline.style.left = cursorOutline.style.top = '0';
   }
-
-  /* ── STAGGER REVEAL — smooth entry animations ── */
-  const staggerObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (!entry.isIntersecting) return;
-      const el = entry.target;
-      const siblings = el.parentElement
-        ? [...el.parentElement.querySelectorAll('.stagger-item')]
-        : [el];
-      const idx = siblings.indexOf(el);
-      el.style.transitionDelay = `${Math.min(idx * 80, 400)}ms`;
-      el.classList.add('stagger-visible');
-      staggerObserver.unobserve(el);
-    });
-  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
-  document.querySelectorAll('.stagger-item').forEach(el => staggerObserver.observe(el));
-  /* ── COUNTER ANIMATION — count up when visible ── */
-  const counterObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (!entry.isIntersecting) return;
-      const el = entry.target;
-      const target = parseInt(el.getAttribute('data-target'), 10);
-      if (!target || el.dataset.counted) return;
-      el.dataset.counted = '1';
-      const duration = 1800;
-      const start = performance.now();
-      function tick(now) {
-        const elapsed = now - start;
-        const progress = Math.min(elapsed / duration, 1);
-        // ease-out cubic
-        const eased = 1 - Math.pow(1 - progress, 3);
-        el.textContent = Math.round(eased * target).toLocaleString('ar');
-        if (progress < 1) requestAnimationFrame(tick);
-        else el.textContent = target.toLocaleString('ar') + (target >= 100 ? '+' : '');
-      }
-      requestAnimationFrame(tick);
-      counterObserver.unobserve(el);
-    });
-  }, { threshold: 0.5 });
-  document.querySelectorAll('.ep-stat-num[data-target]').forEach(el => counterObserver.observe(el));
-
-
 
   /* ── SMOOTH MAGNETIC BUTTONS ── */
   document.querySelectorAll('.magnetic-btn').forEach(btn => {
