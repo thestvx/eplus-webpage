@@ -460,9 +460,14 @@ DECLARE
   v_total INT;
   v_total_sessions INT;
   v_period INT;
+  v_base_month INT;
   v_today TEXT := to_char(CURRENT_DATE, 'YYYY-MM-DD');
   v_teacher_id TEXT := COALESCE(NULLIF(p_teacher_id, ''), '');
   v_subject_id TEXT := COALESCE(NULLIF(p_subject_id, ''), '');
+  v_existing_id TEXT;
+  v_existing_status TEXT;
+  v_existing_end TEXT;
+  v_is_permanent BOOLEAN;
 BEGIN
   IF NOT is_admin(p_admin_uid) THEN RAISE EXCEPTION 'unauthorized'; END IF;
   IF p_student_id IS NULL OR p_student_id = '' THEN RAISE EXCEPTION 'student_id required'; END IF;
@@ -517,18 +522,74 @@ BEGIN
     v_end := to_char(v_next - interval '1 day', 'YYYY-MM-DD');
   END IF;
 
-  -- منع التداخل: لا يتداخل اشتراك مع اشتراك آخر نشط لنفس الطالب
-  -- في نفس المادة + نفس الأستاذ. (الطلبة قد يملكون اشتراكات مختلفة
-  -- في مواد مختلفة بشكل متوازٍ — وهذا مسموح.)
-  IF EXISTS (
-    SELECT 1 FROM student_subscriptions s
-     WHERE s.student_id = p_student_id
-       AND s.status <> 'cancelled'
-       AND s.subject_id = v_subject_id
-       AND s.teacher_id = v_teacher_id
-       AND p_start_date <= s.end_date
-       AND v_end >= s.start_date
-  ) THEN RAISE EXCEPTION 'overlapping active subscription for this student/subject/teacher'; END IF;
+  -- ────────────────────────────────────────────────────────────────
+  -- الدمج/التمديد بدلاً من الرفض:
+  -- إذا وُجد اشتراك فعّال لنفس (الطالب + المادة + الأستاذ) يتداخل
+  -- زمنياً مع الجلسة الجديدة، نمدّد نفس الصف (لا إنشاء صف ثانٍ).
+  -- (الطلبة قد يملكون اشتراكات مختلفة في مواد مختلفة بشكل متوازٍ — وهذا مسموح.)
+  -- ────────────────────────────────────────────────────────────────
+  SELECT s.id, s.status, s.end_date
+    INTO v_existing_id, v_existing_status, v_existing_end
+    FROM student_subscriptions s
+   WHERE s.student_id = p_student_id
+     AND s.status <> 'cancelled'
+     AND s.subject_id = v_subject_id
+     AND s.teacher_id = v_teacher_id
+     AND p_start_date <= s.end_date
+     AND v_end >= s.start_date
+   ORDER BY s.start_date
+   LIMIT 1;
+
+  IF v_existing_id IS NOT NULL THEN
+    v_is_permanent := p_permanent OR v_existing_status = 'permanent';
+
+    -- الأشهر الإضافية (للباقات الشهرية فقط): تُنشأ بدءاً من اليوم التالي
+    -- لآخر نهاية فعليّة، فلا تتداخل مع أشهر الاشتراك الحالية أبداً.
+    IF NOT v_is_permanent THEN
+      v_base_month := (SELECT COALESCE(MAX(month_number), 0) FROM subscription_periods WHERE subscription_id = v_existing_id);
+      v_cur := (CASE WHEN v_existing_end = '' OR v_existing_end IS NULL THEN p_start_date::date ELSE v_existing_end::date END) + 1;
+      FOR i IN 1..v_months LOOP
+        v_start := to_char(v_cur, 'YYYY-MM-DD');
+        v_next := v_cur + interval '1 month';
+        v_end := to_char(v_next - interval '1 day', 'YYYY-MM-DD');
+        -- توزيع الحصص على الأشهر: في الباقة المخصصة وزّع عدد الحصص المتبقية على
+        -- الأشهر المتبقية، وفي غيرها 8 حصص لكل شهر.
+        v_period := CASE WHEN p_total_sessions IS NOT NULL
+          THEN (SELECT COALESCE(floor((v_total_sessions - (i - 1) * (v_total_sessions / v_months)) / (v_months - (i - 1))), 0))
+          ELSE 8 END;
+        INSERT INTO subscription_periods
+          (id, subscription_id, month_number, start_date, end_date, total_sessions, used_sessions, remaining_sessions, status)
+        VALUES
+          (v_existing_id || '-M' || (v_base_month + i), v_existing_id, (v_base_month + i),
+           v_start, v_end, v_period, 0, v_period,
+           CASE WHEN v_today < v_start THEN 'upcoming'
+                WHEN v_today > v_end THEN 'completed'
+                ELSE 'active' END);
+        v_cur := v_next::date;
+      END LOOP;
+    END IF;
+
+    -- التمديد بعد بناء الأشهر: نهاية الاشتراك تُحسب من آخر شهر فعلي.
+    UPDATE student_subscriptions s
+       SET total_sessions = s.total_sessions + v_total_sessions,
+           total_price    = s.total_price + v_total,
+           end_date       = CASE WHEN v_is_permanent THEN '2099-12-31' ELSE GREATEST(s.end_date, v_end) END,
+           months         = CASE WHEN v_is_permanent THEN s.months ELSE s.months + v_months END,
+           status         = CASE WHEN v_is_permanent THEN 'permanent' ELSE s.status END,
+           notes          = CASE
+                              WHEN COALESCE(s.notes, '') = '' THEN COALESCE(p_notes, '')
+                              WHEN COALESCE(p_notes, '') = '' THEN s.notes
+                              ELSE s.notes || ' | ' || p_notes END
+     WHERE s.id = v_existing_id;
+
+    RETURN jsonb_build_object(
+      'merged', true,
+      'subscription', (SELECT to_jsonb(s) FROM student_subscriptions s WHERE s.id = v_existing_id),
+      'periods', (SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.month_number), '[]'::jsonb)
+                  FROM subscription_periods p WHERE p.subscription_id = v_existing_id),
+      'note', 'تمت إضافة الحصص إلى الاشتراك الفعّال الحالي (تمديد) بدلاً من إنشاء اشتراك ثانٍ — الحضور لم يُمسّ'
+    );
+  END IF;
 
   INSERT INTO student_subscriptions
     (id, student_id, teacher_id, subject_id, teacher_name, subject_name,
@@ -612,8 +673,9 @@ BEGIN
     'subscription', to_jsonb(s),
     'periods', (SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.month_number), '[]'::jsonb)
                 FROM subscription_periods p WHERE p.subscription_id = s.id)
-  ) ORDER BY s.created_at DESC), '[]'::jsonb)
-            FROM (SELECT * FROM student_subscriptions ORDER BY created_at DESC LIMIT 200) s);
+) ORDER BY COALESCE(s.updated_at, s.created_at) DESC), '[]'::jsonb)
+            FROM (SELECT * FROM student_subscriptions
+                   ORDER BY COALESCE(updated_at, created_at) DESC LIMIT 500) s);
 END; $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- تفاصيل اشتراك واحد + أشهره + بيانات الطالب (لنافذة التفاصيل)

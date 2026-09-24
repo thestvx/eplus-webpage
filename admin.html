@@ -26366,21 +26366,22 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     window._subxCreating = true;
     btn.disabled = true;
     try {
-      // منع التداخل: نفس الطالب + نفس المادة + نفس الأستاذ فقط
+      // منع التداخل = دمج: نفس الطالب + نفس المادة + نفس الأستاذ فقط.
+      // بدلاً من رفض العملية أو تحويل تاريخ البداية (مما كان يُنشئ لاحقاً
+      // صف اشتراك ثانياً متداخلاً)، نكتشف التداخل ونسأل المستخدم، ونسأل:
+      // «سيُدمج الرصيد الجديد في اشتراكك الحالي». عند الموافقة نُرسل الطلب
+      // بالتاريخ الأصلي دون أي تحويل، والخادم (admin_create_subscription)
+      // يدمج الحصص والقيمة في نفس صف الاشتراك الفعّال ويمدد نهايته وينشئ
+      // أشهراً جديدة في subscription_periods دون لمس الحضور إطلاقاً.
       const overlap = await SubscriptionService.findOverlapping(selectedStudent.id, start, months, selectedSubject.subjectId, selectedSubject.teacherId);
       if (overlap && overlap.subscription) {
-        btn.disabled = false;
         const until = SubscriptionService.fmtAr(overlap.subscription.end_date, true);
-        const ask = await cmShow('⚠️',
-          'اشتراك نشط موجود',
+        const ask = await cmShow('🔄',
+          'سيتم دمج الحصص الجديدة في الاشتراك الحالي',
           'هذا الطالب لديه اشتراك نشط في <b>' + escX(selectedSubject.subjectName) + ' — ' + escX(selectedSubject.teacherName || '') + '</b> حتى <b>' + until + '</b>.<br><br>' +
-          'لا يمكن إنشاء اشتراك متداخل معه لهذه المادة.',
-          { confirmText: 'إنشاء بعد انتهاء الاشتراك الحالي', cancelText: 'إلغاء', success: true });
+          'سيُضاف الرصيد الجديد (الحصص + القيمة) إلى <b>نفس الاشتراك الحالي</b> وتُمَدَّد نهايته بدلاً من إنشاء اشتراك ثانٍ — الحضور لم ولن يُمَسّ.',
+          { confirmText: 'دمج الحصص', cancelText: 'إلغاء', success: true });
         if (!ask) { btn.disabled = false; return; }
-        start = SubscriptionService.addDays(overlap.subscription.end_date, 1);
-        $x('subx-start').value = start;
-        subxRenderPreview();
-        srShowToast('سيبدأ الاشتراك الجديد من ' + SubscriptionService.fmtAr(start, true), 'success');
       }
 
       const name = studentFullName(selectedStudent);
@@ -27413,47 +27414,89 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     });
 
     var csvRows = [];
+    var SUBJECT_SHEET_CAP = 8;
+
+    function _subxStudentName(sid) {
+      var r = (typeof regs !== 'undefined') ? regs.find(function (rr) { return String(rr.id) === String(sid || ''); }) : null;
+      return r ? studentFullName(r) : String(sid || '—');
+    }
+
+    // المجموع الموثوق من سجل الاشتراكات (used_sessions) — لتطابق CSV مع سجل الاشتراك
+    function _subUsedTotal(sid, subject, teacher) {
+      var t = 0;
+      (allSubs || []).forEach(function (row) {
+        var s = row.subscription || {};
+        if (s.status === 'cancelled') return;
+        if (String(s.student_id || '') !== String(sid || '')) return;
+        if (String(s.subject_name || '').trim() !== String(subject || '').trim()) return;
+        if (String(s.teacher_name || '').trim() !== String(teacher || '').trim()) return;
+        (row.periods || []).forEach(function (p) { t += (Number(p.used_sessions) || 0); });
+      });
+      return t;
+    }
 
     Object.keys(byTeacher).sort(function (a, b) { return String(a).localeCompare(String(b), 'ar'); }).forEach(function (tName) {
       var recs = byTeacher[tName];
-      // Distinct session dates (ascending), capped at the 8 most recent
-      var dateSet = {};
-      recs.forEach(function (r) { if (r.date) dateSet[r.date] = true; });
-      var sessionDates = Object.keys(dateSet).sort();
-      if (sessionDates.length > 8) sessionDates = sessionDates.slice(sessionDates.length - 8);
-
-      // Unique students of this teacher
-      var students = {};
-      recs.forEach(function (r) {
-        var sid = r.studentId || r.studentName || '—';
-        if (!students[sid]) students[sid] = { id: r.studentId || '—', name: r.studentName || sid, att: {} };
-        if (r.date) students[sid].att[r.date] = true;
-      });
-
-      // Block header
       var subjects = {};
       recs.forEach(function (r) { if (r.subjectName) subjects[r.subjectName] = true; });
       var subjList = Object.keys(subjects).sort();
+      if (!subjList.length) subjList = [''];
+
       csvRows.push([]);
-      csvRows.push(['أستاذ: ' + tName + (subjList.length ? ' — المواد: ' + subjList.join('، ') : '')]);
+      csvRows.push(['أستاذ: ' + tName]);
 
-      var header = ['الطالب', 'رقم التسجيل'];
-      for (var si = 0; si < sessionDates.length; si++) {
-        header.push('الحصة ' + (si + 1) + ' (' + sessionDates[si] + ')');
-      }
-      header.push('مجموع الحضور');
-      csvRows.push(header);
+      subjList.forEach(function (subj) {
+        var subRecs = recs.filter(function (r) { return (r.subjectName || '') === subj; });
 
-      Object.keys(students).sort(function (a, b) { return String(students[a].name).localeCompare(String(students[b].name), 'ar'); }).forEach(function (sid) {
-        var st = students[sid];
-        var row = [st.name, st.id];
-        var cnt = 0;
+        // حصص هذه المادة فقط (بلا حصر عالمي على مستوى الأستاذ) — تصل إلى 8 حصص
+        var dateSet = {};
+        subRecs.forEach(function (r) { if (r.date) dateSet[r.date] = true; });
+        var sessionDates = Object.keys(dateSet).sort();
+        if (sessionDates.length > SUBJECT_SHEET_CAP) sessionDates = sessionDates.slice(sessionDates.length - SUBJECT_SHEET_CAP);
+
+        csvRows.push([]);
+        csvRows.push(['المادة: ' + (subj || '—')]);
+
+        var header = ['الطالب', 'رقم التسجيل'];
         for (var si = 0; si < sessionDates.length; si++) {
-          if (st.att[sessionDates[si]]) { row.push('حاضر'); cnt++; }
-          else row.push('غائب');
+          header.push('الحصة ' + (si + 1) + ' (' + sessionDates[si] + ')');
         }
-        row.push(cnt);
-        csvRows.push(row);
+        header.push('مجموع الحضور');
+        csvRows.push(header);
+
+        // الطلاب: من سجلات الحضور + أصحاب الاشتراكات لهذه المادة/الأستاذ
+        var students = {};
+        subRecs.forEach(function (r) {
+          var sid = r.studentId || r.studentName || '—';
+          if (!students[sid]) students[sid] = { id: r.studentId || '—', name: r.studentName || sid, att: {} };
+          if (r.date) students[sid].att[r.date] = true;
+        });
+        (allSubs || []).forEach(function (row) {
+          var s = row.subscription || {};
+          if (s.status === 'cancelled') return;
+          if (String(s.teacher_name || '').trim() !== String(tName)) return;
+          if (String(s.subject_name || '').trim() !== String(subj || '').trim()) return;
+          var sid = String(s.student_id || '');
+          if (!sid) return;
+          if (!students[sid]) students[sid] = { id: sid, name: _subxStudentName(sid), att: {} };
+        });
+
+        Object.keys(students).sort(function (a, b) { return String(students[a].name).localeCompare(String(students[b].name), 'ar'); }).forEach(function (sid) {
+          var st = students[sid];
+          var row = [st.name, st.id];
+          for (var si = 0; si < sessionDates.length; si++) {
+            row.push(st.att[sessionDates[si]] ? 'حاضر' : 'غائب');
+          }
+          var theTotal = 0;
+          if (subj) {
+            // المجموع = سجل الاشتراك الموثوق (used_sessions)
+            theTotal = _subUsedTotal(sid, subj, tName);
+          } else {
+            for (var di = 0; di < sessionDates.length; di++) if (st.att[sessionDates[di]]) theTotal++;
+          }
+          row.push(theTotal);
+          csvRows.push(row);
+        });
       });
     });
 
