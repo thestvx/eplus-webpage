@@ -26121,21 +26121,50 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         return;
       }
       const low = v.toLowerCase();
+      const normQ = _norm(v);
+      const qTokens = v.toLowerCase().split(/\s+/).map(_norm).filter(Boolean);
       const rawDigits = v.replace(/\D/g, '');
       const normalized = _subxNormalizeBarcodeInput(v).replace(/\D/g, '');
       const decodedFromBarcode = (rawDigits.length === 13 && rawDigits.startsWith('200') && typeof EAN13 !== 'undefined' && EAN13.isValid(rawDigits)) ? EAN13.decode(rawDigits) : '';
-      const items = regs.filter(r => {
-        const name = studentFullName(r).toLowerCase();
-        const ln = (r.last_name || '').toLowerCase();
-        const fn = (r.first_name || '').toLowerCase();
-        const bv = String(r.barcode_value || r.barcodeValue || '').toLowerCase();
+      const items = regs.map(r => {
         const rid = String(r.id).toLowerCase();
-        return name.includes(low) || ln.includes(low) || fn.includes(low) || rid.includes(low) ||
-               (bv && (bv.includes(rawDigits) || bv.includes(normalized))) ||
-               (decodedFromBarcode && String(decodedFromBarcode) === rid);
-      }).slice(0, 8);
+        const fn = _norm(r.first_name || '');
+        const ln = _norm(r.last_name || '');
+        const name = fn + ln;
+        const bv = String(r.barcode_value || r.barcodeValue || '').toLowerCase();
+        let score = 0;
+
+        // التطابق الدقيق بالمعرّف يفوز دائماً — البحث بالـ id يبقى فورياً وصحيحاً
+        if (rid === low) score += 1000000;
+        else if (rid.includes(low)) score += 5000;
+
+        // اسم كامل مكوَّن من أكثر من كلمة: كل الكلمات يجب أن تظهر في الاسم
+        if (qTokens.length >= 2 && qTokens.every(t => name.includes(t))) {
+          score += 2000 + qTokens.length * 10;
+        }
+
+        // اللقب (last_name)
+        if (ln && ln === normQ) score += 3000;
+        else if (ln && ln.startsWith(normQ)) score += 800;
+        else if (ln && ln.includes(normQ)) score += 300;
+
+        // الاسم الأول (first_name)
+        if (fn && fn === normQ) score += 2500;
+        else if (fn && fn.startsWith(normQ)) score += 600;
+        else if (fn && fn.includes(normQ)) score += 250;
+
+        // الباركود — تطابق كامل أعلى من الجزئي
+        if (bv && bv === rawDigits) score += 9000;
+        else if (bv && (bv.includes(rawDigits) || bv.includes(normalized))) score += 1500;
+        if (decodedFromBarcode && String(decodedFromBarcode) === rid) score += 9000;
+
+        return { r, score };
+      }).filter(x => x.score > 0).sort(function (a, b) {
+        if (b.score !== a.score) return b.score - a.score;
+        return String(a.r.id).localeCompare(String(b.r.id), 'ar');
+      }).slice(0, 8).map(x => x.r);
       if (!items.length) {
-        list.innerHTML = '<div class="subx-combo-item" style="color:#dc2626;cursor:default">لا يمكن إنشاء اشتراك — الطالب غير مسجل نهائياً.</div>';
+        list.innerHTML = '<div class="subx-combo-item" style="color:#dc2626;cursor:default">لا يوجد طالب مطابق للبحث — تأكد من الاسم أو استعمل رقم التسجيل أو الباركود.</div>';
         list.classList.add('open');
         return;
       }
