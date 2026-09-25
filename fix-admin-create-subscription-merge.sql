@@ -16,6 +16,15 @@ CREATE OR REPLACE FUNCTION _sn(p TEXT) RETURNS TEXT AS $$
   SELECT lower(regexp_replace(COALESCE(p, ''), '\s+', '', 'g'));
 $$ LANGUAGE sql IMMUTABLE;
 
+-- تطبيع أسماء الأساتذة: إزالة الفراغات ثم فرز الأحرف — يجعل «عبد الرحمان سرهود»
+-- و«سرهود عبدالرحمان» و«سرهود عبد الرحمان» اسماً واحداً (نفس الحروف). لا تُستخدم
+-- للمواد (المطابقة الاسمية للمواد تبقى بحسب _sn).
+CREATE OR REPLACE FUNCTION _ncan(p TEXT) RETURNS TEXT AS $$
+  SELECT lower(coalesce(string_agg(ch, '' ORDER BY ch), ''))
+    FROM (SELECT regexp_split_to_table(regexp_replace(coalesce(p, ''), '\s+', '', 'g'), '') AS ch) s
+   WHERE ch <> '';
+$$ LANGUAGE sql IMMUTABLE;
+
 CREATE OR REPLACE FUNCTION admin_create_subscription(
   p_admin_uid TEXT,
   p_student_id TEXT,
@@ -90,6 +99,7 @@ BEGIN
        AND (
              (el->>'teacherId' IS NOT NULL AND el->>'teacherId' <> '' AND el->>'teacherId' = v_teacher_id)
           OR _sn(el->>'teacher') = _sn(p_teacher_name)
+          OR _ncan(el->>'teacher') = _ncan(p_teacher_name)
           OR (el->>'teacher' IS NULL OR el->>'teacher' = '')
        )
   ) THEN RAISE EXCEPTION 'student not enrolled for this subject/teacher'; END IF;
