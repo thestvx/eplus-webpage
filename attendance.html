@@ -636,6 +636,8 @@ main{flex:1;position:relative;overflow:hidden}
     await loadTeacherIdMap();
     var atc = await checkAttendanceControl();
     var openMap = atc.openMap, openIdMap = atc.openIdMap, openNameMap = atc.openNameMap;
+    var subsAll = [];
+    try { subsAll = (await SubscriptionService.getSubscriptions(studentId)) || []; } catch (e) { logScanner('subs lookup error: ' + e.message); }
     for (var i = 0; i < subjects.length; i++) {
       var s = subjects[i];
       var key = (s.teacher || '') + '|' + (s.subject || '');
@@ -696,6 +698,17 @@ main{flex:1;position:relative;overflow:hidden}
           }
         });
       } catch (e) { logScanner('att query error: ' + e.message); }
+      sess.hasSubscription = false;
+      for (var si2 = 0; si2 < subsAll.length; si2++) {
+        var _px = subsAll[si2].subscription || {};
+        if (_px.status === 'cancelled') continue;
+        var _pxSId = _px.subject_id || '', _pxTId = _px.teacher_id || '';
+        var _pxSN = _px.subject_name || '', _pxTN = _px.teacher_name || '';
+        if (_pxSId && _pxSId !== s.subject) { if (!_pxSN || _pxSN !== s.subject) continue; }
+        if (_pxTId && _pxTId !== s.teacher) { if (!_pxTN || _pxTN !== s.teacher) continue; }
+        sess.hasSubscription = true;
+        break;
+      }
       sessions.push(sess);
     }
     return sessions;
@@ -767,9 +780,12 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
       } else if (hasActiveSub) {
         stClass = badgeClass = 'green';
         badgeText = '\uD83D\uDFE2 نشط';
-      } else {
+      } else if (s.hasSubscription) {
         stClass = badgeClass = 'red';
         badgeText = '\u26A0\uFE0F انتهى الاشتراك';
+      } else {
+        stClass = badgeClass = 'red';
+        badgeText = '\u26A0\uFE0F لا يوجد اشتراك';
       }
       var attended = s.attended;
       var total = hasActiveSub ? Math.max(1, (s.remaining + s.attended)) : 0;
@@ -786,7 +802,7 @@ if (hasActiveSub) {
           html += '<div class="tc-stats"><div class="tc-stat"><div class="tc-stat-num">' + attended + '</div><div class="tc-stat-label">حضر</div></div><div class="tc-stat"><div class="tc-stat-num">' + remaining + '</div><div class="tc-stat-label">متبقي</div></div><div class="tc-stat"><div class="tc-stat-num">' + total + '</div><div class="tc-stat-label">الإجمالي</div></div></div>';
           html += '<div class="tc-progress-wrap"><div class="tc-progress"><div class="tc-progress-fill ' + barClass + '" style="width:' + pct + '%"></div></div></div>';
       } else {
-        html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:13px;font-weight:900;color:#ef4444">لا يوجد اشتراك فعلي</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">يمكن للاستقبال السماح بتسجيل الحضور<br>وتُخصم لاحقاً من حصص الاشتراك</div></div></div>';
+        html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:13px;font-weight:900;color:#ef4444">' + (s.hasSubscription ? 'انتهى الاشتراك' : 'لا يوجد اشتراك') + '</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">يمكن للاستقبال السماح بتسجيل الحضور<br>وتُخصم لاحقاً من حصص الاشتراك</div></div></div>';
       }
       html += '<div class="tc-btn-wrap">';
       if (s.alreadyCheckedIn) {
