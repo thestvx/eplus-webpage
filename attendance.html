@@ -881,7 +881,7 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
         html += '<div class="tc-progress-wrap"><div class="tc-progress"><div class="tc-progress-fill orange" style="width:' + trialPct + '%"></div></div></div>';
         html += '<div style="text-align:center;font-size:11px;font-weight:700;color:#f59e0b;padding:2px 0 6px">حصة مجانية من الحصتين المجانيتين</div>';
       } else {
-        html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:13px;font-weight:900;color:#ef4444">انتهت الحصتان المجانيتان</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">لم يعد مسموحاً بالتسجيل<br>يرجى الاشتراك الشهري للدخول</div></div></div>';
+        html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:13px;font-weight:900;color:#ef4444">انتهت الحصص المجانية</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">يمكن للاستقبال السماح بتسجيل الحضور<br>وتُخصم لاحقاً من حصص الاشتراك</div></div></div>';
       }
       html += '<div class="tc-btn-wrap">';
       if (s.alreadyCheckedIn) {
@@ -891,7 +891,7 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
       } else if (hasTrial) {
         html += '<button class="tc-btn orange" data-sidx="' + i + '">سجّل (حصة مجانية)</button>';
       } else {
-        html += '<button class="tc-btn red" disabled>سجّل اشتراكاً شهرياً للدخول</button>';
+        html += '<button class="tc-btn purple" data-sidx="' + i + '" data-allow="1">السماح بالحضور</button>';
       }
       html += '</div></div>';
     }
@@ -900,7 +900,8 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
     document.querySelectorAll('.tc-btn[data-sidx]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var idx = parseInt(btn.getAttribute('data-sidx'), 10);
-        handleCheckIn(sessions[idx], btn);
+        if (btn.getAttribute('data-allow') === '1') { handleAllowCheckIn(sessions[idx], btn); }
+        else { handleCheckIn(sessions[idx], btn); }
       });
     });
   }
@@ -1024,6 +1025,50 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
     }
   }
 
+  // ── Allow check-in (بدون اشتراك — تُخصم لاحقاً من حصص الاشتراك القادم) ──
+  async function handleAllowCheckIn(session, btnEl) {
+    if (!session || !btnEl) return;
+    btnEl.classList.add('loading');
+    btnEl.innerHTML = '<span class="spin"></span>جاري التسجيل...';
+    logScanner('handleAllow: ' + session.teacher + ' / ' + session.subject);
+
+    // ── Server-side gate: verify attendance is still open for this teacher ──
+    try {
+      var atc3 = await checkAttendanceControl();
+      if (!isTeacherOpen(atc3.openMap, atc3.openIdMap, session.teacher, session.subject, atc3.openNameMap)) {
+        btnEl.classList.remove('loading');
+        btnEl.innerHTML = '\uD83D\uDD12 الحضور مغلق';
+        btnEl.classList.add('orange');
+        btnEl.disabled = true;
+        playSoundIncorrect();
+        showScanOverlay('red', '\uD83D\uDD12', 'الحضور غير متاح حالياً', pendingName,
+          'لم يبدأ المركز تسجيل الحضور لهذا الأستاذ بعد.<br>يرجى الانتظار حتى يتم فتح الحضور من الإدارة.', 3500,
+          function() { processing = false; scanner.setBusy(false); setTimeout(renderReady, 300); });
+        return;
+      }
+    } catch (e) { logScanner('atc gate check error: ' + e.message); }
+
+    if (fbReady && authState.signedIn) {
+      try {
+        await AttendanceService.writeMirror({
+          studentId: pendingStudentId, studentName: pendingName, studentType: pendingReg ? (pendingReg.student_type || '') : '',
+          sessionNumber: 1, date: AttendanceService.today(), checkInTime: AttendanceService.nowTime(),
+          barcodeValue: pendingBarcode, source: 'eplus-attendance', type: 'allow_sub',
+          teacherName: session.teacher, subjectName: session.subject,
+          createdAt: AttendanceService.nowTime()
+        });
+        logScanner('allow recorded (allow_sub): ' + session.teacher + ' / ' + session.subject);
+      } catch (e) { logScanner('allow mirror write error: ' + e.message); }
+    }
+
+    playSoundCorrect();
+    attendedCount++; updateCounter();
+    postCheckin(session, 'allow');
+    showCheckinAnimation('allow', session.subject, session.teacher);
+    showScanOverlay('purple', '🟣', 'تم السماح بالحضور', pendingName,
+      session.teacher + ' — ' + session.subject + '<br>سُمح بالتسجيل دون اشتراك — ستُخصم من حصص اشتراكه القادم', 3200);
+  }
+
   function postCheckin(session, type) {
     if (type !== 'red') {
       session.alreadyCheckedIn = true;
@@ -1071,12 +1116,12 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
     var circle = document.getElementById('checkmark-circle');
     var path = document.getElementById('checkmark-path');
     var text = document.getElementById('checkmark-text');
-    var color = type === 'green' ? '#10b981' : type === 'orange' ? '#f59e0b' : '#ef4444';
+    var color = type === 'green' ? '#10b981' : type === 'orange' ? '#f59e0b' : type === 'allow' ? '#a855f7' : '#ef4444';
     el.style.display = 'flex';
     circle.style.stroke = color;
     path.style.stroke = color;
     text.style.color = color;
-    text.textContent = type === 'green' ? '✅ تم التسجيل' : type === 'orange' ? '⚠️ تم السماح' : '🚫 ممنوع';
+    text.textContent = type === 'green' ? '✅ تم التسجيل' : type === 'orange' ? '⚠️ تم السماح' : type === 'allow' ? '🟣 تم السماح بالحضور' : '🚫 ممنوع';
     text.style.opacity = 0;
     circle.style.strokeDashoffset = 283;
     path.style.strokeDashoffset = 50;
