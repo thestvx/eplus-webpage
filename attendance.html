@@ -462,89 +462,6 @@ main{flex:1;position:relative;overflow:hidden}
     vibrate([100, 80, 100]);
   }
 
-  // ── Trial session tracking (Firestore) ──
-  // Source of truth: individual trial_session docs in support_attendance.
-  // The kiosk signs in anonymously and Firestore rules allow CREATE but not
-  // UPDATE for anonymous users on support_attendance. So we NEVER use an
-  // aggregate doc that needs updating. Instead, each trial check-in creates
-  // a trial_session mirror doc (CREATE-only), and we count them on read.
-  const TRIAL_MAX = 2;
-  function trialKey(teacher, subject) {
-    var tn = String(teacher || '').replace(/\s+/g, ' ').trim().toLowerCase();
-    tn = tn.replace(/\bعبد\s+ال/, 'عبدال');
-    return tn.split(' ').sort().join(' ') + '___' + (subject || '');
-  }
-  function getTrialCount(used, teacher, subject) {
-    return used[trialKey(teacher, subject)] || 0;
-  }
-  async function getTrialUsage(studentId) {
-    var used = {};
-    if (!fbReady) return used;
-    // ── Cycle-aware: cutoff = last sub end_date per teacher+subject ──
-    // Truly expired subs (today > end_date) set cutoff = end_date.
-    // "Done" subs (remaining=0, date not expired) set cutoff = start_date —
-    //   trials before the subscription are excluded, but fresh trial records count.
-    var lastSubEndByTeacherSubject = {};
-    try {
-      var subs = await SubscriptionService.getSubscriptions(studentId);
-      var todayStr = AttendanceService.today();
-      if (subs && subs.length) {
-        for (var si = 0; si < subs.length; si++) {
-          var s = subs[si].subscription || {};
-          if (s.status === 'cancelled') continue;
-          var sKey = trialKey(s.teacher_name || '', s.subject_name || '');
-          var sEnd = s.end_date || '';
-          if (!sKey || !sEnd) continue;
-          // "Done" subs (remaining=0 but date not yet expired):
-          //   Use start_date as cutoff — trials before the subscription are excluded,
-          //   but fresh trial records made during/after this sub ARE counted.
-          var periods = subs[si].periods || [];
-          var totals = SubscriptionService.computeSubscriptionTotals(periods);
-          if (totals.remainingSessions <= 0 && todayStr <= sEnd) {
-            var sStart = s.start_date || '';
-            if (sStart && (!lastSubEndByTeacherSubject[sKey] || sStart > lastSubEndByTeacherSubject[sKey])) {
-              lastSubEndByTeacherSubject[sKey] = sStart;
-            }
-            continue;
-          }
-          // Only truly expired subs set the cutoff
-          if (!lastSubEndByTeacherSubject[sKey] || sEnd > lastSubEndByTeacherSubject[sKey]) {
-            lastSubEndByTeacherSubject[sKey] = sEnd;
-          }
-        }
-      }
-    } catch (e) { logScanner('subscription lookup for trial cycle: ' + e.message); }
-    try {
-      var snap = await window.db.collection('support_attendance')
-        .where('studentId', '==', studentId)
-        .where('type', '==', 'trial_session')
-        .get();
-      snap.forEach(function (doc) {
-        var d = doc.data();
-        if (!d.date) return;
-        var k = trialKey(d.teacherName || '', d.subjectName || '');
-        // Only count trial records from AFTER the last subscription ended for this teacher+subject
-        var cutoff = lastSubEndByTeacherSubject[k] || '';
-        if (cutoff && d.date <= cutoff) return;
-        used[k] = (used[k] || 0) + 1;
-      });
-    } catch (e) { logScanner('trial read error: ' + e.message); }
-    return used;
-  }
-  async function recordTrialUsage(studentId, studentName, teacher, subject, barcode) {
-    if (!fbReady) return;
-    try {
-      await AttendanceService.writeMirror({
-        studentId: studentId, studentName: studentName, studentType: pendingReg ? (pendingReg.student_type || '') : '',
-        sessionNumber: 1, date: AttendanceService.today(), checkInTime: AttendanceService.nowTime(),
-        barcodeValue: barcode, source: 'eplus-attendance', type: 'trial_session',
-        teacherName: teacher, subjectName: subject,
-        createdAt: AttendanceService.nowTime()
-      });
-      logScanner('trial recorded: ' + trialKey(teacher, subject));
-    } catch (e) { logScanner('trial mirror write error: ' + e.message); }
-  }
-
   // ── Attendance Control: check which teachers are open today ──
   function normalizeTeacherName(n) {
     var s = String(n || '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -716,7 +633,6 @@ main{flex:1;position:relative;overflow:hidden}
     var sessions = [];
     var seen = {};
     var today = AttendanceService.today();
-    var trialUsage = await getTrialUsage(studentId);
     await loadTeacherIdMap();
     var atc = await checkAttendanceControl();
     var openMap = atc.openMap, openIdMap = atc.openIdMap, openNameMap = atc.openNameMap;
@@ -726,7 +642,7 @@ main{flex:1;position:relative;overflow:hidden}
       if (seen[key]) continue;
       seen[key] = true;
       var isOpen = isTeacherOpen(openMap, openIdMap, s.teacher, s.subject, openNameMap);
-      var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, trialUsed: 0, trialRemaining: 0, allowed: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length, hasSubscription: false };
+      var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, allowed: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length, hasSubscription: false };
       try {
         var subResult = await SubscriptionService.getActiveSubscriptionForSubject(studentId, s.subject, s.teacher, today);
         if (subResult && subResult.subscription) {
@@ -755,7 +671,7 @@ main{flex:1;position:relative;overflow:hidden}
             sess.status = 'active';
             sess.attended = ap.used_sessions || 0;
             sess.remaining = Math.max(0, (ap.total_sessions || 8) - sess.attended);
-            // If all sessions used, treat as expired for card display (trial mode)
+            // If all sessions used, treat as expired for card display
             if (sess.remaining <= 0) {
               sess.status = 'expired';
               sess.remaining = 0;
@@ -780,8 +696,6 @@ main{flex:1;position:relative;overflow:hidden}
           }
         });
       } catch (e) { logScanner('att query error: ' + e.message); }
-      sess.trialUsed = getTrialCount(trialUsage, s.teacher, s.subject);
-      sess.trialRemaining = Math.max(0, TRIAL_MAX - sess.trialUsed);
       sessions.push(sess);
     }
     return sessions;
@@ -846,7 +760,6 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
       }
 
       var hasActiveSub = s.status === 'active';
-      var hasTrial = !hasActiveSub && s.trialRemaining > 0;
       var stClass, badgeClass, badgeText;
       if (s.alreadyCheckedIn) {
         stClass = badgeClass = 'green';
@@ -854,42 +767,32 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
       } else if (hasActiveSub) {
         stClass = badgeClass = 'green';
         badgeText = '\uD83D\uDFE2 نشط';
-      } else if (hasTrial) {
-        stClass = badgeClass = 'orange';
-        badgeText = '\uD83D\uDFE0 حصص مجانية: ' + s.trialRemaining + '/' + TRIAL_MAX;
       } else {
         stClass = badgeClass = 'red';
-        badgeText = '\u26A0\uFE0F انتهت الحصص المجانية';
+        badgeText = '\u26A0\uFE0F انتهى الاشتراك';
       }
       var attended = s.attended;
-      var total = hasActiveSub ? Math.max(1, (s.remaining + s.attended)) : TRIAL_MAX;
-      var remaining = hasActiveSub ? Math.max(0, total - attended) : s.trialRemaining;
-      var pct = Math.min(100, Math.round((attended / total) * 100));
-      var barClass = hasActiveSub ? (pct >= 75 ? 'orange' : 'green') : (hasTrial ? 'orange' : 'green');
+      var total = hasActiveSub ? Math.max(1, (s.remaining + s.attended)) : 0;
+      var remaining = hasActiveSub ? Math.max(0, total - attended) : 0;
+      var pct = hasActiveSub ? Math.min(100, Math.round((attended / total) * 100)) : 0;
+      var barClass = hasActiveSub ? (pct >= 75 ? 'orange' : 'green') : 'green';
       html += '<div class="tc-card" data-idx="' + i + '" style="animation-delay:' + delay + '">';
       html += '<div class="tc-top">';
       html += '<div class="tc-subject-icon ' + stClass + '">' + icon + '</div>';
 html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) + '">' + esc(s.teacher) + (s.permanent ? '<span class="tc-perm-mark">∞</span>' : '') + '</div><div class="tc-subject">' + esc(s.subject) + '</div></div>';
       html += '<div class="tc-badge ' + badgeClass + '">' + badgeText + '</div>';
       html += '</div>';
-      if (hasActiveSub) {
+if (hasActiveSub) {
           html += '<div class="tc-stats"><div class="tc-stat"><div class="tc-stat-num">' + attended + '</div><div class="tc-stat-label">حضر</div></div><div class="tc-stat"><div class="tc-stat-num">' + remaining + '</div><div class="tc-stat-label">متبقي</div></div><div class="tc-stat"><div class="tc-stat-num">' + total + '</div><div class="tc-stat-label">الإجمالي</div></div></div>';
           html += '<div class="tc-progress-wrap"><div class="tc-progress"><div class="tc-progress-fill ' + barClass + '" style="width:' + pct + '%"></div></div></div>';
-      } else if (hasTrial) {
-        html += '<div class="tc-stats"><div class="tc-stat"><div class="tc-stat-num" style="color:#f59e0b">' + s.trialUsed + '</div><div class="tc-stat-label">مستهلكة</div></div><div class="tc-stat"><div class="tc-stat-num" style="color:#059669">' + s.trialRemaining + '</div><div class="tc-stat-label">متبقية</div></div><div class="tc-stat"><div class="tc-stat-num">' + TRIAL_MAX + '</div><div class="tc-stat-label">الإجمالي</div></div></div>';
-        var trialPct = Math.min(100, Math.round((s.trialUsed / TRIAL_MAX) * 100));
-        html += '<div class="tc-progress-wrap"><div class="tc-progress"><div class="tc-progress-fill orange" style="width:' + trialPct + '%"></div></div></div>';
-        html += '<div style="text-align:center;font-size:11px;font-weight:700;color:#f59e0b;padding:2px 0 6px">حصة مجانية من الحصتين المجانيتين</div>';
       } else {
-        html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:13px;font-weight:900;color:#ef4444">انتهت الحصص المجانية</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">يمكن للاستقبال السماح بتسجيل الحضور<br>وتُخصم لاحقاً من حصص الاشتراك</div></div></div>';
+        html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:13px;font-weight:900;color:#ef4444">لا يوجد اشتراك فعلي</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">يمكن للاستقبال السماح بتسجيل الحضور<br>وتُخصم لاحقاً من حصص الاشتراك</div></div></div>';
       }
       html += '<div class="tc-btn-wrap">';
       if (s.alreadyCheckedIn) {
         html += '<button class="tc-btn done" disabled>✓ تم التسجيل اليوم</button>';
       } else if (hasActiveSub) {
         html += '<button class="tc-btn green" data-sidx="' + i + '">تسجيل الحضور</button>';
-      } else if (hasTrial) {
-        html += '<button class="tc-btn orange" data-sidx="' + i + '">سجّل (حصة مجانية)</button>';
       } else {
         html += '<button class="tc-btn purple" data-sidx="' + i + '" data-allow="1">السماح بالحضور</button>';
       }
@@ -933,7 +836,6 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
     try { subCheck = await SubscriptionService.getActiveSubscriptionForSubject(pendingStudentId, session.subject, session.teacher, AttendanceService.today()); } catch (e) { logScanner('subCheck error: ' + e.message); }
 
     var type = 'none';
-    var freshTrialRemaining = session.trialRemaining;
 
     if (subCheck && subCheck.subscription) {
       var subStatus = SubscriptionService.subscriptionStatus(subCheck.subscription);
@@ -970,37 +872,10 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
           } catch (e) { logScanner('increment usage error: ' + e.message); }
         }
       } else {
-        // ── Subscription expired or sessions exhausted → fresh trial check from Firestore ──
-        var _fu = await getTrialUsage(pendingStudentId);
-        var _fc = getTrialCount(_fu, session.teacher, session.subject);
-        var _fr = Math.max(0, TRIAL_MAX - _fc);
-        freshTrialRemaining = _fr;
-        logScanner('trial fresh check: used=' + _fc + ' remaining=' + _fr);
-        if (_fr > 0) {
-          type = 'orange';
-          if (fbReady && authState.signedIn) {
-            await recordTrialUsage(pendingStudentId, pendingName, session.teacher, session.subject, pendingBarcode);
-          }
-        } else {
-          type = 'red';
-        }
-      }
-    } else {
-      // ── No subscription → fresh trial check from Firestore ──
-      var _fu2 = await getTrialUsage(pendingStudentId);
-      var _fc2 = getTrialCount(_fu2, session.teacher, session.subject);
-      var _fr2 = Math.max(0, TRIAL_MAX - _fc2);
-      freshTrialRemaining = _fr2;
-      logScanner('trial fresh check: used=' + _fc2 + ' remaining=' + _fr2);
-      if (_fr2 > 0) {
-        type = 'orange';
-        if (fbReady && authState.signedIn) {
-          await recordTrialUsage(pendingStudentId, pendingName, session.teacher, session.subject, pendingBarcode);
-        }
-      } else {
-        // ── استهلكت الحصتان المجانيتان ولم يسجّل اشتراكاً → رفض الدخول ──
         type = 'red';
       }
+    } else {
+      type = 'red';
     }
 
     if (type === 'green') {
@@ -1009,19 +884,11 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
       postCheckin(session, type);
       showCheckinAnimation('green', session.subject, session.teacher);
       showScanOverlay('green', '✅', 'تم تسجيل الحضور', pendingName, session.teacher + ' — ' + session.subject, 2200);
-    } else if (type === 'orange') {
-      playSoundWarning();
-      attendedCount++; updateCounter();
-      postCheckin(session, type);
-      var newTrialRemain = Math.max(0, freshTrialRemaining - 1);
-      showCheckinAnimation('orange', session.subject, session.teacher);
-      showScanOverlay('orange', '🟠', 'تم تسجيل الحضور', pendingName,
-        'هذه حصة مجانية (من الحصتين المجانيتين)<br>المتبقي: <b>' + newTrialRemain + ' / ' + TRIAL_MAX + '</b> حصة', 3000);
     } else {
       playSoundIncorrect();
       postCheckin(session, type);
       showScanOverlay('red', '🚫', 'لا يمكن تسجيل الحضور', pendingName,
-        session.teacher + ' — ' + session.subject + '<br>انتهت الحصتان المجانيتان — سجّل اشتراكاً شهرياً للدخول', 3500);
+        session.teacher + ' — ' + session.subject + '<br>انتهى الاشتراك — يمكن للاستقبال السماح بتسجيل الحضور', 3500);
     }
   }
 
@@ -1072,13 +939,8 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
   function postCheckin(session, type) {
     if (type !== 'red') {
       session.alreadyCheckedIn = true;
-      if (type === 'orange') {
-        session.trialUsed = Math.min(TRIAL_MAX, (session.trialUsed || 0) + 1);
-        session.trialRemaining = Math.max(0, TRIAL_MAX - session.trialUsed);
-      } else {
-        session.attended = Math.min(8, session.attended + 1);
-        session.remaining = Math.max(0, session.remaining - 1);
-      }
+      session.attended = Math.min(8, session.attended + 1);
+      session.remaining = Math.max(0, session.remaining - 1);
     }
     var btn = document.querySelector('.tc-btn.loading') || document.querySelector('.tc-btn[data-sidx]');
     if (btn) {
@@ -1092,18 +954,11 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
         btn.innerHTML = 'تسجيل الحضور';
       }
       var card = btn.closest('.tc-card');
-      if (card && type !== 'red' && type !== 'allow') {
+      if (card && type === 'green') {
         var nums = card.querySelectorAll('.tc-stat-num');
-        if (type === 'orange') {
-          if (nums.length >= 3) {
-            nums[0].textContent = session.trialUsed;
-            nums[1].textContent = session.trialRemaining;
-          }
-        } else {
-          if (nums.length >= 2) {
-            nums[0].textContent = session.attended;
-            nums[1].textContent = session.remaining;
-          }
+        if (nums.length >= 2) {
+          nums[0].textContent = session.attended;
+          nums[1].textContent = session.remaining;
         }
       }
     }
@@ -1116,12 +971,12 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
     var circle = document.getElementById('checkmark-circle');
     var path = document.getElementById('checkmark-path');
     var text = document.getElementById('checkmark-text');
-    var color = type === 'green' ? '#10b981' : type === 'orange' ? '#f59e0b' : type === 'allow' ? '#a855f7' : '#ef4444';
+    var color = type === 'green' ? '#10b981' : type === 'allow' ? '#a855f7' : '#ef4444';
     el.style.display = 'flex';
     circle.style.stroke = color;
     path.style.stroke = color;
     text.style.color = color;
-    text.textContent = type === 'green' ? '✅ تم التسجيل' : type === 'orange' ? '⚠️ تم السماح' : type === 'allow' ? '🟣 تم السماح بالحضور' : '🚫 ممنوع';
+    text.textContent = type === 'green' ? '✅ تم التسجيل' : type === 'allow' ? '🟣 تم السماح بالحضور' : '🚫 ممنوع';
     text.style.opacity = 0;
     circle.style.strokeDashoffset = 283;
     path.style.strokeDashoffset = 50;

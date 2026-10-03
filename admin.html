@@ -26447,12 +26447,12 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         totalSessions: isPermanent ? 100000 : sessions,
         permanent: isPermanent
       });
-      var trialDeducted = 0, allowDeducted = 0, _deductExcess = 0;
+      var allowDeducted = 0, _deductExcess = 0;
       var subObj = created && created.subscription ? created.subscription : (Array.isArray(created) && created[0] ? (created[0].subscription || created[0]) : null);
       if (subObj && !isPermanent) {
-        // ── Deduct trial sessions from first period (cycle-aware) ──
+        // ── Deduct "allow" sessions (sessions permitted without subscription) from first period ──
         // "Done" subs (remaining=0, date not expired): use start_date as cutoff
-        // so old trials before the subscription are excluded, but fresh trial records count.
+        // so old allows before the subscription are excluded, but fresh allow records count.
         try {
           var fs2 = window._firestore, fdb2 = window._db;
           if (fs2 && fdb2) {
@@ -26480,7 +26480,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
                 }
                 if (!lastEnd || psEnd > lastEnd) lastEnd = psEnd;
               }
-            } catch (e) { console.warn('[SUBSCRIPTIONS] prev subs lookup for trial deduct:', e); }
+            } catch (e) { console.warn('[SUBSCRIPTIONS] prev subs lookup for allow deduct:', e); }
             var _qStudentId = selectedStudent.id;
             var _qStudentIdStr = String(_qStudentId);
             var trialSnap;
@@ -26493,23 +26493,21 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
               }
             }
             if (trialSnap) {
-              console.log('[SUBSCRIPTIONS] Trial query: id=' + _qStudentId + ' type=' + typeof _qStudentId + ' results=' + trialSnap.size);
+              console.log('[SUBSCRIPTIONS] Allow query: id=' + _qStudentId + ' type=' + typeof _qStudentId + ' results=' + trialSnap.size);
               trialSnap.forEach(function (d) {
                 var r = d.data();
-                if (r.type !== 'trial_session' && r.type !== 'allow_sub') return;
-                var isAllow = r.type === 'allow_sub';
+                if (r.type !== 'allow_sub') return;
                 var dk = _nrm(r.teacherName) + '___' + _nrm(r.subjectName);
                 if (dk !== tKey) return;
                 if (!r.date) return;
                 if (lastEnd && r.date <= lastEnd) return;
                 console.log('[SUBSCRIPTIONS] Deduct match (' + r.type + '): ' + r.date + ' ' + r.teacherName + '/' + r.subjectName);
-                if (isAllow) allowDeducted++;
-                else trialDeducted++;
+                allowDeducted++;
               });
             }
           }
-          if (trialDeducted > 0 || allowDeducted > 0) {
-            var deductTotal = trialDeducted + allowDeducted;
+          if (allowDeducted > 0) {
+            var deductTotal = allowDeducted;
             var _deductExcess = 0;
             var subPeriods = (created && created.periods) || (Array.isArray(created) && created[0] && created[0].periods) || [];
             if (!subPeriods.length && subObj && subObj.id) {
@@ -26533,17 +26531,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
               // الحصص سالبة (تسجيل «بدون اشتراك» يتجاوز عدد حصص الباقة).
               var _capLimit = Math.max(0, (firstPeriod.total_sessions || firstPeriod.totalSessions || sessions || 8));
               if (deductTotal > _capLimit) {
-                var _ratioN = _capLimit / deductTotal;
-                var _newT = Math.floor(trialDeducted * _ratioN);
-                var _newA = Math.min(allowDeducted, Math.max(0, _capLimit - _newT));
-                trialDeducted = _newT;
-                allowDeducted = _newA;
-                _deductExcess = deductTotal - (trialDeducted + allowDeducted);
-                deductTotal = trialDeducted + allowDeducted;
+                allowDeducted = _capLimit;
+                _deductExcess = deductTotal - allowDeducted;
+                deductTotal = allowDeducted;
               }
               if (pid) {
                 var _incResult = await SubscriptionService.incrementPeriodUsage(pid, deductTotal);
-                console.log('[SUBSCRIPTIONS] Deducted ' + deductTotal + ' (' + trialDeducted + ' trial + ' + allowDeducted + ' allow_sub) sessions from new subscription period ' + pid, _incResult);
+                console.log('[SUBSCRIPTIONS] Deducted ' + deductTotal + ' (' + allowDeducted + ' allow_sub) sessions from new subscription period ' + pid, _incResult);
                 if (_incResult) {
                   console.log('[SUBSCRIPTIONS] RPC success — updated period:', JSON.stringify(_incResult));
                 } else {
@@ -26553,16 +26547,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
                 console.warn('[SUBSCRIPTIONS] No period_id found in first period:', JSON.stringify(firstPeriod));
               }
             } else {
-              console.warn('[SUBSCRIPTIONS] No periods found for subscription ' + (subObj ? subObj.id : '?') + ' — trial deduction skipped');
+              console.warn('[SUBSCRIPTIONS] No periods found for subscription ' + (subObj ? subObj.id : '?') + ' — allow deduction skipped');
             }
           }
-        } catch (e) { console.warn('[SUBSCRIPTIONS] trial deduct failed', e); }
+        } catch (e) { console.warn('[SUBSCRIPTIONS] allow deduct failed', e); }
 
         }
-      var _effective = Math.max(0, (Number(sessions) || 0) - trialDeducted - allowDeducted);
-      var _trialLine = trialDeducted > 0
-        ? '<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:6px 10px;margin-top:4px;color:#d97706;font-size:12px;font-weight:800">🟠 تم خصم ' + trialDeducted + ' حصة استثنائية سابقة → الحصص الفعلية: ' + _effective + '</div>'
-        : '';
+      var _effective = Math.max(0, (Number(sessions) || 0) - allowDeducted);
       var _allowLine = allowDeducted > 0
         ? '<div style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.25);border-radius:8px;padding:6px 10px;margin-top:4px;color:#7c3aed;font-size:12px;font-weight:800">♻️ خُصم ' + allowDeducted + ' حصة (سُمح بالدخول سابقاً بدون اشتراك) → الحصص الفعلية: ' + _effective + '</div>'
         : '';
@@ -26571,7 +26562,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         : '';
       var _monthsLine = isPermanent
         ? '<div><b>المدة:</b> <span style="color:#7C3AED;font-weight:900">♾️ دائم (بلا نهاية)</span></div>'
-        : SubscriptionService.buildPeriods(start, months).map(p => '<div><b>الشهر ' + p.monthNumber + ':</b> ' + ((trialDeducted > 0 || allowDeducted > 0) && p.monthNumber === 1 ? _effective : (p.totalSessions || 8)) + ' حصص</div>').join('');
+        : SubscriptionService.buildPeriods(start, months).map(p => '<div><b>الشهر ' + p.monthNumber + ':</b> ' + (allowDeducted > 0 && p.monthNumber === 1 ? _effective : (p.totalSessions || 8)) + ' حصص</div>').join('');
       const successHtml =
         '<div style="text-align:center;font-size:13px">' +
           '<div style="font-weight:900;font-size:15px;margin-bottom:12px">تم إنشاء الاشتراك بنجاح</div>' +
@@ -26583,8 +26574,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
             '<div><b>الحصص:</b> ' + (isPermanent ? 'بدون حد للأبد' : sessions + ' حصة') + '</div>' +
             '<div><b>البداية:</b> ' + SubscriptionService.fmtAr(start, true) + '</div>' +
             '<div><b>النهاية:</b> ' + (isPermanent ? '<span style="color:#7C3AED;font-weight:900">دائم (بلا نهاية)</span>' : SubscriptionService.fmtAr(end, true)) + '</div>' +
-            ((trialDeducted > 0 || allowDeducted > 0) ? '<div style="font-weight:900;color:#059669"><b>المتبقي فعلياً:</b> ' + _effective + ' حصة</div>' : '') +
-            _trialLine + _allowLine + _excessLine +
+            ((allowDeducted > 0) ? '<div style="font-weight:900;color:#059669"><b>المتبقي فعلياً:</b> ' + _effective + ' حصة</div>' : '') +
+            _allowLine + _excessLine +
             _monthsLine +
           '</div>' +
         '</div>';
