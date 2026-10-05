@@ -807,6 +807,7 @@ CREATE OR REPLACE FUNCTION admin_recompute_balance(
 RETURNS JSONB AS $$
 DECLARE
   v_due INT := 0; v_paid INT := 0; v_sessions INT := 0; v_students INT := 0; v_rate INT := 0;
+  v_maxrow INT := 0;
   v JSONB;
 BEGIN
   IF NOT is_admin(p_admin_uid) THEN RAISE EXCEPTION 'unauthorized'; END IF;
@@ -822,10 +823,15 @@ BEGIN
     FROM teacher_transactions
    WHERE teacher_id = p_teacher_id AND transaction_type = 'dues' AND student_id <> '';
 
-  SELECT COALESCE(MAX(lesson_rate), 0) INTO v_rate
+  -- السعر المعروض يجب أن يكون السعر الذي تُحسب به المستحقات فعلاً.
+  -- الاعتماد على MAX(lesson_rate) وحده كان يُظهر أعلى سعر قديم في
+  -- سجلات بأسعار مختلفة، فلا يطابق أبداً مجموع المستحقات المعروض.
+  -- لذلك: السعر المعتمد (p_rate) هو المرجع، و MAX مجرد بديل عند غيابه.
+  SELECT COALESCE(MAX(lesson_rate), 0) INTO v_maxrow
     FROM teacher_transactions
    WHERE teacher_id = p_teacher_id AND transaction_type = 'dues' AND lesson_rate > 0;
-  IF v_rate = 0 THEN v_rate := GREATEST(COALESCE(p_rate, 0), 0); END IF;
+  v_rate := GREATEST(COALESCE(p_rate, 0), 0);
+  IF v_rate = 0 THEN v_rate := v_maxrow; END IF;
 
   INSERT INTO teacher_balances
     (teacher_id, teacher_name, total_due, total_paid, pending, student_count, session_count, rate)
