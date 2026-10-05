@@ -140,6 +140,12 @@ window.TeacherFinance = (function () {
     const baseRate = Number(rate || teacher.rate || 0) || 0;
     const registrations = await loadConfirmedRegistrations();
     const activeSubsRes = await loadActiveSubs(teacherId);
+    // إن تعذّر جلب الاشتراكات النشطة لا نحتسب شيئاً إطلاقاً — منع احتساب
+    // حصص طلاب بلا اشتراك شهري (تجريبية/مسموحة) ضمن المستحقات.
+    if (!activeSubsRes.ok) {
+      console.warn('[TeacherFinance] active subs unavailable — dues skipped for teacher', teacherId);
+      return { duesRows: [], totalSessions: 0, studentCount: 0, rate: baseRate };
+    }
     const activeSubs = activeSubsRes.list;
     const filterDues = activeSubsRes.ok;
     const duesRows = [];

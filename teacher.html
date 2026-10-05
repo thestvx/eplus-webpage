@@ -435,6 +435,11 @@
     function fmtDate(d){if(!d)return'—';const t=d.seconds?new Date(d.seconds*1000):new Date(d);return t.toLocaleDateString('ar-DZ',{year:'numeric',month:'short',day:'numeric'});}
     function fmtTimeAgo(d){if(!d)return'';const t=d.seconds?new Date(d.seconds*1000):new Date(d);const diff=Date.now()-t.getTime();const mins=Math.floor(diff/60000);if(mins<1)return'الآن';if(mins<60)return'منذ '+mins+' دقيقة';const hrs=Math.floor(mins/60);if(hrs<24)return'منذ '+hrs+' ساعة';const days=Math.floor(hrs/24);return'منذ '+days+' يوم';}
 
+    // أنواع سجلات الحضور التي لا تُحتسب أبداً في مدفوعات الأستاذ
+    // (حصص تجريبية / سماح بدون اشتراك / مجانية إجرائية) — القاعدة موحّدة مع teacherFinance.js
+    var FREE_ATT_TYPES=['grace','grace_session','trial','trial_session','trial_usage','allow_sub'];
+    function isFreeAtt(a){return FREE_ATT_TYPES.indexOf(String((a&&a.type)||''))!==-1;}
+
     function togglePassVisibility(id,btn){const inp=document.getElementById(id);if(inp.type==='password'){inp.type='text';btn.textContent='🙈';}else{inp.type='password';btn.textContent='👁️';}inp.focus();}
 
     /* ===== TEACHER PHOTO MAPPING ===== */
@@ -655,7 +660,7 @@
         var exercises=allContent.filter(function(c){return c.type==='exercise'||c.type==='homework';});
         var announcements=allContent.filter(function(c){return c.type==='announcement';});
         var studentCount=regRpc.length||0;
-        var attDocs=attSnap.docs.map(function(d){return d.data();}).filter(function(a){return ['grace','grace_session','trial','trial_session','trial_usage'].indexOf(a.type)===-1;});
+        var attDocs=attSnap.docs.map(function(d){return d.data();}).filter(function(a){return !isFreeAtt(a);});
         var attendanceCount=attDocs.length||0;
         var finDoc=finSnap.docs.length>0?finSnap.docs[0].data():{};
         var payments=Array.isArray(finDoc.payments)?finDoc.payments:[];
@@ -1066,14 +1071,16 @@
           }
         }
 
-        const allAttendance=attAllDocs.map(function(d){return Object.assign({id:d.id},d.data());}).filter(function(a){return ['grace','grace_session','trial','trial_session','trial_usage'].indexOf(a.type)===-1;});
+        const allAttendance=attAllDocs.map(function(d){return Object.assign({id:d.id},d.data());}).filter(function(a){return !isFreeAtt(a);});
+        // الاستثناء يعتمد على isFreeAtt الموحّد (يشمل allow_sub). ملاحظة: totalSessionsOffered
+        // يبقى عدد الحصص المعروضة للحضور فقط ولا يدخل في المستحقات المالية.
         const totalSessionsOffered=atcDocs.length;
 
         const byStudent={};
         allAttendance.forEach(function(a){
           const sid=a.studentId||a.student_id;if(!sid)return;
           if(!byStudent[sid])byStudent[sid]={sessions:0,freeSessions:0,subjects:{}};
-          if(a.type==='orange'||a.type==='trial'){
+          if(isFreeAtt(a)){
             byStudent[sid].freeSessions++;
           }else{
             byStudent[sid].sessions++;
