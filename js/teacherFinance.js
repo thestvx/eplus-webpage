@@ -100,99 +100,169 @@ window.TeacherFinance = (function () {
     return (Array.isArray(rows) ? rows : []).filter(r => !r.deleted_at && r.status === 'مسجل نهائياً' && Array.isArray(r.subjects));
   }
 
-  // ── Active monthly subscriptions (عبر admin-api) ────────
-  //  يُرجع أزواج (student_id, subject) ذات اشتراك شهري نشط عند الأستاذ.
-  //  تُستخدم لاحتساب المستحقات لذوي الاشتراك الشهري النشط فقط.
+  
 
-  function _sEqual(a, b) {
-    return _norm(a) === _norm(b);
-  }
+  // ── مصدر الأرقام: قسم الاشتراكات الشهرية ─────────────────
+  //  القاعدة المعتمدة: مستحقات الأستاذ تُشتق من «الاشتراكات الشهرية»
+  //  لا من سجلات الحضور. لكل اشتراك شهري عند الأستاذ:
+  //     sessions = Σ periods[].used_sessions
+  //     amount   = sessions × سعر الحصة
+  //  ثم يُجمع المجموع مع باقي التلاميذ.
+  //  بهذا تختفي الحصص التجريبية والمسموحة لأنها لا تدخل عدّاد الاشتراك.
 
-  async function loadActiveSubs(teacherId) {
+  async function loadSubscriptionRows() {
     try {
-      const rows = await _adminCall('list-active-subs', { teacherId: teacherId });
+      const rows = await _adminCall('list-subscriptions-rich', {});
       if (!Array.isArray(rows)) return { list: [], ok: false };
       return { list: rows, ok: true };
     } catch (e) {
-      console.warn('[TeacherFinance] load active subs failed:', e);
+      console.warn('[TeacherFinance] subscriptions fetch failed:', e);
       return { list: [], ok: false };
     }
   }
 
-  function isActiveSubActive(studentId, subjectName, activeSubs) {
-    for (let i = 0; i < activeSubs.length; i++) {
-      const s = activeSubs[i];
-      if (String(s.student_id) !== String(studentId)) continue;
-      if (_sEqual(s.subject_name, subjectName)) return true;
-      if (s.subject_id && _sEqual(s.subject_id, subjectName)) return true;
-    }
+  function _subBelongsToTeacher(sub, teacherId, teacherName) {
+    if (!sub) return false;
+    if (String(sub.status || '') === 'cancelled') return false;
+    if (teacherId && sub.teacher_id) return String(sub.teacher_id) === String(teacherId);
+    if (teacherName && sub.teacher_name) return _norm(sub.teacher_name) === _norm(teacherName);
     return false;
   }
 
-  // ── Dues: تحويل الحضور إلى مستحقات ────────────────────
+  function _periodsUsed(periods) {
+    if (!Array.isArray(periods)) return 0;
+    let n = 0;
+    for (const p of periods) n += Number(p.used_sessions) || 0;
+    return n;
+  }
 
-  // يحسب المستحقات لمعلم معيّن من سجلات الحضور الحقيقية.
+  // سعر الحصة المتفق عليه وقت التسجيل (إن وُجد) لكل (تلميذ + مادة)
+  function _buildRateLookup(registrations, teacherId, teacherName) {
+    const map = {};
+    for (const r of registrations) {
+      const sid = String(r.id);
+      const subjects = Array.isArray(r.subjects) ? r.subjects : [];
+      for (const s of subjects) {
+        const belongs = (s.teacherId && teacherId) ? String(s.teacherId) === String(teacherId)
+          : (s.teacher || s.teacherName) ? _norm(s.teacher || s.teacherName) === _norm(teacherName)
+          : false;
+        if (!belongs) continue;
+        const rate = Number(s.lessonRateAtTransaction);
+        if (!(rate > 0)) continue;
+        map[sid + '||' + _norm(s.subject || s.subjectName || '')] = rate;
+        if (s.subjectId) map[sid + '||' + _norm(s.subjectId)] = rate;
+      }
+    }
+    return map;
+  }
+
+  // ── Dues: تحويل حصص الاشتراكات الشهرية إلى مستحقات ───────
+
   // معرّف الدفتر ثابت (dues_teacher_student_subject) ⇒ إعادة التشغيل
   // لا تكرّر أبداً، بل تحدّث الحصة والرصيد نفسهم.
   async function computeDuesForTeacher(teacher, rate, adminName) {
     const teacherId = teacher.teacherId || teacher.id || '';
     const teacherName = teacher.name || '';
     const baseRate = Number(rate || teacher.rate || 0) || 0;
-    const registrations = await loadConfirmedRegistrations();
-    const activeSubsRes = await loadActiveSubs(teacherId);
-    // إن تعذّر جلب الاشتراكات النشطة لا نحتسب شيئاً إطلاقاً — منع احتساب
-    // حصص طلاب بلا اشتراك شهري (تجريبية/مسموحة) ضمن المستحقات.
-    if (!activeSubsRes.ok) {
-      console.warn('[TeacherFinance] active subs unavailable — dues skipped for teacher', teacherId);
-      return { duesRows: [], totalSessions: 0, studentCount: 0, rate: baseRate };
-    }
-    const activeSubs = activeSubsRes.list;
-    const filterDues = activeSubsRes.ok;
-    const duesRows = [];
-    let totalSessions = 0;
-    let uniqueStudents = new Set();
 
+    const subsRes = await loadSubscriptionRows();
+    // تعذّر قراءة الاشتراكات ⇒ لا نكتب شيئاً إطلاقاً (لا تصفير ولا حذف).
+    if (!subsRes.ok) {
+      console.warn('[TeacherFinance] subscriptions unavailable — dues skipped for teacher', teacherId);
+      return { ok: false, duesRows: [], totalSessions: 0, studentCount: 0, rate: baseRate, removedRows: 0 };
+    }
+
+    let registrations = [];
+    try { registrations = await loadConfirmedRegistrations(); } catch (e) { registrations = []; }
+    const rateMap = _buildRateLookup(registrations, teacherId, teacherName);
+    const nameMap = {};
     for (const r of registrations) {
-      const subjects = r.subjects.filter(s => {
-        if (s.teacherId) return s.teacherId === teacherId;
-        if (teacherId && s.teacher) return _norm(s.teacher) === _norm(teacherName);
-        return false;
+      nameMap[String(r.id)] = ((r.first_name || '') + ' ' + (r.last_name || '')).trim() || String(r.id);
+    }
+
+    // تجميع الحصص المستهلكة لكل (تلميذ + مادة) من اشتراكاته الشهرية
+    const buckets = new Map();
+    for (const row of subsRes.list) {
+      const sub = (row && row.subscription) || {};
+      if (!_subBelongsToTeacher(sub, teacherId, teacherName)) continue;
+      const sid = String(sub.student_id || '');
+      if (!sid) continue;
+      const used = _periodsUsed(row.periods);
+      if (used <= 0) continue;
+      const subjectId = String(sub.subject_id || '');
+      const subjectName = sub.subject_name || '';
+      const key = sid + '||' + (subjectId || _norm(subjectName));
+      const b = buckets.get(key) || {
+        studentId: sid,
+        studentName: sub.student_name || '',
+        subjectId: subjectId,
+        subjectName: subjectName,
+        count: 0,
+      };
+      b.count += used;
+      if (!b.studentName) b.studentName = sub.student_name || '';
+      buckets.set(key, b);
+    }
+
+    const duesRows = [];
+    const uniqueStudents = new Set();
+    let totalSessions = 0;
+
+    for (const key of buckets.keys()) {
+      const b = buckets.get(key);
+      const lessonRate = rateMap[b.studentId + '||' + _norm(b.subjectName)]
+        || rateMap[b.studentId + '||' + _norm(b.subjectId)]
+        || baseRate;
+      const amount = b.count * lessonRate;
+      uniqueStudents.add(b.studentId);
+      totalSessions += b.count;
+      duesRows.push({
+        id: 'dues_' + teacherId + '_' + b.studentId + '_' + (b.subjectId || _norm(b.subjectName)),
+        teacher_id: teacherId,
+        teacher_name: teacherName,
+        student_id: b.studentId,
+        student_name: nameMap[b.studentId] || b.studentName || b.studentId,
+        subject_id: b.subjectId,
+        subject_name: b.subjectName,
+        session_count: b.count,
+        lesson_rate: lessonRate,
+        amount: amount,
+        transaction_type: 'dues',
+        status: 'pending',
+        date: today(),
+        notes: b.count + ' حصة × ' + lessonRate + ' دج',
+        admin_name: adminName || '',
       });
-      for (const s of subjects) {
-        const subjectId = s.subjectId || (window.SubjectService && SubjectService.getSubjectId(s.subject || s.subjectName || '')) || '';
-        const subjectName = s.subject || s.subjectName || '';
-        if (filterDues && !isActiveSubActive(r.id, subjectName, activeSubs)) continue;
-        const count = await countAttendance(r.id, subjectId, teacherId, subjectName, teacherName);
-        if (count <= 0) continue;
-        const lessonRate = Number(s.lessonRateAtTransaction) > 0 ? Number(s.lessonRateAtTransaction) : baseRate;
-        const amount = count * lessonRate;
-        uniqueStudents.add(r.id);
-        totalSessions += count;
-        duesRows.push({
-          id: 'dues_' + teacherId + '_' + r.id + '_' + subjectId,
-          teacher_id: teacherId,
-          teacher_name: teacherName,
-          student_id: r.id,
-          student_name: ((r.first_name || '') + ' ' + (r.last_name || '')).trim(),
-          subject_id: subjectId,
-          subject_name: subjectName,
-          session_count: count,
-          lesson_rate: lessonRate,
-          amount: amount,
-          transaction_type: 'dues',
-          status: 'pending',
-          date: today(),
-          notes: count + ' حصة × ' + lessonRate + ' دج',
-          admin_name: adminName || '',
-        });
-      }
     }
 
     // Upsert دفتر المستحقات (يحدّث بدل التكرار) عبر admin-api
     if (duesRows.length) await _adminCall('upsert-transactions', { rows: duesRows });
 
+    // حذف مستحقات قديمة لم تعد ناتجة عن الاشتراكات الشهرية.
+    // بدونها تبقى الصفوف القديمة في الدفتر ويُحسب مجموعها في total_due.
+    const keepIds = new Set(duesRows.map(r => r.id));
+    let removedRows = 0;
+    try {
+      const ledger = await getLedger(teacherId);
+      for (const tx of ledger) {
+        if (!tx) continue;
+        const id = String(tx.id || '');
+        if (!id || keepIds.has(id)) continue;
+        if (String(tx.transaction_type || '') !== 'dues') continue;
+        if (id.indexOf('dues_' + teacherId + '_') !== 0) continue;
+        try {
+          await deleteTransaction(teacherId, teacherName, id, baseRate, adminName);
+          removedRows++;
+        } catch (e) {
+          console.warn('[TeacherFinance] stale dues delete failed:', id, e);
+        }
+      }
+    } catch (e) {
+      console.warn('[TeacherFinance] ledger fetch failed:', e);
+    }
+
     await recomputeBalance(teacherId, teacherName, totalSessions, uniqueStudents.size, baseRate, adminName);
-    return { duesRows, totalSessions, studentCount: uniqueStudents.size, rate: baseRate };
+    return { ok: true, duesRows, totalSessions, studentCount: uniqueStudents.size, rate: baseRate, removedRows };
   }
 
   // ── Payment: دفعة مستقلة (بدون أي خصم يدوي) ────────────
