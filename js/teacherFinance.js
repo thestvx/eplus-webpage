@@ -124,9 +124,11 @@ window.TeacherFinance = (function () {
   function _subBelongsToTeacher(sub, teacherId, teacherName) {
     if (!sub) return false;
     const st = String(sub.status || '').toLowerCase();
-    // الاشتراك الدائم (حصص غير محدودة) لا يدخل الحسابات المالية إطلاقاً،
-    // والاشتراك الملغى لا يُحتسب أيضاً.
-    if (st === 'cancelled' || st === 'permanent' || sub.permanent === true) return false;
+    // الاشتراك الملغى فقط هو ما يُستبعد.
+    // الاشتراك الدائم يُحتسب بحصص الحضور المستهلكة فيه (used_sessions)،
+    // وهي نفس الآلية التي يزيد بها attendance.html العدّاد عند كل حضور،
+    // لأن الحضور يزيد periods.used_sessions للاشتراك الدائم أيضاً.
+    if (st === 'cancelled') return false;
     if (teacherId && sub.teacher_id) return String(sub.teacher_id) === String(teacherId);
     if (teacherName && sub.teacher_name) return _norm(sub.teacher_name) === _norm(teacherName);
     return false;
