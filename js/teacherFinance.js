@@ -124,10 +124,10 @@ window.TeacherFinance = (function () {
   function _subBelongsToTeacher(sub, teacherId, teacherName) {
     if (!sub) return false;
     const st = String(sub.status || '').toLowerCase();
-    // الاشتراك الملغى فقط هو ما يُستبعد.
-    // الاشتراك الدائم يُحتسب بحصص الحضور المستهلكة فيه (used_sessions)،
-    // وهي نفس الآلية التي يزيد بها attendance.html العدّاد عند كل حضور.
-    if (st === 'cancelled') return false;
+    // الاشتراك الملغى والاشتراك الدائم كلاهما خارج حسابات المستحقات.
+    // التلاميذ الدائمون حصصهم غير محدودة فلا يُحتسب لهم مبلغ،
+    // وتُعرض حصصهم في خانة مستقلة بجدول الاشتراكات الشهرية.
+    if (st === 'cancelled' || st === 'permanent' || sub.permanent === true) return false;
     // المطابقة بالـid أو بالاسم — أيهما يكفي.
     // كان الـid وحده يحسم الأمر ويرفض اشتراكاً قديم الـid حتى لو كان
     // الاسم مطابقاً، فكان جدول الاشتراكات الشهري يحتسبه ومستحقات

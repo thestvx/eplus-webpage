@@ -27025,7 +27025,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
 
     let html = '';
     let rowNum = 0;
-    let grandSubs = 0, grandUsed = 0, grandTotal = 0;
+    let grandSubs = 0, grandUsed = 0, grandTotal = 0, grandPermUsed = 0;
     const studentIds = Object.keys(studentMap);
     studentIds.forEach(sid => {
       const stu = studentMap[sid];
@@ -27035,16 +27035,15 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       const hasPermanent = stu.subs.some(x => SubscriptionService.isPermanent((x.sub || {})));
       const nonPermSubs = stu.subs.filter(x => !SubscriptionService.isPermanent((x.sub || {})));
       const permSubs = stu.subs.filter(x => SubscriptionService.isPermanent((x.sub || {})));
-      // البسط = الحصص المستهلكة (الحضور) لكل الاشتراكات، بما فيها الدائمة:
-      //          هذا هو أساس احتساب مستحقات الأستاذ.
-      // المقام = الحصة الكاملة للاشتراكات الشهرية فقط (الدائم غير محدود
-      //          فلا معنى لإدراجه في مقام).
+      // حصص التلاميذ الدائمين تُعرض في خانة مستقلة ولا تدخل المجموع:
+      // هم خارج حسابات مستحقات الأستاذ نهائياً.
       const permUsed = permSubs.reduce((a, x) => a + x.periods.reduce((b, p) => b + (p.used_sessions || 0), 0), 0);
-      const totalUsed = nonPermSubs.reduce((a, x) => a + x.periods.reduce((b, p) => b + (p.used_sessions || 0), 0), 0) + permUsed;
+      const totalUsed = nonPermSubs.reduce((a, x) => a + x.periods.reduce((b, p) => b + (p.used_sessions || 0), 0), 0);
       const totalSessions = nonPermSubs.reduce((a, x) => a + (x.sub.total_sessions || (x.sub.months || 1) * 8), 0);
       grandSubs += totalSubs;
       grandUsed += totalUsed;
       grandTotal += totalSessions;
+      grandPermUsed += permUsed;
       let statusSummary = '';
       if (hasPermanent) statusSummary += '<span style="color:#7c3aed;font-weight:800">♾️ دائم</span>';
       if (activeSubs > 0) statusSummary += (statusSummary ? ' · ' : '') + '<span style="color:#059669;font-weight:800">' + activeSubs + ' نشط</span>';
@@ -27057,7 +27056,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       const remaining = Math.max(0, totalSessions - totalUsed);
       const sessCell = hasPermanent
         ? '<span style="display:inline-flex;align-items:center;gap:6px;font-weight:900;color:#7c3aed">♾️ اشتراك دائم</span> <span style="font-size:11px;color:var(--text-muted);font-weight:700">(حصص غير محدودة)</span>'
-          + (permUsed > 0 ? '<div style="font-size:11.5px;font-weight:800;color:#7c3aed;margin-top:3px">✦ حضر ' + permUsed + ' حصة — تُحتسب في مستحقات الأستاذ</div>' : '')
+          + (permUsed > 0 ? '<div style="font-size:11px;font-weight:800;color:#7c3aed;margin-top:3px">✦ حضر ' + permUsed + ' حصة — خارج المستحقات</div>' : '')
         : '<span style="font-weight:800">' + totalUsed + ' / ' + totalSessions + '</span> <span style="font-size:11px;color:var(--text-muted);font-weight:700">(متبقي ' + remaining + ')</span>';
       html += '<tr ondblclick="subxShowStudentDetail(\'' + escX(sid) + '\')" style="cursor:pointer" title="اضغط مرتين لعرض تفاصيل الاشتراكات">' +
         '<td style="font-weight:800;color:var(--text-muted);font-size:12px">' + rowNum + '</td>' +
@@ -27081,7 +27080,12 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         '<td style="font-weight:900;font-size:13px">المجموع<span style="font-weight:700;color:var(--text-muted);font-size:11px"> (' + rowNum + ' تلميذ)</span></td>' +
         '<td><span style="font-weight:900;color:var(--primary);font-size:15px">' + grandSubs + '</span> <span style="font-size:11px;color:var(--text-muted);font-weight:700">اشتراك</span></td>' +
         '<td><span style="font-weight:900;color:var(--primary);font-size:14px">' + grandUsed + ' / ' + grandTotal + '</span> <span style="font-size:11px;color:var(--text-muted);font-weight:700">(متبقي ' + grandRemaining + ')</span></td>' +
-        '<td style="font-size:11px;color:var(--text-muted);font-weight:800">مجموع حصص الحضور لكل التلاميذ (شاملاً الدائمة)</td>' +
+        '<td style="font-size:11px;font-weight:700;line-height:1.7">'
+          + '<div style="color:var(--text-muted);font-weight:800">مجموع حصص التلاميذ غير الدائمين — أساس مستحقات الأستاذ</div>'
+          + (grandPermUsed > 0
+            ? '<div style="margin-top:4px;display:inline-block;padding:2px 9px;border-radius:999px;background:rgba(124,58,237,0.12);color:#7c3aed;border:1px solid rgba(124,58,237,0.28);font-weight:900;font-size:11px">♾️ دائم: ' + grandPermUsed + ' حصة — خارج المستحقات</div>'
+            : '')
+        + '</td>' +
         '<td></td>' +
         '</tr>';
     }
@@ -31094,7 +31098,7 @@ async function srtFinanceComputeDues() {
   // السعر المعتمد = السعر الظاهر في الخانة (وليس سعراً مخزّناً قديماً)
   const inputRate = parseInt(document.getElementById('srt-finance-rate').value, 10);
   if (!inputRate || inputRate <= 0) { srtShowToast('⚠️ أدخل سعر حصة صحيح أولاً', 'error'); return; }
-  if (!(await cmConfirm('حساب المستحقات', 'سيتم احتساب مستحقات الأستاذ من قسم «الاشتراكات الشهرية»:\n\n• تُؤخذ حصص كل تلميذ من اشتراكاته الشهرية عند هذا الأستاذ (الحصص المستهلكة)\n• إجمالي المستحقات = مجموع الحصص × سعر الحصة (' + inputRate.toLocaleString('ar-DZ') + ' دج)\n• الاشتراك الدائم يُحتسب بحصص حضوره فقط\n• تُحذف المستحقات القديمة التي لم تعد ناتجة عن الاشتراكات\n\nمتابعة؟', '🔄'))) return;
+  if (!(await cmConfirm('حساب المستحقات', 'سيتم احتساب مستحقات الأستاذ من قسم «الاشتراكات الشهرية»:\n\n• تُؤخذ حصص كل تلميذ من اشتراكاته الشهرية عند هذا الأستاذ (الحصص المستهلكة)\n• إجمالي المستحقات = مجموع الحصص × سعر الحصة (' + inputRate.toLocaleString('ar-DZ') + ' دج)\n• التلاميذ ذوو الاشتراك الدائم خارج الحساب\n• تُحذف المستحقات القديمة التي لم تعد ناتجة عن الاشتراكات\n\nمتابعة؟', '🔄'))) return;
   document.getElementById('srt-finance-ledger').innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px 20px">'
     + '<div class="srt-spinner"></div>'
     + '<div style="font-size:13px;font-weight:800;color:var(--text);background:linear-gradient(135deg,rgba(124,58,237,0.12),rgba(124,58,237,0.05));border:1px solid rgba(124,58,237,0.2);padding:8px 18px;border-radius:10px">⏳ جارٍ حساب المستحقات من الاشتراكات الشهرية...</div>';
@@ -31575,7 +31579,7 @@ async function srtFinancePaymentDetails() {
         + '<td style="padding:11px 14px;text-align:center;font-weight:900;color:var(--primary);font-size:14px">' + duesSessions + '</td>'
         + '<td style="padding:11px 14px;text-align:left;font-weight:900;color:var(--green);font-size:14px;direction:ltr">' + duesSum.toLocaleString('ar-DZ') + ' دج</td>'
         + '</tr></tfoot></table></div>'
-      + '<div style="margin-top:10px;padding:9px 14px;background:rgba(124,58,237,0.04);border:1px dashed rgba(124,58,237,0.2);border-radius:10px;font-size:10.5px;color:var(--text-muted);font-weight:600">📏 المستحق = حصص الاشتراك الشهري (الحصص المستهلكة) × سعر الحصة. الاشتراك الملغى غير محسوب.</div>';
+      + '<div style="margin-top:10px;padding:9px 14px;background:rgba(124,58,237,0.04);border:1px dashed rgba(124,58,237,0.2);border-radius:10px;font-size:10.5px;color:var(--text-muted);font-weight:600">📏 المستحق = حصص الاشتراك الشهري (الحصص المستهلكة) × سعر الحصة. الاشتراك الدائم والملغى غير محسوبين.</div>';
   }
 
   // ── الدفعات المسجلة ──
