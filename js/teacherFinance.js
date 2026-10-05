@@ -145,12 +145,27 @@ window.TeacherFinance = (function () {
 
   // معرّف الدفتر ثابت (dues_teacher_student_subject) ⇒ إعادة التشغيل
   // لا تكرّر أبداً، بل تحدّث الحصة والرصيد نفسهم.
-  async function computeDuesForTeacher(teacher, rate, adminName) {
+  async function computeDuesForTeacher(teacher, rate, adminName, subsOverride) {
     const teacherId = teacher.teacherId || teacher.id || '';
     const teacherName = teacher.name || '';
-    const baseRate = Number(rate || teacher.rate || 0) || 0;
+    // السعر المُمرَّر مرجّح حتى لو كان 0 — لا نرجع إلى سعر مخزّن قديم
+    // بالـ|| لأن ذلك كان يُخفي صفاً بمبلغ 0 وي corrupt الرصيد.
+    const baseRate = Number(rate != null && rate !== '' ? rate : teacher.rate) || 0;
 
-    const subsRes = await loadSubscriptionRows();
+    let subsRes;
+    if (Array.isArray(subsOverride)) {
+      // مصدر مُمرَّر من الواجهة: دالة مخصّصة لهذا الأستاذ بلا حدود
+      subsRes = { list: subsOverride, ok: true };
+    } else {
+      subsRes = await loadSubscriptionRows();
+      // 500 = الحدّ القديم في admin_list_subscriptions_rich. إن وصلنا
+      // إليه فالبيانات مقصوصة، وحساب المستحقات سيكون ناقصاً ⇒ نتوقف
+      // بدل كتابة أرقام خاطئة.
+      if (subsRes.ok && subsRes.list.length >= 500) {
+        console.warn('[TeacherFinance] subscription list truncated at 500 — dues skipped', teacherId);
+        return { ok: false, duesRows: [], totalSessions: 0, studentCount: 0, rate: baseRate, removedRows: 0, reason: 'truncated' };
+      }
+    }
     // تعذّر قراءة الاشتراكات ⇒ لا نكتب شيئاً إطلاقاً (لا تصفير ولا حذف).
     if (!subsRes.ok) {
       console.warn('[TeacherFinance] subscriptions unavailable — dues skipped for teacher', teacherId);

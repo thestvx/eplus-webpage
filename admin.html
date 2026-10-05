@@ -31069,6 +31069,24 @@ async function srtFinanceSaveRate() {
   }
 }
 
+async function srtFinanceLoadDuesSubs(t) {
+  // المصدر المفضّل: دالة مخصّصة لهذا الأستاذ فقط، بلا حدّ لعدد
+  // الاشتراكات. لا نعتمد على قائمة عامة كانت مقصوصة سابقاً (LIMIT 500)
+  // فكانت تُسقط تلاميذاً من تقرير المستحقات.
+  try {
+    const r = await srFetch(`${SR_SUPABASE_URL}/rest/v1/rpc/admin_teacher_due_sessions`, {
+      method: 'POST',
+      body: JSON.stringify({ p_teacher_id: String(t.teacherId || t.id || ''), p_teacher_name: String(t.name || '') }),
+    });
+    if (r.ok) {
+      const d = await r.json();
+      const rows = Array.isArray(d) ? d : (d && Array.isArray(d.data) ? d.data : null);
+      if (rows && rows.length) return { rows: rows, scoped: true };
+    }
+  } catch (e) { /* الدالة غير مطبّقة بعد — نرجع للمصدر القديم */ }
+  return { rows: null, scoped: false };
+}
+
 async function srtFinanceComputeDues() {
   const t = _srtFinanceTeacher;
   if (!t) return;
@@ -31086,9 +31104,15 @@ async function srtFinanceComputeDues() {
       await TeacherFinance.saveTeacherRate(id, inputRate, srtFinAdminName());
       t.rate = inputRate;
     }
-    const res = await TeacherFinance.computeDuesForTeacher(t, inputRate, srtFinAdminName());
+    const src = await srtFinanceLoadDuesSubs(t);
+    if (!src.scoped) {
+      srtShowToast('⚠️ لم يُطبَّق إصلاح قاعدة البيانات بعد — سيبقى الحساب ناقصاً. طبّق: 20260924140000_teacher_dues_complete_fix.sql', 'error');
+    }
+    const res = await TeacherFinance.computeDuesForTeacher(t, inputRate, srtFinAdminName(), src.rows);
     if (res.ok === false) {
-      srtShowToast(res.reason === 'invalid_rate'
+      srtShowToast(res.reason === 'truncated'
+        ? '⛔ قائمة الاشتراكات مقصوصة (500) — لم يتم تعديل المستحقات. طبّق ملف الإصلاح في Supabase'
+        : res.reason === 'invalid_rate'
         ? 'سعر الحصة غير صالح — لم يتم تعديل المستحقات'
         : 'تعذّر قراءة الاشتراكات الشهرية — لم يتم تعديل المستحقات', 'error');
       await srtFinanceRefresh();
