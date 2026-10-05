@@ -146,6 +146,13 @@ window.TeacherFinance = (function () {
     return n;
   }
 
+  // هل هذا الاشتراك دائم؟ (مطابقة SubscriptionService.isPermanent)
+  function SubscriptionServiceFlag(sub) {
+    if (!sub) return false;
+    if (sub.permanent === true) return true;
+    return String(sub.status || '').toLowerCase() === 'permanent';
+  }
+
   // ── Dues: تحويل حصص الاشتراكات الشهرية إلى مستحقات ───────
 
   // معرّف الدفتر ثابت (dues_teacher_student_subject) ⇒ إعادة التشغيل
@@ -207,9 +214,12 @@ window.TeacherFinance = (function () {
         subjectId: subjectId,
         subjectName: subjectName,
         count: 0,
+        perm: false,
       };
       b.count += used;
       if (!b.studentName) b.studentName = sub.student_name || '';
+      // تلميذ دائم: نبقي العلامة لعرضها في تقرير المستحقات
+      if (SubscriptionServiceFlag(sub)) b.perm = true;
       buckets.set(key, b);
     }
 
@@ -240,8 +250,9 @@ window.TeacherFinance = (function () {
         transaction_type: 'dues',
         status: 'pending',
         date: today(),
-        notes: b.count + ' حصة × ' + lessonRate + ' دج',
+        notes: (b.perm ? 'اشتراك دائم · ' : '') + b.count + ' حصة × ' + lessonRate + ' دج',
         admin_name: adminName || '',
+        permanent: b.perm,
       });
     }
 
