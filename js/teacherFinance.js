@@ -126,11 +126,16 @@ window.TeacherFinance = (function () {
     const st = String(sub.status || '').toLowerCase();
     // الاشتراك الملغى فقط هو ما يُستبعد.
     // الاشتراك الدائم يُحتسب بحصص الحضور المستهلكة فيه (used_sessions)،
-    // وهي نفس الآلية التي يزيد بها attendance.html العدّاد عند كل حضور،
-    // لأن الحضور يزيد periods.used_sessions للاشتراك الدائم أيضاً.
+    // وهي نفس الآلية التي يزيد بها attendance.html العدّاد عند كل حضور.
     if (st === 'cancelled') return false;
-    if (teacherId && sub.teacher_id) return String(sub.teacher_id) === String(teacherId);
-    if (teacherName && sub.teacher_name) return _norm(sub.teacher_name) === _norm(teacherName);
+    // المطابقة بالـid أو بالاسم — أيهما يكفي.
+    // كان الـid وحده يحسم الأمر ويرفض اشتراكاً قديم الـid حتى لو كان
+    // الاسم مطابقاً، فكان جدول الاشتراكات الشهري يحتسبه ومستحقات
+    // الأستاذ لا ⇒ فرق دائم بين المجموعين.
+    const byId = !!(teacherId && sub.teacher_id && String(sub.teacher_id) === String(teacherId));
+    const byName = !!(teacherName && sub.teacher_name && _norm(sub.teacher_name) === _norm(teacherName));
+    if (byId || byName) return true;
+    // لا مرجع مطابق إطلاقاً (اشتراك بلا أستاذ) ⇒ لا يُحتسب
     return false;
   }
 
