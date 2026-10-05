@@ -123,7 +123,10 @@ window.TeacherFinance = (function () {
 
   function _subBelongsToTeacher(sub, teacherId, teacherName) {
     if (!sub) return false;
-    if (String(sub.status || '') === 'cancelled') return false;
+    const st = String(sub.status || '').toLowerCase();
+    // الاشتراك الدائم (حصص غير محدودة) لا يدخل الحسابات المالية إطلاقاً،
+    // والاشتراك الملغى لا يُحتسب أيضاً.
+    if (st === 'cancelled' || st === 'permanent' || sub.permanent === true) return false;
     if (teacherId && sub.teacher_id) return String(sub.teacher_id) === String(teacherId);
     if (teacherName && sub.teacher_name) return _norm(sub.teacher_name) === _norm(teacherName);
     return false;
@@ -134,26 +137,6 @@ window.TeacherFinance = (function () {
     let n = 0;
     for (const p of periods) n += Number(p.used_sessions) || 0;
     return n;
-  }
-
-  // سعر الحصة المتفق عليه وقت التسجيل (إن وُجد) لكل (تلميذ + مادة)
-  function _buildRateLookup(registrations, teacherId, teacherName) {
-    const map = {};
-    for (const r of registrations) {
-      const sid = String(r.id);
-      const subjects = Array.isArray(r.subjects) ? r.subjects : [];
-      for (const s of subjects) {
-        const belongs = (s.teacherId && teacherId) ? String(s.teacherId) === String(teacherId)
-          : (s.teacher || s.teacherName) ? _norm(s.teacher || s.teacherName) === _norm(teacherName)
-          : false;
-        if (!belongs) continue;
-        const rate = Number(s.lessonRateAtTransaction);
-        if (!(rate > 0)) continue;
-        map[sid + '||' + _norm(s.subject || s.subjectName || '')] = rate;
-        if (s.subjectId) map[sid + '||' + _norm(s.subjectId)] = rate;
-      }
-    }
-    return map;
   }
 
   // ── Dues: تحويل حصص الاشتراكات الشهرية إلى مستحقات ───────
@@ -169,12 +152,16 @@ window.TeacherFinance = (function () {
     // تعذّر قراءة الاشتراكات ⇒ لا نكتب شيئاً إطلاقاً (لا تصفير ولا حذف).
     if (!subsRes.ok) {
       console.warn('[TeacherFinance] subscriptions unavailable — dues skipped for teacher', teacherId);
-      return { ok: false, duesRows: [], totalSessions: 0, studentCount: 0, rate: baseRate, removedRows: 0 };
+      return { ok: false, duesRows: [], totalSessions: 0, studentCount: 0, rate: baseRate, removedRows: 0, reason: 'subscriptions_unavailable' };
+    }
+    // سعر الحصة غير صالح ⇒ لا نكتب صفوفاً بمبلغ 0 (كان يفسد الدفتر).
+    if (!(baseRate > 0)) {
+      console.warn('[TeacherFinance] invalid rate — dues skipped for teacher', teacherId, baseRate);
+      return { ok: false, duesRows: [], totalSessions: 0, studentCount: 0, rate: baseRate, removedRows: 0, reason: 'invalid_rate' };
     }
 
     let registrations = [];
     try { registrations = await loadConfirmedRegistrations(); } catch (e) { registrations = []; }
-    const rateMap = _buildRateLookup(registrations, teacherId, teacherName);
     const nameMap = {};
     for (const r of registrations) {
       nameMap[String(r.id)] = ((r.first_name || '') + ' ' + (r.last_name || '')).trim() || String(r.id);
@@ -210,9 +197,10 @@ window.TeacherFinance = (function () {
 
     for (const key of buckets.keys()) {
       const b = buckets.get(key);
-      const lessonRate = rateMap[b.studentId + '||' + _norm(b.subjectName)]
-        || rateMap[b.studentId + '||' + _norm(b.subjectId)]
-        || baseRate;
+      // سعر واحد للجميع: سعر حصة الأستاذ. يضمن أن
+      // إجمالي المستحقات = مجموع الحصص × سعر الحصة بالضبط،
+      // بلا أسعار مختلفة لكل تلميذ (lessonRateAtTransaction) تُربك المطابقة.
+      const lessonRate = baseRate;
       const amount = b.count * lessonRate;
       uniqueStudents.add(b.studentId);
       totalSessions += b.count;

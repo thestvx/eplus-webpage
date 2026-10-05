@@ -30991,33 +30991,9 @@ async function srtFinanceRefresh() {
     const pendingEl = document.getElementById('srt-fin-card-pending');
     pendingEl.textContent = pendingVal.toLocaleString('ar-DZ') + ' دج';
     pendingEl.style.color = pendingVal <= 0 ? '#059669' : '#d97706';
-    // التلاميذ = عدد المشتركين في مواد الأستاذ (RPC) — الحصص = سجلات الحضور الفعلية
-    try {
-      const rpcRes = await srFetch(`${SR_SUPABASE_URL}/rest/v1/rpc/get_teacher_registered_students`, {
-        method: 'POST',
-        body: JSON.stringify({ p_teacher_id: id, p_teacher_name: t.name || '' }),
-      });
-      let studentsCount = bal.student_count || 0;
-      if (rpcRes.ok) {
-        try { const arr = await rpcRes.json(); if (Array.isArray(arr)) studentsCount = arr.length; } catch (e) {}
-      }
-      document.getElementById('srt-fin-card-students').textContent = studentsCount;
-    } catch (e) {
-      document.getElementById('srt-fin-card-students').textContent = bal.student_count || 0;
-    }
-    try {
-      const { getDocs, collection: cc3 } = srtFS();
-      const attestSnap = await getDocs(cc3(srtDB(), 'attendance_control'));
-      const tNameMatch = String(t.name || '').replace(/\s+/g, ' ').trim().toLowerCase().replace(/عبد\s+ال/g, 'abd');
-      const sessionCount = attestSnap.docs.filter(d => {
-        const dd = d.data();
-        const dn = String(dd.teacherName || '').replace(/\s+/g, ' ').trim().toLowerCase().replace(/عبد\s+ال/g, 'abd');
-        return dn === tNameMatch;
-      }).length;
-      document.getElementById('srt-fin-card-sessions').textContent = sessionCount || 0;
-    } catch (e) {
-      document.getElementById('srt-fin-card-sessions').textContent = bal.session_count || 0;
-    }
+    // التلاميذ والحصص أرقام الدفتر (نفس أساس احتساب المستحقات)
+    document.getElementById('srt-fin-card-students').textContent = bal.student_count || 0;
+    document.getElementById('srt-fin-card-sessions').textContent = bal.session_count || 0;
     if (bal.rate && document.getElementById('srt-finance-rate').value === '0') document.getElementById('srt-finance-rate').value = bal.rate;
 
     const ledger = await TeacherFinance.getLedger(id);
@@ -31033,7 +31009,7 @@ async function srtFinanceRefresh() {
           <div style="flex:1;min-width:220px">
             <div style="font-size:14px;font-weight:900;color:var(--text);display:flex;align-items:center;gap:8px;flex-wrap:wrap">مستحقات معلّقة
               <span style="font-size:10px;font-weight:800;background:rgba(245,158,11,0.15);color:#d97706;padding:2px 9px;border-radius:999px">${duesCount} بند</span></div>
-            <div style="font-size:12px;color:var(--text-muted);font-weight:600;margin-top:3px">تم احتساب المستحقات من الحضور ولم يُسدَّد بعد — سجّل الدفعة لإصدار الإيصال</div>
+            <div style="font-size:12px;color:var(--text-muted);font-weight:600;margin-top:3px">تم احتساب المستحقات من حصص الاشتراكات الشهرية ولم يُسدَّد بعد — سجّل الدفعة لإصدار الإيصال</div>
           </div>
           <div style="text-align:left">
             <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:4px">المبلغ المتبقي</div>
@@ -31090,18 +31066,30 @@ async function srtFinanceComputeDues() {
   const t = _srtFinanceTeacher;
   if (!t) return;
   const id = t.teacherId || t.id;
-  if (!(await cmConfirm('حساب المستحقات', 'سيتم احتساب مستحقات الأستاذ من قسم «الاشتراكات الشهرية»:\n\n• تُؤخذ حصص كل تلميذ من اشتراكاته الشهرية عند هذا الأستاذ (الحصص المستهلكة)\n• amount = عدد الحصص × سعر الحصة، ثم يُجمع المجموع مع باقي التلاميذ\n• تُحذف المستحقات القديمة التي لم تعد ناتجة عن الاشتراكات\n\nمتابعة؟', '🔄'))) return;
+  // السعر المعتمد = السعر الظاهر في الخانة (وليس سعراً مخزّناً قديماً)
+  const inputRate = parseInt(document.getElementById('srt-finance-rate').value, 10);
+  if (!inputRate || inputRate <= 0) { srtShowToast('⚠️ أدخل سعر حصة صحيح أولاً', 'error'); return; }
+  if (!(await cmConfirm('حساب المستحقات', 'سيتم احتساب مستحقات الأستاذ من قسم «الاشتراكات الشهرية»:\n\n• تُؤخذ حصص كل تلميذ من اشتراكاته الشهرية عند هذا الأستاذ (الحصص المستهلكة)\n• إجمالي المستحقات = مجموع الحصص × سعر الحصة (' + inputRate.toLocaleString('ar-DZ') + ' دج)\n• الاشتراك الدائم لا يُحتسب\n• تُحذف المستحقات القديمة التي لم تعد ناتجة عن الاشتراكات\n\nمتابعة؟', '🔄'))) return;
   document.getElementById('srt-finance-ledger').innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px 20px">'
     + '<div class="srt-spinner"></div>'
     + '<div style="font-size:13px;font-weight:800;color:var(--text);background:linear-gradient(135deg,rgba(124,58,237,0.12),rgba(124,58,237,0.05));border:1px solid rgba(124,58,237,0.2);padding:8px 18px;border-radius:10px">⏳ جارٍ حساب المستحقات من الاشتراكات الشهرية...</div>';
   try {
-    const res = await TeacherFinance.computeDuesForTeacher(t, t.rate || 0, srtFinAdminName());
+    // إن اختلف السعر المكتوب عن المخزّن نُحدّثه أولاً حتى لا يُحسب المستحق بسعر قديم
+    if (Number(t.rate || 0) !== inputRate) {
+      await TeacherFinance.saveTeacherRate(id, inputRate, srtFinAdminName());
+      t.rate = inputRate;
+    }
+    const res = await TeacherFinance.computeDuesForTeacher(t, inputRate, srtFinAdminName());
     if (res.ok === false) {
-      srtShowToast('تعذّر قراءة الاشتراكات الشهرية — لم يتم تعديل المستحقات', 'error');
+      srtShowToast(res.reason === 'invalid_rate'
+        ? 'سعر الحصة غير صالح — لم يتم تعديل المستحقات'
+        : 'تعذّر قراءة الاشتراكات الشهرية — لم يتم تعديل المستحقات', 'error');
       await srtFinanceRefresh();
       return;
     }
-    srtShowToast('✅ تم حساب ' + res.studentCount + ' تلميذ — ' + res.totalSessions + ' حصة'
+    const expected = res.totalSessions * inputRate;
+    srtShowToast('✅ ' + res.studentCount + ' تلميذ — ' + res.totalSessions + ' حصة × '
+      + inputRate.toLocaleString('ar-DZ') + ' = ' + expected.toLocaleString('ar-DZ') + ' دج'
       + (res.removedRows ? ' (حُذفت ' + res.removedRows + ' مستحقات قديمة)' : ''), 'success');
     await srtFinanceRefresh();
     srtShowDuesReport(res);
@@ -31515,11 +31503,14 @@ async function srtFinancePaymentDetails() {
   const totalDue = (bal.total_due != null) ? Number(bal.total_due) : dues.reduce(function(s, d) { return s + (Number(d.amount) || 0); }, 0);
   const pending = (bal.pending != null) ? Number(bal.pending) : (totalDue - totalPaid);
 
-  // ── المستحقات التفصيلية حسب الحضور ──
+  // ── المستحقات التفصيلية حسب حصص الاشتراكات الشهرية ──
   let duesHtml = '';
   if (dues.length === 0) {
-    duesHtml = '<div style="text-align:center;padding:22px;color:var(--text-muted);font-size:12px;font-weight:700">لا توجد مستحقات بعد — احسبها من زر «حساب المستحقات من الحضور»</div>';
+    duesHtml = '<div style="text-align:center;padding:22px;color:var(--text-muted);font-size:12px;font-weight:700">لا توجد مستحقات بعد — اضغط «احسب المستحقات»</div>';
   } else {
+    const duesSessions = dues.reduce(function(s, d) { return s + (Number(d.session_count) || 0); }, 0);
+    const duesSum = dues.reduce(function(s, d) { return s + (Number(d.amount) || 0); }, 0);
+    const shownRate = bal.rate || 0;
     duesHtml = '<div style="overflow:hidden;border:1px solid var(--border-light);border-radius:14px">'
       + '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>'
       + '<th style="padding:10px 14px;text-align:right;font-size:10.5px;font-weight:800;color:var(--text-muted);background:var(--bg);border-bottom:2px solid var(--border-light)">التلميذ</th>'
@@ -31535,8 +31526,17 @@ async function srtFinancePaymentDetails() {
           + '<td style="padding:10px 14px;text-align:left;font-weight:900;color:var(--green);direction:ltr">' + (d.amount || 0).toLocaleString('ar-DZ') + ' دج</td>'
           + '</tr>';
       }).join('')
-      + '</tbody></table></div>'
-      + '<div style="margin-top:10px;padding:9px 14px;background:rgba(124,58,237,0.04);border:1px dashed rgba(124,58,237,0.2);border-radius:10px;font-size:10.5px;color:var(--text-muted);font-weight:600">📏 كل حضور = حصة واحدة × سعر الحصة — تُحتسب تلقائياً من سجلات الحضور ولا تشمل الحصص المجانية.</div>';
+      + '</tbody><tfoot><tr style="background:linear-gradient(180deg,rgba(124,58,237,0.08),rgba(124,58,237,0.02));border-top:2px solid rgba(124,58,237,0.28)">'
+        + '<td style="padding:11px 14px;font-weight:900;color:var(--primary)">∑ المجموع (' + dues.length + ' صف)</td>'
+        + '<td style="padding:11px 14px;font-size:11px;font-weight:800;color:var(--text-muted)">'
+          + duesSessions + ' حصة × ' + (shownRate || '—') + ' دج'
+          + (shownRate && duesSessions * shownRate !== duesSum
+            ? ' <span style="color:#dc2626">(غير مطابق — راجع السجلات القديمة)</span>' : '')
+        + '</td>'
+        + '<td style="padding:11px 14px;text-align:center;font-weight:900;color:var(--primary);font-size:14px">' + duesSessions + '</td>'
+        + '<td style="padding:11px 14px;text-align:left;font-weight:900;color:var(--green);font-size:14px;direction:ltr">' + duesSum.toLocaleString('ar-DZ') + ' دج</td>'
+        + '</tr></tfoot></table></div>'
+      + '<div style="margin-top:10px;padding:9px 14px;background:rgba(124,58,237,0.04);border:1px dashed rgba(124,58,237,0.2);border-radius:10px;font-size:10.5px;color:var(--text-muted);font-weight:600">📏 المستحق = حصص الاشتراك الشهري (الحصص المستهلكة) × سعر الحصة. الاشتراك الدائم والملغى غير محسوبين.</div>';
   }
 
   // ── الدفعات المسجلة ──
