@@ -445,6 +445,10 @@
     body.emp-hide-money button[onclick*="subxPrintReceipt"] { display:none !important; }
     /* ── استثناء موظفي الاستقبال: زر طباعة وصل الاشتراك يبقى ظاهراً رغم إخفاء المبالغ ── */
     body.emp-hide-money.rec-print-receipt button[onclick*="subxPrintReceipt"] { display:inline-block !important; }
+    /* ── استثناء موظفي الاستقبال: تظهر إعدادات الباقة المخصصة كاملة (عدد الحصص + السعر + الاسم)
+         حتى يتمكنوا من إنشاء اشتراك بباقة مخصصة مثل الأدمن، تماماً كما تظهر لهم مبالغ وصل القبض ── */
+    body.emp-hide-money.rec-custom-price .subx-custom-price-field { display:block !important; }
+    body.emp-hide-money.rec-custom-price #subx-custom-presets .subx-pkg .p-price { display:block !important; }
 
     /* ===== CAMP V2 DETAIL MODAL ===== */
     .camp2-detail-hero{display:flex;align-items:center;gap:14px;padding:16px 18px;margin-bottom:16px;background:linear-gradient(135deg,rgba(249,115,22,0.14),rgba(249,115,22,0.05));border:1px solid rgba(249,115,22,0.28);border-radius:16px}
@@ -6121,7 +6125,7 @@ function receptionCfgFrom(acc, uid) {
     role: RECEPTION_ROLE_NAME,
     allowedSections: (base.allowedSections || []).slice(),
     showWebsite: false,
-    restrictions: Object.assign({ subxHideAttendance: true, subxAllowPrint: true }, base.restrictions || {})
+    restrictions: Object.assign({ subxHideAttendance: true, subxAllowPrint: true, subxAllowCustomPrice: true }, base.restrictions || {})
   };
 }
 window.RECEPTION_ROLE_NAME = RECEPTION_ROLE_NAME;
@@ -6135,6 +6139,9 @@ function applyEmployeeMode(cfg) {
   }
   if (cfg.restrictions.subxAllowPrint) {
     document.body.classList.add('rec-print-receipt');
+  }
+  if (cfg.restrictions.subxAllowCustomPrice) {
+    document.body.classList.add('rec-custom-price');
   }
 
   // ── الـ sidebar: إظهار الأقسام المسموحة فقط ──
@@ -26347,7 +26354,10 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700;width:130px">الطالب</td><td style="padding:5px 6px;font-weight:800">' + escX(name) + ' <span style="font-family:monospace;font-size:11px;color:var(--text-muted)">' + escX(selectedStudent.id) + '</span></td></tr>';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">المادة — الأستاذ</td><td style="padding:5px 6px;font-weight:800">' + (selectedSubject ? escX(selectedSubject.icon + ' ' + selectedSubject.subjectName + ' — ' + (selectedSubject.teacherName || '—')) : '<span style="color:#b45309">لم تُختر بعد</span>') + '</td></tr>';
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">الباقة</td><td style="padding:5px 6px;font-weight:800">' + escX(label) + '</td></tr>';
-    if (!(window._employeeRestrictions && window._employeeRestrictions.subxHideMoney) && !isPermanent) {
+    // السعر يُعرض للأدمن دائماً، وللاستقبال في الباقة المخصصة فقط (باقي الأسعار تبقى مخفية)
+    var _r = window._employeeRestrictions;
+    var showPriceRow = !isPermanent && !!(!(_r && _r.subxHideMoney) || (_r && _r.subxAllowCustomPrice && isCustom));
+    if (showPriceRow) {
       html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">السعر</td><td style="padding:5px 6px;font-weight:800;color:#059669">' + SubscriptionService.fmtPrice(price) + '</td></tr>';
     }
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">عدد الحصص</td><td style="padding:5px 6px;font-weight:800">' + sessions + (isPermanent ? ' — الحضور مسموح دائماً' : ' حصة') + '</td></tr>';
