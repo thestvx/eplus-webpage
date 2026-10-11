@@ -26597,12 +26597,17 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         await cmShow('✅', 'تم بنجاح', successHtml, { hideCancel: true, confirmText: 'موافق', success: true });
       } catch (e) { console.warn('[SUBSCRIPTIONS] success modal failed', e); }
       srShowToast('🎉 تم إنشاء اشتراك ' + label + ' للتلميذ ' + name + ' بنجاح — وهو ظاهر الآن في القائمة.', 'success');
-      // ── خطوة أخيرة إلزامية: طباعة وصل الاشتراك للتلميذ (بالحساب الحالي: أدمن أو موظف استقبال) ──
+      // ── خطوة أخيرة: نافذة طباعة وصل الاشتراك للتلميذ — لا تُطبع تلقائياً، المستخدم يضغط الزر ──
       if (subObj && subObj.id) {
         try {
-          srShowToast('🖨️ جاري طباعة وصل الاشتراك…', 'success');
-          await subxPrintReceiptThermal(subObj.id);
-        } catch (e) { console.warn('[SUBSCRIPTIONS] post-create print failed', e); }
+          const printAsk = await cmShow('🧾', 'طباعة وصل الاشتراك',
+            'تم إنشاء الاشتراك بنجاح.<br><br>اضغط زر <b>طباعة وصل الاشتراك</b> لإصدار وصل التلميذ <b>' + escX(name) + '</b> الآن.',
+            { confirmText: '🖨️ طباعة وصل الاشتراك', cancelText: 'لاحقاً', success: true });
+          if (printAsk) {
+            srShowToast('🖨️ جاري طباعة وصل الاشتراك…', 'success');
+            await subxPrintReceiptThermal(subObj.id);
+          }
+        } catch (e) { console.warn('[SUBSCRIPTIONS] post-create print prompt failed', e); }
       }
       if (window.dashLog) window.dashLog('اشتراكات', 'إنشاء اشتراك', 'تم إنشاء اشتراك ' + label + ' للتلميذ ' + name + (isPermanent ? '' : ' (' + SubscriptionService.fmtPrice(price) + ')') + ' — ' + selectedSubject.subjectName + (selectedSubject.teacherName ? ' / ' + selectedSubject.teacherName : ''));
     } catch (e) {
@@ -27986,14 +27991,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     return m + ' شهرًا';
   }
 
-  // اسم الحساب الذي أنشأ/طبَع الوصل (أدمن أو موظف استقبال) + دوره
+  // اسم الحساب الذي أنشأ/طبَع الوصل (أدمن أو حساب استقبال) — الاسم فقط
   window._subxOperatorLabel = function () {
-    var name = '', role = '', mail = '';
+    var name = '', mail = '';
     try { var an = document.getElementById('admin-name'); if (an) name = (an.textContent || '').trim(); } catch (e) {}
-    try { var ar = document.querySelector('.admin-role'); if (ar) role = String(ar.textContent || '').replace(/\s+/g, ' ').trim().replace(/^👔\s*/, ''); } catch (e) {}
     try { mail = (window._auth && window._auth.currentUser && window._auth.currentUser.email) || ''; } catch (e) {}
     if (!name) name = mail || '';
-    return (name ? name : '—') + (role ? ' — ' + role : '');
+    return name || '—';
   };
 
   window.subxPrintReceipt = async function (id) {
