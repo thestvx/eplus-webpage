@@ -260,7 +260,10 @@
       }
       if (b.type === 'footer') {
         var _fbPad = num(b.spacingBottom) > 0 ? 'padding-bottom:calc(var(--s)*' + fmtNum(b.spacingBottom) + 'mm);' : '';
-        html += '<div data-rb="' + b.key + '" class="rb rb-footer" style="' + fs(b) + ';' + sTop(b) + ';text-align:' + (b.align || 'center') + ';font-weight:' + (b.bold ? '900' : '400') + ';' + _fbPad + '">' + numSpan(rec.footerText != null ? rec.footerText : t.footerText, t) + '</div>';
+        html += '<div data-rb="' + b.key + '" class="rb rb-footer" style="' + fs(b) + ';' + sTop(b) + ';text-align:' + (b.align || 'center') + ';font-weight:' + (b.bold ? '900' : '400') + ';' + _fbPad + '">' +
+          numSpan(rec.footerText != null ? rec.footerText : t.footerText, t) +
+          (rec.printedBy ? '<div style="margin-top:calc(var(--s)*1.2mm);line-height:1.6">' + esc(rec.printedBy) + '</div>' : '') +
+          '</div>';
         return;
       }
       var isTitle = b.type === 'title';

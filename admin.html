@@ -26597,6 +26597,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         await cmShow('✅', 'تم بنجاح', successHtml, { hideCancel: true, confirmText: 'موافق', success: true });
       } catch (e) { console.warn('[SUBSCRIPTIONS] success modal failed', e); }
       srShowToast('🎉 تم إنشاء اشتراك ' + label + ' للتلميذ ' + name + ' بنجاح — وهو ظاهر الآن في القائمة.', 'success');
+      // ── خطوة أخيرة إلزامية: طباعة وصل الاشتراك للتلميذ (بالحساب الحالي: أدمن أو موظف استقبال) ──
+      if (subObj && subObj.id) {
+        try {
+          srShowToast('🖨️ جاري طباعة وصل الاشتراك…', 'success');
+          await subxPrintReceiptThermal(subObj.id);
+        } catch (e) { console.warn('[SUBSCRIPTIONS] post-create print failed', e); }
+      }
       if (window.dashLog) window.dashLog('اشتراكات', 'إنشاء اشتراك', 'تم إنشاء اشتراك ' + label + ' للتلميذ ' + name + (isPermanent ? '' : ' (' + SubscriptionService.fmtPrice(price) + ')') + ' — ' + selectedSubject.subjectName + (selectedSubject.teacherName ? ' / ' + selectedSubject.teacherName : ''));
     } catch (e) {
       const msg = String((e && e.message) || e);
@@ -27979,6 +27986,16 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     return m + ' شهرًا';
   }
 
+  // اسم الحساب الذي أنشأ/طبَع الوصل (أدمن أو موظف استقبال) + دوره
+  window._subxOperatorLabel = function () {
+    var name = '', role = '', mail = '';
+    try { var an = document.getElementById('admin-name'); if (an) name = (an.textContent || '').trim(); } catch (e) {}
+    try { var ar = document.querySelector('.admin-role'); if (ar) role = String(ar.textContent || '').replace(/\s+/g, ' ').trim().replace(/^👔\s*/, ''); } catch (e) {}
+    try { mail = (window._auth && window._auth.currentUser && window._auth.currentUser.email) || ''; } catch (e) {}
+    if (!name) name = mail || '';
+    return (name ? name : '—') + (role ? ' — ' + role : '');
+  };
+
   window.subxPrintReceipt = async function (id) {
     try {
       const d = await SubscriptionService.adminSubscriptionDetail(id);
@@ -27996,6 +28013,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       const words = _numArWords(sub.total_price);
       const studentName = studentFullName(stu) || (sub.student_name || sub.student_id || '—');
       const today = SubscriptionService.fmtAr(SubscriptionService.today(), true);
+      const opLabel = (window._subxOperatorLabel ? window._subxOperatorLabel() : '') || (window._auth && window._auth.currentUser && window._auth.currentUser.email) || '—';
 
       const w = window.open('', '_blank', 'width=850,height=1100');
       if (!w) { showToast('⚠️ تعذّر فتح نافذة الطباعة (مانع النوافذ المنبثقة)', true); return; }
@@ -28149,9 +28167,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           '<div class="rcpt-sigs">' +
             '<div class="rcpt-sig"><div class="rcpt-sig-line"></div><div class="rcpt-sig-label">توقيع ولي التلميذ</div></div>' +
             '<div class="rcpt-mid"><img src="schoollogo/schoollogoblack.PNG" alt="logo"><span>E-PLUS</span></div>' +
-            '<div class="rcpt-sig"><div class="rcpt-sig-line"></div><div class="rcpt-sig-label">الإدارة: ' + esc((window._auth && window._auth.currentUser && window._auth.currentUser.email) || '—') + '</div></div>' +
+            '<div class="rcpt-sig"><div class="rcpt-sig-line"></div><div class="rcpt-sig-label">الإدارة: ' + esc(opLabel) + '</div></div>' +
           '</div>' +
-          '<div class="rcpt-footer">وصل إلكتروني رسمي صادر عبر نظام إدارة أكاديمية التعليم والدعم المدرسي — يُحتفظ به للرجوع إليه</div>' +
+          '<div class="rcpt-footer">وصل إلكتروني رسمي صادر عبر نظام إدارة أكاديمية التعليم والدعم المدرسي — يُحتفظ به للرجوع إليه' + (opLabel && opLabel !== '—' ? '<br>طُبع بواسطة: ' + esc(opLabel) : '') + '</div>' +
         '</div>' +
         '<button class="print-btn no-print" onclick="window.print()">طباعة</button>' +
         '<script>window.onafterprint=function(){setTimeout(function(){window.close();},200)};' +
@@ -28185,6 +28203,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       const words = _numArWords(sub.total_price);
       const studentName = studentFullName(stu) || (sub.student_name || sub.student_id || '—');
       const today = SubscriptionService.fmtAr(SubscriptionService.today(), true);
+      const opLabel = (window._subxOperatorLabel ? window._subxOperatorLabel() : '') || (window._auth && window._auth.currentUser && window._auth.currentUser.email) || '';
       const fmtAr = ar => {
         const s = String(ar == null ? '' : ar);
         if (s.length <= 10) return (s || '—');
@@ -28195,7 +28214,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         centerName: tpl.centerName,
         receiptTitle: tpl.receiptTitle,
         footerText: tpl.footerText,
-        adminEmail: (window._auth && window._auth.currentUser && window._auth.currentUser.email) || '',
+        adminEmail: opLabel,
+        printedBy: opLabel ? 'طُبع هذا الوصل بواسطة حساب: ' + opLabel : '',
         orderId: sub.id || '',
         studentName: studentName,
         studentId: sub.student_id || '',
