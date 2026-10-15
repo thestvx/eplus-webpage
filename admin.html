@@ -4561,8 +4561,13 @@
                 <option value="">كل المواد</option>
               </select>
               <input type="date" id="subx-logs-date" onchange="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+              <select id="subx-logs-first8" onchange="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+                <option value="">كل الحصص</option>
+                <option value="first8">🎯 أول 8 حصص لكل تلميذ</option>
+              </select>
               <button class="tbl-action" onclick="subxLogsFilter()" style="font-size:12px;border-color:rgba(16,185,129,0.3);color:#059669">🔄 تحديث</button>
               <button class="tbl-action" onclick="subxExportLogsCSV()" style="font-size:12px;border-color:rgba(99,102,241,0.3);color:#6366f1">📥 CSV</button>
+              <button class="tbl-action" onclick="subxShowArchivedLogs()" style="font-size:12px;border-color:rgba(16,185,129,0.3);color:#059669">📦 الحضور المؤرشف</button>
               <button class="tbl-action" onclick="subxShowDeletedLogs()" style="font-size:12px;border-color:rgba(245,158,11,0.35);color:#d97706">🗂️ المحذوفة</button>
               <button class="tbl-action" onclick="subxShowClearPinModal()" style="font-size:12px;border-color:rgba(220,38,38,0.3);color:#dc2626">🗑️ مسح السجلات</button>
             </div>
@@ -4606,6 +4611,25 @@
             </div>
             <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;padding:10px 14px;background:rgba(245,158,11,0.06);border:1px dashed rgba(245,158,11,0.25);border-radius:10px;line-height:1.7">سجلات الحضور المحذوفة تُحفظ هنا مع <b>تاريخ ووقت الحذف</b> تلقائياً، وتُزال من القائمة الرئيسية. يمكنك استعادتها في أي وقت.<br><span style="font-size:11px;color:#d97706">كما تُعرض هنا السجلات المُلغاة أو غير المؤكّدة حتى لا يختفي أي حضور نهائياً.</span></div>
             <div id="subx-deleted-logs-body" style="font-size:12px;color:var(--text-muted)">جارٍ تحميل السجلات المحذوفة…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== ARCHIVED ATTENDANCE LOGS MODAL ===== -->
+      <div class="teacher-modal-bg" id="subx-archived-logs-modal">
+        <div class="teacher-modal" style="max-width:860px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.2)">📦</div>
+            <div class="teacher-modal-title">الحضور المؤرشف</div>
+            <button class="att-modal-close" onclick="document.getElementById('subx-archived-logs-modal').classList.remove('open')">✕</button>
+          </div>
+          <div class="teacher-modal-body" style="overflow:auto;max-height:72vh;padding:22px 26px">
+            <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+              <input type="text" id="subx-archived-search" placeholder="🔍 بحث بالطالب أو الأستاذ..." oninput="subxArchivedFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;flex:1;min-width:160px;background:var(--card)">
+              <button class="tbl-action" onclick="subxShowArchivedLogs()" style="font-size:12px;border-color:rgba(16,185,129,0.3);color:#059669">🔄 تحديث</button>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;padding:10px 14px;background:rgba(16,185,129,0.06);border:1px dashed rgba(16,185,129,0.25);border-radius:10px;line-height:1.7">تُحفظ هنا الحصص المؤرشفة (أول 8 حصص حضرها كل تلميذ عند الأستاذ) مع <b>تاريخ ووقت الأرشفة</b> والموظف الذي أرشفها، وتُخصم من سجل الحضور الحيّ. يمكنك استعادتها إلى سجل الحضور في أي وقت.</div>
+            <div id="subx-archived-logs-body" style="font-size:12px;color:var(--text-muted)">جارٍ تحميل الحضور المؤرشف…</div>
           </div>
         </div>
       </div>
@@ -6215,7 +6239,7 @@ function applyEmployeeMode(cfg) {
       if (cfg.restrictions.srtReadOnly)
         document.querySelectorAll('button[onclick*="srtOpenAddModal"], button[onclick*="srtOpenEditModal"], button[onclick*="srtResetPassword"], button[onclick*="srtConfirmResetPassword"], button[onclick*="srtToggleStatus"], button[onclick*="srtDelete"], button[onclick*="srtOpenFinance"], button[onclick*="srtFinanceAddPayment"], button[onclick*="srtFinanceDeleteTx"], button[onclick*="srtFinanceComputeDues"], button[onclick*="srtTreasuryAdjust"], button[onclick*="srtFinanceSaveRate"], button[onclick*="srtAddSubjectRow"]').forEach(b => b.style.display = 'none');
       if (cfg.restrictions.subxHideAttendance)
-        document.querySelectorAll('button[onclick*="subxCancelAttendance"], button[onclick*="subxShowAllLogs"], button[onclick*="subxShowDeletedLogs"], button[onclick*="subxExportLogsCSV"], button[onclick*="subxDeleteLog"]').forEach(b => b.style.display = 'none');
+        document.querySelectorAll('button[onclick*="subxCancelAttendance"], button[onclick*="subxShowAllLogs"], button[onclick*="subxShowDeletedLogs"], button[onclick*="subxExportLogsCSV"], button[onclick*="subxDeleteLog"], button[onclick*="subxArchiveFirst8"], button[onclick*="subxShowArchivedLogs"]').forEach(b => b.style.display = 'none');
       if (cfg.restrictions.prwNoLogActions)
         document.querySelectorAll('button[onclick*="prwLogConfirm"], button[onclick*="prwLogUndo"]').forEach(b => b.style.display = 'none');
       if (cfg.restrictions.attNoSessionControl)
@@ -6280,6 +6304,10 @@ if (cfg.restrictions.srNoConfirmFree) {
     window.subxShowDeletedLogs = () => showToast('⛔ ليس لديك صلاحية فتح السجلات المحذوفة', true);
     window.subxRestoreDeletedLog = () => showToast('⛔ ليس لديك صلاحية استعادة سجلات الحضور', true);
     window.subxRestoreAllDeletedLogs = () => showToast('⛔ ليس لديك صلاحية استعادة سجلات الحضور', true);
+    window.subxArchiveFirst8 = () => showToast('⛔ ليس لديك صلاحية أرشفة الحضور', true);
+    window.subxShowArchivedLogs = () => showToast('⛔ ليس لديك صلاحية فتح الحضور المؤرشف', true);
+    window.subxRestoreArchivedLog = () => showToast('⛔ ليس لديك صلاحية استعادة الحضور المؤرشف', true);
+    window.subxArchivedFilter = () => {};
     window.subxShowClearPinModal = () => showToast('⛔ ليس لديك صلاحية مسح سجلات الحضور', true);
     window.subxConfirmClearLogs = () => showToast('⛔ ليس لديك صلاحية مسح سجلات الحضور', true);
     const _sm = document.getElementById('subx-logs-modal');
@@ -27462,14 +27490,36 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     }
   };
 
+  // ── مجموعة معرّفات «أول 8 حصص» لكل (تلميذ + أستاذ + مادة) ──
+  function _subxFirst8IdSet() {
+    var groups = {};
+    (window._subxLogsData || []).forEach(function (r) {
+      if (r.cancelled) return;
+      var key = String(r.studentId || r.studentName || '') + '|' + String(r.teacherName || '') + '|' + String(r.subjectName || '');
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(r);
+    });
+    var set = {};
+    Object.keys(groups).forEach(function (key) {
+      var arr = groups[key].slice().sort(function (a, b) { return (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')); });
+      arr.slice(0, 8).forEach(function (r) { set[r.id] = true; });
+    });
+    return set;
+  }
+  window._subxFirst8IdSet = _subxFirst8IdSet;
+
   // ── جلب السجلات المفلترة حسب الفلتر الحالي ──
   function _getFilteredLogs() {
     var q = (document.getElementById('subx-logs-search').value || '').trim().toLowerCase();
     var dateFilter = document.getElementById('subx-logs-date').value || '';
     var teacherFilter = document.getElementById('subx-logs-teacher').value || '';
     var subjectFilter = document.getElementById('subx-logs-subject').value || '';
+    var first8El = document.getElementById('subx-logs-first8');
+    var first8 = !!(first8El && first8El.value === 'first8');
+    var first8Set = first8 ? _subxFirst8IdSet() : null;
     return (window._subxLogsData || []).filter(function (r) {
       if (r.cancelled) return false;
+      if (first8 && !first8Set[r.id]) return false;
       if (dateFilter && r.date !== dateFilter) return false;
       if (teacherFilter && r.teacherName !== teacherFilter) return false;
       if (subjectFilter && r.subjectName !== subjectFilter) return false;
@@ -27660,18 +27710,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   };
 
   window.subxLogsFilter = function () {
-    const q = (document.getElementById('subx-logs-search').value || '').trim().toLowerCase();
-    const dateFilter = document.getElementById('subx-logs-date').value || '';
-    const teacherFilter = document.getElementById('subx-logs-teacher').value || '';
-    const subjectFilter = document.getElementById('subx-logs-subject').value || '';
-    const rows = (window._subxLogsData || []).filter(r => {
-      if (r.cancelled) return false;
-      if (dateFilter && r.date !== dateFilter) return false;
-      if (teacherFilter && r.teacherName !== teacherFilter) return false;
-      if (subjectFilter && r.subjectName !== subjectFilter) return false;
-      if (q && !(r.studentName + ' ' + r.studentId + ' ' + r.subjectName + ' ' + r.teacherName).toLowerCase().includes(q)) return false;
-      return true;
-    });
+    const rows = _getFilteredLogs();
+    const first8El = document.getElementById('subx-logs-first8');
+    const first8 = !!(first8El && first8El.value === 'first8');
     const c = document.getElementById('subx-logs-body');
     if (!rows.length) {
       c.innerHTML = '<div style="text-align:center;padding:14px;color:var(--text-muted);border:1px dashed var(--border);border-radius:12px">لا توجد سجلات حضور</div>';
@@ -27698,11 +27739,11 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       h += '<td style="padding:7px 10px">' + escX(r.subjectName || '—') + '</td>';
       h += '<td style="padding:7px 10px">' + escX(r.teacherName || '—') + '</td>';
       h += '<td style="padding:7px 10px;text-align:center">' + typeLabel + '</td>';
-      h += '<td style="padding:7px 10px;text-align:center"><button onclick="subxDeleteLog(\'' + r.id + '\',\'' + escX(r.studentName || '').replace(/'/g, "\\'") + '\',\'' + escX(r.date) + '\')" style="background:rgba(220,38,38,0.1);color:#dc2626;border:1px solid rgba(220,38,38,0.25);border-radius:8px;padding:4px 12px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.background=\'rgba(220,38,38,0.2)\'" onmouseout="this.style.background=\'rgba(220,38,38,0.1)\'">🗑️ حذف</button></td>';
+      h += '<td style="padding:7px 10px;text-align:center"><button onclick="subxArchiveFirst8(\'' + escX(r.studentId || '') + '\',\'' + escX(r.teacherName || '').replace(/'/g, "\\'") + '\',\'' + escX(r.subjectName || '').replace(/'/g, "\\'") + '\',\'' + escX(r.studentName || '').replace(/'/g, "\\'") + '\')" style="background:rgba(16,185,129,0.1);color:#059669;border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:4px 12px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit;transition:all .15s;margin-inline-start:6px" onmouseover="this.style.background=\'rgba(16,185,129,0.2)\'" onmouseout="this.style.background=\'rgba(16,185,129,0.1)\'">📦 أرشفة أول 8</button><button onclick="subxDeleteLog(\'' + r.id + '\',\'' + escX(r.studentName || '').replace(/'/g, "\\'") + '\',\'' + escX(r.date) + '\')" style="background:rgba(220,38,38,0.1);color:#dc2626;border:1px solid rgba(220,38,38,0.25);border-radius:8px;padding:4px 12px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit;transition:all .15s;margin-inline-start:6px" onmouseover="this.style.background=\'rgba(220,38,38,0.2)\'" onmouseout="this.style.background=\'rgba(220,38,38,0.1)\'">🗑️ حذف</button></td>';
       h += '</tr>';
     });
     h += '</tbody></table></div>';
-    h += '<div style="text-align:center;margin-top:10px;font-size:11px;color:var(--text-muted)">إجمالي السجلات: ' + rows.length + '</div>';
+    h += '<div style="text-align:center;margin-top:10px;font-size:11px;color:var(--text-muted)">إجمالي السجلات: ' + rows.length + (first8 ? ' · عرض «أول 8 حصص» لكل تلميذ عند الأستاذ' : '') + '</div>';
     c.innerHTML = h;
   };
 
@@ -27741,6 +27782,175 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     } catch (e) {
       console.error('[SUBSCRIPTIONS] delete log failed', e);
       showToast('❌ ' + ((e && e.message) || 'تعذر حذف السجل'), true);
+    }
+  };
+
+  // ── أرشفة «أول 8 حصص» لتلميذ عند أستاذ (نقل من السجل الحي إلى الأرشيف) ──
+  function _subxArchiveGroupKey(r) {
+    return String(r.studentId || r.studentName || '') + '|' + String(r.teacherName || '') + '|' + String(r.subjectName || '');
+  }
+
+  window.subxArchiveFirst8 = async function (studentId, teacherName, subjectName, studentName) {
+    const { _db: fdb, _firestore: fs } = window;
+    if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); return; }
+    var groupKey = String(studentId || studentName || '') + '|' + String(teacherName || '') + '|' + String(subjectName || '');
+    var group = (window._subxLogsData || []).filter(function (r) {
+      return !r.cancelled && _subxArchiveGroupKey(r) === groupKey;
+    }).sort(function (a, b) { return (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')); });
+    if (!group.length) { showToast('⚠️ لا توجد حصص لهذا التلميذ عند هذا الأستاذ', true); return; }
+    var first8 = group.slice(0, 8);
+    var label = (studentName || studentId || '—') + ' — ' + (subjectName || 'مادة') + ' / ' + (teacherName || 'أستاذ');
+    var ok = await cmConfirm('أرشفة أول 8 حصص',
+      'أرشفة <b>' + first8.length + '</b> حصة (أول 8 حصص حضرها) للتلميذ:<br><b>' + escX(label) + '</b><br><span style="color:#059669;font-size:11px;font-weight:800">📦 ستُنقل من سجل الحضور الحيّ إلى «الحضور المؤرشف» مع إمكانية استعادتها لاحقاً.</span>',
+      '📦', { confirmText: 'نعم، أرشف' });
+    if (!ok) return;
+    try {
+      var now = new Date();
+      var archivedBy = (typeof window._subxOperatorLabel === 'function') ? window._subxOperatorLabel() : ((window._auth && window._auth.currentUser && (window._auth.currentUser.name || window._auth.currentUser.email)) || 'admin');
+      var batch = fs.writeBatch(fdb);
+      var ops = 0;
+      var batches = [];
+      var moved = 0;
+      for (var i = 0; i < first8.length; i++) {
+        var r = first8[i];
+        var srcRef = fs.doc(fdb, 'support_attendance', r.id);
+        var srcSnap = await fs.getDoc(srcRef);
+        if (!srcSnap.exists()) continue;
+        var data = srcSnap.data();
+        var archDoc = Object.assign({}, data, {
+          _archivedAt: now.toISOString(),
+          _archivedDate: now.toLocaleString('ar-DZ'),
+          _archivedBy: archivedBy,
+          _archivedFrom: 'subscriptions_first8'
+        });
+        batch.set(fs.doc(fdb, 'support_attendance_archive', 'a_' + r.id), archDoc);
+        batch.delete(srcRef);
+        ops += 2; moved++;
+        if (ops >= 450) { batches.push(batch); batch = fs.writeBatch(fdb); ops = 0; }
+      }
+      if (ops > 0) batches.push(batch);
+      for (var bi = 0; bi < batches.length; bi++) { await batches[bi].commit(); }
+      showToast('📦 تم أرشفة ' + moved + ' حصة إلى «الحضور المؤرشف»');
+      if (window.dashLog) window.dashLog('اشتراكات', 'أرشفة أول 8 حصص', 'أرشفة ' + moved + ' حصة للتلميذ ' + (studentName || studentId || '') + ' عند الأستاذ ' + (teacherName || '') + ' (' + (subjectName || '') + ')');
+      if (typeof subxShowAllLogs === 'function') await subxShowAllLogs();
+    } catch (e) {
+      console.error('[SUBSCRIPTIONS] archive first8 failed', e);
+      showToast('❌ ' + ((e && e.message) || 'تعذر الأرشفة'), true);
+    }
+  };
+
+  // ── عرض «الحضور المؤرشف» ──
+  window.subxShowArchivedLogs = async function () {
+    const modal = document.getElementById('subx-archived-logs-modal');
+    const body = document.getElementById('subx-archived-logs-body');
+    if (modal) modal.classList.add('open');
+    if (body) body.innerHTML = '<div style="text-align:center;padding:18px;color:var(--text-muted)">جارٍ تحميل الحضور المؤرشف…</div>';
+    try {
+      const { _db: fdb, _firestore: fs } = window;
+      if (!fdb || !fs) { if (body) body.innerHTML = '<div style="text-align:center;padding:12px;color:#dc2626">Firebase غير متاح</div>'; return; }
+      const snap = await fs.getDocs(fs.collection(fdb, 'support_attendance_archive'));
+      const rows = [];
+      snap.forEach(d => {
+        const r = d.data();
+        rows.push({
+          id: d.id,
+          studentId: r.studentId || '',
+          studentName: r.studentName || '',
+          date: r.date || '',
+          time: r.checkInTime || r.createdAt || '',
+          teacherName: r.teacherName || '',
+          subjectName: r.subjectName || '',
+          type: r.type || '',
+          archivedAt: r._archivedAt || '',
+          archivedDate: r._archivedDate || '',
+          archivedBy: r._archivedBy || ''
+        });
+      });
+      rows.sort((a, b) => (b.archivedAt || '').localeCompare(a.archivedAt || ''));
+      window._subxArchivedData = rows;
+      var searchInput = document.getElementById('subx-archived-search');
+      if (searchInput) searchInput.value = '';
+      subxArchivedFilter();
+    } catch (e) {
+      console.error('[SUBSCRIPTIONS] load archived logs failed', e);
+      if (body) body.innerHTML = '<div style="text-align:center;padding:12px;color:#dc2626">تعذر تحميل الحضور المؤرشف</div>';
+    }
+  };
+
+  window.subxArchivedFilter = function () {
+    const q = (document.getElementById('subx-archived-search').value || '').trim().toLowerCase();
+    const rows = (window._subxArchivedData || []).filter(r => {
+      if (q && !(r.studentName + ' ' + r.studentId + ' ' + r.subjectName + ' ' + r.teacherName + ' ' + r.archivedBy).toLowerCase().includes(q)) return false;
+      return true;
+    });
+    const c = document.getElementById('subx-archived-logs-body');
+    if (!c) return;
+    if (!rows.length) {
+      c.innerHTML = '<div style="text-align:center;padding:14px;color:var(--text-muted);border:1px dashed var(--border);border-radius:12px">لا توجد حصص مؤرشفة بعد</div>';
+      return;
+    }
+    const typeLabel = {
+      'grace_session': '<span style="color:#d97706">⚠️ حصّة مجانية</span>',
+      'trial_session': '<span style="color:#f59e0b">🟠 حصة تجريبية</span>'
+    };
+    let h = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px">';
+    h += '<thead><tr style="background:rgba(16,185,129,0.06)">';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">تاريخ الأرشفة</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">التاريخ</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الوقت</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الطالب</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">رقم التسجيل</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">المادة</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الأستاذ</th>';
+    h += '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">النوع</th>';
+    h += '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">إجراءات</th>';
+    h += '</tr></thead><tbody>';
+    rows.forEach(r => {
+      h += '<tr style="border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'rgba(16,185,129,0.04)\'" onmouseout="this.style.background=\'\'">';
+      h += '<td style="padding:7px 10px;white-space:nowrap;color:#059669;font-weight:700">' + escX(r.archivedDate || '—') + (r.archivedBy ? '<br><span style="font-size:10px;color:var(--text-muted)">' + escX(r.archivedBy) + '</span>' : '') + '</td>';
+      h += '<td style="padding:7px 10px;white-space:nowrap">' + escX(r.date) + '</td>';
+      h += '<td style="padding:7px 10px;white-space:nowrap" dir="ltr">' + escX(r.time) + '</td>';
+      h += '<td style="padding:7px 10px;font-weight:700">' + escX(r.studentName || '—') + '</td>';
+      h += '<td style="padding:7px 10px;font-family:monospace" dir="ltr">' + escX(r.studentId) + '</td>';
+      h += '<td style="padding:7px 10px">' + escX(r.subjectName || '—') + '</td>';
+      h += '<td style="padding:7px 10px">' + escX(r.teacherName || '—') + '</td>';
+      h += '<td style="padding:7px 10px;text-align:center">' + (typeLabel[r.type] || '<span style="color:#059669">✅ حضور</span>') + '</td>';
+      h += '<td style="padding:7px 10px;text-align:center"><button onclick="subxRestoreArchivedLog(\'' + r.id + '\')" style="background:rgba(59,130,246,0.1);color:#2563eb;border:1px solid rgba(59,130,246,0.25);border-radius:8px;padding:4px 12px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.background=\'rgba(59,130,246,0.2)\'" onmouseout="this.style.background=\'rgba(59,130,246,0.1)\'">↩️ استعادة</button></td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table></div>';
+    h += '<div style="text-align:center;margin-top:10px;font-size:11px;color:var(--text-muted)">إجمالي المؤرشف: ' + rows.length + '</div>';
+    c.innerHTML = h;
+  };
+
+  window.subxRestoreArchivedLog = async function (archiveId) {
+    const { _db: fdb, _firestore: fs } = window;
+    if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); return; }
+    try {
+      const arcRef = fs.doc(fdb, 'support_attendance_archive', archiveId);
+      const arcSnap = await fs.getDoc(arcRef);
+      if (!arcSnap.exists()) { showToast('⚠️ السجل المؤرشف غير موجود', true); return; }
+      const data = arcSnap.data();
+      const origId = String(archiveId).replace(/^a_/, '');
+      const liveRef = fs.doc(fdb, 'support_attendance', origId);
+      const liveSnap = await fs.getDoc(liveRef);
+      if (liveSnap.exists()) {
+        const ok = await cmConfirm('⚠️ سجل موجود مسبقاً', 'هذا السجل موجود أصلاً في سجل الحضور.<br>هل تريد حذف النسخة المؤرشفة فقط؟', '📦', { confirmText: 'نعم' });
+        if (!ok) return;
+        await fs.deleteDoc(arcRef);
+        showToast('✅ تم حذف النسخة المؤرشفة.');
+      } else {
+        const clean = {};
+        Object.keys(data).forEach(k => { if (!k.startsWith('_archived')) clean[k] = data[k]; });
+        await fs.setDoc(liveRef, clean);
+        await fs.deleteDoc(arcRef);
+        showToast('↩️ تمت استعادة الحصة إلى سجل الحضور.');
+      }
+      if (typeof subxShowAllLogs === 'function') await subxShowAllLogs();
+      await subxShowArchivedLogs();
+    } catch (e) {
+      console.error('[SUBSCRIPTIONS] restore archived log failed', e);
+      showToast('❌ تعذر استعادة السجل', true);
     }
   };
 
