@@ -27470,6 +27470,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     try {
       const { _db: fdb, _firestore: fs } = window;
       if (!fdb || !fs) { document.getElementById('subx-logs-body').innerHTML = '<div style="text-align:center;padding:12px;color:#dc2626">Firebase غير متاح</div>'; return; }
+      // تحديث بيانات الاشتراكات كي يطابق تقدّم الحصص (used_sessions) قسمَ الاشتراكات
+      if (typeof subxLoadAll === 'function') { try { await subxLoadAll(); } catch (e) { console.warn('[SUBSCRIPTIONS] refresh subs for logs failed', e); } }
       const snap = await fs.getDocs(fs.collection(fdb, 'support_attendance'));
       const rows = [];
       snap.forEach(d => {
@@ -27543,6 +27545,41 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       + '<div style="font-size:11px;color:var(--text-muted)">' + escX(scope.join(' · ')) + ' — ' + n + ' حصة</div>'
       + '<button onclick="subxArchiveByDate()" style="margin-inline-start:auto;background:rgba(16,185,129,0.15);color:#059669;border:1px solid rgba(16,185,129,0.35);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit">📦 أرشفة الآن</button>'
       + '</div>';
+  }
+  // ── تقدّم اشتراك التلميذ من قسم الاشتراكات الشهرية (used_sessions / total_sessions) ──
+  // نفس حساب بطاقة الاشتراك: Σ periods.used_sessions / (sub.total_sessions || months*8)
+  function _subxSubProgress(studentId, subjectName, teacherName) {
+    var sid = String(studentId || '');
+    if (!sid) return null;
+    var subj = String(subjectName || '').trim();
+    var tea = String(teacherName || '').trim();
+    var subs = (typeof allSubs !== 'undefined' && allSubs) ? allSubs : [];
+    var used = 0, total = 0, perm = false, found = false;
+    subs.forEach(function (row) {
+      var s = row.subscription || {};
+      if (s.status === 'cancelled') return;
+      if (String(s.student_id || '') !== sid) return;
+      if (subj && String(s.subject_name || '').trim() !== subj) return;
+      if (tea && String(s.teacher_name || '').trim() !== tea) return;
+      found = true;
+      var periods = row.periods || [];
+      used += periods.reduce(function (a, p) { return a + (Number(p.used_sessions) || 0); }, 0);
+      total += Number(s.total_sessions) || (Number(s.months) || 1) * 8;
+      if (typeof SubscriptionService !== 'undefined' && SubscriptionService.isPermanent && SubscriptionService.isPermanent(s)) perm = true;
+    });
+    if (!found) return null;
+    return { used: used, total: total, perm: perm };
+  }
+  function _subxSubProgressBadge(studentId, subjectName, teacherName) {
+    var pr = _subxSubProgress(studentId, subjectName, teacherName);
+    if (!pr) return '';
+    if (pr.perm) {
+      return '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(124,58,237,0.1);color:#7c3aed;border:1px solid rgba(124,58,237,0.3);border-radius:20px;padding:1px 9px;font-size:10.5px;font-weight:800" title="اشتراك دائم — حصص غير محدودة">♾️ حضر ' + pr.used + '</span>';
+    }
+    var pct = pr.total ? Math.round((pr.used / pr.total) * 100) : 0;
+    var full = pr.used >= pr.total;
+    var bg = full ? 'background:rgba(239,68,68,0.1);color:#dc2626;border:1px solid rgba(239,68,68,0.25)' : 'background:rgba(16,185,129,0.1);color:#059669;border:1px solid rgba(16,185,129,0.25)';
+    return '<span style="display:inline-flex;align-items:center;gap:4px;' + bg + ';border-radius:20px;padding:1px 9px;font-size:10.5px;font-weight:800" title="حضر ' + pr.used + ' من ' + pr.total + ' حصة (' + pct + '%)">📚 ' + pr.used + ' / ' + pr.total + '</span>';
   }
   // مجموعات التلميذ (مفتاح) → الحصص مرتبة تصاعدياً، مقسّمة إلى فترات من 8
   function _subxBuildPeriodGroups(rows) {
@@ -27772,6 +27809,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(99,102,241,0.06);flex-wrap:wrap">';
       h += '<div style="font-weight:900;font-size:13.5px">' + escX(first.studentName || '—') + '</div>';
       h += '<div style="font-family:monospace;font-size:11px;color:var(--text-muted)" dir="ltr">' + escX(first.studentId || '') + '</div>';
+      h += _subxSubProgressBadge(first.studentId, first.subjectName, first.teacherName);
       h += '<div style="font-size:11px;color:var(--text-muted)">' + escX(first.subjectName || '—') + ' · ' + escX(first.teacherName || '—') + '</div>';
       h += '<div style="margin-inline-start:auto;font-size:11px;font-weight:800;color:#6366f1">' + g.arr.length + ' حصة · ' + g.chunks.length + ' فترة</div>';
       h += '</div>';
@@ -27829,7 +27867,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       h += '<tr style="border-bottom:1px solid var(--border)">';
       h += '<td style="padding:7px 10px;white-space:nowrap">' + escX(r.date) + '</td>';
       h += '<td style="padding:7px 10px;white-space:nowrap" dir="ltr">' + escX(r.time) + '</td>';
-      h += '<td style="padding:7px 10px;font-weight:700">' + escX(r.studentName || '—') + '</td>';
+      h += '<td style="padding:7px 10px;font-weight:700">' + escX(r.studentName || '—') + '<div style="margin-top:3px">' + _subxSubProgressBadge(r.studentId, r.subjectName, r.teacherName) + '</div></td>';
       h += '<td style="padding:7px 10px;font-family:monospace" dir="ltr">' + escX(r.studentId) + '</td>';
       h += '<td style="padding:7px 10px">' + escX(r.subjectName || '—') + '</td>';
       h += '<td style="padding:7px 10px">' + escX(r.teacherName || '—') + '</td>';
