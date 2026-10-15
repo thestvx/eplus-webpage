@@ -4554,10 +4554,10 @@
           <div class="teacher-modal-body" style="overflow:auto;max-height:72vh;padding:22px 26px">
             <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
               <input type="text" id="subx-logs-search" placeholder="🔍 بحث بالطالب..." oninput="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;flex:1;min-width:160px;background:var(--card)">
-              <select id="subx-logs-teacher" onchange="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+              <select id="subx-logs-teacher" onchange="_subxRefreshDateOptions()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
                 <option value="">كل الأساتذة</option>
               </select>
-              <select id="subx-logs-subject" onchange="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+              <select id="subx-logs-subject" onchange="_subxRefreshDateOptions()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
                 <option value="">كل المواد</option>
               </select>
               <select id="subx-logs-date" onchange="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
@@ -6241,7 +6241,7 @@ function applyEmployeeMode(cfg) {
       if (cfg.restrictions.srtReadOnly)
         document.querySelectorAll('button[onclick*="srtOpenAddModal"], button[onclick*="srtOpenEditModal"], button[onclick*="srtResetPassword"], button[onclick*="srtConfirmResetPassword"], button[onclick*="srtToggleStatus"], button[onclick*="srtDelete"], button[onclick*="srtOpenFinance"], button[onclick*="srtFinanceAddPayment"], button[onclick*="srtFinanceDeleteTx"], button[onclick*="srtFinanceComputeDues"], button[onclick*="srtTreasuryAdjust"], button[onclick*="srtFinanceSaveRate"], button[onclick*="srtAddSubjectRow"]').forEach(b => b.style.display = 'none');
       if (cfg.restrictions.subxHideAttendance)
-        document.querySelectorAll('button[onclick*="subxCancelAttendance"], button[onclick*="subxShowAllLogs"], button[onclick*="subxShowDeletedLogs"], button[onclick*="subxExportLogsCSV"], button[onclick*="subxDeleteLog"], button[onclick*="subxArchiveFirst8"], button[onclick*="subxArchiveGroupedBlock"], button[onclick*="subxShowArchivedLogs"]').forEach(b => b.style.display = 'none');
+        document.querySelectorAll('button[onclick*="subxCancelAttendance"], button[onclick*="subxShowAllLogs"], button[onclick*="subxShowDeletedLogs"], button[onclick*="subxExportLogsCSV"], button[onclick*="subxDeleteLog"], button[onclick*="subxArchiveFirst8"], button[onclick*="subxArchiveByDate"], button[onclick*="subxShowArchivedLogs"]').forEach(b => b.style.display = 'none');
       if (cfg.restrictions.prwNoLogActions)
         document.querySelectorAll('button[onclick*="prwLogConfirm"], button[onclick*="prwLogUndo"]').forEach(b => b.style.display = 'none');
       if (cfg.restrictions.attNoSessionControl)
@@ -6307,7 +6307,7 @@ if (cfg.restrictions.srNoConfirmFree) {
     window.subxRestoreDeletedLog = () => showToast('⛔ ليس لديك صلاحية استعادة سجلات الحضور', true);
     window.subxRestoreAllDeletedLogs = () => showToast('⛔ ليس لديك صلاحية استعادة سجلات الحضور', true);
     window.subxArchiveFirst8 = () => showToast('⛔ ليس لديك صلاحية أرشفة الحضور', true);
-    window.subxArchiveGroupedBlock = () => showToast('⛔ ليس لديك صلاحية أرشفة الحضور', true);
+    window.subxArchiveByDate = () => showToast('⛔ ليس لديك صلاحية أرشفة الحضور', true);
     window.subxShowArchivedLogs = () => showToast('⛔ ليس لديك صلاحية فتح الحضور المؤرشف', true);
     window.subxRestoreArchivedLog = () => showToast('⛔ ليس لديك صلاحية استعادة الحضور المؤرشف', true);
     window.subxArchivedFilter = () => {};
@@ -27368,7 +27368,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         c.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;border:1px dashed var(--border);border-radius:10px">لا توجد سجلات حضور لهذا الاشتراك</div>';
         return;
       }
-      let h = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px">';
+    let h = _subxDateArchiveBar() + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px">';
       h += '<thead><tr style="background:rgba(99,102,241,0.06)">';
       h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">التاريخ</th>';
       h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الوقت</th>';
@@ -27486,16 +27486,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       var sSel = document.getElementById('subx-logs-subject');
       if (tSel) { var tv = tSel.value; tSel.innerHTML = '<option value="">كل الأساتذة</option>'; Array.from(tSet).sort().forEach(function (n) { tSel.innerHTML += '<option value="' + escX(n) + '">' + escX(n) + '</option>'; }); tSel.value = tv; }
       if (sSel) { var sv = sSel.value; sSel.innerHTML = '<option value="">كل المواد</option>'; Array.from(sSet).sort().forEach(function (n) { sSel.innerHTML += '<option value="' + escX(n) + '">' + escX(n) + '</option>'; }); sSel.value = sv; }
-      var dSel = document.getElementById('subx-logs-date');
-      if (dSel) {
-        var dv = dSel.value;
-        var dSet = new Set();
-        rows.forEach(function (r) { if (r.date) dSet.add(r.date); });
-        dSel.innerHTML = '<option value="">📅 كل التواريخ</option>';
-        Array.from(dSet).sort().reverse().forEach(function (d) { dSel.innerHTML += '<option value="' + escX(d) + '">' + escX(d) + '</option>'; });
-        dSel.value = dv;
-        if (dSel.value !== dv) dSel.value = '';
-      }
+      _subxPopulateDates(rows);
       subxLogsFilter();
     } catch (e) {
       console.error('[SUBSCRIPTIONS] load all logs failed', e);
@@ -27512,6 +27503,46 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var out = [];
     for (var i = 0; i < arr.length; i += 8) out.push(arr.slice(i, i + 8));
     return out;
+  }
+  // ── قائمة التواريخ المنسدلة: تُبنى حسب فلتر الأستاذ/المادة (لا تظهر تواريخ بلا حصص) ──
+  function _subxPopulateDates(rows) {
+    var dSel = document.getElementById('subx-logs-date');
+    if (!dSel) return;
+    var tEl = document.getElementById('subx-logs-teacher');
+    var sEl = document.getElementById('subx-logs-subject');
+    var teacherFilter = tEl ? (tEl.value || '') : '';
+    var subjectFilter = sEl ? (sEl.value || '') : '';
+    var dv = dSel.value;
+    var dSet = new Set();
+    (rows || window._subxLogsData || []).forEach(function (r) {
+      if (teacherFilter && r.teacherName !== teacherFilter) return;
+      if (subjectFilter && r.subjectName !== subjectFilter) return;
+      if (r.date) dSet.add(r.date);
+    });
+    dSel.innerHTML = '<option value="">📅 كل التواريخ</option>';
+    Array.from(dSet).sort().reverse().forEach(function (d) { dSel.innerHTML += '<option value="' + escX(d) + '">' + escX(d) + '</option>'; });
+    dSel.value = dv;
+    if (dSel.value !== dv) dSel.value = '';
+  }
+  window._subxRefreshDateOptions = function () { _subxPopulateDates(window._subxLogsData); subxLogsFilter(); };
+  // ── شريط أرشفة «حضور هذا التاريخ» (يظهر عند تحديد تاريخ) ──
+  function _subxDateArchiveBar() {
+    var dEl = document.getElementById('subx-logs-date');
+    var dateFilter = dEl ? (dEl.value || '') : '';
+    if (!dateFilter) return '';
+    var tEl = document.getElementById('subx-logs-teacher');
+    var sEl = document.getElementById('subx-logs-subject');
+    var teacherFilter = tEl ? (tEl.value || '') : '';
+    var subjectFilter = sEl ? (sEl.value || '') : '';
+    var n = _getFilteredLogs().length;
+    var scope = ['تاريخ ' + dateFilter];
+    if (teacherFilter) scope.push('الأستاذ ' + teacherFilter);
+    if (subjectFilter) scope.push('المادة ' + subjectFilter);
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;margin-bottom:12px;border:1.5px solid rgba(16,185,129,0.3);background:rgba(16,185,129,0.06);border-radius:12px;flex-wrap:wrap">'
+      + '<div style="font-size:12px;font-weight:800;color:#059669">📦 أرشفة حضور هذا التاريخ</div>'
+      + '<div style="font-size:11px;color:var(--text-muted)">' + escX(scope.join(' · ')) + ' — ' + n + ' حصة</div>'
+      + '<button onclick="subxArchiveByDate()" style="margin-inline-start:auto;background:rgba(16,185,129,0.15);color:#059669;border:1px solid rgba(16,185,129,0.35);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit">📦 أرشفة الآن</button>'
+      + '</div>';
   }
   // مجموعات التلميذ (مفتاح) → الحصص مرتبة تصاعدياً، مقسّمة إلى فترات من 8
   function _subxBuildPeriodGroups(rows) {
@@ -27728,16 +27759,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   };
 
   // ── العرض المجمّع: كتلة لكل تلميذ مقسّمة إلى فترات (كل فترة = 8 حصص) ──
-  window._subxGroupedList = [];
   function _subxRenderGrouped(rows, c) {
     if (!rows.length) {
-      c.innerHTML = '<div style="text-align:center;padding:14px;color:var(--text-muted);border:1px dashed var(--border);border-radius:12px">لا توجد سجلات حضور</div>';
-      window._subxGroupedList = [];
+      c.innerHTML = _subxDateArchiveBar() + '<div style="text-align:center;padding:14px;color:var(--text-muted);border:1px dashed var(--border);border-radius:12px">لا توجد سجلات حضور</div>';
       return;
     }
     var groups = _subxBuildPeriodGroups(rows);
-    window._subxGroupedList = groups;
-    var h = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.7">عرض مجمّع: كل تلميذ مقسّم إلى <b>فترات</b> (كل فترة = 8 حصص). اضغط <b style="color:#059669">📦 أرشفة الفترة</b> لتحويل حصص تلك الفترة إلى «الحضور المؤرشف».</div>';
+    var h = _subxDateArchiveBar() + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.7">عرض مجمّع: كل تلميذ مقسّم إلى <b>فترات</b> (كل فترة = 8 حصص)، مع نوع كل حصة (<b style="color:#059669">حضور</b> / <b style="color:#d97706">فترة تجريبية</b>).</div>';
     groups.forEach(function (g, gi) {
       var first = g.arr[0];
       h += '<div style="border:1.5px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden">';
@@ -27753,14 +27781,18 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">';
         h += '<span style="background:#6366f1;color:#fff;border-radius:20px;padding:2px 12px;font-size:11px;font-weight:900">الفترة ' + (ci + 1) + '</span>';
         h += '<span style="font-size:11px;color:var(--text-muted)">' + escX(sd) + ' → ' + escX(ed) + ' · الحصص ' + (ci * 8 + 1) + '–' + (ci * 8 + ch.length) + '</span>';
-        h += '<button onclick="subxArchiveGroupedBlock(' + gi + ',' + ci + ')" style="margin-inline-start:auto;background:rgba(16,185,129,0.1);color:#059669;border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:4px 12px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit" onmouseover="this.style.background=\'rgba(16,185,129,0.2)\'" onmouseout="this.style.background=\'rgba(16,185,129,0.1)\'">📦 أرشفة الفترة</button>';
         h += '</div>';
         h += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
         ch.forEach(function (r, si) {
-          h += '<div style="display:flex;align-items:center;gap:6px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:8px;padding:4px 10px;font-size:11px">';
-          h += '<b style="color:#059669">#' + (si + 1) + '</b>';
+          var isTrial = r.type === 'trial_session';
+          var typeTxt = isTrial ? 'فترة تجريبية' : 'حضور';
+          var typeStyle = isTrial ? 'background:rgba(245,158,11,0.15);color:#d97706;border:1px solid rgba(245,158,11,0.35)' : 'background:rgba(16,185,129,0.12);color:#059669;border:1px solid rgba(16,185,129,0.3)';
+          h += '<div style="display:flex;align-items:center;gap:6px;background:rgba(99,102,241,0.05);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px">';
+          h += '<b style="color:#6366f1">#' + (si + 1) + '</b>';
           h += '<span>' + escX(r.date) + '</span>';
           h += '<span style="color:var(--text-muted)" dir="ltr">' + escX(r.time || '') + '</span>';
+          h += '<span style="border-radius:20px;padding:1px 8px;font-size:10px;font-weight:800;' + typeStyle + '">' + typeTxt + '</span>';
+          h += '<button onclick="subxDeleteLog(\'' + r.id + '\',\'' + escX(r.studentName || '').replace(/'/g, "\\'") + '\',\'' + escX(r.date) + '\')" title="حذف هذه الحصة" style="background:rgba(220,38,38,0.1);color:#dc2626;border:1px solid rgba(220,38,38,0.25);border-radius:6px;padding:1px 8px;font-size:10px;font-weight:800;cursor:pointer;font-family:inherit">🗑️ حذف</button>';
           h += '</div>';
         });
         h += '</div></div>';
@@ -27878,6 +27910,34 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     return moved;
   }
 
+  // ── أرشفة «حضور هذا التاريخ» عند الأستاذ المحدد (حسب الفلاتر الحالية) ──
+  window.subxArchiveByDate = async function () {
+    var dEl = document.getElementById('subx-logs-date');
+    var dateFilter = dEl ? (dEl.value || '') : '';
+    if (!dateFilter) { showToast('⚠️ اختر تاريخاً أولاً', true); return; }
+    var rows = _getFilteredLogs();
+    if (!rows.length) { showToast('⚠️ لا توجد حصص لهذا التاريخ', true); return; }
+    var tEl = document.getElementById('subx-logs-teacher');
+    var sEl = document.getElementById('subx-logs-subject');
+    var teacherFilter = tEl ? (tEl.value || '') : '';
+    var subjectFilter = sEl ? (sEl.value || '') : '';
+    var scope = 'تاريخ ' + dateFilter + (teacherFilter ? ' · الأستاذ ' + teacherFilter : '') + (subjectFilter ? ' · المادة ' + subjectFilter : '');
+    var ok = await cmConfirm('أرشفة حضور هذا التاريخ',
+      'أرشفة <b>' + rows.length + '</b> حصة (' + escX(scope) + ') إلى «الحضور المؤرشف»؟<br><span style="color:#059669;font-size:11px;font-weight:800">📦 ستُنقل من سجل الحضور الحيّ مع إمكانية استعادتها لاحقاً.</span>',
+      '📦', { confirmText: 'نعم، أرشف' });
+    if (!ok) return;
+    try {
+      var moved = await _subxMoveToArchive(rows);
+      if (moved < 0) return;
+      showToast('📦 تم أرشفة ' + moved + ' حصة إلى «الحضور المؤرشف»');
+      if (window.dashLog) window.dashLog('اشتراكات', 'أرشفة بتاريخ', 'أرشفة ' + moved + ' حصة (' + scope + ')');
+      if (typeof subxShowAllLogs === 'function') await subxShowAllLogs();
+    } catch (e) {
+      console.error('[SUBSCRIPTIONS] archive by date failed', e);
+      showToast('❌ ' + ((e && e.message) || 'تعذر الأرشفة'), true);
+    }
+  };
+
   // ── أرشفة «الفترة» (دفعة 8 حصص) التي تنتمي إليها حصة معيّنة — من الجدول العادي ──
   window.subxArchiveFirst8 = async function (studentId, teacherName, subjectName, studentName, recordId) {
     var groupKey = String(studentId || studentName || '') + '|' + String(teacherName || '') + '|' + String(subjectName || '');
@@ -27906,29 +27966,6 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       if (typeof subxShowAllLogs === 'function') await subxShowAllLogs();
     } catch (e) {
       console.error('[SUBSCRIPTIONS] archive period failed', e);
-      showToast('❌ ' + ((e && e.message) || 'تعذر الأرشفة'), true);
-    }
-  };
-
-  // ── أرشفة فترة محدّدة من العرض المجمّع ──
-  window.subxArchiveGroupedBlock = async function (gi, ci) {
-    var g = (window._subxGroupedList || [])[gi];
-    if (!g || !g.chunks || !g.chunks[ci]) { showToast('⚠️ تعذّر تحديد الفترة', true); return; }
-    var ch = g.chunks[ci];
-    var first = ch[0];
-    var label = (first.studentName || first.studentId || '—') + ' — ' + (first.subjectName || 'مادة') + ' / ' + (first.teacherName || 'أستاذ');
-    var ok = await cmConfirm('أرشفة الفترة ' + (ci + 1),
-      'أرشفة <b>' + ch.length + '</b> حصة (' + escX(ch[0].date) + ' → ' + escX(ch[ch.length - 1].date) + ') للتلميذ:<br><b>' + escX(label) + '</b><br><span style="color:#059669;font-size:11px;font-weight:800">📦 ستُنقل من سجل الحضور الحيّ إلى «الحضور المؤرشف» مع إمكانية استعادتها لاحقاً.</span>',
-      '📦', { confirmText: 'نعم، أرشف' });
-    if (!ok) return;
-    try {
-      var moved = await _subxMoveToArchive(ch);
-      if (moved < 0) return;
-      showToast('📦 تم أرشفة ' + moved + ' حصة إلى «الحضور المؤرشف»');
-      if (window.dashLog) window.dashLog('اشتراكات', 'أرشفة فترة', 'أرشفة ' + moved + ' حصة (الفترة ' + (ci + 1) + ') للتلميذ ' + (first.studentName || first.studentId || '') + ' عند الأستاذ ' + (first.teacherName || '') + ' (' + (first.subjectName || '') + ')');
-      if (typeof subxShowAllLogs === 'function') await subxShowAllLogs();
-    } catch (e) {
-      console.error('[SUBSCRIPTIONS] archive grouped block failed', e);
       showToast('❌ ' + ((e && e.message) || 'تعذر الأرشفة'), true);
     }
   };
