@@ -234,6 +234,30 @@ const SubscriptionService = (function () {
     return null;
   }
 
+  // مطابقة اشتراك مع مادة+أستاذ. لو الاشتراك قديم (بدون teacher_id/subject_id)
+  // يعمل بالتوافق الرجعي على أساس أن المادة/الأستاذ غير محددين = كل المواد/الأساتذة.
+  function _matchesSubjectTeacher(s, subjectId, teacherId) {
+    var sId = s.subject_id || '';
+    var tId = s.teacher_id || '';
+    var sName = s.subject_name || '';
+    var tName = s.teacher_name || '';
+    if (sId && sId !== (subjectId || '')) {
+      if (!sName || sName !== (subjectId || '')) return false;
+    }
+    if (tId && tId !== (teacherId || '')) {
+      if (!tName || tName !== (teacherId || '')) return false;
+    }
+    return true;
+  }
+
+  function _periodRemaining(p) {
+    if (!p) return 0;
+    var total = Number(p.total_sessions);
+    if (!isFinite(total) || total <= 0) total = SESSIONS_PER_MONTH;
+    var used = Number(p.used_sessions) || 0;
+    return Math.max(0, total - used);
+  }
+
   // اشتراك مادة+أستاذ محدد نشط في تاريخ معيّن (فصل الحصص بين المواد)
   // يطابق: نفس الطالب + نفس المادة + نفس الأستاذ. لو الاشتراك قديم (بدون
   // teacher_id/subject_id) يعمل بالتوافق على أساس أن المادة غير محددة = كل المواد.
@@ -241,23 +265,10 @@ const SubscriptionService = (function () {
     const rows = await getSubscriptions(studentId);
     if (!rows.length) return null;
     const r = refDate || today();
-    const matches = function (s) {
-      var sId = s.subject_id || '';
-      var tId = s.teacher_id || '';
-      var sName = s.subject_name || '';
-      var tName = s.teacher_name || '';
-      if (sId && sId !== (subjectId || '')) {
-        if (!sName || sName !== (subjectId || '')) return false;
-      }
-      if (tId && tId !== (teacherId || '')) {
-        if (!tName || tName !== (teacherId || '')) return false;
-      }
-      return true;
-    };
     for (const row of rows) {
       const s = row.subscription || {};
       if (s.status === 'cancelled') continue;
-      if (!matches(s)) continue;
+      if (!_matchesSubjectTeacher(s, subjectId, teacherId)) continue;
       if (r >= s.start_date && r <= s.end_date) {
         return { subscription: s, periods: row.periods || [] };
       }
@@ -268,6 +279,61 @@ const SubscriptionService = (function () {
   function activePeriod(periods, refDate) {
     const r = refDate || today();
     return (periods || []).find(p => r >= p.start_date && r <= p.end_date) || null;
+  }
+
+  // يختار أفضل فترة قابلة لتسجيل الحضور ضمن الاشتراك (يتعامل مع الشهور المتعددة
+  // والفترات المتداخلة/غير المتطابقة): أولوية لفترة اليوم إن كانت بها حصص، وإلا
+  // لأحدث فترة بدأت وبها حصص متبقية. وإن استُهلكت كل الفترات التي بدأت، ينتقل
+  // تلقائياً إلى أقرب فترة قادمة بها حصص ضمن المدة المدفوعة (مثال: اشتراك شهرين).
+  function selectCheckInPeriod(sub, periods, refDate) {
+    const r = refDate || today();
+    if (!sub) return null;
+    if (isPermanent(sub)) return { period: null, remaining: Infinity, attended: 0, permanent: true, allowed: true };
+    if (sub.status === 'cancelled' || sub.status === 'paused') {
+      return { period: null, remaining: 0, attended: 0, permanent: false, allowed: false };
+    }
+    const list = (periods || []).filter(Boolean).slice().sort(function (a, b) {
+      return String(a.start_date || '').localeCompare(String(b.start_date || '')) ||
+        ((Number(a.month_number) || 0) - (Number(b.month_number) || 0));
+    });
+    if (!list.length) return null;
+    const containing = list.find(function (p) { return r >= (p.start_date || '') && r <= (p.end_date || ''); });
+    if (containing && _periodRemaining(containing) > 0) {
+      return { period: containing, remaining: _periodRemaining(containing), attended: Number(containing.used_sessions) || 0, permanent: false, allowed: true };
+    }
+    const started = list.filter(function (p) { return (p.start_date || '') <= r && _periodRemaining(p) > 0; });
+    if (started.length) {
+      const p = started[started.length - 1];
+      return { period: p, remaining: _periodRemaining(p), attended: Number(p.used_sessions) || 0, permanent: false, allowed: true };
+    }
+    // الانتقال للفترة القادمة عند استهلاك كل الفترات التي بدأت — ضمن المدة المدفوعة فقط
+    const upcoming = list.filter(function (p) { return (p.start_date || '') > r && _periodRemaining(p) > 0; });
+    const withinPaid = (!sub.start_date || r >= String(sub.start_date)) && (!sub.end_date || r <= String(sub.end_date));
+    if (upcoming.length && withinPaid) {
+      const p = upcoming[0];
+      return { period: p, remaining: _periodRemaining(p), attended: Number(p.used_sessions) || 0, permanent: false, allowed: true };
+    }
+    const last = containing || list[list.length - 1];
+    return { period: last, remaining: containing ? _periodRemaining(containing) : 0, attended: Number((last || {}).used_sessions) || 0, permanent: false, allowed: false };
+  }
+
+  // يبحث في كل اشتراكات الطالب عن أفضل اشتراك مطابق للمادة+الأستاذ يمكن تسجيل
+  // الحضور عليه اليوم (يعالج انفصال صفوف الاشتراك أو تعدد الشهور عبر صفوف منفصلة).
+  function findBestSubscriptionForSubject(rows, subjectId, teacherId, refDate) {
+    const r = refDate || today();
+    const matches = (rows || []).filter(function (row) {
+      const s = row.subscription || {};
+      return s.status !== 'cancelled' && _matchesSubjectTeacher(s, subjectId, teacherId);
+    });
+    if (!matches.length) return null;
+    for (const row of matches) {
+      const s = row.subscription || {};
+      if (s.status === 'paused') continue;
+      const pick = selectCheckInPeriod(s, row.periods || [], r);
+      if (pick && pick.allowed) return { subscription: s, periods: row.periods || [] };
+    }
+    const row = matches[0];
+    return { subscription: row.subscription || {}, periods: row.periods || [] };
   }
 
   // أحداث حضور الطالب من قاعدة البيانات الموثوقة (attendance_sessions)
@@ -443,7 +509,9 @@ const SubscriptionService = (function () {
     getSubscriptions,
     getActiveSubscription,
     getActiveSubscriptionForSubject,
+    findBestSubscriptionForSubject,
     activePeriod,
+    selectCheckInPeriod,
     getStudentEvents,
     createSubscription,
     adminListSubscriptions,

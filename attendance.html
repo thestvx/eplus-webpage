@@ -647,13 +647,20 @@ main{flex:1;position:relative;overflow:hidden}
       var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, allowed: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length, hasSubscription: false };
       try {
         var subResult = await SubscriptionService.getActiveSubscriptionForSubject(studentId, s.subject, s.teacher, today);
+        var pick = (subResult && subResult.subscription) ? SubscriptionService.selectCheckInPeriod(subResult.subscription, subResult.periods || [], today) : null;
+        if (!(pick && pick.allowed)) {
+          // احتياط: صف اشتراك آخر مطابق للمادة+الأستاذ يمكن الحضور عليه (شهور منفصلة)
+          var alt = SubscriptionService.findBestSubscriptionForSubject(subsAll, s.subject, s.teacher, today);
+          if (alt && alt.subscription) {
+            var altPick = SubscriptionService.selectCheckInPeriod(alt.subscription, alt.periods || [], today);
+            if ((altPick && altPick.allowed) || !pick) { subResult = alt; pick = altPick; }
+          }
+        }
         if (subResult && subResult.subscription) {
           sess.hasSubscription = true;
           sess.sub = subResult.subscription;
           sess.periods = subResult.periods || [];
-          var subStatus = SubscriptionService.subscriptionStatus(subResult.subscription);
           sess.permanent = SubscriptionService.isPermanent(subResult.subscription);
-          var ap = SubscriptionService.activePeriod(sess.periods);
           if (sess.permanent) {
             sess.status = 'active';
             sess.remaining = permRemainingSeed(studentId);
@@ -669,18 +676,13 @@ main{flex:1;position:relative;overflow:hidden}
               });
               sess.attended = pc;
             } catch (e) { logScanner('perm attended count error: ' + e.message); sess.attended = 0; }
-          } else if (subStatus === 'active' && ap) {
+          } else if (pick && pick.allowed) {
             sess.status = 'active';
-            sess.attended = ap.used_sessions || 0;
-            sess.remaining = Math.max(0, (ap.total_sessions || 8) - sess.attended);
-            // If all sessions used, treat as expired for card display
-            if (sess.remaining <= 0) {
-              sess.status = 'expired';
-              sess.remaining = 0;
-            }
+            sess.attended = pick.attended || 0;
+            sess.remaining = pick.remaining;
           } else {
             sess.status = 'expired';
-            sess.attended = ap ? (ap.used_sessions || 0) : 0;
+            sess.attended = pick ? (pick.attended || 0) : 0;
             sess.remaining = 0;
           }
         } else {
@@ -848,25 +850,30 @@ if (hasActiveSub) {
       }
     } catch (e) { logScanner('atc gate check error: ' + e.message); }
 
-    var subCheck = null;
+    var subCheck = null, _pick = null;
     try { subCheck = await SubscriptionService.getActiveSubscriptionForSubject(pendingStudentId, session.subject, session.teacher, AttendanceService.today()); } catch (e) { logScanner('subCheck error: ' + e.message); }
+    if (subCheck && subCheck.subscription) {
+      _pick = SubscriptionService.selectCheckInPeriod(subCheck.subscription, subCheck.periods, AttendanceService.today());
+    }
+    if (!(_pick && _pick.allowed)) {
+      // احتياط: كل اشتراكات الطالب (يعالج صفوف الاشتراك المنفصلة / تعدد الشهور)
+      try {
+        var _allSubs = await SubscriptionService.getSubscriptions(pendingStudentId);
+        var _bestSub = SubscriptionService.findBestSubscriptionForSubject(_allSubs, session.subject, session.teacher, AttendanceService.today());
+        if (_bestSub && _bestSub.subscription) {
+          var _bestPick = SubscriptionService.selectCheckInPeriod(_bestSub.subscription, _bestSub.periods, AttendanceService.today());
+          if ((_bestPick && _bestPick.allowed) || !_pick) { subCheck = _bestSub; _pick = _bestPick; }
+        }
+      } catch (e) { logScanner('subFallback error: ' + e.message); }
+    }
 
     var type = 'none';
 
     if (subCheck && subCheck.subscription) {
-      var subStatus = SubscriptionService.subscriptionStatus(subCheck.subscription);
-      var _subHasRemaining = false;
       var _isPermSub = SubscriptionService.isPermanent(subCheck.subscription);
-      if (_isPermSub) {
-        // الاشتراك الدائم يُسجَّل حضوره دائماً — يُسمح له بالدخول بدون حدود
-        _subHasRemaining = true;
-      } else if (subStatus === 'active') {
-        // الحسم من حصة الاشتراك الحالية (فترة الشهر النشط) — وليس مجموع كل الفترات،
-        // حتى لا يُحتسب حضور بمدة مستقبلية وتتفاقم الشهور دون فائض.
-        var _apChk = SubscriptionService.activePeriod(subCheck.periods);
-        _subHasRemaining = !!(_apChk && ((_apChk.total_sessions || 8) - (_apChk.used_sessions || 0)) > 0);
-      }
-      if (subStatus === 'active' && _subHasRemaining) {
+      // الحسم من حصة فترة الشهر القابلة للحضور فعلاً (ليس مجموع كل الفترات)،
+      // حتى لا يُحتسب حضور بمدة مستقبلية وتتفاقم الشهور دون فائض.
+      if (_pick && _pick.allowed) {
         // ── GREEN: active subscription with remaining sessions ──
         type = 'green';
         if (fbReady && authState.signedIn) {
@@ -879,12 +886,11 @@ if (hasActiveSub) {
             });
           } catch (e) { logScanner('mirror write error: ' + e.message); }
           try {
-            var _ap = SubscriptionService.activePeriod(subCheck.periods);
-            var _pid = _ap ? (_ap.period_id || _ap.id) : null;
-            if (_pid) {
+            var _pid = _pick.period ? (_pick.period.period_id || _pick.period.id) : null;
+            if (_pid && !_isPermSub) {
               var _r = await SubscriptionService.incrementPeriodUsage(_pid, 1);
               logScanner('increment result: ' + JSON.stringify(_r));
-            } else { logScanner('increment skipped: no active period found'); }
+            } else { logScanner('increment skipped: ' + (_isPermSub ? 'permanent subscription' : 'no active period found')); }
           } catch (e) { logScanner('increment usage error: ' + e.message); }
         }
       } else {
