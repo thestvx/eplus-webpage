@@ -4578,6 +4578,38 @@
         </div>
       </div>
 
+      <!-- ===== CSV RANGE EXPORT MODAL ===== -->
+      <div id="subx-csv-modal" class="teacher-modal-bg">
+        <div class="teacher-modal" style="max-width:460px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:rgba(99,102,241,0.1);border-color:rgba(99,102,241,0.2)">📥</div>
+            <div class="teacher-modal-title">تصدير سجل الحضور (CSV)</div>
+            <button class="att-modal-close" onclick="document.getElementById('subx-csv-modal').classList.remove('open')">✕</button>
+          </div>
+          <div class="teacher-modal-body" style="padding:20px 24px">
+            <div id="subx-csv-scope" style="font-size:12.5px;color:var(--text);background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.18);border-radius:10px;padding:10px 14px;line-height:1.8;margin-bottom:16px"></div>
+            <label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-size:13px;font-weight:700;margin-bottom:16px">
+              <input type="checkbox" id="subx-csv-alldates" onchange="_subxCsvToggleAll()" style="width:17px;height:17px;accent-color:#6366f1;cursor:pointer">
+              كل التواريخ (سجل الحضور الكامل من أول تاريخ)
+            </label>
+            <div style="display:flex;gap:12px">
+              <div style="flex:1">
+                <label style="display:block;font-size:11.5px;font-weight:800;color:var(--text-muted);margin-bottom:6px">من تاريخ</label>
+                <input type="date" id="subx-csv-from" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+              </div>
+              <div style="flex:1">
+                <label style="display:block;font-size:11.5px;font-weight:800;color:var(--text-muted);margin-bottom:6px">إلى تاريخ</label>
+                <input type="date" id="subx-csv-to" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">
+              <button onclick="document.getElementById('subx-csv-modal').classList.remove('open')" style="padding:10px 22px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:var(--card);color:var(--text)">إلغاء</button>
+              <button onclick="subxExportLogsCSVRun()" style="padding:10px 22px;border:none;border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff">📥 تنزيل CSV</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- PIN confirmation modal for clearing logs -->
       <div id="pin-clear-modal" class="teacher-modal-bg">
         <div class="teacher-modal" style="max-width:380px">
@@ -27615,146 +27647,112 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   }
 
   // ── تصدير CSV ──
-  //  • عند اختيار تاريخ محدد → تقرير صفحة واحدة لذلك اليوم بالضبط (صف لكل سجل).
-  //  • دون تحديد تاريخ → جدول حضور (عمود لكل تاريخ، صف لكل تلميذ).
+  //  • نافذة اختيار النطاق: من/إلى تاريخ، أو «كل التواريخ» (سجل الحضور الكامل للأستاذ).
+  //  • النتيجة: سجل حضور مسطّح (صف لكل حصة) من أول التاريخ المختار إلى آخره.
+  function _subxCsvScopeRows() {
+    var t = (document.getElementById('subx-logs-teacher') || {}).value || '';
+    var s = (document.getElementById('subx-logs-subject') || {}).value || '';
+    return (window._subxLogsData || []).filter(function (r) {
+      if (r.cancelled) return false;
+      if (t && r.teacherName !== t) return false;
+      if (s && r.subjectName !== s) return false;
+      return true;
+    });
+  }
+  function _subxCsvStudentName(sid) {
+    var r = (typeof regs !== 'undefined') ? regs.find(function (rr) { return String(rr.id) === String(sid || ''); }) : null;
+    return r ? studentFullName(r) : String(sid || '');
+  }
+  function _subxCsvType(t) {
+    if (t === 'trial_session' || t === 'trial') return 'فترة تجريبية';
+    if (t === 'grace_session' || t === 'grace') return 'حصّة مجانية';
+    if (t === 'allow_sub') return 'سماح اشتراك';
+    return 'حضور';
+  }
+  function _subxCsvEsc(v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }
+
+  window._subxCsvToggleAll = function () {
+    var alld = document.getElementById('subx-csv-alldates').checked;
+    document.getElementById('subx-csv-from').disabled = alld;
+    document.getElementById('subx-csv-to').disabled = alld;
+  };
+
+  // فتح نافذة اختيار نطاق التاريخ للتصدير
   window.subxExportLogsCSV = function () {
-    var rows = _getFilteredLogs();
+    var rows = _subxCsvScopeRows();
     if (!rows.length) { showToast('⚠️ لا توجد سجلات للتصدير', true); return; }
-    var teacherFilter = document.getElementById('subx-logs-teacher').value || '';
-    var subjectFilter = document.getElementById('subx-logs-subject').value || '';
-    var dateFilter = document.getElementById('subx-logs-date').value || '';
+    var t = (document.getElementById('subx-logs-teacher') || {}).value || '';
+    var s = (document.getElementById('subx-logs-subject') || {}).value || '';
+    var dates = rows.map(function (r) { return r.date; }).filter(Boolean).sort();
+    document.getElementById('subx-csv-scope').innerHTML =
+      'الأستاذ: <b>' + escX(t || 'كل الأساتذة') + '</b>' + (s ? ' · المادة: <b>' + escX(s) + '</b>' : '')
+      + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">' + rows.length + ' سجل · من ' + escX(dates[0] || '—') + ' إلى ' + escX(dates[dates.length - 1] || '—') + '</div>';
+    var from = document.getElementById('subx-csv-from');
+    var to = document.getElementById('subx-csv-to');
+    var alld = document.getElementById('subx-csv-alldates');
+    alld.checked = false;
+    from.disabled = to.disabled = false;
+    from.value = dates[0] || '';
+    to.value = dates[dates.length - 1] || '';
+    document.getElementById('subx-csv-modal').classList.add('open');
+  };
 
-    function _subxStudentName(sid) {
-      var r = (typeof regs !== 'undefined') ? regs.find(function (rr) { return String(rr.id) === String(sid || ''); }) : null;
-      return r ? studentFullName(r) : String(sid || '—');
-    }
-    function _csvType(t) {
-      if (t === 'trial_session' || t === 'trial') return 'فترة تجريبية';
-      if (t === 'grace_session' || t === 'grace') return 'حصّة مجانية';
-      if (t === 'allow_sub') return 'سماح اشتراك';
-      return 'حضور';
-    }
-    function _esc(v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }
-
-    var csvRows = [];
-    var summary = '';
-
-    if (dateFilter) {
-      // ── تقرير التاريخ المحدد فقط ──
-      var dayRows = rows.slice().sort(function (a, b) {
-        return String(a.teacherName || '').localeCompare(String(b.teacherName || ''), 'ar') ||
-          String(a.subjectName || '').localeCompare(String(b.subjectName || ''), 'ar') ||
-          String(a.time || '').localeCompare(String(b.time || '')) ||
-          String(a.studentName || '').localeCompare(String(b.studentName || ''), 'ar');
-      });
-      csvRows.push(['تقرير حضور — التاريخ: ' + dateFilter]);
-      var scope = [];
-      if (teacherFilter) scope.push('الأستاذ: ' + teacherFilter);
-      if (subjectFilter) scope.push('المادة: ' + subjectFilter);
-      if (scope.length) csvRows.push([scope.join('  |  ')]);
-      csvRows.push([]);
-      csvRows.push(['#', 'رقم التسجيل', 'الطالب', 'المادة', 'الأستاذ', 'الوقت', 'النوع']);
-      dayRows.forEach(function (r, i) {
-        csvRows.push([
-          i + 1,
-          r.studentId || '—',
-          r.studentName || _subxStudentName(r.studentId),
-          r.subjectName || '—',
-          r.teacherName || '—',
-          r.time || '',
-          _csvType(r.type)
-        ]);
-      });
-      csvRows.push([]);
-      csvRows.push(['المجموع:', dayRows.length + ' سجل حضور']);
-      summary = dayRows.length + ' سجل بتاريخ ' + dateFilter;
+  // تنفيذ التصدير حسب النطاق المختار في النافذة
+  window.subxExportLogsCSVRun = function () {
+    var t = (document.getElementById('subx-logs-teacher') || {}).value || '';
+    var s = (document.getElementById('subx-logs-subject') || {}).value || '';
+    var allDates = document.getElementById('subx-csv-alldates').checked;
+    var from = document.getElementById('subx-csv-from').value;
+    var to = document.getElementById('subx-csv-to').value;
+    var rows = _subxCsvScopeRows();
+    var scopeLabel;
+    if (allDates) {
+      scopeLabel = 'كل التواريخ';
     } else {
-      // ── جدول حضور: عمود لكل تاريخ، صف لكل تلميذ (مجموعة لكل أستاذ/مادة) ──
-      var byTeacher = {};
-      rows.forEach(function (r) {
-        var tName = r.teacherName || 'أستاذ غير محدد';
-        (byTeacher[tName] = byTeacher[tName] || []).push(r);
-      });
-      Object.keys(byTeacher).sort(function (a, b) { return String(a).localeCompare(String(b), 'ar'); }).forEach(function (tName) {
-        var recs = byTeacher[tName];
-        var subjects = {};
-        recs.forEach(function (r) { if (r.subjectName) subjects[r.subjectName] = true; });
-        var subjList = Object.keys(subjects).sort(function (a, b) { return String(a).localeCompare(String(b), 'ar'); });
-        if (!subjList.length) subjList = [''];
-
-        csvRows.push([]);
-        csvRows.push(['أستاذ: ' + tName]);
-
-        subjList.forEach(function (subj) {
-          var subRecs = recs.filter(function (r) { return (r.subjectName || '') === subj; });
-          if (!subRecs.length) return;
-
-          // حصص هذه المادة فقط — آخر 8 تواريخ حضور
-          var dateSet = {};
-          subRecs.forEach(function (r) { if (r.date) dateSet[r.date] = true; });
-          var sessionDates = Object.keys(dateSet).sort();
-          if (sessionDates.length > 8) sessionDates = sessionDates.slice(sessionDates.length - 8);
-
-          csvRows.push([]);
-          csvRows.push(['المادة: ' + (subj || '—')]);
-
-          var header = ['رقم التسجيل', 'الطالب'];
-          for (var si = 0; si < sessionDates.length; si++) {
-            header.push('الحصة ' + (si + 1) + ' (' + sessionDates[si] + ')');
-          }
-          header.push('مجموع الحضور');
-          csvRows.push(header);
-
-          // الطلاب: من سجلات الحضور + أصحاب اشتراكات هذه المادة/الأستاذ
-          var students = {};
-          subRecs.forEach(function (r) {
-            var sid = r.studentId || r.studentName || '—';
-            if (!students[sid]) students[sid] = { id: r.studentId || '—', name: r.studentName || _subxStudentName(r.studentId), att: {} };
-            if (r.date) students[sid].att[r.date] = true;
-          });
-          (allSubs || []).forEach(function (row) {
-            var s = row.subscription || {};
-            if (s.status === 'cancelled') return;
-            if (String(s.teacher_name || '').trim() !== String(tName)) return;
-            if (String(s.subject_name || '').trim() !== String(subj || '').trim()) return;
-            var sid = String(s.student_id || '');
-            if (!sid) return;
-            if (!students[sid]) students[sid] = { id: sid, name: _subxStudentName(sid), att: {} };
-          });
-
-          Object.keys(students).sort(function (a, b) { return String(students[a].name).localeCompare(String(students[b].name), 'ar'); }).forEach(function (sid) {
-            var st = students[sid];
-            var line = [st.id, st.name];
-            var total = 0;
-            for (var di = 0; di < sessionDates.length; di++) {
-              var present = !!st.att[sessionDates[di]];
-              if (present) total++;
-              line.push(present ? 'حاضر' : 'غائب');
-            }
-            line.push(total);
-            csvRows.push(line);
-          });
-        });
-      });
-      summary = rows.length + ' سجل';
+      if (!from || !to) { showToast('⚠️ اختر من تاريخ وإلى تاريخ', true); return; }
+      if (from > to) { showToast('⚠️ تاريخ البداية بعد تاريخ النهاية', true); return; }
+      rows = rows.filter(function (r) { return r.date >= from && r.date <= to; });
+      scopeLabel = from === to ? from : (from + ' → ' + to);
     }
-
-    var csvContent = csvRows.map(function (row) {
-      return row.map(_esc).join(',');
-    }).join('\r\n');
+    if (!rows.length) { showToast('⚠️ لا توجد سجلات في هذا النطاق', true); return; }
+    rows.sort(function (a, b) {
+      return String(a.date + (a.time || '')).localeCompare(String(b.date + (b.time || ''))) ||
+        String(a.teacherName || '').localeCompare(String(b.teacherName || '')) ||
+        String(a.subjectName || '').localeCompare(String(b.subjectName || ''));
+    });
+    var ds = rows.map(function (r) { return r.date; }).filter(Boolean).sort();
+    var csvRows = [];
+    csvRows.push(['سجل الحضور — ' + scopeLabel]);
+    var sc = ['الأستاذ: ' + (t || 'كل الأساتذة')];
+    if (s) sc.push('المادة: ' + s);
+    csvRows.push([sc.join('  |  ')]);
+    if (allDates && ds.length) {
+      csvRows.push(['من ' + ds[0] + ' إلى ' + ds[ds.length - 1] + ' — عدد السجلات: ' + rows.length]);
+    } else {
+      csvRows.push(['عدد السجلات: ' + rows.length]);
+    }
+    csvRows.push([]);
+    csvRows.push(['#', 'التاريخ', 'الوقت', 'رقم التسجيل', 'الطالب', 'المادة', 'الأستاذ', 'النوع']);
+    rows.forEach(function (r, i) {
+      csvRows.push([i + 1, r.date || '', r.time || '', r.studentId || '', r.studentName || _subxCsvStudentName(r.studentId), r.subjectName || '', r.teacherName || '', _subxCsvType(r.type)]);
+    });
+    csvRows.push([]);
+    csvRows.push(['المجموع:', rows.length + ' سجل حضور']);
+    var csvContent = csvRows.map(function (row) { return row.map(_subxCsvEsc).join(','); }).join('\r\n');
     var blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    var label = teacherFilter ? teacherFilter.replace(/[\\/:*?"<>|]/g, '_') : 'كل_الأساتذة';
-    if (subjectFilter) label += '_' + subjectFilter.replace(/[\\/:*?"<>|]/g, '_');
-    if (dateFilter) label += '_' + dateFilter;
-    a.download = 'حضور_' + label + '_' + new Date().toISOString().slice(0, 10) + '.csv';
+    var label = t ? t.replace(/[\\/:*?"<>|]/g, '_') : 'كل_الأساتذة';
+    if (s) label += '_' + s.replace(/[\\/:*?"<>|]/g, '_');
+    label += allDates ? '_كل_التواريخ' : '_' + scopeLabel.replace(/[\\/:*?"<>|]/g, '_');
+    a.download = 'سجل_الحضور_' + label + '_' + new Date().toISOString().slice(0, 10) + '.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('✅ تم تصدير ' + summary + ' — ' + a.download);
+    document.getElementById('subx-csv-modal').classList.remove('open');
+    showToast('✅ تم تصدير ' + rows.length + ' سجل — ' + a.download);
   };
 
   window.subxShowClearPinModal = function () {
