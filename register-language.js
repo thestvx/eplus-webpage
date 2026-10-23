@@ -55,8 +55,9 @@ let lFormData = null;
 
 function $id(id) { return document.getElementById(id); }
 
+// ID رباعي الأرقام للتسجيلات الجديدة (1000–9999) — القديمة الثلاثية تبقى كما هي.
 function _genLangId() {
-  return String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+  return String(Math.floor(Math.random() * 9000) + 1000);
 }
 
 function _genToken(n) {
@@ -292,13 +293,14 @@ async function doLangSubmit() {
 
   const MAX_TRIES = 1000;
   for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
+    const id = _genLangId();
     const payload = Object.assign({}, lFormData, {
-      id: _genLangId(),
+      id: id,
       status: 'مسجل مبدئياً',
       fee_amount: 500,
       student_token: _genToken(32),
       terms_accepted: true,
-      barcode_value: (typeof EAN13 !== 'undefined' && EAN13.make) ? EAN13.make(lFormData.id || '000') : '',
+      barcode_value: (typeof EAN13 !== 'undefined' && EAN13.make) ? EAN13.make(id) : '',
     });
     try {
       if (typeof EAN13 === 'undefined' || !EAN13.make) delete payload.barcode_value;

@@ -199,9 +199,11 @@ function currentSubjectItems() {
   return [];
 }
 
-// توليد ID ثلاثي الأرقام (000–999)
+// توليد ID رباعي الأرقام للتسجيلات الجديدة (1000–9999).
+// ملاحظة: التلاميذ الحاليون بأرقام ثلاثية (000–999) يبقون كما هم دون أي تغيير.
+// لا تصادم بين الطولين، والباركود EAN-13 يدعم حتى 9 أرقام (راجع js/ean13.js).
 function _genRegId() {
-  return String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+  return String(Math.floor(Math.random() * 9000) + 1000);
 }
 
 // ── Smooth scroll بين المراحل الرئيسية ──
@@ -727,9 +729,10 @@ async function onLawsConfirm() {
   if (btn) { btn.disabled = true; btn.textContent = 'جاري التسجيل...'; }
   openLoadingModal();
   try {
-    // ID ثلاثي الأرقام (000–999): عند تصادم 23505 نعيد توليد ID جديد
-    // ونعيد المحاولة (حتى 1000 محاولة) دون تغيير الباركود نهائياً —
+    // ID رباعي الأرقام للتسجيلات الجديدة (1000–9999): عند تصادم 23505 نعيد
+    // توليد ID جديد ونعيد المحاولة (حتى 1000 محاولة) دون تغيير الباركود —
     // الباركود يُشتق من الـ ID النهائي ويبقى ثابتاً للتسجيل الواحد.
+    // (الأرقام الثلاثية القديمة لا تُلمس ولا تُعاد توليدها.)
     const MAX_TRIES = 1000;
     for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
       if (attempt > 0) {
@@ -760,7 +763,7 @@ async function onLawsConfirm() {
       const txt = await res.text();
       throw new Error(txt.slice(0, 200));
     }
-    throw new Error('لا توجد Registration IDs ثلاثية متاحة حالياً');
+    throw new Error('لا توجد Registration IDs رباعية متاحة حالياً');
   } catch (e) {
     closeLoadingModal();
     if (byId('lawsConfirmBtn')) { byId('lawsConfirmBtn').disabled = false; byId('lawsConfirmBtn').textContent = 'تأكيد التسجيل الأولي'; }
