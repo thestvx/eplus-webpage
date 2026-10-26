@@ -57,6 +57,7 @@
 const StudentCardRenderer = (function () {
   const FRONT_IMG = 'studentidcard/studentidcardfront1.jpg';
   const BACK_IMG = 'studentidcard/studentidcardback1.jpg';
+  const LANG_FRONT_IMG = 'studentidcard/single course card front.jpg';
   const CARD_W = 380;          // display width  (px)
   const CARD_H = 228;          // display height (px)
   const QR_SIZE = 64;          // base QR px size
@@ -1268,6 +1269,9 @@ ${info}
   function buildA4FrontSheetHTML(opts) {
     const sheet = (opts && opts.sheet) || getSheetLayout();
     const slots = (sheet && sheet.slots && sheet.slots.length) ? sheet.slots : defaultCardSlots();
+    const img = (opts && opts.img) || FRONT_IMG;
+    const title = (opts && opts.title) || 'الوجه الأمامي — ورقة A4 (بطاقات)';
+    const autoprint = !(opts && opts.preview);
     const cut = !opts || opts.cutLines !== false;
     // Full-width dashed horizontal guides at the TOP and BOTTOM edge of every
     // card, spanning the whole sheet (left edge → right edge), so the user can
@@ -1276,12 +1280,12 @@ ${info}
       `<i class="ec-a4-cut" style="top:${s.y.toFixed(2)}mm"></i><i class="ec-a4-cut" style="top:${(s.y + s.h).toFixed(2)}mm"></i>`
     ).join('') : '';
     const slotsHtml = slots.map(s =>
-      `<div class="ec-a4-front-slot" style="${a4SlotStyle(s, 'mm', 1)}"><img src="${FRONT_IMG}" alt=""></div>`
+      `<div class="ec-a4-front-slot" style="${a4SlotStyle(s, 'mm', 1)}"><img src="${img}" alt=""></div>`
     ).join('');
-    const info = `<div class="ec-a4-info">طباعة الوجه الأمامي (الخطوة 1) — ورقة A4 · Portrait · Scale 100% · Margins None ·
+    const info = (opts && opts.infoHtml) || `<div class="ec-a4-info">طباعة الوجه الأمامي (الخطوة 1) — ورقة A4 · Portrait · Scale 100% · Margins None ·
   ${slots.length} بطاقات في منتصف الصفحة. هذه الورقة هي المرجع: الوجه الخلفي يُطبع على نفس المواضع (CARD_SLOTS) بنفس حدود القص —
   <div class="sub">الخطوط المتقطعة (بعرض الورقة كاملاً) عند الحافة العلوية والسفلية لكل بطاقة هي دليل القص: اقصّ على طول الخط بالضبط لتظل البطاقة مقصوصة على نفس حدود الأمام/الخلف وتقع جميع المعلومات في مكانها تماماً.</div></div>`;
-    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>الوجه الأمامي — ورقة A4 (بطاقات)</title>
+    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${title}</title>
 <style>
   @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
   html, body { margin: 0; padding: 0; background: #ffffff; }
@@ -1305,15 +1309,37 @@ ${info}
     for (var i = 0; i < imgs.length; i++) {
       if (!imgs[i].complete || imgs[i].naturalWidth === 0) { ready = false; break; }
     }
-    if (ready || tries++ > 40) { try { window.focus(); window.print(); } catch (e) {} }
+    if (ready || tries++ > 40) {
+      if (!${autoprint ? 'true' : 'false'}) return;
+      try { window.focus(); window.print(); } catch (e) {}
+    }
     else { setTimeout(go, 250); }
   }
   setTimeout(go, 300);
-  window.onafterprint = function () { setTimeout(function () { try { window.close(); } catch (e) {} }, 250); };
+  if (${autoprint ? 'true' : 'false'}) {
+    window.onafterprint = function () { setTimeout(function () { try { window.close(); } catch (e) {} }, 250); };
     setTimeout(function () { try { window.close(); } catch (e) {} }, 120000);
+  }
 })();
 <\/script>
 </body></html>`;
+  }
+
+  // ── Language-course cards — FRONT A4 sheet ───────────────────────────
+  // Same slot grid/cut lines as the language barcode back sheet, but with the
+  // "single course card front" design on every card. No data and no DB rows:
+  // only the back sheet carries (and consumes) the barcode card IDs.
+  function buildA4LangFrontSheetHTML(opts) {
+    const sheet = (opts && opts.sheet) || getSheetLayout();
+    const slots = (sheet && sheet.slots && sheet.slots.length) ? sheet.slots : defaultCardSlots();
+    const info = `<div class="ec-a4-info"><b>طباعة الوجه الأمامي لبطاقات دورات اللغات</b> — ورقة A4 · Portrait · Scale 100% · Margins None ·
+  ${slots.length} بطاقات في منتصف الصفحة بتصميم البطاقة الأمامية.
+  <div class="sub">الخطوط المتقطعة (بعرض الورقة كاملاً) عند الحافة العلوية والسفلية لكل بطاقة هي دليل القص: اقصّ على طول الخط بالضبط لتطابق حدود الوجه الأمامي مع الخلفي.</div></div>`;
+    return buildA4FrontSheetHTML(Object.assign({}, opts || {}, {
+      img: LANG_FRONT_IMG,
+      title: 'بطاقات دورات اللغات — الوجه الأمامي (A4)',
+      infoHtml: info
+    }));
   }
 
   // ── A4 two-pass workflow (print this page in step 2) ─────────────────
@@ -1452,13 +1478,13 @@ ${info}
   .ec-a4-back-slot { position: absolute; transform-origin: 0 0; background: #ffffff; }
   .ec-a4-back-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
   .ec-a4-lang-data { position: absolute; }
-  .ec-a4-langid { position: absolute; display: flex; align-items: center; justify-content: center; background: #ffffff; font-family: 'Courier New', monospace; font-weight: 900; letter-spacing: 0.3mm; color: #0b1b3f; direction: ltr; }
+  .ec-a4-langid { position: absolute; z-index: 5; display: flex; align-items: center; justify-content: center; line-height: 1; background: #ffffff; font-family: 'Courier New', monospace; font-weight: 900; letter-spacing: 0.3mm; color: #0b1b3f; direction: ltr; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .ec-a4-langdl .ec-dl-bc svg text { display: none !important; }
   .ec-a4-cut { position: absolute; left: 0; width: 100%; border-top: 0.3mm dashed #555555; pointer-events: none; }
   ${dlRules('mm', sc, sc, '', CAL.textColor)}
 </style>
 <script src="js/JsBarcode.all.min.js?v=1"><\/script>
-<script src="js/studentCardRenderer.js?v=22"><\/script>
+<script src="js/studentCardRenderer.js?v=23"><\/script>
 </head><body>
 ${info}
 <div class="ec-a4">${cutLinesHtml}${slotsHtml}</div>
@@ -1766,7 +1792,7 @@ ${page(backSlots, 'الخلفي', 'ts-back')}
     dataLayerHTML, dlRules, gridOverlayHTML, GRID_CSS,
     a4SheetCSS, a4SlotStyle, a4DataStyle, a4DataGeom, a4BackDecorHTML, a4GridOverlayHTML, A4_GRID_CSS,
     buildA4PrintHTML, buildA4TestSheetHTML, buildA4FrontSheetHTML, buildA4BackSheetHTML, buildDuplexTestSheetHTML,
-    buildA4BarcodeSheetHTML,
+    buildA4BarcodeSheetHTML, buildA4LangFrontSheetHTML,
     renderBarcodeSVG, buildBarcodePrintHTML,
     initCentral, centralSave, centralStatus,
     saveCalSnapshot, getCalHistory, restoreCalSnapshot, deleteCalSnapshot, syncCalHistory, recoverLastSnapshot

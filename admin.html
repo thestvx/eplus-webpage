@@ -11,7 +11,7 @@
   <script src="js/qrcode.min.js?v=1"></script>
   <script src="js/JsBarcode.all.min.js?v=1"></script>
   <script src="js/ean13.js?v=2"></script>
-  <script src="js/studentCardRenderer.js?v=22"></script>
+  <script src="js/studentCardRenderer.js?v=23"></script>
   <script src="js/registrationService.js?v=4"></script>
   <script src="js/subjectService.js?v=6"></script>
   <script src="js/attendanceService.js?v=2"></script>
@@ -1998,11 +1998,6 @@
         <span class="nav-icon">📨</span>
         <span class="nav-label" data-i18n="notification_center">مركز الإشعارات</span>
       </div>
-      <div class="nav-section" data-nav-cat="programs">تسجيلات البرامج</div>
-      <div class="nav-item" data-nav="program-registrations" onclick="switchNavSection('program-registrations')">
-        <span class="nav-icon">📋</span>
-        <span class="nav-label">تسجيلات البرامج</span>
-      </div>
       <div class="nav-section" data-nav-cat="languages">تسجيلات اللغات</div>
       <div class="nav-item" data-nav="language-registrations" onclick="switchNavSection('language-registrations')">
         <span class="nav-icon">🌍</span>
@@ -2013,6 +2008,11 @@
         <span class="nav-icon">🎴</span>
         <span class="nav-label">اشتراكات دورات اللغات</span>
         <span class="nav-badge" id="nav-badge-lang-cards">0</span>
+      </div>
+      <div class="nav-section" data-nav-cat="programs">تسجيلات البرامج</div>
+      <div class="nav-item" data-nav="program-registrations" onclick="switchNavSection('program-registrations')">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">تسجيلات البرامج</span>
       </div>
       <a href="index.html" class="nav-item" data-nav="website">
         <span class="nav-icon">🌐</span>
@@ -3911,9 +3911,8 @@
                 <div id="lc-card-summary" class="lc-summary"></div>
                 <div class="lc-form">
                   <div><label>اللغة</label><select class="inp" id="lc-fill-language" style="width:100%;padding:8px 10px"></select></div>
-                  <div><label>عدد الحصص</label><input class="inp" id="lc-fill-sessions" type="number" min="1" step="1" value="12" style="width:100%;padding:8px 10px" /></div>
-                  <div><label>الأستاذ</label><input class="inp" id="lc-fill-teacher" list="lc-teacher-list" placeholder="اكتب اسم الأستاذ أو اختر" style="width:100%;padding:8px 10px" /><datalist id="lc-teacher-list"></datalist></div>
-                  <div><label>الطالب (اختياري)</label><select class="inp" id="lc-fill-student" style="width:100%;padding:8px 10px" onchange="lcOnStudentChange()"><option value="">— بدون ربط —</option></select></div>
+                  <div><label>عدد الحصص</label><input class="inp" id="lc-fill-sessions" type="number" min="1" step="1" value="4" style="width:100%;padding:8px 10px" /></div>
+                  <div><label>الأستاذ</label><select class="inp" id="lc-fill-teacher" style="width:100%;padding:8px 10px"><option value="">— اختر الأستاذ —</option></select></div>
                   <div class="full"><label>ملاحظات</label><input class="inp" id="lc-fill-notes" placeholder="اختياري" style="width:100%;padding:8px 10px" /></div>
                 </div>
                 <div style="display:flex;justify-content:space-between;gap:8px;margin-top:16px">
@@ -3935,14 +3934,19 @@
             </div>
             <div class="teacher-modal-body">
               <div id="lc-preview-info" style="font-size:12px;font-weight:700;color:var(--text-muted);line-height:1.7">
-                ورقة A4 واحدة · 4 بطاقات · التصميم الخلفي + باركود فقط (بدون اسم أو QR). عند الطباعة تُستهلك الأرقام وتُحفظ البطاقات كجاهزة للتعبئة.
+                ورقة A4 واحدة · 4 بطاقات. اختر الوجه للمعاينة ثم اطبع كل وجه على حدة: الأمام بتصميم البطاقة، والخلف بالباركود ورقم البطاقة (تُستهلك الأرقام وتُحفظ البطاقات كجاهزة للتعبئة عند طباعة الخلف).
+              </div>
+              <div style="display:flex;gap:6px;margin-top:10px">
+                <button class="tbl-action" id="lc-tab-back" onclick="lcPreviewSide('back')" style="padding:8px 16px;font-size:12px">الوجه الخلفي (باركود)</button>
+                <button class="tbl-action" id="lc-tab-front" onclick="lcPreviewSide('front')" style="padding:8px 16px;font-size:12px">الوجه الأمامي</button>
               </div>
               <div class="lc-preview-stage"><iframe id="lc-preview-frame" title="معاينة ورقة البطاقات"></iframe></div>
               <div style="display:flex;justify-content:space-between;gap:8px;margin-top:14px;flex-wrap:wrap">
                 <button class="tbl-action" onclick="lcRegeneratePreview()" style="padding:10px 18px">♻️ توليد أرقام جديدة</button>
-                <div style="display:flex;gap:8px">
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
                   <button class="tbl-action" onclick="lcClosePrint()" style="padding:10px 18px">إلغاء</button>
-                  <button class="tbl-action" onclick="lcPrintSheet()" id="lc-print-btn" style="border-color:rgba(16,185,129,.35);color:#059669;font-weight:900;padding:10px 22px">🖨️ طباعة</button>
+                  <button class="tbl-action" onclick="lcPrintFront()" id="lc-print-front-btn" style="border-color:rgba(99,102,241,.35);color:#4f46e5;font-weight:900;padding:10px 22px">🖨️ طباعة الوجه الأمامي</button>
+                  <button class="tbl-action" onclick="lcPrintSheet()" id="lc-print-btn" style="border-color:rgba(16,185,129,.35);color:#059669;font-weight:900;padding:10px 22px">🖨️ طباعة الوجه الخلفي</button>
                 </div>
               </div>
             </div>
@@ -6797,8 +6801,8 @@ window.NAV_CATS = [
   { key: 'students', label: 'إدارة التلاميذ', items: ['students'] },
   { key: 'teachers', label: 'إدارة الأساتذة', items: ['teachers'] },
   { key: 'support', label: 'الدعم المدرسي', items: ['support-registrations', 'support-teachers', 'subscriptions', 'support-finance', 'support-rooms'] },
-  { key: 'programs', label: 'تسجيلات البرامج', items: ['program-registrations'] },
   { key: 'languages', label: 'تسجيلات اللغات', items: ['language-registrations', 'language-subscriptions'] },
+  { key: 'programs', label: 'تسجيلات البرامج', items: ['program-registrations'] },
   { key: 'communication', label: 'التواصل', items: ['msgs'] },
   { key: 'finance', label: 'المالية', items: ['finance'] },
   { key: 'system', label: 'النظام', items: ['settings'] },
@@ -6861,6 +6865,13 @@ function navMerge(cfg) {
   if (_pi > -1 && _ci > -1 && _pi > _ci) {
     cfg.catOrder.splice(_pi, 1);
     cfg.catOrder.splice(_ci, 0, 'programs');
+  }
+  // «تسجيلات اللغات» تسبق «تسجيلات البرامج» دائماً — حتى مع تخطيط محفوظ قديم.
+  const _lp = cfg.catOrder.indexOf('languages');
+  const _pp = cfg.catOrder.indexOf('programs');
+  if (_lp > -1 && _pp > -1 && _lp > _pp) {
+    cfg.catOrder.splice(_lp, 1);
+    cfg.catOrder.splice(cfg.catOrder.indexOf('programs'), 0, 'languages');
   }
   if (!cfg.itemOrder || typeof cfg.itemOrder !== 'object') cfg.itemOrder = {};
   Object.keys(d.itemOrder).forEach(cat => {
@@ -30941,7 +30952,7 @@ window.langRegPrint = function() {
 const LC_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
 const LC_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
 const LC_TABLE = 'language_cards';
-const LC_LANGS = ['الإنجليزية','الفرنسية','الإسبانية','الألمانية','الإيطالية','التركية'];
+const LC_LANGS = ['الإنجليزية','الفرنسية','الألمانية','الإسبانية'];
 
 let lcAllData = [], lcFilteredData = [];
 let lcPage = 1, lcPageSize = 20;
@@ -30949,7 +30960,7 @@ let lcTableMissing = false;
 let lcPendingCards = [];
 let lcScannedCard = null;
 let lcTeachersCache = null;
-let lcLangRegsCache = null;
+let lcPrintSide = 'back';
 
 async function lcFetch(url, opts) {
   return fetch(url, Object.assign({}, opts, {
@@ -31111,17 +31122,44 @@ window.lcOpenPrint = async function() {
     if (lcTableMissing) { srShowToast('جدول language_cards غير موجود — نفّذ ملف الهجرة أولاً', 'error'); return; }
   }
   lcPendingCards = lcGenCards(4);
+  lcPrintSide = 'back';
   lcRenderPreview();
   document.getElementById('lc-print-modal').classList.add('open');
+};
+
+function lcUpdatePreviewTabs() {
+  const back = document.getElementById('lc-tab-back');
+  const front = document.getElementById('lc-tab-front');
+  const set = function(el, on) {
+    if (!el) return;
+    el.style.background = on ? 'rgba(99,102,241,.14)' : '';
+    el.style.color = on ? '#4f46e5' : '';
+    el.style.borderColor = on ? 'rgba(99,102,241,.4)' : '';
+    el.style.fontWeight = '900';
+  };
+  set(back, lcPrintSide === 'back');
+  set(front, lcPrintSide === 'front');
+}
+
+window.lcPreviewSide = function(side) {
+  lcPrintSide = side === 'front' ? 'front' : 'back';
+  lcRenderPreview();
 };
 
 function lcRenderPreview() {
   const frame = document.getElementById('lc-preview-frame');
   if (!frame) return;
   let html = '';
-  try { html = StudentCardRenderer.buildA4BarcodeSheetHTML(lcPendingCards, { preview: true }); }
-  catch(e) { console.error('[LANG-CARDS] preview error:', e); html = '<p style="font-family:sans-serif;padding:20px">تعذر إنشاء المعاينة: ' + lcEsc(e.message) + '</p>'; }
+  try {
+    html = lcPrintSide === 'front'
+      ? StudentCardRenderer.buildA4LangFrontSheetHTML({ preview: true })
+      : StudentCardRenderer.buildA4BarcodeSheetHTML(lcPendingCards, { preview: true });
+  } catch(e) {
+    console.error('[LANG-CARDS] preview error:', e);
+    html = '<p style="font-family:sans-serif;padding:20px">تعذر إنشاء المعاينة: ' + lcEsc(e.message) + '</p>';
+  }
   frame.srcdoc = html;
+  lcUpdatePreviewTabs();
 }
 
 window.lcRegeneratePreview = function() {
@@ -31133,6 +31171,23 @@ window.lcClosePrint = function() {
   document.getElementById('lc-print-modal').classList.remove('open');
   const frame = document.getElementById('lc-preview-frame');
   if (frame) frame.srcdoc = '';
+};
+
+window.lcPrintFront = function() {
+  const win = window.open('', '', 'width=900,height=1200');
+  if (!win) { srShowToast('اسمح بالنوافذ المنبثقة لإتمام الطباعة', 'error'); return; }
+  win.document.write('<html dir="rtl"><head><meta charset="utf-8"><title>بطاقات دورات اللغات — الوجه الأمامي</title></head><body style="font-family:Tajawal,Arial,sans-serif;padding:30px;text-align:center;color:#555">جارٍ تجهيز الوجه الأمامي…</body></html>');
+  win.document.close();
+  try {
+    const html = StudentCardRenderer.buildA4LangFrontSheetHTML({});
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    srShowToast('🖨️ تم فتح نافذة طباعة الوجه الأمامي');
+  } catch(e) {
+    try { win.close(); } catch(_) {}
+    srShowToast('فشل طباعة الوجه الأمامي: ' + e.message, 'error');
+  }
 };
 
 window.lcPrintSheet = async function() {
@@ -31178,7 +31233,7 @@ window.lcPrintSheet = async function() {
     try { win.close(); } catch(_) {}
     srShowToast('فشل حفظ/طباعة البطاقات: ' + e.message, 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🖨️ طباعة'; }
+    if (btn) { btn.disabled = false; btn.textContent = '🖨️ طباعة الوجه الخلفي'; }
   }
 };
 
@@ -31197,7 +31252,6 @@ window.lcOpenFill = function() {
   document.getElementById('lc-fill-modal').classList.add('open');
   setTimeout(function(){ if (input) input.focus(); }, 150);
   lcEnsureTeachers();
-  lcEnsureLangRegs();
 };
 
 window.lcOpenFillWith = function(id) {
@@ -31293,13 +31347,12 @@ async function lcShowFillStep2(card) {
     }).join('');
   }
   const sessions = document.getElementById('lc-fill-sessions');
-  if (sessions) sessions.value = '12';
+  if (sessions) sessions.value = '4';
   const notes = document.getElementById('lc-fill-notes');
   if (notes) notes.value = '';
   const teacher = document.getElementById('lc-fill-teacher');
   if (teacher) teacher.value = '';
   await lcEnsureTeachers();
-  await lcEnsureLangRegs();
 }
 
 async function lcEnsureTeachers() {
@@ -31310,64 +31363,31 @@ async function lcEnsureTeachers() {
 }
 
 function lcFillTeacherList() {
-  const list = document.getElementById('lc-teacher-list');
-  if (!list) return;
-  const arr = (lcTeachersCache || []).slice().sort(function(a,b) {
+  const sel = document.getElementById('lc-fill-teacher');
+  if (!sel) return;
+  const current = sel.value;
+  const arr = (lcTeachersCache || []).slice().filter(function(t) {
+    return String(t.name || '').trim();
+  }).sort(function(a,b) {
     return String(a.name || '').localeCompare(String(b.name || ''), 'ar');
   });
-  list.innerHTML = arr.map(function(t) {
-    return '<option value="' + lcEsc(t.name || '') + '"></option>';
+  sel.innerHTML = '<option value="">— اختر الأستاذ —</option>' + arr.map(function(t) {
+    const name = String(t.name || '').trim();
+    const id = String(t.teacherId || t.id || '');
+    return '<option value="' + lcEsc(id) + '" data-name="' + lcEsc(name) + '">' + lcEsc(name) + '</option>';
   }).join('');
+  if (current) sel.value = current;
 }
-
-async function lcEnsureLangRegs() {
-  if (lcLangRegsCache) { lcFillStudentSelect(); return; }
-  try {
-    const res = await lcFetch(LC_URL + '/rest/v1/language_registrations?select=id,first_name,last_name,language&order=created_at.desc');
-    lcLangRegsCache = res.ok ? await res.json() : [];
-  } catch(e) { lcLangRegsCache = []; }
-  if (!Array.isArray(lcLangRegsCache)) lcLangRegsCache = [];
-  lcFillStudentSelect();
-}
-
-function lcFillStudentSelect() {
-  const sel = document.getElementById('lc-fill-student');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">— بدون ربط —</option>' + (lcLangRegsCache || []).map(function(r) {
-    const name = ((r.first_name || '') + ' ' + (r.last_name || '')).trim();
-    return '<option value="' + lcEsc(r.id) + '" data-name="' + lcEsc(name) + '" data-lang="' + lcEsc(r.language || '') + '">' + lcEsc(r.id) + ' — ' + lcEsc(name) + (r.language ? ' (' + lcEsc(r.language) + ')' : '') + '</option>';
-  }).join('');
-}
-
-window.lcOnStudentChange = function() {
-  const sel = document.getElementById('lc-fill-student');
-  const langSel = document.getElementById('lc-fill-language');
-  if (!sel || !langSel || !sel.value) return;
-  const opt = sel.options[sel.selectedIndex];
-  const lang = opt ? opt.getAttribute('data-lang') : '';
-  if (!lang) return;
-  langSel.value = lang;
-  if (langSel.value !== lang) {
-    const o = document.createElement('option');
-    o.value = lang;
-    o.textContent = lang;
-    langSel.appendChild(o);
-    langSel.value = lang;
-  }
-};
 
 window.lcActivateCard = async function() {
   if (!lcScannedCard) return;
   const sessions = parseInt((document.getElementById('lc-fill-sessions') || {}).value, 10);
   if (!(sessions > 0)) { srShowToast('عدد الحصص يجب أن يكون أكبر من 0', 'error'); return; }
-  const teacherName = String((document.getElementById('lc-fill-teacher') || {}).value || '').trim();
-  if (!teacherName) { srShowToast('اختر الأستاذ أو اكتب اسمه', 'error'); return; }
-  const t = (lcTeachersCache || []).find(function(x) { return String(x.name || '').trim() === teacherName; });
-  const teacherId = t ? (t.teacherId || t.id || '') : '';
-  const studentSel = document.getElementById('lc-fill-student');
-  const studentId = studentSel ? studentSel.value : '';
-  const studentOpt = studentSel && studentSel.selectedIndex >= 0 ? studentSel.options[studentSel.selectedIndex] : null;
-  const studentName = studentId && studentOpt ? (studentOpt.getAttribute('data-name') || '') : '';
+  const teacherSel = document.getElementById('lc-fill-teacher');
+  const teacherOpt = teacherSel && teacherSel.selectedIndex >= 0 ? teacherSel.options[teacherSel.selectedIndex] : null;
+  const teacherName = teacherOpt ? String(teacherOpt.getAttribute('data-name') || '').trim() : '';
+  if (!teacherName) { srShowToast('اختر الأستاذ', 'error'); return; }
+  const teacherId = teacherOpt ? String(teacherOpt.value || '') : '';
   const language = (document.getElementById('lc-fill-language') || {}).value || '';
   const notes = String((document.getElementById('lc-fill-notes') || {}).value || '').trim();
   const btn = document.getElementById('lc-activate-btn');
@@ -31375,8 +31395,8 @@ window.lcActivateCard = async function() {
   try {
     const patch = {
       status: 'active',
-      student_id: studentId,
-      student_name: studentName,
+      student_id: '',
+      student_name: '',
       language: language,
       teacher_id: teacherId,
       teacher_name: teacherName,
