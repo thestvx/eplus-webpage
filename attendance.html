@@ -237,7 +237,7 @@ main{flex:1;position:relative;overflow:hidden}
       <img class="logo" src="images/education-plus-center-logo.png" alt="Education Plus Center" draggable="false">
       <div class="title">
         <div class="en">E-PLUS <span class="live-badge"><span class="dot"></span>نظام الحضور</span></div>
-        <div class="ar" id="header-sub">نقطة تسجيل حضور الطلاب — الاستقبال</div>
+        <div class="ar" id="header-sub">نقطة تسجيل حضور الطلاب ودورات اللغات — الاستقبال</div>
       </div>
     </div>
     <div class="top-actions">
@@ -268,14 +268,14 @@ main{flex:1;position:relative;overflow:hidden}
             </div>
           </div>
           <div id="kiosk-ready-msg">
-            <div class="k-ready-text">مرر بطاقة الطالب أمام جهاز الماسح</div>
+            <div class="k-ready-text">مرر بطاقة الطالب أو بطاقة اللغة أمام جهاز الماسح</div>
             <div class="k-ready-sub">التسجيل تلقائي — لا حاجة للضغط على أي زر</div>
           </div>
           <div class="k-status-pill" id="k-status-pill"><span class="dot"></span>الماسح جاهز — امسح البطاقة</div>
           <div class="k-last-read" id="k-last-read"></div>
           <button class="manual-toggle" id="manual-toggle" type="button">⌨️ إدخال يدوي</button>
           <div class="manual-row" id="manual-row">
-            <input type="text" id="manual-input" autocomplete="off" placeholder="رقم الطالب أو الباركود">
+            <input type="text" id="manual-input" autocomplete="off" placeholder="رقم الطالب / باركود البطاقة / رقم بطاقة اللغة">
             <button type="button" id="manual-submit">تسجيل</button>
           </div>
           <button class="debug-toggle" id="debug-toggle" type="button">🔧 Debug</button>
@@ -327,12 +327,65 @@ main{flex:1;position:relative;overflow:hidden}
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   SubscriptionService.init(SUPABASE_URL, SUPABASE_KEY);
+  var LC_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
+  var LC_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
+  var LC_TABLE = 'language_cards';
   var ALGERIA_TZ = 'Africa/Algiers';
   var PIN_SESSION_KEY = 'eplus_att_pin';
   var PIN_HASH = '023e33504ab909cf87a6f4e4e545090e40bdc0a2153e5b68b19f7fad2b737904';
   var PIN_FALLBACK = String.fromCharCode(50, 48, 49, 57);
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function studentFullName(s) { return ((s && (s.first_name || '') + ' ' + (s.last_name || '')) || '').trim(); }
+
+  // ── Language course cards (Supabase) ──
+  function lcFetch(url, opts) {
+    return fetch(url, Object.assign({}, opts, {
+      headers: Object.assign({ 'Content-Type': 'application/json', 'apikey': LC_KEY, 'Authorization': 'Bearer ' + LC_KEY }, (opts || {}).headers || {})
+    }));
+  }
+  function lcParseCard(raw) {
+    var s = String(raw == null ? '' : raw).replace(/\D/g, '');
+    if (s.length === 13) {
+      var id = (typeof EAN13 !== 'undefined') ? EAN13.decodeLang(s) : null;
+      return id ? { id: id, isBarcode: true } : null;
+    }
+    if (s.length === 5) return { id: s, isBarcode: false };
+    return null;
+  }
+  async function lookupLanguageCard(raw) {
+    var parsed = lcParseCard(raw);
+    if (!parsed) return { parsed: null, card: null };
+    try {
+      var res = await lcFetch(LC_URL + '/rest/v1/' + LC_TABLE + '?select=*&id=eq.' + encodeURIComponent(parsed.id));
+      if (!res.ok) {
+        var txt = await res.text().catch(function () { return ''; });
+        if (res.status === 404 || /PGRST205|42P01/.test(txt)) {
+          logScanner('language_cards table missing');
+          return { parsed: parsed, card: null, missing: true };
+        }
+        throw new Error('HTTP ' + res.status);
+      }
+      var rows = await res.json();
+      return { parsed: parsed, card: (Array.isArray(rows) ? rows[0] : null) || null };
+    } catch (e) {
+      logScanner('language card lookup error: ' + e.message);
+      return { parsed: parsed, card: null, error: e.message };
+    }
+  }
+  async function recordLanguageAttendance(cardId) {
+    var res = await lcFetch(LC_URL + '/rest/v1/rpc/record_language_attendance', {
+      method: 'POST',
+      body: JSON.stringify({ p_card_id: cardId })
+    });
+    if (!res.ok) {
+      var txt = await res.text().catch(function () { return ''; });
+      if (res.status === 404 || /PGRST202|record_language_attendance|does not exist/i.test(txt)) {
+        return { ok: false, code: 'setup_required' };
+      }
+      throw new Error('HTTP ' + res.status + (txt ? ' — ' + txt.slice(0, 120) : ''));
+    }
+    return await res.json().catch(function () { return { ok: false, code: 'invalid_response' }; });
+  }
   var ICONS_SVG = {
     student: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='#6366f1' d='M12 3L1 9l11 6 9-4.91V17h2V9L12 3z'/><path fill='#6366f1' d='M5 13.18V17c0 1.66 3.13 3 7 3s7-1.34 7-3v-3.82l-7 3.82-7-3.82z'/></svg>",
     teacher: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='#059669'/><path d='M4 21c0-4 3.58-6.5 8-6.5s8 2.5 8 6.5' fill='#059669'/></svg>",
@@ -569,6 +622,106 @@ main{flex:1;position:relative;overflow:hidden}
     scanner.start();
     grabScanFocus();
   }
+  function resetScannerSoon() {
+    processing = false;
+    scanner.setBusy(false);
+    setTimeout(renderReady, 300);
+  }
+  function lcCardLabel(card) {
+    return String((card && card.student_name) || '').trim() || ('بطاقة #' + ((card && card.id) || ''));
+  }
+  function lcCardSub(card, extra) {
+    var parts = [];
+    if (card && card.language) parts.push(card.language);
+    if (card && card.teacher_name) parts.push(card.teacher_name);
+    var line = parts.join(' — ');
+    return (line ? esc(line) + '<br>' : '') + (extra || '');
+  }
+  async function handleLanguageCardScan(card) {
+    var name = lcCardLabel(card);
+    var total = Number(card.sessions_total) || 0;
+    var used = Number(card.sessions_used) || 0;
+    $('k-last-read').textContent = (card.id || '') + ' — ' + name;
+
+    if (card.deleted_at) {
+      playSoundIncorrect();
+      showScanOverlay('red', '❌', 'بطاقة غير معروفة', name, 'هذه البطاقة محذوفة من النظام', 3000, resetScannerSoon);
+      return;
+    }
+    if (card.status === 'printed') {
+      playSoundWarning();
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>البطاقة غير مفعّلة — ' + esc(name);
+      showScanOverlay('orange', '💳', 'البطاقة غير مفعّلة', name, 'عبّئ البطاقة من لوحة الإدارة أولاً (اسم الطالب · الحصص · الأستاذ)', 3200, resetScannerSoon);
+      return;
+    }
+    if (card.status === 'finished' || (total > 0 && used >= total)) {
+      playSoundWarning();
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#ef4444"></span>البطاقة منتهية — ' + esc(name);
+      showScanOverlay('red', '🏁', 'البطاقة منتهية', name, lcCardSub(card, 'استُهلكت جميع الحصص (' + used + ' / ' + total + ') — غير قابلة للتجديد'), 3500, resetScannerSoon);
+      return;
+    }
+    if (card.status !== 'active') {
+      playSoundWarning();
+      showScanOverlay('orange', '💳', 'البطاقة غير مفعّلة', name, lcCardSub(card, 'فعّل البطاقة من لوحة الإدارة أولاً'), 3000, resetScannerSoon);
+      return;
+    }
+
+    var out = null;
+    try { out = await recordLanguageAttendance(card.id); }
+    catch (e) {
+      logScanner('language attendance error: ' + e.message);
+      playSoundIncorrect();
+      showScanOverlay('red', '❌', 'فشل تسجيل الحضور', name, lcCardSub(card, 'خطأ: ' + esc(e.message)), 3500, resetScannerSoon);
+      return;
+    }
+
+    if (out && out.code === 'setup_required') {
+      playSoundIncorrect();
+      showScanOverlay('red', '⚠️', 'إعداد ناقص', name, 'نفّذ ملف هجرة الحضور <b dir="ltr">20261027120000_language_cards_payments_attendance.sql</b> في Supabase أولاً', 4000, resetScannerSoon);
+      return;
+    }
+    if (out && out.ok && out.code === 'recorded') {
+      playSoundCorrect();
+      attendedCount++; updateCounter();
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#10b981"></span>تم تسجيل حضور اللغة — ' + esc(name);
+      showScanOverlay('green', '✅', 'تم تسجيل حضور اللغة', name,
+        lcCardSub(card, 'الحصص: ' + (Number(out.sessions_used) || 0) + ' / ' + (Number(out.sessions_total) || 0)), 2600, resetScannerSoon);
+      return;
+    }
+    if (out && out.ok && out.code === 'finished') {
+      playSoundCorrect();
+      attendedCount++; updateCounter();
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#10b981"></span>تم تسجيل الحضور — انتهت البطاقة';
+      showScanOverlay('green', '🏁', 'تم التسجيل — انتهت البطاقة', name,
+        lcCardSub(card, 'آخر حصة (' + (Number(out.sessions_used) || 0) + ' / ' + (Number(out.sessions_total) || 0) + ') — البطاقة منتهية وغير قابلة للتجديد'), 3800, resetScannerSoon);
+      return;
+    }
+    if (out && out.code === 'already') {
+      playSoundWarning();
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>تم التسجيل مسبقاً اليوم — ' + esc(name);
+      showScanOverlay('orange', 'ℹ️', 'تم التسجيل مسبقاً اليوم', name,
+        lcCardSub(card, 'الحصص: ' + (Number(out.sessions_used) || 0) + ' / ' + (Number(out.sessions_total) || 0)), 3000, resetScannerSoon);
+      return;
+    }
+    if (out && !out.ok && out.code === 'finished') {
+      playSoundWarning();
+      showScanOverlay('red', '🏁', 'البطاقة منتهية', name, lcCardSub(card, 'استُهلكت جميع الحصص — غير قابلة للتجديد'), 3500, resetScannerSoon);
+      return;
+    }
+    if (out && out.code === 'not_active') {
+      playSoundWarning();
+      showScanOverlay('orange', '💳', 'البطاقة غير مفعّلة', name, lcCardSub(card, 'فعّل البطاقة من لوحة الإدارة أولاً'), 3000, resetScannerSoon);
+      return;
+    }
+    if (out && out.code === 'no_sessions') {
+      playSoundWarning();
+      showScanOverlay('orange', '⚠️', 'لا توجد حصص', name, lcCardSub(card, 'عدد الحصص غير محدد لهذه البطاقة'), 3000, resetScannerSoon);
+      return;
+    }
+    playSoundIncorrect();
+    showScanOverlay('red', '❌', 'تعذر تسجيل الحضور', name, lcCardSub(card, 'بطاقة غير موجودة أو غير صالحة'), 3000, resetScannerSoon);
+  }
+
   // ── Scan handler ──
   async function handleScan(val) {
     if (processing) return;
@@ -576,6 +729,23 @@ main{flex:1;position:relative;overflow:hidden}
     scanner.setBusy(true);
     $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>جاري التحقق...';
     var raw = String(val || '').trim();
+
+    // 0. Language course card (EAN-13 '201' or 5-digit card ID)
+    var lcRes = null;
+    try { lcRes = await lookupLanguageCard(raw); } catch (e) { logScanner('lookupLanguageCard error: ' + e.message); }
+    if (lcRes && lcRes.card) { await handleLanguageCardScan(lcRes.card); return; }
+    if (lcRes && lcRes.parsed && lcRes.parsed.isBarcode) {
+      $('k-last-read').textContent = raw;
+      playSoundIncorrect();
+      if (lcRes.missing) {
+        showScanOverlay('red', '⚠️', 'إعداد ناقص', raw, 'جدول بطاقات اللغة غير موجود — نفّذ ملف الهجرة في Supabase أولاً', 3500, resetScannerSoon);
+      } else if (lcRes.error) {
+        showScanOverlay('red', '❌', 'تعذر قراءة بطاقة اللغة', raw, esc(lcRes.error), 3000, resetScannerSoon);
+      } else {
+        showScanOverlay('red', '❌', 'بطاقة لغة غير معروفة', raw, 'لا توجد بطاقة دورات لغات بهذا الباركود', 3000, resetScannerSoon);
+      }
+      return;
+    }
 
     // 1. Resolve student ID from barcode
     var scanResult = null;

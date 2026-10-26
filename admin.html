@@ -3840,7 +3840,7 @@
 
         <div id="lc-setup-warning" class="panel" style="display:none;padding:16px 20px;margin-bottom:16px;border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.08)">
           <div style="font-size:13px;font-weight:900;color:#b45309">⚠️ جدول language_cards غير موجود بعد</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.7">نفّذ ملف الهجرة <code dir="ltr">supabase/migrations/20261026130000_language_cards.sql</code> في Supabase SQL Editor ثم اضغط «تحديث».</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.7">نفّذ ملفات الهجرة <code dir="ltr">20261026130000_language_cards.sql</code> ثم <code dir="ltr">20261027120000_language_cards_payments_attendance.sql</code> في Supabase SQL Editor ثم اضغط «تحديث».</div>
         </div>
 
         <div class="stats-grid" style="margin-bottom:24px">
@@ -3875,8 +3875,9 @@
               <th>اللغة</th>
               <th>الأستاذ</th>
               <th>الحصص</th>
+              <th>المبلغ المدفوع</th>
               <th>الحالة</th>
-              <th>تاريخ التعبئة</th>
+              <th>تاريخ التفعيل</th>
               <th style="text-align:center">إجراءات</th>
             </tr></thead>
             <tbody id="lc-tbody"></tbody>
@@ -3910,10 +3911,13 @@
               <div id="lc-fill-step2" style="display:none">
                 <div id="lc-card-summary" class="lc-summary"></div>
                 <div class="lc-form">
+                  <div class="full"><label>اسم ولقب الطالب</label><input class="inp" id="lc-fill-student-name" placeholder="مثال: محمد بن علي" style="width:100%;padding:8px 10px" /></div>
                   <div><label>اللغة</label><select class="inp" id="lc-fill-language" style="width:100%;padding:8px 10px"></select></div>
                   <div><label>عدد الحصص</label><input class="inp" id="lc-fill-sessions" type="number" min="1" step="1" value="4" style="width:100%;padding:8px 10px" /></div>
                   <div><label>الأستاذ</label><select class="inp" id="lc-fill-teacher" style="width:100%;padding:8px 10px"><option value="">— اختر الأستاذ —</option></select></div>
-                  <div class="full"><label>ملاحظات</label><input class="inp" id="lc-fill-notes" placeholder="اختياري" style="width:100%;padding:8px 10px" /></div>
+                  <div><label>المبلغ المدفوع (دج)</label><input class="inp" id="lc-fill-amount" type="number" min="0" step="1" value="0" style="width:100%;padding:8px 10px" /></div>
+                  <div><label>تاريخ التفعيل</label><input class="inp" id="lc-fill-date" type="date" style="width:100%;padding:8px 10px" /></div>
+                  <div><label>ملاحظات</label><input class="inp" id="lc-fill-notes" placeholder="اختياري" style="width:100%;padding:8px 10px" /></div>
                 </div>
                 <div style="display:flex;justify-content:space-between;gap:8px;margin-top:16px">
                   <button class="tbl-action" onclick="lcFillBack()" style="padding:10px 18px">→ رجوع</button>
@@ -30978,6 +30982,21 @@ function lcFmtDate(d) {
   catch(e) { return '—'; }
 }
 
+function lcTodayISO() {
+  const now = new Date();
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone:'Africa/Algiers', year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(now);
+    const get = function(t) { const p = parts.find(function(x){ return x.type === t; }); return p ? p.value : ''; };
+    return get('year') + '-' + get('month') + '-' + get('day');
+  } catch(e) { return now.toISOString().slice(0, 10); }
+}
+
+function lcDateToISO(d) {
+  if (!d) return new Date().toISOString();
+  const dt = new Date(String(d) + 'T12:00:00+01:00');
+  return isNaN(dt.getTime()) ? new Date().toISOString() : dt.toISOString();
+}
+
 function lcStatusLabel(s) {
   return s === 'active' ? '🟢 مفعّلة' : s === 'finished' ? '🔵 منتهية' : '🟡 جاهزة';
 }
@@ -31069,7 +31088,7 @@ window.lcRenderTable = function() {
   const page = lcFilteredData.slice(start, start + lcPageSize);
 
   tbody.innerHTML = page.length === 0
-    ? '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted);font-weight:600">' + (lcTableMissing ? 'جدول البطاقات غير موجود — نفّذ ملف الهجرة أولاً.' : 'لا توجد بطاقات') + '</td></tr>'
+    ? '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted);font-weight:600">' + (lcTableMissing ? 'جدول البطاقات غير موجود — نفّذ ملف الهجرة أولاً.' : 'لا توجد بطاقات') + '</td></tr>'
     : page.map(function(r, i) {
       const row = start + i + 1;
       const st = r.status || 'printed';
@@ -31092,6 +31111,7 @@ window.lcRenderTable = function() {
         + '<td>' + (r.language ? lcEsc(r.language) : '—') + '</td>'
         + '<td>' + (r.teacher_name ? lcEsc(r.teacher_name) : '—') + '</td>'
         + '<td><strong>' + sessions + '</strong></td>'
+        + '<td>' + (Number(r.amount_paid) > 0 ? '<strong dir="ltr">' + Number(r.amount_paid).toLocaleString('ar-DZ') + '</strong> دج' : '—') + '</td>'
         + '<td><span class="lc-pill ' + st + '">' + lcStatusLabel(st) + '</span></td>'
         + '<td>' + (r.activated_at ? lcFmtDate(r.activated_at) : '—') + '</td>'
         + '<td style="text-align:center;white-space:nowrap">' + actions + '</td>'
@@ -31315,7 +31335,7 @@ window.lcLookupCard = async function() {
       return;
     }
     if (card.status === 'finished') {
-      if (hint) hint.textContent = '⚠️ هذه البطاقة منتهية (استُهلكت كل حصصها).';
+      if (hint) hint.textContent = '⚠️ هذه البطاقة منتهية (استُهلكت كل حصصها) — غير قابلة للتجديد.';
       return;
     }
     lcScannedCard = card;
@@ -31346,6 +31366,12 @@ async function lcShowFillStep2(card) {
       return '<option value="' + l + '"' + (cur === l ? ' selected' : '') + '>' + l + '</option>';
     }).join('');
   }
+  const studentName = document.getElementById('lc-fill-student-name');
+  if (studentName) studentName.value = card.student_name || '';
+  const amount = document.getElementById('lc-fill-amount');
+  if (amount) amount.value = card.amount_paid != null ? String(card.amount_paid) : '0';
+  const activated = document.getElementById('lc-fill-date');
+  if (activated) activated.value = lcTodayISO();
   const sessions = document.getElementById('lc-fill-sessions');
   if (sessions) sessions.value = '4';
   const notes = document.getElementById('lc-fill-notes');
@@ -31381,6 +31407,12 @@ function lcFillTeacherList() {
 
 window.lcActivateCard = async function() {
   if (!lcScannedCard) return;
+  const studentName = String((document.getElementById('lc-fill-student-name') || {}).value || '').trim();
+  if (!studentName) { srShowToast('أدخل اسم ولقب الطالب', 'error'); return; }
+  const amountRaw = String((document.getElementById('lc-fill-amount') || {}).value || '').trim();
+  const amountPaid = amountRaw === '' ? 0 : Number(amountRaw);
+  if (!isFinite(amountPaid) || amountPaid < 0) { srShowToast('أدخل مبلغاً صحيحاً', 'error'); return; }
+  const activatedAt = lcDateToISO((document.getElementById('lc-fill-date') || {}).value || '');
   const sessions = parseInt((document.getElementById('lc-fill-sessions') || {}).value, 10);
   if (!(sessions > 0)) { srShowToast('عدد الحصص يجب أن يكون أكبر من 0', 'error'); return; }
   const teacherSel = document.getElementById('lc-fill-teacher');
@@ -31396,14 +31428,15 @@ window.lcActivateCard = async function() {
     const patch = {
       status: 'active',
       student_id: '',
-      student_name: '',
+      student_name: studentName,
       language: language,
       teacher_id: teacherId,
       teacher_name: teacherName,
       sessions_total: sessions,
       sessions_used: 0,
+      amount_paid: amountPaid,
       notes: notes,
-      activated_at: new Date().toISOString(),
+      activated_at: activatedAt,
       updated_at: new Date().toISOString()
     };
     const res = await lcFetch(LC_URL + '/rest/v1/' + LC_TABLE + '?id=eq.' + encodeURIComponent(lcScannedCard.id), {
@@ -31419,7 +31452,10 @@ window.lcActivateCard = async function() {
     lcCloseFill();
     lcLoadData();
   } catch(e) {
-    srShowToast('فشل تفعيل البطاقة: ' + e.message, 'error');
+    const msg = /amount_paid/i.test(String(e.message || ''))
+      ? 'عمود المبلغ غير موجود — نفّذ ملف الهجرة 20261027120000_language_cards_payments_attendance.sql أولاً'
+      : e.message;
+    srShowToast('فشل تفعيل البطاقة: ' + msg, 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '✅ تفعيل البطاقة'; }
   }
@@ -31431,16 +31467,51 @@ window.lcUseSession = async function(id) {
   const used = (Number(r.sessions_used) || 0) + 1;
   const total = Number(r.sessions_total) || 0;
   if (!(await cmConfirm('تسجيل حصة', 'تسجيل حصة جديدة' + (r.student_name ? ' للطالب ' + r.student_name : '') + '؟\n' + used + ' / ' + total, '➕'))) return;
-  const status = total > 0 && used >= total ? 'finished' : 'active';
   try {
-    const res = await lcFetch(LC_URL + '/rest/v1/' + LC_TABLE + '?id=eq.' + encodeURIComponent(id), {
-      method: 'PATCH',
-      headers: { 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ sessions_used: used, status: status, updated_at: new Date().toISOString() })
+    const res = await lcFetch(LC_URL + '/rest/v1/rpc/record_language_attendance', {
+      method: 'POST',
+      body: JSON.stringify({ p_card_id: id })
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    srShowToast(status === 'finished' ? '✅ انتهت حصص البطاقة' : '✅ تم تسجيل الحصة (' + used + ' / ' + total + ')');
-    lcLoadData();
+    if (res.ok) {
+      const out = await res.json().catch(function(){ return null; });
+      if (out && out.code === 'already') {
+        srShowToast('⚠️ تم تسجيل حصة اليوم مسبقاً لهذه البطاقة', 'error');
+        lcLoadData();
+        return;
+      }
+      if (out && out.ok) {
+        srShowToast(out.code === 'finished'
+          ? '✅ انتهت حصص البطاقة (' + out.sessions_used + ' / ' + out.sessions_total + ')'
+          : '✅ تم تسجيل الحصة (' + out.sessions_used + ' / ' + out.sessions_total + ')');
+        lcLoadData();
+        return;
+      }
+      if (out && out.code === 'finished') {
+        srShowToast('🏁 البطاقة منتهية وغير قابلة للتجديد', 'error');
+        lcLoadData();
+        return;
+      }
+      if (out && out.code === 'not_active') {
+        srShowToast('البطاقة غير مفعّلة', 'error');
+        lcLoadData();
+        return;
+      }
+      throw new Error((out && out.code) || 'invalid response');
+    }
+    const txt = await res.text().catch(function(){ return ''; });
+    if (res.status === 404 || /PGRST202|does not exist/i.test(txt)) {
+      const status = total > 0 && used >= total ? 'finished' : 'active';
+      const legacy = await lcFetch(LC_URL + '/rest/v1/' + LC_TABLE + '?id=eq.' + encodeURIComponent(id), {
+        method: 'PATCH',
+        headers: { 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ sessions_used: used, status: status, updated_at: new Date().toISOString() })
+      });
+      if (!legacy.ok) throw new Error('HTTP ' + legacy.status);
+      srShowToast(status === 'finished' ? '✅ انتهت حصص البطاقة' : '✅ تم تسجيل الحصة (' + used + ' / ' + total + ')');
+      lcLoadData();
+      return;
+    }
+    throw new Error('HTTP ' + res.status + (txt ? ' — ' + txt.slice(0, 120) : ''));
   } catch(e) { srShowToast('فشل تسجيل الحصة: ' + e.message, 'error'); }
 };
 
