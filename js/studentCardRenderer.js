@@ -1390,6 +1390,111 @@ ${info}
 </body></html>`;
   }
 
+  // ── Language-course cards — barcode-only back sheet ──────────────────
+  // A4 sheet with the BACK design on every card and ONLY the barcode + its
+  // short 5-digit card ID (no name / Student ID / stream / date / QR).
+  // `cards` = [{ id: '12345', barcode: '201…13 digits' }, …] (one per slot,
+  // max = slot count). Empty slots still show the back design without data.
+  // Same slot/duplex geometry as buildA4BackSheetHTML so the cards line up
+  // with the rest of the print workflow. opts.preview = do not auto-print
+  // (used by the admin on-screen preview); opts.cutLines = false hides the
+  // cut guides; opts.info = false hides the instructions bar.
+  function a4BarcodeDataHTML(slot, card) {
+    const g = a4DataGeom(slot);
+    const sc = g.sc;
+    const box = bcBox();
+    const GB = bcBgGeom();
+    const badgeH = Math.min(3.8, Math.max(3.0, box.h * 0.26));
+    const badgeY = Math.min(CAL.bc.y + box.h - badgeH - 0.25, CARD_H_MM - badgeH - 0.3);
+    return `<div class="ec-a4-lang-data" style="${a4DataStyle(slot, 'mm', 1)}">
+    <div class="ec-dl ec-a4-langdl">
+      <svg class="ec-dl-bcbg" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100%" height="100%" rx="${GB.radius}" ry="${GB.radius}" fill="${GB.color === 'transparent' ? 'none' : GB.color}"/></svg>
+      <div class="ec-dl-bc" data-card-code="${card.barcode || ''}"></div>
+      <div class="ec-a4-langid" style="left:${(CAL.bc.x * sc).toFixed(3)}mm;top:${(badgeY * sc).toFixed(3)}mm;width:${(box.w * sc).toFixed(3)}mm;height:${(badgeH * sc).toFixed(3)}mm;font-size:${(2.9 * sc).toFixed(3)}mm">${card.id || ''}</div>
+    </div>
+  </div>`;
+  }
+
+  function buildA4BarcodeSheetHTML(cards, opts) {
+    const sheet = (opts && opts.sheet) || getSheetLayout();
+    const rawSlots = (sheet && sheet.slots && sheet.slots.length) ? sheet.slots : defaultCardSlots();
+    const duplex = duplexFromSheet(sheet);
+    const mirrored = duplex.mode === 'long' || duplex.mode === 'short';
+    const slots = mirrored ? rawSlots.map(s => duplexBackSlot(s, duplex.mode, duplex.dx, duplex.dy)) : rawSlots;
+    const list = Array.isArray(cards) ? cards.slice(0, slots.length) : [];
+    const sc = a4DataGeom(rawSlots[0]).sc;
+    const cut = !opts || opts.cutLines !== false;
+    const cutLinesHtml = cut ? slots.map(s =>
+      `<i class="ec-a4-cut" style="top:${s.y.toFixed(2)}mm"></i><i class="ec-a4-cut" style="top:${(s.y + s.h).toFixed(2)}mm"></i>`
+    ).join('') : '';
+    const slotsHtml = slots.map((s, i) => {
+      const c = list[i];
+      return `<div class="ec-a4-back-slot" data-i="${i}" style="${a4SlotStyle(s, 'mm', 1)}"><img src="${BACK_IMG}" alt="">${c ? a4BarcodeDataHTML(s, c) : ''}</div>`;
+    }).join('');
+    const cardsInfo = list.map(c => c.id).filter(Boolean).join(' · ');
+    const info = `<div class="ec-a4-info"><b>ورقة بطاقات دورات اللغات</b> — ${slots.length} بطاقات على ورقة A4 · Portrait · Scale 100% · Margins None ·
+  <span class="hi">كل بطاقة: التصميم الخلفي + باركود فقط (بدون اسم/QR)</span>
+  <div class="sub">أرقام البطاقات: ${cardsInfo || '—'} — كل رقم مطبوع أسفل الباركود. الأرقام عشوائية بخمسة أرقام ومستهلكة عند الطباعة (لا تتكرر).</div></div>`;
+    const autoprint = !!(opts && opts.autoprint) || !(opts && opts.preview);
+    return `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>بطاقات دورات اللغات — ورقة A4</title>
+<style>
+  @page { size: ${A4_W_MM}mm ${A4_H_MM}mm; margin: 0; }
+  html, body { margin: 0; padding: 0; background: #ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  * { box-sizing: border-box; }
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .ec-a4-info { display: none !important; }
+  }
+  .ec-a4-info { font-family: 'Tajawal', Arial, sans-serif; font-size: 3.4mm; line-height: 1.5; color: #0f172a; background: #f8fafc; border: 0.3mm solid #cbd5e1; border-radius: 1.5mm; padding: 2.5mm 4mm; margin: 3mm 3mm 4mm; }
+  .ec-a4-info .hi { color: #059669; font-weight: 800; }
+  .ec-a4-info .sub { font-size: 2.9mm; color: #475569; margin-top: 1mm; }
+  .ec-a4 { position: relative; width: ${A4_W_MM}mm; height: ${A4_H_MM}mm; overflow: hidden; }
+  .ec-a4-back-slot { position: absolute; transform-origin: 0 0; background: #ffffff; }
+  .ec-a4-back-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .ec-a4-lang-data { position: absolute; }
+  .ec-a4-langid { position: absolute; display: flex; align-items: center; justify-content: center; background: #ffffff; font-family: 'Courier New', monospace; font-weight: 900; letter-spacing: 0.3mm; color: #0b1b3f; direction: ltr; }
+  .ec-a4-langdl .ec-dl-bc svg text { display: none !important; }
+  .ec-a4-cut { position: absolute; left: 0; width: 100%; border-top: 0.3mm dashed #555555; pointer-events: none; }
+  ${dlRules('mm', sc, sc, '', CAL.textColor)}
+</style>
+<script src="js/JsBarcode.all.min.js?v=1"><\/script>
+<script src="js/studentCardRenderer.js?v=22"><\/script>
+</head><body>
+${info}
+<div class="ec-a4">${cutLinesHtml}${slotsHtml}</div>
+<script>
+(function () {
+  var tries = 0;
+  var autoprint = ${autoprint ? 'true' : 'false'};
+  function ready() {
+    return typeof window.JsBarcode !== 'undefined' && window.StudentCardRenderer && typeof window.StudentCardRenderer.renderBarcodeSVG === 'function';
+  }
+  function hydrate() {
+    var els = document.querySelectorAll('[data-card-code]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i], code = el.getAttribute('data-card-code');
+      if (!code) continue;
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      el.appendChild(svg);
+      window.StudentCardRenderer.renderBarcodeSVG(svg, code, document);
+    }
+  }
+  function go() {
+    if (!ready()) { if (tries++ < 40) { setTimeout(go, 250); return; } }
+    hydrate();
+    if (!autoprint) return;
+    setTimeout(function () { try { window.focus(); window.print(); } catch (e) {} }, 350);
+  }
+  setTimeout(go, 300);
+  if (autoprint) {
+    window.onafterprint = function () { setTimeout(function () { try { window.close(); } catch (e) {} }, 250); };
+    setTimeout(function () { try { window.close(); } catch (e) {} }, 120000);
+  }
+})();
+<\/script>
+</body></html>`;
+  }
+
   // White A4 test sheet: slot outlines + slot numbers (+ optional grid).
   // Printed on blank paper and laid over the pre-printed A4 to verify the
   // saved slot positions match the real card grid. No designs, no data.
@@ -1661,6 +1766,7 @@ ${page(backSlots, 'الخلفي', 'ts-back')}
     dataLayerHTML, dlRules, gridOverlayHTML, GRID_CSS,
     a4SheetCSS, a4SlotStyle, a4DataStyle, a4DataGeom, a4BackDecorHTML, a4GridOverlayHTML, A4_GRID_CSS,
     buildA4PrintHTML, buildA4TestSheetHTML, buildA4FrontSheetHTML, buildA4BackSheetHTML, buildDuplexTestSheetHTML,
+    buildA4BarcodeSheetHTML,
     renderBarcodeSVG, buildBarcodePrintHTML,
     initCentral, centralSave, centralStatus,
     saveCalSnapshot, getCalHistory, restoreCalSnapshot, deleteCalSnapshot, syncCalHistory, recoverLastSnapshot

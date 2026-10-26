@@ -597,6 +597,44 @@ const SubjectService = (function () {
     return options;
   }
 
+  // Active support teachers (Firestore `support_teachers`, status='active').
+  async function getActiveTeachers() {
+    return _loadTeachers();
+  }
+
+  // Every subject taught by ANY active support teacher — NOT filtered by the
+  // student's level/stream. Used by the support registration profile so an
+  // admin can add a subject/teacher that belongs to another level (e.g. the
+  // student takes one subject outside their registered stream).
+  async function buildAllTeacherSubjectOptions() {
+    const teachers = await _loadTeachers();
+    const options = [];
+    const seen = new Set();
+    for (const t of teachers) {
+      const teacherName = String(t.name || '').trim();
+      if (!teacherName) continue;
+      const teacherId = t.teacherId || t.id || '';
+      const subjects = Array.isArray(t.subjects) ? t.subjects : [];
+      for (const s of subjects) {
+        const subject = String((s && (s.subject || s)) || '').trim();
+        if (!subject) continue;
+        const key = subject + '||' + teacherName;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        options.push({
+          label: getSubjectIcon(subject) + ' ' + subject + ' — الأستاذ ' + teacherName,
+          value: subject + '|' + (teacherId || teacherName),
+          subjectId: getSubjectId(subject),
+          subject: subject,
+          teacherId: teacherId,
+          teacherName: teacherName,
+          teacher: teacherName
+        });
+      }
+    }
+    return options;
+  }
+
   // ── Build Subjects Display (for student detail) ───────
 
   function buildSubjectDisplayList(subjects) {
@@ -644,6 +682,8 @@ const SubjectService = (function () {
     getTeachersForLevel,
     resolveTeacherId,
     buildSubjectTeacherOptions,
+    getActiveTeachers,
+    buildAllTeacherSubjectOptions,
     buildSubjectDisplayList,
     invalidateCache,
     isTeacherDeleted,

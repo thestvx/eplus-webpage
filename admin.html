@@ -10,14 +10,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
   <script src="js/qrcode.min.js?v=1"></script>
   <script src="js/JsBarcode.all.min.js?v=1"></script>
-  <script src="js/ean13.js"></script>
-  <script src="js/studentCardRenderer.js?v=21"></script>
+  <script src="js/ean13.js?v=2"></script>
+  <script src="js/studentCardRenderer.js?v=22"></script>
   <script src="js/registrationService.js?v=4"></script>
-  <script src="js/subjectService.js?v=5"></script>
+  <script src="js/subjectService.js?v=6"></script>
   <script src="js/attendanceService.js?v=2"></script>
   <script src="js/barcodeScanner.js?v=1"></script>
   <script src="js/teacherFinance.js?v=6"></script>
-  <script src="js/subscriptionService.js?v=2"></script>
+  <script src="js/subscriptionService.js?v=3"></script>
 <script src="js/receiptCalib.js?v=1"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
@@ -2003,6 +2003,17 @@
         <span class="nav-icon">📋</span>
         <span class="nav-label">تسجيلات البرامج</span>
       </div>
+      <div class="nav-section" data-nav-cat="languages">تسجيلات اللغات</div>
+      <div class="nav-item" data-nav="language-registrations" onclick="switchNavSection('language-registrations')">
+        <span class="nav-icon">🌍</span>
+        <span class="nav-label">تسجيلات دورات اللغات</span>
+        <span class="nav-badge" id="nav-badge-lang">0</span>
+      </div>
+      <div class="nav-item" data-nav="language-subscriptions" onclick="switchNavSection('language-subscriptions')">
+        <span class="nav-icon">🎴</span>
+        <span class="nav-label">اشتراكات دورات اللغات</span>
+        <span class="nav-badge" id="nav-badge-lang-cards">0</span>
+      </div>
       <a href="index.html" class="nav-item" data-nav="website">
         <span class="nav-icon">🌐</span>
         <span class="nav-label" data-i18n="visit_site">زيارة الموقع</span>
@@ -3797,6 +3808,148 @@
         </div>
       </div>
 
+      <!-- ===== SECTION: LANGUAGE COURSE CARD SUBSCRIPTIONS (اشتراكات دورات اللغات) ===== -->
+      <style>
+        .lc-hint{font-size:11.5px;color:var(--text-muted);font-weight:700;margin-top:8px;line-height:1.6}
+        .lc-scan-box{border:2px dashed rgba(124,58,237,.35);border-radius:16px;padding:26px 20px;text-align:center;background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(124,58,237,.02));transition:all .2s}
+        .lc-scan-box.found{border-style:solid;border-color:rgba(16,185,129,.45);background:linear-gradient(135deg,rgba(16,185,129,.1),rgba(16,185,129,.03))}
+        .lc-preview-stage{position:relative;height:68vh;min-height:420px;background:#e7e7ec;border-radius:14px;overflow:auto;margin-top:10px}
+        .lc-preview-stage iframe{position:absolute;left:50%;top:14px;transform:translateX(-50%) scale(.62);transform-origin:top center;width:794px;height:1123px;border:0;background:#fff;box-shadow:0 14px 34px rgba(20,20,40,.25)}
+        .lc-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;white-space:nowrap}
+        .lc-pill.printed{background:rgba(245,158,11,.14);color:#d97706}
+        .lc-pill.active{background:rgba(16,185,129,.14);color:#059669}
+        .lc-pill.finished{background:rgba(99,102,241,.14);color:#4f46e5}
+        .lc-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        .lc-form .full{grid-column:1/-1}
+        .lc-form label{font-size:11.5px;font-weight:800;display:block;margin-bottom:4px;color:var(--text-muted)}
+        .lc-summary{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:12px 14px;border-radius:12px;background:var(--primary-light);border:1px solid var(--border);margin-bottom:14px;font-size:12px;font-weight:800}
+        @media (max-width:640px){.lc-form{grid-template-columns:1fr}}
+      </style>
+      <div id="section-language-subscriptions" style="display:none">
+        <div class="section-header">
+          <div class="section-title">
+            <div class="section-icon" style="background:linear-gradient(135deg,rgba(16,185,129,.16),rgba(16,185,129,.04));border-color:rgba(16,185,129,.3)">🎴</div>
+            <span>اشتراكات دورات اللغات</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="tbl-action" onclick="lcOpenFill()" style="border-color:rgba(16,185,129,.35);color:#059669;font-weight:900;padding:9px 18px;font-size:12px">💳 تعبئة بطاقة</button>
+            <button class="tbl-action" onclick="lcOpenPrint()" style="border-color:rgba(99,102,241,.35);color:#4f46e5;font-weight:900;padding:9px 18px;font-size:12px">🖨️ طباعة ورقة بطاقات</button>
+            <button class="tbl-action" onclick="lcLoadData()" style="padding:9px 16px;font-size:12px">🔄 تحديث</button>
+          </div>
+        </div>
+
+        <div id="lc-setup-warning" class="panel" style="display:none;padding:16px 20px;margin-bottom:16px;border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.08)">
+          <div style="font-size:13px;font-weight:900;color:#b45309">⚠️ جدول language_cards غير موجود بعد</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.7">نفّذ ملف الهجرة <code dir="ltr">supabase/migrations/20261026130000_language_cards.sql</code> في Supabase SQL Editor ثم اضغط «تحديث».</div>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom:24px">
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--primary-light)">🎴</div></div><div class="stat-num" id="lc-stat-total">0</div><div class="stat-label">إجمالي البطاقات</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--accent-soft)">🟡</div></div><div class="stat-num" id="lc-stat-printed" style="color:var(--warning)">0</div><div class="stat-label">جاهزة للتعبئة</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--success-soft)">🟢</div></div><div class="stat-num" id="lc-stat-active" style="color:var(--success)">0</div><div class="stat-label">مفعّلة</div></div>
+          <div class="stat-card"><div class="stat-card-glow"></div><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--warning-soft)">🔵</div></div><div class="stat-num" id="lc-stat-finished" style="color:#4f46e5">0</div><div class="stat-label">منتهية</div></div>
+        </div>
+
+        <div class="panel" style="padding:16px 20px;margin-bottom:16px">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <input class="inp" id="lc-search" placeholder="🔍 ابحث بالرقم / الطالب / الأستاذ..." style="width:250px;padding:8px 14px" oninput="lcApplyFilters()" />
+              <select class="inp" id="lc-filter-status" style="width:auto;min-width:160px;padding:8px 14px" onchange="lcApplyFilters()">
+                <option value="">كل الحالات</option>
+                <option value="printed">🟡 جاهزة (مطبوعة)</option>
+                <option value="active">🟢 مفعّلة</option>
+                <option value="finished">🔵 منتهية</option>
+              </select>
+              <button class="tbl-action" onclick="lcResetFilters()" style="padding:8px 12px;font-size:12px;border-color:rgba(245,158,11,0.3);color:var(--warning)">🧹 مسح الفلاتر</button>
+            </div>
+            <div id="lc-count-label" style="font-size:12px;color:var(--text-muted);font-weight:700"></div>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;background:var(--card);border:1px solid var(--border);border-radius:12px">
+          <table class="tbl" id="lc-table">
+            <thead><tr>
+              <th style="width:36px">#</th>
+              <th>رقم البطاقة</th>
+              <th>الطالب</th>
+              <th>اللغة</th>
+              <th>الأستاذ</th>
+              <th>الحصص</th>
+              <th>الحالة</th>
+              <th>تاريخ التعبئة</th>
+              <th style="text-align:center">إجراءات</th>
+            </tr></thead>
+            <tbody id="lc-tbody"></tbody>
+          </table>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-top:1px solid var(--border)">
+            <div id="lc-pagination-info" style="font-size:12px;color:var(--text-muted)"></div>
+            <div id="lc-pagination-btns" style="display:flex;gap:4px"></div>
+          </div>
+        </div>
+
+        <!-- Fill card modal -->
+        <div class="teacher-modal-bg" id="lc-fill-modal">
+          <div class="teacher-modal" style="max-width:560px">
+            <div class="teacher-modal-header">
+              <div class="panel-icon" style="background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.25)">🎴</div>
+              <div class="teacher-modal-title">تعبئة بطاقة اشتراك</div>
+              <button class="att-modal-close" onclick="lcCloseFill()">✕</button>
+            </div>
+            <div class="teacher-modal-body">
+              <div id="lc-fill-step1">
+                <div class="lc-scan-box" id="lc-scan-box">
+                  <div style="font-size:46px;line-height:1;margin-bottom:8px">▥</div>
+                  <div style="font-size:13px;font-weight:900;color:var(--text)">امسح باركود البطاقة أو أدخل رقمها</div>
+                  <input class="inp" id="lc-card-input" inputmode="numeric" autocomplete="off" dir="ltr" placeholder="5 أرقام أو باركود 13 رقم" style="width:100%;max-width:340px;margin:14px auto 0;text-align:center;font-size:20px;letter-spacing:2px;font-weight:800" onkeydown="if(event.key==='Enter'){event.preventDefault();lcLookupCard();}" />
+                  <div class="lc-hint" id="lc-card-hint">ضع المؤشر في الحقل ثم امسح الباركود (يعمل كإدخال لوحة مفاتيح) — أو اكتب رقم البطاقة واضغط Enter.</div>
+                </div>
+                <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+                  <button class="tbl-action" onclick="lcLookupCard()" style="border-color:rgba(16,185,129,.35);color:#059669;font-weight:900;padding:10px 22px">متابعة →</button>
+                </div>
+              </div>
+              <div id="lc-fill-step2" style="display:none">
+                <div id="lc-card-summary" class="lc-summary"></div>
+                <div class="lc-form">
+                  <div><label>اللغة</label><select class="inp" id="lc-fill-language" style="width:100%;padding:8px 10px"></select></div>
+                  <div><label>عدد الحصص</label><input class="inp" id="lc-fill-sessions" type="number" min="1" step="1" value="12" style="width:100%;padding:8px 10px" /></div>
+                  <div><label>الأستاذ</label><input class="inp" id="lc-fill-teacher" list="lc-teacher-list" placeholder="اكتب اسم الأستاذ أو اختر" style="width:100%;padding:8px 10px" /><datalist id="lc-teacher-list"></datalist></div>
+                  <div><label>الطالب (اختياري)</label><select class="inp" id="lc-fill-student" style="width:100%;padding:8px 10px" onchange="lcOnStudentChange()"><option value="">— بدون ربط —</option></select></div>
+                  <div class="full"><label>ملاحظات</label><input class="inp" id="lc-fill-notes" placeholder="اختياري" style="width:100%;padding:8px 10px" /></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;gap:8px;margin-top:16px">
+                  <button class="tbl-action" onclick="lcFillBack()" style="padding:10px 18px">→ رجوع</button>
+                  <button class="tbl-action" onclick="lcActivateCard()" id="lc-activate-btn" style="border-color:rgba(16,185,129,.35);color:#059669;font-weight:900;padding:10px 22px">✅ تفعيل البطاقة</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- A4 sheet preview modal -->
+        <div class="teacher-modal-bg" id="lc-print-modal">
+          <div class="teacher-modal" style="max-width:900px;max-height:94vh">
+            <div class="teacher-modal-header">
+              <div class="panel-icon" style="background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.25)">🖨️</div>
+              <div class="teacher-modal-title">معاينة ورقة البطاقات (A4)</div>
+              <button class="att-modal-close" onclick="lcClosePrint()">✕</button>
+            </div>
+            <div class="teacher-modal-body">
+              <div id="lc-preview-info" style="font-size:12px;font-weight:700;color:var(--text-muted);line-height:1.7">
+                ورقة A4 واحدة · 4 بطاقات · التصميم الخلفي + باركود فقط (بدون اسم أو QR). عند الطباعة تُستهلك الأرقام وتُحفظ البطاقات كجاهزة للتعبئة.
+              </div>
+              <div class="lc-preview-stage"><iframe id="lc-preview-frame" title="معاينة ورقة البطاقات"></iframe></div>
+              <div style="display:flex;justify-content:space-between;gap:8px;margin-top:14px;flex-wrap:wrap">
+                <button class="tbl-action" onclick="lcRegeneratePreview()" style="padding:10px 18px">♻️ توليد أرقام جديدة</button>
+                <div style="display:flex;gap:8px">
+                  <button class="tbl-action" onclick="lcClosePrint()" style="padding:10px 18px">إلغاء</button>
+                  <button class="tbl-action" onclick="lcPrintSheet()" id="lc-print-btn" style="border-color:rgba(16,185,129,.35);color:#059669;font-weight:900;padding:10px 22px">🖨️ طباعة</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ===== SECTION: إنشاء تسجيل برنامج وطبع الوصل ===== -->
       <style>
         .prw-form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
@@ -4053,7 +4206,6 @@
             <button type="button" class="prg-tab" data-prg-tab="ielts" onclick="prgTabShow('ielts')"><span class="prg-tab-icon">🎯</span> التحضير لاختبار IELTS <span class="prg-badge" id="nav-badge-ielts">0</span></button>
             <button type="button" class="prg-tab" data-prg-tab="online" onclick="prgTabShow('online')"><span class="prg-tab-icon">💻</span> الدورات الأونلاين <span class="prg-badge" id="nav-badge-online">0</span></button>
             <button type="button" class="prg-tab" data-prg-tab="takwini" onclick="prgTabShow('takwini')"><span class="prg-tab-icon">🛠️</span> الدورات التكوينية <span class="prg-badge" id="nav-badge-takwini">0</span></button>
-            <button type="button" class="prg-tab" data-prg-tab="language" onclick="prgTabShow('language')"><span class="prg-tab-icon">🌍</span> تسجيلات دورات اللغات <span class="prg-badge" id="nav-badge-lang">0</span></button>
             <button type="button" class="prg-tab" data-prg-tab="register" onclick="prgTabShow('register')"><span class="prg-tab-icon">🧾</span> إنشاء تسجيل وطبع وصل</button>
           </aside>
           <div class="prg-panes">
@@ -4061,7 +4213,6 @@
             <div class="prg-pane" id="prg-pane-ielts"></div>
             <div class="prg-pane" id="prg-pane-online"></div>
             <div class="prg-pane" id="prg-pane-takwini"></div>
-            <div class="prg-pane" id="prg-pane-language"></div>
             <div class="prg-pane" id="prg-pane-register"></div>
           </div>
         </div>
@@ -4073,13 +4224,12 @@
             ['section-ielts-registrations', 'prg-pane-ielts'],
             ['section-online-registrations', 'prg-pane-online'],
             ['section-takwini-registrations', 'prg-pane-takwini'],
-            ['section-language-registrations', 'prg-pane-language'],
             ['section-program-register', 'prg-pane-register']
           ];
           window._prgTab = 'vip';
           window.prgTabShow = function (key) {
             window._prgTab = key;
-            ['vip', 'ielts', 'online', 'takwini', 'language', 'register'].forEach(function (k) {
+            ['vip', 'ielts', 'online', 'takwini', 'register'].forEach(function (k) {
               var pane = document.getElementById('prg-pane-' + k);
               var on = k === key;
               if (pane) {
@@ -4094,8 +4244,6 @@
             if (key === 'register') {
               if (typeof prwPreview === 'function') prwPreview();
               if (typeof prwLogRender === 'function') prwLogRender();
-            } else if (key === 'language') {
-              if (typeof langRegLoadData === 'function') langRegLoadData();
             } else {
               if (typeof pregLoadData === 'function') pregLoadData();
             }
@@ -6650,6 +6798,7 @@ window.NAV_CATS = [
   { key: 'teachers', label: 'إدارة الأساتذة', items: ['teachers'] },
   { key: 'support', label: 'الدعم المدرسي', items: ['support-registrations', 'support-teachers', 'subscriptions', 'support-finance', 'support-rooms'] },
   { key: 'programs', label: 'تسجيلات البرامج', items: ['program-registrations'] },
+  { key: 'languages', label: 'تسجيلات اللغات', items: ['language-registrations', 'language-subscriptions'] },
   { key: 'communication', label: 'التواصل', items: ['msgs'] },
   { key: 'finance', label: 'المالية', items: ['finance'] },
   { key: 'system', label: 'النظام', items: ['settings'] },
@@ -6672,6 +6821,8 @@ window.NAV_ITEMS = {
   'support-rooms': { icon: '🏫', label: 'قاعات الحضور' },
   notifications: { icon: '📨', label: 'مركز الإشعارات' },
   'program-registrations': { icon: '📋', label: 'تسجيلات البرامج' },
+  'language-registrations': { icon: '🌍', label: 'تسجيلات دورات اللغات' },
+  'language-subscriptions': { icon: '🎴', label: 'اشتراكات دورات اللغات' },
 };
 const NAV_FORCED_CATS = ['system'];
 const NAV_FORCED_ITEMS = ['settings'];
@@ -7068,7 +7219,7 @@ window.switchNavSection = (section) => {
     if (typeof renderRegStats === 'function') renderRegStats();
     if (typeof updateSiteStats === 'function') updateSiteStats();
   }
-  ['home','announcements','summer','camp-v2','students','teachers','finance','settings','notifications','support-registrations','support-teachers','subscriptions','support-finance','support-rooms','program-registrations'].forEach(s => {
+  ['home','announcements','summer','camp-v2','students','teachers','finance','settings','notifications','support-registrations','support-teachers','subscriptions','support-finance','support-rooms','program-registrations','language-registrations','language-subscriptions'].forEach(s => {
     const el = document.getElementById('section-' + s);
     if (el) el.style.display = s === section ? 'block' : 'none';
   });
@@ -7091,6 +7242,12 @@ window.switchNavSection = (section) => {
     if (finFilter) finFilter.value = 'expense';
     if (window.loadFinanceSection) window.loadFinanceSection();
     else setTimeout(() => window.loadFinanceSection?.(), 600);
+  }
+  if (section === 'language-registrations' && typeof window.langRegLoadData === 'function') {
+    window.langRegLoadData();
+  }
+  if (section === 'language-subscriptions' && typeof window.lcLoadData === 'function') {
+    window.lcLoadData();
   }
   if (section === 'summer') {
     // Re-run ticket rendering to ensure all tickets show
@@ -27647,13 +27804,16 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   }
 
   // ── تصدير CSV ──
-  //  • نافذة اختيار النطاق: من/إلى تاريخ، أو «كل التواريخ» (سجل الحضور الكامل للأستاذ).
-  //  • النتيجة: سجل حضور مسطّح (صف لكل حصة) من أول التاريخ المختار إلى آخره.
+  //  • النطاق = فلتر الأستاذ/المادة الحالي + تاريخ القائمة المنسدلة إن وُجد.
+  //  • نافذة التصدير: من/إلى تاريخ داخل هذا النطاق، أو «كل التواريخ».
+  //  • النتيجة: صف واحد لكل تلميذ + عدد الحصص التي حضرها (بدون تكرار).
   function _subxCsvScopeRows() {
     var t = (document.getElementById('subx-logs-teacher') || {}).value || '';
     var s = (document.getElementById('subx-logs-subject') || {}).value || '';
+    var d = (document.getElementById('subx-logs-date') || {}).value || '';
     return (window._subxLogsData || []).filter(function (r) {
       if (r.cancelled) return false;
+      if (d && r.date !== d) return false;
       if (t && r.teacherName !== t) return false;
       if (s && r.subjectName !== s) return false;
       return true;
@@ -27663,13 +27823,15 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var r = (typeof regs !== 'undefined') ? regs.find(function (rr) { return String(rr.id) === String(sid || ''); }) : null;
     return r ? studentFullName(r) : String(sid || '');
   }
-  function _subxCsvType(t) {
-    if (t === 'trial_session' || t === 'trial') return 'فترة تجريبية';
-    if (t === 'grace_session' || t === 'grace') return 'حصّة مجانية';
-    if (t === 'allow_sub') return 'سماح اشتراك';
-    return 'حضور';
-  }
+  function _subxCsvIsTrial(t) { return t === 'trial_session' || t === 'trial'; }
   function _subxCsvEsc(v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }
+  // خلية تاريخ/وقت: تمنع Excel من تحويلها إلى قيمة تاريخية تظهر بـ "########"
+  // في عمود ضيّق — تُصدَّر كصيغة ="..." فيُعتبر نصاً ثابت العرض.
+  function _subxCsvDateCell(v) { return { __csvDate: true, v: v }; }
+  function _subxCsvCell(cell) {
+    if (cell && typeof cell === 'object' && cell.__csvDate) return _subxCsvEsc('="' + String(cell.v == null ? '' : cell.v) + '"');
+    return _subxCsvEsc(cell);
+  }
 
   window._subxCsvToggleAll = function () {
     var alld = document.getElementById('subx-csv-alldates').checked;
@@ -27683,27 +27845,39 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     if (!rows.length) { showToast('⚠️ لا توجد سجلات للتصدير', true); return; }
     var t = (document.getElementById('subx-logs-teacher') || {}).value || '';
     var s = (document.getElementById('subx-logs-subject') || {}).value || '';
+    var dateFilter = (document.getElementById('subx-logs-date') || {}).value || '';
     var dates = rows.map(function (r) { return r.date; }).filter(Boolean).sort();
     document.getElementById('subx-csv-scope').innerHTML =
       'الأستاذ: <b>' + escX(t || 'كل الأساتذة') + '</b>' + (s ? ' · المادة: <b>' + escX(s) + '</b>' : '')
+      + (dateFilter ? ' · التاريخ: <b>' + escX(dateFilter) + '</b>' : '')
       + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">' + rows.length + ' سجل · من ' + escX(dates[0] || '—') + ' إلى ' + escX(dates[dates.length - 1] || '—') + '</div>';
     var from = document.getElementById('subx-csv-from');
     var to = document.getElementById('subx-csv-to');
     var alld = document.getElementById('subx-csv-alldates');
     alld.checked = false;
-    from.disabled = to.disabled = false;
-    from.value = dates[0] || '';
-    to.value = dates[dates.length - 1] || '';
+    if (dateFilter) {
+      // تاريخ محدّد في القائمة → التصدير مقتصراً عليه، بلا تبديل النطاق.
+      from.disabled = to.disabled = alld.disabled = true;
+      from.value = to.value = dateFilter;
+    } else {
+      alld.disabled = false;
+      from.disabled = to.disabled = false;
+      from.value = dates[0] || '';
+      to.value = dates[dates.length - 1] || '';
+    }
     document.getElementById('subx-csv-modal').classList.add('open');
   };
 
   // تنفيذ التصدير حسب النطاق المختار في النافذة
+  // (صف واحد لكل تلميذ + عدد الحصص التي حضرها — بدون تكرار التلميذ في كل فترة)
   window.subxExportLogsCSVRun = function () {
     var t = (document.getElementById('subx-logs-teacher') || {}).value || '';
     var s = (document.getElementById('subx-logs-subject') || {}).value || '';
-    var allDates = document.getElementById('subx-csv-alldates').checked;
-    var from = document.getElementById('subx-csv-from').value;
-    var to = document.getElementById('subx-csv-to').value;
+    // تاريخ محدّد في القائمة → التصدير له وحده (تُتجاهل باقي خيارات النطاق).
+    var dateFilter = (document.getElementById('subx-logs-date') || {}).value || '';
+    var allDates = dateFilter ? false : document.getElementById('subx-csv-alldates').checked;
+    var from = dateFilter || document.getElementById('subx-csv-from').value;
+    var to = dateFilter || document.getElementById('subx-csv-to').value;
     var rows = _subxCsvScopeRows();
     var scopeLabel;
     if (allDates) {
@@ -27715,30 +27889,47 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       scopeLabel = from === to ? from : (from + ' → ' + to);
     }
     if (!rows.length) { showToast('⚠️ لا توجد سجلات في هذا النطاق', true); return; }
-    rows.sort(function (a, b) {
-      return String(a.date + (a.time || '')).localeCompare(String(b.date + (b.time || ''))) ||
-        String(a.teacherName || '').localeCompare(String(b.teacherName || '')) ||
-        String(a.subjectName || '').localeCompare(String(b.subjectName || ''));
+
+    // تجميع: (طالب + مادة + أستاذ) واحد → عدد الحصص وتواريخها (لا تكرار)
+    var byKey = {};
+    rows.forEach(function (r) {
+      var key = String(r.studentId || r.studentName || '') + '|' + String(r.teacherName || '') + '|' + String(r.subjectName || '');
+      var g = byKey[key];
+      if (!g) {
+        g = byKey[key] = { sid: r.studentId || '', name: r.studentName || _subxCsvStudentName(r.studentId), subject: r.subjectName || '', teacher: r.teacherName || '', count: 0, trial: 0, dates: {} };
+      }
+      g.count++;
+      if (_subxCsvIsTrial(r.type)) g.trial++;
+      if (r.date) g.dates[r.date] = true;
     });
+    var groups = Object.keys(byKey).map(function (k) {
+      var g = byKey[k];
+      g.dateList = Object.keys(g.dates).sort();
+      return g;
+    });
+    groups.sort(function (a, b) {
+      return String(a.teacher).localeCompare(String(b.teacher), 'ar') ||
+        String(a.subject).localeCompare(String(b.subject), 'ar') ||
+        String(a.name).localeCompare(String(b.name), 'ar');
+    });
+
     var ds = rows.map(function (r) { return r.date; }).filter(Boolean).sort();
     var csvRows = [];
     csvRows.push(['سجل الحضور — ' + scopeLabel]);
     var sc = ['الأستاذ: ' + (t || 'كل الأساتذة')];
     if (s) sc.push('المادة: ' + s);
     csvRows.push([sc.join('  |  ')]);
-    if (allDates && ds.length) {
-      csvRows.push(['من ' + ds[0] + ' إلى ' + ds[ds.length - 1] + ' — عدد السجلات: ' + rows.length]);
-    } else {
-      csvRows.push(['عدد السجلات: ' + rows.length]);
-    }
+    var meta = 'عدد التلاميذ: ' + groups.length + ' — مجموع الحصص: ' + rows.length;
+    if (allDates && ds.length) meta += ' — من ' + ds[0] + ' إلى ' + ds[ds.length - 1];
+    csvRows.push([meta]);
     csvRows.push([]);
-    csvRows.push(['#', 'التاريخ', 'الوقت', 'رقم التسجيل', 'الطالب', 'المادة', 'الأستاذ', 'النوع']);
-    rows.forEach(function (r, i) {
-      csvRows.push([i + 1, r.date || '', r.time || '', r.studentId || '', r.studentName || _subxCsvStudentName(r.studentId), r.subjectName || '', r.teacherName || '', _subxCsvType(r.type)]);
+    csvRows.push(['#', 'رقم التسجيل', 'الطالب', 'المادة', 'الأستاذ', 'عدد الحصص', 'منها تجريبية', 'التواريخ (حضرها)']);
+    groups.forEach(function (g, i) {
+      csvRows.push([i + 1, g.sid || '', g.name, g.subject, g.teacher, g.count, g.trial, _subxCsvDateCell(g.dateList.join(' ، '))]);
     });
     csvRows.push([]);
-    csvRows.push(['المجموع:', rows.length + ' سجل حضور']);
-    var csvContent = csvRows.map(function (row) { return row.map(_subxCsvEsc).join(','); }).join('\r\n');
+    csvRows.push(['المجموع:', groups.length + ' تلميذ — ' + rows.length + ' حصة']);
+    var csvContent = csvRows.map(function (row) { return row.map(_subxCsvCell).join(','); }).join('\r\n');
     var blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -27752,7 +27943,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     document.getElementById('subx-csv-modal').classList.remove('open');
-    showToast('✅ تم تصدير ' + rows.length + ' سجل — ' + a.download);
+    showToast('✅ تم تصدير ' + groups.length + ' تلميذ (' + rows.length + ' حصة) — ' + a.download);
   };
 
   window.subxShowClearPinModal = function () {
@@ -29490,16 +29681,28 @@ function srShowDetail(id) {
   const subjectSelect = document.getElementById('sr-subject-add-select');
   if (subjectSelect) {
     subjectSelect.innerHTML = '<option value="">جاري تحميل المواد...</option>';
-    SubjectService.buildSubjectTeacherOptions(r.level, r.stream).then(options => {
+    const escA = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    Promise.all([
+      SubjectService.buildSubjectTeacherOptions(r.level, r.stream).catch(() => []),
+      (typeof SubjectService.buildAllTeacherSubjectOptions === 'function'
+        ? SubjectService.buildAllTeacherSubjectOptions().catch(() => [])
+        : Promise.resolve([]))
+    ]).then(([options, allOptions]) => {
       const existingKeys = Array.isArray(r.subjects)
         ? r.subjects.map(s => ((s.subject || '') + '||' + (s.teacher || s.teacherName || '')).trim())
         : [];
-      const filtered = options.filter(o => {
-        const key = (o.subject + '||' + (o.teacherName || '')).trim();
-        return !existingKeys.includes(key);
-      });
-      subjectSelect.innerHTML = '<option value="">اختر مادة لإضافتها...</option>' + filtered.map(o => `<option value="${o.value}" data-subject-id="${o.subjectId}" data-teacher-id="${o.teacherId || ''}" data-subject="${o.subject}" data-teacher="${o.teacherName || ''}">${o.label}</option>`).join('');
-      if (filtered.length === 0) subjectSelect.innerHTML = '<option value="">لا توجد مواد متاحة لهذا المستوى</option>';
+      const keyOf = o => (o.subject + '||' + (o.teacherName || '')).trim();
+      // Subjects of the student's own level/stream first, then every subject
+      // taught by ANY active support teacher (out-of-stream subjects too).
+      const levelOptions = options.filter(o => !existingKeys.includes(keyOf(o)));
+      const levelKeys = new Set(levelOptions.map(keyOf));
+      const allOptionsExtra = allOptions.filter(o => !existingKeys.includes(keyOf(o)) && !levelKeys.has(keyOf(o)));
+      const optHtml = o => `<option value="${escA(o.value)}" data-subject-id="${escA(o.subjectId)}" data-teacher-id="${escA(o.teacherId || '')}" data-subject="${escA(o.subject)}" data-teacher="${escA(o.teacherName || '')}">${escA(o.label)}</option>`;
+      let html = '<option value="">اختر مادة لإضافتها...</option>';
+      if (levelOptions.length) html += `<optgroup label="مواد المستوى">${levelOptions.map(optHtml).join('')}</optgroup>`;
+      if (allOptionsExtra.length) html += `<optgroup label="كل أساتذة الدعم">${allOptionsExtra.map(optHtml).join('')}</optgroup>`;
+      if (!levelOptions.length && !allOptionsExtra.length) html = '<option value="">لا توجد مواد متاحة</option>';
+      subjectSelect.innerHTML = html;
     });
   }
 
@@ -30723,6 +30926,533 @@ window.langRegPrint = function() {
   });
   w.document.write('</tbody></table></body></html>');
   w.document.close(); w.print();
+};
+
+})();
+
+// ═══════════════════════════════════════════════════════════
+//  LANGUAGE COURSE CARDS — اشتراكات دورات اللغات (بطاقات + طباعة)
+//  Cards are printed 4 per A4 page with ONLY a barcode + its
+//  5-digit ID. Printing consumes the random IDs and stores the
+//  rows as status='printed'. Scanning/filling a card binds it to
+//  a student/teacher and a number of sessions (status='active').
+// ═══════════════════════════════════════════════════════════
+(function(){
+const LC_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
+const LC_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
+const LC_TABLE = 'language_cards';
+const LC_LANGS = ['الإنجليزية','الفرنسية','الإسبانية','الألمانية','الإيطالية','التركية'];
+
+let lcAllData = [], lcFilteredData = [];
+let lcPage = 1, lcPageSize = 20;
+let lcTableMissing = false;
+let lcPendingCards = [];
+let lcScannedCard = null;
+let lcTeachersCache = null;
+let lcLangRegsCache = null;
+
+async function lcFetch(url, opts) {
+  return fetch(url, Object.assign({}, opts, {
+    headers: Object.assign({ 'Content-Type':'application/json', 'apikey':LC_KEY, 'Authorization':'Bearer '+LC_KEY }, (opts||{}).headers||{})
+  }));
+}
+
+function lcEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function lcFmtDate(d) {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleDateString('ar-DZ',{year:'numeric',month:'short',day:'numeric'}); }
+  catch(e) { return '—'; }
+}
+
+function lcStatusLabel(s) {
+  return s === 'active' ? '🟢 مفعّلة' : s === 'finished' ? '🔵 منتهية' : '🟡 جاهزة';
+}
+
+function lcGenId() {
+  return String(Math.floor(Math.random() * 90000) + 10000);
+}
+
+function lcGenCards(n) {
+  const out = [], used = new Set();
+  while (out.length < n) {
+    let id = lcGenId();
+    while (used.has(id)) id = lcGenId();
+    used.add(id);
+    out.push({ id: id, barcode: EAN13.makeLang(id) });
+  }
+  return out;
+}
+
+function lcSetTableMissing(missing) {
+  lcTableMissing = !!missing;
+  const warn = document.getElementById('lc-setup-warning');
+  if (warn) warn.style.display = lcTableMissing ? 'block' : 'none';
+}
+
+window.lcLoadData = async function() {
+  lcSetTableMissing(false);
+  try {
+    const res = await lcFetch(LC_URL + '/rest/v1/' + LC_TABLE + '?select=*&order=created_at.desc');
+    if (!res.ok) {
+      const txt = await res.text().catch(function(){ return ''; });
+      if (res.status === 404 || /PGRST205|42P01/.test(txt)) { lcSetTableMissing(true); lcAllData = []; }
+      else throw new Error('HTTP ' + res.status);
+    } else {
+      const rows = await res.json();
+      lcAllData = Array.isArray(rows) ? rows.filter(function(r){ return !r.deleted_at; }) : [];
+    }
+  } catch(e) {
+    console.error('[LANG-CARDS] load error:', e);
+    lcAllData = [];
+  }
+  lcApplyFilters();
+};
+
+window.lcApplyFilters = function() {
+  const status = (document.getElementById('lc-filter-status') || {}).value || '';
+  const q = ((document.getElementById('lc-search') || {}).value || '').trim().toLowerCase();
+  lcFilteredData = lcAllData.filter(function(r) {
+    if (status && r.status !== status) return false;
+    if (q) {
+      const hay = ((r.id||'')+' '+(r.student_name||'')+' '+(r.student_id||'')+' '+(r.teacher_name||'')+' '+(r.language||'')).toLowerCase();
+      if (hay.indexOf(q) === -1) return false;
+    }
+    return true;
+  });
+  lcPage = 1;
+  lcUpdateStats();
+  lcRenderTable();
+};
+
+window.lcResetFilters = function() {
+  ['lc-filter-status','lc-search'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  lcApplyFilters();
+};
+
+function lcUpdateStats() {
+  const total = lcAllData.length;
+  const printed = lcAllData.filter(function(r){ return r.status === 'printed'; }).length;
+  const active = lcAllData.filter(function(r){ return r.status === 'active'; }).length;
+  const finished = lcAllData.filter(function(r){ return r.status === 'finished'; }).length;
+  const el = function(id, v) { const e = document.getElementById(id); if (e) e.textContent = v; };
+  el('lc-stat-total', total); el('lc-stat-printed', printed); el('lc-stat-active', active); el('lc-stat-finished', finished);
+  const badge = document.getElementById('nav-badge-lang-cards');
+  if (badge) badge.textContent = printed;
+  const count = document.getElementById('lc-count-label');
+  if (count) count.textContent = lcFilteredData.length + ' من ' + total + ' بطاقة';
+}
+
+window.lcRenderTable = function() {
+  const tbody = document.getElementById('lc-tbody');
+  if (!tbody) return;
+  const total = lcFilteredData.length;
+  const pages = Math.max(1, Math.ceil(total / lcPageSize));
+  if (lcPage > pages) lcPage = pages;
+  const start = (lcPage - 1) * lcPageSize;
+  const page = lcFilteredData.slice(start, start + lcPageSize);
+
+  tbody.innerHTML = page.length === 0
+    ? '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted);font-weight:600">' + (lcTableMissing ? 'جدول البطاقات غير موجود — نفّذ ملف الهجرة أولاً.' : 'لا توجد بطاقات') + '</td></tr>'
+    : page.map(function(r, i) {
+      const row = start + i + 1;
+      const st = r.status || 'printed';
+      const studentCell = r.student_name
+        ? '<div style="font-weight:800">' + lcEsc(r.student_name) + '</div><div style="font-size:10.5px;color:var(--text-muted)" dir="ltr">' + lcEsc(r.student_id || '') + '</div>'
+        : '<span style="color:var(--text-muted)">—</span>';
+      const sessions = st === 'printed' ? '—' : (Number(r.sessions_used) || 0) + ' / ' + (Number(r.sessions_total) || 0);
+      let actions = '';
+      if (st === 'printed') {
+        actions += '<button class="tbl-action" onclick="lcOpenFillWith(\'' + r.id + '\')" style="padding:5px 10px;font-size:11px;border-color:rgba(16,185,129,.3);color:#059669;font-weight:800">💳 تعبئة</button> ';
+      } else if (st === 'active') {
+        actions += '<button class="tbl-action" onclick="lcUseSession(\'' + r.id + '\')" style="padding:5px 10px;font-size:11px;border-color:rgba(99,102,241,.3);color:#4f46e5;font-weight:800">➕ حصة</button> ';
+        actions += '<button class="tbl-action" onclick="lcFinishCard(\'' + r.id + '\')" style="padding:5px 10px;font-size:11px">⏹ إنهاء</button> ';
+      }
+      actions += '<button class="tbl-action del" onclick="lcDeleteCard(\'' + r.id + '\')" style="padding:5px 10px;font-size:11px">🗑️</button>';
+      return '<tr>'
+        + '<td style="font-weight:700;color:var(--text-muted)">' + row + '</td>'
+        + '<td><strong dir="ltr">' + lcEsc(r.id) + '</strong></td>'
+        + '<td>' + studentCell + '</td>'
+        + '<td>' + (r.language ? lcEsc(r.language) : '—') + '</td>'
+        + '<td>' + (r.teacher_name ? lcEsc(r.teacher_name) : '—') + '</td>'
+        + '<td><strong>' + sessions + '</strong></td>'
+        + '<td><span class="lc-pill ' + st + '">' + lcStatusLabel(st) + '</span></td>'
+        + '<td>' + (r.activated_at ? lcFmtDate(r.activated_at) : '—') + '</td>'
+        + '<td style="text-align:center;white-space:nowrap">' + actions + '</td>'
+        + '</tr>';
+    }).join('');
+
+  const info = document.getElementById('lc-pagination-info');
+  if (info) info.textContent = total + ' بطاقة — صفحة ' + lcPage + ' من ' + pages;
+  const btns = document.getElementById('lc-pagination-btns');
+  if (btns) {
+    let html = '';
+    if (lcPage > 1) html += '<button onclick="lcPage_(' + (lcPage-1) + ')" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--card);cursor:pointer;font-weight:700;font-size:12px">‹ السابق</button>';
+    for (let p = Math.max(1, lcPage-2); p <= Math.min(pages, lcPage+2); p++) {
+      html += '<button onclick="lcPage_(' + p + ')" style="padding:6px 12px;border:1px solid ' + (p===lcPage?'var(--primary)':'var(--border)') + ';border-radius:6px;background:' + (p===lcPage?'var(--primary-light)':'var(--card)') + ';cursor:pointer;font-weight:' + (p===lcPage?'900':'700') + ';font-size:12px;color:' + (p===lcPage?'var(--primary)':'var(--text)') + '">' + p + '</button>';
+    }
+    if (lcPage < pages) html += '<button onclick="lcPage_(' + (lcPage+1) + ')" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--card);cursor:pointer;font-weight:700;font-size:12px">التالي ›</button>';
+    btns.innerHTML = html;
+  }
+  lcUpdateStats();
+};
+
+window.lcPage_ = function(p) { lcPage = p; lcRenderTable(); };
+
+// ── A4 sheet generation + preview ─────────────────────────
+window.lcOpenPrint = async function() {
+  if (lcTableMissing) {
+    await lcLoadData();
+    if (lcTableMissing) { srShowToast('جدول language_cards غير موجود — نفّذ ملف الهجرة أولاً', 'error'); return; }
+  }
+  lcPendingCards = lcGenCards(4);
+  lcRenderPreview();
+  document.getElementById('lc-print-modal').classList.add('open');
+};
+
+function lcRenderPreview() {
+  const frame = document.getElementById('lc-preview-frame');
+  if (!frame) return;
+  let html = '';
+  try { html = StudentCardRenderer.buildA4BarcodeSheetHTML(lcPendingCards, { preview: true }); }
+  catch(e) { console.error('[LANG-CARDS] preview error:', e); html = '<p style="font-family:sans-serif;padding:20px">تعذر إنشاء المعاينة: ' + lcEsc(e.message) + '</p>'; }
+  frame.srcdoc = html;
+}
+
+window.lcRegeneratePreview = function() {
+  lcPendingCards = lcGenCards(4);
+  lcRenderPreview();
+};
+
+window.lcClosePrint = function() {
+  document.getElementById('lc-print-modal').classList.remove('open');
+  const frame = document.getElementById('lc-preview-frame');
+  if (frame) frame.srcdoc = '';
+};
+
+window.lcPrintSheet = async function() {
+  if (!lcPendingCards.length) return;
+  const btn = document.getElementById('lc-print-btn');
+  const win = window.open('', '', 'width=900,height=1200');
+  if (!win) { srShowToast('اسمح بالنوافذ المنبثقة لإتمام الطباعة', 'error'); return; }
+  win.document.write('<html dir="rtl"><head><meta charset="utf-8"><title>بطاقات دورات اللغات</title></head><body style="font-family:Tajawal,Arial,sans-serif;padding:30px;text-align:center;color:#555">جارٍ تجهيز ورقة البطاقات…</body></html>');
+  win.document.close();
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
+  try {
+    // Never overwrite an existing card: regenerate on the (very unlikely) clash.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const ids = lcPendingCards.map(function(c){ return c.id; });
+      const check = await lcFetch(LC_URL + '/rest/v1/' + LC_TABLE + '?select=id&id=in.(' + ids.join(',') + ')');
+      if (!check.ok) break;
+      const rows = await check.json().catch(function(){ return []; });
+      if (!Array.isArray(rows) || rows.length === 0) break;
+      lcPendingCards = lcGenCards(4);
+      lcRenderPreview();
+    }
+    const body = lcPendingCards.map(function(c) {
+      return { id: c.id, barcode_value: c.barcode, status: 'printed', sessions_total: 0, sessions_used: 0 };
+    });
+    const res = await lcFetch(LC_URL + '/rest/v1/' + LC_TABLE, {
+      method: 'POST',
+      headers: { 'Prefer': 'return=minimal' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(function(){ return ''; });
+      throw new Error('HTTP ' + res.status + (txt ? ' — ' + txt.slice(0, 140) : ''));
+    }
+    const html = StudentCardRenderer.buildA4BarcodeSheetHTML(lcPendingCards, {});
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    srShowToast('✅ تم حفظ ' + lcPendingCards.length + ' بطاقات وفتح نافذة الطباعة');
+    lcClosePrint();
+    lcPendingCards = [];
+    lcLoadData();
+  } catch(e) {
+    try { win.close(); } catch(_) {}
+    srShowToast('فشل حفظ/طباعة البطاقات: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🖨️ طباعة'; }
+  }
+};
+
+// ── Fill a printed card ───────────────────────────────────
+window.lcOpenFill = function() {
+  if (lcTableMissing) { srShowToast('جدول language_cards غير موجود — نفّذ ملف الهجرة أولاً', 'error'); return; }
+  lcScannedCard = null;
+  document.getElementById('lc-fill-step1').style.display = 'block';
+  document.getElementById('lc-fill-step2').style.display = 'none';
+  const input = document.getElementById('lc-card-input');
+  if (input) { input.value = ''; input.disabled = false; }
+  const box = document.getElementById('lc-scan-box');
+  if (box) box.classList.remove('found');
+  const hint = document.getElementById('lc-card-hint');
+  if (hint) hint.textContent = 'ضع المؤشر في الحقل ثم امسح الباركود (يعمل كإدخال لوحة مفاتيح) — أو اكتب رقم البطاقة واضغط Enter.';
+  document.getElementById('lc-fill-modal').classList.add('open');
+  setTimeout(function(){ if (input) input.focus(); }, 150);
+  lcEnsureTeachers();
+  lcEnsureLangRegs();
+};
+
+window.lcOpenFillWith = function(id) {
+  lcOpenFill();
+  const input = document.getElementById('lc-card-input');
+  if (input) input.value = id;
+  setTimeout(function(){ lcLookupCard(); }, 220);
+};
+
+window.lcCloseFill = function() {
+  document.getElementById('lc-fill-modal').classList.remove('open');
+  lcScannedCard = null;
+};
+
+window.lcFillBack = function() {
+  lcScannedCard = null;
+  document.getElementById('lc-fill-step2').style.display = 'none';
+  document.getElementById('lc-fill-step1').style.display = 'block';
+  const input = document.getElementById('lc-card-input');
+  if (input) { input.disabled = false; input.focus(); }
+};
+
+function lcParseCard(raw) {
+  const s = String(raw == null ? '' : raw).replace(/[^0-9]/g, '');
+  if (s.length === 13) {
+    const id = EAN13.decodeLang(s);
+    return id ? { id: id, barcode: EAN13.makeLang(id) } : null;
+  }
+  if (s.length === 5) return { id: s, barcode: EAN13.makeLang(s) };
+  return null;
+}
+
+window.lcLookupCard = async function() {
+  const input = document.getElementById('lc-card-input');
+  const hint = document.getElementById('lc-card-hint');
+  const parsed = lcParseCard(input ? input.value : '');
+  if (!parsed) {
+    if (hint) hint.textContent = '❌ رقم غير صالح — أدخل 5 أرقام أو امسح باركود البطاقة.';
+    return;
+  }
+  if (hint) hint.textContent = '⏳ جاري البحث عن البطاقة...';
+  try {
+    const res = await lcFetch(LC_URL + '/rest/v1/' + LC_TABLE + '?select=*&id=eq.' + encodeURIComponent(parsed.id));
+    if (!res.ok) {
+      const txt = await res.text().catch(function(){ return ''; });
+      if (res.status === 404 || /PGRST205|42P01/.test(txt)) {
+        lcSetTableMissing(true);
+        if (hint) hint.textContent = '⚠️ جدول language_cards غير موجود — نفّذ ملف الهجرة أولاً.';
+        return;
+      }
+      throw new Error('HTTP ' + res.status);
+    }
+    const rows = await res.json();
+    const card = Array.isArray(rows) ? rows[0] : null;
+    if (!card || card.deleted_at) {
+      if (hint) hint.textContent = '❌ لا توجد بطاقة بهذا الرقم — اطبع ورقة بطاقات جديدة أولاً.';
+      return;
+    }
+    if (card.status === 'active') {
+      if (hint) hint.textContent = '⚠️ هذه البطاقة مفعّلة مسبقاً' + (card.student_name ? ' للطالب ' + card.student_name : '') + '.';
+      return;
+    }
+    if (card.status === 'finished') {
+      if (hint) hint.textContent = '⚠️ هذه البطاقة منتهية (استُهلكت كل حصصها).';
+      return;
+    }
+    lcScannedCard = card;
+    const box = document.getElementById('lc-scan-box');
+    if (box) box.classList.add('found');
+    if (hint) hint.textContent = '✅ بطاقة صالحة — ' + parsed.id;
+    if (input) input.disabled = true;
+    await lcShowFillStep2(card);
+  } catch(e) {
+    if (hint) hint.textContent = 'خطأ: ' + e.message;
+    srShowToast('فشل البحث عن البطاقة: ' + e.message, 'error');
+  }
+};
+
+async function lcShowFillStep2(card) {
+  document.getElementById('lc-fill-step1').style.display = 'none';
+  document.getElementById('lc-fill-step2').style.display = 'block';
+  const summary = document.getElementById('lc-card-summary');
+  if (summary) {
+    summary.innerHTML = '🎴 بطاقة رقم <strong dir="ltr">' + lcEsc(card.id) + '</strong>'
+      + '<span style="font-size:11px;color:var(--text-muted)" dir="ltr">' + lcEsc(card.barcode_value || '') + '</span>'
+      + '<span class="lc-pill printed">🟡 جاهزة للتعبئة</span>';
+  }
+  const langSel = document.getElementById('lc-fill-language');
+  if (langSel) {
+    const cur = card.language || '';
+    langSel.innerHTML = '<option value="">— اختر اللغة —</option>' + LC_LANGS.map(function(l) {
+      return '<option value="' + l + '"' + (cur === l ? ' selected' : '') + '>' + l + '</option>';
+    }).join('');
+  }
+  const sessions = document.getElementById('lc-fill-sessions');
+  if (sessions) sessions.value = '12';
+  const notes = document.getElementById('lc-fill-notes');
+  if (notes) notes.value = '';
+  const teacher = document.getElementById('lc-fill-teacher');
+  if (teacher) teacher.value = '';
+  await lcEnsureTeachers();
+  await lcEnsureLangRegs();
+}
+
+async function lcEnsureTeachers() {
+  if (lcTeachersCache) { lcFillTeacherList(); return; }
+  try { lcTeachersCache = await SubjectService.getActiveTeachers(); }
+  catch(e) { console.error('[LANG-CARDS] teachers error:', e); lcTeachersCache = []; }
+  lcFillTeacherList();
+}
+
+function lcFillTeacherList() {
+  const list = document.getElementById('lc-teacher-list');
+  if (!list) return;
+  const arr = (lcTeachersCache || []).slice().sort(function(a,b) {
+    return String(a.name || '').localeCompare(String(b.name || ''), 'ar');
+  });
+  list.innerHTML = arr.map(function(t) {
+    return '<option value="' + lcEsc(t.name || '') + '"></option>';
+  }).join('');
+}
+
+async function lcEnsureLangRegs() {
+  if (lcLangRegsCache) { lcFillStudentSelect(); return; }
+  try {
+    const res = await lcFetch(LC_URL + '/rest/v1/language_registrations?select=id,first_name,last_name,language&order=created_at.desc');
+    lcLangRegsCache = res.ok ? await res.json() : [];
+  } catch(e) { lcLangRegsCache = []; }
+  if (!Array.isArray(lcLangRegsCache)) lcLangRegsCache = [];
+  lcFillStudentSelect();
+}
+
+function lcFillStudentSelect() {
+  const sel = document.getElementById('lc-fill-student');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— بدون ربط —</option>' + (lcLangRegsCache || []).map(function(r) {
+    const name = ((r.first_name || '') + ' ' + (r.last_name || '')).trim();
+    return '<option value="' + lcEsc(r.id) + '" data-name="' + lcEsc(name) + '" data-lang="' + lcEsc(r.language || '') + '">' + lcEsc(r.id) + ' — ' + lcEsc(name) + (r.language ? ' (' + lcEsc(r.language) + ')' : '') + '</option>';
+  }).join('');
+}
+
+window.lcOnStudentChange = function() {
+  const sel = document.getElementById('lc-fill-student');
+  const langSel = document.getElementById('lc-fill-language');
+  if (!sel || !langSel || !sel.value) return;
+  const opt = sel.options[sel.selectedIndex];
+  const lang = opt ? opt.getAttribute('data-lang') : '';
+  if (!lang) return;
+  langSel.value = lang;
+  if (langSel.value !== lang) {
+    const o = document.createElement('option');
+    o.value = lang;
+    o.textContent = lang;
+    langSel.appendChild(o);
+    langSel.value = lang;
+  }
+};
+
+window.lcActivateCard = async function() {
+  if (!lcScannedCard) return;
+  const sessions = parseInt((document.getElementById('lc-fill-sessions') || {}).value, 10);
+  if (!(sessions > 0)) { srShowToast('عدد الحصص يجب أن يكون أكبر من 0', 'error'); return; }
+  const teacherName = String((document.getElementById('lc-fill-teacher') || {}).value || '').trim();
+  if (!teacherName) { srShowToast('اختر الأستاذ أو اكتب اسمه', 'error'); return; }
+  const t = (lcTeachersCache || []).find(function(x) { return String(x.name || '').trim() === teacherName; });
+  const teacherId = t ? (t.teacherId || t.id || '') : '';
+  const studentSel = document.getElementById('lc-fill-student');
+  const studentId = studentSel ? studentSel.value : '';
+  const studentOpt = studentSel && studentSel.selectedIndex >= 0 ? studentSel.options[studentSel.selectedIndex] : null;
+  const studentName = studentId && studentOpt ? (studentOpt.getAttribute('data-name') || '') : '';
+  const language = (document.getElementById('lc-fill-language') || {}).value || '';
+  const notes = String((document.getElementById('lc-fill-notes') || {}).value || '').trim();
+  const btn = document.getElementById('lc-activate-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري التفعيل...'; }
+  try {
+    const patch = {
+      status: 'active',
+      student_id: studentId,
+      student_name: studentName,
+      language: language,
+      teacher_id: teacherId,
+      teacher_name: teacherName,
+      sessions_total: sessions,
+      sessions_used: 0,
+      notes: notes,
+      activated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    const res = await lcFetch(LC_URL + '/rest/v1/' + LC_TABLE + '?id=eq.' + encodeURIComponent(lcScannedCard.id), {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=minimal' },
+      body: JSON.stringify(patch)
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(function(){ return ''; });
+      throw new Error('HTTP ' + res.status + (txt ? ' — ' + txt.slice(0, 140) : ''));
+    }
+    srShowToast('✅ تم تفعيل البطاقة ' + lcScannedCard.id + ' — ' + sessions + ' حصة');
+    lcCloseFill();
+    lcLoadData();
+  } catch(e) {
+    srShowToast('فشل تفعيل البطاقة: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✅ تفعيل البطاقة'; }
+  }
+};
+
+window.lcUseSession = async function(id) {
+  const r = lcAllData.find(function(x){ return x.id === id; });
+  if (!r || r.status !== 'active') return;
+  const used = (Number(r.sessions_used) || 0) + 1;
+  const total = Number(r.sessions_total) || 0;
+  if (!(await cmConfirm('تسجيل حصة', 'تسجيل حصة جديدة' + (r.student_name ? ' للطالب ' + r.student_name : '') + '؟\n' + used + ' / ' + total, '➕'))) return;
+  const status = total > 0 && used >= total ? 'finished' : 'active';
+  try {
+    const res = await lcFetch(LC_URL + '/rest/v1/' + LC_TABLE + '?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ sessions_used: used, status: status, updated_at: new Date().toISOString() })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    srShowToast(status === 'finished' ? '✅ انتهت حصص البطاقة' : '✅ تم تسجيل الحصة (' + used + ' / ' + total + ')');
+    lcLoadData();
+  } catch(e) { srShowToast('فشل تسجيل الحصة: ' + e.message, 'error'); }
+};
+
+window.lcFinishCard = async function(id) {
+  const r = lcAllData.find(function(x){ return x.id === id; });
+  if (!r) return;
+  if (!(await cmConfirm('إنهاء البطاقة', 'إنهاء بطاقة' + (r.student_name ? ' الطالب ' + r.student_name : '') + ' نهائياً؟', '⏹'))) return;
+  try {
+    const res = await lcFetch(LC_URL + '/rest/v1/' + LC_TABLE + '?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ status: 'finished', updated_at: new Date().toISOString() })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    srShowToast('✅ تم إنهاء البطاقة');
+    lcLoadData();
+  } catch(e) { srShowToast('فشل إنهاء البطاقة: ' + e.message, 'error'); }
+};
+
+window.lcDeleteCard = async function(id) {
+  const r = lcAllData.find(function(x){ return x.id === id; });
+  if (!r) return;
+  if (!(await cmConfirm('حذف البطاقة', 'هل أنت متأكد من حذف البطاقة رقم ' + id + '؟', '🗑️'))) return;
+  try {
+    const res = await lcFetch(LC_URL + '/rest/v1/' + LC_TABLE + '?id=eq.' + encodeURIComponent(id), {
+      method: 'DELETE',
+      headers: { 'Prefer': 'return=minimal' }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    srShowToast('✅ تم حذف البطاقة');
+    lcLoadData();
+  } catch(e) { srShowToast('فشل حذف البطاقة: ' + e.message, 'error'); }
 };
 
 })();

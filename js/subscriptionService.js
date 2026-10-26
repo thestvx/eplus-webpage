@@ -234,6 +234,17 @@ const SubscriptionService = (function () {
     return null;
   }
 
+  // تطبيع اسم للمطابقة (نفس سلوك _sn في القاعدة): إزالة كل الفروق
+  // (فراغات/حروف كبيرة-صغيرة) حتى لا يُرفض اشتراك سليم بسبب اختلاف الكتابة.
+  function _normName(x) { return String(x || '').replace(/\s+/g, '').toLowerCase(); }
+  // تطبيع اسم الأستاذ (نفس سلوك _ncan): إزالة الفراغات ثم ترتيب الحروف —
+  // «عبد الرحمان سرهود» = «سرهود عبدالرحمان».
+  function _normTeacher(x) { return _normName(x).split('').sort().join(''); }
+  function _eqName(a, b) {
+    if (!a || !b) return false;
+    return _normName(a) === _normName(b) || _normTeacher(a) === _normTeacher(b);
+  }
+
   // مطابقة اشتراك مع مادة+أستاذ. لو الاشتراك قديم (بدون teacher_id/subject_id)
   // يعمل بالتوافق الرجعي على أساس أن المادة/الأستاذ غير محددين = كل المواد/الأساتذة.
   function _matchesSubjectTeacher(s, subjectId, teacherId) {
@@ -242,10 +253,10 @@ const SubscriptionService = (function () {
     var sName = s.subject_name || '';
     var tName = s.teacher_name || '';
     if (sId && sId !== (subjectId || '')) {
-      if (!sName || sName !== (subjectId || '')) return false;
+      if (!sName || !_eqName(sName, subjectId)) return false;
     }
     if (tId && tId !== (teacherId || '')) {
-      if (!tName || tName !== (teacherId || '')) return false;
+      if (!tName || !_eqName(tName, teacherId)) return false;
     }
     return true;
   }
@@ -281,6 +292,31 @@ const SubscriptionService = (function () {
     return (periods || []).find(p => r >= p.start_date && r <= p.end_date) || null;
   }
 
+  // احتياط دائم: اشتراك مدفوع وساري المدة لكن لا توجد «فترة» صالحة للحضور
+  // (فترة ناقصة/بتواريخ خاطئة/شهران في صفوف منفصلة). لا يُمنع حضور مدفوع أبداً:
+  // يُبنى الاختيار من رصيد الاشتراك نفسه ويُسجَّل الحضور دون خصم فترة محددة.
+  function _syntheticPick(sub, periods, r) {
+    if (!sub) return null;
+    if (sub.status === 'cancelled' || sub.status === 'paused') {
+      return { period: null, remaining: 0, attended: 0, permanent: false, allowed: false, synthetic: true };
+    }
+    if (isPermanent(sub)) return { period: null, remaining: Infinity, attended: 0, permanent: true, allowed: true, synthetic: true };
+    const inDate = (!sub.start_date || r >= String(sub.start_date)) && (!sub.end_date || r <= String(sub.end_date));
+    if (!inDate) return { period: null, remaining: 0, attended: 0, permanent: false, allowed: false, synthetic: true };
+    const used = (periods || []).reduce(function (a, p) { return a + (Number(p.used_sessions) || 0); }, 0);
+    let total = Number(sub.total_sessions) || 0;
+    if (!total) total = (periods || []).reduce(function (a, p) { return a + (Number(p.total_sessions) || SESSIONS_PER_MONTH); }, 0);
+    if (!total) total = (Number(sub.months) || 1) * SESSIONS_PER_MONTH;
+    const remaining = Math.max(0, total - used);
+    if (remaining <= 0) return { period: null, remaining: 0, attended: used, permanent: false, allowed: false, synthetic: true };
+    // إن وُجدت فترة بها رصيد (لكن تواريخها لم تُطابَق) نُرجعها ليُخصم منها الحضور.
+    let bestP = null;
+    (periods || []).forEach(function (p) {
+      if (p && _periodRemaining(p) > 0 && (!bestP || _periodRemaining(p) > _periodRemaining(bestP))) bestP = p;
+    });
+    return { period: bestP, remaining: remaining, attended: used, permanent: false, allowed: true, synthetic: true };
+  }
+
   // يختار أفضل فترة قابلة لتسجيل الحضور ضمن الاشتراك (يتعامل مع الشهور المتعددة
   // والفترات المتداخلة/غير المتطابقة): أولوية لفترة اليوم إن كانت بها حصص، وإلا
   // لأحدث فترة بدأت وبها حصص متبقية. وإن استُهلكت كل الفترات التي بدأت، ينتقل
@@ -296,7 +332,7 @@ const SubscriptionService = (function () {
       return String(a.start_date || '').localeCompare(String(b.start_date || '')) ||
         ((Number(a.month_number) || 0) - (Number(b.month_number) || 0));
     });
-    if (!list.length) return null;
+    if (!list.length) return _syntheticPick(sub, [], r);
     const containing = list.find(function (p) { return r >= (p.start_date || '') && r <= (p.end_date || ''); });
     if (containing && _periodRemaining(containing) > 0) {
       return { period: containing, remaining: _periodRemaining(containing), attended: Number(containing.used_sessions) || 0, permanent: false, allowed: true };
@@ -314,7 +350,57 @@ const SubscriptionService = (function () {
       return { period: p, remaining: _periodRemaining(p), attended: Number(p.used_sessions) || 0, permanent: false, allowed: true };
     }
     const last = containing || list[list.length - 1];
+    // سلامة أخيرة: اشتراك ساري المدة وبه رصيد مدفوع فعلي لكن لا فترة صالحة
+    // تُخصم منها (بيانات الشهر الثاني ناقصة/متداخلة) — لا نمنع الحضور.
+    const net = _syntheticPick(sub, list, r);
+    if (net && net.allowed) return net;
     return { period: last, remaining: containing ? _periodRemaining(containing) : 0, attended: Number((last || {}).used_sessions) || 0, permanent: false, allowed: false };
+  }
+
+  // نقطة الدخول الوحيدة لقرار تسجيل الحضور: يفحص «كل» اشتراكات الطالب
+  // (الصفوف المنفصلة/تعدد الشهور) ويعيد أفضل اشتراك+فترة يُسمح بالحضور عليها.
+  // يستعمل في بطاقة المادة وفي بوابة التسجيل معاً — فلا تختلف الحالة عن القرار.
+  function _pickScore(pick, r) {
+    if (!pick || !pick.allowed) return -1;
+    let sc = 0;
+    if (pick.permanent) sc += 100;
+    if (pick.period && r >= String(pick.period.start_date || '') && r <= String(pick.period.end_date || '')) sc += 10;
+    sc += Math.min(5, Number(pick.remaining) || 0) * 0.1;
+    return sc;
+  }
+  function resolveCheckIn(rows, subjectId, teacherId, refDate) {
+    const r = refDate || today();
+    const matches = (rows || []).filter(function (row) {
+      const s = row.subscription || {};
+      return s.status !== 'cancelled' && _matchesSubjectTeacher(s, subjectId, teacherId);
+    });
+    let best = null;
+    for (const row of matches) {
+      const s = row.subscription || {};
+      if (s.status === 'paused') continue;
+      const pick = selectCheckInPeriod(s, row.periods || [], r);
+      if (!best || _pickScore(pick, r) > _pickScore(best.pick, r)) {
+        best = { subscription: s, periods: row.periods || [], pick: pick };
+      }
+    }
+    if (best && best.pick && best.pick.allowed) return best;
+    // لا يُسمح بالحضور: نعيد اشتراكاً مطابقاً للعرض حتى تظهر الحالة الصحيحة
+    // («انتهى الاشتراك» بدل «لا يوجد اشتراك») ويبقى خيار السماح بالحضور.
+    for (const row of matches) {
+      const s = row.subscription || {};
+      if (s.status === 'paused') continue;
+      if (isPermanent(s) || (r >= String(s.start_date || '') && r <= String(s.end_date || ''))) {
+        const pick = selectCheckInPeriod(s, row.periods || [], r) ||
+          { period: null, remaining: 0, attended: 0, permanent: false, allowed: false };
+        return { subscription: s, periods: row.periods || [], pick: pick };
+      }
+    }
+    if (best) return best;
+    if (matches.length) {
+      const row = matches[0];
+      return { subscription: row.subscription || {}, periods: row.periods || [], pick: null };
+    }
+    return null;
   }
 
   // يبحث في كل اشتراكات الطالب عن أفضل اشتراك مطابق للمادة+الأستاذ يمكن تسجيل
@@ -510,6 +596,7 @@ const SubscriptionService = (function () {
     getActiveSubscription,
     getActiveSubscriptionForSubject,
     findBestSubscriptionForSubject,
+    resolveCheckIn,
     activePeriod,
     selectCheckInPeriod,
     getStudentEvents,

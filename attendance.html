@@ -26,7 +26,7 @@
 <script src="js/registrationService.js?v=4"></script>
 <script src="js/subjectService.js?v=5"></script>
 <script src="js/attendanceService.js?v=4"></script>
-<script src="js/subscriptionService.js?v=1"></script><style>
+<script src="js/subscriptionService.js?v=2"></script><style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
   --primary:#6366f1;--primary-dark:#4f46e5;--primary-soft:rgba(99,102,241,0.10);
@@ -638,6 +638,10 @@ main{flex:1;position:relative;overflow:hidden}
     var openMap = atc.openMap, openIdMap = atc.openIdMap, openNameMap = atc.openNameMap;
     var subsAll = [];
     try { subsAll = (await SubscriptionService.getSubscriptions(studentId)) || []; } catch (e) { logScanner('subs lookup error: ' + e.message); }
+    if (!subsAll.length) {
+      // محاولة ثانية عند فشل RPC عابر — لا نعرض «لا يوجد اشتراك» لطالب مشترك.
+      try { subsAll = (await SubscriptionService.getSubscriptions(studentId)) || []; } catch (e) { logScanner('subs retry error: ' + e.message); }
+    }
     for (var i = 0; i < subjects.length; i++) {
       var s = subjects[i];
       var key = (s.teacher || '') + '|' + (s.subject || '');
@@ -646,17 +650,12 @@ main{flex:1;position:relative;overflow:hidden}
       var isOpen = isTeacherOpen(openMap, openIdMap, s.teacher, s.subject, openNameMap);
       var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, allowed: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length, hasSubscription: false };
       try {
-        var subResult = await SubscriptionService.getActiveSubscriptionForSubject(studentId, s.subject, s.teacher, today);
-        var pick = (subResult && subResult.subscription) ? SubscriptionService.selectCheckInPeriod(subResult.subscription, subResult.periods || [], today) : null;
-        if (!(pick && pick.allowed)) {
-          // احتياط: صف اشتراك آخر مطابق للمادة+الأستاذ يمكن الحضور عليه (شهور منفصلة)
-          var alt = SubscriptionService.findBestSubscriptionForSubject(subsAll, s.subject, s.teacher, today);
-          if (alt && alt.subscription) {
-            var altPick = SubscriptionService.selectCheckInPeriod(alt.subscription, alt.periods || [], today);
-            if ((altPick && altPick.allowed) || !pick) { subResult = alt; pick = altPick; }
-          }
-        }
-        if (subResult && subResult.subscription) {
+        // قرار واحد لكل مادة: يفحص «كل» اشتراكات الطالب (صفوف منفصلة / تعدد
+        // الشهور) — فلا تظهر بطاقة «انتهى الاشتراك» بينما التسجيل مسموح، والعكس.
+        var resolved = SubscriptionService.resolveCheckIn(subsAll, s.subject, s.teacher, today);
+        var subResult = (resolved && resolved.subscription) ? resolved : null;
+        var pick = subResult ? subResult.pick : null;
+        if (subResult) {
           sess.hasSubscription = true;
           sess.sub = subResult.subscription;
           sess.periods = subResult.periods || [];
@@ -700,16 +699,19 @@ main{flex:1;position:relative;overflow:hidden}
           }
         });
       } catch (e) { logScanner('att query error: ' + e.message); }
-      sess.hasSubscription = false;
-      for (var si2 = 0; si2 < subsAll.length; si2++) {
-        var _px = subsAll[si2].subscription || {};
-        if (_px.status === 'cancelled') continue;
-        var _pxSId = _px.subject_id || '', _pxTId = _px.teacher_id || '';
-        var _pxSN = _px.subject_name || '', _pxTN = _px.teacher_name || '';
-        if (_pxSId && _pxSId !== s.subject) { if (!_pxSN || _pxSN !== s.subject) continue; }
-        if (_pxTId && _pxTId !== s.teacher) { if (!_pxTN || _pxTN !== s.teacher) continue; }
-        sess.hasSubscription = true;
-        break;
+      // وجود اشتراك (للحالات التي لا يُسمح فيها بالحضور): لا يُلغي ما اكتشفه
+      // resolveCheckIn (المطابقة هنا أضيق للاسم).
+      if (!sess.hasSubscription) {
+        for (var si2 = 0; si2 < subsAll.length; si2++) {
+          var _px = subsAll[si2].subscription || {};
+          if (_px.status === 'cancelled') continue;
+          var _pxSId = _px.subject_id || '', _pxTId = _px.teacher_id || '';
+          var _pxSN = _px.subject_name || '', _pxTN = _px.teacher_name || '';
+          if (_pxSId && _pxSId !== s.subject) { if (!_pxSN || _pxSN !== s.subject) continue; }
+          if (_pxTId && _pxTId !== s.teacher) { if (!_pxTN || _pxTN !== s.teacher) continue; }
+          sess.hasSubscription = true;
+          break;
+        }
       }
       sessions.push(sess);
     }
@@ -851,21 +853,16 @@ if (hasActiveSub) {
     } catch (e) { logScanner('atc gate check error: ' + e.message); }
 
     var subCheck = null, _pick = null;
-    try { subCheck = await SubscriptionService.getActiveSubscriptionForSubject(pendingStudentId, session.subject, session.teacher, AttendanceService.today()); } catch (e) { logScanner('subCheck error: ' + e.message); }
-    if (subCheck && subCheck.subscription) {
-      _pick = SubscriptionService.selectCheckInPeriod(subCheck.subscription, subCheck.periods, AttendanceService.today());
-    }
-    if (!(_pick && _pick.allowed)) {
-      // احتياط: كل اشتراكات الطالب (يعالج صفوف الاشتراك المنفصلة / تعدد الشهور)
-      try {
-        var _allSubs = await SubscriptionService.getSubscriptions(pendingStudentId);
-        var _bestSub = SubscriptionService.findBestSubscriptionForSubject(_allSubs, session.subject, session.teacher, AttendanceService.today());
-        if (_bestSub && _bestSub.subscription) {
-          var _bestPick = SubscriptionService.selectCheckInPeriod(_bestSub.subscription, _bestSub.periods, AttendanceService.today());
-          if ((_bestPick && _bestPick.allowed) || !_pick) { subCheck = _bestSub; _pick = _bestPick; }
-        }
-      } catch (e) { logScanner('subFallback error: ' + e.message); }
-    }
+    // نفس مصدر القرار الذي بُنيت به البطاقة (resolveCheckIn): يفحص كل اشتراكات
+    // الطالب — صفوف منفصلة أو شهور متعددة — فلا يختلف القرار عن المعروض.
+    try {
+      var _allSubs = await SubscriptionService.getSubscriptions(pendingStudentId);
+      var _res = SubscriptionService.resolveCheckIn(_allSubs, session.subject, session.teacher, AttendanceService.today());
+      if (_res && _res.subscription) {
+        subCheck = { subscription: _res.subscription, periods: _res.periods || [] };
+        _pick = _res.pick;
+      }
+    } catch (e) { logScanner('subCheck error: ' + e.message); }
 
     var type = 'none';
 
