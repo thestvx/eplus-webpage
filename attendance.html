@@ -909,12 +909,17 @@ main{flex:1;position:relative;overflow:hidden}
     if (!Array.isArray(courses) || !courses.length) {
       courses = [{ language: card.language, sessions: card.sessions_total, teacher_name: card.teacher_name }];
     }
+    try {
+      var attsAll = await lcFetch(LC_URL + '/rest/v1/language_attendance?card_id=eq.' + encodeURIComponent(card.id) + '&cancelled=eq.false&select=language', { headers: { 'Accept': 'application/json' } });
+      card._attCount = {};
+      (attsAll||[]).forEach(function(r){ if(r&&r.language){ card._attCount[r.language] = (card._attCount[r.language]||0)+1; } });
+    } catch(e){ card._attCount = card._attCount||{}; }
 
     var html = '<div class="ts-grid" id="tc-grid">';
     for (var i = 0; i < courses.length; i++) {
       var c = courses[i];
       var tot = Number(c.sessions) || Number(card.sessions_total) || 0;
-      var usd = Number(card.sessions_used) || 0;
+      var usd = Number((card._attCount && card._attCount[c.language]) || 0);
       html += '<div class="tc-card">';
       html += '<div class="tc-top">';
       html += '<div class="tc-subject-icon green">G</div>';
