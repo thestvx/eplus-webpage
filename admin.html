@@ -31014,6 +31014,32 @@ function lcEsc(s) {
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+async function lcLoadAttCounts() {
+  const map = {};
+  const batch = 1000;
+  for (let page = 0; page < 50; page++) {
+    const from = page * batch;
+    let res;
+    try {
+      res = await lcFetch(LC_URL + '/rest/v1/language_attendance?cancelled=eq.false&select=card_id,language&order=id.asc', {
+        headers: { 'Range': from + '-' + (from + batch - 1), 'Range-Unit': 'items', 'Accept': 'application/json' }
+      });
+    } catch (e) { console.error('[LANG-ATT] counts load error:', e); break; }
+    if (!res.ok) break;
+    const rows = await res.json().catch(function(){ return []; });
+    const arr = Array.isArray(rows) ? rows : [];
+    arr.forEach(function(a) {
+      if (!a || a.card_id == null) return;
+      const key = String(a.card_id);
+      const lang = String(a.language == null ? '' : a.language);
+      const m = map[key] || (map[key] = {});
+      m[lang] = (m[lang] || 0) + 1;
+    });
+    if (arr.length < batch) break;
+  }
+  return map;
+}
+
 function lcFmtDate(d) {
   if (!d) return '—';
   try { return new Date(d).toLocaleDateString('ar-DZ',{year:'numeric',month:'short',day:'numeric'}); }
@@ -31076,6 +31102,15 @@ window.lcLoadData = async function() {
     console.error('[LANG-CARDS] load error:', e);
     lcAllData = [];
   }
+  if (lcAllData.length) {
+    try {
+      const attCounts = await lcLoadAttCounts();
+      lcAllData.forEach(function(r){ r._attCount = attCounts[String(r.id)] || {}; });
+    } catch(e) {
+      console.error('[LANG-CARDS] attendance counts error:', e);
+      lcAllData.forEach(function(r){ r._attCount = {}; });
+    }
+  }
   lcApplyFilters();
 };
 
@@ -31134,6 +31169,9 @@ window.lcRenderTable = function() {
         ? '<div style="font-weight:800">' + lcEsc(r.student_name) + '</div><div style="font-size:10.5px;color:var(--text-muted)" dir="ltr">' + lcEsc(r.student_id || '') + '</div>'
         : '<span style="color:var(--text-muted)">—</span>';
       let sessions = st === 'printed' ? '—' : (Number(r.sessions_used) || 0) + ' / ' + (Number(r.sessions_total) || 0);
+      if (st !== 'printed' && r.language && r._attCount && r._attCount[r.language] != null) {
+        sessions = (Number(r._attCount[r.language]) || 0) + ' / ' + (Number(r.sessions_total) || 0);
+      }
       let amountCell = (Number(r.amount_paid) > 0 ? '<strong dir=\"ltr\">' + Number(r.amount_paid).toLocaleString('ar-DZ') + '</strong> دج' : '—');
       if (st !== 'printed' && r.notes) {
         try {
@@ -31141,10 +31179,17 @@ window.lcRenderTable = function() {
           if (Array.isArray(parsed) && parsed.length > 1) {
             const names = parsed.map(function(c){ return String(c.language || ''); });
             const allSame = names.every(function(n){ return n === names[0]; });
-            if (!allSame) {
-              sessions = parsed.map(function(c){ return '0/' + (Number(c.sessions) || 0); }).join(' ، ');
+            if (allSame) {
+              const usedAll = Number((r._attCount || {})[names[0]] || 0);
+              const totalAll = parsed.reduce(function(s, c){ return s + (Number(c.sessions) || 0); }, 0);
+              sessions = usedAll + ' / ' + totalAll;
+            } else {
+              sessions = parsed.map(function(c){ return Number((r._attCount || {})[String(c.language || '')] || 0) + '/' + (Number(c.sessions) || 0); }).join(' ، ');
               amountCell = parsed.map(function(c){ return (Number(c.amount) || 0).toLocaleString('ar-DZ'); }).join(' + ') + ' دج';
             }
+          } else if (Array.isArray(parsed) && parsed.length === 1) {
+            const c0 = parsed[0];
+            sessions = Number((r._attCount || {})[String(c0.language || '')] || 0) + ' / ' + (Number(c0.sessions) || 0);
           }
         } catch (e) {}
       }
