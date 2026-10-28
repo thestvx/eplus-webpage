@@ -358,7 +358,7 @@ function showInstitution() {
   if (ig) { ig.style.display = 'block'; }
   const sel = byId('sInstitution');
   if (sel) {
-    const institutions = SUPPORT_INSTITUTIONS[sLevel] || [];
+    const institutions = SUPPORT_INSTITUTIONS[sLevel] || ((sLevel === 'تحضيري' || (sLevel || '').includes('ابتدائي')) ? SUPPORT_INSTITUTIONS['السنة الخامسة ابتدائي'] : []) || [];
     sel.innerHTML = '<option value="">اختر المؤسسة التعليمية</option>' +
       institutions.map(inst => `<option value="${inst}">${inst}</option>`).join('');
     if (sInstitutionVal) sel.value = sInstitutionVal;
