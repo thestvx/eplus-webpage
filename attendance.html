@@ -921,7 +921,7 @@ main{flex:1;position:relative;overflow:hidden}
       html += '<div class="tc-info"><div class="tc-teacher">' + esc(c.teacher_name || card.teacher_name || '') + '</div><div class="tc-subject">' + esc(c.language || card.language || '') + '</div></div>';
       html += '<div class="tc-badge green">' + usd + ' / ' + tot + '</div>';
       html += '</div>';
-      html += '<div class="tc-btn-wrap"><button class="tc-btn green" data-action="att">تسجيل الحضور</button></div>';
+      html += '<div class="tc-btn-wrap"><button class="tc-btn green" data-action="att" data-course="' + esc(c.language || card.language || '') + '" data-teacher="' + esc(c.teacher_name || card.teacher_name || '') + '">تسجيل الحضور</button></div>';
       html += '</div>';
     }
     html += '</div>';
@@ -937,32 +937,52 @@ main{flex:1;position:relative;overflow:hidden}
       renderReady();
     });
 
-    document.querySelectorAll('.tc-btn[data-action="att"]').forEach(function (btn) {
-      btn.addEventListener('click', async function () {
-        btn.classList.add('loading');
-        btn.innerHTML = '<span class="spin"></span>جاري التسجيل...';
+    document.querySelectorAll('.tc-btn[data-action="att"]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        var cid = b.getAttribute('data-cid');
+        b.classList.add('loading');
+        b.innerHTML = '<span class="spin"></span>جاري التسجيل...';
+        var courseName = b.getAttribute('data-course') || (card.language || '');
+        var courseTeacher = b.getAttribute('data-teacher') || (card.teacher_name || '');
+        var parent = card;
+        var today2 = (function(){ try { return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Algiers' }); } catch(e){ return new Date().toISOString().slice(0,10); } })();
         try {
-          var out = await recordLanguageAttendance(card.id);
-          if (out && out.code === 'already') {
-            btn.classList.remove('loading');
-            btn.innerHTML = '✓ تم التسجيل اليوم';
-            btn.disabled = true;
-            btn.style.background = '#e5e7eb'; btn.style.color = '#6b7280'; btn.style.cursor = 'not-allowed';
-          } else if (out && (out.code === 'recorded' || out.code === 'finished')) {
-            btn.classList.remove('loading');
-            btn.innerHTML = '✓ تم التسجيل اليوم';
-            btn.disabled = true;
-            btn.style.background = '#e5e7eb'; btn.style.color = '#6b7280'; btn.style.cursor = 'not-allowed';
-            playSoundCorrect();
-          } else {
-            btn.classList.remove('loading');
-            btn.innerHTML = 'تسجيل الحضور';
-            playSoundIncorrect();
+          var chk = await lcFetch(LC_URL + '/rest/v1/language_attendance?select=id&card_id=eq.' + encodeURIComponent(parent.id) + '&date=eq.' + today2 + '&language=eq.' + encodeURIComponent(courseName) + '&cancelled=eq.false');
+          var chkRows = chk.ok ? await chk.json() : [];
+          if (Array.isArray(chkRows) && chkRows.length) {
+            b.classList.remove('loading');
+            b.innerHTML = 'تم تسجيل حضورك لليوم';
+            b.disabled = true;
+            b.style.background = '#e5e7eb'; b.style.color = '#6b7280'; b.style.cursor = 'not-allowed';
+            showScanOverlay('orange', 'i', 'تم التسجيل مسبقاً اليوم', lcCardLabel(parent), lcCardSub(parent, 'الحصص: ' + (Number(parent.sessions_used) || 0) + ' / ' + (Number(parent.sessions_total) || 0)), 3000, resetScannerSoon);
+            return;
           }
+        } catch(e) { logScanner('att check error: ' + e.message); }
+        try {
+          await lcFetch(LC_URL + '/rest/v1/language_attendance', {
+            method: 'POST',
+            headers: { 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ card_id: parent.id, student_name: parent.student_name || lcCardLabel(parent), language: courseName, teacher_id: parent.teacher_id || '', teacher_name: (parent.teacher_name || ''), date: today2 })
+          });
+          var newUsed = (Number(parent.sessions_used) || 0) + 1;
+          var newStatus = newUsed >= (Number(parent.sessions_total) || 0) ? 'finished' : 'active';
+          await lcFetch(LC_URL + '/rest/v1/' + LC_TABLE + '?id=eq.' + encodeURIComponent(parent.id), {
+            method: 'PATCH',
+            headers: { 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ sessions_used: newUsed, status: newStatus, updated_at: new Date().toISOString() })
+          });
+          playSoundCorrect();
+          b.classList.remove('loading');
+          b.innerHTML = '✓ تم التسجيل اليوم';
+          b.disabled = true;
+          b.style.background = '#e5e7eb'; b.style.color = '#6b7280'; b.style.cursor = 'not-allowed';
+          showScanOverlay('green', 'OK', 'تم تسجيل الحضور', lcCardLabel(parent), lcCardSub(parent, 'الحصص: ' + newUsed + ' / ' + (Number(parent.sessions_total) || 0)), 2600, resetScannerSoon);
         } catch (e) {
-          btn.classList.remove('loading');
-          btn.innerHTML = 'تسجيل الحضور';
+          logScanner('att record error: ' + e.message);
           playSoundIncorrect();
+          b.classList.remove('loading');
+          b.innerHTML = 'تسجيل الحضور';
+          showScanOverlay('red', 'X', 'تعذر تسجيل الحضور', lcCardLabel(parent), lcCardSub(parent, 'خطأ: ' + esc(e.message)), 3000, resetScannerSoon);
         }
       });
     });
