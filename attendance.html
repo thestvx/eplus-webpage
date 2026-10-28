@@ -959,7 +959,8 @@ main{flex:1;position:relative;overflow:hidden}
             b.innerHTML = 'تم تسجيل حضورك لليوم';
             b.disabled = true;
             b.style.background = '#e5e7eb'; b.style.color = '#6b7280'; b.style.cursor = 'not-allowed';
-            showScanOverlay('orange', 'i', 'تم التسجيل مسبقاً اليوم', lcCardLabel(parent), lcCardSub(parent, 'الحصص: ' + (Number(parent.sessions_used) || 0) + ' / ' + (Number(parent.sessions_total) || 0)), 3000, resetScannerSoon);
+            try { var cac=await lcFetch(LC_URL + '/rest/v1/language_attendance?card_id=eq.' + encodeURIComponent(parent.id) + '&language=eq.' + encodeURIComponent(courseName) + '&cancelled=eq.false&select=count', { headers: { 'Accept': 'application/json' } }); var pc=Array.isArray(cac)&&cac[0]&&cac[0].count?Number(cac[0].count):1; card._attCount=card._attCount||{}; card._attCount[courseName]=pc; } catch(e){}
+            showScanOverlay('orange', 'i', 'تم التسجيل مسبقاً اليوم', lcCardLabel(parent), lcCardSub(parent, 'الدورة: ' + courseName + ' | حصص هذه الدورة: ' + (card._attCount&&card._attCount[courseName]?card._attCount[courseName]:1)), 3000, function(){ document.getElementById('view-kiosk').classList.remove('active'); document.getElementById('view-teachers').classList.add('active'); processing = false; scanner.setBusy(false); try { showLanguageCardPanel(card); } catch(e){} renderReady(); });
             return;
           }
         } catch(e) { logScanner('att check error: ' + e.message); }
