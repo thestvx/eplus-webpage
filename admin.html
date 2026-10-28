@@ -31471,30 +31471,24 @@ window.lcActivateCard = async function() {
   if (!lcScannedCard) return;
   const studentName = String((document.getElementById('lc-fill-student-name') || {}).value || '').trim();
   if (!studentName) { srShowToast('أدخل اسم ولقب الطالب', 'error'); return; }
-  const amountRaw = String((document.getElementById('lc-fill-amount') || {}).value || '').trim();
-  const amountPaid = amountRaw === '' ? 0 : Number(amountRaw);
-  if (!isFinite(amountPaid) || amountPaid < 0) { srShowToast('أدخل مبلغاً صحيحاً', 'error'); return; }
-  const activatedAt = lcDateToISO((document.getElementById('lc-fill-date') || {}).value || '');
-  const sessions = parseInt((document.getElementById('lc-fill-sessions') || {}).value, 10);
-  if (!(sessions > 0)) { srShowToast('عدد الحصص يجب أن يكون أكبر من 0', 'error'); return; }
   const blocks = Array.from(document.querySelectorAll('#lc-fill-courses .lc-course-block'));
   if (!blocks.length) { srShowToast('أضف دورة لغة واحدة على الأقل', 'error'); return; }
   const courses = [];
   for (const b of blocks) {
     const lang = String((b.querySelector('.lc-course-lang') || {}).value || '').trim();
     const sessRaw = String((b.querySelector('.lc-course-sessions') || {}).value || '').trim();
-    const sessions = parseInt(sessRaw, 10);
+    const sess = parseInt(sessRaw, 10);
     const teacherSel = b.querySelector('.lc-course-teacher');
     const teacherOpt = teacherSel && teacherSel.selectedIndex >= 0 ? teacherSel.options[teacherSel.selectedIndex] : null;
-    const teacherName = teacherOpt ? String(teacherOpt.getAttribute('data-name') || '').trim() : '';
+    const tName = teacherOpt ? String(teacherOpt.getAttribute('data-name') || '').trim() : '';
     const teacherId = teacherOpt ? String(teacherOpt.value || '') : '';
     const amountRaw = String((b.querySelector('.lc-course-amount') || {}).value || '').trim();
     const amount = amountRaw === '' ? 0 : Number(amountRaw);
     const date = lcDateToISO(String((b.querySelector('.lc-course-date') || {}).value || '').trim());
-    if (!teacherName) { srShowToast('اختر الأستاذ لكل دورة', 'error'); return; }
-    if (!(sessions > 0)) { srShowToast('عدد الحصص يجب أن يكون أكبر من 0', 'error'); return; }
+    if (!tName) { srShowToast('اختر الأستاذ لكل دورة', 'error'); return; }
+    if (!(sess > 0)) { srShowToast('عدد الحصص يجب أن يكون أكبر من 0', 'error'); return; }
     if (!isFinite(amount) || amount < 0) { srShowToast('أدخل مبلغاً صحيحاً', 'error'); return; }
-    courses.push({ language: lang, sessions: sessions, teacher_id: teacherId, teacher_name: teacherName, amount: amount, activated_at: date });
+    courses.push({ language: lang, sessions: sess, teacher_id: teacherId, teacher_name: tName, amount: amount, activated_at: date });
   }
   const language = courses.map(function(c){ return c.language; }).filter(Boolean).join(', ');
   const teacherName = courses.map(function(c){ return c.teacher_name; }).filter(Boolean).join(', ');
