@@ -3912,7 +3912,14 @@
                 <div id="lc-card-summary" class="lc-summary"></div>
                 <div class="lc-form">
                   <div class="full"><label>اسم ولقب الطالب</label><input class="inp" id="lc-fill-student-name" placeholder="مثال: محمد بن علي" style="width:100%;padding:8px 10px" /></div>
-                  <div><label>اللغة</label><select class="inp" id="lc-fill-language" style="width:100%;padding:8px 10px"></select></div>
+                  <div class="full"><label>اللغة (يمكن إضافة عدة لغات)</label>
+                    <div id="lc-fill-lang-rows" style="display:flex;flex-direction:column;gap:6px">
+                      <div style="display:flex;gap:6px;align-items:center">
+                        <select class="inp lc-fill-lang" style="flex:1;padding:8px 10px"></select>
+                        <button type="button" class="tbl-action" onclick="lcAddLanguageRow()" title="إضافة لغة" style="padding:8px 12px;font-weight:900">➕</button>
+                      </div>
+                    </div>
+                  </div>
                   <div><label>عدد الحصص</label><input class="inp" id="lc-fill-sessions" type="number" min="1" step="1" value="4" style="width:100%;padding:8px 10px" /></div>
                   <div><label>الأستاذ</label><select class="inp" id="lc-fill-teacher" style="width:100%;padding:8px 10px"><option value="">— اختر الأستاذ —</option></select></div>
                   <div><label>المبلغ المدفوع (دج)</label><input class="inp" id="lc-fill-amount" type="number" min="0" step="1" value="0" style="width:100%;padding:8px 10px" /></div>
@@ -30956,7 +30963,7 @@ window.langRegPrint = function() {
 const LC_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
 const LC_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
 const LC_TABLE = 'language_cards';
-const LC_LANGS = ['الإنجليزية','الفرنسية','الألمانية','الإسبانية'];
+const LC_LANGS = ['الإنجليزية','الفرنسية','الإسبانية','الألمانية','الإيطالية','التركية'];
 
 let lcAllData = [], lcFilteredData = [];
 let lcPage = 1, lcPageSize = 20;
@@ -31102,6 +31109,9 @@ window.lcRenderTable = function() {
       } else if (st === 'active') {
         actions += '<button class="tbl-action" onclick="lcUseSession(\'' + r.id + '\')" style="padding:5px 10px;font-size:11px;border-color:rgba(99,102,241,.3);color:#4f46e5;font-weight:800">➕ حصة</button> ';
         actions += '<button class="tbl-action" onclick="lcFinishCard(\'' + r.id + '\')" style="padding:5px 10px;font-size:11px">⏹ إنهاء</button> ';
+      }
+      if (st !== 'printed') {
+        actions += '<button class="tbl-action" onclick="lcPrintReceiptById(\'' + r.id + '\')" style="padding:5px 10px;font-size:11px;border-color:rgba(16,185,129,.3);color:#059669;font-weight:800">🖨️ طباعة الوصل</button> ';
       }
       actions += '<button class="tbl-action del" onclick="lcDeleteCard(\'' + r.id + '\')" style="padding:5px 10px;font-size:11px">🗑️</button>';
       return '<tr>'
@@ -31359,12 +31369,15 @@ async function lcShowFillStep2(card) {
       + '<span style="font-size:11px;color:var(--text-muted)" dir="ltr">' + lcEsc(card.barcode_value || '') + '</span>'
       + '<span class="lc-pill printed">🟡 جاهزة للتعبئة</span>';
   }
-  const langSel = document.getElementById('lc-fill-language');
-  if (langSel) {
-    const cur = card.language || '';
-    langSel.innerHTML = '<option value="">— اختر اللغة —</option>' + LC_LANGS.map(function(l) {
-      return '<option value="' + l + '"' + (cur === l ? ' selected' : '') + '>' + l + '</option>';
-    }).join('');
+  const langRows = document.getElementById('lc-fill-lang-rows');
+  if (langRows) {
+    const langs = String(card.language || '').split(',').map(function(x){ return x.trim(); }).filter(Boolean);
+    const first = langs.length ? langs[0] : '';
+    langRows.innerHTML = '<div style="display:flex;gap:6px;align-items:center">'
+      + '<select class="inp lc-fill-lang" style="flex:1;padding:8px 10px">' + lcLangSelectHtml(first) + '</select>'
+      + '<button type="button" class="tbl-action" onclick="lcAddLanguageRow()" title="إضافة لغة" style="padding:8px 12px;font-weight:900">➕</button>'
+      + '</div>';
+    for (let i = 1; i < langs.length; i++) { lcAddLanguageRow(langs[i]); }
   }
   const studentName = document.getElementById('lc-fill-student-name');
   if (studentName) studentName.value = card.student_name || '';
@@ -31381,6 +31394,20 @@ async function lcShowFillStep2(card) {
   await lcEnsureTeachers();
 }
 
+function lcLangSelectHtml(selected) {
+  return '<option value="">— اختر اللغة —</option>' + LC_LANGS.map(function(l) {
+    return '<option value="' + lcEsc(l) + '"' + (selected === l ? ' selected' : '') + '>' + lcEsc(l) + '</option>';
+  }).join('');
+}
+window.lcAddLanguageRow = function(selected) {
+  const container = document.getElementById('lc-fill-lang-rows');
+  if (!container) return;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:6px;align-items:center';
+  row.innerHTML = '<select class="inp lc-fill-lang" style="flex:1;padding:8px 10px">' + lcLangSelectHtml(selected || '') + '</select>'
+    + '<button type="button" class="tbl-action" onclick="this.parentElement.remove()" title="حذف" style="padding:8px 12px;font-weight:900;color:#dc2626">➖</button>';
+  container.appendChild(row);
+};
 async function lcEnsureTeachers() {
   if (lcTeachersCache) { lcFillTeacherList(); return; }
   try { lcTeachersCache = await SubjectService.getActiveTeachers(); }
@@ -31420,7 +31447,8 @@ window.lcActivateCard = async function() {
   const teacherName = teacherOpt ? String(teacherOpt.getAttribute('data-name') || '').trim() : '';
   if (!teacherName) { srShowToast('اختر الأستاذ', 'error'); return; }
   const teacherId = teacherOpt ? String(teacherOpt.value || '') : '';
-  const language = (document.getElementById('lc-fill-language') || {}).value || '';
+  const langVals = Array.from(document.querySelectorAll('.lc-fill-lang')).map(function(s){ return String(s.value || '').trim(); }).filter(Boolean);
+  const language = langVals.join(', ');
   const notes = String((document.getElementById('lc-fill-notes') || {}).value || '').trim();
   const btn = document.getElementById('lc-activate-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري التفعيل...'; }
@@ -31449,8 +31477,19 @@ window.lcActivateCard = async function() {
       throw new Error('HTTP ' + res.status + (txt ? ' — ' + txt.slice(0, 140) : ''));
     }
     srShowToast('✅ تم تفعيل البطاقة ' + lcScannedCard.id + ' — ' + sessions + ' حصة');
+    const receiptCard = {
+      id: lcScannedCard.id,
+      student_name: studentName,
+      language: language,
+      teacher_name: teacherName,
+      sessions_total: sessions,
+      amount_paid: amountPaid,
+      activated_at: activatedAt
+    };
+    const wantReceipt = await cmConfirm('طباعة الوصل', 'تم تفعيل البطاقة بنجاح.<br>هل تريد طباعة الوصل الآن؟', '🖨️', { confirmText: 'طباعة', cancelText: 'لاحقاً', success: true });
     lcCloseFill();
     lcLoadData();
+    if (wantReceipt) { lcPrintCardReceipt(receiptCard); }
   } catch(e) {
     const msg = /amount_paid/i.test(String(e.message || ''))
       ? 'عمود المبلغ غير موجود — نفّذ ملف الهجرة 20261027120000_language_cards_payments_attendance.sql أولاً'
@@ -31460,6 +31499,65 @@ window.lcActivateCard = async function() {
     if (btn) { btn.disabled = false; btn.textContent = '✅ تفعيل البطاقة'; }
   }
 };
+
+window.lcPrintCardReceipt = async function(card) {
+  if (!card) return;
+  try {
+    const activated = card.activated_at ? String(card.activated_at).slice(0, 10) : lcTodayISO();
+    const items = [];
+    items.push({ label: 'رقم البطاقة', value: card.id, key: 'cardId', fs: 3.0 });
+    if (card.student_name) items.push({ label: 'الطالب', value: card.student_name, key: 'studentName', fs: 3.6 });
+    if (card.language) items.push({ label: 'اللغة', value: card.language, key: 'language', fs: 3.0 });
+    if (card.teacher_name) items.push({ label: 'الأستاذ', value: card.teacher_name, key: 'teacherName', fs: 3.0 });
+    if (card.sessions_total) items.push({ label: 'عدد الحصص', value: String(card.sessions_total), key: 'sessions', fs: 3.0 });
+    items.push({ label: 'تاريخ التفعيل', value: activated, key: 'activatedAt', fs: 3.0 });
+    const base = await ReceiptCalib.getTemplate();
+    const t = lcThermalTemplate(base, items);
+    const rec = {};
+    items.forEach(function(it){ rec[it.key] = it.value; });
+    const amount = Math.max(0, Number(card.amount_paid) || 0);
+    rec.amount = String(amount);
+    rec.amountWords = amount > 0 ? prwNumWords(amount) + ' دينار جزائري' : '';
+    rec.date = new Date().toLocaleDateString('ar-DZ', { year: 'numeric', month: 'long', day: 'numeric' });
+    rec.centerName = t.centerName;
+    rec.receiptTitle = t.receiptTitle;
+    rec.footerText = PRW_FOOTER_THERMAL;
+    if (!ReceiptCalib.printThermal(t, rec)) {
+      srShowToast('تعذّر فتح نافذة الطباعة (مانع النوافذ المنبثقة)', 'error');
+    }
+  } catch (e) {
+    console.error('[LANG-CARDS] print receipt error:', e);
+    srShowToast('فشل طباعة الوصل: ' + e.message, 'error');
+  }
+};
+window.lcPrintReceiptById = function(id) {
+  const r = lcAllData.find(function(x){ return x.id === id; });
+  if (!r) return;
+  lcPrintCardReceipt(r);
+};
+function lcThermalTemplate(base, items) {
+  const t = ReceiptCalib.normalize(base || ReceiptCalib.loadLocal());
+  const blocks = [];
+  const push = function(b){ blocks.push(b); };
+  push({ key: 'logo', type: 'logo', hide: false, spacingTop: 0 });
+  push({ key: 'centerName', type: 'title', hide: false, fs: 4.6, bold: true, align: 'center', indent: 0, spacingTop: 1, lh: 1.3 });
+  push({ key: 'receiptTitle', type: 'title', hide: false, fs: 3.7, bold: true, align: 'center', indent: 0, spacingTop: 0.5, lh: 1.3 });
+  push({ key: 'div1', type: 'divider', hide: false, thick: 0.5, dash: false, spacingTop: 1 });
+  items.forEach(function(it) {
+    push({ key: it.key, type: 'text', label: it.label, hide: false, fs: it.fs || 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true });
+  });
+  push({ key: 'div2', type: 'divider', hide: false, thick: 0.5, dash: false, spacingTop: 1 });
+  push({ key: 'amount', type: 'text', label: 'المبلغ', hide: false, fs: 4.6, valueBold: true, align: 'center', indent: 0, spacingTop: 1.4, lh: 1.2, showLabel: false, curOffset: 0.6 });
+  push({ key: 'amountWords', type: 'text', label: '', hide: false, fs: 2.8, valueBold: true, align: 'center', indent: 0, spacingTop: 0.3, lh: 1.6, showLabel: false });
+  push({ key: 'date', type: 'text', label: 'تاريخ الإصدار', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true });
+  push({ key: 'div3', type: 'divider', hide: false, thick: 0.5, dash: false, spacingTop: 1.2 });
+  push({ key: 'signature', type: 'signature', hide: false, fs: 2.8, spacingTop: 2, bold: true });
+  push({ key: 'footer', type: 'footer', hide: false, fs: 2.6, spacingTop: 1.3, lh: 1.6, align: 'center', spacingBottom: 3, bold: true });
+  t.blocks = blocks;
+  t.deleted = ['studentId', 'studentLevel', 'subject', 'teacher', 'months', 'period', 'status', 'table', 'div4', 'div5', 'barcode'];
+  t.receiptTitle = 'وصل اشتراك دورة لغات';
+  return t;
+}
 
 window.lcUseSession = async function(id) {
   const r = lcAllData.find(function(x){ return x.id === id; });
