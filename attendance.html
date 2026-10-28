@@ -979,6 +979,25 @@ main{flex:1;position:relative;overflow:hidden}
         (rows2 || []).forEach(function(r){ attended[r.card_id] = true; });
       }
     } catch (e) { logScanner("lc att fetch error: " + e.message); }
+    var displayCards = [];
+    cards.forEach(function(c) {
+      var courses = null;
+      if (c.notes) { try { courses = JSON.parse(String(c.notes).split("\n").pop()); } catch(e){} }
+      if (Array.isArray(courses) && courses.length > 1) {
+        courses.forEach(function(course) {
+          displayCards.push(Object.assign({}, c, {
+            language: course.language || c.language,
+            teacher_name: course.teacher_name || c.teacher_name,
+            sessions_total: Number(course.sessions) || c.sessions_total,
+            _parent: c
+          }));
+        });
+      } else {
+        displayCards.push(c);
+      }
+    });
+    if (!displayCards.length) displayCards = cards;
+
     var headerHtml = "<div class=\"ts-header\">"
       + "<div class=\"ts-student-avatar\"><img src=\"icons/student.png\" alt=\"student\"></div>"
       + "<div class=\"ts-student-name\">" + esc(name) + "</div>"
@@ -988,13 +1007,13 @@ main{flex:1;position:relative;overflow:hidden}
       + "</div>";
     $("student-panel").innerHTML = "<button class=\"ts-back\" id=\"ts-back-btn\">x</button>" + headerHtml;
     var html = "<div class=\"ts-grid\" id=\"tc-grid\">";
-    for (var i = 0; i < cards.length; i++) {
-      var c = cards[i];
+    for (var i = 0; i < displayCards.length; i++) {
+      var c = displayCards[i];
       var tot = Number(c.sessions_total) || 0;
       var usd = Number(c.sessions_used) || 0;
       var remaining = Math.max(0, tot - usd);
       var pct = tot > 0 ? Math.min(100, Math.round((usd / tot) * 100)) : 0;
-      var already = !!attended[c.id];
+      var pid = (c._parent && c._parent.id) ? c._parent.id : c.id; var already = !!attended[pid];
       var active = c.status === "active";
       html += "<div class=\"tc-card\" data-idx=\"" + i + "\">";
       html += "<div class=\"tc-top\">";
@@ -1034,7 +1053,7 @@ main{flex:1;position:relative;overflow:hidden}
         b.classList.add("loading");
         b.innerHTML = "<span class=\"spin\"></span>جاري التسجيل...";
         var c = cards.find(function(x){ return x.id === cid; });
-        await recordLanguageCardAttendance(c || card);
+        await recordLanguageCardAttendance((c && c._parent) ? c._parent : (c || card));
         $("view-teachers").classList.remove("active");
         $("view-kiosk").classList.add("active");
         processing = false; scanner.setBusy(false);
