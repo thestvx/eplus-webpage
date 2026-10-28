@@ -3940,7 +3940,10 @@
             </div>
             <div class="teacher-modal-body">
               <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-                <input class="inp" id="lc-attlog-search" placeholder="بحث بالاسم / الدورة..." style="width:220px;padding:8px 12px" oninput="lcRenderAttLog()" />
+                <input class="inp" id="lc-attlog-search" placeholder="بحث بالاسم..." style="width:200px;padding:8px 12px" oninput="lcRenderAttLog()" />
+                <select class="inp" id="lc-attlog-course" style="width:180px;padding:8px 12px" onchange="lcRenderAttLog()">
+                  <option value="">كل الدورات</option>
+                </select>
                 <input class="inp" id="lc-attlog-date" type="date" style="width:160px;padding:8px 12px" onchange="lcRenderAttLog()" />
                 <button class="tbl-action" onclick="lcLoadAttLog()" style="padding:8px 12px;font-size:12px">🔄 تحديث</button>
               </div>
@@ -30989,7 +30992,8 @@ const LC_LANGS = ['الإنجليزية','الفرنسية','الإسبانية'
 const LC_COURSE_LIST = [
   { name: 'دورة اللغة الإسبانية', teacher: 'الأستاذة كرام وجدان' },
   { name: 'دورة اللغة الانجليزية', teacher: 'الأستاذ كرام الصادق' },
-  { name: 'دورة الاقتصاد والقانون', teacher: 'الأستاذ سرهود عبد الرحمان' }
+  { name: 'دورة الاقتصاد والقانون', teacher: 'الأستاذ سرهود عبد الرحمان' },
+  { name: 'دورة الفلسفة', teacher: 'الأستاذة دادة نجاح سلام' }
 ];
 
 let lcAllData = [], lcFilteredData = [];
@@ -31842,6 +31846,10 @@ window.lcSaveEdit = async function() {
 
 let lcAttLogData = [];
 window.lcOpenAttLog = async function() {
+  const sel = document.getElementById('lc-attlog-course');
+  if (sel && sel.options.length <= 1) {
+    sel.innerHTML = '<option value="">كل الدورات</option>' + LC_COURSE_LIST.map(function(c){ return '<option value="' + lcEsc(c.name) + '">' + lcEsc(c.name) + '</option>'; }).join('');
+  }
   document.getElementById('lc-attlog-modal').classList.add('open');
   await lcLoadAttLog();
 };
@@ -31856,9 +31864,11 @@ window.lcRenderAttLog = function() {
   const tbody = document.getElementById('lc-attlog-tbody');
   if (!tbody) return;
   const q = String((document.getElementById('lc-attlog-search') || {}).value || '').trim().toLowerCase();
+  const course = String((document.getElementById('lc-attlog-course') || {}).value || '').trim();
   const d = String((document.getElementById('lc-attlog-date') || {}).value || '').trim();
   let rows = lcAttLogData || [];
   if (q) rows = rows.filter(function(r){ return String(r.student_name||'').toLowerCase().includes(q) || String(r.language||'').toLowerCase().includes(q); });
+  if (course) rows = rows.filter(function(r){ return String(r.language||'') === course; });
   if (d) rows = rows.filter(function(r){ return String(r.date||'').slice(0,10) === d; });
   tbody.innerHTML = rows.length === 0
     ? '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">لا توجد سجلات</td></tr>'
