@@ -342,7 +342,7 @@ function onLevelChange() {
   const sel = byId('sLevel');
   sLevel = sel ? sel.value : null;
   if (sLevel) {
-    sInstitutionVal = null; sStream = null;
+    sInstitutionVal = null; sStream = null; sSubjects = [];
     showInstitution();
   } else {
     [byId('s-institution-group'),byId('s-institution-input-group'),
@@ -377,6 +377,8 @@ function onInstitutionChange() {
   byId('s-stream-group')&&(byId('s-stream-group').style.display='none');
   byId('s-subjects-group')&&(byId('s-subjects-group').style.display='none');
   byId('s-submit-btn')&&(byId('s-submit-btn').style.display='none');
+  byId('s-selected-group')&&(byId('s-selected-group').style.display='none');
+  byId('ms-options')&&(byId('ms-options').innerHTML='');
   byId('msLabel')&&(byId('msLabel').textContent='اختر المواد');
   byId('msStrip')&&(byId('msStrip').style.display='none');
   byId('s-selected-group')&&(byId('s-selected-group').style.display='none');
