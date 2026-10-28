@@ -666,6 +666,9 @@ main{flex:1;position:relative;overflow:hidden}
       return;
     }
 
+    showLanguageCardPanel(card);
+    return;
+
     var out = null;
     try { out = await recordLanguageAttendance(card.id); }
     catch (e) {
@@ -886,6 +889,268 @@ main{flex:1;position:relative;overflow:hidden}
       sessions.push(sess);
     }
     return sessions;
+  }
+
+﻿  async function recordLanguageCardAttendance(card) {
+    var name = lcCardLabel(card);
+    var total = Number(card.sessions_total) || 0;
+    var used = Number(card.sessions_used) || 0;
+    var out = null;
+    try { out = await recordLanguageAttendance(card.id); }
+    catch (e) {
+      logScanner('language attendance error: ' + e.message);
+      playSoundIncorrect();
+      showScanOverlay('red', 'âŒ', 'ÙØ´Ù„ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø­Ø¶ÙˆØ±', name, lcCardSub(card, 'Ø®Ø·Ø£: ' + esc(e.message)), 3500, resetScannerSoon);
+      return;
+    }
+
+    if (out && out.code === 'setup_required') {
+      playSoundIncorrect();
+      showScanOverlay('red', 'âš ï¸', 'Ø¥Ø¹Ø¯Ø§Ø¯ Ù†Ø§Ù‚Øµ', name, 'Ù†ÙÙ‘Ø° Ù…Ù„Ù Ù‡Ø¬Ø±Ø© Ø§Ù„Ø­Ø¶ÙˆØ± <b dir="ltr">20261027120000_language_cards_payments_attendance.sql</b> ÙÙŠ Supabase Ø£ÙˆÙ„Ø§Ù‹', 4000, resetScannerSoon);
+      return;
+    }
+    if (out && out.ok && out.code === 'recorded') {
+      playSoundCorrect();
+      attendedCount++; updateCounter();
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#10b981"></span>ØªÙ… ØªØ³Ø¬ÙŠÙ„ Ø­Ø¶ÙˆØ± Ø§Ù„Ù„ØºØ© â€” ' + esc(name);
+      showScanOverlay('green', 'âœ…', 'ØªÙ… ØªØ³Ø¬ÙŠÙ„ Ø­Ø¶ÙˆØ± Ø§Ù„Ù„ØºØ©', name,
+        lcCardSub(card, 'Ø§Ù„Ø­ØµØµ: ' + (Number(out.sessions_used) || 0) + ' / ' + (Number(out.sessions_total) || 0)), 2600, resetScannerSoon);
+      return;
+    }
+    if (out && out.ok && out.code === 'finished') {
+      playSoundCorrect();
+      attendedCount++; updateCounter();
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#10b981"></span>ØªÙ… ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø­Ø¶ÙˆØ± â€” Ø§Ù†ØªÙ‡Øª Ø§Ù„Ø¨Ø·Ø§Ù‚Ø©';
+      showScanOverlay('green', 'ðŸ', 'ØªÙ… Ø§Ù„ØªØ³Ø¬ÙŠÙ„ â€” Ø§Ù†ØªÙ‡Øª Ø§Ù„Ø¨Ø·Ø§Ù‚Ø©', name,
+        lcCardSub(card, 'Ø¢Ø®Ø± Ø­ØµØ© (' + (Number(out.sessions_used) || 0) + ' / ' + (Number(out.sessions_total) || 0) + ') â€” Ø§Ù„Ø¨Ø·Ø§Ù‚Ø© Ù…Ù†ØªÙ‡ÙŠØ© ÙˆØºÙŠØ± Ù‚Ø§Ø¨Ù„Ø© Ù„Ù„ØªØ¬Ø¯ÙŠØ¯'), 3800, resetScannerSoon);
+      return;
+    }
+    if (out && out.code === 'already') {
+      playSoundWarning();
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>ØªÙ… Ø§Ù„ØªØ³Ø¬ÙŠÙ„ Ù…Ø³Ø¨Ù‚Ø§Ù‹ Ø§Ù„ÙŠÙˆÙ… â€” ' + esc(name);
+      showScanOverlay('orange', 'â„¹ï¸', 'ØªÙ… Ø§Ù„ØªØ³Ø¬ÙŠÙ„ Ù…Ø³Ø¨Ù‚Ø§Ù‹ Ø§Ù„ÙŠÙˆÙ…', name,
+        lcCardSub(card, 'Ø§Ù„Ø­ØµØµ: ' + (Number(out.sessions_used) || 0) + ' / ' + (Number(out.sessions_total) || 0)), 3000, resetScannerSoon);
+      return;
+    }
+    if (out && !out.ok && out.code === 'finished') {
+      playSoundWarning();
+      showScanOverlay('red', 'ðŸ', 'Ø§Ù„Ø¨Ø·Ø§Ù‚Ø© Ù…Ù†ØªÙ‡ÙŠØ©', name, lcCardSub(card, 'Ø§Ø³ØªÙÙ‡Ù„ÙƒØª Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø­ØµØµ â€” ØºÙŠØ± Ù‚Ø§Ø¨Ù„Ø© Ù„Ù„ØªØ¬Ø¯ÙŠØ¯'), 3500, resetScannerSoon);
+      return;
+    }
+    if (out && out.code === 'not_active') {
+      playSoundWarning();
+      showScanOverlay('orange', 'ðŸ’³', 'Ø§Ù„Ø¨Ø·Ø§Ù‚Ø© ØºÙŠØ± Ù…ÙØ¹Ù‘Ù„Ø©', name, lcCardSub(card, 'ÙØ¹Ù‘Ù„ Ø§Ù„Ø¨Ø·Ø§Ù‚Ø© Ù…Ù† Ù„ÙˆØ­Ø© Ø§Ù„Ø¥Ø¯Ø§Ø±Ø© Ø£ÙˆÙ„Ø§Ù‹'), 3000, resetScannerSoon);
+      return;
+    }
+    if (out && out.code === 'no_sessions') {
+      playSoundWarning();
+      showScanOverlay('orange', 'âš ï¸', 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ø­ØµØµ', name, lcCardSub(card, 'Ø¹Ø¯Ø¯ Ø§Ù„Ø­ØµØµ ØºÙŠØ± Ù…Ø­Ø¯Ø¯ Ù„Ù‡Ø°Ù‡ Ø§Ù„Ø¨Ø·Ø§Ù‚Ø©'), 3000, resetScannerSoon);
+      return;
+    }
+    playSoundIncorrect();
+    showScanOverlay('red', 'âŒ', 'ØªØ¹Ø°Ø± ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø­Ø¶ÙˆØ±', name, lcCardSub(card, 'Ø¨Ø·Ø§Ù‚Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø© Ø£Ùˆ ØºÙŠØ± ØµØ§Ù„Ø­Ø©'), 3000, resetScannerSoon);
+  }
+
+  // â”€â”€ Scan handler â”€â”€
+  async function handleScan(val) {
+    if (processing) return;
+    processing = true;
+    scanner.setBusy(true);
+    $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>Ø¬Ø§Ø±ÙŠ Ø§Ù„ØªØ­Ù‚Ù‚...';
+    var raw = String(val || '').trim();
+
+    // 0. Language course card (EAN-13 '201' or 5-digit card ID)
+    var lcRes = null;
+    try { lcRes = await lookupLanguageCard(raw); } catch (e) { logScanner('lookupLanguageCard error: ' + e.message); }
+    if (lcRes && lcRes.card) { await handleLanguageCardScan(lcRes.card); return; }
+    if (lcRes && lcRes.parsed && lcRes.parsed.isBarcode) {
+      $('k-last-read').textContent = raw;
+      playSoundIncorrect();
+      if (lcRes.missing) {
+        showScanOverlay('red', 'âš ï¸', 'Ø¥Ø¹Ø¯Ø§Ø¯ Ù†Ø§Ù‚Øµ', raw, 'Ø¬Ø¯ÙˆÙ„ Ø¨Ø·Ø§Ù‚Ø§Øª Ø§Ù„Ù„ØºØ© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯ â€” Ù†ÙÙ‘Ø° Ù…Ù„Ù Ø§Ù„Ù‡Ø¬Ø±Ø© ÙÙŠ Supabase Ø£ÙˆÙ„Ø§Ù‹', 3500, resetScannerSoon);
+      } else if (lcRes.error) {
+        showScanOverlay('red', 'âŒ', 'ØªØ¹Ø°Ø± Ù‚Ø±Ø§Ø¡Ø© Ø¨Ø·Ø§Ù‚Ø© Ø§Ù„Ù„ØºØ©', raw, esc(lcRes.error), 3000, resetScannerSoon);
+      } else {
+        showScanOverlay('red', 'âŒ', 'Ø¨Ø·Ø§Ù‚Ø© Ù„ØºØ© ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙØ©', raw, 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¨Ø·Ø§Ù‚Ø© Ø¯ÙˆØ±Ø§Øª Ù„ØºØ§Øª Ø¨Ù‡Ø°Ø§ Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯', 3000, resetScannerSoon);
+      }
+      return;
+    }
+
+    // 1. Resolve student ID from barcode
+    var scanResult = null;
+    try { scanResult = await AttendanceService.resolveStudentFromScan(raw); } catch (e) { logScanner('resolveStudentFromScan error: ' + e.message); }
+    var studentId = scanResult && scanResult.student ? scanResult.student.id : null;
+    if (!studentId) {
+      $('k-last-read').textContent = raw;
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#ef4444"></span>Ø¨Ø·Ø§Ù‚Ø© ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙØ©';
+      logScanner('REJECT unknown card: ' + raw);
+      showScanOverlay('red', 'âŒ', 'Ø¨Ø·Ø§Ù‚Ø© ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙØ©', raw, 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ø·Ø§Ù„Ø¨ Ù…Ø±ØªØ¨Ø· Ø¨Ù‡Ø°Ù‡ Ø§Ù„Ø¨Ø·Ø§Ù‚Ø©', 2500, function() { processing = false; scanner.setBusy(false); setTimeout(renderReady, 300); });
+      playSoundIncorrect();
+      return;
+    }
+    logScanner('resolveStudent: id=' + studentId + ' raw=' + raw);
+
+    // 2. Fetch registration
+    var reg = null;
+    try { reg = await RegistrationService.getById(studentId); } catch (e) { logScanner('getById error: ' + e.message); }
+    if (!reg) {
+      $('k-last-read').textContent = studentId;
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#ef4444"></span>Ø·Ø§Ù„Ø¨ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯';
+      logScanner('REJECT student not found: ' + studentId);
+      showScanOverlay('red', 'âŒ', 'Ø·Ø§Ù„Ø¨ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯', studentId, 'Ù„Ù… ÙŠØªÙ… Ø§Ù„Ø¹Ø«ÙˆØ± Ø¹Ù„Ù‰ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø·Ø§Ù„Ø¨', 2500, function() { processing = false; scanner.setBusy(false); setTimeout(renderReady, 300); });
+      playSoundIncorrect();
+      return;
+    }
+    var name = studentFullName(reg);
+    $('k-last-read').textContent = studentId + ' â€” ' + name;
+    logScanner('student: ' + name + ' (id=' + studentId + ', status=' + reg.status + ')');
+
+    // 3. Check registration status
+    if (reg.status !== 'Ù…Ø³Ø¬Ù„ Ù†Ù‡Ø§Ø¦ÙŠØ§Ù‹') {
+      $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>Ø­Ø§Ù„Ø© ØºÙŠØ± Ù…Ù‚Ø¨ÙˆÙ„Ø© â€” ' + name;
+      logScanner('REJECT status: ' + reg.status);
+      showScanOverlay('red', 'âš ï¸', 'Ø§Ù„Ø­Ø§Ù„Ø©: ' + reg.status, name, 'Ø§Ù„Ø·Ø§Ù„Ø¨ ØºÙŠØ± Ù…Ø³Ø¬Ù„ Ù†Ù‡Ø§Ø¦ÙŠØ§Ù‹', 3000, function() { processing = false; scanner.setBusy(false); setTimeout(renderReady, 300); });
+      playSoundIncorrect();
+      return;
+    }
+
+    // 4. Show teacher selection
+    showTeacherSelection(reg, raw, studentId, name);
+  }
+
+  // Ø±Ù‚Ù… Â«Ù…ØªØ¨Ù‚ÙŠÂ» Ø·Ø¨ÙŠØ¹ÙŠ Ø§Ù„Ø«Ø§Ø¨Øª Ù„ÙƒÙ„ Ø·Ø§Ù„Ø¨ (Ù„Ø§ ÙŠØ³ØªÙ†ÙØ° â€” Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ Ø§Ù„Ø¯Ø§Ø¦Ù… Ù„Ø§ ÙŠØªÙˆÙ‚Ù Ø£Ø¨Ø¯Ø§Ù‹)
+  function permRemainingSeed(str) {
+    var h = 0;
+    for (var i = 0; i < str.length; i++) { h = (h * 31 + (str.charCodeAt(i) || 0)) >>> 0; }
+    return 8 + (h % 8);
+  }
+
+  var pendingReg = null, pendingBarcode = null, pendingStudentId = null, pendingName = null;
+
+  // â”€â”€ Fetch student sessions (subscription + attendance per teacher/subject) â”€â”€
+  async function fetchStudentSessions(studentId, subjects) {
+    var sessions = [];
+    var seen = {};
+    var today = AttendanceService.today();
+    await loadTeacherIdMap();
+    var atc = await checkAttendanceControl();
+    var openMap = atc.openMap, openIdMap = atc.openIdMap, openNameMap = atc.openNameMap;
+    var subsAll = [];
+    try { subsAll = (await SubscriptionService.getSubscriptions(studentId)) || []; } catch (e) { logScanner('subs lookup error: ' + e.message); }
+    if (!subsAll.length) {
+      // Ù…Ø­Ø§ÙˆÙ„Ø© Ø«Ø§Ù†ÙŠØ© Ø¹Ù†Ø¯ ÙØ´Ù„ RPC Ø¹Ø§Ø¨Ø± â€” Ù„Ø§ Ù†Ø¹Ø±Ø¶ Â«Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ø§Ø´ØªØ±Ø§ÙƒÂ» Ù„Ø·Ø§Ù„Ø¨ Ù…Ø´ØªØ±Ùƒ.
+      try { subsAll = (await SubscriptionService.getSubscriptions(studentId)) || []; } catch (e) { logScanner('subs retry error: ' + e.message); }
+    }
+    for (var i = 0; i < subjects.length; i++) {
+      var s = subjects[i];
+      var key = (s.teacher || '') + '|' + (s.subject || '');
+      if (seen[key]) continue;
+      seen[key] = true;
+      var isOpen = isTeacherOpen(openMap, openIdMap, s.teacher, s.subject, openNameMap);
+      var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, allowed: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length, hasSubscription: false };
+      try {
+        // Ù‚Ø±Ø§Ø± ÙˆØ§Ø­Ø¯ Ù„ÙƒÙ„ Ù…Ø§Ø¯Ø©: ÙŠÙØ­Øµ Â«ÙƒÙ„Â» Ø§Ø´ØªØ±Ø§ÙƒØ§Øª Ø§Ù„Ø·Ø§Ù„Ø¨ (ØµÙÙˆÙ Ù…Ù†ÙØµÙ„Ø© / ØªØ¹Ø¯Ø¯
+        // Ø§Ù„Ø´Ù‡ÙˆØ±) â€” ÙÙ„Ø§ ØªØ¸Ù‡Ø± Ø¨Ø·Ø§Ù‚Ø© Â«Ø§Ù†ØªÙ‡Ù‰ Ø§Ù„Ø§Ø´ØªØ±Ø§ÙƒÂ» Ø¨ÙŠÙ†Ù…Ø§ Ø§Ù„ØªØ³Ø¬ÙŠÙ„ Ù…Ø³Ù…ÙˆØ­ØŒ ÙˆØ§Ù„Ø¹ÙƒØ³.
+        var resolved = SubscriptionService.resolveCheckIn(subsAll, s.subject, s.teacher, today);
+        var subResult = (resolved && resolved.subscription) ? resolved : null;
+        var pick = subResult ? subResult.pick : null;
+        if (subResult) {
+          sess.hasSubscription = true;
+          sess.sub = subResult.subscription;
+          sess.periods = subResult.periods || [];
+          sess.permanent = SubscriptionService.isPermanent(subResult.subscription);
+          if (sess.permanent) {
+            sess.status = 'active';
+            sess.remaining = permRemainingSeed(studentId);
+            try {
+              var pcSnap = await window.db.collection('support_attendance')
+                .where('studentId', '==', studentId)
+                .where('teacherName', '==', s.teacher)
+                .where('subjectName', '==', s.subject).get();
+              var pc = 0;
+              pcSnap.forEach(function (pd) {
+                var pdd = pd.data();
+                if (pdd && !pdd.cancelled && pdd.type !== 'grace' && pdd.type !== 'grace_session') pc++;
+              });
+              sess.attended = pc;
+            } catch (e) { logScanner('perm attended count error: ' + e.message); sess.attended = 0; }
+          } else if (pick && pick.allowed) {
+            sess.status = 'active';
+            sess.attended = pick.attended || 0;
+            sess.remaining = pick.remaining;
+          } else {
+            sess.status = 'expired';
+            sess.attended = pick ? (pick.attended || 0) : 0;
+            sess.remaining = 0;
+          }
+        } else {
+          sess.status = 'expired';
+        }
+      } catch (e) { logScanner('subCheck error for ' + s.teacher + ': ' + e.message); }
+      try {
+        var attSnap = await window.db.collection('support_attendance')
+          .where('studentId', '==', studentId)
+          .where('date', '==', today).get();
+        attSnap.forEach(function (doc) {
+          var d = doc.data();
+          if (d.teacherName === s.teacher && d.subjectName === s.subject && d.type !== 'grace' && d.type !== 'grace_session' && !d.cancelled) {
+            sess.alreadyCheckedIn = true;
+          }
+        });
+      } catch (e) { logScanner('att query error: ' + e.message); }
+      // ÙˆØ¬ÙˆØ¯ Ø§Ø´ØªØ±Ø§Ùƒ (Ù„Ù„Ø­Ø§Ù„Ø§Øª Ø§Ù„ØªÙŠ Ù„Ø§ ÙŠÙØ³Ù…Ø­ ÙÙŠÙ‡Ø§ Ø¨Ø§Ù„Ø­Ø¶ÙˆØ±): Ù„Ø§ ÙŠÙÙ„ØºÙŠ Ù…Ø§ Ø§ÙƒØªØ´ÙÙ‡
+      // resolveCheckIn (Ø§Ù„Ù…Ø·Ø§Ø¨Ù‚Ø© Ù‡Ù†Ø§ Ø£Ø¶ÙŠÙ‚ Ù„Ù„Ø§Ø³Ù…).
+      if (!sess.hasSubscription) {
+        for (var si2 = 0; si2 < subsAll.length; si2++) {
+          var _px = subsAll[si2].subscription || {};
+          if (_px.status === 'cancelled') continue;
+          var _pxSId = _px.subject_id || '', _pxTId = _px.teacher_id || '';
+          var _pxSN = _px.subject_name || '', _pxTN = _px.teacher_name || '';
+          if (_pxSId && _pxSId !== s.subject) { if (!_pxSN || _pxSN !== s.subject) continue; }
+          if (_pxTId && _pxTId !== s.teacher) { if (!_pxTN || _pxTN !== s.teacher) continue; }
+          sess.hasSubscription = true;
+          break;
+        }
+      }
+      sessions.push(sess);
+    }
+    return sessions;
+  }
+  }
+
+  function showLanguageCardPanel(card) {
+    scanner.setBusy(true);
+    var name = lcCardLabel(card);
+    var total = Number(card.sessions_total) || 0;
+    var used = Number(card.sessions_used) || 0;
+    var headerHtml = '<div class="ts-header">'
+      + '<div class="ts-student-avatar"><img src="icons/student.png" alt="student"></div>'
+      + '<div class="ts-student-name">' + esc(name) + '</div>'
+      + '<div class="ts-student-id">Student ID  #' + esc(card.id || '') + '</div>'
+      + '<div class="ts-student-divider"></div>'
+      + '<div class="ts-subtitle">الدورة: ' + esc(card.language || '') + ' — ' + esc(card.teacher_name || '') + '</div>'
+      + '<div class="ts-subtitle">الحصص: ' + used + ' / ' + total + '</div>'
+      + '</div>';
+    student-panel.innerHTML = '<button class="ts-back" id="ts-back-btn">✕ رجوع</button>' + headerHtml;
+    tc-list.innerHTML = '<div class="ts-grid"><div class="tc-card"><div class="tc-info"><div class="tc-teacher">' + esc(card.teacher_name || '') + '</div><div class="tc-subject">' + esc(card.language || '') + '</div></div><button class="tc-btn green" id="lc-att-btn">تسجيل الحضور</button></div></div>';
+    view-kiosk.classList.remove('active');
+    view-teachers.classList.add('active');
+    ts-back-btn.addEventListener('click', function () {
+      view-teachers.classList.remove('active');
+      view-kiosk.classList.add('active');
+      processing = false; scanner.setBusy(false);
+      renderReady();
+    });
+    var btn = lc-att-btn;
+    if (btn) btn.addEventListener('click', async function () {
+      btn.classList.add('loading');
+      btn.innerHTML = '<span class="spin"></span>جاري التسجيل...';
+      await recordLanguageCardAttendance(card);
+      view-teachers.classList.remove('active');
+      view-kiosk.classList.add('active');
+      processing = false; scanner.setBusy(false);
+      renderReady();
+    });
   }
 
   function showTeacherSelection(reg, barcode, studentId, name) {
