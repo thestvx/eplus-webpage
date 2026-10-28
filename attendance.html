@@ -951,40 +951,91 @@ main{flex:1;position:relative;overflow:hidden}
     showScanOverlay('red', 'âŒ', 'ØªØ¹Ø°Ø± ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø­Ø¶ÙˆØ±', name, lcCardSub(card, 'Ø¨Ø·Ø§Ù‚Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø© Ø£Ùˆ ØºÙŠØ± ØµØ§Ù„Ø­Ø©'), 3000, resetScannerSoon);
   }
 
-  function showLanguageCardPanel(card) {
+
+  async function showLanguageCardPanel(card) {
     scanner.setBusy(true);
     var name = lcCardLabel(card);
     var total = Number(card.sessions_total) || 0;
     var used = Number(card.sessions_used) || 0;
+    var today = (function(){ try { return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Algiers' }); } catch(e){ return new Date().toISOString().slice(0,10); } })();
+    var cards = [card];
+    try {
+      var res = await lcFetch(LC_URL + '/rest/v1/' + LC_TABLE + '?select=*&student_name=eq.' + encodeURIComponent(name));
+      if (res.ok) {
+        var rows = await res.json();
+        if (Array.isArray(rows)) {
+          var filtered = rows.filter(function(r){ return !r.deleted_at && r.status !== 'printed'; });
+          if (filtered.length) cards = filtered;
+        }
+      }
+    } catch (e) { logScanner('lc cards fetch error: ' + e.message); }
+
+    var attended = {};
+    try {
+      var ids = cards.map(function(c){ return c.id; });
+      var q = LC_URL + '/rest/v1/language_attendance?select=card_id&date=eq.' + today + '&cancelled=eq.false&card_id=in.(' + ids.map(function(x){ return encodeURIComponent(x); }).join(',') + ')';
+      var r2 = await lcFetch(q);
+      if (r2.ok) {
+        var rows2 = await r2.json();
+        (rows2 || []).forEach(function(r){ attended[r.card_id] = true; });
+      }
+    } catch (e) { logScanner('lc att fetch error: ' + e.message); }
+
     var headerHtml = '<div class="ts-header">'
       + '<div class="ts-student-avatar"><img src="icons/student.png" alt="student"></div>'
       + '<div class="ts-student-name">' + esc(name) + '</div>'
       + '<div class="ts-student-id">Student ID  #' + esc(card.id || '') + '</div>'
       + '<div class="ts-student-divider"></div>'
-      + '<div class="ts-subtitle">الدورة: ' + esc(card.language || '') + ' — ' + esc(card.teacher_name || '') + '</div>'
-      + '<div class="ts-subtitle">الحصص: ' + used + ' / ' + total + '</div>'
-    $('student-panel').innerHTML = '<button class="ts-back" id="ts-back-btn">x</button>' + headerHtml;
-    $('tc-list').innerHTML = 'x';
-    $('view-kiosk').classList.remove('active');
-    $('view-teachers').classList.add('active');
-    $('ts-back-btn').addEventListener('click', function () {
-      view-teachers.classList.remove('active');
-      view-kiosk.classList.add('active');
+      + '<div class="ts-subtitle">الدورات المشتركة</div>'
+      + '</div>';
+    document.getElementById('student-panel').innerHTML = '<button class="ts-back" id="ts-back-btn">x</button>' + headerHtml;
+
+    var html = '<div class="ts-grid" id="tc-grid">';
+    for (var i = 0; i < cards.length; i++) {
+      var c = cards[i];
+      var tot = Number(c.sessions_total) || 0;
+      var usd = Number(c.sessions_used) || 0;
+      var already = !!attended[c.id];
+      html += '<div class="tc-card">';
+      html += '<div class="tc-top"><div class="tc-subject-icon">G</div>';
+      html += '<div class="tc-info"><div class="tc-teacher">' + esc(c.teacher_name || '') + '</div><div class="tc-subject">' + esc(c.language || '') + '</div></div>';
+      html += '<div class="tc-badge">' + usd + ' / ' + tot + '</div></div>';
+      if (already) {
+        html += '<div class="tc-btn" style="background:#e5e7eb;color:#6b7280;cursor:not-allowed">تم تسجيل حضورك لليوم</div>';
+      } else if (c.status === 'active') {
+        html += '<button class="tc-btn green" data-cid="' + esc(c.id) + '">تسجيل الحضور</button>';
+      } else {
+        html += '<div class="tc-btn" style="background:#fee2e2;color:#dc2626;cursor:not-allowed">البطاقة ' + esc(c.status || '') + '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    document.getElementById('tc-list').innerHTML = html;
+
+    document.getElementById('view-kiosk').classList.remove('active');
+    document.getElementById('view-teachers').classList.add('active');
+
+    document.getElementById('ts-back-btn').addEventListener('click', function () {
+      document.getElementById('view-teachers').classList.remove('active');
+      document.getElementById('view-kiosk').classList.add('active');
       processing = false; scanner.setBusy(false);
       renderReady();
     });
-    var btn = $('lc-att-btn');
-    if (btn) btn.addEventListener('click', async function () {
-      btn.classList.add('loading');
-      btn.innerHTML = '<span class="spin"></span>جاري التسجيل...';
-      await recordLanguageCardAttendance(card);
-      view-teachers.classList.remove('active');
-      view-kiosk.classList.add('active');
-      processing = false; scanner.setBusy(false);
-      renderReady();
+
+    document.querySelectorAll('.tc-btn[data-cid]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        var cid = b.getAttribute('data-cid');
+        b.classList.add('loading');
+        b.innerHTML = '<span class="spin"></span>جاري التسجيل...';
+        var c = cards.find(function(x){ return x.id === cid; });
+        await recordLanguageCardAttendance(c || card);
+        document.getElementById('view-teachers').classList.remove('active');
+        document.getElementById('view-kiosk').classList.add('active');
+        processing = false; scanner.setBusy(false);
+        renderReady();
+      });
     });
   }
-
   function showTeacherSelection(reg, barcode, studentId, name) {
     scanner.setBusy(true);
     pendingReg = reg; pendingBarcode = barcode; pendingStudentId = studentId; pendingName = name;
