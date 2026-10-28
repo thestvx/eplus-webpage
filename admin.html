@@ -31505,8 +31505,19 @@ window.lcAddCourseBlock = function(data) {
   const langSel = block.querySelector('.lc-course-lang');
   if (langSel) langSel.innerHTML = lcLangSelectHtml(data.language || '');
   const teacherSel = block.querySelector('.lc-course-teacher');
-  if (teacherSel) teacherSel.innerHTML = lcTeacherOptionsHtml(data.teacher_id || '');
-  if (langSel && data.language) setTimeout(function(){ window.lcOnCourseChange(langSel); }, 0);
+  if (teacherSel) {
+    teacherSel.innerHTML = lcTeacherOptionsHtml(data.teacher_id || '');
+    if (data.teacher_name && !Array.from(teacherSel.options).some(function(o){ return String(o.getAttribute('data-name') || '') === String(data.teacher_name); })) {
+      const opt = document.createElement('option');
+      opt.value = data.teacher_id || data.teacher_name;
+      opt.setAttribute('data-name', data.teacher_name);
+      opt.textContent = data.teacher_name;
+      opt.selected = true;
+      teacherSel.appendChild(opt);
+    } else if (data.teacher_id) {
+      teacherSel.value = data.teacher_id;
+    }
+  }
   window.lcRenumberCourses && window.lcRenumberCourses();
 };
 window.lcRenumberCourses = function() {
@@ -31690,6 +31701,7 @@ window.lcEditCard = async function(id) {
     summary.innerHTML = '🎴 بطاقة رقم <strong dir="ltr">' + lcEsc(r.id) + '</strong>'
       + '<span class="lc-pill ' + (r.status || 'printed') + '">' + lcStatusLabel(r.status || 'printed') + '</span>';
   }
+  await lcEnsureTeachers();
   const coursesBox = document.getElementById('lc-fill-courses');
   if (coursesBox) {
     coursesBox.innerHTML = '';
@@ -31716,7 +31728,6 @@ window.lcEditCard = async function(id) {
       notes.value = lines.length > 1 ? lines.slice(0, -1).join('\n') : '';
     }
   }
-  await lcEnsureTeachers();
   const btn = document.getElementById('lc-activate-btn');
   if (btn) { btn.textContent = '💾 حفظ التعديلات'; btn.onclick = function(){ lcSaveEdit(); }; }
   document.getElementById('lc-fill-modal').classList.add('open');
