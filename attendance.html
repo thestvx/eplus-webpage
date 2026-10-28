@@ -1053,14 +1053,47 @@ main{flex:1;position:relative;overflow:hidden}
         b.classList.add("loading");
         b.innerHTML = "<span class=\"spin\"></span>جاري التسجيل...";
         var c = cards.find(function(x){ return x.id === cid; });
-        await recordLanguageCardAttendance((c && c._parent) ? c._parent : (c || card));
-        $("view-teachers").classList.remove("active");
-        $("view-kiosk").classList.add("active");
-        processing = false; scanner.setBusy(false);
-        renderReady();
+        var parent = (c && c._parent) ? c._parent : (c || card);
+        var courseName = (c && c.language) ? c.language : (parent.language || "");
+        var today2 = (function(){ try { return new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Algiers" }); } catch(e){ return new Date().toISOString().slice(0,10); } })();
+        try {
+          var chk = await lcFetch(LC_URL + "/rest/v1/language_attendance?select=id&card_id=eq." + encodeURIComponent(parent.id) + "&date=eq." + today2 + "&language=eq." + encodeURIComponent(courseName) + "&cancelled=eq.false");
+          var chkRows = chk.ok ? await chk.json() : [];
+          if (Array.isArray(chkRows) && chkRows.length) {
+            b.classList.remove("loading");
+            b.innerHTML = "تم تسجيل حضورك لليوم";
+            b.disabled = true;
+            b.style.background = "#e5e7eb"; b.style.color = "#6b7280"; b.style.cursor = "not-allowed";
+            return;
+          }
+        } catch(e) { logScanner("att check error: " + e.message); }
+        try {
+          await lcFetch(LC_URL + "/rest/v1/language_attendance", {
+            method: "POST",
+            headers: { "Prefer": "return=minimal" },
+            body: JSON.stringify({ card_id: parent.id, student_name: parent.student_name || name, language: courseName, teacher_id: parent.teacher_id || "", teacher_name: (c && c.teacher_name) ? c.teacher_name : (parent.teacher_name || ""), date: today2 })
+          });
+          var newUsed = (Number(parent.sessions_used) || 0) + 1;
+          var newStatus = newUsed >= (Number(parent.sessions_total) || 0) ? "finished" : "active";
+          await lcFetch(LC_URL + "/rest/v1/" + LC_TABLE + "?id=eq." + encodeURIComponent(parent.id), {
+            method: "PATCH",
+            headers: { "Prefer": "return=minimal" },
+            body: JSON.stringify({ sessions_used: newUsed, status: newStatus, updated_at: new Date().toISOString() })
+          });
+          playSoundCorrect();
+          b.classList.remove("loading");
+          b.innerHTML = "✓ تم التسجيل اليوم";
+          b.disabled = true;
+          b.style.background = "#e5e7eb"; b.style.color = "#6b7280"; b.style.cursor = "not-allowed";
+        } catch (e) {
+          logScanner("att record error: " + e.message);
+          playSoundIncorrect();
+          b.classList.remove("loading");
+          b.innerHTML = "تسجيل الحضور";
+        }
+        setTimeout(function(){ showLanguageCardPanel(card); }, 400);
       });
     });
-  }
   function showTeacherSelection(reg, barcode, studentId, name) {
     scanner.setBusy(true);
     pendingReg = reg; pendingBarcode = barcode; pendingStudentId = studentId; pendingName = name;
