@@ -31103,6 +31103,7 @@ window.lcRenderTable = function() {
         ? '<div style="font-weight:800">' + lcEsc(r.student_name) + '</div><div style="font-size:10.5px;color:var(--text-muted)" dir="ltr">' + lcEsc(r.student_id || '') + '</div>'
         : '<span style="color:var(--text-muted)">—</span>';
       let sessions = st === 'printed' ? '—' : (Number(r.sessions_used) || 0) + ' / ' + (Number(r.sessions_total) || 0);
+      let amountCell = (Number(r.amount_paid) > 0 ? '<strong dir=\"ltr\">' + Number(r.amount_paid).toLocaleString('ar-DZ') + '</strong> دج' : '—');
       if (st !== 'printed' && r.notes) {
         try {
           const parsed = JSON.parse(String(r.notes).split('\n').pop());
@@ -31110,7 +31111,8 @@ window.lcRenderTable = function() {
             const names = parsed.map(function(c){ return String(c.language || ''); });
             const allSame = names.every(function(n){ return n === names[0]; });
             if (!allSame) {
-              sessions = parsed.map(function(c){ return (Number(c.sessions) || 0); }).join(' + ') + '  ( ' + (Number(r.sessions_used) || 0) + ' / ' + (Number(r.sessions_total) || 0) + ' )';
+              sessions = parsed.map(function(c){ return '0/' + (Number(c.sessions) || 0); }).join(' ، ');
+              amountCell = parsed.map(function(c){ return (Number(c.amount) || 0).toLocaleString('ar-DZ'); }).join(' + ') + ' دج';
             }
           }
         } catch (e) {}
@@ -31134,7 +31136,7 @@ window.lcRenderTable = function() {
         + '<td>' + (r.language ? lcEsc(r.language) : '—') + '</td>'
         + '<td>' + (r.teacher_name ? lcEsc(r.teacher_name) : '—') + '</td>'
         + '<td><strong>' + sessions + '</strong></td>'
-        + '<td>' + (Number(r.amount_paid) > 0 ? '<strong dir="ltr">' + Number(r.amount_paid).toLocaleString('ar-DZ') + '</strong> دج' : '—') + '</td>'
+        + '<td>' + amountCell + '</td>'
         + '<td><span class="lc-pill ' + st + '">' + lcStatusLabel(st) + '</span></td>'
         + '<td>' + (r.activated_at ? lcFmtDate(r.activated_at) : '—') + '</td>'
         + '<td style="text-align:center;white-space:nowrap">' + actions + '</td>'
