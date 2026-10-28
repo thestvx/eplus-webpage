@@ -2006,7 +2006,7 @@
       </div>
       <div class="nav-item" data-nav="language-subscriptions" onclick="switchNavSection('language-subscriptions')">
         <span class="nav-icon">🎴</span>
-        <span class="nav-label">اشتراكات دورات اللغات</span>
+        <span class="nav-label">اشتراكات الدورات</span>
         <span class="nav-badge" id="nav-badge-lang-cards">0</span>
       </div>
       <div class="nav-section" data-nav-cat="programs">تسجيلات البرامج</div>
@@ -3808,7 +3808,7 @@
         </div>
       </div>
 
-      <!-- ===== SECTION: LANGUAGE COURSE CARD SUBSCRIPTIONS (اشتراكات دورات اللغات) ===== -->
+      <!-- ===== SECTION: LANGUAGE COURSE CARD SUBSCRIPTIONS (اشتراكات الدورات) ===== -->
       <style>
         .lc-hint{font-size:11.5px;color:var(--text-muted);font-weight:700;margin-top:8px;line-height:1.6}
         .lc-scan-box{border:2px dashed rgba(124,58,237,.35);border-radius:16px;padding:26px 20px;text-align:center;background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(124,58,237,.02));transition:all .2s}
@@ -3829,7 +3829,7 @@
         <div class="section-header">
           <div class="section-title">
             <div class="section-icon" style="background:linear-gradient(135deg,rgba(16,185,129,.16),rgba(16,185,129,.04));border-color:rgba(16,185,129,.3)">🎴</div>
-            <span>اشتراكات دورات اللغات</span>
+            <span>اشتراكات الدورات</span>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="tbl-action" onclick="lcOpenFill()" style="border-color:rgba(16,185,129,.35);color:#059669;font-weight:900;padding:9px 18px;font-size:12px">💳 تعبئة بطاقة</button>
@@ -3872,7 +3872,7 @@
               <th style="width:36px">#</th>
               <th>رقم البطاقة</th>
               <th>الطالب</th>
-              <th>اللغة</th>
+               <th>الدورة</th>
               <th>الأستاذ</th>
               <th>الحصص</th>
               <th>المبلغ المدفوع</th>
@@ -6831,7 +6831,7 @@ window.NAV_ITEMS = {
   notifications: { icon: '📨', label: 'مركز الإشعارات' },
   'program-registrations': { icon: '📋', label: 'تسجيلات البرامج' },
   'language-registrations': { icon: '🌍', label: 'تسجيلات دورات اللغات' },
-  'language-subscriptions': { icon: '🎴', label: 'اشتراكات دورات اللغات' },
+  'language-subscriptions': { icon: '🎴', label: 'اشتراكات الدورات' },
 };
 const NAV_FORCED_CATS = ['system', 'languages'];
 const NAV_FORCED_ITEMS = ['settings', 'language-registrations', 'language-subscriptions'];
@@ -28823,8 +28823,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         if (s.length <= 10) return (s || '—');
         try { return new Date(s).toLocaleDateString('ar-DZ', { year: 'numeric', month: 'long', day: 'numeric' }); } catch (e) { return s; }
       };
-      const tpl = await ReceiptCalib.getTemplate();
-      const record = {
+       const tpl = await ReceiptCalib.getTemplate();
+       if (tpl) tpl.widthMm = 78;
+       const record = {
         centerName: tpl.centerName,
         receiptTitle: tpl.receiptTitle,
         footerText: tpl.footerText,
@@ -30947,7 +30948,7 @@ window.langRegPrint = function() {
 })();
 
 // ═══════════════════════════════════════════════════════════
-//  LANGUAGE COURSE CARDS — اشتراكات دورات اللغات (بطاقات + طباعة)
+//  LANGUAGE COURSE CARDS — اشتراكات الدورات (بطاقات + طباعة)
 //  Cards are printed 4 per A4 page with ONLY a barcode + its
 //  5-digit ID. Printing consumes the random IDs and stores the
 //  rows as status='printed'. Scanning/filling a card binds it to
@@ -30958,6 +30959,11 @@ const LC_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
 const LC_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
 const LC_TABLE = 'language_cards';
 const LC_LANGS = ['الإنجليزية','الفرنسية','الإسبانية','الألمانية','الإيطالية','التركية'];
+const LC_COURSE_LIST = [
+  { name: 'دورة اللغة الإسبانية', teacher: 'الأستاذة كرام وجدان' },
+  { name: 'دورة اللغة الانجليزية', teacher: 'الأستاذ كرام الصادق' },
+  { name: 'دورة الاقتصاد والقانون', teacher: 'الأستاذ سرهود عبد الرحمان' }
+];
 
 let lcAllData = [], lcFilteredData = [];
 let lcPage = 1, lcPageSize = 20;
@@ -31107,6 +31113,7 @@ window.lcRenderTable = function() {
       if (st !== 'printed') {
         actions += '<button class="tbl-action" onclick="lcPrintReceiptById(\'' + r.id + '\')" style="padding:5px 10px;font-size:11px;border-color:rgba(16,185,129,.3);color:#059669;font-weight:800">🖨️ طباعة الوصل</button> ';
       }
+      actions += '<button class="tbl-action" onclick="lcEditCard(\'' + r.id + '\')" style="padding:5px 10px;font-size:11px;border-color:rgba(245,158,11,.3);color:#d97706;font-weight:800">✏️ تعديل</button> ';
       actions += '<button class="tbl-action del" onclick="lcDeleteCard(\'' + r.id + '\')" style="padding:5px 10px;font-size:11px">🗑️</button>';
       return '<tr>'
         + '<td style="font-weight:700;color:var(--text-muted)">' + row + '</td>'
@@ -31288,6 +31295,8 @@ window.lcOpenFillWith = function(id) {
 window.lcCloseFill = function() {
   document.getElementById('lc-fill-modal').classList.remove('open');
   lcScannedCard = null;
+  const btn = document.getElementById('lc-activate-btn');
+  if (btn) { btn.textContent = '✅ تفعيل البطاقة'; btn.onclick = function(){ lcActivateCard(); }; }
 };
 
 window.lcFillBack = function() {
@@ -31296,6 +31305,8 @@ window.lcFillBack = function() {
   document.getElementById('lc-fill-step1').style.display = 'block';
   const input = document.getElementById('lc-card-input');
   if (input) { input.disabled = false; input.focus(); }
+  const btn = document.getElementById('lc-activate-btn');
+  if (btn) { btn.textContent = '✅ تفعيل البطاقة'; btn.onclick = function(){ lcActivateCard(); }; }
 };
 
 function lcParseCard(raw) {
@@ -31389,11 +31400,49 @@ async function lcShowFillStep2(card) {
   await lcEnsureTeachers();
 }
 
-function lcLangSelectHtml(selected) {
-  return '<option value="">— اختر اللغة —</option>' + LC_LANGS.map(function(l) {
-    return '<option value="' + lcEsc(l) + '"' + (selected === l ? ' selected' : '') + '>' + lcEsc(l) + '</option>';
+function lcCourseSelectHtml(selected) {
+  return '<option value="">— اختر الدورة —</option>' + LC_COURSE_LIST.map(function(c) {
+    return '<option value="' + lcEsc(c.name) + '"' + (selected === c.name ? ' selected' : '') + '>' + lcEsc(c.name) + '</option>';
   }).join('');
 }
+const lcLangSelectHtml = lcCourseSelectHtml;
+
+function lcTeacherIdByName(name) {
+  const arr = lcTeachersCache || [];
+  const found = arr.find(function(t) {
+    const n = String(t.name || '').trim();
+    return n === name || n.indexOf(name) !== -1 || name.indexOf(n) !== -1;
+  });
+  return found ? String(found.teacherId || found.id || '') : '';
+}
+
+window.lcOnCourseChange = function(sel) {
+  const block = sel && sel.closest ? sel.closest('.lc-course-block') : null;
+  if (!block) return;
+  const course = LC_COURSE_LIST.find(function(c){ return c.name === sel.value; });
+  const teacherSel = block.querySelector('.lc-course-teacher');
+  if (!course || !teacherSel) return;
+  let id = lcTeacherIdByName(course.teacher);
+  if (!Array.from(teacherSel.options).some(function(o){ return String(o.getAttribute('data-name') || '') === course.teacher; })) {
+    const opt = document.createElement('option');
+    opt.value = id || course.teacher;
+    opt.setAttribute('data-name', course.teacher);
+    opt.textContent = course.teacher;
+    teacherSel.appendChild(opt);
+  }
+  teacherSel.value = id || course.teacher;
+};
+
+// attach onchange to course selects after render
+const _lcCourseObserver = new MutationObserver(function() {
+  document.querySelectorAll('.lc-course-lang').forEach(function(s) {
+    if (!s.getAttribute('data-bound')) {
+      s.setAttribute('data-bound', '1');
+      s.addEventListener('change', function(){ window.lcOnCourseChange(s); });
+    }
+  });
+});
+if (document.body) _lcCourseObserver.observe(document.body, { childList: true, subtree: true });
 window.lcAddLanguageRow = function(selected) {
   const container = document.getElementById('lc-fill-lang-rows');
   if (!container) return;
@@ -31442,7 +31491,7 @@ window.lcAddCourseBlock = function(data) {
   const n = container.children.length + 1;
   block.innerHTML = ''
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
-    + '<strong style="font-size:12px;color:var(--text)">دورة لغة #' + n + '</strong>'
+    + '<strong style=\"font-size:12px;color:var(--text)\">دورة #' + n + '</strong>'
     + '<button type="button" class="tbl-action del" onclick="this.closest(\'.lc-course-block\').remove(); window.lcRenumberCourses && window.lcRenumberCourses();" style="padding:4px 10px;font-size:11px">✕ حذف</button>'
     + '</div>'
     + '<div class="lc-form">'
@@ -31457,13 +31506,14 @@ window.lcAddCourseBlock = function(data) {
   if (langSel) langSel.innerHTML = lcLangSelectHtml(data.language || '');
   const teacherSel = block.querySelector('.lc-course-teacher');
   if (teacherSel) teacherSel.innerHTML = lcTeacherOptionsHtml(data.teacher_id || '');
+  if (langSel && data.language) setTimeout(function(){ window.lcOnCourseChange(langSel); }, 0);
   window.lcRenumberCourses && window.lcRenumberCourses();
 };
 window.lcRenumberCourses = function() {
   const blocks = document.querySelectorAll('#lc-fill-courses .lc-course-block');
   blocks.forEach(function(b, i) {
     const title = b.querySelector('strong');
-    if (title) title.textContent = 'دورة لغة #' + (i + 1);
+    if (title) title.textContent = 'دورة #' + (i + 1);
   });
 };
 
@@ -31624,9 +31674,119 @@ function lcThermalTemplate(base, items) {
   push({ key: 'footer', type: 'footer', hide: false, fs: 2.6, spacingTop: 1.3, lh: 1.6, align: 'center', spacingBottom: 3, bold: true });
   t.blocks = blocks;
   t.deleted = ['studentId', 'studentLevel', 'subject', 'teacher', 'months', 'period', 'status', 'table', 'div4', 'div5', 'barcode'];
-  t.receiptTitle = 'وصل اشتراك دورة لغات';
+  t.receiptTitle = 'وصل اشتراك دورة';
+  t.widthMm = 78;
   return t;
 }
+
+window.lcEditCard = async function(id) {
+  const r = lcAllData.find(function(x){ return x.id === id; });
+  if (!r) return;
+  lcScannedCard = r;
+  document.getElementById('lc-fill-step1').style.display = 'none';
+  document.getElementById('lc-fill-step2').style.display = 'block';
+  const summary = document.getElementById('lc-card-summary');
+  if (summary) {
+    summary.innerHTML = '🎴 بطاقة رقم <strong dir="ltr">' + lcEsc(r.id) + '</strong>'
+      + '<span class="lc-pill ' + (r.status || 'printed') + '">' + lcStatusLabel(r.status || 'printed') + '</span>';
+  }
+  const coursesBox = document.getElementById('lc-fill-courses');
+  if (coursesBox) {
+    coursesBox.innerHTML = '';
+    let courses = null;
+    if (r.notes) {
+      try {
+        const parsed = JSON.parse(String(r.notes).split('\n').pop());
+        if (Array.isArray(parsed)) courses = parsed;
+      } catch (e) {}
+    }
+    if (!courses) {
+      courses = [{ language: r.language || '', sessions: Number(r.sessions_total) || 4, teacher_id: r.teacher_id || '', teacher_name: r.teacher_name || '', amount: Number(r.amount_paid) || 0, activated_at: r.activated_at || lcTodayISO() }];
+    }
+    courses.forEach(function(c){ lcAddCourseBlock(c); });
+  }
+  const studentName = document.getElementById('lc-fill-student-name');
+  if (studentName) studentName.value = r.student_name || '';
+  const notes = document.getElementById('lc-fill-notes');
+  if (notes) {
+    if (r.notes && !/^\s*\[/.test(String(r.notes).split('\n').pop() || '')) {
+      notes.value = r.notes;
+    } else {
+      const lines = String(r.notes || '').split('\n');
+      notes.value = lines.length > 1 ? lines.slice(0, -1).join('\n') : '';
+    }
+  }
+  await lcEnsureTeachers();
+  const btn = document.getElementById('lc-activate-btn');
+  if (btn) { btn.textContent = '💾 حفظ التعديلات'; btn.onclick = function(){ lcSaveEdit(); }; }
+  document.getElementById('lc-fill-modal').classList.add('open');
+};
+
+window.lcSaveEdit = async function() {
+  if (!lcScannedCard) return;
+  const studentName = String((document.getElementById('lc-fill-student-name') || {}).value || '').trim();
+  if (!studentName) { srShowToast('أدخل اسم ولقب الطالب', 'error'); return; }
+  const blocks = Array.from(document.querySelectorAll('#lc-fill-courses .lc-course-block'));
+  if (!blocks.length) { srShowToast('أضف دورة واحدة على الأقل', 'error'); return; }
+  const courses = [];
+  for (const b of blocks) {
+    const lang = String((b.querySelector('.lc-course-lang') || {}).value || '').trim();
+    const sessRaw = String((b.querySelector('.lc-course-sessions') || {}).value || '').trim();
+    const sess = parseInt(sessRaw, 10);
+    const teacherSel = b.querySelector('.lc-course-teacher');
+    const teacherOpt = teacherSel && teacherSel.selectedIndex >= 0 ? teacherSel.options[teacherSel.selectedIndex] : null;
+    const tName = teacherOpt ? String(teacherOpt.getAttribute('data-name') || '').trim() : '';
+    const teacherId = teacherOpt ? String(teacherOpt.value || '') : '';
+    const amountRaw = String((b.querySelector('.lc-course-amount') || {}).value || '').trim();
+    const amount = amountRaw === '' ? 0 : Number(amountRaw);
+    const date = lcDateToISO(String((b.querySelector('.lc-course-date') || {}).value || '').trim());
+    if (!tName) { srShowToast('اختر الأستاذ لكل دورة', 'error'); return; }
+    if (!(sess > 0)) { srShowToast('عدد الحصص يجب أن يكون أكبر من 0', 'error'); return; }
+    if (!isFinite(amount) || amount < 0) { srShowToast('أدخل مبلغاً صحيحاً', 'error'); return; }
+    courses.push({ language: lang, sessions: sess, teacher_id: teacherId, teacher_name: tName, amount: amount, activated_at: date });
+  }
+  const language = courses.map(function(c){ return c.language; }).filter(Boolean).join(', ');
+  const teacherName = courses.map(function(c){ return c.teacher_name; }).filter(Boolean).join(', ');
+  const teacherId = courses.map(function(c){ return c.teacher_id; }).filter(Boolean).join(', ');
+  const sessionsTotal = courses.reduce(function(s, c){ return s + c.sessions; }, 0);
+  const amountPaid = courses.reduce(function(s, c){ return s + c.amount; }, 0);
+  const activatedAt = courses[0].activated_at || lcTodayISO();
+  const generalNotes = String((document.getElementById('lc-fill-notes') || {}).value || '').trim();
+  const notes = courses.length > 1
+    ? (generalNotes ? generalNotes + '\n' : '') + JSON.stringify(courses)
+    : generalNotes;
+  const btn = document.getElementById('lc-activate-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
+  try {
+    const patch = {
+      student_name: studentName,
+      language: language,
+      teacher_id: teacherId,
+      teacher_name: teacherName,
+      sessions_total: sessionsTotal,
+      amount_paid: amountPaid,
+      notes: notes,
+      activated_at: activatedAt,
+      updated_at: new Date().toISOString()
+    };
+    const res = await lcFetch(LC_URL + '/rest/v1/' + LC_TABLE + '?id=eq.' + encodeURIComponent(lcScannedCard.id), {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=minimal' },
+      body: JSON.stringify(patch)
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(function(){ return ''; });
+      throw new Error('HTTP ' + res.status + (txt ? ' — ' + txt.slice(0, 140) : ''));
+    }
+    srShowToast('✅ تم حفظ التعديلات');
+    lcCloseFill();
+    lcLoadData();
+  } catch(e) {
+    srShowToast('فشل حفظ التعديلات: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '💾 حفظ التعديلات'; }
+  }
+};
 
 window.lcUseSession = async function(id) {
   const r = lcAllData.find(function(x){ return x.id === id; });
