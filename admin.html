@@ -31102,7 +31102,19 @@ window.lcRenderTable = function() {
       const studentCell = r.student_name
         ? '<div style="font-weight:800">' + lcEsc(r.student_name) + '</div><div style="font-size:10.5px;color:var(--text-muted)" dir="ltr">' + lcEsc(r.student_id || '') + '</div>'
         : '<span style="color:var(--text-muted)">—</span>';
-      const sessions = st === 'printed' ? '—' : (Number(r.sessions_used) || 0) + ' / ' + (Number(r.sessions_total) || 0);
+      let sessions = st === 'printed' ? '—' : (Number(r.sessions_used) || 0) + ' / ' + (Number(r.sessions_total) || 0);
+      if (st !== 'printed' && r.notes) {
+        try {
+          const parsed = JSON.parse(String(r.notes).split('\n').pop());
+          if (Array.isArray(parsed) && parsed.length > 1) {
+            const names = parsed.map(function(c){ return String(c.language || ''); });
+            const allSame = names.every(function(n){ return n === names[0]; });
+            if (!allSame) {
+              sessions = parsed.map(function(c){ return (Number(c.sessions) || 0); }).join(' + ') + '  ( ' + (Number(r.sessions_used) || 0) + ' / ' + (Number(r.sessions_total) || 0) + ' )';
+            }
+          }
+        } catch (e) {}
+      }
       let actions = '';
       if (st === 'printed') {
         actions += '<button class="tbl-action" onclick="lcOpenFillWith(\'' + r.id + '\')" style="padding:5px 10px;font-size:11px;border-color:rgba(16,185,129,.3);color:#059669;font-weight:800">💳 تعبئة</button> ';
