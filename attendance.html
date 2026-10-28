@@ -962,7 +962,7 @@ main{flex:1;position:relative;overflow:hidden}
           await lcFetch(LC_URL + '/rest/v1/language_attendance', {
             method: 'POST',
             headers: { 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ card_id: parent.id, student_name: parent.student_name || lcCardLabel(parent), language: courseName, teacher_id: parent.teacher_id || '', teacher_name: (parent.teacher_name || ''), date: today2 })
+            body: JSON.stringify({ card_id: parent.id, student_name: parent.student_name || lcCardLabel(parent), language: courseName, teacher_id: parent.teacher_id || '', teacher_name: courseTeacher, date: today2 })
           });
           var newUsed = (Number(parent.sessions_used) || 0) + 1;
           var newStatus = newUsed >= (Number(parent.sessions_total) || 0) ? 'finished' : 'active';
@@ -974,11 +974,27 @@ main{flex:1;position:relative;overflow:hidden}
             body: JSON.stringify({ sessions_used: newUsed, status: newStatus, updated_at: new Date().toISOString() })
           });
           playSoundCorrect();
+          parent.sessions_used = newUsed;
+          parent.status = newStatus;
           b.classList.remove('loading');
           b.innerHTML = '✓ تم التسجيل اليوم';
           b.disabled = true;
           b.style.background = '#e5e7eb'; b.style.color = '#6b7280'; b.style.cursor = 'not-allowed';
+          var cardEl = b.closest('.tc-card');
+          if (cardEl) {
+            var badge = cardEl.querySelector('.tc-badge');
+            if (badge) badge.textContent = newUsed + ' / ' + (Number(parent.sessions_total) || 0);
+            var stats = cardEl.querySelectorAll('.tc-stat-num');
+            if (stats.length >= 1) stats[0].textContent = newUsed;
+            if (stats.length >= 2) stats[1].textContent = Math.max(0, (Number(parent.sessions_total) || 0) - newUsed);
+          }
           showCheckinAnimation('green', courseName, courseTeacher);
+          setTimeout(function() {
+            document.getElementById('view-teachers').classList.remove('active');
+            document.getElementById('view-kiosk').classList.add('active');
+            processing = false; scanner.setBusy(false);
+            renderReady();
+          }, 1900);
           setTimeout(function() {
             document.getElementById('view-teachers').classList.remove('active');
             document.getElementById('view-kiosk').classList.add('active');
