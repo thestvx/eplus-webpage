@@ -666,6 +666,9 @@ main{flex:1;position:relative;overflow:hidden}
       return;
     }
 
+    showLanguageCardPanel(card);
+    return;
+
     var out = null;
     try { out = await recordLanguageAttendance(card.id); }
     catch (e) {
@@ -886,6 +889,83 @@ main{flex:1;position:relative;overflow:hidden}
       sessions.push(sess);
     }
     return sessions;
+  }
+
+﻿  function showLanguageCardPanel(card) {
+    scanner.setBusy(true);
+    var name = lcCardLabel(card);
+    var headerHtml = '<div class="ts-header">'
+      + '<div class="ts-student-avatar"><img src="icons/student.png" alt="student"></div>'
+      + '<div class="ts-student-name">' + esc(name) + '</div>'
+      + '<div class="ts-student-id">Student ID  #' + esc(card.id || '') + '</div>'
+      + '<div class="ts-student-divider"></div>'
+      + '<div class="ts-subtitle">الدورات المشتركة</div>'
+      + '</div>';
+    $('student-panel').innerHTML = '<button class="ts-back" id="ts-back-btn">✕ رجوع</button>' + headerHtml;
+
+    // build per-course cards from notes if available
+    var courses = null;
+    if (card.notes) { try { courses = JSON.parse(String(card.notes).split('\n').pop()); } catch (e) {} }
+    if (!Array.isArray(courses) || !courses.length) {
+      courses = [{ language: card.language, sessions: card.sessions_total, teacher_name: card.teacher_name }];
+    }
+
+    var html = '<div class="ts-grid" id="tc-grid">';
+    for (var i = 0; i < courses.length; i++) {
+      var c = courses[i];
+      var tot = Number(c.sessions) || Number(card.sessions_total) || 0;
+      var usd = Number(card.sessions_used) || 0;
+      html += '<div class="tc-card">';
+      html += '<div class="tc-top">';
+      html += '<div class="tc-subject-icon green">G</div>';
+      html += '<div class="tc-info"><div class="tc-teacher">' + esc(c.teacher_name || card.teacher_name || '') + '</div><div class="tc-subject">' + esc(c.language || card.language || '') + '</div></div>';
+      html += '<div class="tc-badge green">' + usd + ' / ' + tot + '</div>';
+      html += '</div>';
+      html += '<div class="tc-btn-wrap"><button class="tc-btn green" data-action="att">تسجيل الحضور</button></div>';
+      html += '</div>';
+    }
+    html += '</div>';
+    $('tc-list').innerHTML = html;
+
+    $('view-kiosk').classList.remove('active');
+    $('view-teachers').classList.add('active');
+
+    $('ts-back-btn').addEventListener('click', function () {
+      $('view-teachers').classList.remove('active');
+      $('view-kiosk').classList.add('active');
+      processing = false; scanner.setBusy(false);
+      renderReady();
+    });
+
+    document.querySelectorAll('.tc-btn[data-action="att"]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        btn.classList.add('loading');
+        btn.innerHTML = '<span class="spin"></span>جاري التسجيل...';
+        try {
+          var out = await recordLanguageAttendance(card.id);
+          if (out && out.code === 'already') {
+            btn.classList.remove('loading');
+            btn.innerHTML = '✓ تم التسجيل اليوم';
+            btn.disabled = true;
+            btn.style.background = '#e5e7eb'; btn.style.color = '#6b7280'; btn.style.cursor = 'not-allowed';
+          } else if (out && (out.code === 'recorded' || out.code === 'finished')) {
+            btn.classList.remove('loading');
+            btn.innerHTML = '✓ تم التسجيل اليوم';
+            btn.disabled = true;
+            btn.style.background = '#e5e7eb'; btn.style.color = '#6b7280'; btn.style.cursor = 'not-allowed';
+            playSoundCorrect();
+          } else {
+            btn.classList.remove('loading');
+            btn.innerHTML = 'تسجيل الحضور';
+            playSoundIncorrect();
+          }
+        } catch (e) {
+          btn.classList.remove('loading');
+          btn.innerHTML = 'تسجيل الحضور';
+          playSoundIncorrect();
+        }
+      });
+    });
   }
 
   function showTeacherSelection(reg, barcode, studentId, name) {
