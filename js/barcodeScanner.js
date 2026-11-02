@@ -19,6 +19,10 @@ window.BarcodeScanner = (function () {
     this.onInvalid = opts.onInvalid || function () {};
     this.onState = opts.onState || null;         // 'start' | 'key' | 'nondigit' | 'complete'
     this.shouldIgnoreKey = opts.shouldIgnoreKey || null;
+    // When true, printable non-digit keys and Tab are swallowed outside
+    // inputs. Scanners sometimes emit a symbology prefix/suffix (]E0, letters)
+    // around the digits; without this those characters get typed into the page.
+    this.blockStrayChars = !!opts.blockStrayChars;
 
     this.enabled = false;
     this.busy = false;
@@ -89,12 +93,33 @@ window.BarcodeScanner = (function () {
     // Debounce lock — swallow scan keys while a lookup is running.
     if (this.busy) {
       var bc = e.code || '';
-      if (/^(Digit|Numpad)[0-9]$/.test(bc) || bc === 'Enter' || bc === 'NumpadEnter' || e.key === 'Enter') {
+      var scanKey = /^(Digit|Numpad)[0-9]$/.test(bc) || bc === 'Enter' || bc === 'NumpadEnter' || e.key === 'Enter';
+      var strayKey = this.blockStrayChars && !e.ctrlKey && !e.altKey && !e.metaKey &&
+        (bc === 'Tab' || e.key === 'Tab' || (typeof e.key === 'string' && e.key.length === 1 && !/[0-9]/.test(e.key)));
+      if (scanKey || strayKey) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
       }
       return;
+    }
+
+    // Scanners may emit a symbology prefix/suffix around the digits (]E0,
+    // letters, Tab). Swallow those outside inputs so they never get typed
+    // into the kiosk page. Digits are still handled by the scanner below.
+    if (this.blockStrayChars && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      var keyStr = typeof e.key === 'string' ? e.key : '';
+      if (e.code === 'Tab' || keyStr === 'Tab' || (keyStr.length === 1 && !/[0-9]/.test(keyStr))) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        if (keyStr.length === 1) {
+          this.sawNonDigit = true;
+          this.log('Stray char blocked: code=' + (e.code || '') + ' key=' + JSON.stringify(keyStr));
+          this._emit('nondigit', { code: e.code || '', key: keyStr });
+        }
+        return;
+      }
     }
 
     var now = Date.now();

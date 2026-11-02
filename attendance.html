@@ -22,7 +22,7 @@
   } catch (e) { console.error('Firebase init error:', e); }
 </script>
 <script src="js/ean13.js"></script>
-<script src="js/barcodeScanner.js?v=1"></script>
+<script src="js/barcodeScanner.js?v=2"></script>
 <script src="js/registrationService.js?v=4"></script>
 <script src="js/subjectService.js?v=5"></script>
 <script src="js/attendanceService.js?v=4"></script>
@@ -345,12 +345,39 @@ main{flex:1;position:relative;overflow:hidden}
   }
   function lcParseCard(raw) {
     var s = String(raw == null ? '' : raw).replace(/\D/g, '');
-    if (s.length === 13) {
-      var id = (typeof EAN13 !== 'undefined') ? EAN13.decodeLang(s) : null;
-      return id ? { id: id, isBarcode: true } : null;
+    if (!s) return null;
+    // Tolerate common scanner/GTIN variants: GTIN-14 leading zero, or an
+    // EAN-13 whose leading '2' was dropped (12 digits). Keep 5-digit IDs.
+    var candidates = [s];
+    if (s.length === 14 && s.charAt(0) === '0') candidates.push(s.slice(1));
+    if (s.length === 12 && /^0[01]/.test(s)) candidates.push('2' + s);
+    for (var ci = 0; ci < candidates.length; ci++) {
+      var c = candidates[ci];
+      if (c.length === 13) {
+        var id = (typeof EAN13 !== 'undefined') ? EAN13.decodeLang(c) : null;
+        if (id) return { id: id, isBarcode: true };
+        // Forgiving fallback: keep the embedded 9-digit ID even if the check
+        // digit was misread. The DB lookup still confirms the card exists.
+        if (c.indexOf('201') === 0) {
+          var looseId = String(parseInt(c.slice(3, 12), 10) || 0);
+          if (looseId !== '0') return { id: looseId, isBarcode: true };
+        }
+      } else if (c.length === 12 && c.indexOf('201') === 0) {
+        // Scanner dropped the check digit but kept prefix + 9-digit ID.
+        var noCheckId = String(parseInt(c.slice(3, 12), 10) || 0);
+        if (noCheckId !== '0') return { id: noCheckId, isBarcode: true };
+      } else if (c.length === 5) {
+        return { id: c, isBarcode: false };
+      }
     }
-    if (s.length === 5) return { id: s, isBarcode: false };
     return null;
+  }
+  function lcNormalizeScan(val) {
+    var d = String(val == null ? '' : val).replace(/\D/g, '');
+    if (!d) return String(val == null ? '' : val).trim();
+    if (d.length === 14 && d.charAt(0) === '0') d = d.slice(1);
+    if (d.length === 12 && /^0[01]/.test(d)) d = '2' + d;
+    return d;
   }
   async function lookupLanguageCard(raw) {
     var parsed = lcParseCard(raw);
@@ -731,7 +758,7 @@ main{flex:1;position:relative;overflow:hidden}
     processing = true;
     scanner.setBusy(true);
     $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>جاري التحقق...';
-    var raw = String(val || '').trim();
+    var raw = lcNormalizeScan(val);
 
     // 0. Language course card (EAN-13 '201' or 5-digit card ID)
     var lcRes = null;
@@ -1316,7 +1343,8 @@ if (hasActiveSub) {
   try {
     scanner = new BarcodeScanner.Scanner({
       logPrefix: 'ATTENDANCE',
-      shouldIgnoreKey: function () { var el = document.activeElement; var inInput = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable); return processing || !appUnlocked || inInput; },
+      blockStrayChars: true,
+      shouldIgnoreKey: function () { var el = document.activeElement; var inInput = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable); return !appUnlocked || inInput; },
       onState: function (info) { if (info && info.buffer !== undefined) { updateDebug(info); if (info.buffer) logScanner('buf=' + info.buffer); } },
       onScan: function (code) {
         logScanner('SCAN: ' + code + ' (len=' + code.length + ')');
