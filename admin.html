@@ -15,7 +15,7 @@
   <script src="js/registrationService.js?v=4"></script>
   <script src="js/subjectService.js?v=6"></script>
   <script src="js/attendanceService.js?v=2"></script>
-  <script src="js/barcodeScanner.js?v=1"></script>
+  <script src="js/barcodeScanner.js?v=2"></script>
   <script src="js/teacherFinance.js?v=6"></script>
   <script src="js/subscriptionService.js?v=3"></script>
 <script src="js/receiptCalib.js?v=1"></script>
@@ -3946,6 +3946,7 @@
                 </select>
                 <input class="inp" id="lc-attlog-date" type="date" style="width:160px;padding:8px 12px" onchange="lcRenderAttLog()" />
                 <button class="tbl-action" onclick="lcLoadAttLog()" style="padding:8px 12px;font-size:12px">🔄 تحديث</button>
+                <button class="tbl-action" onclick="lcExportAttLog()" style="padding:8px 12px;font-size:12px;border-color:rgba(16,185,129,.35);color:#059669;font-weight:800">⬇️ تحميل CSV</button>
               </div>
               <div style="overflow-x:auto">
                 <table class="tbl" id="lc-attlog-table">
@@ -31401,11 +31402,25 @@ window.lcFillBack = function() {
 
 function lcParseCard(raw) {
   const s = String(raw == null ? '' : raw).replace(/[^0-9]/g, '');
-  if (s.length === 13) {
-    const id = EAN13.decodeLang(s);
-    return id ? { id: id, barcode: EAN13.makeLang(id) } : null;
+  if (!s) return null;
+  const candidates = [s];
+  if (s.length === 14 && s.charAt(0) === '0') candidates.push(s.slice(1));
+  if (s.length === 12 && /^0[01]/.test(s)) candidates.push('2' + s);
+  for (const c of candidates) {
+    if (c.length === 13) {
+      const id = EAN13.decodeLang(c);
+      if (id) return { id: id, barcode: EAN13.makeLang(id) };
+      if (c.indexOf('201') === 0) {
+        const looseId = String(parseInt(c.slice(3, 12), 10) || 0);
+        if (looseId !== '0') return { id: looseId, barcode: EAN13.makeLang(looseId) };
+      }
+    } else if (c.length === 12 && c.indexOf('201') === 0) {
+      const noCheckId = String(parseInt(c.slice(3, 12), 10) || 0);
+      if (noCheckId !== '0') return { id: noCheckId, barcode: EAN13.makeLang(noCheckId) };
+    } else if (c.length === 5) {
+      return { id: c, barcode: EAN13.makeLang(c) };
+    }
   }
-  if (s.length === 5) return { id: s, barcode: EAN13.makeLang(s) };
   return null;
 }
 
@@ -31905,9 +31920,7 @@ window.lcLoadAttLog = async function() {
   } catch (e) { lcAttLogData = []; }
   lcRenderAttLog();
 };
-window.lcRenderAttLog = function() {
-  const tbody = document.getElementById('lc-attlog-tbody');
-  if (!tbody) return;
+function lcFilterAttLogRows() {
   const q = String((document.getElementById('lc-attlog-search') || {}).value || '').trim().toLowerCase();
   const course = String((document.getElementById('lc-attlog-course') || {}).value || '').trim();
   const d = String((document.getElementById('lc-attlog-date') || {}).value || '').trim();
@@ -31915,6 +31928,35 @@ window.lcRenderAttLog = function() {
   if (q) rows = rows.filter(function(r){ return String(r.student_name||'').toLowerCase().includes(q) || String(r.language||'').toLowerCase().includes(q); });
   if (course) rows = rows.filter(function(r){ return String(r.language||'') === course; });
   if (d) rows = rows.filter(function(r){ return String(r.date||'').slice(0,10) === d; });
+  return rows;
+}
+window.lcExportAttLog = function() {
+  const rows = lcFilterAttLogRows();
+  if (!rows.length) { srShowToast('لا توجد سجلات للتحميل', 'error'); return; }
+  const cell = function(v) {
+    const s = String(v == null ? '' : v);
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const lines = [['#','المشترك','الدورة','الأستاذ','التاريخ'].map(cell).join(',')];
+  rows.forEach(function(r, i) {
+    lines.push([i + 1, r.student_name || '', r.language || '', r.teacher_name || '', r.date || ''].map(cell).join(','));
+  });
+  const csv = '\uFEFF' + lines.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'سجل-حضور-الدورات-' + lcTodayISO() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  srShowToast('✅ تم تحميل السجل (' + rows.length + ' سجل)');
+};
+window.lcRenderAttLog = function() {
+  const tbody = document.getElementById('lc-attlog-tbody');
+  if (!tbody) return;
+  const rows = lcFilterAttLogRows();
   tbody.innerHTML = rows.length === 0
     ? '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">لا توجد سجلات</td></tr>'
     : rows.map(function(r, i) {
