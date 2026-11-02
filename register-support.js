@@ -19,14 +19,9 @@ const supportStreams = () => {
   return raw;
 };
 
-// ── استثناءات نموذج التسجيل فقط ──
-// مادة معينة عند أستاذ معين لا تُعرض للتسجيلات الجديدة، بينما التلاميذ
-// الذين سبق واختاروها يحتفظون بها ضمن موادهم المسجلة (لا يُمسّ سجلهم).
 function registrationFormItems(pairs) {
   const active = (window.SubjectService && SubjectService.filterActiveTeachers) ? SubjectService.filterActiveTeachers(pairs) : (pairs || []);
-  return (Array.isArray(active) ? active : []).filter(p =>
-    !(p.subject === 'الرياضيات' && p.teacher === 'نعورة عبدالباسط')
-  );
+  return Array.isArray(active) ? active : [];
 }
 
 const SUPPORT_INSTITUTIONS = {
