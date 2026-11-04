@@ -188,6 +188,37 @@
     });
 
     updateProgramStatus();
+
+    if (!reduceMotion && tabs.length) {
+      var autoTimer = null;
+      function startAuto() {
+        if (autoTimer || reduceMotion) return;
+        autoTimer = window.setInterval(function () {
+          var next = (activeIndex + 1) % tabs.length;
+          activateDay(tabs[next].getAttribute('data-day'), false);
+        }, 2000);
+      }
+      function stopAuto() {
+        if (autoTimer) { window.clearInterval(autoTimer); autoTimer = null; }
+      }
+      if ('IntersectionObserver' in window && program) {
+        var autoObserver = new IntersectionObserver(function (entries) {
+          if (entries[0].isIntersecting) startAuto();
+          else stopAuto();
+        }, { threshold: 0.18 });
+        autoObserver.observe(program);
+      } else {
+        startAuto();
+      }
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) stopAuto();
+        else startAuto();
+      });
+      if (program) {
+        program.addEventListener('mouseenter', stopAuto);
+        program.addEventListener('mouseleave', startAuto);
+      }
+    }
   }
 
 document.querySelectorAll('.faq-q').forEach(function (button) {
