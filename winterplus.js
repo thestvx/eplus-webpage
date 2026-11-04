@@ -53,6 +53,10 @@
       entries.forEach(function (entry) {
         if (!entry.isIntersecting) return;
         var id = '#' + entry.target.id;
+        var hasLink = navAnchors.some(function (link) {
+          return link.getAttribute('href') === id;
+        });
+        if (!hasLink) return;
         navAnchors.forEach(function (link) {
           link.classList.toggle('active', link.getAttribute('href') === id);
         });
@@ -65,20 +69,99 @@
 
   var tabs = Array.prototype.slice.call(document.querySelectorAll('.day-tab'));
   var panels = Array.prototype.slice.call(document.querySelectorAll('.day-panel'));
+  var program = document.querySelector('.program');
+  var programToggle = document.querySelector('.program-toggle');
+  var programStatus = document.getElementById('programStatus');
+  var autoInterval = 6000;
+  var activeIndex = 0;
+  var progressElapsed = 0;
+  var progressLast = 0;
+  var progressFrame = 0;
+  var programInView = false;
+  var autoPausedByUser = false;
+  var autoPausedByHover = false;
+  var canHover = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+  tabs.forEach(function (tab, index) {
+    if (tab.classList.contains('active')) activeIndex = index;
+  });
+
+  function updateProgress(value) {
+    tabs.forEach(function (tab, index) {
+      tab.style.setProperty('--day-progress', index === activeIndex ? String(value) : '0');
+    });
+  }
+
+  function updateProgramStatus() {
+    if (!programStatus || !tabs[activeIndex]) return;
+    var name = tabs[activeIndex].querySelector('.day-name');
+    programStatus.textContent = 'البرنامج الحالي: ' + (name ? name.textContent : '');
+  }
+
+  function resetProgramClock() {
+    progressElapsed = 0;
+    progressLast = performance.now();
+    updateProgress(0);
+  }
+
+  function stopProgramClock() {
+    if (progressFrame) {
+      cancelAnimationFrame(progressFrame);
+      progressFrame = 0;
+    }
+  }
+
+  function programTick(now) {
+    progressFrame = 0;
+    var paused = autoPausedByUser || autoPausedByHover || !programInView || document.hidden;
+
+    if (!paused) {
+      var delta = now - progressLast;
+      if (delta < 0 || delta > 160) delta = 0;
+      progressElapsed += delta;
+
+      if (progressElapsed >= autoInterval) {
+        progressElapsed = 0;
+        var next = (activeIndex + 1) % tabs.length;
+        activateDay(tabs[next].getAttribute('data-day'), false);
+      }
+
+      updateProgress(Math.min(progressElapsed / autoInterval, 1));
+    }
+
+    progressLast = now;
+    progressFrame = requestAnimationFrame(programTick);
+  }
+
+  function startProgramClock() {
+    if (reduceMotion || progressFrame || !tabs.length) return;
+    progressLast = performance.now();
+    progressFrame = requestAnimationFrame(programTick);
+  }
 
   function activateDay(day, moveFocus) {
-    tabs.forEach(function (tab) {
+    var nextIndex = -1;
+
+    tabs.forEach(function (tab, index) {
       var active = tab.getAttribute('data-day') === String(day);
       tab.classList.toggle('active', active);
       tab.setAttribute('aria-selected', active ? 'true' : 'false');
       tab.setAttribute('tabindex', active ? '0' : '-1');
+      if (active) nextIndex = index;
       if (active && moveFocus) tab.focus();
     });
+
+    if (nextIndex > -1) activeIndex = nextIndex;
+
     panels.forEach(function (panel) {
       var active = panel.getAttribute('data-day') === String(day);
       panel.classList.toggle('active', active);
       panel.hidden = !active;
     });
+
+    updateProgramStatus();
+    resetProgramClock();
+
     if (hasGSAP && !reduceMotion) {
       var current = document.querySelector('.day-panel[data-day="' + day + '"]');
       if (current) {
@@ -102,6 +185,58 @@
         event.preventDefault();
         activateDay(tabs[next].getAttribute('data-day'), true);
       });
+    });
+
+    if (program) {
+      program.addEventListener('mouseenter', function () {
+        if (canHover) autoPausedByHover = true;
+      });
+      program.addEventListener('mouseleave', function () {
+        autoPausedByHover = false;
+        progressLast = performance.now();
+      });
+    }
+
+    if (programToggle) {
+      if (reduceMotion) {
+        programToggle.disabled = true;
+        var disabledLabel = programToggle.querySelector('span');
+        if (disabledLabel) disabledLabel.textContent = 'التبديل التلقائي معطّل';
+      } else {
+        programToggle.addEventListener('click', function () {
+          autoPausedByUser = !autoPausedByUser;
+          programToggle.setAttribute('aria-pressed', autoPausedByUser ? 'true' : 'false');
+          var icon = programToggle.querySelector('i');
+          var label = programToggle.querySelector('span');
+          if (icon) icon.className = autoPausedByUser ? 'fa-solid fa-play' : 'fa-solid fa-pause';
+          if (label) label.textContent = autoPausedByUser ? 'تشغيل التبديل التلقائي' : 'إيقاف التبديل التلقائي';
+          progressLast = performance.now();
+        });
+      }
+    }
+
+    updateProgramStatus();
+    updateProgress(0);
+
+    if ('IntersectionObserver' in window && program) {
+      var programObserver = new IntersectionObserver(function (entries) {
+        programInView = entries[0].isIntersecting;
+        if (programInView) startProgramClock();
+        else stopProgramClock();
+      }, { threshold: 0.18 });
+      programObserver.observe(program);
+    } else {
+      programInView = true;
+      startProgramClock();
+    }
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        stopProgramClock();
+      } else {
+        progressLast = performance.now();
+        if (programInView) startProgramClock();
+      }
     });
   }
 
