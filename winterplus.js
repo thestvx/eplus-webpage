@@ -187,60 +187,10 @@
       });
     });
 
-    if (program) {
-      program.addEventListener('mouseenter', function () {
-        if (canHover) autoPausedByHover = true;
-      });
-      program.addEventListener('mouseleave', function () {
-        autoPausedByHover = false;
-        progressLast = performance.now();
-      });
-    }
-
-    if (programToggle) {
-      if (reduceMotion) {
-        programToggle.disabled = true;
-        var disabledLabel = programToggle.querySelector('span');
-        if (disabledLabel) disabledLabel.textContent = 'التبديل التلقائي معطّل';
-      } else {
-        programToggle.addEventListener('click', function () {
-          autoPausedByUser = !autoPausedByUser;
-          programToggle.setAttribute('aria-pressed', autoPausedByUser ? 'true' : 'false');
-          var icon = programToggle.querySelector('i');
-          var label = programToggle.querySelector('span');
-          if (icon) icon.className = autoPausedByUser ? 'fa-solid fa-play' : 'fa-solid fa-pause';
-          if (label) label.textContent = autoPausedByUser ? 'تشغيل التبديل التلقائي' : 'إيقاف التبديل التلقائي';
-          progressLast = performance.now();
-        });
-      }
-    }
-
     updateProgramStatus();
-    updateProgress(0);
-
-    if ('IntersectionObserver' in window && program) {
-      var programObserver = new IntersectionObserver(function (entries) {
-        programInView = entries[0].isIntersecting;
-        if (programInView) startProgramClock();
-        else stopProgramClock();
-      }, { threshold: 0.18 });
-      programObserver.observe(program);
-    } else {
-      programInView = true;
-      startProgramClock();
-    }
-
-    document.addEventListener('visibilitychange', function () {
-      if (document.hidden) {
-        stopProgramClock();
-      } else {
-        progressLast = performance.now();
-        if (programInView) startProgramClock();
-      }
-    });
   }
 
-  document.querySelectorAll('.faq-q').forEach(function (button) {
+document.querySelectorAll('.faq-q').forEach(function (button) {
     button.addEventListener('click', function () {
       var item = button.closest('.faq-item');
       var isOpen = item.classList.toggle('open');
