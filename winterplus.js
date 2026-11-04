@@ -340,6 +340,7 @@ document.querySelectorAll('.faq-q').forEach(function (button) {
     if (window.innerWidth > 960) {
       gsap.to('.hero-bg-img', {
         yPercent: 12,
+        filter: 'blur(4px)',
         ease: 'none',
         scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true }
       });
