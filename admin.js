@@ -83,19 +83,20 @@ function applyEmployeeMode(cfg) {
 
   // ── الـ sidebar: إظهار الأقسام المسموحة فقط ──
   const navItems = document.querySelectorAll('.nav-item');
-  // ترتيب navItems: 0=home,1=announcements,2=summer,3=teachers,4=msgs,5=finance,6=settings,7=website
-  const navMap = [
-    { section: 'home' },
-    { section: 'announcements' },
-    { section: 'summer' },
-    { section: 'teachers' },
-    { section: 'msgs' },
-    { section: 'finance' },
-    { section: 'settings' },
-    { section: 'website' },
-  ];
-  navItems.forEach((el, i) => {
-    const sec = navMap[i]?.section;
+  const navMap = {
+    home: 'home',
+    announcements: 'announcements',
+    summer: 'summer',
+    winterplus: 'winterplus',
+    students: 'students',
+    teachers: 'teachers',
+    msgs: 'msgs',
+    finance: 'finance',
+    settings: 'settings',
+    website: 'website',
+  };
+  navItems.forEach(el => {
+    const sec = navMap[el.dataset.nav];
     if (!sec) return;
     if (sec === 'website') { el.style.display = cfg.showWebsite ? '' : 'none'; return; }
     el.style.display = cfg.allowedSections.includes(sec) ? '' : 'none';
@@ -1559,7 +1560,8 @@ function loadTickets() {
     if(tsmT) tsmT.textContent=activeTickets.filter(x=>x.status==='paid').reduce((s,x)=>s+Number(x.amount||0),0).toLocaleString('ar-DZ')+' دج';
     updateSummerStats(activeTickets.length, paid, pending);
     updateFinancialStats(activeTickets.length, paid, studentsWithRemaining, totalExpected, totalCollected, totalRemaining);
-    document.getElementById('nav-badge-summer').textContent = activeTickets.length;
+    const summerBadge = document.getElementById('nav-badge-summer');
+    if (summerBadge) summerBadge.textContent = activeTickets.length;
     // إعادة رسم قائمة الحضور إذا كانت مفتوحة — حتى تنعكس أي تغييرات في حالة التذاكر فوراً
     refreshAttendanceListIfOpen();
   });

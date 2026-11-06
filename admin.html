@@ -1930,15 +1930,10 @@
         <span class="nav-label" data-i18n="announcements">الإعلانات</span>
       </div>
       <div class="nav-section" data-nav-cat="events" data-i18n="events">الفعاليات</div>
-      <div class="nav-item" data-nav="summer" onclick="switchNavSection('summer')" style="display:none;">
-        <span class="nav-icon">☀️</span>
-        <span class="nav-label" data-i18n="summer_camp">المخيم الصيفي</span>
-        <span class="nav-badge" id="nav-badge-summer">0</span>
-      </div>
-      <div class="nav-item" data-nav="camp-v2" onclick="switchNavSection('camp-v2')">
-        <span class="nav-icon">🏕️</span>
-        <span class="nav-label">المخيم الصيفي — النسخة الثانية</span>
-        <span class="nav-badge" id="nav-badge-camp2">0</span>
+      <div class="nav-item" data-nav="winterplus" onclick="switchNavSection('winterplus')">
+        <span class="nav-icon">❄️</span>
+        <span class="nav-label">المخيم الشتوي — WinterPlus</span>
+        <span class="nav-badge" id="nav-badge-winterplus">0</span>
       </div>
       <div class="nav-section" data-nav-cat="students" data-i18n="students_mgmt">إدارة التلاميذ</div>
       <div class="nav-item" data-nav="students" onclick="switchNavSection('students')">
@@ -4538,6 +4533,104 @@
         </div>
       </div>
 
+      <div id="section-winterplus" style="display:none">
+        <div class="section-header">
+          <div class="section-title">
+            <div class="section-icon" style="background:linear-gradient(135deg,rgba(14,165,233,0.18),rgba(2,132,199,0.1));border-color:rgba(14,165,233,0.3)">❄️</div>
+            <span>المخيم الشتوي — WinterPlus</span>
+          </div>
+          <div class="section-actions">
+            <button class="btn-summer" style="padding:9px 16px;border-radius:12px;border:none;color:#fff;font-size:12.5px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,#0EA5E9,#0284C7)" onclick="winterplusRefresh()">🔄 تحديث</button>
+          </div>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom:24px">
+          <div class="stat-card">
+            <div class="stat-card-glow"></div>
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(14,165,233,0.12)">📋</div></div>
+            <div class="stat-num" id="wpreg-stat-total" style="color:#0284C7">0</div>
+            <div class="stat-label">إجمالي التسجيلات</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-glow"></div>
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(16,185,129,0.12)">🟢</div></div>
+            <div class="stat-num" id="wpreg-stat-6-9" style="color:var(--success)">0</div>
+            <div class="stat-label">الفئة 6–9 سنوات</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-glow"></div>
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(59,130,246,0.12)">🔵</div></div>
+            <div class="stat-num" id="wpreg-stat-10-14" style="color:#3B82F6">0</div>
+            <div class="stat-label">الفئة 10–14 سنة</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-glow"></div>
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:rgba(168,85,247,0.12)">📅</div></div>
+            <div class="stat-num" id="wpreg-stat-week" style="color:#A855F7">0</div>
+            <div class="stat-label">تسجيلات آخر 7 أيام</div>
+          </div>
+        </div>
+
+        <div class="panel" style="padding:16px 20px;margin-bottom:16px">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <select class="inp" id="wpreg-filter-group" style="width:auto;min-width:150px;padding:8px 14px" onchange="winterplusApplyFilters()">
+                <option value="">كل الفئات</option>
+                <option value="6–9">6–9 سنوات</option>
+                <option value="10–14">10–14 سنة</option>
+              </select>
+              <input class="inp" id="wpreg-search" type="text" placeholder="🔍 بحث بالاسم أو ولي الأمر أو الهاتف أو رقم التسجيل..." style="width:290px;padding:8px 14px" oninput="winterplusApplyFilters()" />
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <select class="inp" id="wpreg-print-range" style="width:auto;min-width:170px;padding:8px 14px">
+                <option value="current">نتائج الفلتر الحالي</option>
+                <option value="all">جميع التسجيلات</option>
+                <option value="bygroup">حسب الفئة العمرية</option>
+              </select>
+              <button class="tbl-action" onclick="winterplusPrint()" style="font-size:12px">🖨️ طباعة</button>
+              <button class="tbl-action" onclick="winterplusExportCSV()" style="font-size:12px">📥 CSV</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="padding:0;overflow:hidden">
+          <div class="tbl-wrap" style="border:none">
+            <table class="tbl" id="wpreg-table">
+              <thead>
+                <tr>
+                  <th style="width:36px">#</th>
+                  <th onclick="winterplusSort('id')" style="cursor:pointer">رقم التسجيل ↕</th>
+                  <th onclick="winterplusSort('last_name')" style="cursor:pointer">الطالب ↕</th>
+                  <th onclick="winterplusSort('age')" style="cursor:pointer">العمر ↕</th>
+                  <th>الفئة</th>
+                  <th>ولي الأمر</th>
+                  <th>الهاتف</th>
+                  <th>الدافع</th>
+                  <th onclick="winterplusSort('created_at')" style="cursor:pointer">تاريخ التسجيل ↕</th>
+                  <th>عرض</th>
+                </tr>
+              </thead>
+              <tbody id="wpreg-tbody"></tbody>
+            </table>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px">
+            <div style="font-size:12px;color:var(--text-muted);font-weight:600" id="wpreg-pagination-info"></div>
+            <div style="display:flex;gap:6px" id="wpreg-pagination-btns"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="teacher-modal-bg" id="wpreg-detail-modal" onclick="if(event.target===this)winterplusCloseDetails()">
+        <div class="teacher-modal" style="max-width:760px">
+          <div class="teacher-modal-header">
+            <div class="panel-icon" style="background:rgba(14,165,233,0.12);border-color:rgba(14,165,233,0.25)">❄️</div>
+            <div class="teacher-modal-title">تفاصيل تسجيل WinterPlus</div>
+            <button class="att-modal-close" onclick="winterplusCloseDetails()">✕</button>
+          </div>
+          <div class="teacher-modal-body" id="wpreg-detail-content"></div>
+        </div>
+      </div>
+
       <div id="section-subscriptions" style="display:none">
         <div class="section-header">
           <div class="section-title">
@@ -6833,7 +6926,7 @@ onAuthStateChanged(auth, async user => {
 // ─── ترتيب وإظهار/إخفاء أقسام لوحة التحكم (الإعدادات) ───
 window.NAV_CATS = [
   { key: 'main', label: 'القائمة الرئيسية', items: ['home', 'announcements'] },
-  { key: 'events', label: 'الفعاليات', items: ['summer', 'camp-v2'] },
+  { key: 'events', label: 'الفعاليات', items: ['winterplus'] },
   { key: 'students', label: 'إدارة التلاميذ', items: ['students'] },
   { key: 'teachers', label: 'إدارة الأساتذة', items: ['teachers'] },
   { key: 'support', label: 'الدعم المدرسي', items: ['support-registrations', 'support-teachers', 'subscriptions', 'support-finance', 'support-rooms'] },
@@ -6847,8 +6940,7 @@ window.NAV_CATS = [
 window.NAV_ITEMS = {
   home: { icon: '📊', label: 'لوحة الإحصائيات' },
   announcements: { icon: '📢', label: 'الإعلانات' },
-  summer: { icon: '☀️', label: 'المخيم الصيفي' },
-  'camp-v2': { icon: '🏕️', label: 'المخيم الصيفي — النسخة الثانية' },
+  winterplus: { icon: '❄️', label: 'المخيم الشتوي — WinterPlus' },
   students: { icon: '👥', label: 'قائمة التلاميذ' },
   teachers: { icon: '👨‍🏫', label: 'الأساتذة' },
   msgs: { icon: '💬', label: 'الرسائل' },
@@ -7266,7 +7358,7 @@ window.switchNavSection = (section) => {
     if (typeof renderRegStats === 'function') renderRegStats();
     if (typeof updateSiteStats === 'function') updateSiteStats();
   }
-  ['home','announcements','summer','camp-v2','students','teachers','finance','settings','notifications','support-registrations','support-teachers','subscriptions','support-finance','support-rooms','program-registrations','language-registrations','language-subscriptions'].forEach(s => {
+  ['home','announcements','summer','camp-v2','winterplus','students','teachers','finance','settings','notifications','support-registrations','support-teachers','subscriptions','support-finance','support-rooms','program-registrations','language-registrations','language-subscriptions'].forEach(s => {
     const el = document.getElementById('section-' + s);
     if (el) el.style.display = s === section ? 'block' : 'none';
   });
@@ -7325,6 +7417,9 @@ window.switchNavSection = (section) => {
   }
   if (section === 'camp-v2') {
     if (typeof window.camp2LoadData === 'function') window.camp2LoadData();
+  }
+  if (section === 'winterplus') {
+    if (typeof window.winterplusLoadData === 'function') window.winterplusLoadData();
   }
   if (section === 'support-teachers') {
     if (typeof srtLoadData === 'function') srtLoadData();
@@ -8725,7 +8820,8 @@ function loadTickets() {
     if(tsmT) tsmT.textContent=activeTickets.filter(x=>x.status==='paid').reduce((s,x)=>s+Number(x.amount||0),0).toLocaleString('ar-DZ')+' دج';
     updateSummerStats(activeTickets.length, paid, pending);
     updateFinancialStats(activeTickets.length, paid, studentsWithRemaining, totalExpected, totalCollected, totalRemaining);
-    document.getElementById('nav-badge-summer').textContent = activeTickets.length;
+    const summerBadge = document.getElementById('nav-badge-summer');
+    if (summerBadge) summerBadge.textContent = activeTickets.length;
     // إعادة رسم قائمة الحضور إذا كانت مفتوحة — حتى تنعكس أي تغييرات في حالة التذاكر فوراً
     refreshAttendanceListIfOpen();
     renderStudentOverview();
@@ -34789,6 +34885,7 @@ window.sfExportCSV = function () {
 
 <script src="js/camp-programs.js?v=1"></script>
 <script src="admin-camp.js?v=3"></script>
+<script src="admin-winterplus.js?v=1"></script>
 
 </body>
 </html>

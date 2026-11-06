@@ -4,6 +4,18 @@
   var WP_URL = 'https://jftfvpultaqufhsekdle.supabase.co';
   var WP_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmdGZ2cHVsdGFxdWZoc2VrZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTI2NzMsImV4cCI6MjA5OTMyODY3M30.ep8b2omBGaN2qUB_XG8EE8XDhoRfAVAwnxOgEodEKBc';
   var WP_TABLE = 'program_registrations';
+  var WP_PROGRAMS = {
+    young: {
+      group: '6–9',
+      label: '6–9 سنوات',
+      list: ['اللغات', 'الرياضة', 'الأوريغامي وتشكيل الورق', 'الرسم والتلوين', 'Palm Garden']
+    },
+    older: {
+      group: '10–14',
+      label: '10–14 سنة',
+      list: ['اللغات', 'الرياضة', 'الأمن السيبراني', 'فوتوشوب وورشة How to design a good poster', 'Palm Garden']
+    }
+  };
 
   var WP_LAWS = [
     'يلتزم الطالب بحضور جميع الحصص في المواعيد المحددة.',
@@ -38,6 +50,28 @@
     var el = wpById(id);
     return el ? String(el.value || '').trim() : '';
   }
+
+  function wpProgramsForAge(age) {
+    return age <= 9 ? WP_PROGRAMS.young : WP_PROGRAMS.older;
+  }
+
+  window.wpAgeChanged = function () {
+    var box = wpById('wpAgePrograms');
+    if (!box) return;
+    var raw = wpValue('wpAge');
+    var age = Number(raw);
+    if (!raw || age % 1 !== 0 || age < 6 || age > 14) {
+      box.hidden = true;
+      box.innerHTML = '';
+      return;
+    }
+    var info = wpProgramsForAge(age);
+    box.innerHTML = '<div class="wp-age-programs-head"><strong>البرامج المناسبة لعمر ' + age + ' سنوات</strong><span>فئة ' + info.label + '</span></div>'
+      + '<div class="wp-age-chips">' + info.list.map(function (item) {
+        return '<span class="wp-age-chip"><i class="fa-solid fa-check" aria-hidden="true"></i> ' + item + '</span>';
+      }).join('') + '</div>';
+    box.hidden = false;
+  };
 
   function wpNotify(message) {
     var old = document.querySelector('.wp-toast');
@@ -134,6 +168,8 @@
   }
 
   function wpOpenLaws() {
+    var box = wpById('wpAgePrograms');
+    if (box) { box.hidden = true; box.innerHTML = ''; }
     var text = wpById('wp-laws-text');
     if (text) {
       text.innerHTML = WP_LAWS.map(function (law, index) {
@@ -157,6 +193,8 @@
     wpLastFocus = document.activeElement;
     var form = wpById('wp-reg-form');
     if (form) form.reset();
+    var agePrograms = wpById('wpAgePrograms');
+    if (agePrograms) { agePrograms.hidden = true; agePrograms.innerHTML = ''; }
     wpHide(wpById('wp-laws-modal'));
     wpHide(wpById('wp-success-modal'));
     wpShow(wpById('wp-reg-modal'));
@@ -181,15 +219,18 @@
     var lastName = wpValue('wpLastName');
     var guardianName = wpValue('wpGuardianName');
     var guardianPhone = wpValue('wpGuardianPhone');
-    var age = parseInt(wpValue('wpAge'), 10);
-    var reason = wpValue('wpReason');
+  var ageInput = wpValue('wpAge');
+  var age = parseInt(ageInput, 10);
+  var reason = wpValue('wpReason');
 
     if (!firstName) { wpNotify('الرجاء إدخال اسم التلميذ.'); wpFocus('wpFirstName'); return; }
     if (!lastName) { wpNotify('الرجاء إدخال لقب التلميذ.'); wpFocus('wpLastName'); return; }
     if (!guardianName) { wpNotify('الرجاء إدخال اسم ولي الأمر.'); wpFocus('wpGuardianName'); return; }
     var digits = guardianPhone.replace(/\D/g, '');
     if (digits.length < 8) { wpNotify('الرجاء إدخال رقم هاتف صحيح لولي الأمر.'); wpFocus('wpGuardianPhone'); return; }
-    if (!age || age < 6 || age > 14) { wpNotify('عمر التلميذ يجب أن يكون بين 6 و14 سنة.'); wpFocus('wpAge'); return; }
+    if (!ageInput || age % 1 !== 0 || isNaN(age)) { wpNotify('أدخل عمر التلميذ كرقم بين 6 و14 سنة.'); wpFocus('wpAge'); return; }
+  if (age <= 5) { wpNotify('الحد الأدنى لعمر التلميذ هو 6 سنوات.'); wpFocus('wpAge'); return; }
+  if (age >= 15) { wpNotify('الحد الأقصى لعمر التلميذ هو 14 سنة.'); wpFocus('wpAge'); return; }
 
     wpFormData = {
       first_name: firstName,
@@ -242,7 +283,7 @@
       extra: {
         program: 'WinterPlus 2026',
         age: wpFormData.age,
-        age_group: wpFormData.age <= 9 ? '6–9' : '10–14',
+        age_group: wpProgramsForAge(wpFormData.age).group,
         motivation: wpFormData.reason || '',
         days: ['اللغات', 'الرياضة', 'التقنية والإبداع', 'Palm Garden']
       },
