@@ -327,7 +327,6 @@ document.querySelectorAll('.faq-q').forEach(function (button) {
       .from('.hero-kicker', { y: 18, opacity: 0, duration: 0.55 }, 0.2)
       .from('.title-line', { yPercent: 110, opacity: 0, duration: 0.9, stagger: 0.12 }, 0.28)
       .from('.hero-ar', { y: 22, opacity: 0, duration: 0.65 }, 0.62)
-      .from('.hero-desc', { y: 22, opacity: 0, duration: 0.65 }, 0.72)
       .from('.hero-fact', { y: 16, opacity: 0, duration: 0.5, stagger: 0.07 }, 0.82)
       .from('.hero-actions .btn', { y: 16, opacity: 0, duration: 0.55, stagger: 0.08 }, 0.98)
       .from('.hero-photo', { opacity: 0, scale: 1.035, duration: 1.05 }, 0.45)
@@ -339,8 +338,9 @@ document.querySelectorAll('.faq-q').forEach(function (button) {
 
     if (window.innerWidth > 960) {
       gsap.to('.hero-bg-img', {
-        yPercent: 12,
-        filter: 'blur(4px)',
+        scale: 1.08,
+        yPercent: 4,
+        filter: 'saturate(.94) contrast(1.02) blur(4px)',
         ease: 'none',
         scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true }
       });
