@@ -483,6 +483,12 @@ const SubscriptionService = (function () {
     return await _adminCall('set-period-sessions', { periodId: periodId, usedSessions: usedSessions });
   }
 
+  async function adminDeletePeriod(subscriptionId, periodId) {
+    if (!subscriptionId || !periodId) throw new Error('subscriptionId and periodId are required');
+    const res = await _adminCall('delete-period', { subscriptionId: subscriptionId, periodId: periodId });
+    return (res && res.data) ? res.data : res;
+  }
+
   async function incrementPeriodUsage(periodId, amount) {
     try {
       const data = await _rpc('increment_period_usage', { p_period_id: periodId, p_used: amount || 1 });
@@ -606,6 +612,7 @@ const SubscriptionService = (function () {
     adminSetSubscriptionPaused,
     adminDeleteSubscription,
     adminSetPeriodSessions,
+    adminDeletePeriod,
     incrementPeriodUsage,
     findOverlapping,
     subscriptionStatus,

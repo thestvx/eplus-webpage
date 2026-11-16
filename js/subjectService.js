@@ -21,7 +21,6 @@ const SUPPORT_STREAMS = {
     { subject: 'اللغة الإنجليزية', teacher: 'خادم الله نور' },
     { subject: 'اللغة الإنجليزية ( دورة )', teacher: 'تليلي راضية' },
     { subject: 'العلوم الإسلامية ( دورة )', teacher: 'هبيته ربيع' },
-    { subject: 'اللغة الإنجليزية', teacher: 'خادم الله نور' },
     { subject: 'اجتماعيات ( دورة )', teacher: 'أيمن دخان' },
     { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
   ],
@@ -36,7 +35,6 @@ const SUPPORT_STREAMS = {
     { subject: 'اللغة الإنجليزية', teacher: 'خادم الله نور' },
     { subject: 'اللغة الإنجليزية ( دورة )', teacher: 'تليلي راضية' },
     { subject: 'العلوم الإسلامية ( دورة )', teacher: 'هبيته ربيع' },
-    { subject: 'اللغة الإنجليزية', teacher: 'خادم الله نور' },
     { subject: 'اجتماعيات ( دورة )', teacher: 'أيمن دخان' },
     { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
   ],
@@ -49,7 +47,6 @@ const SUPPORT_STREAMS = {
     { subject: 'المحاسبة', teacher: 'سرهود عبدالرحمان' },
     { subject: 'اقتصاد وقانون', teacher: 'سرهود عبدالرحمان' },
     { subject: 'العلوم الإسلامية ( دورة )', teacher: 'هبيته ربيع' },
-    { subject: 'اللغة الإنجليزية', teacher: 'خادم الله نور' },
     { subject: 'اجتماعيات ( دورة )', teacher: 'أيمن دخان' },
     { subject: 'الفلسفة', teacher: 'دادة نجاح سلام' },
     { subject: 'الرياضيات', teacher: 'حاصي فريد' },
@@ -64,7 +61,6 @@ const SUPPORT_STREAMS = {
     { subject: 'اللغة الإنجليزية', teacher: 'خادم الله نور' },
     { subject: 'اللغة الإنجليزية ( دورة )', teacher: 'تليلي راضية' },
     { subject: 'العلوم الإسلامية ( دورة )', teacher: 'هبيته ربيع' },
-    { subject: 'اللغة الإنجليزية', teacher: 'خادم الله نور' },
     { subject: 'اجتماعيات ( دورة )', teacher: 'أيمن دخان' },
   ],
   'آداب ولغات': [
@@ -78,7 +74,6 @@ const SUPPORT_STREAMS = {
     { subject: 'اللغة الإسبانية', teacher: 'طوالبية ابراهيم' },
     { subject: 'الرياضيات', teacher: 'هبيته ربيع' },
     { subject: 'العلوم الإسلامية ( دورة )', teacher: 'هبيته ربيع' },
-    { subject: 'اللغة الإنجليزية', teacher: 'خادم الله نور' },
     { subject: 'اجتماعيات ( دورة )', teacher: 'أيمن دخان' },
   ],
   'آداب وفلسفة': [
@@ -92,7 +87,6 @@ const SUPPORT_STREAMS = {
     { subject: 'اللغة الإسبانية', teacher: 'طوالبية ابراهيم' },
     { subject: 'الرياضيات', teacher: 'هبيته ربيع' },
     { subject: 'العلوم الإسلامية ( دورة )', teacher: 'هبيته ربيع' },
-    { subject: 'اللغة الإنجليزية', teacher: 'خادم الله نور' },
     { subject: 'اجتماعيات ( دورة )', teacher: 'أيمن دخان' },
   ],
 };
@@ -144,7 +138,6 @@ const SUPPORT_PRIMARY = {
 // ── المتوسط (الأولى/الثانية/الثالثة) — نفس القائمة للمستويات الثلاثة ──
 const SUPPORT_MIDDLE_LOW = [
   { subject: 'علوم الطبيعة والحياة', teacher: 'زيراوي حفصة' },
-  { subject: 'اللغة الإنجليزية', teacher: 'خادم الله نور الهدى' },
   { subject: 'اللغة الإنجليزية', teacher: 'خادم الله نور' },
   { subject: 'اللغة الإنجليزية', teacher: 'بادة العربي' },
   { subject: 'اللغة الإنجليزية', teacher: 'كرام اسراء' },

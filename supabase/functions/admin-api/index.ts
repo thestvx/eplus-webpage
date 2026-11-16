@@ -110,6 +110,80 @@ Deno.serve(async (req) => {
         p_used: Number(body.usedSessions) || 0,
       });
 
+    case 'delete-period': {
+      const subscriptionId = String(body.subscriptionId || '');
+      const periodId = String(body.periodId || '');
+      if (!subscriptionId || !periodId) return json({ error: 'subscriptionId and periodId are required' }, 400);
+
+      const { data: sub, error: subErr } = await supabase
+        .from('student_subscriptions')
+        .select('*')
+        .eq('id', subscriptionId)
+        .maybeSingle();
+      if (subErr) return json({ error: subErr.message }, 400);
+      if (!sub) return json({ error: 'subscription not found' }, 404);
+      if (sub.permanent) return json({ error: 'لا يمكن حذف شهر من اشتراك دائم' }, 400);
+
+      const { data: periodRows, error: periodErr } = await supabase
+        .from('subscription_periods')
+        .select('*')
+        .eq('subscription_id', subscriptionId);
+      if (periodErr) return json({ error: periodErr.message }, 400);
+      const periods = periodRows || [];
+      if (periods.length <= 1) return json({ error: 'لا يمكن حذف الشهر الوحيد في الاشتراك' }, 400);
+      if (!periods.some((p) => String(p.id) === periodId)) return json({ error: 'period not found in subscription' }, 404);
+
+      const remaining = periods
+        .filter((p) => String(p.id) !== periodId)
+        .sort((a, b) => (Number(a.month_number) || 0) - (Number(b.month_number) || 0) || String(a.start_date || '').localeCompare(String(b.start_date || '')));
+
+      const oldTotalSessions = Number(sub.total_sessions) || periods.reduce((a, p) => a + (Number(p.total_sessions) || 8), 0);
+      const newTotalSessions = remaining.reduce((a, p) => a + (Number(p.total_sessions) || 8), 0);
+      const oldPrice = Number(sub.total_price) || 0;
+      const newPrice = oldTotalSessions > 0 ? Math.round(oldPrice * newTotalSessions / oldTotalSessions) : oldPrice;
+      const startDates = remaining.map((p) => p.start_date).filter(Boolean).sort();
+      const endDates = remaining.map((p) => p.end_date).filter(Boolean).sort();
+      const patch: Record<string, unknown> = {
+        months: remaining.length,
+        total_sessions: newTotalSessions,
+        total_price: newPrice,
+      };
+      if (startDates.length) patch.start_date = startDates[0];
+      if (endDates.length) patch.end_date = endDates[endDates.length - 1];
+
+      const { error: delErr } = await supabase.from('subscription_periods').delete().eq('id', periodId);
+      if (delErr) return json({ error: delErr.message }, 400);
+
+      for (let i = 0; i < remaining.length; i++) {
+        if (Number(remaining[i].month_number) !== i + 1) {
+          const { error: renErr } = await supabase
+            .from('subscription_periods')
+            .update({ month_number: i + 1 })
+            .eq('id', remaining[i].id);
+          if (renErr) return json({ error: renErr.message }, 400);
+        }
+      }
+
+      const { error: updErr } = await supabase
+        .from('student_subscriptions')
+        .update(patch)
+        .eq('id', subscriptionId);
+      if (updErr) return json({ error: updErr.message }, 400);
+
+      return json({
+        ok: true,
+        data: {
+          subscriptionId,
+          periodId,
+          months: remaining.length,
+          total_sessions: newTotalSessions,
+          total_price: newPrice,
+          start_date: patch.start_date ?? sub.start_date,
+          end_date: patch.end_date ?? sub.end_date,
+        },
+      });
+    }
+
     case 'get-balance':
       return rpc('admin_get_teacher_balance', {
         p_admin_uid: uid,

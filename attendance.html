@@ -190,7 +190,7 @@ main{flex:1;position:relative;overflow:hidden}
 .tc-progress-fill.green{background:linear-gradient(90deg,#059669,#10b981)}
 .tc-progress-fill.orange{background:linear-gradient(90deg,#b45309,#f59e0b)}
 .tc-progress-fill.red{background:linear-gradient(90deg,#dc2626,#ef4444)}
-.tc-btn-wrap{padding:12px 20px 18px}
+.tc-btn-wrap{padding:12px 20px 18px;display:flex;flex-direction:column;gap:9px}
 .tc-btn{width:100%;font-family:'Tajawal',sans-serif;font-size:15px;font-weight:900;border:none;border-radius:14px;padding:14px;cursor:pointer;transition:all .25s;color:#fff;position:relative;overflow:hidden}
 .tc-btn.green{background:linear-gradient(135deg,#059669,#10b981);box-shadow:0 6px 18px rgba(5,150,105,0.35)}
 .tc-btn.green:hover{filter:brightness(1.1);transform:translateY(-2px);box-shadow:0 8px 24px rgba(5,150,105,0.45)}
@@ -201,7 +201,24 @@ main{flex:1;position:relative;overflow:hidden}
 .tc-btn.done{background:rgba(5,150,105,0.15);color:#6ee7b7;cursor:default;box-shadow:none}
 .tc-btn.red{background:rgba(220,38,38,0.12);color:#f87171;border:1.5px solid rgba(220,38,38,0.25);cursor:default;box-shadow:none}
 .tc-btn.disabled{background:rgba(220,38,38,0.15);color:#fca5a5;cursor:default;box-shadow:none}
-.tc-btn.loading{pointer-events:none;opacity:.85}
+.tc-btn.log{background:rgba(99,102,241,0.12);color:#c7d2fe;border:1.5px solid rgba(99,102,241,0.32);box-shadow:none;font-size:13px;padding:11px}
+.tc-btn.log:hover{background:rgba(99,102,241,0.22);color:#fff;transform:none;box-shadow:none}
+.tc-btn.log:disabled{opacity:.7;cursor:default}
+.att-log-modal{position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(2,6,23,0.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.att-log-modal.open{display:flex}
+.att-log-card{width:min(680px,100%);max-height:84vh;display:flex;flex-direction:column;background:var(--card,#111827);border:1px solid rgba(148,163,184,0.28);border-radius:18px;box-shadow:0 28px 80px rgba(0,0,0,0.55);overflow:hidden;animation:soSlideUp .25s ease both}
+.att-log-head{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid rgba(148,163,184,0.2);background:rgba(99,102,241,0.09)}
+.att-log-title{font-size:16px;font-weight:900;color:var(--text,#f8fafc)}
+.att-log-sub{font-size:11.5px;font-weight:700;color:var(--text-muted,#94a3b8);margin-top:3px;line-height:1.6}
+.att-log-close{margin-inline-start:auto;width:34px;height:34px;border-radius:10px;border:1px solid rgba(148,163,184,0.25);background:rgba(15,23,42,0.35);color:var(--text,#f8fafc);font-size:16px;font-weight:900;cursor:pointer}
+.att-log-body{padding:14px 18px 18px;overflow:auto}
+.att-log-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.att-log-chip{padding:5px 12px;border-radius:999px;font-size:11.5px;font-weight:900;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.28);color:#6ee7b7}
+.att-log-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+.att-log-table th{text-align:right;padding:8px 10px;color:var(--text-muted,#94a3b8);font-size:11px;font-weight:800;border-bottom:1px solid rgba(148,163,184,0.2);background:rgba(15,23,42,0.22)}
+.att-log-table td{text-align:right;padding:9px 10px;border-bottom:1px solid rgba(148,163,184,0.12);color:var(--text,#f8fafc);font-weight:700}
+.att-log-table tr:last-child td{border-bottom:none}
+.att-log-empty{text-align:center;padding:26px 12px;color:var(--text-muted,#94a3b8);font-size:12.5px;font-weight:700;border:1px dashed rgba(148,163,184,0.25);border-radius:12px}
 .tc-btn.loading::after{content:'';position:absolute;inset:0;background:rgba(0,0,0,0.15)}
 @keyframes btnSpin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
 .tc-btn .spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:btnSpin .6s linear infinite;vertical-align:middle;margin:0 6px}
@@ -309,6 +326,18 @@ main{flex:1;position:relative;overflow:hidden}
     <div class="so-name" id="so-name"></div>
     <div class="so-sub" id="so-sub"></div>
     <div class="so-time" id="so-time"></div>
+  </div>
+</div>
+<div class="att-log-modal" id="att-log-modal" aria-hidden="true">
+  <div class="att-log-card">
+    <div class="att-log-head">
+      <div>
+        <div class="att-log-title" id="att-log-title">📋 سجل الحضور</div>
+        <div class="att-log-sub" id="att-log-sub"></div>
+      </div>
+      <button class="att-log-close" type="button" onclick="closeAttendanceLog()" aria-label="إغلاق">✕</button>
+    </div>
+    <div class="att-log-body" id="att-log-body"></div>
   </div>
 </div>
 <div id="checkmark-anim" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;flex-direction:column">
@@ -1075,6 +1104,96 @@ main{flex:1;position:relative;overflow:hidden}
     });
   }
 
+  function _attLogDate(d) {
+    try { return SubscriptionService.fmtAr(d, true); } catch (e) { return String(d || ''); }
+  }
+  function _attLogTime(r) {
+    var t = r.checkInTime || r.createdAt || '';
+    t = String(t || '');
+    var p = t.indexOf('T');
+    if (p >= 0) return t.slice(p + 1, p + 6);
+    return t;
+  }
+  window.openAttendanceLog = async function (session) {
+    if (!session) return;
+    var modal = $('att-log-modal');
+    if (!modal) return;
+    $('att-log-title').textContent = '\uD83D\uDCCB سجل الحضور — ' + (session.subject || '');
+    $('att-log-sub').textContent = (pendingName || '') + ' · الأستاذ: ' + (session.teacher || '');
+    $('att-log-body').innerHTML = '<div class="att-log-empty">جارٍ تحميل سجل الحضور…</div>';
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    try {
+      var fdb = window._db, fs = window._firestore;
+      if (!fdb || !fs) {
+        $('att-log-body').innerHTML = '<div class="att-log-empty">Firebase غير متاح حالياً.</div>';
+        return;
+      }
+      var snap;
+      try {
+        snap = await fs.getDocs(fs.query(fs.collection(fdb, 'support_attendance'), fs.where('studentId', '==', pendingStudentId)));
+      } catch (e1) {
+        snap = await fs.getDocs(fs.query(fs.collection(fdb, 'support_attendance'), fs.where('studentId', '==', String(pendingStudentId))));
+      }
+      var rows = [];
+      snap.forEach(function (d) {
+        var r = d.data();
+        if (r.cancelled) return;
+        if (r.type === 'grace' || r.type === 'grace_session') return;
+        if (!r.date) return;
+        if (String(r.teacherName || '') !== String(session.teacher || '')) return;
+        if (String(r.subjectName || '') !== String(session.subject || '')) return;
+        rows.push(r);
+      });
+      rows.sort(function (a, b) {
+        return (String(b.date) + String(b.checkInTime || b.createdAt || '')).localeCompare(String(a.date) + String(a.checkInTime || a.createdAt || ''));
+      });
+      if (!rows.length) {
+        $('att-log-body').innerHTML = '<div class="att-log-empty">لا توجد حصص حضور مسجلة لهذا الاشتراك بعد.</div>';
+        return;
+      }
+      var firstDate = rows[rows.length - 1].date || '';
+      var lastDate = rows[0].date || '';
+      var body = '<div class="att-log-summary">' +
+        '<span class="att-log-chip">✅ ' + rows.length + ' حصة</span>' +
+        '<span class="att-log-chip">📅 ' + esc(_attLogDate(firstDate)) + ' → ' + esc(_attLogDate(lastDate)) + '</span>' +
+      '</div>';
+      body += '<div style="overflow-x:auto"><table class="att-log-table"><thead><tr><th>#</th><th>التاريخ</th><th>الوقت</th><th>المادة</th><th>الأستاذ</th></tr></thead><tbody>';
+      rows.forEach(function (r, i) {
+        var isTrial = r.type === 'trial' || r.type === 'trial_session';
+        body += '<tr>' +
+          '<td>' + (i + 1) + '</td>' +
+          '<td>' + esc(_attLogDate(r.date)) + '</td>' +
+          '<td dir="ltr" style="text-align:right">' + esc(_attLogTime(r) || '—') + '</td>' +
+          '<td>' + esc(r.subjectName || session.subject || '') + (isTrial ? ' <span style="font-size:10px;color:#d97706;font-weight:900">(تجريبية)</span>' : '') + '</td>' +
+          '<td>' + esc(r.teacherName || session.teacher || '') + '</td>' +
+        '</tr>';
+      });
+      body += '</tbody></table></div>';
+      $('att-log-body').innerHTML = body;
+    } catch (e) {
+      console.error('[ATTENDANCE LOG] load failed', e);
+      $('att-log-body').innerHTML = '<div class="att-log-empty">تعذر تحميل سجل الحضور. حاول مرة أخرى.</div>';
+    }
+  };
+  window.closeAttendanceLog = function () {
+    var modal = $('att-log-modal');
+    if (!modal) return;
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+  };
+  (function bindAttendanceLogModal() {
+    var modal = $('att-log-modal');
+    if (modal) {
+      modal.addEventListener('click', function (e) {
+        if (e.target === modal) window.closeAttendanceLog();
+      });
+    }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') window.closeAttendanceLog();
+    });
+  })();
+
   function renderTeacherCards(sessions) {
     var html = '<div class="ts-grid" id="tc-grid">';
     for (var i = 0; i < sessions.length; i++) {
@@ -1095,7 +1214,7 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
         html += '<div style="font-size:13px;font-weight:800;color:#6b7280">التسجيل غير متاح حالياً</div>';
         html += '<div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;line-height:1.6">لم يبدأ المركز تسجيل الحضور لهذا الأستاذ بعد.<br>يرجى الانتظار حتى يقوم الإدارة بفتح الحضور.</div>';
         html += '</div>';
-        html += '<div class="tc-btn-wrap"><button class="tc-btn red" disabled>\uD83D\uDD12 الحضور مغلق</button></div>';
+        html += '<div class="tc-btn-wrap"><button class="tc-btn red" disabled>\uD83D\uDD12 الحضور مغلق</button><button class="tc-btn log" data-logidx="' + i + '">\uD83D\uDCCB عرض سجل الحضور</button></div>';
         html += '</div>';
         continue;
       }
@@ -1140,6 +1259,7 @@ if (hasActiveSub) {
       } else {
         html += '<button class="tc-btn purple" data-sidx="' + i + '" data-allow="1">السماح بالحضور</button>';
       }
+      html += '<button class="tc-btn log" data-logidx="' + i + '">\uD83D\uDCCB عرض سجل الحضور</button>';
       html += '</div></div>';
     }
     html += '</div>';
@@ -1149,6 +1269,12 @@ if (hasActiveSub) {
         var idx = parseInt(btn.getAttribute('data-sidx'), 10);
         if (btn.getAttribute('data-allow') === '1') { handleAllowCheckIn(sessions[idx], btn); }
         else { handleCheckIn(sessions[idx], btn); }
+      });
+    });
+    document.querySelectorAll('.tc-btn[data-logidx]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var idx = parseInt(btn.getAttribute('data-logidx'), 10);
+        openAttendanceLog(sessions[idx]);
       });
     });
   }
