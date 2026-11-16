@@ -4792,10 +4792,7 @@
                 </div>
               </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">تاريخ بداية الاشتراك</label>
-              <input class="inp" type="date" id="subx-start" style="width:100%" onchange="subxRenderPreview()">
-            </div>
+            <input type="hidden" id="subx-start">
             <div id="subx-preview" style="margin-top:6px;border:1.5px dashed var(--border);border-radius:12px;padding:14px;background:var(--bg,#f8f9fc)">
               <div style="font-size:12px;font-weight:800;color:var(--text-muted);margin-bottom:10px">معاينة الاشتراك</div>
               <div id="subx-preview-body"></div>
@@ -26798,8 +26795,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var _sessNum = Number(sessions) || 0;
     html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">عدد الحصص' + (count > 1 ? ' الإجمالي' : '') + '</td><td style="padding:5px 6px;font-weight:800">' +
       (isPermanent ? 'بدون حد — الحضور مسموح دائماً' : (count > 1 ? (_sessNum * count) + ' حصة <span style="font-size:11px;color:var(--text-muted)">(' + _sessNum + ' × ' + count + ')</span>' : sessions + ' حصة')) + '</td></tr>';
-    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">تاريخ البداية</td><td style="padding:5px 6px;font-weight:800">' + SubscriptionService.fmtAr(start, true) + '</td></tr>';
-    html += '<tr><td style="padding:5px 6px;color:var(--text-muted);font-weight:700">تاريخ النهاية</td><td style="padding:5px 6px;font-weight:800">' + (isPermanent ? '<span style="color:#7C3AED;font-weight:900">دائم (بلا نهاية)</span>' : SubscriptionService.fmtAr(end, true)) + '</td></tr>';
+    // التاريخ غير مستخدم — الاشتراك يُحتسب بالحصص فقط
     html += '</table>';
     if (count > 1) {
       html += '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);font-size:12px;font-weight:800;color:#047857">✅ سيتم إنشاء اشتراك مستقل لكل مادة من المواد المختارة (' + count + ' اشتراكات) بنفس الباقة وتاريخ البداية.</div>';
@@ -27079,8 +27075,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           '<div><b>الباقة:</b> ' + escX(label) + '</div>' +
           (isPermanent ? '<div><b>الحالة:</b> <span style="color:#7C3AED;font-weight:900">♾️ دائم</span></div>' : '<div><b>السعر:</b> ' + SubscriptionService.fmtPrice(price) + '</div>') +
           '<div><b>الحصص:</b> ' + (isPermanent ? 'بدون حد للأبد' : sessions + ' حصة') + '</div>' +
-          '<div><b>البداية:</b> ' + SubscriptionService.fmtAr(start, true) + '</div>' +
-          '<div><b>النهاية:</b> ' + (isPermanent ? '<span style="color:#7C3AED;font-weight:900">دائم (بلا نهاية)</span>' : SubscriptionService.fmtAr(end, true)) + '</div>' +
+             // التاريخ غير مستخدم — الاشتراك يُحتسب بالحصص فقط
         '</div>';
       const ok = await cmShow('📅', 'تأكيد الاشتراك', summary + '<div style="margin-top:8px;font-size:12px;color:var(--text-muted)">هل تريد تأكيد إنشاء هذا الاشتراك؟</div>', { confirmText: 'تأكيد الاشتراك', success: true });
       if (!ok) { btn.disabled = false; return; }
@@ -27576,6 +27571,85 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     container.innerHTML = html;
   };
 
+  // ── استهلاك حصص الغائبين عند إغلاق الحضور ──
+  // التلاميذ الذين لديهم اشتراك فعّال ولم يسجلوا حضوراً this day
+  // يُعتبرون غائبين وتُستهلك حصة من اشتراكهم.
+  async function atcConsumeAbsent(name, subjectName, teacherId) {
+    var { _db: fdb, _firestore: fs } = window;
+    if (!fdb || !fs) return;
+    var todayStr = atcToday();
+    var normT = atcMatchNorm(name);
+    var normS = subjectName ? subjectName.trim().toLowerCase() : '';
+    // present students today for this teacher/subject
+    var presentSet = new Set();
+    try {
+      var cSnap = await fs.getDocs(fs.query(fs.collection(fdb, 'support_attendance'), fs.where('date', '==', todayStr)));
+      cSnap.forEach(function (d) {
+        var r = d.data();
+        var rSubj = (r.subjectName || '').trim().toLowerCase();
+        var nameMatch = atcMatchNorm(r.teacherName) === normT && (!normS || rSubj === normS);
+        var idMatch = teacherId && r.teacherId && r.teacherId === teacherId && (!normS || rSubj === normS);
+        if ((nameMatch || idMatch) && r.studentId) presentSet.add(String(r.studentId));
+      });
+    } catch (e) { console.warn('[ATC] absent present-set failed', e); }
+    // active subscriptions for this teacher/subject
+    var subs = [];
+    try {
+      if (SubscriptionService && typeof SubscriptionService.adminListSubscriptions === 'function') {
+        subs = await SubscriptionService.adminListSubscriptions();
+      }
+    } catch (e) { console.warn('[ATC] absent subs load failed', e); subs = []; }
+    var consumed = 0;
+    for (var i = 0; i < (subs || []).length; i++) {
+      var row = subs[i] || {};
+      var s = row.subscription || {};
+      if (s.status === 'cancelled' || s.status === 'paused') continue;
+      if (SubscriptionService.isPermanent && SubscriptionService.isPermanent(s)) continue;
+      var teaMatch = atcMatchNorm(s.teacher_name || '') === normT;
+      var idMatch2 = teacherId && s.teacher_id && s.teacher_id === teacherId;
+      if (!teaMatch && !idMatch2) continue;
+      if (normS && String(s.subject_name || '').trim().toLowerCase() !== normS) continue;
+      var sid = String(s.student_id || '');
+      if (!sid || presentSet.has(sid)) continue;
+      // period with remaining sessions
+      var periods = row.periods || [];
+      var period = periods.find(function (p) { return (Number(p.total_sessions || p.totalSessions || 0) - (Number(p.used_sessions) || 0)) > 0; }) || periods[0];
+      var pid = period ? (period.period_id || period.id) : null;
+      if (!pid) continue;
+      try {
+        await SubscriptionService.incrementPeriodUsage(pid, 1);
+        consumed++;
+      } catch (e) { console.warn('[ATC] absent increment failed', e); }
+      // write absent record (best effort)
+      try {
+        var key = (sid + '_' + (s.teacher_id || 'x') + '_' + (s.subject_id || 'x') + '_' + todayStr + '_absent').replace(/[^A-Za-z0-9_.\\-]/g, '_');
+        var doc = {
+          studentId: sid,
+          studentName: '',
+          teacherId: s.teacher_id || teacherId || '',
+          teacherName: s.teacher_name || name,
+          subjectId: s.subject_id || '',
+          subjectName: s.subject_name || subjectName || '',
+          date: todayStr,
+          checkInTime: '',
+          status: 'absent',
+          sessionNumber: 1,
+          level: '',
+          stream: '',
+          institution: '',
+          subscriptionId: s.id || '',
+          subscriptionPeriodId: pid,
+          monthNumber: period ? (period.month_number || 0) : 0,
+          createdAt: new Date().toISOString(),
+          confirmed: true,
+          updatedAt: new Date().toISOString()
+        };
+        await fdb.collection('support_attendance').doc(key).set(doc, { merge: true });
+      } catch (e) { console.warn('[ATC] absent record write failed', e); }
+    }
+    if (consumed > 0) showToast('📌 تم استهلاك ' + consumed + ' حصة للغائبين');
+  }
+
   window.atcCloseFromBar = async function (dk) {
     var parts = dk.split('|||');
     var name = parts[0] || '';
@@ -27605,9 +27679,10 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
             if (ops >= 450) { batch.commit(); batch = fs.writeBatch(fdb); ops = 0; }
           }
         });
-        if (ops > 0) await batch.commit();
-        showToast('✅ تم إغلاق حضور ' + name + (subjectName ? ' — ' + subjectName : '') + ' وتأكيد ' + confirmed + ' سجل');
-        await atcLoad();
+         if (ops > 0) await batch.commit();
+         showToast('✅ تم إغلاق حضور ' + name + (subjectName ? ' — ' + subjectName : '') + ' وتأكيد ' + confirmed + ' سجل');
+         try { await atcConsumeAbsent(name, subjectName, teacherId); } catch (e) { console.warn('[ATC] consume absent failed', e); }
+         await atcLoad();
       }
     } catch (e) { console.error('[ATC] close from bar failed', e); showToast('❌ تعذر إغلاق الحضور', true); }
   };
@@ -27657,9 +27732,10 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           }
         });
         if (ops2 > 0) await batch2.commit();
-        showToast('✅ تم إغلاق الحضور وتأكيد ' + confirmed + ' سجل');
-        if (window.dashLog) window.dashLog('حضور', 'إغلاق حضور وتأكيد سجلات', 'تم إغلاق حضور ' + name + (subjectName ? ' — ' + subjectName : '') + ' وتأكيد ' + confirmed + ' سجل');
-      } catch (e) { console.error('[ATC] confirm records failed', e); }
+         showToast('✅ تم إغلاق الحضور وتأكيد ' + confirmed + ' سجل');
+         if (window.dashLog) window.dashLog('حضور', 'إغلاق حضور وتأكيد سجلات', 'تم إغلاق حضور ' + name + (subjectName ? ' — ' + subjectName : '') + ' وتأكيد ' + confirmed + ' سجل');
+         try { await atcConsumeAbsent(name, subjectName, teacherId); } catch (e) { console.warn('[ATC] consume absent failed', e); }
+       } catch (e) { console.error('[ATC] confirm records failed', e); }
     } else {
       showToast('✅ تم بدء الحضور — التلاميذ يمكنهم الآن تسجيل الحضور');
     }
@@ -27811,8 +27887,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         '<div class="subx-detail-cell"><span class="subx-detail-label">الباقة</span><span class="subx-detail-val">' + escX(pkg ? pkg.label : ((sub.months || '—') + ' شهر')) + '</span></div>' +
         '<div class="subx-detail-cell"><span class="subx-detail-label">المستوى</span><span class="subx-detail-val">' + escX(stu.level || '—') + '</span></div>' +
         (stu.stream ? '<div class="subx-detail-cell"><span class="subx-detail-label">الشعبة</span><span class="subx-detail-val">' + escX(stu.stream) + '</span></div>' : '') +
-        '<div class="subx-detail-cell"><span class="subx-detail-label">تاريخ البداية</span><span class="subx-detail-val">' + SubscriptionService.fmtAr(sub.start_date, true) + '</span></div>' +
-        '<div class="subx-detail-cell"><span class="subx-detail-label">تاريخ النهاية</span><span class="subx-detail-val">' + (perm ? '♾️ دائم — لا ينتهي' : SubscriptionService.fmtAr(sub.end_date, true)) + '</span></div>' +
+         // التاريخ غير مستخدم — الاشتراك يُحتسب بالحصص فقط
         (perm
           ? '<div class="subx-detail-cell" style="grid-column:span 2"><span class="subx-detail-label">إجمالي الحصص</span><span class="subx-detail-val" style="display:flex;align-items:center;gap:8px"><span style="font-size:20px;line-height:1">♾️</span><span><b style="font-size:15px;color:#7c3aed">اشتراك دائم</b><span style="display:block;font-size:11px;color:var(--text-muted)">حصص غير محدودة — حضور بلا حدود</span></span></span></div>'
           : '<div class="subx-detail-cell"><span class="subx-detail-label">إجمالي الحصص</span><span class="subx-detail-val">' + total + ' حصة</span></div>' +
@@ -27829,7 +27904,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           if (perm) {
             html += '<div class="subx-detail-month">' +
               '<div class="subx-detail-month-num">فترة العضوية الدائمة</div>' +
-              '<div class="subx-detail-month-dates">' + SubscriptionService.fmtAr(p.start_date, true) + ' → ♾️ مستمرة</div>' +
+               '<div class="subx-detail-month-dates">♾️ حضور مستمر — حضر حتى الآن ' + u + ' حصة</div>' +
               '<span class="subx-status" style="background:rgba(124,58,237,0.12);color:#7c3aed;border:1px solid rgba(124,58,237,0.3);padding:3px 10px;border-radius:8px;font-size:10.5px;font-weight:800">بدون حدود — لا تُخصم الحصص</span>' +
             '</div>' +
             '<div style="margin:0 14px 12px;padding:16px;border:1.5px dashed rgba(124,58,237,0.35);border-radius:12px;background:rgba(124,58,237,0.06);text-align:center">' +
@@ -27846,7 +27921,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
               : 'background:var(--border);color:var(--text-muted)';
             html += '<div class="subx-detail-month">' +
               '<div class="subx-detail-month-num">الشهر ' + (p.month_number || '—') + '</div>' +
-              '<div class="subx-detail-month-dates">' + SubscriptionService.fmtAr(p.start_date, true) + ' → ' + SubscriptionService.fmtAr(p.end_date, true) + '</div>' +
+               '<div class="subx-detail-month-dates">حصص: ' + t + ' — حضر: ' + u + ' — متبقي: ' + Math.max(0, t - u) + '</div>' +
               '<span class="subx-status" style="' + msBg + ';padding:3px 10px;border-radius:8px;font-size:10.5px;font-weight:800">' + SubscriptionService.monthStatusLabel(ms) + '</span>' +
             '</div>' +
             '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:0 14px 8px;font-size:11px;font-weight:800">' +

@@ -522,15 +522,13 @@ const SubscriptionService = (function () {
   // ── حالات العرض (لا تعتمد على التاريخ فقط) ─────────────
   // اشتراك: active | upcoming | expired | done | cancelled
   function subscriptionStatus(sub, refDate) {
-    const r = refDate || today();
     if (sub.status === 'cancelled') return 'cancelled';
     if (sub.status === 'paused') return 'paused';
     if (sub.status === 'permanent') return 'active';
-    if (r < (sub.start_date || '')) return 'upcoming';
-    if (r > (sub.end_date || '')) return 'expired';
     const periods = (sub.periods || []);
-    const active = periods.find(p => p && r >= p.start_date && r <= p.end_date);
-    if (active && (active.remaining_sessions || 0) <= 0) return 'done';
+    const total = Number(sub.total_sessions) || periods.reduce((a, p) => a + (Number(p.total_sessions) || 0), 0) || (Number(sub.months) || 1) * 8;
+    const used = periods.reduce((a, p) => a + (Number(p.used_sessions) || 0), 0);
+    if (total > 0 && used >= total) return 'done';
     return 'active';
   }
 
@@ -553,13 +551,11 @@ const SubscriptionService = (function () {
 
   // شهر واحد: upcoming | active | full | completed | expired_remain
   function monthStatus(p, refDate) {
-    const r = refDate || today();
     const used = p.used_sessions || 0;
     const total = p.total_sessions || SESSIONS_PER_MONTH;
     const remaining = Math.max(0, total - used);
-    if (r < (p.start_date || '')) return 'upcoming';
-    if (r > (p.end_date || '')) return remaining > 0 ? 'expired_remain' : 'completed';
-    return remaining <= 0 ? 'full' : 'active';
+    if (remaining <= 0) return 'full';
+    return 'active';
   }
 
   function monthStatusLabel(st) {
