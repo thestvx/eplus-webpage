@@ -4740,9 +4740,8 @@
             </div>
             <div class="form-group">
               <label class="form-label">المواد + الأساتذة <span style="font-weight:600;color:var(--text-muted);font-size:11px">(يمكن اختيار أكثر من مادة)</span></label>
-              <select class="inp" id="subx-subject" style="width:100%;min-height:112px;padding:6px" onchange="subxOnSubjectChange()" disabled>
-                <option value="">— اختر مادة أو أكثر —</option>
-              </select>
+              <div id="subx-subject-list" style="display:grid;gap:8px;max-height:220px;overflow:auto;padding:8px;border:1.5px solid var(--border);border-radius:12px;background:var(--card)"></div>
+              <select id="subx-subject" multiple style="display:none"></select>
               <div id="subx-subject-note" class="subx-note" style="margin-top:6px"></div>
             </div>
             <div class="form-group">
@@ -4841,8 +4840,8 @@
               <select id="subx-logs-subject" onchange="_subxRefreshDateOptions()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
                 <option value="">كل المواد</option>
               </select>
-              <select id="subx-logs-year" onchange="_subxRefreshDateOptions()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
-                <option value="">🎓 كل السنوات الدراسية</option>
+              <select id="subx-logs-level" onchange="_subxRefreshDateOptions()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
+                <option value="">🎓 كل المستويات الدراسية</option>
               </select>
               <select id="subx-logs-date" onchange="subxLogsFilter()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:var(--card)">
                 <option value="">📅 كل التواريخ</option>
@@ -26264,8 +26263,10 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     $x('subx-combo-list').classList.remove('open');
     renderStudentCard(null);
     const subj = $x('subx-subject');
-    subj.innerHTML = '<option value="">— اختر المادة —</option>';
+    subj.innerHTML = '';
     subj.disabled = true;
+    const list = $x('subx-subject-list');
+    if (list) list.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;font-weight:700">— اختر الطالب أولاً —</div>';
     $x('subx-subject-note').innerHTML = '';
     $x('subx-valid-msg').style.display = 'none';
     $x('subx-scan-hint').innerHTML = '🟢 بانتظار مسح بطاقة الطالب…';
@@ -26397,17 +26398,21 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   // ── المادة + الأستاذ (من subjects الطالب — مصدر التسجيل الموحّد) ──
   async function subxLoadSubjectOptions() {
     const subj = $x('subx-subject');
-    subj.multiple = true;
-    subj.innerHTML = '<option value="">— اختر مادة أو أكثر —</option>';
+    subj.innerHTML = '';
     subj.disabled = true;
+    const list = $x('subx-subject-list');
+    if (list) list.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;font-weight:700">جارٍ تحميل المواد…</div>';
     $x('subx-subject-note').innerHTML = '';
     _subjectOptions = [];
     selectedSubjects = [];
     selectedSubject = null;
-    if (!selectedStudent) return;
+    if (!selectedStudent) {
+      if (list) list.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;font-weight:700">— اختر الطالب أولاً —</div>';
+      return;
+    }
     const arr = Array.isArray(selectedStudent.subjects) ? selectedStudent.subjects : [];
     if (!arr.length) {
-      subj.innerHTML = '<option value="">لا توجد مواد مسجلة لهذا الطالب</option>';
+      if (list) list.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;font-weight:700">لا توجد مواد مسجلة لهذا الطالب</div>';
       $x('subx-subject-note').innerHTML = 'لم يسجل هذا الطالب في أي مادة بعد — يجب تسجيل المواد لدى الإدارة أولاً.';
       return;
     }
@@ -26441,29 +26446,36 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       });
     }
     if (!_subjectOptions.length) {
-      subj.innerHTML = '<option value="">لا توجد مواد صالحة</option>';
+      if (list) list.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;font-weight:700">لا توجد مواد مكتملة البيانات لهذا الطالب</div>';
       $x('subx-subject-note').innerHTML = 'لا توجد مواد مكتملة البيانات لهذا الطالب.';
       return;
     }
     subj.disabled = false;
-    subj.innerHTML = '<option value="">— اختر مادة أو أكثر —</option>' + _subjectOptions.map(function (o, i) {
+    subj.innerHTML = _subjectOptions.map(function (o, i) {
       return '<option value="' + i + '">' + o.icon + ' ' + escX(o.subjectName) + (o.teacherName ? ' — الأستاذ ' + escX(o.teacherName) : '') + '</option>';
     }).join('');
-    subj.size = Math.min(7, Math.max(3, _subjectOptions.length));
-    if (!subj._subxMultiBound) {
-      subj._subxMultiBound = true;
-      subj.addEventListener('mousedown', function (e) {
-        var op = e.target && e.target.tagName === 'OPTION' ? e.target : null;
-        if (!op) return;
-        e.preventDefault();
-        op.selected = !op.selected;
-        subxOnSubjectChange();
+    if (list) {
+      list.innerHTML = _subjectOptions.map(function (o, i) {
+        return '<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg,#f8f9fc);cursor:pointer;font-size:13px;font-weight:800">' +
+          '<input type="checkbox" data-subject-idx="' + i + '" style="width:16px;height:16px;accent-color:#059669">' +
+          '<span style="flex:1;min-width:0">' + o.icon + ' ' + escX(o.subjectName) + (o.teacherName ? ' — <span style="color:var(--text-muted);font-weight:700">الأستاذ ' + escX(o.teacherName) + '</span>' : '') + '</span>' +
+          (o.teacherId ? '' : '<span style="font-size:10px;color:#d97706;font-weight:900">⚠️</span>') +
+        '</label>';
+      }).join('');
+      list.querySelectorAll('input[data-subject-idx]').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+          var idx = Number(cb.getAttribute('data-subject-idx'));
+          var opt = subj.options[idx];
+          if (opt) opt.selected = cb.checked;
+          subxOnSubjectChange();
+        });
       });
     }
   }
 
   window.subxOnSubjectChange = function () {
     const subj = $x('subx-subject');
+    var _seenSubj = {};
     var _seenSubj = {};
     selectedSubjects = Array.from(subj.selectedOptions || [])
       .filter(function (op) { return op.value !== ''; })
@@ -26476,6 +26488,14 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         return true;
       });
     selectedSubject = selectedSubjects[0] || null;
+    var list = $x('subx-subject-list');
+    if (list) {
+      list.querySelectorAll('input[data-subject-idx]').forEach(function (cb) {
+        var idx = Number(cb.getAttribute('data-subject-idx'));
+        var opt = subj.options[idx];
+        cb.checked = !!(opt && opt.selected);
+      });
+    }
     const note = $x('subx-subject-note');
     if (!selectedSubjects.length) {
       note.innerHTML = '';
@@ -28089,7 +28109,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         const r = d.data();
         if (r.type === 'grace') return;
         if (!r.date) return;
-        rows.push({ id: d.id, studentId: r.studentId || '', studentName: r.studentName || '', date: r.date, time: r.checkInTime || r.createdAt || '', teacherName: r.teacherName || '', subjectName: r.subjectName || '', type: r.type || '', cancelled: r.cancelled || false, confirmed: r.confirmed !== false });
+        rows.push({ id: d.id, studentId: r.studentId || '', studentName: r.studentName || '', date: r.date, time: r.checkInTime || r.createdAt || '', teacherName: r.teacherName || '', subjectName: r.subjectName || '', level: r.level || '', type: r.type || '', cancelled: r.cancelled || false, confirmed: r.confirmed !== false });
       });
       rows.sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
       window._subxLogsData = rows;
@@ -28099,7 +28119,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       var sSel = document.getElementById('subx-logs-subject');
       if (tSel) { var tv = tSel.value; tSel.innerHTML = '<option value="">كل الأساتذة</option>'; Array.from(tSet).sort().forEach(function (n) { tSel.innerHTML += '<option value="' + escX(n) + '">' + escX(n) + '</option>'; }); tSel.value = tv; }
       if (sSel) { var sv = sSel.value; sSel.innerHTML = '<option value="">كل المواد</option>'; Array.from(sSet).sort().forEach(function (n) { sSel.innerHTML += '<option value="' + escX(n) + '">' + escX(n) + '</option>'; }); sSel.value = sv; }
-      _subxPopulateYears(rows);
+      _subxPopulateLevels(rows);
       _subxPopulateDates(rows);
       subxLogsFilter();
     } catch (e) {
@@ -28118,36 +28138,26 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     for (var i = 0; i < arr.length; i += 8) out.push(arr.slice(i, i + 8));
     return out;
   }
-  // ── السنة الدراسية: من 1 سبتمبر إلى 31 أوت ──
-  function _subxAcademicYear(dateStr) {
-    var m = String(dateStr || '').match(/^(\d{4})-(\d{2})/);
-    if (!m) return '';
-    var y = Number(m[1]), mo = Number(m[2]);
-    if (!y || !mo) return '';
-    var start = mo >= 9 ? y : y - 1;
-    return start + '/' + (start + 1);
-  }
-  function _subxPopulateYears(rows) {
-    var ySel = document.getElementById('subx-logs-year');
-    if (!ySel) return;
+  function _subxPopulateLevels(rows) {
+    var lSel = document.getElementById('subx-logs-level');
+    if (!lSel) return;
     var tEl = document.getElementById('subx-logs-teacher');
     var sEl = document.getElementById('subx-logs-subject');
     var teacherFilter = tEl ? (tEl.value || '') : '';
     var subjectFilter = sEl ? (sEl.value || '') : '';
-    var yv = ySel.value;
-    var ySet = new Set();
+    var lv = lSel.value;
+    var lSet = new Set();
     (rows || window._subxLogsData || []).forEach(function (r) {
       if (teacherFilter && r.teacherName !== teacherFilter) return;
       if (subjectFilter && r.subjectName !== subjectFilter) return;
-      var y = _subxAcademicYear(r.date);
-      if (y) ySet.add(y);
+      if (r.level) lSet.add(r.level);
     });
-    ySel.innerHTML = '<option value="">🎓 كل السنوات الدراسية</option>';
-    Array.from(ySet).sort().reverse().forEach(function (y) {
-      ySel.innerHTML += '<option value="' + escX(y) + '">' + escX('السنة الدراسية ' + y) + '</option>';
+    lSel.innerHTML = '<option value="">🎓 كل المستويات الدراسية</option>';
+    Array.from(lSet).sort().forEach(function (l) {
+      lSel.innerHTML += '<option value="' + escX(l) + '">' + escX(l) + '</option>';
     });
-    ySel.value = yv;
-    if (ySel.value !== yv) ySel.value = '';
+    lSel.value = lv;
+    if (lSel.value !== lv) lSel.value = '';
   }
   // ── قائمة التواريخ المنسدلة: تُبنى حسب فلتر السنة/الأستاذ/المادة (لا تظهر تواريخ بلا حصص) ──
   function _subxPopulateDates(rows) {
@@ -28155,14 +28165,14 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     if (!dSel) return;
     var tEl = document.getElementById('subx-logs-teacher');
     var sEl = document.getElementById('subx-logs-subject');
-    var yEl = document.getElementById('subx-logs-year');
+    var lEl = document.getElementById('subx-logs-level');
     var teacherFilter = tEl ? (tEl.value || '') : '';
     var subjectFilter = sEl ? (sEl.value || '') : '';
-    var yearFilter = yEl ? (yEl.value || '') : '';
+    var levelFilter = lEl ? (lEl.value || '') : '';
     var dv = dSel.value;
     var dSet = new Set();
     (rows || window._subxLogsData || []).forEach(function (r) {
-      if (yearFilter && _subxAcademicYear(r.date) !== yearFilter) return;
+      if (levelFilter && r.level !== levelFilter) return;
       if (teacherFilter && r.teacherName !== teacherFilter) return;
       if (subjectFilter && r.subjectName !== subjectFilter) return;
       if (r.date) dSet.add(r.date);
@@ -28172,7 +28182,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     dSel.value = dv;
     if (dSel.value !== dv) dSel.value = '';
   }
-  window._subxRefreshDateOptions = function () { _subxPopulateYears(window._subxLogsData); _subxPopulateDates(window._subxLogsData); subxLogsFilter(); };
+  window._subxRefreshDateOptions = function () { _subxPopulateLevels(window._subxLogsData); _subxPopulateDates(window._subxLogsData); subxLogsFilter(); };
   // ── شريط أرشفة «حضور هذا التاريخ» (يظهر عند تحديد تاريخ) ──
   function _subxDateArchiveBar() {
     var dEl = document.getElementById('subx-logs-date');
@@ -28180,13 +28190,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     if (!dateFilter) return '';
     var tEl = document.getElementById('subx-logs-teacher');
     var sEl = document.getElementById('subx-logs-subject');
-    var yEl = document.getElementById('subx-logs-year');
+    var lEl = document.getElementById('subx-logs-level');
     var teacherFilter = tEl ? (tEl.value || '') : '';
     var subjectFilter = sEl ? (sEl.value || '') : '';
-    var yearFilter = yEl ? (yEl.value || '') : '';
+    var levelFilter = lEl ? (lEl.value || '') : '';
     var n = _getFilteredLogs().length;
     var scope = ['تاريخ ' + dateFilter];
-    if (yearFilter) scope.push('السنة ' + yearFilter);
+    if (levelFilter) scope.push('المستوى ' + levelFilter);
     if (teacherFilter) scope.push('الأستاذ ' + teacherFilter);
     if (subjectFilter) scope.push('المادة ' + subjectFilter);
     return '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;margin-bottom:12px;border:1.5px solid rgba(16,185,129,0.3);background:rgba(16,185,129,0.06);border-radius:12px;flex-wrap:wrap">'
@@ -28251,12 +28261,12 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
   function _getFilteredLogs() {
     var q = (document.getElementById('subx-logs-search').value || '').trim().toLowerCase();
     var dateFilter = document.getElementById('subx-logs-date').value || '';
-    var yearFilter = (document.getElementById('subx-logs-year') || {}).value || '';
+    var levelFilter = (document.getElementById('subx-logs-level') || {}).value || '';
     var teacherFilter = document.getElementById('subx-logs-teacher').value || '';
     var subjectFilter = document.getElementById('subx-logs-subject').value || '';
     return (window._subxLogsData || []).filter(function (r) {
       if (r.cancelled) return false;
-      if (yearFilter && _subxAcademicYear(r.date) !== yearFilter) return false;
+      if (levelFilter && r.level !== levelFilter) return false;
       if (dateFilter && r.date !== dateFilter) return false;
       if (teacherFilter && r.teacherName !== teacherFilter) return false;
       if (subjectFilter && r.subjectName !== subjectFilter) return false;
@@ -28273,10 +28283,10 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var t = (document.getElementById('subx-logs-teacher') || {}).value || '';
     var s = (document.getElementById('subx-logs-subject') || {}).value || '';
     var d = (document.getElementById('subx-logs-date') || {}).value || '';
-    var y = (document.getElementById('subx-logs-year') || {}).value || '';
+    var l = (document.getElementById('subx-logs-level') || {}).value || '';
     return (window._subxLogsData || []).filter(function (r) {
       if (r.cancelled) return false;
-      if (y && _subxAcademicYear(r.date) !== y) return false;
+      if (l && r.level !== l) return false;
       if (d && r.date !== d) return false;
       if (t && r.teacherName !== t) return false;
       if (s && r.subjectName !== s) return false;
@@ -28310,11 +28320,11 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var t = (document.getElementById('subx-logs-teacher') || {}).value || '';
     var s = (document.getElementById('subx-logs-subject') || {}).value || '';
     var dateFilter = (document.getElementById('subx-logs-date') || {}).value || '';
-    var yearFilter = (document.getElementById('subx-logs-year') || {}).value || '';
+    var levelFilter = (document.getElementById('subx-logs-level') || {}).value || '';
     var dates = rows.map(function (r) { return r.date; }).filter(Boolean).sort();
     document.getElementById('subx-csv-scope').innerHTML =
       'الأستاذ: <b>' + escX(t || 'كل الأساتذة') + '</b>' + (s ? ' · المادة: <b>' + escX(s) + '</b>' : '')
-      + (yearFilter ? ' · السنة: <b>' + escX(yearFilter) + '</b>' : '')
+      + (levelFilter ? ' · المستوى: <b>' + escX(levelFilter) + '</b>' : '')
       + (dateFilter ? ' · التاريخ: <b>' + escX(dateFilter) + '</b>' : '')
       + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">' + rows.length + ' سجل · من ' + escX(dates[0] || '—') + ' إلى ' + escX(dates[dates.length - 1] || '—') + '</div>';
     var from = document.getElementById('subx-csv-from');
@@ -28341,7 +28351,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var s = (document.getElementById('subx-logs-subject') || {}).value || '';
     // تاريخ محدّد في القائمة → التصدير له وحده (تُتجاهل باقي خيارات النطاق).
     var dateFilter = (document.getElementById('subx-logs-date') || {}).value || '';
-    var yearFilter = (document.getElementById('subx-logs-year') || {}).value || '';
+    var levelFilter = (document.getElementById('subx-logs-level') || {}).value || '';
     var allDates = dateFilter ? false : document.getElementById('subx-csv-alldates').checked;
     var from = dateFilter || document.getElementById('subx-csv-from').value;
     var to = dateFilter || document.getElementById('subx-csv-to').value;
@@ -28385,7 +28395,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     csvRows.push(['سجل الحضور — ' + scopeLabel]);
     var sc = ['الأستاذ: ' + (t || 'كل الأساتذة')];
     if (s) sc.push('المادة: ' + s);
-    if (yearFilter) sc.push('السنة الدراسية: ' + yearFilter);
+    if (levelFilter) sc.push('المستوى: ' + levelFilter);
     csvRows.push([sc.join('  |  ')]);
     var meta = 'عدد التلاميذ: ' + groups.length + ' — مجموع الحصص: ' + rows.length;
     if (allDates && ds.length) meta += ' — من ' + ds[0] + ' إلى ' + ds[ds.length - 1];
@@ -28404,7 +28414,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     a.href = url;
     var label = t ? t.replace(/[\\/:*?"<>|]/g, '_') : 'كل_الأساتذة';
     if (s) label += '_' + s.replace(/[\\/:*?"<>|]/g, '_');
-    if (yearFilter) label += '_' + yearFilter.replace(/[\\/:*?"<>|]/g, '_');
+    if (levelFilter) label += '_' + levelFilter.replace(/[\\/:*?"<>|]/g, '_');
     label += allDates ? '_كل_التواريخ' : '_' + scopeLabel.replace(/[\\/:*?"<>|]/g, '_');
     a.download = 'سجل_الحضور_' + label + '_' + new Date().toISOString().slice(0, 10) + '.csv';
     document.body.appendChild(a);
@@ -28433,8 +28443,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       var teacherFilter = document.getElementById('subx-logs-teacher').value || '';
       var subjectFilter = document.getElementById('subx-logs-subject').value || '';
       var dateFilter = document.getElementById('subx-logs-date').value || '';
-      var yearFilter = (document.getElementById('subx-logs-year') || {}).value || '';
-      var hasFilter = teacherFilter || subjectFilter || dateFilter || yearFilter;
+      var levelFilter = (document.getElementById('subx-logs-level') || {}).value || '';
+      var hasFilter = teacherFilter || subjectFilter || dateFilter || levelFilter;
 
       if (!hasFilter) {
         var ok = await cmConfirm('⚠️ حذف كل السجلات', 'لم تحدد فلتر — سيتم حذف جميع سجلات الحضور.\nهل أنت متأكد؟', '🗑️', { danger: true, confirmText: 'حذف الكل' });
@@ -28451,8 +28461,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         var r = d.data();
         if (r.type === 'grace' || r.type === 'grace_session') return;
         if (hasFilter) {
-          if (yearFilter && _subxAcademicYear(r.date) !== yearFilter) { skipped++; return; }
-          if (teacherFilter && r.teacherName !== teacherFilter) { skipped++; return; }
+        if (levelFilter && r.level !== levelFilter) { skipped++; return; }
+        if (teacherFilter && r.teacherName !== teacherFilter) { skipped++; return; }
           if (subjectFilter && r.subjectName !== subjectFilter) { skipped++; return; }
           if (dateFilter && r.date !== dateFilter) { skipped++; return; }
         }
