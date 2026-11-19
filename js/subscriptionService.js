@@ -440,8 +440,8 @@ const SubscriptionService = (function () {
     const pkg = packageByMonths(months);
     const isCustom = !!opts.permanent || !!(opts.totalSessions || opts.totalPrice);
     const price = opts.permanent ? (opts.totalPrice || 0) : (isCustom ? (opts.totalPrice || pkg.price) : pkg.price);
-    const paymentId = opts.paymentId || ('SUBPAY-' + opts.studentId + '-' + (opts.subjectId || '') + '-' + start + '-' + months + (opts.permanent ? '-PERM' : ''));
-    const data = await _adminCall('create-subscription', {
+    const paymentId = opts.paymentId || ('SUBPAY-' + opts.studentId + '-' + (opts.subjectId || '') + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
+    const data = await _adminCall('create-subscription-fresh', {
       studentId: opts.studentId,
       months: months,
       startDate: start,

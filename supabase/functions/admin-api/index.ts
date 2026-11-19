@@ -22,6 +22,21 @@ async function rpc(fn: string, args: Record<string, unknown>) {
   return json({ ok: true, data });
 }
 
+function addMonthsYMD(start: string, months: number): string {
+  const [y, m, d] = start.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, (m - 1) + months, 1));
+  const lastDay = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0)).getUTCDate();
+  dt.setUTCDate(Math.min(d || 1, lastDay));
+  return dt.toISOString().slice(0, 10);
+}
+
+function dayBefore(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() - 1);
+  return dt.toISOString().slice(0, 10);
+}
+
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
@@ -90,6 +105,91 @@ Deno.serve(async (req) => {
         p_teacher_name: body.teacherName == null ? null : String(body.teacherName),
         p_subject_name: body.subjectName == null ? null : String(body.subjectName),
       });
+
+    case 'create-subscription-fresh': {
+      const studentId = String(body.studentId || '');
+      const teacherId = String(body.teacherId || '');
+      const subjectId = String(body.subjectId || '');
+      const paymentId = String(body.paymentId || '');
+      if (!studentId) return json({ error: 'studentId required' }, 400);
+      if (!teacherId || !subjectId) return json({ error: 'subjectId and teacherId required' }, 400);
+      if (!paymentId) return json({ error: 'paymentId required' }, 400);
+
+      const permanent = body.permanent === true;
+      const months = permanent ? 1 : (Number(body.months) || 1);
+      if (!permanent && ![1, 2, 3].includes(months)) return json({ error: 'months must be 1, 2 or 3' }, 400);
+      const startDate = String(body.startDate || new Date().toISOString().slice(0, 10));
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return json({ error: 'invalid startDate' }, 400);
+
+      const totalSessions = permanent
+        ? 100000
+        : (body.totalSessions != null && Number(body.totalSessions) > 0 ? Number(body.totalSessions) : months * 8);
+      const totalPrice = Math.max(0, Number(body.totalPrice) || 0);
+      const endDate = permanent ? '2099-12-31' : dayBefore(addMonthsYMD(startDate, months));
+      const subId = 'SUB-' + studentId + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      const today = new Date().toISOString().slice(0, 10);
+
+      const subscriptionRow = {
+        id: subId,
+        student_id: studentId,
+        teacher_id: teacherId,
+        subject_id: subjectId,
+        teacher_name: String(body.teacherName || ''),
+        subject_name: String(body.subjectName || ''),
+        start_date: startDate,
+        end_date: endDate,
+        months,
+        total_price: totalPrice,
+        total_sessions: totalSessions,
+        status: permanent ? 'permanent' : 'active',
+        payment_id: paymentId,
+        notes: body.notes == null ? '' : String(body.notes),
+      };
+
+      const periodRows: Record<string, unknown>[] = [];
+      const customSessions = body.totalSessions != null && Number(body.totalSessions) > 0;
+      const baseSessions = customSessions ? Math.floor(totalSessions / months) : 8;
+      const extraSessions = customSessions ? totalSessions % months : 0;
+      for (let i = 0; i < months; i++) {
+        const pStart = addMonthsYMD(startDate, i);
+        const pEnd = permanent ? '2099-12-31' : dayBefore(addMonthsYMD(startDate, i + 1));
+        const perSessions = permanent ? totalSessions : baseSessions + (i < extraSessions ? 1 : 0);
+        periodRows.push({
+          id: subId + '-M' + (i + 1),
+          subscription_id: subId,
+          month_number: i + 1,
+          start_date: pStart,
+          end_date: pEnd,
+          total_sessions: perSessions,
+          used_sessions: 0,
+          remaining_sessions: permanent ? 100000 : perSessions,
+          status: permanent || (today >= pStart && today <= pEnd) ? 'active' : (today < pStart ? 'upcoming' : 'completed'),
+        });
+      }
+
+      const { data: subscription, error: subErr } = await supabase
+        .from('student_subscriptions')
+        .insert(subscriptionRow)
+        .select()
+        .single();
+      if (subErr) return json({ error: subErr.message, code: subErr.code || null }, 400);
+
+      const { data: periods, error: periodErr } = await supabase
+        .from('subscription_periods')
+        .insert(periodRows)
+        .select();
+      if (periodErr) return json({ error: periodErr.message, code: periodErr.code || null }, 400);
+
+      return json({
+        ok: true,
+        data: {
+          merged: false,
+          subscription,
+          periods: periods || [],
+          note: 'اشتراك جديد مستقل — لا دمج مع اشتراكات سابقة ولا جمع للأسعار',
+        },
+      });
+    }
 
     case 'pause-subscription':
       return rpc('admin_pause_subscription', {

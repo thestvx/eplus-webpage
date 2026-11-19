@@ -132,6 +132,7 @@ main{flex:1;position:relative;overflow:hidden}
 .scan-overlay.orange{background:linear-gradient(135deg,rgba(180,83,9,0.92),rgba(245,158,11,0.88));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
 .scan-overlay.red{background:linear-gradient(135deg,rgba(220,38,38,0.92),rgba(239,68,68,0.88));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
 .scan-overlay.purple{background:linear-gradient(135deg,rgba(124,58,237,0.92),rgba(168,85,247,0.88));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.scan-overlay.gold{background:linear-gradient(135deg,rgba(180,83,9,0.94),rgba(245,158,11,0.9));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
 .scan-overlay .so-inner{text-align:center;color:#fff;animation:soSlideUp .4s ease both}
 .scan-overlay .so-icon{width:100px;height:100px;margin:0 auto 20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:48px;background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.25);animation:soPulse .6s ease both}
 .scan-overlay .so-title{font-size:28px;font-weight:900;margin-bottom:8px;text-shadow:0 2px 8px rgba(0,0,0,0.2)}
@@ -201,9 +202,13 @@ main{flex:1;position:relative;overflow:hidden}
 .tc-btn.done{background:rgba(5,150,105,0.15);color:#6ee7b7;cursor:default;box-shadow:none}
 .tc-btn.red{background:rgba(220,38,38,0.12);color:#f87171;border:1.5px solid rgba(220,38,38,0.25);cursor:default;box-shadow:none}
 .tc-btn.disabled{background:rgba(220,38,38,0.15);color:#fca5a5;cursor:default;box-shadow:none}
-.tc-btn.log{background:linear-gradient(135deg,rgba(99,102,241,0.22),rgba(129,140,248,0.18));color:#eef2ff;border:1.5px solid rgba(129,140,248,0.45);box-shadow:0 4px 14px rgba(99,102,241,0.18);font-size:13px;padding:11px;font-weight:900}
-.tc-btn.log:hover{background:linear-gradient(135deg,rgba(99,102,241,0.34),rgba(129,140,248,0.28));color:#fff;transform:none;box-shadow:0 6px 18px rgba(99,102,241,0.28)}
+.tc-btn.log{background:linear-gradient(135deg,#4f46e5,#818cf8);color:#fff;border:none;box-shadow:0 6px 18px rgba(79,70,229,0.35);font-size:13px;padding:11px;font-weight:900}
+.tc-btn.log:hover{background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;transform:translateY(-2px);box-shadow:0 8px 24px rgba(79,70,229,0.45)}
 .tc-btn.log:disabled{opacity:.7;cursor:default}
+.tc-btn.gold{background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;border:none;box-shadow:0 6px 18px rgba(180,83,9,0.35);font-size:13px;padding:11px;font-weight:900}
+.tc-btn.gold:hover{background:linear-gradient(135deg,#92400e,#d97706);color:#fff;transform:translateY(-2px);box-shadow:0 8px 24px rgba(180,83,9,0.45)}
+.tc-btn.gold:disabled{opacity:.7;cursor:default}
+.tc-skip-note{font-size:10.5px;font-weight:800;color:#fbbf24;margin-top:4px;line-height:1.5}
 .att-log-modal{position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(2,6,23,0.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .att-log-modal.open{display:flex}
 .att-log-card{width:min(680px,100%);max-height:84vh;display:flex;flex-direction:column;background:var(--card,#fff);border:1px solid var(--border,#e4e7f2);border-radius:18px;box-shadow:0 22px 55px rgba(15,20,60,0.22);overflow:hidden;animation:soSlideUp .25s ease both}
@@ -871,13 +876,24 @@ main{flex:1;position:relative;overflow:hidden}
       // محاولة ثانية عند فشل RPC عابر — لا نعرض «لا يوجد اشتراك» لطالب مشترك.
       try { subsAll = (await SubscriptionService.getSubscriptions(studentId)) || []; } catch (e) { logScanner('subs retry error: ' + e.message); }
     }
+    var skipKeys = {};
+    try {
+      var skipSnap = await window.db.collection('support_attendance')
+        .where('studentId', '==', studentId)
+        .where('type', '==', 'skip').get();
+      skipSnap.forEach(function (sd) {
+        var d = sd.data() || {};
+        var k = String(d.subscriptionId || ((d.teacherName || '') + '|' + (d.subjectName || '')));
+        skipKeys[k] = true;
+      });
+    } catch (e) { logScanner('skip lookup error: ' + e.message); }
     for (var i = 0; i < subjects.length; i++) {
       var s = subjects[i];
       var key = (s.teacher || '') + '|' + (s.subject || '');
       if (seen[key]) continue;
       seen[key] = true;
       var isOpen = isTeacherOpen(openMap, openIdMap, s.teacher, s.subject, openNameMap);
-      var sess = { teacher: s.teacher, subject: s.subject, status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, allowed: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length, hasSubscription: false };
+      var sess = { teacher: s.teacher, subject: s.subject, teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(s.teacher)] || '', subjectId: s.subjectId || '', status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, allowed: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length, hasSubscription: false, skipAvailable: false };
       try {
         // قرار واحد لكل مادة: يفحص «كل» اشتراكات الطالب (صفوف منفصلة / تعدد
         // الشهور) — فلا تظهر بطاقة «انتهى الاشتراك» بينما التسجيل مسموح، والعكس.
@@ -941,6 +957,10 @@ main{flex:1;position:relative;overflow:hidden}
           sess.hasSubscription = true;
           break;
         }
+      }
+      if (sess.hasSubscription && sess.status !== 'active') {
+        var _skipKey = String((sess.sub && sess.sub.id) || (s.teacher + '|' + s.subject));
+        sess.skipAvailable = !skipKeys[_skipKey];
       }
       sessions.push(sess);
     }
@@ -1249,7 +1269,7 @@ if (hasActiveSub) {
           html += '<div class="tc-stats"><div class="tc-stat"><div class="tc-stat-num">' + attended + '</div><div class="tc-stat-label">حضر</div></div><div class="tc-stat"><div class="tc-stat-num">' + remaining + '</div><div class="tc-stat-label">متبقي</div></div><div class="tc-stat"><div class="tc-stat-num">' + total + '</div><div class="tc-stat-label">الإجمالي</div></div></div>';
           html += '<div class="tc-progress-wrap"><div class="tc-progress"><div class="tc-progress-fill ' + barClass + '" style="width:' + pct + '%"></div></div></div>';
       } else {
-        html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:13px;font-weight:900;color:#ef4444">' + (s.hasSubscription ? 'انتهى الاشتراك' : 'لا يوجد اشتراك') + '</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">يمكن للاستقبال السماح بتسجيل الحضور<br>وتُخصم لاحقاً من حصص الاشتراك</div></div></div>';
+        html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:13px;font-weight:900;color:#ef4444">' + (s.hasSubscription ? 'انتهى الاشتراك' : 'لا يوجد اشتراك') + '</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">' + (s.skipAvailable ? 'تبقى فرصة تخطي واحدة لهذا الاشتراك' : 'يمكن للاستقبال السماح بتسجيل الحضور<br>وتُخصم لاحقاً من حصص الاشتراك') + '</div></div></div>';
       }
       html += '<div class="tc-btn-wrap">';
       if (s.alreadyCheckedIn) {
@@ -1257,6 +1277,10 @@ if (hasActiveSub) {
       } else if (hasActiveSub) {
         html += '<button class="tc-btn green" data-sidx="' + i + '">تسجيل الحضور</button>';
       } else {
+        if (s.hasSubscription && s.skipAvailable) {
+          html += '<button class="tc-btn gold" data-skipidx="' + i + '">⏭️ تخطي الحضور</button>';
+          html += '<div class="tc-skip-note">يُستخدم مرة واحدة فقط لهذا الاشتراك</div>';
+        }
         html += '<button class="tc-btn purple" data-sidx="' + i + '" data-allow="1">السماح بالحضور</button>';
       }
       html += '<button class="tc-btn log" data-logidx="' + i + '">\uD83D\uDCCB عرض سجل الحضور</button>';
@@ -1269,6 +1293,12 @@ if (hasActiveSub) {
         var idx = parseInt(btn.getAttribute('data-sidx'), 10);
         if (btn.getAttribute('data-allow') === '1') { handleAllowCheckIn(sessions[idx], btn); }
         else { handleCheckIn(sessions[idx], btn); }
+      });
+    });
+    document.querySelectorAll('.tc-btn[data-skipidx]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var idx = parseInt(btn.getAttribute('data-skipidx'), 10);
+        handleSkipCheckIn(sessions[idx], btn);
       });
     });
     document.querySelectorAll('.tc-btn[data-logidx]').forEach(function (btn) {
@@ -1359,6 +1389,85 @@ if (hasActiveSub) {
       showScanOverlay('red', '🚫', 'لا يمكن تسجيل الحضور', pendingName,
         session.teacher + ' — ' + session.subject + '<br>انتهى الاشتراك — يمكن للاستقبال السماح بتسجيل الحضور', 3500);
     }
+  }
+
+  // ── Skip once: فرصة تخطي واحدة للاشتراك المنتهي لدى هذا الأستاذ/المادة ──
+  async function handleSkipCheckIn(session, btnEl) {
+    if (!session || !btnEl || !session.hasSubscription) return;
+    btnEl.classList.add('loading');
+    btnEl.innerHTML = '<span class="spin"></span>جاري التسجيل...';
+    logScanner('handleSkip: ' + session.teacher + ' / ' + session.subject);
+    try {
+      var atc4 = await checkAttendanceControl();
+      if (!isTeacherOpen(atc4.openMap, atc4.openIdMap, session.teacher, session.subject, atc4.openNameMap)) {
+        btnEl.classList.remove('loading');
+        btnEl.innerHTML = '🔒 الحضور مغلق';
+        btnEl.classList.add('orange');
+        btnEl.disabled = true;
+        playSoundIncorrect();
+        showScanOverlay('red', '🔒', 'الحضور غير متاح حالياً', pendingName,
+          'لم يبدأ المركز تسجيل الحضور لهذا الأستاذ بعد.', 3500,
+          function() { processing = false; scanner.setBusy(false); setTimeout(renderReady, 300); });
+        return;
+      }
+    } catch (e) { logScanner('skip atc gate error: ' + e.message); }
+
+    if (!fbReady || !authState.signedIn) {
+      btnEl.classList.remove('loading');
+      btnEl.innerHTML = '⏭️ تخطي الحضور';
+      showScanOverlay('red', '🚫', 'تعذر استخدام التخطي', pendingName,
+        'تعذر حفظ فرصة التخطي — تأكد من اتصال قاعدة البيانات.', 3500,
+        function() { processing = false; scanner.setBusy(false); setTimeout(renderReady, 300); });
+      return;
+    }
+    var subId = String((session.sub && session.sub.id) || '');
+    var tid = String(session.teacherId || _teacherIdByName[normalizeTeacherName(session.teacher)] || '');
+    var sid = String(session.subjectId || '');
+    var keyRaw = 'SKIP-' + pendingStudentId + '_' + tid + '_' + sid + '_' + (subId || (session.teacher + '|' + session.subject));
+    var skipId = keyRaw.replace(/[^A-Za-z0-9_.\-]/g, '_');
+    try {
+      await AttendanceService.writeMirror({
+        id: skipId,
+        studentId: pendingStudentId,
+        studentName: pendingName || '',
+        studentType: pendingReg ? (pendingReg.student_type || '') : '',
+        sessionNumber: 1,
+        date: AttendanceService.today(),
+        checkInTime: AttendanceService.nowTime(),
+        barcodeValue: pendingBarcode || '',
+        source: 'eplus-attendance-skip',
+        type: 'skip',
+        status: 'present',
+        teacherId: tid,
+        teacherName: session.teacher,
+        subjectId: sid,
+        subjectName: session.subject,
+        subscriptionId: subId,
+        subscriptionPeriodId: '',
+        level: pendingReg ? (pendingReg.level || '') : '',
+        stream: pendingReg ? (pendingReg.stream || '') : '',
+        institution: pendingReg ? (pendingReg.institution || '') : '',
+        confirmed: true,
+        createdAt: AttendanceService.nowTime()
+      });
+      logScanner('skip recorded: ' + skipId);
+    } catch (e) {
+      logScanner('skip mirror write error: ' + e.message);
+      btnEl.classList.remove('loading');
+      btnEl.innerHTML = '⏭️ تخطي الحضور';
+      showScanOverlay('red', '🚫', 'تعذر استخدام التخطي', pendingName,
+        'تعذر حفظ فرصة التخطي. حاول مرة أخرى.', 3500,
+        function() { processing = false; scanner.setBusy(false); setTimeout(renderReady, 300); });
+      return;
+    }
+    session.skipAvailable = false;
+    session.alreadyCheckedIn = true;
+    playSoundCorrect();
+    attendedCount++; updateCounter();
+    postCheckin(session, 'skip');
+    showCheckinAnimation('allow', session.subject, session.teacher);
+    showScanOverlay('gold', '⏭️', 'تم استخدام فرصة التخطي', pendingName,
+      session.teacher + ' — ' + session.subject + '<br>تُستخدم هذه الفرصة مرة واحدة فقط لهذا الاشتراك', 3200);
   }
 
   // ── Allow check-in (بدون اشتراك — تُخصم لاحقاً من حصص الاشتراك القادم) ──
