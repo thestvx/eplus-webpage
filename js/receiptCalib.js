@@ -61,7 +61,6 @@
       { key: 'teacher', type: 'text', label: 'الأستاذ', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
       { key: 'months', type: 'text', label: 'المدة', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
       { key: 'sessions', type: 'text', label: 'الحصص', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
-      { key: 'period', type: 'text', label: 'الفترة', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
       { key: 'status', type: 'text', label: 'الحالة', hide: false, fs: 3.0, valueBold: true, align: 'right', indent: 0, spacingTop: 1, lh: 1.5, showLabel: true },
       { key: 'div3', type: 'divider', hide: false, thick: 0.5, dash: false, spacingTop: 1 },
       { key: 'table', type: 'table', hide: false, fs: 2.9, spacingTop: 0.5, bold: true },
@@ -81,7 +80,7 @@
     div1: 'فاصل علوي', orderId: 'رقم الوصل', studentName: 'التلميذ', studentId: 'رقم التسجيل',
     studentLevel: 'المستوى', parentName: 'ولي الأمر', parentPhone: 'هاتف ولي الأمر',
     div2: 'فاصل', subject: 'المادة', teacher: 'الأستاذ', months: 'المدة', sessions: 'الحصص',
-    period: 'الفترة', status: 'الحالة', div3: 'فاصل',
+    status: 'الحالة', div3: 'فاصل',
     table: 'جدول الأشهر', div4: 'فاصل', amount: 'المبلغ', amountWords: 'المبلغ كتابةً',
     date: 'تاريخ الإصدار', div5: 'فاصل', barcode: 'الباركود', signature: 'التوقيع', footer: 'التذييل'
   };
@@ -216,7 +215,7 @@
     rec = rec || {};
     var html = '';
     t.blocks.forEach(function (b) {
-      if (b.hide) return;
+      if (b.hide || b.key === 'period') return;
       if (b.type === 'logo') {
         if (!t.logo.show || !t.logo.src) return;
         html += '<div data-rb="logo" class="rb rb-logo" style="text-align:' + (t.logo.align || 'center') + ';' + sTop(b) + '">' +
@@ -235,7 +234,7 @@
           var ss = r[2] == null ? '' : String(r[2]);
           return '<div class="rb-mrow">' +
             '<div class="rb-mhead">' + (mon && mon !== '—' ? 'الشهر ' + numSpan(mon, t) : 'اشتراك شهري') + '</div>' +
-            (per ? '<div class="rb-mline"><span class="rb-mlbl">الفترة:</span> ' + numSpan(per, t) + '</div>' : '') +
+            (per ? '<div class="rb-mline"><span class="rb-mlbl">الإجمالي:</span> ' + numSpan(per, t) + '</div>' : '') +
             '<div class="rb-mline"><span class="rb-mlbl">الحصص:</span> ' + numSpan(ss, t) + '</div>' +
             '</div>';
         }).join('');
@@ -397,14 +396,13 @@
       teacher: 'الأستاذ عبد الله',
       months: 'شهر واحد',
       sessions: '8 حصص',
-      period: 'من 01 سبتمبر 2026 إلى 30 سبتمبر 2026',
       status: 'نشط',
       amount: '5 000',
       amountWords: 'خمسة آلاف دينار جزائري',
       date: '09 سبتمبر 2026',
       table: [
-        ['1', 'من 01/09 إلى 30/09', '2 / 8'],
-        ['2', 'من 01/10 إلى 31/10', '5 / 8']
+        ['1', '8 حصص', '2 / 8'],
+        ['2', '8 حصص', '5 / 8']
       ]
     };
   }

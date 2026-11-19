@@ -29297,9 +29297,6 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       card2.push(['الأستاذ(ة)', esc(sub.teacher_name || '—')]);
       card2.push(['مدة الاشتراك', esc(permI ? 'دائمة' : _monthsTxt(sub.months))]);
       card2.push(['عدد الحصص', permI ? 'غير محدود' : (total + ' حصة')]);
-      card2.push(['الفترة', permI
-        ? 'دائمة (تبدأ من ' + fmtAr(sub.start_date) + ')'
-        : fmtAr(sub.start_date) + ' ← ' + fmtAr(sub.end_date)]);
       card2.push(['الحالة', esc(stLbl)]);
 
       const row = r => '<div class="rcpt-card-row"><span class="rcpt-k">' + r[0] + '</span><span class="rcpt-v">' + r[1] + '</span></div>';
@@ -29307,8 +29304,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       const periodRows = periods.map(p =>
         '<tr>' +
           '<td>' + esc(p.month_number || '—') + '</td>' +
-          '<td>' + fmtAr(p.start_date) + '</td>' +
-          '<td>' + (permI ? 'مستمرة' : fmtAr(p.end_date)) + '</td>' +
+          '<td>' + (permI ? 'غير محدود' : (p.total_sessions || 8) + ' حصة') + '</td>' +
           '<td>' + (permI ? 'غير محدود' : (p.used_sessions || 0) + ' / ' + (p.total_sessions || 8)) + '</td>' +
         '</tr>'
       ).join('');
@@ -29347,8 +29343,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           '<div class="rcpt-table-wrap">' +
             '<div class="rcpt-card-title">تفصيل الأشهر</div>' +
             '<table class="rcpt-table">' +
-              '<thead><tr><th>الشهر</th><th>من</th><th>إلى</th><th>الحصص المستخدمة</th></tr></thead>' +
-              '<tbody>' + (periodRows || '<tr><td colspan="4">لا توجد تفاصيل أشهر.</td></tr>') + '</tbody>' +
+              '<thead><tr><th>الشهر</th><th>إجمالي الحصص</th><th>الحصص المستخدمة</th></tr></thead>' +
+              '<tbody>' + (periodRows || '<tr><td colspan="3">لا توجد تفاصيل أشهر.</td></tr>') + '</tbody>' +
             '</table>' +
           '</div>' +
           '<div class="rcpt-amount-box">' +
@@ -29420,17 +29416,14 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         teacher: sub.teacher_name || '—',
         months: permI ? 'دائمة' : _monthsTxt(sub.months),
         sessions: permI ? 'غير محدود' : (total + ' حصة'),
-        period: permI
-          ? 'دائمة — تبدأ من ' + fmtAr(sub.start_date)
-          : 'من ' + fmtAr(sub.start_date) + ' إلى ' + fmtAr(sub.end_date),
         status: stLbl,
         amount: (Number(sub.total_price) || 0).toLocaleString('en-US'),
         amountWords: words ? words + ' دينار جزائري' : '',
         date: today,
         table: periods.map(p => [
           String(p.month_number || '—'),
-          'من ' + fmtAr(p.start_date) + ' إلى ' + fmtAr(p.end_date),
-          (permI ? 'مستمرة' : ((p.used_sessions || 0) + ' / ' + (p.total_sessions || 8)))
+          permI ? 'غير محدود' : ((p.total_sessions || 8) + ' حصة'),
+          (permI ? 'غير محدود' : ((p.used_sessions || 0) + ' / ' + (p.total_sessions || 8)))
         ])
       };
       const opened = ReceiptCalib.printThermal(tpl, record);
