@@ -28178,13 +28178,25 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       if (!fdb || !fs) { document.getElementById('subx-logs-body').innerHTML = '<div style="text-align:center;padding:12px;color:#dc2626">Firebase غير متاح</div>'; return; }
       // تحديث بيانات الاشتراكات كي يطابق تقدّم الحصص (used_sessions) قسمَ الاشتراكات
       if (typeof subxLoadAll === 'function') { try { await subxLoadAll(); } catch (e) { console.warn('[SUBSCRIPTIONS] refresh subs for logs failed', e); } }
+      // المستويات الدراسية تأتي من تسجيلات الدعم المدرسي (نموذج التسجيلات)
+      try { await loadRegs(); } catch (e) { console.warn('[SUBSCRIPTIONS] load regs for log levels failed', e); }
+      const regById = {}, regByName = {};
+      const regPool = (regs || []).concat(typeof regStatsData !== 'undefined' && Array.isArray(regStatsData) ? regStatsData : []);
+      regPool.forEach(function (rr) {
+        if (rr.id) regById[String(rr.id)] = rr;
+        const nm = _norm(studentFullName(rr));
+        if (nm) regByName[nm] = rr;
+      });
       const snap = await fs.getDocs(fs.collection(fdb, 'support_attendance'));
       const rows = [];
       snap.forEach(d => {
         const r = d.data();
         if (r.type === 'grace') return;
         if (!r.date) return;
-        rows.push({ id: d.id, studentId: r.studentId || '', studentName: r.studentName || '', date: r.date, time: r.checkInTime || r.createdAt || '', teacherName: r.teacherName || '', subjectName: r.subjectName || '', level: r.level || '', type: r.type || '', cancelled: r.cancelled || false, confirmed: r.confirmed !== false });
+        const sid = String(r.studentId || '');
+        const reg = regById[sid] || regByName[_norm(r.studentName || '')] || null;
+        const level = r.level || (reg ? (reg.level || '') : '');
+        rows.push({ id: d.id, studentId: sid, studentName: r.studentName || '', date: r.date, time: r.checkInTime || r.createdAt || '', teacherName: r.teacherName || '', subjectName: r.subjectName || '', level: level, type: r.type || '', cancelled: r.cancelled || false, confirmed: r.confirmed !== false });
       });
       rows.sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
       window._subxLogsData = rows;
@@ -28213,22 +28225,47 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     for (var i = 0; i < arr.length; i += 8) out.push(arr.slice(i, i + 8));
     return out;
   }
+  // موحّد مقارنة المستويات: «السنة الأولى ثانوي» = «الأولى ثانوي»
+  function _subxLevelKey(v) {
+    return String(v || '').trim()
+      .replace(/^السنة\s+/, '')
+      .replace(/\s*\(بكالوريا\)\s*$/, '')
+      .replace(/[\sــ]+/g, '')
+      .toLowerCase();
+  }
+  function _subxLevelMatch(rowLevel, filterLevel) {
+    if (!filterLevel) return true;
+    var a = _subxLevelKey(rowLevel), b = _subxLevelKey(filterLevel);
+    return !!a && !!b && a === b;
+  }
+  // مستويات نموذج تسجيلات الدعم المدرسي + أي مستوى موجود في السجلات
+  function _subxRegistrationLevels() {
+    var set = new Set();
+    var src = document.getElementById('sr-filter-level');
+    if (src) Array.from(src.options || []).forEach(function (o) { if (o.value) set.add(o.value); });
+    if (typeof SRT_LEVELS !== 'undefined' && Array.isArray(SRT_LEVELS)) SRT_LEVELS.forEach(function (l) { if (l) set.add(l); });
+    (typeof regs !== 'undefined' && Array.isArray(regs) ? regs : []).forEach(function (r) { if (r && r.level) set.add(r.level); });
+    (typeof regStatsData !== 'undefined' && Array.isArray(regStatsData) ? regStatsData : []).forEach(function (r) { if (r && r.level) set.add(r.level); });
+    (window._subxLogsData || []).forEach(function (r) { if (r && r.level) set.add(r.level); });
+    return Array.from(set);
+  }
   function _subxPopulateLevels(rows) {
     var lSel = document.getElementById('subx-logs-level');
     if (!lSel) return;
-    var tEl = document.getElementById('subx-logs-teacher');
-    var sEl = document.getElementById('subx-logs-subject');
-    var teacherFilter = tEl ? (tEl.value || '') : '';
-    var subjectFilter = sEl ? (sEl.value || '') : '';
     var lv = lSel.value;
-    var lSet = new Set();
-    (rows || window._subxLogsData || []).forEach(function (r) {
-      if (teacherFilter && r.teacherName !== teacherFilter) return;
-      if (subjectFilter && r.subjectName !== subjectFilter) return;
-      if (r.level) lSet.add(r.level);
+    var order = (typeof SRT_LEVELS !== 'undefined' && Array.isArray(SRT_LEVELS)) ? SRT_LEVELS : [];
+    var levels = _subxRegistrationLevels();
+    levels.sort(function (a, b) {
+      var ia = order.indexOf(a), ib = order.indexOf(b);
+      if (ia !== -1 || ib !== -1) {
+        if (ia === -1) return 1;
+        if (ib === -1) return -1;
+        return ia - ib;
+      }
+      return String(a).localeCompare(String(b), 'ar');
     });
     lSel.innerHTML = '<option value="">🎓 كل المستويات الدراسية</option>';
-    Array.from(lSet).sort().forEach(function (l) {
+    levels.forEach(function (l) {
       lSel.innerHTML += '<option value="' + escX(l) + '">' + escX(l) + '</option>';
     });
     lSel.value = lv;
@@ -28247,7 +28284,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var dv = dSel.value;
     var dSet = new Set();
     (rows || window._subxLogsData || []).forEach(function (r) {
-      if (levelFilter && r.level !== levelFilter) return;
+      if (levelFilter && !_subxLevelMatch(r.level, levelFilter)) return;
       if (teacherFilter && r.teacherName !== teacherFilter) return;
       if (subjectFilter && r.subjectName !== subjectFilter) return;
       if (r.date) dSet.add(r.date);
@@ -28341,7 +28378,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var subjectFilter = document.getElementById('subx-logs-subject').value || '';
     return (window._subxLogsData || []).filter(function (r) {
       if (r.cancelled) return false;
-      if (levelFilter && r.level !== levelFilter) return false;
+      if (levelFilter && !_subxLevelMatch(r.level, levelFilter)) return false;
       if (dateFilter && r.date !== dateFilter) return false;
       if (teacherFilter && r.teacherName !== teacherFilter) return false;
       if (subjectFilter && r.subjectName !== subjectFilter) return false;
@@ -28361,7 +28398,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var l = (document.getElementById('subx-logs-level') || {}).value || '';
     return (window._subxLogsData || []).filter(function (r) {
       if (r.cancelled) return false;
-      if (l && r.level !== l) return false;
+      if (l && !_subxLevelMatch(r.level, l)) return false;
       if (d && r.date !== d) return false;
       if (t && r.teacherName !== t) return false;
       if (s && r.subjectName !== s) return false;
@@ -28448,7 +28485,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       var key = String(r.studentId || r.studentName || '') + '|' + String(r.teacherName || '') + '|' + String(r.subjectName || '');
       var g = byKey[key];
       if (!g) {
-        g = byKey[key] = { sid: r.studentId || '', name: r.studentName || _subxCsvStudentName(r.studentId), subject: r.subjectName || '', teacher: r.teacherName || '', count: 0, trial: 0, dates: {} };
+        g = byKey[key] = { sid: r.studentId || '', name: r.studentName || _subxCsvStudentName(r.studentId), level: r.level || '', subject: r.subjectName || '', teacher: r.teacherName || '', count: 0, trial: 0, dates: {} };
       }
       g.count++;
       if (_subxCsvIsTrial(r.type)) g.trial++;
@@ -28476,9 +28513,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     if (allDates && ds.length) meta += ' — من ' + ds[0] + ' إلى ' + ds[ds.length - 1];
     csvRows.push([meta]);
     csvRows.push([]);
-    csvRows.push(['#', 'رقم التسجيل', 'الطالب', 'المادة', 'الأستاذ', 'عدد الحصص', 'منها تجريبية', 'التواريخ (حضرها)']);
+    csvRows.push(['#', 'رقم التسجيل', 'الطالب', 'المستوى', 'المادة', 'الأستاذ', 'عدد الحصص', 'منها تجريبية', 'التواريخ (حضرها)']);
     groups.forEach(function (g, i) {
-      csvRows.push([i + 1, g.sid || '', g.name, g.subject, g.teacher, g.count, g.trial, _subxCsvDateCell(g.dateList.join(' ، '))]);
+      csvRows.push([i + 1, g.sid || '', g.name, g.level || '', g.subject, g.teacher, g.count, g.trial, _subxCsvDateCell(g.dateList.join(' ، '))]);
     });
     csvRows.push([]);
     csvRows.push(['المجموع:', groups.length + ' تلميذ — ' + rows.length + ' حصة']);
@@ -28536,7 +28573,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         var r = d.data();
         if (r.type === 'grace' || r.type === 'grace_session') return;
         if (hasFilter) {
-        if (levelFilter && r.level !== levelFilter) { skipped++; return; }
+        if (levelFilter && !_subxLevelMatch(r.level, levelFilter)) { skipped++; return; }
         if (teacherFilter && r.teacherName !== teacherFilter) { skipped++; return; }
           if (subjectFilter && r.subjectName !== subjectFilter) { skipped++; return; }
           if (dateFilter && r.date !== dateFilter) { skipped++; return; }
@@ -28625,6 +28662,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الوقت</th>';
     h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الطالب</th>';
     h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">رقم التسجيل</th>';
+    h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">المستوى</th>';
     h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">المادة</th>';
     h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الأستاذ</th>';
     h += '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">النوع</th>';
@@ -28637,6 +28675,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       h += '<td style="padding:7px 10px;white-space:nowrap" dir="ltr">' + escX(r.time) + '</td>';
       h += '<td style="padding:7px 10px;font-weight:700">' + escX(r.studentName || '—') + '<div style="margin-top:3px">' + _subxSubProgressBadge(r.studentId, r.subjectName, r.teacherName) + '</div></td>';
       h += '<td style="padding:7px 10px;font-family:monospace" dir="ltr">' + escX(r.studentId) + '</td>';
+      h += '<td style="padding:7px 10px">' + escX(r.level || '—') + '</td>';
       h += '<td style="padding:7px 10px">' + escX(r.subjectName || '—') + '</td>';
       h += '<td style="padding:7px 10px">' + escX(r.teacherName || '—') + '</td>';
       h += '<td style="padding:7px 10px;text-align:center">' + typeLabel + '</td>';
