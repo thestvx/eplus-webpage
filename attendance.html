@@ -209,6 +209,15 @@ main{flex:1;position:relative;overflow:hidden}
 .tc-btn.gold:hover{background:linear-gradient(135deg,#92400e,#d97706);color:#fff;transform:translateY(-2px);box-shadow:0 8px 24px rgba(180,83,9,0.45)}
 .tc-btn.gold:disabled{opacity:.7;cursor:default}
 .tc-skip-note{font-size:10.5px;font-weight:800;color:#fbbf24;margin-top:4px;line-height:1.5}
+.tc-select{display:flex;align-items:center;justify-content:center;width:24px;height:24px;flex-shrink:0;border-radius:8px;border:1.5px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.05);cursor:pointer;transition:.2s}
+.tc-select:hover{background:rgba(99,102,241,0.25);border-color:rgba(165,180,252,0.7)}
+.tc-select input{width:16px;height:16px;accent-color:#10b981;cursor:pointer;margin:0}
+.tc-batch-bar{width:100%;max-width:1100px;margin:0 auto 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:10px 14px}
+.tc-batch-bar .tc-btn{width:auto;font-size:13px;padding:10px 16px;margin:0}
+.tc-batch-bar .tc-btn.batch-all{background:rgba(99,102,241,0.28);border:1px solid rgba(165,180,252,0.35)}
+.tc-batch-bar .tc-btn.batch-go{background:linear-gradient(135deg,#059669,#10b981);box-shadow:0 6px 18px rgba(5,150,105,0.35)}
+.tc-batch-bar .tc-btn.batch-go:disabled{opacity:.5;cursor:default;box-shadow:none;transform:none}
+.tc-batch-msg{font-size:11.5px;font-weight:800;color:#c7d2fe;line-height:1.5;margin-inline-start:auto}
 .att-log-modal{position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(2,6,23,0.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .att-log-modal.open{display:flex}
 .att-log-card{width:min(680px,100%);max-height:84vh;display:flex;flex-direction:column;background:var(--card,#fff);border:1px solid var(--border,#e4e7f2);border-radius:18px;box-shadow:0 22px 55px rgba(15,20,60,0.22);overflow:hidden;animation:soSlideUp .25s ease both}
@@ -860,7 +869,7 @@ main{flex:1;position:relative;overflow:hidden}
     return 8 + (h % 8);
   }
 
-  var pendingReg = null, pendingBarcode = null, pendingStudentId = null, pendingName = null;
+  var pendingReg = null, pendingBarcode = null, pendingStudentId = null, pendingName = null, currentSessions = [];
 
   // ── Fetch student sessions (subscription + attendance per teacher/subject) ──
   async function fetchStudentSessions(studentId, subjects) {
@@ -1118,8 +1127,12 @@ main{flex:1;position:relative;overflow:hidden}
     });
     fetchStudentSessions(studentId, subjects).then(function (sessions) {
       renderTeacherCards(sessions);
+      processing = false;
+      scanner.setBusy(true);
     }).catch(function (e) {
       logScanner('fetchStudentSessions error: ' + e.message);
+      processing = false;
+      scanner.setBusy(false);
       $('tc-list').innerHTML = '<div class="ts-grid"><div style="text-align:center;color:#fca5a5;padding:40px;font-size:14px;font-weight:700;grid-column:1/-1">❌ خطأ في تحميل البيانات</div></div>';
     });
   }
@@ -1215,11 +1228,19 @@ main{flex:1;position:relative;overflow:hidden}
   })();
 
   function renderTeacherCards(sessions) {
-    var html = '<div class="ts-grid" id="tc-grid">';
+    currentSessions = sessions || [];
+    var batchable = currentSessions.filter(function (s) { return s.attendanceOpen && !s.alreadyCheckedIn && s.status === 'active'; }).length;
+    var html = '<div class="tc-batch-bar" id="tc-batch-bar">'
+      + '<button class="tc-btn batch-all" id="tc-select-all" type="button"' + (batchable ? '' : ' disabled') + '>تحديد الكل</button>'
+      + '<button class="tc-btn batch-go" id="tc-batch-submit" type="button" disabled>تسجيل المحدد (<span id="tc-sel-count">0</span>)</button>'
+      + '<span class="tc-batch-msg" id="tc-batch-msg">' + (batchable ? 'يمكن اختيار أكثر من مادة وتسجيلها دفعة واحدة' : 'لا توجد مواد نشطة متاحة للتسجيل الدفعي') + '</span>'
+      + '</div>';
+    html += '<div class="ts-grid" id="tc-grid">';
     for (var i = 0; i < sessions.length; i++) {
       var s = sessions[i];
       var icon = SubjectService.getSubjectIcon(s.subject);
       var delay = (i * 0.08) + 's';
+      var canBatch = s.attendanceOpen && !s.alreadyCheckedIn && s.status === 'active';
 
       // ── Gate: attendance not open for this teacher ──
       if (!s.attendanceOpen) {
@@ -1261,6 +1282,7 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
       var barClass = hasActiveSub ? (pct >= 75 ? 'orange' : 'green') : 'green';
       html += '<div class="tc-card" data-idx="' + i + '" style="animation-delay:' + delay + '">';
       html += '<div class="tc-top">';
+      if (canBatch) html += '<label class="tc-select" title="اختيار لتسجيل دفعي"><input type="checkbox" data-selectidx="' + i + '"></label>';
       html += '<div class="tc-subject-icon ' + stClass + '">' + icon + '</div>';
 html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) + '">' + esc(s.teacher) + (s.permanent ? '<span class="tc-perm-mark">∞</span>' : '') + '</div><div class="tc-subject">' + esc(s.subject) + '</div></div>';
       html += '<div class="tc-badge ' + badgeClass + '">' + badgeText + '</div>';
@@ -1307,10 +1329,141 @@ if (hasActiveSub) {
         openAttendanceLog(sessions[idx]);
       });
     });
+
+    var selectAllBtn = $('tc-select-all');
+    var batchBtn = $('tc-batch-submit');
+    var countEl = $('tc-sel-count');
+    var msgEl = $('tc-batch-msg');
+    function selectedIndexes() {
+      return Array.prototype.slice.call(document.querySelectorAll('input[data-selectidx]:checked'))
+        .map(function (el) { return parseInt(el.getAttribute('data-selectidx'), 10); })
+        .filter(function (i) { return isFinite(i); });
+    }
+    function updateBatchButtons() {
+      var n = selectedIndexes().length;
+      if (countEl) countEl.textContent = String(n);
+      if (batchBtn) batchBtn.disabled = n === 0;
+      if (selectAllBtn && msgEl && batchable) {
+        var all = n === batchable;
+        selectAllBtn.textContent = all ? 'إلغاء التحديد' : 'تحديد الكل';
+        msgEl.textContent = n ? n + ' مادة/مواد محددة' : 'يمكن اختيار أكثر من مادة وتسجيلها دفعة واحدة';
+      }
+    }
+    document.querySelectorAll('input[data-selectidx]').forEach(function (el) {
+      el.addEventListener('change', updateBatchButtons);
+    });
+    if (selectAllBtn) {
+      selectAllBtn.addEventListener('click', function () {
+        var boxes = document.querySelectorAll('input[data-selectidx]');
+        var shouldCheck = Array.prototype.slice.call(boxes).some(function (el) { return !el.checked; });
+        boxes.forEach(function (el) { el.checked = shouldCheck; });
+        updateBatchButtons();
+      });
+    }
+    if (batchBtn) {
+      batchBtn.addEventListener('click', function () {
+        var idxs = selectedIndexes();
+        if (!idxs.length) return;
+        submitBatchCheckIn(idxs.map(function (idx) { return sessions[idx]; }), batchBtn);
+      });
+    }
+    updateBatchButtons();
+  }
+
+  async function kioskIdToken() {
+    await ensureAttendanceAuth();
+    var app = (typeof firebase !== 'undefined' && firebase.app) ? firebase.app('kiosk') : null;
+    var user = app && app.auth ? app.auth().currentUser : null;
+    return user ? await user.getIdToken() : '';
+  }
+
+  async function submitBatchCheckIn(sessions, btnEl, forceMode) {
+    var list = Array.isArray(sessions) ? sessions.filter(Boolean) : [];
+    if (!list.length || processing) return;
+    processing = true;
+    scanner.setBusy(true);
+    var oldHtml = btnEl ? btnEl.innerHTML : '';
+    if (btnEl) {
+      btnEl.classList.add('loading');
+      btnEl.innerHTML = '<span class="spin"></span>جاري التسجيل...';
+    }
+    var items = list.map(function (s) {
+      return {
+        teacherName: s.teacher || '', subjectName: s.subject || '',
+        teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(s.teacher)] || '',
+        subjectId: s.subjectId || '',
+        mode: forceMode || 'normal',
+      };
+    });
+    try {
+      var token = await kioskIdToken();
+      if (!token) throw new Error('تعذر الحصول على رمز الدخول — حاول فتح الحضور من جديد');
+      var response = await fetch(ATTENDANCE_EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({
+          action: 'batch',
+          studentId: pendingStudentId,
+          studentName: pendingName || '',
+          studentType: pendingReg ? (pendingReg.student_type || '') : '',
+          barcodeValue: pendingBarcode || '',
+          level: pendingReg ? (pendingReg.level || '') : '',
+          stream: pendingReg ? (pendingReg.stream || '') : '',
+          institution: pendingReg ? (pendingReg.institution || '') : '',
+          items: items,
+        }),
+      });
+      var data = null;
+      try { data = await response.json(); } catch (e) {}
+      if (!response.ok || !data || !data.ok) throw new Error((data && data.error) || ('HTTP ' + response.status));
+      var results = Array.isArray(data.results) ? data.results : [];
+      var okCount = 0;
+      var failures = [];
+      results.forEach(function (r, i) {
+        var s = list[i];
+        if (!r || !r.ok) {
+          failures.push((r && r.subjectName) || (s && s.subject) || 'مادة') + ': ' + ((r && r.reason) || 'خطأ غير معروف');
+          return;
+        }
+        okCount++;
+        if (s) {
+          s.alreadyCheckedIn = true;
+          s.attended = Number(s.attended || 0) + 1;
+          if (typeof r.remaining === 'number') s.remaining = Math.max(0, r.remaining);
+          else s.remaining = Math.max(0, Number(s.remaining || 0) - 1);
+          if (r.action === 'skip') s.skipAvailable = false;
+        }
+      });
+      if (okCount) { playSoundCorrect(); attendedCount += okCount; updateCounter(); }
+      if (failures.length) playSoundIncorrect();
+      var title = failures.length ? (okCount ? 'تم تسجيل جزء من المواد' : 'تعذر تسجيل الحضور') : 'تم تسجيل الحضور';
+      var sub = okCount ? okCount + ' مادة/مواد مسجلة بنجاح' : '';
+      if (failures.length) sub += (sub ? '<br>' : '') + 'فشل: ' + esc(failures.slice(0, 3).join(' · '));
+      showScanOverlay(failures.length ? (okCount ? 'orange' : 'red') : 'green', failures.length ? '⚠️' : '✅', title, pendingName, sub, 3400, function () {
+        renderTeacherCards(currentSessions);
+        processing = false;
+        scanner.setBusy(false);
+        renderReady();
+      });
+      logScanner('batch result: ' + okCount + '/' + results.length);
+    } catch (e) {
+      logScanner('batch error: ' + (e && e.message ? e.message : e));
+      playSoundIncorrect();
+      showScanOverlay('red', '🚫', 'تعذر تسجيل الحضور', pendingName, esc(e && e.message ? e.message : 'خطأ غير معروف'), 3500, function () {
+        if (btnEl) { btnEl.classList.remove('loading'); btnEl.innerHTML = oldHtml; }
+        renderTeacherCards(currentSessions);
+        processing = false;
+        scanner.setBusy(false);
+        renderReady();
+      });
+    }
   }
 
   // ── Check-in handler ──
   async function handleCheckIn(session, btnEl) {
+    return submitBatchCheckIn([session], btnEl, 'normal');
+  }
+  async function legacyHandleCheckIn(session, btnEl) {
     if (!session || !btnEl) return;
     btnEl.classList.add('loading');
     btnEl.innerHTML = '<span class="spin"></span>جاري التسجيل...';
@@ -1394,6 +1547,9 @@ if (hasActiveSub) {
 
   // ── Skip once: فرصة تخطي واحدة للاشتراك المنتهي لدى هذا الأستاذ/المادة ──
   async function handleSkipCheckIn(session, btnEl) {
+    return submitBatchCheckIn([session], btnEl, 'skip');
+  }
+  async function legacyHandleSkipCheckIn(session, btnEl) {
     if (!session || !btnEl || !session.hasSubscription) return;
     btnEl.classList.add('loading');
     btnEl.innerHTML = '<span class="spin"></span>جاري التسجيل...';
@@ -1473,6 +1629,9 @@ if (hasActiveSub) {
 
   // ── Allow check-in (بدون اشتراك — تُخصم لاحقاً من حصص الاشتراك القادم) ──
   async function handleAllowCheckIn(session, btnEl) {
+    return submitBatchCheckIn([session], btnEl, 'allow');
+  }
+  async function legacyHandleAllowCheckIn(session, btnEl) {
     if (!session || !btnEl) return;
     btnEl.classList.add('loading');
     btnEl.innerHTML = '<span class="spin"></span>جاري التسجيل...';
