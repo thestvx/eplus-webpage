@@ -50,6 +50,19 @@ const RegistrationService = (function () {
     return await res.json();
   }
 
+  async function _fetchAllCols(params) {
+    const pageSize = 1000;
+    let offset = 0;
+    const all = [];
+    while (true) {
+      const rows = await _fetchCols(params + '&limit=' + pageSize + '&offset=' + offset);
+      all.push(...(rows || []));
+      if (!rows || rows.length < pageSize) break;
+      offset += pageSize;
+    }
+    return all;
+  }
+
   // ── Core Lookups ──────────────────────────────────────
 
   async function getById(id) {
@@ -74,8 +87,7 @@ const RegistrationService = (function () {
   async function getAll(status) {
     let params = 'deleted_at=is.null';
     if (status) params += '&status=eq.' + encodeURIComponent(status);
-    const data = await _fetchCols(params);
-    return data;
+    return await _fetchAllCols(params);
   }
 
   async function getConfirmed() {

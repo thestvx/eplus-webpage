@@ -7616,9 +7616,7 @@ window.loadRegistrations = loadRegistrations;
 
 async function loadRegistrations() {
   try {
-    const res = await srFetch(`${SR_SUPABASE_URL}/rest/v1/registrations?select=*&order=created_at.desc`);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    regStatsData = (await res.json()).filter(r => !r.deleted_at);
+    regStatsData = (await srFetchAll(`${SR_SUPABASE_URL}/rest/v1/registrations?select=*&order=created_at.desc`)).filter(r => !r.deleted_at);
   } catch (e) {
     console.error('stats load error:', e);
     regStatsData = (typeof srAllData !== 'undefined' && Array.isArray(srAllData)) ? srAllData.filter(r => !r.deleted_at) : [];
@@ -29904,6 +29902,22 @@ async function srFetch(url, options) {
   });
 }
 
+async function srFetchAll(url) {
+  const pageSize = 1000;
+  let offset = 0;
+  const all = [];
+  while (true) {
+    const sep = url.includes('?') ? '&' : '?';
+    const res = await srFetch(url + sep + 'limit=' + pageSize + '&offset=' + offset);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    all.push(...(rows || []));
+    if (!rows || rows.length < pageSize) break;
+    offset += pageSize;
+  }
+  return all;
+}
+
 // ── توحيد أسماء الأساتذة (قراءة فقط، دون المساس بقاعدة البيانات) ──
 // ظهر نفس الأستاذ كخيارين في فلتر الأساتذة لأن السجلات التاريخية خزّنت اسمه بترتيبين
 // مختلفين ("عبد الرحمان سرهود" / "سرهود عبدالرحمان"). الحل غير مدمر: نطبّق اسماً موحّداً
@@ -29935,9 +29949,7 @@ function srNormalizeTeacherInData(list) {
 
 async function srLoadData() {
   try {
-    const res = await srFetch(`${SR_SUPABASE_URL}/rest/v1/registrations?select=*&order=created_at.desc`);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    srAllData = await res.json();
+    srAllData = await srFetchAll(`${SR_SUPABASE_URL}/rest/v1/registrations?select=*&order=created_at.desc`);
     srAllData = (srAllData || []).filter(r => !r.deleted_at);
     srNormalizeTeacherInData(srAllData);
     srFilteredData = [...srAllData];
@@ -30058,6 +30070,9 @@ function srApplyFilters() {
   const queryDigits = srSearchDigits(rawQuery);
   const decodedQueryId = srSearchDecodeBarcode(queryDigits);
   const textTokens = query.replace(/\d+/g, ' ').split(/\s+/).filter(Boolean);
+  const hasExactIdMatch = queryDigits
+    ? srAllData.some(r => srSearchDigits(r.id) === queryDigits)
+    : false;
 
   srFilteredData = srAllData.filter(r => {
     if (!r) return false;
@@ -30080,14 +30095,15 @@ function srApplyFilters() {
       const barcodeDigits = srSearchDigits(r.barcode_value);
       const parentDigits = srSearchDigits(r.parent_phone);
       if (queryDigits) {
-        const numericMatch =
-          idDigits === queryDigits ||
-          (queryDigits.length >= 2 && idDigits.indexOf(queryDigits) !== -1) ||
-          barcodeDigits === queryDigits ||
-          (queryDigits.length >= 4 && barcodeDigits.indexOf(queryDigits) !== -1) ||
-          parentDigits === queryDigits ||
-          (queryDigits.length >= 6 && parentDigits.indexOf(queryDigits) !== -1) ||
-          (decodedQueryId && idDigits === decodedQueryId);
+        const numericMatch = hasExactIdMatch
+          ? idDigits === queryDigits
+          : idDigits === queryDigits ||
+            (queryDigits.length >= 2 && idDigits.indexOf(queryDigits) !== -1) ||
+            barcodeDigits === queryDigits ||
+            (queryDigits.length >= 4 && barcodeDigits.indexOf(queryDigits) !== -1) ||
+            parentDigits === queryDigits ||
+            (queryDigits.length >= 6 && parentDigits.indexOf(queryDigits) !== -1) ||
+            (decodedQueryId && idDigits === decodedQueryId);
         if (!numericMatch) return false;
       }
       if (textTokens.length) {
