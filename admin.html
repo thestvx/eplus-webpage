@@ -30079,7 +30079,6 @@ function srApplyFilters() {
       const idDigits = srSearchDigits(r.id);
       const barcodeDigits = srSearchDigits(r.barcode_value);
       const parentDigits = srSearchDigits(r.parent_phone);
-      const decodedBarcodeId = srSearchDecodeBarcode(barcodeDigits);
       if (queryDigits) {
         const numericMatch =
           idDigits === queryDigits ||
@@ -30087,14 +30086,14 @@ function srApplyFilters() {
           barcodeDigits === queryDigits ||
           (queryDigits.length >= 4 && barcodeDigits.indexOf(queryDigits) !== -1) ||
           parentDigits === queryDigits ||
-          (decodedQueryId && idDigits === decodedQueryId) ||
-          (decodedBarcodeId && idDigits === decodedBarcodeId);
+          (queryDigits.length >= 6 && parentDigits.indexOf(queryDigits) !== -1) ||
+          (decodedQueryId && idDigits === decodedQueryId);
         if (!numericMatch) return false;
       }
       if (textTokens.length) {
         const haystack = srSearchNorm([
           r.first_name, r.last_name, r.parent_name, r.institution, r.level, r.stream,
-          r.id, r.barcode_value, r.student_token
+          r.id, r.barcode_value, r.student_token, String(r.created_at || '').slice(0, 4)
         ].join(' '));
         if (!textTokens.every(t => haystack.indexOf(t) !== -1)) return false;
       }
