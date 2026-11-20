@@ -209,9 +209,19 @@ main{flex:1;position:relative;overflow:hidden}
 .tc-btn.gold:hover{background:linear-gradient(135deg,#92400e,#d97706);color:#fff;transform:translateY(-2px);box-shadow:0 8px 24px rgba(180,83,9,0.45)}
 .tc-btn.gold:disabled{opacity:.7;cursor:default}
 .tc-skip-note{font-size:10.5px;font-weight:800;color:#fbbf24;margin-top:4px;line-height:1.5}
-.tc-select{display:flex;align-items:center;justify-content:center;width:24px;height:24px;flex-shrink:0;border-radius:8px;border:1.5px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.05);cursor:pointer;transition:.2s}
-.tc-select:hover{background:rgba(99,102,241,0.25);border-color:rgba(165,180,252,0.7)}
-.tc-select input{width:16px;height:16px;accent-color:#10b981;cursor:pointer;margin:0}
+.tc-select{position:relative;display:flex;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;cursor:pointer;isolation:isolate}
+.tc-select input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.tc-check{position:relative;width:28px;height:28px;border-radius:10px;border:1.5px solid rgba(200,168,75,0.4);background:linear-gradient(145deg,rgba(255,255,255,0.12),rgba(255,255,255,0.02));box-shadow:inset 0 1px 0 rgba(255,255,255,0.16),0 4px 12px rgba(2,6,23,0.22);transition:transform .3s cubic-bezier(.2,.9,.25,1.35),border-color .3s,background .3s,box-shadow .3s}
+.tc-check::after{content:'';position:absolute;inset:-4px;border-radius:14px;border:1px solid rgba(200,168,75,0.5);opacity:0;transform:scale(.72);transition:opacity .3s,transform .35s cubic-bezier(.2,.9,.25,1.35)}
+.tc-check svg{position:absolute;inset:5px;width:18px;height:18px;fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:26;stroke-dashoffset:26;opacity:0;transform:rotate(-14deg) scale(.6);transition:stroke-dashoffset .34s ease .07s,transform .34s cubic-bezier(.2,.9,.25,1.4) .07s,opacity .14s}
+.tc-select:hover .tc-check{transform:translateY(-2px) scale(1.06);border-color:rgba(227,199,109,0.85);box-shadow:inset 0 1px 0 rgba(255,255,255,0.22),0 8px 18px rgba(138,109,31,0.35)}
+.tc-select input:focus-visible + .tc-check{outline:2px solid #e3c76d;outline-offset:4px}
+.tc-select.checked .tc-check{border-color:rgba(227,199,109,0.9);background:linear-gradient(135deg,#8a6d1f,#c8a84b 55%,#e3c76d);box-shadow:0 0 0 1px rgba(227,199,109,0.45),0 10px 22px rgba(138,109,31,0.5),inset 0 1px 0 rgba(255,255,255,0.4);animation:tcCheckPop .42s cubic-bezier(.2,.9,.25,1.35)}
+.tc-select.checked .tc-check::after{opacity:1;transform:scale(1)}
+.tc-select.checked .tc-check svg{stroke-dashoffset:0;transform:rotate(0) scale(1);opacity:1}
+.tc-card.selected{border-color:rgba(200,168,75,0.55);box-shadow:0 0 0 1px rgba(200,168,75,0.22),0 18px 42px rgba(138,109,31,0.25);transform:translateY(-3px)}
+.tc-card.selected .tc-badge.green{background:rgba(200,168,75,0.22);border-color:rgba(227,199,109,0.5);color:#fde68a}
+@keyframes tcCheckPop{0%{transform:scale(.82)}55%{transform:scale(1.14)}100%{transform:scale(1)}}
 .tc-batch-bar{width:100%;max-width:1100px;margin:0 auto 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:10px 14px}
 .tc-batch-bar .tc-btn{width:auto;font-size:13px;padding:10px 16px;margin:0}
 .tc-batch-bar .tc-btn.batch-all{background:rgba(99,102,241,0.28);border:1px solid rgba(165,180,252,0.35)}
@@ -1282,7 +1292,7 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
       var barClass = hasActiveSub ? (pct >= 75 ? 'orange' : 'green') : 'green';
       html += '<div class="tc-card" data-idx="' + i + '" style="animation-delay:' + delay + '">';
       html += '<div class="tc-top">';
-      if (canBatch) html += '<label class="tc-select" title="اختيار لتسجيل دفعي"><input type="checkbox" data-selectidx="' + i + '"></label>';
+      if (canBatch) html += '<label class="tc-select" title="اختيار لتسجيل دفعي"><input type="checkbox" data-selectidx="' + i + '"><span class="tc-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.3 4.3L19 7.2"/></svg></span></label>';
       html += '<div class="tc-subject-icon ' + stClass + '">' + icon + '</div>';
 html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) + '">' + esc(s.teacher) + (s.permanent ? '<span class="tc-perm-mark">∞</span>' : '') + '</div><div class="tc-subject">' + esc(s.subject) + '</div></div>';
       html += '<div class="tc-badge ' + badgeClass + '">' + badgeText + '</div>';
@@ -1339,7 +1349,16 @@ if (hasActiveSub) {
         .map(function (el) { return parseInt(el.getAttribute('data-selectidx'), 10); })
         .filter(function (i) { return isFinite(i); });
     }
+    function syncSelectionUI() {
+      document.querySelectorAll('input[data-selectidx]').forEach(function (el) {
+        var label = el.closest('.tc-select');
+        var card = el.closest('.tc-card');
+        if (label) label.classList.toggle('checked', el.checked);
+        if (card) card.classList.toggle('selected', el.checked);
+      });
+    }
     function updateBatchButtons() {
+      syncSelectionUI();
       var n = selectedIndexes().length;
       if (countEl) countEl.textContent = String(n);
       if (batchBtn) batchBtn.disabled = n === 0;
