@@ -5,6 +5,7 @@ import { verifyFirebaseToken, bearerToken } from '../_shared/firebase.ts';
 const FIRESTORE_PROJECT = Deno.env.get('FIREBASE_PROJECT_ID') || 'eplus-center-39';
 const FIRESTORE_DOCUMENTS = `https://firestore.googleapis.com/v1/projects/${FIRESTORE_PROJECT}/databases/(default)/documents`;
 const SESSIONS_PER_MONTH = 8;
+const KIOSK_ACCESS_HASH = Deno.env.get('KIOSK_ACCESS_HASH') || '023e33504ab909cf87a6f4e4e545090e40bdc0a2153e5b68b19f7fad2b737904';
 
 function str(v: unknown): string {
   return v === null || v === undefined ? '' : String(v);
@@ -284,6 +285,11 @@ function attendanceDocId(studentId: string, teacherId: string, subjectId: string
   return raw.replace(/[^A-Za-z0-9_.\-]/g, '_');
 }
 
+function allowDocId(studentId: string, teacherId: string, subjectId: string, subscriptionId: string): string {
+  const raw = `ALLOW-${studentId}_${teacherId || 'x'}_${subjectId || 'x'}_${subscriptionId}`;
+  return raw.replace(/[^A-Za-z0-9_.\-]/g, '_');
+}
+
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
@@ -342,6 +348,12 @@ Deno.serve(async (req) => {
     if (!studentId) return json({ error: 'studentId required' }, 400);
     if (!rawItems.length) return json({ error: 'items required' }, 400);
     if (rawItems.length > 12) return json({ error: 'too many items' }, 400);
+    const modes = rawItems.map((it: any) => str(it && it.mode || 'normal'));
+    if (modes.includes('skip')) return json({ error: 'skip mode is no longer supported' }, 400);
+    if (modes.some((m: string) => m !== 'normal' && m !== 'allow')) return json({ error: 'unsupported mode' }, 400);
+    if (modes.includes('allow') && req.headers.get('x-kiosk-key') !== KIOSK_ACCESS_HASH) {
+      return json({ error: 'kiosk authorization required' }, 403);
+    }
 
     const registrationResult = await supabase
       .from('registrations')
@@ -374,11 +386,11 @@ Deno.serve(async (req) => {
     if (subResult.error) return json({ error: subResult.error.message }, 400);
     subscriptionRows = Array.isArray(subResult.data) ? subResult.data : [];
 
-    const skipKeys: Record<string, boolean> = {};
+    const allowKeys: Record<string, boolean> = {};
     attendanceDocs.forEach((d: any) => {
-      if (d.type !== 'skip') return;
-      const key = str(d.subscriptionId || `${d.teacherName || ''}|${d.subjectName || ''}`);
-      skipKeys[key] = true;
+      if (d.type !== 'allow_sub' || d.allowCycle !== true) return;
+      const key = str(d.subscriptionId || '');
+      if (key) allowKeys[key] = true;
     });
 
     const results: any[] = [];
@@ -405,33 +417,50 @@ Deno.serve(async (req) => {
         });
         if (duplicate) throw new Error('تم تسجيل الحضور لهذه المادة اليوم');
 
-        const resolved = resolveCheckIn(subscriptionRows, subjectId, teacherId, date);
-        const pick = resolved && resolved.pick;
-        const subscription = resolved && resolved.subscription;
+        let resolved = resolveCheckIn(subscriptionRows, subjectId, teacherId, date);
+        let pick = resolved && resolved.pick;
+        let subscription = resolved && resolved.subscription;
         let actionType = 'normal';
         let periodId = '';
         let monthNumber = 0;
         let subscriptionId = '';
         let permanent = false;
+        let allowCycle = false;
         let docId = attendanceDocId(studentId, teacherId, subjectId, date);
         let source = 'eplus-attendance';
         let recordType = 'present';
 
-        if (mode === 'skip') {
-          if (!subscription || !subscription.id) throw new Error('لا يوجد اشتراك مطابق لهذه المادة');
-          if (pick && pick.allowed) throw new Error('الاشتراك لا يزال نشطاً — لا حاجة للتخطي');
-          const skipKey = str(subscription.id);
-          if (skipKeys[skipKey]) throw new Error('تم استخدام فرصة التخطي لهذا الاشتراك');
-          const skipRaw = `SKIP-${studentId}_${teacherId}_${subjectId}_${subscription.id}`;
-          docId = skipRaw.replace(/[^A-Za-z0-9_.\-]/g, '_');
-          actionType = 'skip';
-          source = 'eplus-attendance-skip';
-          recordType = 'skip';
-          subscriptionId = str(subscription.id);
-          skipKeys[skipKey] = true;
-        } else if (mode === 'allow') {
+        if (mode === 'allow') {
+          const requestedCycleId = str(raw.subscriptionId || '');
+          if (requestedCycleId) {
+            const currentCycleId = str(resolved && resolved.subscription && resolved.subscription.id);
+            if (currentCycleId && requestedCycleId !== currentCycleId) {
+              throw new Error('دورة الاشتراك المحددة ليست الدورة الحالية');
+            }
+            const row = subscriptionRows.find((r: any) => {
+              const s = r && r.subscription;
+              if (str(s && s.id) !== requestedCycleId) return false;
+              return matchesSubjectTeacher(s, subjectId, teacherId)
+                || (eqName(s && s.subject_name, subjectName) && eqName(s && s.teacher_name, teacherName));
+            });
+            if (!row) throw new Error('دورة الاشتراك المحددة غير صالحة لهذه المادة');
+            subscription = row.subscription;
+            pick = selectCheckInPeriod(subscription, row.periods || [], date);
+          }
+          if (!subscription || !subscription.id) throw new Error('لا يوجد اشتراك منتهٍ مطابق لهذه المادة');
+          if (subscription.status === 'cancelled' || subscription.status === 'paused') {
+            throw new Error('دورة الاشتراك غير صالحة للسماح الاستثنائي');
+          }
+          if (pick && pick.allowed) throw new Error('الاشتراك لا يزال نشطاً — لا حاجة للسماح الاستثنائي');
+          const cycleId = str(subscription.id);
+          if (allowKeys[cycleId]) throw new Error('تم استخدام السماح لهذه الدورة');
+          docId = allowDocId(studentId, teacherId, subjectId, cycleId);
           actionType = 'allow';
           recordType = 'allow_sub';
+          source = 'eplus-attendance-allow';
+          subscriptionId = cycleId;
+          allowCycle = true;
+          allowKeys[cycleId] = true;
         } else {
           if (!subscription || !pick || !pick.allowed) throw new Error('انتهى الاشتراك لهذه المادة');
           subscriptionId = str(subscription.id || '');
@@ -454,6 +483,7 @@ Deno.serve(async (req) => {
           barcodeValue: str(body.barcodeValue || ''),
           source,
           type: recordType,
+          allowCycle,
           status: 'present',
           teacherName,
           subjectName,

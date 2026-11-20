@@ -26867,7 +26867,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       var allow = 0;
       snap.forEach(function (d) {
         var r = d.data();
-        if (r.type !== 'allow_sub') return;
+        if (r.type !== 'allow_sub' || r.allowCycle === true) return;
         if (_nrmName(r.teacherName) + '___' + _nrmName(r.subjectName) !== tKey) return;
         if (!r.date) return;
         if (lastEnd && r.date <= lastEnd) return;
@@ -27145,7 +27145,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
               console.log('[SUBSCRIPTIONS] Allow query: id=' + _qStudentId + ' type=' + typeof _qStudentId + ' results=' + trialSnap.size);
               trialSnap.forEach(function (d) {
                 var r = d.data();
-                if (r.type !== 'allow_sub') return;
+                if (r.type !== 'allow_sub' || r.allowCycle === true) return;
                 var dk = _nrm(r.teacherName) + '___' + _nrm(r.subjectName);
                 if (dk !== tKey) return;
                 if (!r.date) return;
@@ -28110,24 +28110,29 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       // record always appears in the «المحذوفة» window and can be restored.
       const srcRef = fs.doc(fdb, 'support_attendance', attId);
       const srcSnap = await fs.getDoc(srcRef);
+      const srcData = srcSnap.exists() ? (srcSnap.data() || {}) : {};
+      const isCycleAllow = srcData.type === 'allow_sub' && srcData.allowCycle === true;
       if (srcSnap.exists()) {
         const nowBk = new Date();
-        const bkDoc = Object.assign({}, srcSnap.data(), {
+        const bkDoc = Object.assign({}, srcData, {
           _backupDeletedAt: nowBk.toISOString(),
           _backupDeletedDate: nowBk.toLocaleString('ar-DZ'),
           _backupReason: 'subscancel'
         });
         await fs.setDoc(fs.doc(fdb, 'support_attendance_backup', 'b_' + attId + '_' + nowBk.getTime()), bkDoc);
       }
-      // Try hard delete first, fall back to soft-delete (cancelled flag)
-      try {
-        await fs.deleteDoc(srcRef);
-      } catch (delErr) {
-        console.warn('[SUBSCRIPTIONS] hard delete failed, trying soft-delete:', delErr);
+      if (isCycleAllow) {
         await fs.updateDoc(srcRef, { cancelled: true, cancelledAt: new Date().toISOString() });
+      } else {
+        try {
+          await fs.deleteDoc(srcRef);
+        } catch (delErr) {
+          console.warn('[SUBSCRIPTIONS] hard delete failed, trying soft-delete:', delErr);
+          await fs.updateDoc(srcRef, { cancelled: true, cancelledAt: new Date().toISOString() });
+        }
       }
-      // Decrement used_sessions for the matching period
-      if (subId) {
+      // Decrement used_sessions for the matching period (exceptional allow never consumes a paid session)
+      if (subId && !isCycleAllow) {
         try {
           const d = await SubscriptionService.adminSubscriptionDetail(subId);
           if (d && d.periods && d.periods.length) {
@@ -28570,6 +28575,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       snap.forEach(function (d) {
         var r = d.data();
         if (r.type === 'grace' || r.type === 'grace_session') return;
+        if (r.type === 'allow_sub' && r.allowCycle === true) { skipped++; return; }
         if (hasFilter) {
         if (levelFilter && !_subxLevelMatch(r.level, levelFilter)) { skipped++; return; }
         if (teacherFilter && r.teacherName !== teacherFilter) { skipped++; return; }
@@ -28694,9 +28700,10 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       // succeed; if it fails we abort so a record is never lost without a copy.
       const srcRef = fs.doc(fdb, 'support_attendance', attId);
       const srcSnap = await fs.getDoc(srcRef);
+      var data = srcSnap.exists() ? (srcSnap.data() || {}) : {};
+      var isCycleAllow = data.type === 'allow_sub' && data.allowCycle === true;
       if (srcSnap.exists()) {
         const now = new Date();
-        const data = srcSnap.data();
         const backupDoc = Object.assign({}, data, {
           _backupDeletedAt: now.toISOString(),
           _backupDeletedDate: now.toLocaleString('ar-DZ'),
@@ -28705,11 +28712,14 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         const bid = 'b_' + attId + '_' + now.getTime();
         await fs.setDoc(fs.doc(fdb, 'support_attendance_backup', bid), backupDoc);
       }
-      // Try hard delete first, fall back to soft-delete
-      try {
-        await fs.deleteDoc(srcRef);
-      } catch (delErr) {
+      if (isCycleAllow) {
         await fs.updateDoc(srcRef, { cancelled: true, cancelledAt: new Date().toISOString() });
+      } else {
+        try {
+          await fs.deleteDoc(srcRef);
+        } catch (delErr) {
+          await fs.updateDoc(srcRef, { cancelled: true, cancelledAt: new Date().toISOString() });
+        }
       }
       showToast('🗑️ تم حذف السجل وحفظ نسخة احتياطية.');
       // Refresh the logs modal data
@@ -28737,6 +28747,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       var srcSnap = await fs.getDoc(srcRef);
       if (!srcSnap.exists()) continue;
       var data = srcSnap.data();
+      if (data.type === 'allow_sub' && data.allowCycle === true) continue;
       var archDoc = Object.assign({}, data, {
         _archivedAt: now.toISOString(),
         _archivedDate: now.toLocaleString('ar-DZ'),

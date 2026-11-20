@@ -208,7 +208,8 @@ main{flex:1;position:relative;overflow:hidden}
 .tc-btn.gold{background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;border:none;box-shadow:0 6px 18px rgba(180,83,9,0.35);font-size:13px;padding:11px;font-weight:900}
 .tc-btn.gold:hover{background:linear-gradient(135deg,#92400e,#d97706);color:#fff;transform:translateY(-2px);box-shadow:0 8px 24px rgba(180,83,9,0.45)}
 .tc-btn.gold:disabled{opacity:.7;cursor:default}
-.tc-skip-note{font-size:10.5px;font-weight:800;color:#fbbf24;margin-top:4px;line-height:1.5}
+.tc-btn.used{background:rgba(148,163,184,0.12);color:#94a3b8;border:1.5px solid rgba(148,163,184,0.22);cursor:default;box-shadow:none;font-size:13px;padding:11px}
+.tc-allow-note{font-size:10.5px;font-weight:800;color:#c4b5fd;margin-top:4px;line-height:1.5}
 .tc-select{position:relative;display:flex;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;cursor:pointer;isolation:isolate}
 .tc-select input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .tc-check{position:relative;width:28px;height:28px;border-radius:10px;border:1.5px solid rgba(200,168,75,0.4);background:linear-gradient(145deg,rgba(255,255,255,0.12),rgba(255,255,255,0.02));box-shadow:inset 0 1px 0 rgba(255,255,255,0.16),0 4px 12px rgba(2,6,23,0.22);transition:transform .3s cubic-bezier(.2,.9,.25,1.35),border-color .3s,background .3s,box-shadow .3s}
@@ -386,6 +387,7 @@ main{flex:1;position:relative;overflow:hidden}
   var ALGERIA_TZ = 'Africa/Algiers';
   var PIN_SESSION_KEY = 'eplus_att_pin';
   var PIN_HASH = '023e33504ab909cf87a6f4e4e545090e40bdc0a2153e5b68b19f7fad2b737904';
+  var KIOSK_ACCESS_HASH = PIN_HASH;
   var PIN_FALLBACK = String.fromCharCode(50, 48, 49, 57);
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function studentFullName(s) { return ((s && (s.first_name || '') + ' ' + (s.last_name || '')) || '').trim(); }
@@ -895,24 +897,24 @@ main{flex:1;position:relative;overflow:hidden}
       // محاولة ثانية عند فشل RPC عابر — لا نعرض «لا يوجد اشتراك» لطالب مشترك.
       try { subsAll = (await SubscriptionService.getSubscriptions(studentId)) || []; } catch (e) { logScanner('subs retry error: ' + e.message); }
     }
-    var skipKeys = {};
+    var allowKeys = {};
     try {
-      var skipSnap = await window.db.collection('support_attendance')
+      var allowSnap = await window.db.collection('support_attendance')
         .where('studentId', '==', studentId)
-        .where('type', '==', 'skip').get();
-      skipSnap.forEach(function (sd) {
-        var d = sd.data() || {};
-        var k = String(d.subscriptionId || ((d.teacherName || '') + '|' + (d.subjectName || '')));
-        skipKeys[k] = true;
+        .where('type', '==', 'allow_sub').get();
+      allowSnap.forEach(function (ad) {
+        var d = ad.data() || {};
+        if (d.allowCycle !== true || !d.subscriptionId) return;
+        allowKeys[String(d.subscriptionId)] = true;
       });
-    } catch (e) { logScanner('skip lookup error: ' + e.message); }
+    } catch (e) { logScanner('allow lookup error: ' + e.message); }
     for (var i = 0; i < subjects.length; i++) {
       var s = subjects[i];
       var key = (s.teacher || '') + '|' + (s.subject || '');
       if (seen[key]) continue;
       seen[key] = true;
       var isOpen = isTeacherOpen(openMap, openIdMap, s.teacher, s.subject, openNameMap);
-      var sess = { teacher: s.teacher, subject: s.subject, teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(s.teacher)] || '', subjectId: s.subjectId || '', status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, allowed: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length, hasSubscription: false, skipAvailable: false };
+      var sess = { teacher: s.teacher, subject: s.subject, teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(s.teacher)] || '', subjectId: s.subjectId || '', status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, allowed: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length, hasSubscription: false, allowAvailable: false };
       try {
         // قرار واحد لكل مادة: يفحص «كل» اشتراكات الطالب (صفوف منفصلة / تعدد
         // الشهور) — فلا تظهر بطاقة «انتهى الاشتراك» بينما التسجيل مسموح، والعكس.
@@ -977,9 +979,8 @@ main{flex:1;position:relative;overflow:hidden}
           break;
         }
       }
-      if (sess.hasSubscription && sess.status !== 'active') {
-        var _skipKey = String((sess.sub && sess.sub.id) || (s.teacher + '|' + s.subject));
-        sess.skipAvailable = !skipKeys[_skipKey];
+      if (sess.hasSubscription && sess.status !== 'active' && sess.sub && sess.sub.id && !allowKeys[String(sess.sub.id)]) {
+        sess.allowAvailable = true;
       }
       sessions.push(sess);
     }
@@ -1301,19 +1302,18 @@ if (hasActiveSub) {
           html += '<div class="tc-stats"><div class="tc-stat"><div class="tc-stat-num">' + attended + '</div><div class="tc-stat-label">حضر</div></div><div class="tc-stat"><div class="tc-stat-num">' + remaining + '</div><div class="tc-stat-label">متبقي</div></div><div class="tc-stat"><div class="tc-stat-num">' + total + '</div><div class="tc-stat-label">الإجمالي</div></div></div>';
           html += '<div class="tc-progress-wrap"><div class="tc-progress"><div class="tc-progress-fill ' + barClass + '" style="width:' + pct + '%"></div></div></div>';
       } else {
-        html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:13px;font-weight:900;color:#ef4444">' + (s.hasSubscription ? 'انتهى الاشتراك' : 'لا يوجد اشتراك') + '</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">' + (s.skipAvailable ? 'تبقى فرصة تخطي واحدة لهذا الاشتراك' : 'يمكن للاستقبال السماح بتسجيل الحضور<br>وتُخصم لاحقاً من حصص الاشتراك') + '</div></div></div>';
+        html += '<div class="tc-stats" style="justify-content:center"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0"><div style="font-size:13px;font-weight:900;color:#ef4444">' + (s.hasSubscription ? 'انتهى الاشتراك' : 'لا يوجد اشتراك') + '</div><div style="font-size:11px;color:var(--text-muted);font-weight:700">' + (s.allowAvailable ? 'سماح استثنائي واحد متاح لهذه الدورة' : (s.hasSubscription ? 'تم استخدام السماح لهذه الدورة' : 'لا يمكن تسجيل الحضور بدون اشتراك')) + '</div></div></div>';
       }
       html += '<div class="tc-btn-wrap">';
       if (s.alreadyCheckedIn) {
         html += '<button class="tc-btn done" disabled>✓ تم التسجيل اليوم</button>';
       } else if (hasActiveSub) {
         html += '<button class="tc-btn green" data-sidx="' + i + '">تسجيل الحضور</button>';
-      } else {
-        if (s.hasSubscription && s.skipAvailable) {
-          html += '<button class="tc-btn gold" data-skipidx="' + i + '">⏭️ تخطي الحضور</button>';
-          html += '<div class="tc-skip-note">يُستخدم مرة واحدة فقط لهذا الاشتراك</div>';
-        }
+      } else if (s.allowAvailable) {
         html += '<button class="tc-btn purple" data-sidx="' + i + '" data-allow="1">السماح بالحضور</button>';
+        html += '<div class="tc-allow-note">سماح استثنائي واحد لهذه الدورة</div>';
+      } else if (s.hasSubscription) {
+        html += '<button class="tc-btn used" disabled>تم استخدام السماح لهذه الدورة</button>';
       }
       html += '<button class="tc-btn log" data-logidx="' + i + '">\uD83D\uDCCB عرض سجل الحضور</button>';
       html += '</div></div>';
@@ -1325,12 +1325,6 @@ if (hasActiveSub) {
         var idx = parseInt(btn.getAttribute('data-sidx'), 10);
         if (btn.getAttribute('data-allow') === '1') { handleAllowCheckIn(sessions[idx], btn); }
         else { handleCheckIn(sessions[idx], btn); }
-      });
-    });
-    document.querySelectorAll('.tc-btn[data-skipidx]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var idx = parseInt(btn.getAttribute('data-skipidx'), 10);
-        handleSkipCheckIn(sessions[idx], btn);
       });
     });
     document.querySelectorAll('.tc-btn[data-logidx]').forEach(function (btn) {
@@ -1411,6 +1405,7 @@ if (hasActiveSub) {
         teacherName: s.teacher || '', subjectName: s.subject || '',
         teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(s.teacher)] || '',
         subjectId: s.subjectId || '',
+        subscriptionId: forceMode === 'allow' ? String((s.sub && s.sub.id) || '') : '',
         mode: forceMode || 'normal',
       };
     });
@@ -1419,7 +1414,7 @@ if (hasActiveSub) {
       if (!token) throw new Error('تعذر الحصول على رمز الدخول — حاول فتح الحضور من جديد');
       var response = await fetch(ATTENDANCE_EDGE_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'x-kiosk-key': KIOSK_ACCESS_HASH },
         body: JSON.stringify({
           action: 'batch',
           studentId: pendingStudentId,
@@ -1450,7 +1445,7 @@ if (hasActiveSub) {
           s.attended = Number(s.attended || 0) + 1;
           if (typeof r.remaining === 'number') s.remaining = Math.max(0, r.remaining);
           else s.remaining = Math.max(0, Number(s.remaining || 0) - 1);
-          if (r.action === 'skip') s.skipAvailable = false;
+          if (r.action === 'allow') s.allowAvailable = false;
         }
       });
       if (okCount) { playSoundCorrect(); attendedCount += okCount; updateCounter(); }
@@ -1482,277 +1477,10 @@ if (hasActiveSub) {
   async function handleCheckIn(session, btnEl) {
     return submitBatchCheckIn([session], btnEl, 'normal');
   }
-  async function legacyHandleCheckIn(session, btnEl) {
-    if (!session || !btnEl) return;
-    btnEl.classList.add('loading');
-    btnEl.innerHTML = '<span class="spin"></span>جاري التسجيل...';
-    logScanner('handleCheckIn: ' + session.teacher + ' / ' + session.subject);
-
-    // ── Server-side gate: verify attendance is still open for this teacher ──
-    try {
-      var atc2 = await checkAttendanceControl();
-      if (!isTeacherOpen(atc2.openMap, atc2.openIdMap, session.teacher, session.subject, atc2.openNameMap)) {
-        btnEl.classList.remove('loading');
-        btnEl.innerHTML = '\uD83D\uDD12 الحضور مغلق';
-        btnEl.classList.add('orange');
-        btnEl.disabled = true;
-        playSoundIncorrect();
-        showScanOverlay('red', '\uD83D\uDD12', 'الحضور غير متاح حالياً', pendingName,
-          'لم يبدأ المركز تسجيل الحضور لهذا الأستاذ بعد.<br>يرجى الانتظار حتى يتم فتح الحضور من الإدارة.', 3500,
-          function() { processing = false; scanner.setBusy(false); setTimeout(renderReady, 300); });
-        return;
-      }
-    } catch (e) { logScanner('atc gate check error: ' + e.message); }
-
-    var subCheck = null, _pick = null;
-    // نفس مصدر القرار الذي بُنيت به البطاقة (resolveCheckIn): يفحص كل اشتراكات
-    // الطالب — صفوف منفصلة أو شهور متعددة — فلا يختلف القرار عن المعروض.
-    try {
-      var _allSubs = await SubscriptionService.getSubscriptions(pendingStudentId);
-      var _res = SubscriptionService.resolveCheckIn(_allSubs, session.subject, session.teacher, AttendanceService.today());
-      if (_res && _res.subscription) {
-        subCheck = { subscription: _res.subscription, periods: _res.periods || [] };
-        _pick = _res.pick;
-      }
-    } catch (e) { logScanner('subCheck error: ' + e.message); }
-
-    var type = 'none';
-
-    if (subCheck && subCheck.subscription) {
-      var _isPermSub = SubscriptionService.isPermanent(subCheck.subscription);
-      // الحسم من حصة فترة الشهر القابلة للحضور فعلاً (ليس مجموع كل الفترات)،
-      // حتى لا يُحتسب حضور بمدة مستقبلية وتتفاقم الشهور دون فائض.
-      if (_pick && _pick.allowed) {
-        // ── GREEN: active subscription with remaining sessions ──
-        type = 'green';
-        if (fbReady && authState.signedIn) {
-          try {
-            await AttendanceService.writeMirror({
-              studentId: pendingStudentId, studentName: pendingName, studentType: pendingReg.student_type || '',
-              sessionNumber: 1, date: AttendanceService.today(), checkInTime: AttendanceService.nowTime(),
-              barcodeValue: pendingBarcode, source: 'eplus-attendance', teacherName: session.teacher, subjectName: session.subject,
-              level: pendingReg.level || '', stream: pendingReg.stream || '', institution: pendingReg.institution || '',
-              createdAt: AttendanceService.nowTime()
-            });
-          } catch (e) { logScanner('mirror write error: ' + e.message); }
-          try {
-            var _pid = _pick.period ? (_pick.period.period_id || _pick.period.id) : null;
-            if (_pid && !_isPermSub) {
-              var _r = await SubscriptionService.incrementPeriodUsage(_pid, 1);
-              logScanner('increment result: ' + JSON.stringify(_r));
-            } else { logScanner('increment skipped: ' + (_isPermSub ? 'permanent subscription' : 'no active period found')); }
-          } catch (e) { logScanner('increment usage error: ' + e.message); }
-        }
-      } else {
-        type = 'red';
-      }
-    } else {
-      type = 'red';
-    }
-
-    if (type === 'green') {
-      playSoundCorrect();
-      attendedCount++; updateCounter();
-      postCheckin(session, type);
-      showCheckinAnimation('green', session.subject, session.teacher);
-      showScanOverlay('green', '✅', 'تم تسجيل الحضور', pendingName, session.teacher + ' — ' + session.subject, 2200);
-    } else {
-      playSoundIncorrect();
-      postCheckin(session, type);
-      showScanOverlay('red', '🚫', 'لا يمكن تسجيل الحضور', pendingName,
-        session.teacher + ' — ' + session.subject + '<br>انتهى الاشتراك — يمكن للاستقبال السماح بتسجيل الحضور', 3500);
-    }
-  }
-
-  // ── Skip once: فرصة تخطي واحدة للاشتراك المنتهي لدى هذا الأستاذ/المادة ──
-  async function handleSkipCheckIn(session, btnEl) {
-    return submitBatchCheckIn([session], btnEl, 'skip');
-  }
-  async function legacyHandleSkipCheckIn(session, btnEl) {
-    if (!session || !btnEl || !session.hasSubscription) return;
-    btnEl.classList.add('loading');
-    btnEl.innerHTML = '<span class="spin"></span>جاري التسجيل...';
-    logScanner('handleSkip: ' + session.teacher + ' / ' + session.subject);
-    try {
-      var atc4 = await checkAttendanceControl();
-      if (!isTeacherOpen(atc4.openMap, atc4.openIdMap, session.teacher, session.subject, atc4.openNameMap)) {
-        btnEl.classList.remove('loading');
-        btnEl.innerHTML = '🔒 الحضور مغلق';
-        btnEl.classList.add('orange');
-        btnEl.disabled = true;
-        playSoundIncorrect();
-        showScanOverlay('red', '🔒', 'الحضور غير متاح حالياً', pendingName,
-          'لم يبدأ المركز تسجيل الحضور لهذا الأستاذ بعد.', 3500,
-          function() { processing = false; scanner.setBusy(false); setTimeout(renderReady, 300); });
-        return;
-      }
-    } catch (e) { logScanner('skip atc gate error: ' + e.message); }
-
-    if (!fbReady || !authState.signedIn) {
-      btnEl.classList.remove('loading');
-      btnEl.innerHTML = '⏭️ تخطي الحضور';
-      showScanOverlay('red', '🚫', 'تعذر استخدام التخطي', pendingName,
-        'تعذر حفظ فرصة التخطي — تأكد من اتصال قاعدة البيانات.', 3500,
-        function() { processing = false; scanner.setBusy(false); setTimeout(renderReady, 300); });
-      return;
-    }
-    var subId = String((session.sub && session.sub.id) || '');
-    var tid = String(session.teacherId || _teacherIdByName[normalizeTeacherName(session.teacher)] || '');
-    var sid = String(session.subjectId || '');
-    var keyRaw = 'SKIP-' + pendingStudentId + '_' + tid + '_' + sid + '_' + (subId || (session.teacher + '|' + session.subject));
-    var skipId = keyRaw.replace(/[^A-Za-z0-9_.\-]/g, '_');
-    try {
-      await AttendanceService.writeMirror({
-        id: skipId,
-        studentId: pendingStudentId,
-        studentName: pendingName || '',
-        studentType: pendingReg ? (pendingReg.student_type || '') : '',
-        sessionNumber: 1,
-        date: AttendanceService.today(),
-        checkInTime: AttendanceService.nowTime(),
-        barcodeValue: pendingBarcode || '',
-        source: 'eplus-attendance-skip',
-        type: 'skip',
-        status: 'present',
-        teacherId: tid,
-        teacherName: session.teacher,
-        subjectId: sid,
-        subjectName: session.subject,
-        subscriptionId: subId,
-        subscriptionPeriodId: '',
-        level: pendingReg ? (pendingReg.level || '') : '',
-        stream: pendingReg ? (pendingReg.stream || '') : '',
-        institution: pendingReg ? (pendingReg.institution || '') : '',
-        confirmed: true,
-        createdAt: AttendanceService.nowTime()
-      });
-      logScanner('skip recorded: ' + skipId);
-    } catch (e) {
-      logScanner('skip mirror write error: ' + e.message);
-      btnEl.classList.remove('loading');
-      btnEl.innerHTML = '⏭️ تخطي الحضور';
-      showScanOverlay('red', '🚫', 'تعذر استخدام التخطي', pendingName,
-        'تعذر حفظ فرصة التخطي. حاول مرة أخرى.', 3500,
-        function() { processing = false; scanner.setBusy(false); setTimeout(renderReady, 300); });
-      return;
-    }
-    session.skipAvailable = false;
-    session.alreadyCheckedIn = true;
-    playSoundCorrect();
-    attendedCount++; updateCounter();
-    postCheckin(session, 'skip');
-    showCheckinAnimation('allow', session.subject, session.teacher);
-    showScanOverlay('gold', '⏭️', 'تم استخدام فرصة التخطي', pendingName,
-      session.teacher + ' — ' + session.subject + '<br>تُستخدم هذه الفرصة مرة واحدة فقط لهذا الاشتراك', 3200);
-  }
-
-  // ── Allow check-in (بدون اشتراك — تُخصم لاحقاً من حصص الاشتراك القادم) ──
+  // ── Allow check-in: سماح استثنائي واحد لكل دورة اشتراك منتهية ──
   async function handleAllowCheckIn(session, btnEl) {
     return submitBatchCheckIn([session], btnEl, 'allow');
   }
-  async function legacyHandleAllowCheckIn(session, btnEl) {
-    if (!session || !btnEl) return;
-    btnEl.classList.add('loading');
-    btnEl.innerHTML = '<span class="spin"></span>جاري التسجيل...';
-    logScanner('handleAllow: ' + session.teacher + ' / ' + session.subject);
-
-    // ── Server-side gate: verify attendance is still open for this teacher ──
-    try {
-      var atc3 = await checkAttendanceControl();
-      if (!isTeacherOpen(atc3.openMap, atc3.openIdMap, session.teacher, session.subject, atc3.openNameMap)) {
-        btnEl.classList.remove('loading');
-        btnEl.innerHTML = '\uD83D\uDD12 الحضور مغلق';
-        btnEl.classList.add('orange');
-        btnEl.disabled = true;
-        playSoundIncorrect();
-        showScanOverlay('red', '\uD83D\uDD12', 'الحضور غير متاح حالياً', pendingName,
-          'لم يبدأ المركز تسجيل الحضور لهذا الأستاذ بعد.<br>يرجى الانتظار حتى يتم فتح الحضور من الإدارة.', 3500,
-          function() { processing = false; scanner.setBusy(false); setTimeout(renderReady, 300); });
-        return;
-      }
-    } catch (e) { logScanner('atc gate check error: ' + e.message); }
-
-    if (fbReady && authState.signedIn) {
-      try {
-        await AttendanceService.writeMirror({
-          studentId: pendingStudentId, studentName: pendingName, studentType: pendingReg ? (pendingReg.student_type || '') : '',
-          sessionNumber: 1, date: AttendanceService.today(), checkInTime: AttendanceService.nowTime(),
-          barcodeValue: pendingBarcode, source: 'eplus-attendance', type: 'allow_sub',
-          teacherName: session.teacher, subjectName: session.subject,
-          level: pendingReg ? (pendingReg.level || '') : '', stream: pendingReg ? (pendingReg.stream || '') : '', institution: pendingReg ? (pendingReg.institution || '') : '',
-          createdAt: AttendanceService.nowTime()
-        });
-        logScanner('allow recorded (allow_sub): ' + session.teacher + ' / ' + session.subject);
-      } catch (e) { logScanner('allow mirror write error: ' + e.message); }
-    }
-
-    playSoundCorrect();
-    attendedCount++; updateCounter();
-    postCheckin(session, 'allow');
-    showCheckinAnimation('allow', session.subject, session.teacher);
-    showScanOverlay('purple', '🟣', 'تم السماح بالحضور', pendingName,
-      session.teacher + ' — ' + session.subject + '<br>سُمح بالتسجيل دون اشتراك — ستُخصم من حصص اشتراكه القادم', 3200);
-  }
-
-  function postCheckin(session, type) {
-    if (type !== 'red') {
-      session.alreadyCheckedIn = true;
-      session.attended = Math.min(8, session.attended + 1);
-      session.remaining = Math.max(0, session.remaining - 1);
-    }
-    var btn = document.querySelector('.tc-btn.loading') || document.querySelector('.tc-btn[data-sidx]');
-    if (btn) {
-      btn.classList.remove('loading', 'green', 'orange', 'purple');
-      if (type !== 'red') {
-        btn.classList.add('done');
-        btn.disabled = true;
-        btn.innerHTML = '✓ تم التسجيل اليوم';
-      } else {
-        btn.classList.add('green');
-        btn.innerHTML = 'تسجيل الحضور';
-      }
-      var card = btn.closest('.tc-card');
-      if (card && type === 'green') {
-        var nums = card.querySelectorAll('.tc-stat-num');
-        if (nums.length >= 2) {
-          nums[0].textContent = session.attended;
-          nums[1].textContent = session.remaining;
-        }
-      }
-    }
-    processing = false; scanner.setBusy(false);
-    setTimeout(renderReady, 300);
-  }
-
-  function showCheckinAnimation(type, subject, teacher) {
-    var el = document.getElementById('checkmark-anim');
-    var circle = document.getElementById('checkmark-circle');
-    var path = document.getElementById('checkmark-path');
-    var text = document.getElementById('checkmark-text');
-    var color = type === 'green' ? '#10b981' : type === 'allow' ? '#a855f7' : '#ef4444';
-    el.style.display = 'flex';
-    circle.style.stroke = color;
-    path.style.stroke = color;
-    text.style.color = color;
-    text.textContent = type === 'green' ? '✅ تم التسجيل' : type === 'allow' ? '🟣 تم السماح بالحضور' : '🚫 ممنوع';
-    text.style.opacity = 0;
-    circle.style.strokeDashoffset = 283;
-    path.style.strokeDashoffset = 50;
-    circle.style.transition = 'none';
-    path.style.transition = 'none';
-    void circle.offsetWidth;
-    circle.style.transition = 'stroke-dashoffset 0.6s ease';
-    circle.style.strokeDashoffset = 0;
-    path.style.transition = 'stroke-dashoffset 0.4s ease 0.4s';
-    path.style.strokeDashoffset = 0;
-    setTimeout(function () { text.style.transition = 'opacity 0.3s ease'; text.style.opacity = 1; }, 500);
-    setTimeout(function () {
-      el.style.display = 'none';
-      circle.style.transition = 'none'; circle.style.strokeDashoffset = 283;
-      path.style.transition = 'none'; path.style.strokeDashoffset = 50;
-    }, 1800);
-  }
-
   // ── Scanner ──
   var scanner = null;
   try {
