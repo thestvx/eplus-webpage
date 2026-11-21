@@ -27,7 +27,7 @@ function buildHeaders(origin: string | null): Record<string, string> {
   const headers: Record<string, string> = {
     // Access-Control-Allow-Headers/Methods are harmless to send; the Origin
     // reflect header is only added when the request origin is allowlisted.
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-kiosk-key',
     'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
     'Vary': 'Origin',
   };
