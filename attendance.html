@@ -598,8 +598,18 @@ main{flex:1;position:relative;overflow:hidden}
   }
 
   // ── Attendance Control: check which teachers are open today ──
+  function canonTeacherName(n) {
+    var s = String(n || '').replace(/\s+/g, ' ').trim();
+    if (s === 'خادم الله نور الهدى') return 'خادم الله نور';
+    return s;
+  }
+  function canonSubjectName(n) {
+    var s = String(n || '').replace(/\s+/g, ' ').trim();
+    if (s === 'اللغة الانجليزية') return 'اللغة الإنجليزية';
+    return s;
+  }
   function normalizeTeacherName(n) {
-    var s = String(n || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    var s = canonTeacherName(n).toLowerCase();
     s = s.replace(/عبد\s+الرحمان/g, 'عبدالرحمان');
     s = s.replace(/عبد\s+ال/g, 'عبدال');
     return s.split(' ').sort().join(' ');
@@ -633,7 +643,7 @@ main{flex:1;position:relative;overflow:hidden}
             var nn = normalizeTeacherName(d.teacherName);
             openNameMap[nn] = true;
             if (d.subjectName) {
-              openMap[nn + '|||' + d.subjectName.trim().toLowerCase()] = true;
+              openMap[nn + '|||' + canonSubjectName(d.subjectName).trim().toLowerCase()] = true;
             } else {
               openMap[nn] = true;
             }
@@ -647,7 +657,7 @@ main{flex:1;position:relative;overflow:hidden}
   function isTeacherOpen(openMap, openIdMap, teacherName, subjectName, openNameMap) {
     var nn = normalizeTeacherName(teacherName);
     if (subjectName) {
-      var sk = nn + '|||' + subjectName.trim().toLowerCase();
+      var sk = nn + '|||' + canonSubjectName(subjectName).trim().toLowerCase();
       if (openMap[sk]) return true;
     }
     if (!subjectName && openMap[nn]) return true;
@@ -910,15 +920,17 @@ main{flex:1;position:relative;overflow:hidden}
     } catch (e) { logScanner('allow lookup error: ' + e.message); }
     for (var i = 0; i < subjects.length; i++) {
       var s = subjects[i];
-      var key = (s.teacher || '') + '|' + (s.subject || '');
+      var tName = canonTeacherName(s.teacher);
+      var subjName = canonSubjectName(s.subject);
+      var key = tName + '|' + subjName;
       if (seen[key]) continue;
       seen[key] = true;
-      var isOpen = isTeacherOpen(openMap, openIdMap, s.teacher, s.subject, openNameMap);
-      var sess = { teacher: s.teacher, subject: s.subject, teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(s.teacher)] || '', subjectId: s.subjectId || '', status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, allowed: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length, hasSubscription: false, allowAvailable: false };
+      var isOpen = isTeacherOpen(openMap, openIdMap, tName, subjName, openNameMap);
+      var sess = { teacher: tName, subject: subjName, teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(tName)] || '', subjectId: s.subjectId || '', status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, allowed: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length, hasSubscription: false, allowAvailable: false };
       try {
         // قرار واحد لكل مادة: يفحص «كل» اشتراكات الطالب (صفوف منفصلة / تعدد
         // الشهور) — فلا تظهر بطاقة «انتهى الاشتراك» بينما التسجيل مسموح، والعكس.
-        var resolved = SubscriptionService.resolveCheckIn(subsAll, s.subject, s.teacher, today);
+        var resolved = SubscriptionService.resolveCheckIn(subsAll, subjName, tName, today);
         var subResult = (resolved && resolved.subscription) ? resolved : null;
         var pick = subResult ? subResult.pick : null;
         if (subResult) {
@@ -934,8 +946,8 @@ main{flex:1;position:relative;overflow:hidden}
             try {
               var pcSnap = await window.db.collection('support_attendance')
                 .where('studentId', '==', studentId)
-                .where('teacherName', '==', s.teacher)
-                .where('subjectName', '==', s.subject).get();
+                .where('teacherName', '==', tName)
+                .where('subjectName', '==', subjName).get();
               var pc = 0;
               pcSnap.forEach(function (pd) {
                 var pdd = pd.data();
@@ -955,14 +967,14 @@ main{flex:1;position:relative;overflow:hidden}
         } else {
           sess.status = 'expired';
         }
-      } catch (e) { logScanner('subCheck error for ' + s.teacher + ': ' + e.message); }
+      } catch (e) { logScanner('subCheck error for ' + tName + ': ' + e.message); }
       try {
         var attSnap = await window.db.collection('support_attendance')
           .where('studentId', '==', studentId)
           .where('date', '==', today).get();
         attSnap.forEach(function (doc) {
           var d = doc.data();
-          if (d.teacherName === s.teacher && d.subjectName === s.subject && d.type !== 'grace' && d.type !== 'grace_session' && !d.cancelled) {
+          if (canonTeacherName(d.teacherName) === tName && canonSubjectName(d.subjectName) === subjName && d.type !== 'grace' && d.type !== 'grace_session' && !d.cancelled) {
             sess.alreadyCheckedIn = true;
           }
         });
@@ -975,8 +987,8 @@ main{flex:1;position:relative;overflow:hidden}
           if (_px.status === 'cancelled') continue;
           var _pxSId = _px.subject_id || '', _pxTId = _px.teacher_id || '';
           var _pxSN = _px.subject_name || '', _pxTN = _px.teacher_name || '';
-          if (_pxSId && _pxSId !== s.subject) { if (!_pxSN || _pxSN !== s.subject) continue; }
-          if (_pxTId && _pxTId !== s.teacher) { if (!_pxTN || _pxTN !== s.teacher) continue; }
+          if (_pxSId && _pxSId !== subjName) { if (!_pxSN || canonSubjectName(_pxSN) !== subjName) continue; }
+          if (_pxTId && _pxTId !== tName) { if (!_pxTN || canonTeacherName(_pxTN) !== tName) continue; }
           sess.hasSubscription = true;
           break;
         }
@@ -1187,8 +1199,8 @@ main{flex:1;position:relative;overflow:hidden}
         if (r.cancelled) return;
         if (r.type === 'grace' || r.type === 'grace_session') return;
         if (!r.date) return;
-        if (String(r.teacherName || '') !== String(session.teacher || '')) return;
-        if (String(r.subjectName || '') !== String(session.subject || '')) return;
+        if (canonTeacherName(r.teacherName) !== canonTeacherName(session.teacher)) return;
+        if (canonSubjectName(r.subjectName) !== canonSubjectName(session.subject)) return;
         rows.push(r);
       });
       rows.sort(function (a, b) {
@@ -1211,8 +1223,8 @@ main{flex:1;position:relative;overflow:hidden}
           '<td>' + (i + 1) + '</td>' +
           '<td>' + esc(_attLogDate(r.date)) + '</td>' +
           '<td dir="ltr" style="text-align:right">' + esc(_attLogTime(r) || '—') + '</td>' +
-          '<td>' + esc(r.subjectName || session.subject || '') + (isTrial ? ' <span style="font-size:10px;color:#d97706;font-weight:900">(تجريبية)</span>' : '') + '</td>' +
-          '<td>' + esc(r.teacherName || session.teacher || '') + '</td>' +
+          '<td>' + esc(canonSubjectName(r.subjectName || session.subject || '')) + (isTrial ? ' <span style="font-size:10px;color:#d97706;font-weight:900">(تجريبية)</span>' : '') + '</td>' +
+          '<td>' + esc(canonTeacherName(r.teacherName || session.teacher || '')) + '</td>' +
         '</tr>';
       });
       body += '</tbody></table></div>';

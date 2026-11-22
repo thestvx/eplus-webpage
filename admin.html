@@ -6338,6 +6338,17 @@ import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, creat
 import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, setDoc, getDoc, getDocs, query, orderBy, where, onSnapshot, serverTimestamp, Timestamp, writeBatch, limit, deleteField } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
 
+window.canonTeacherName = function (n) {
+  var s = String(n || '').replace(/\s+/g, ' ').trim();
+  if (s === 'خادم الله نور الهدى') return 'خادم الله نور';
+  return s;
+};
+window.canonSubjectName = function (n) {
+  var s = String(n || '').replace(/\s+/g, ' ').trim();
+  if (s === 'اللغة الانجليزية') return 'اللغة الإنجليزية';
+  return s;
+};
+
 const firebaseConfig = {
   apiKey: "AIzaSyAMcplfO4veFVLtZZcyqfTJx9NGCit8gjo",
   authDomain: "eplus-center-39.firebaseapp.com",
@@ -27448,10 +27459,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     return String(name || '').replace(/\s+/g, '').toLowerCase();
   }
   function atcMatchNorm(name) {
-    var s = String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    var s = window.canonTeacherName(name).replace(/\s+/g, ' ').trim().toLowerCase();
     s = s.replace(/عبد\s+الرحمان/g, 'عبدالرحمان');
     s = s.replace(/عبد\s+ال/g, 'عبدال');
     return s.split(' ').sort().join(' ');
+  }
+  function atcSubjNorm(name) {
+    return window.canonSubjectName(name).replace(/\s+/g, ' ').trim().toLowerCase();
   }
   function atcDocId(teacherName, subjectName) {
     var key = atcNorm(teacherName);
@@ -27486,16 +27500,18 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       var subjects = (t.subjects || []).map(function (s) { return s.subject || s.name || s; }).filter(Boolean);
       if (!teacherSubjectMap[name]) teacherSubjectMap[name] = { name: name, teacherId: tid, subjects: [] };
       subjects.forEach(function (sub) {
-        if (teacherSubjectMap[name].subjects.indexOf(sub) === -1) teacherSubjectMap[name].subjects.push(sub);
+        var csub = window.canonSubjectName(sub);
+        var dup = teacherSubjectMap[name].subjects.some(function (x) { return window.canonSubjectName(x) === csub; });
+        if (!dup) teacherSubjectMap[name].subjects.push(sub);
       });
     });
     window._atcTeacherIdMap = teacherIdByName;
     Object.values(teacherSubjectMap).forEach(function (t) {
       if (!t.subjects.length) {
-        teacherEntries.push({ value: t.name + '|||', label: t.name, teacherName: t.name, subjectName: '', teacherId: t.teacherId });
+        teacherEntries.push({ value: t.name + '|||', label: window.canonTeacherName(t.name), teacherName: t.name, subjectName: '', teacherId: t.teacherId });
       } else {
         t.subjects.forEach(function (sub) {
-          teacherEntries.push({ value: t.name + '|||' + sub, label: t.name + ' — ' + sub, teacherName: t.name, subjectName: sub, teacherId: t.teacherId });
+          teacherEntries.push({ value: t.name + '|||' + sub, label: window.canonTeacherName(t.name) + ' — ' + window.canonSubjectName(sub), teacherName: t.name, subjectName: sub, teacherId: t.teacherId });
         });
       }
     });
@@ -27557,7 +27573,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     var html = '<div style="font-size:12px;font-weight:800;color:#059669;margin-bottom:8px">🟢 الأساتذة المفتوح حاليًا:</div>';
     html += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
     openEntries.forEach(function (e) {
-      var label = e.teacherName + (e.subjectName ? ' — ' + e.subjectName : '');
+      var label = window.canonTeacherName(e.teacherName) + (e.subjectName ? ' — ' + window.canonSubjectName(e.subjectName) : '');
       html += '<div style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(16,185,129,0.08);border:1.5px solid rgba(16,185,129,0.25);border-radius:10px;font-size:12px;font-weight:700;color:#059669">';
       html += '<span style="width:8px;height:8px;border-radius:50%;background:#10b981;flex-shrink:0"></span>';
       html += '<span>' + escX(label) + '</span>';
@@ -27577,14 +27593,14 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     if (!fdb || !fs) return;
     var todayStr = atcToday();
     var normT = atcMatchNorm(name);
-    var normS = subjectName ? subjectName.trim().toLowerCase() : '';
+    var normS = subjectName ? atcSubjNorm(subjectName) : '';
     // present students today for this teacher/subject
     var presentSet = new Set();
     try {
       var cSnap = await fs.getDocs(fs.query(fs.collection(fdb, 'support_attendance'), fs.where('date', '==', todayStr)));
       cSnap.forEach(function (d) {
         var r = d.data();
-        var rSubj = (r.subjectName || '').trim().toLowerCase();
+        var rSubj = atcSubjNorm(r.subjectName);
         var nameMatch = atcMatchNorm(r.teacherName) === normT && (!normS || rSubj === normS);
         var idMatch = teacherId && r.teacherId && r.teacherId === teacherId && (!normS || rSubj === normS);
         if ((nameMatch || idMatch) && r.studentId) presentSet.add(String(r.studentId));
@@ -27606,7 +27622,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       var teaMatch = atcMatchNorm(s.teacher_name || '') === normT;
       var idMatch2 = teacherId && s.teacher_id && s.teacher_id === teacherId;
       if (!teaMatch && !idMatch2) continue;
-      if (normS && String(s.subject_name || '').trim().toLowerCase() !== normS) continue;
+      if (normS && atcSubjNorm(s.subject_name) !== normS) continue;
       var sid = String(s.student_id || '');
       if (!sid || presentSet.has(sid)) continue;
       // period with remaining sessions
@@ -27661,14 +27677,14 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       if (snap.exists() && snap.data().isOpen) {
         await fs.updateDoc(docRef, { isOpen: false, closedAt: new Date().toISOString() });
         var normT = atcMatchNorm(name);
-        var normS = subjectName ? subjectName.trim().toLowerCase() : '';
+        var normS = subjectName ? atcSubjNorm(subjectName) : '';
         var todayStr = atcToday();
         var cSnap = await fs.getDocs(fs.query(fs.collection(fdb, 'support_attendance'), fs.where('date', '==', todayStr)));
         var batch = fs.writeBatch(fdb);
         var confirmed = 0, ops = 0;
         cSnap.forEach(function (d) {
           var r = d.data();
-          var rSubj = (r.subjectName || '').trim().toLowerCase();
+          var rSubj = atcSubjNorm(r.subjectName);
           var nameMatch = r.confirmed === false && atcMatchNorm(r.teacherName) === normT && (!normS || rSubj === normS);
           var idMatch = teacherId && r.teacherId && r.teacherId === teacherId && (!normS || rSubj === normS);
           if (nameMatch || idMatch) {
@@ -27714,13 +27730,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         var fs2 = window._firestore, fdb2 = window._db;
         var todayStr = atcToday();
         var normT = atcMatchNorm(name);
-        var normS = subjectName ? subjectName.trim().toLowerCase() : '';
+        var normS = subjectName ? atcSubjNorm(subjectName) : '';
         var cSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('date', '==', todayStr)));
         var batch2 = fs2.writeBatch(fdb2);
         var confirmed = 0, ops2 = 0;
         cSnap.forEach(function (d) {
           var r = d.data();
-          var rSubj = (r.subjectName || '').trim().toLowerCase();
+          var rSubj = atcSubjNorm(r.subjectName);
           var nameMatch = r.confirmed === false && atcMatchNorm(r.teacherName) === normT && (!normS || rSubj === normS);
           var idMatch = teacherId && r.teacherId && r.teacherId === teacherId && (!normS || rSubj === normS);
           if (nameMatch || idMatch) {
@@ -28086,8 +28102,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         h += '<tr style="border-bottom:1px solid var(--border)" id="subx-att-row-' + r.id + '">';
         h += '<td style="padding:7px 10px;white-space:nowrap">' + SubscriptionService.fmtAr(r.date, true) + '</td>';
         h += '<td style="padding:7px 10px;white-space:nowrap" dir="ltr">' + escX(r.time) + '</td>';
-        h += '<td style="padding:7px 10px">' + escX(r.subjectName || '—') + '</td>';
-        h += '<td style="padding:7px 10px">' + escX(r.teacherName || '—') + '</td>';
+      h += '<td style="padding:7px 10px">' + escX(window.canonSubjectName(r.subjectName || '—')) + '</td>';
+      h += '<td style="padding:7px 10px">' + escX(window.canonTeacherName(r.teacherName || '—')) + '</td>';
         if (!((window._employeeRestrictions || {}).subxHideAttendance)) {
           h += '<td style="padding:7px 10px;text-align:center"><button onclick="subxCancelAttendance(\'' + escX(r.id) + '\',\'' + escX(studentId) + '\',\'' + escX(r.date) + '\',\'' + escX(subjectName || '') + '\',\'' + escX(teacherName || '') + '\',\'' + escX(subId || '') + '\')" style="background:rgba(239,68,68,0.08);color:#dc2626;border:1px solid rgba(239,68,68,0.2);border-radius:6px;padding:4px 10px;font-size:10px;font-weight:800;font-family:inherit;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'rgba(239,68,68,0.18)\'" onmouseout="this.style.background=\'rgba(239,68,68,0.08)\'">❌ إلغاء الحضور</button></td>';
         }
@@ -28619,7 +28635,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       h += '<div style="font-weight:900;font-size:13.5px">' + escX(first.studentName || '—') + '</div>';
       h += '<div style="font-family:monospace;font-size:11px;color:var(--text-muted)" dir="ltr">' + escX(first.studentId || '') + '</div>';
       h += _subxSubProgressBadge(first.studentId, first.subjectName, first.teacherName);
-      h += '<div style="font-size:11px;color:var(--text-muted)">' + escX(first.subjectName || '—') + ' · ' + escX(first.teacherName || '—') + '</div>';
+      h += '<div style="font-size:11px;color:var(--text-muted)">' + escX(window.canonSubjectName(first.subjectName || '—')) + ' · ' + escX(window.canonTeacherName(first.teacherName || '—')) + '</div>';
       h += '<div style="margin-inline-start:auto;font-size:11px;font-weight:800;color:#6366f1">' + g.arr.length + ' حصة · ' + g.chunks.length + ' فترة</div>';
       h += '</div>';
       g.chunks.forEach(function (ch, ci) {
@@ -28897,8 +28913,8 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       h += '<td style="padding:7px 10px;white-space:nowrap" dir="ltr">' + escX(r.time) + '</td>';
       h += '<td style="padding:7px 10px;font-weight:700">' + escX(r.studentName || '—') + '</td>';
       h += '<td style="padding:7px 10px;font-family:monospace" dir="ltr">' + escX(r.studentId) + '</td>';
-      h += '<td style="padding:7px 10px">' + escX(r.subjectName || '—') + '</td>';
-      h += '<td style="padding:7px 10px">' + escX(r.teacherName || '—') + '</td>';
+        h += '<td style="padding:7px 10px">' + escX(window.canonSubjectName(r.subjectName || '—')) + '</td>';
+        h += '<td style="padding:7px 10px">' + escX(window.canonTeacherName(r.teacherName || '—')) + '</td>';
       h += '<td style="padding:7px 10px;text-align:center">' + (typeLabel[r.type] || '<span style="color:#059669">✅ حضور</span>') + '</td>';
       h += '<td style="padding:7px 10px;text-align:center"><button onclick="subxRestoreArchivedLog(\'' + r.id + '\')" style="background:rgba(59,130,246,0.1);color:#2563eb;border:1px solid rgba(59,130,246,0.25);border-radius:8px;padding:4px 12px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.background=\'rgba(59,130,246,0.2)\'" onmouseout="this.style.background=\'rgba(59,130,246,0.1)\'">↩️ استعادة</button></td>';
       h += '</tr>';
