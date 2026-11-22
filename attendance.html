@@ -629,17 +629,16 @@ main{flex:1;position:relative;overflow:hidden}
       snap.forEach(function (doc) {
         var d = doc.data();
         if (d.isOpen) {
-          var nn = normalizeTeacherName(d.teacherName);
-          var sn = String(d.subjectName || '').trim().toLowerCase();
-          if (nn) {
-            if (sn) {
-              openMap[nn + '|||' + sn] = true;
+          if (d.teacherName) {
+            var nn = normalizeTeacherName(d.teacherName);
+            openNameMap[nn] = true;
+            if (d.subjectName) {
+              openMap[nn + '|||' + d.subjectName.trim().toLowerCase()] = true;
             } else {
-              openNameMap[nn] = true;
               openMap[nn] = true;
             }
           }
-          if (d.teacherId && !sn) openIdMap[d.teacherId] = true;
+          if (d.teacherId) openIdMap[d.teacherId] = true;
         }
       });
     } catch (e) { logScanner('atc check error: ' + e.message); }
@@ -647,9 +646,12 @@ main{flex:1;position:relative;overflow:hidden}
   }
   function isTeacherOpen(openMap, openIdMap, teacherName, subjectName, openNameMap) {
     var nn = normalizeTeacherName(teacherName);
-    var sn = String(subjectName || '').trim().toLowerCase();
-    if (sn) return openMap[nn + '|||' + sn] === true;
-    if (openMap[nn]) return true;
+    if (subjectName) {
+      var sk = nn + '|||' + subjectName.trim().toLowerCase();
+      if (openMap[sk]) return true;
+    }
+    if (!subjectName && openMap[nn]) return true;
+    // مفتوح أي حصة/مادة لهذا الأستاذ → يعتبر حضور الأستاذ مفتوحاً
     if (openNameMap && openNameMap[nn]) return true;
     var tid = _teacherIdByName[nn];
     if (tid && openIdMap[tid]) return true;

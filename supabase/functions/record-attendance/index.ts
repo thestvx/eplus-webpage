@@ -150,17 +150,19 @@ function isAttendanceOpen(docs: any[], item: any): boolean {
   docs.forEach((d) => {
     if (d.isOpen !== true) return;
     const tn = normalizeTeacherName(d.teacherName);
-    const sn = str(d.subjectName).trim().toLowerCase();
     if (tn) {
-      if (sn) openMap[`${tn}|||${sn}`] = true;
-      else { openNameMap[tn] = true; openMap[tn] = true; }
+      openNameMap[tn] = true;
+      if (d.subjectName) openMap[`${tn}|||${str(d.subjectName).trim().toLowerCase()}`] = true;
+      else openMap[tn] = true;
     }
-    if (d.teacherId && !sn) openIdMap[str(d.teacherId)] = true;
+    if (d.teacherId) openIdMap[str(d.teacherId)] = true;
   });
   const nn = normalizeTeacherName(item.teacherName);
-  const subjectName = str(item.subjectName).trim().toLowerCase();
-  if (subjectName) return openMap[`${nn}|||${subjectName}`] === true;
-  return openNameMap[nn] === true || (!!item.teacherId && openIdMap[str(item.teacherId)] === true);
+  const subjectName = str(item.subjectName);
+  if (subjectName && openMap[`${nn}|||${subjectName.trim().toLowerCase()}`]) return true;
+  if (!subjectName && openMap[nn]) return true;
+  if (openNameMap[nn]) return true;
+  return !!item.teacherId && openIdMap[str(item.teacherId)] === true;
 }
 
 function matchesSubjectTeacher(s: any, subjectId: string, teacherId: string): boolean {
