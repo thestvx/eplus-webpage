@@ -150,19 +150,17 @@ function isAttendanceOpen(docs: any[], item: any): boolean {
   docs.forEach((d) => {
     if (d.isOpen !== true) return;
     const tn = normalizeTeacherName(d.teacherName);
+    const sn = str(d.subjectName).trim().toLowerCase();
     if (tn) {
-      openNameMap[tn] = true;
-      if (d.subjectName) openMap[`${tn}|||${str(d.subjectName).trim().toLowerCase()}`] = true;
-      else openMap[tn] = true;
+      if (sn) openMap[`${tn}|||${sn}`] = true;
+      else { openNameMap[tn] = true; openMap[tn] = true; }
     }
-    if (d.teacherId) openIdMap[str(d.teacherId)] = true;
+    if (d.teacherId && !sn) openIdMap[str(d.teacherId)] = true;
   });
   const nn = normalizeTeacherName(item.teacherName);
-  const subjectName = str(item.subjectName);
-  if (subjectName && openMap[`${nn}|||${subjectName.trim().toLowerCase()}`]) return true;
-  if (!subjectName && openMap[nn]) return true;
-  if (openNameMap[nn]) return true;
-  return !!item.teacherId && openIdMap[str(item.teacherId)] === true;
+  const subjectName = str(item.subjectName).trim().toLowerCase();
+  if (subjectName) return openMap[`${nn}|||${subjectName}`] === true;
+  return openNameMap[nn] === true || (!!item.teacherId && openIdMap[str(item.teacherId)] === true);
 }
 
 function matchesSubjectTeacher(s: any, subjectId: string, teacherId: string): boolean {
@@ -400,6 +398,8 @@ Deno.serve(async (req) => {
       const subjectName = str(raw.subjectName || '');
       const teacherId = str(raw.teacherId || '');
       const subjectId = str(raw.subjectId || '');
+      const teacherMatchKey = teacherId || teacherName;
+      const subjectMatchKey = subjectId || subjectName;
       const mode = str(raw.mode || 'normal');
       const base = { index: i, teacherName, subjectName, type: mode };
       try {
@@ -417,7 +417,7 @@ Deno.serve(async (req) => {
         });
         if (duplicate) throw new Error('تم تسجيل الحضور لهذه المادة اليوم');
 
-        let resolved = resolveCheckIn(subscriptionRows, subjectId, teacherId, date);
+        let resolved = resolveCheckIn(subscriptionRows, subjectMatchKey, teacherMatchKey, date);
         let pick = resolved && resolved.pick;
         let subscription = resolved && resolved.subscription;
         let actionType = 'normal';
@@ -426,7 +426,7 @@ Deno.serve(async (req) => {
         let subscriptionId = '';
         let permanent = false;
         let allowCycle = false;
-        let docId = attendanceDocId(studentId, teacherId, subjectId, date);
+        let docId = attendanceDocId(studentId, teacherMatchKey, subjectMatchKey, date);
         let source = 'eplus-attendance';
         let recordType = 'present';
 
@@ -440,7 +440,7 @@ Deno.serve(async (req) => {
             const row = subscriptionRows.find((r: any) => {
               const s = r && r.subscription;
               if (str(s && s.id) !== requestedCycleId) return false;
-              return matchesSubjectTeacher(s, subjectId, teacherId)
+              return matchesSubjectTeacher(s, subjectMatchKey, teacherMatchKey)
                 || (eqName(s && s.subject_name, subjectName) && eqName(s && s.teacher_name, teacherName));
             });
             if (!row) throw new Error('دورة الاشتراك المحددة غير صالحة لهذه المادة');
@@ -454,7 +454,7 @@ Deno.serve(async (req) => {
           if (pick && pick.allowed) throw new Error('الاشتراك لا يزال نشطاً — لا حاجة للسماح الاستثنائي');
           const cycleId = str(subscription.id);
           if (allowKeys[cycleId]) throw new Error('تم استخدام السماح لهذه الدورة');
-          docId = allowDocId(studentId, teacherId, subjectId, cycleId);
+          docId = allowDocId(studentId, teacherMatchKey, subjectMatchKey, cycleId);
           actionType = 'allow';
           recordType = 'allow_sub';
           source = 'eplus-attendance-allow';

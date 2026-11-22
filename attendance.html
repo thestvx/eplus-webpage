@@ -629,16 +629,17 @@ main{flex:1;position:relative;overflow:hidden}
       snap.forEach(function (doc) {
         var d = doc.data();
         if (d.isOpen) {
-          if (d.teacherName) {
-            var nn = normalizeTeacherName(d.teacherName);
-            openNameMap[nn] = true;
-            if (d.subjectName) {
-              openMap[nn + '|||' + d.subjectName.trim().toLowerCase()] = true;
+          var nn = normalizeTeacherName(d.teacherName);
+          var sn = String(d.subjectName || '').trim().toLowerCase();
+          if (nn) {
+            if (sn) {
+              openMap[nn + '|||' + sn] = true;
             } else {
+              openNameMap[nn] = true;
               openMap[nn] = true;
             }
           }
-          if (d.teacherId) openIdMap[d.teacherId] = true;
+          if (d.teacherId && !sn) openIdMap[d.teacherId] = true;
         }
       });
     } catch (e) { logScanner('atc check error: ' + e.message); }
@@ -646,12 +647,9 @@ main{flex:1;position:relative;overflow:hidden}
   }
   function isTeacherOpen(openMap, openIdMap, teacherName, subjectName, openNameMap) {
     var nn = normalizeTeacherName(teacherName);
-    if (subjectName) {
-      var sk = nn + '|||' + subjectName.trim().toLowerCase();
-      if (openMap[sk]) return true;
-    }
-    if (!subjectName && openMap[nn]) return true;
-    // مفتوح أي حصة/مادة لهذا الأستاذ → يعتبر حضور الأستاذ مفتوحاً
+    var sn = String(subjectName || '').trim().toLowerCase();
+    if (sn) return openMap[nn + '|||' + sn] === true;
+    if (openMap[nn]) return true;
     if (openNameMap && openNameMap[nn]) return true;
     var tid = _teacherIdByName[nn];
     if (tid && openIdMap[tid]) return true;
@@ -925,6 +923,8 @@ main{flex:1;position:relative;overflow:hidden}
           sess.hasSubscription = true;
           sess.sub = subResult.subscription;
           sess.periods = subResult.periods || [];
+          if (sess.sub.subject_id) sess.subjectId = sess.sub.subject_id;
+          if (sess.sub.teacher_id) sess.teacherId = sess.sub.teacher_id;
           sess.permanent = SubscriptionService.isPermanent(subResult.subscription);
           if (sess.permanent) {
             sess.status = 'active';
@@ -1386,8 +1386,20 @@ if (hasActiveSub) {
   async function kioskIdToken() {
     await ensureAttendanceAuth();
     var app = (typeof firebase !== 'undefined' && firebase.app) ? firebase.app('kiosk') : null;
-    var user = app && app.auth ? app.auth().currentUser : null;
-    return user ? await user.getIdToken() : '';
+    var auth = app && app.auth ? app.auth() : null;
+    var user = auth ? auth.currentUser : null;
+    if (!user) {
+      authState.signedIn = false;
+      await ensureAttendanceAuth();
+      user = auth ? auth.currentUser : null;
+    }
+    if (!user) return '';
+    try {
+      return await user.getIdToken();
+    } catch (e) {
+      try { return await auth.currentUser.getIdToken(true); }
+      catch (e2) { return ''; }
+    }
   }
 
   async function submitBatchCheckIn(sessions, btnEl, forceMode) {
