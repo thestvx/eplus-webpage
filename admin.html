@@ -27530,8 +27530,33 @@ function attRestoreDb(attId, periodId, refund) {
         },
         body: JSON.stringify(payload)
       });
-      if (!res.ok) console.warn('[ATC] Supabase control mirror failed', res.status);
-    } catch (e) { console.warn('[ATC] Supabase control mirror error', e); }
+      if (!res.ok) { console.warn('[ATC] Supabase control mirror failed', res.status); return false; }
+      return true;
+    } catch (e) { console.warn('[ATC] Supabase control mirror error', e); return false; }
+  }
+
+  async function atcLoadDbStatuses() {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/attendance_control_state?date=eq.' + encodeURIComponent(atcToday()) + '&select=*', {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var rows = await res.json();
+    var out = {};
+    (Array.isArray(rows) ? rows : []).forEach(function (r) {
+      var teacher = r.teacher_name || r.teacherName || '';
+      var subject = r.subject_name || r.subjectName || '';
+      if (!teacher) return;
+      out[teacher + '|||' + subject] = {
+        date: r.date || '',
+        teacherName: teacher,
+        subjectName: subject,
+        teacherId: r.teacher_id || r.teacherId || '',
+        isOpen: r.is_open === true || r.isOpen === true,
+        openedAt: r.opened_at || r.openedAt || '',
+        closedAt: r.closed_at || r.closedAt || ''
+      };
+    });
+    return out;
   }
 
   window.atcLoad = async function () {
@@ -27596,6 +27621,12 @@ function attRestoreDb(attId, periodId, refund) {
         });
       } catch (e) { console.warn('[ATC] load status failed', e); }
     }
+    try {
+      var dbStatuses = await atcLoadDbStatuses();
+      Object.keys(dbStatuses || {}).forEach(function (k) {
+        if (!statuses[k]) statuses[k] = dbStatuses[k];
+      });
+    } catch (e) { console.warn('[ATC] Supabase status fallback failed', e); }
     window._atcStatuses = statuses;
     atcUpdateStatus();
     atcRenderOpenBars(statuses);
@@ -27730,15 +27761,18 @@ function attRestoreDb(attId, periodId, refund) {
     var name = parts[0] || '';
     var subjectName = parts[1] || '';
     var { _db: fdb, _firestore: fs } = window;
-    if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); return; }
-    try {
-      var docRef = fs.doc(fdb, ATC_COLLECTION, atcDocId(name, subjectName));
-      var teacherId = (window._atcTeacherIdMap || {})[atcMatchNorm(name)] || '';
-      var snap = await fs.getDoc(docRef);
-      if (snap.exists() && snap.data().isOpen) {
-        var closedAt = new Date().toISOString();
+    var teacherId = (window._atcTeacherIdMap || {})[atcMatchNorm(name)] || '';
+    var closedAt = new Date().toISOString();
+    var mirrored = await atcMirrorControl(name, subjectName, teacherId, false, '', closedAt);
+    if (!mirrored) { showToast('❌ تعذر تحديث قاعدة بيانات الحضور — لم يتم الإغلاق', true); return; }
+    if (fdb && fs) {
+      try {
+        var docRef = fs.doc(fdb, ATC_COLLECTION, atcDocId(name, subjectName));
         await fs.updateDoc(docRef, { isOpen: false, closedAt: closedAt });
-        await atcMirrorControl(name, subjectName, teacherId, false, '', closedAt);
+      } catch (e) { console.warn('[ATC] Firestore close mirror skipped', e); }
+    }
+    if (fdb && fs) {
+      try {
         var normT = atcMatchNorm(name);
         var normS = subjectName ? atcSubjNorm(subjectName) : '';
         var todayStr = atcToday();
@@ -27756,12 +27790,13 @@ function attRestoreDb(attId, periodId, refund) {
             if (ops >= 450) { batch.commit(); batch = fs.writeBatch(fdb); ops = 0; }
           }
         });
-         if (ops > 0) await batch.commit();
-         showToast('✅ تم إغلاق حضور ' + name + (subjectName ? ' — ' + subjectName : '') + ' وتأكيد ' + confirmed + ' سجل');
-         try { await atcConsumeAbsent(name, subjectName, teacherId); } catch (e) { console.warn('[ATC] consume absent failed', e); }
-         await atcLoad();
-      }
-    } catch (e) { console.error('[ATC] close from bar failed', e); showToast('❌ تعذر إغلاق الحضور', true); }
+        if (ops > 0) await batch.commit();
+        try { await atcConsumeAbsent(name, subjectName, teacherId); } catch (e) { console.warn('[ATC] consume absent failed', e); }
+      } catch (e) { console.warn('[ATC] Firestore close confirmation skipped', e); }
+    }
+    showToast('✅ تم إغلاق حضور ' + name + (subjectName ? ' — ' + subjectName : ''));
+    await atcLoad();
+
   };
 
   window.atcToggleSelected = async function () {
@@ -27774,27 +27809,28 @@ function attRestoreDb(attId, periodId, refund) {
     var subjectName = parts[1] || '';
     if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري التحديث...'; }
     var { _db: fdb, _firestore: fs } = window;
-    if (!fdb || !fs) { showToast('❌ Firebase غير متاح', true); btn.disabled = false; return; }
-    var docRef = fs.doc(fdb, ATC_COLLECTION, atcDocId(name, subjectName));
+    var current = (window._atcStatuses || {})[val];
+    var isClosing = !!(current && current.isOpen);
     var teacherId = (window._atcTeacherIdMap || {})[atcMatchNorm(name)] || '';
-    var isClosing = false;
-    try {
-      var snap = await fs.getDoc(docRef);
-      if (snap.exists() && snap.data().isOpen) {
-        var closedAt = new Date().toISOString();
-        await fs.updateDoc(docRef, { isOpen: false, closedAt: closedAt });
-        await atcMirrorControl(name, subjectName, teacherId, false, '', closedAt);
-        isClosing = true;
-      } else {
-        var openedAt = new Date().toISOString();
-        await fs.setDoc(docRef, { date: atcToday(), teacherName: name, subjectName: subjectName, teacherId: teacherId, isOpen: true, openedAt: openedAt, closedAt: null }, { merge: true });
-        await atcMirrorControl(name, subjectName, teacherId, true, openedAt, '');
-        if (window.dashLog) window.dashLog('حضور', 'فتح حضور أستاذ', 'تم فتح تسجيل الحضور لـ ' + name + (subjectName ? ' — ' + subjectName : ''));
-      }
-    } catch (e) { console.error('[ATC] toggle failed', e); showToast('❌ تعذر تحديث الحالة', true); }
+    var nowIso = new Date().toISOString();
+    var mirrored = await atcMirrorControl(name, subjectName, teacherId, !isClosing, isClosing ? '' : nowIso, isClosing ? nowIso : '');
+    if (!mirrored) {
+      showToast('❌ تعذر تحديث قاعدة بيانات الحضور — لم تتغير الحالة', true);
+      if (btn) { btn.disabled = false; btn.textContent = isClosing ? '🔒 إغلاق الحضور' : '▶️ بدء الحضور'; }
+      return;
+    }
+    if (fdb && fs) {
+      try {
+        var docRef = fs.doc(fdb, ATC_COLLECTION, atcDocId(name, subjectName));
+        if (isClosing) await fs.updateDoc(docRef, { isOpen: false, closedAt: nowIso });
+        else await fs.setDoc(docRef, { date: atcToday(), teacherName: name, subjectName: subjectName, teacherId: teacherId, isOpen: true, openedAt: nowIso, closedAt: null }, { merge: true });
+      } catch (e) { console.warn('[ATC] Firestore mirror skipped', e); }
+    }
+    if (!isClosing && window.dashLog) window.dashLog('حضور', 'فتح حضور أستاذ', 'تم فتح تسجيل الحضور لـ ' + name + (subjectName ? ' — ' + subjectName : ''));
     if (isClosing) {
       try {
         var fs2 = window._firestore, fdb2 = window._db;
+        if (!fs2 || !fdb2) throw new Error('Firebase غير متاح لتأكيد السجلات');
         var todayStr = atcToday();
         var normT = atcMatchNorm(name);
         var normS = subjectName ? atcSubjNorm(subjectName) : '';

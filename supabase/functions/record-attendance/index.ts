@@ -208,6 +208,15 @@ async function fsCreate(collection: string, id: string, fields: Record<string, a
   );
 }
 
+function validationCode(message: string): string {
+  const m = str(message);
+  if (m.includes('الحضور غير مفتوح')) return 'ATTENDANCE_CLOSED';
+  if (m.includes('انتهى الاشتراك')) return 'SUBSCRIPTION_EXPIRED';
+  if (m.includes('السماح')) return 'ALLOW_INVALID';
+  if (m.includes('teacherName') || m.includes('subjectName')) return 'INVALID_ITEM';
+  return 'VALIDATION_FAILED';
+}
+
 function isAttendanceOpen(docs: any[], item: any): boolean {
   const openMap: Record<string, boolean> = {};
   const openIdMap: Record<string, boolean> = {};
@@ -423,9 +432,21 @@ async function loadControlState(
     : [];
   if (snapshotDocs.length) sources.snapshot = 'ok';
 
-  const docs = firestoreDocs || databaseDocs || snapshotDocs;
-  const source = firestoreDocs ? 'firestore' : databaseDocs ? 'database' : snapshotDocs.length ? 'snapshot' : '';
-  if (!source) {
+  let docs: any[] = [];
+  let source = '';
+  if (firestoreDocs) {
+    docs = firestoreDocs;
+    source = 'firestore';
+  } else if (databaseDocs) {
+    docs = databaseDocs;
+    source = 'database';
+  } else if (snapshotDocs.length && sources.firestore !== 'ok' && sources.supabase !== 'ok') {
+    docs = snapshotDocs;
+    source = 'snapshot';
+  } else if (sources.firestore === 'ok' || sources.supabase === 'ok') {
+    docs = [];
+    source = sources.firestore === 'ok' ? 'firestore' : 'database';
+  } else {
     const err: any = new Error('attendance control unavailable');
     err.code = 'CONTROL_UNAVAILABLE';
     err.detail = sources;
@@ -520,6 +541,9 @@ Deno.serve(async (req) => {
     const idToken = bearerToken(req);
     const requestId = str(body.requestId || '') || crypto.randomUUID();
     const checks: Record<string, string> = { auth: user ? 'ok' : 'unauthorized', supabase: 'unknown', firestore: 'unknown', control: 'unknown' };
+    let controlSource = '';
+    let controlSources: Record<string, string> = {};
+    let openCount = 0;
     try {
       await withRetry('status.supabase', async () => {
         const res = await supabase.from('registrations').select('id').limit(1);
@@ -534,6 +558,9 @@ Deno.serve(async (req) => {
       const control = await loadControlState(supabase, algiersDate(), idToken, body.controlSnapshot, requestId);
       checks.firestore = control.sources.firestore === 'ok' ? 'ok' : 'fallback';
       checks.control = control.docs.length ? 'open' : 'closed';
+      controlSource = control.source;
+      controlSources = control.sources;
+      openCount = control.docs.length;
     } catch (e: any) {
       checks.firestore = 'unavailable';
       checks.control = 'unavailable';
@@ -543,8 +570,10 @@ Deno.serve(async (req) => {
       ? 'unavailable'
       : checks.control === 'unavailable'
         ? 'reconnecting'
-        : 'ready';
-    return json({ ok: true, status, checks, requestId, serverTime: new Date().toISOString() });
+        : checks.control === 'open'
+          ? 'ready'
+          : 'closed';
+    return json({ ok: true, status, checks, controlSource, controlSources, openCount, requestId, serverTime: new Date().toISOString() });
   }
 
   if (action === 'batch') {
@@ -606,11 +635,13 @@ Deno.serve(async (req) => {
 
     let controlDocs: any[] = [];
     let controlSource = '';
+    let controlSources: Record<string, string> = {};
     let subscriptionRows: any[] = [];
     try {
       const control = await loadControlState(supabase, date, idToken, body.controlSnapshot, requestId);
       controlDocs = control.docs;
       controlSource = control.source;
+      controlSources = control.sources;
       logEvent({
         operation: 'control.load',
         phase: 'ready',
@@ -660,7 +691,7 @@ Deno.serve(async (req) => {
       const teacherMatchKey = teacherId || teacherName;
       const subjectMatchKey = subjectId || subjectName;
       const mode = str(raw.mode || 'normal');
-      const base = { index: i, teacherName, subjectName, type: mode };
+      const base = { index: i, teacherName, subjectName, teacherId, subjectId, type: mode, stage: 'database' };
       const item: any = {
         teacherName,
         subjectName,
@@ -795,10 +826,29 @@ Deno.serve(async (req) => {
 
     const results: any[] = Array.isArray(data.results) ? data.results : [];
     for (let i = 0; i < results.length; i++) {
-      const validationError = metadata[i] && metadata[i].validationError;
-      if (validationError && results[i]) {
-        results[i] = { ...metadata[i].base, ok: false, reason: validationError };
-      }
+      const meta = metadata[i] || {};
+      const validationError = str(meta.validationError || '');
+      const source = validationError ? 'edge-validation' : 'database';
+      const ok = validationError ? false : results[i] && results[i].ok === true;
+      const action = validationError ? '' : str(results[i] && results[i].action || '');
+      const deducted = ok && action === 'normal' && results[i].permanent !== true;
+      results[i] = {
+        ...meta.base,
+        ...results[i],
+        ok,
+        reason: validationError || str(results[i] && results[i].reason || ''),
+        code: validationError ? validationCode(validationError) : str(results[i] && results[i].code || ''),
+        detail: validationError || str(results[i] && results[i].reason || ''),
+        stage: source,
+        backendReached: true,
+        saved: ok === true,
+        deducted: deducted === true,
+        mirrorSaved: false,
+        controlSource,
+        requestId,
+        subscriptionId: str(meta.item && meta.item.subscriptionId || ''),
+        periodId: str(meta.item && meta.item.periodId || ''),
+      };
     }
 
     let mirrorFailures = 0;
@@ -807,6 +857,7 @@ Deno.serve(async (req) => {
       if (!r || !r.ok || !metadata[i]) continue;
       try {
         await fsCreate('support_attendance', str(r.attendanceId), metadata[i].fields, idToken);
+        r.mirrorSaved = true;
       } catch (e: any) {
         mirrorFailures++;
         logEvent({
@@ -849,6 +900,9 @@ Deno.serve(async (req) => {
       requestId,
       idempotentReplay: data.idempotent_replay === true,
       controlSource: controlSource,
+      controlSources,
+      backendReached: true,
+      serverTime: new Date().toISOString(),
       mirrorFailures,
     });
    } catch (e: any) {

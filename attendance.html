@@ -576,7 +576,7 @@ main{flex:1;position:relative;overflow:hidden}
   function setSystemState(state, detail) {
     systemState = state;
     systemDetail = String(detail || '');
-    systemReady = state === 'ready';
+    systemReady = state === 'ready' || state === 'closed';
     var pill = $('k-status-pill');
     if (!pill) return;
     var color = '#22c55e', label = 'الماسح جاهز — امسح البطاقة';
@@ -584,6 +584,7 @@ main{flex:1;position:relative;overflow:hidden}
     else if (state === 'unauthorized') { color = '#f59e0b'; label = '⚠️ انتهت الجلسة — جارٍ تجديد الدخول'; }
     else if (state === 'reconnecting') { color = '#f59e0b'; label = '⏳ الخدمة تعاود الاتصال...'; }
     else if (state === 'unavailable') { color = '#ef4444'; label = '🚫 خدمة الحضور غير متاحة حالياً'; }
+    else if (state === 'closed') { color = '#f59e0b'; label = '⚠️ الخدمة متصلة — لا توجد جلسة حضور مفتوحة'; }
     pill.innerHTML = '<span class="dot" style="background:' + color + '"></span>' + label;
   }
   function updateDebug(payload) {
@@ -1523,11 +1524,13 @@ if (hasActiveSub) {
         setSystemState('unauthorized', 'جلسة الدخول منتهية');
         return 'unauthorized';
       }
-      if (!response.ok || (status !== 'ready' && status !== 'reconnecting')) {
+      if (!response.ok || (status !== 'ready' && status !== 'reconnecting' && status !== 'closed')) {
         setSystemState('unavailable', (data && data.error) || ('HTTP ' + response.status));
         return 'unavailable';
       }
-      setSystemState(status === 'reconnecting' ? 'reconnecting' : 'ready', '');
+      var detail = status === 'closed' ? ('مصدر الحالة: ' + ((data && data.controlSource) || 'غير معروف')) : '';
+      setSystemState(status, detail);
+      logAttendanceEvent({ operation: 'attendance.probe', phase: 'ok', status, controlSource: (data && data.controlSource) || '', openCount: (data && data.openCount) || 0, backendReached: true });
       return status;
     } catch (e) {
       setSystemState('unavailable', (e && e.message) || 'تعذر الوصول لخدمة الحضور');
@@ -1663,37 +1666,62 @@ if (hasActiveSub) {
       }
       if (!data) throw new Error(lastError || 'تعذر تسجيل الحضور');
       var results = Array.isArray(data.results) ? data.results : [];
+      var replay = data.idempotentReplay === true;
       var okCount = 0;
-      var failures = [];
+      var failedCount = 0;
+      var lines = [];
       results.forEach(function (r, i) {
         var s = list[i];
-        if (!r || !r.ok) {
-          failures.push((r && r.subjectName) || (s && s.subject) || 'مادة') + ': ' + ((r && r.reason) || 'خطأ غير معروف');
-          return;
+        var ok = !!(r && r.ok);
+        var subject = (r && r.subjectName) || (s && s.subject) || 'مادة غير معروفة';
+        var teacher = (r && r.teacherName) || (s && s.teacher) || 'معلم غير معروف';
+        var reason = (r && (r.reason || r.detail)) || (ok ? 'تم التسجيل' : 'خطأ غير معروف');
+        var code = (r && (r.code || r.errorCode)) || '';
+        var reached = r ? r.backendReached !== false : backendReached;
+        var saved = !!(r && r.saved);
+        var deducted = !!(r && r.deducted);
+        var mirror = r && r.mirrorSaved === true ? 'نعم' : 'لا';
+        if (ok) {
+          okCount++;
+          if (s) {
+            s.alreadyCheckedIn = true;
+            if (!replay) {
+              s.attended = Number(s.attended || 0) + 1;
+              if (typeof r.remaining === 'number') s.remaining = Math.max(0, r.remaining);
+              else if (!r.permanent && r.action !== 'allow') s.remaining = Math.max(0, Number(s.remaining || 0) - 1);
+              if (r.action === 'allow') s.allowAvailable = false;
+            }
+          }
+        } else {
+          failedCount++;
         }
-        okCount++;
-        if (s) {
-          s.alreadyCheckedIn = true;
-          s.attended = Number(s.attended || 0) + 1;
-          if (typeof r.remaining === 'number') s.remaining = Math.max(0, r.remaining);
-          else if (!r.permanent && r.action !== 'allow') s.remaining = Math.max(0, Number(s.remaining || 0) - 1);
-          if (r.action === 'allow') s.allowAvailable = false;
-        }
+        lines.push('<div style="padding:7px 0;border-top:1px solid rgba(255,255,255,.12);text-align:right">'
+          + (ok ? '✅' : '❌') + ' <b>' + esc(subject) + '</b> — ' + esc(teacher)
+          + '<div style="font-size:11px;opacity:.9;margin-top:3px">' + esc(reason) + (code ? ' [' + esc(code) + ']' : '') + '</div>'
+          + '<div style="font-size:10px;opacity:.75;margin-top:2px">وصل الطلب: ' + (reached ? 'نعم' : 'لا')
+          + ' · حُفظ: ' + (saved ? 'نعم' : 'لا') + ' · خُصم: ' + (deducted ? 'نعم' : 'لا') + ' · مرآة Firestore: ' + mirror + '</div>'
+          + '</div>');
+        logAttendanceEvent({
+          operation: 'batch.item-result', phase: ok ? 'ok' : 'failed', requestId,
+          subject, teacher, ok, reason, code, stage: (r && r.stage) || '',
+          backendReached: reached, saved, deducted, replay,
+        });
       });
-      if (okCount) { playSoundCorrect(); attendedCount += okCount; updateCounter(); }
-      if (failures.length) playSoundIncorrect();
+      if (okCount && !replay) { playSoundCorrect(); attendedCount += okCount; updateCounter(); }
+      if (failedCount) playSoundIncorrect();
       setSystemState('ready', '');
-      var title = failures.length ? (okCount ? 'تم تسجيل جزء من المواد' : 'تعذر تسجيل الحضور') : (data.idempotentReplay ? 'تم تسجيل الحضور سابقاً' : 'تم تسجيل الحضور');
-      var sub = okCount ? okCount + ' مادة/مواد مسجلة بنجاح' : '';
-      if (data.idempotentReplay) sub += (sub ? '<br>' : '') + 'تم التحقق من العملية السابقة بدون تكرار الخصم';
-      if (failures.length) sub += (sub ? '<br>' : '') + 'فشل: ' + esc(failures.slice(0, 3).join(' · '));
-      showScanOverlay(failures.length ? (okCount ? 'orange' : 'red') : 'green', failures.length ? '⚠️' : '✅', title, pendingName, sub, 3400, function () {
+      var title = failedCount ? (okCount ? 'تم تسجيل جزء من المواد' : 'تعذر تسجيل الحضور') : (replay ? 'تم تسجيل الحضور سابقاً' : 'تم تسجيل الحضور');
+      var sub = '<div style="max-height:190px;overflow:auto">' + lines.join('') + '</div>'
+        + '<div style="font-size:10px;opacity:.75;margin-top:6px">طلب: ' + esc(requestId)
+        + ' · مصدر الحالة: ' + esc((data && data.controlSource) || 'غير معروف')
+        + (replay ? ' · إعادة عرض للنتيجة السابقة بدون خصم إضافي' : '') + '</div>';
+      showScanOverlay(failedCount ? (okCount ? 'orange' : 'red') : 'green', failedCount ? '⚠️' : '✅', title, pendingName, sub, failedCount ? 7000 : 3800, function () {
         renderTeacherCards(currentSessions);
         processing = false;
         scanner.setBusy(false);
         renderReady();
       });
-      logScanner('batch result: ' + okCount + '/' + results.length);
+      logScanner('batch result: ' + okCount + '/' + results.length + ' failed=' + failedCount);
     } catch (e) {
       var message = (e && e.message) || 'خطأ غير معروف';
       logScanner('batch error: ' + message);
