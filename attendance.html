@@ -662,48 +662,11 @@ main{flex:1;position:relative;overflow:hidden}
       _teacherIdMapLoaded = true;
     } catch (e) { logScanner('teacherId map load error: ' + e.message); }
   }
-  async function checkAttendanceControl() {
-    var openMap = {};
-    var openIdMap = {};
-    var openNameMap = {};
-    var docsForServer = [];
-    try {
-      var today = AttendanceService.today();
-      var snap = await window.db.collection('attendance_control')
-        .where('date', '==', today)
-        .get();
-      snap.forEach(function (doc) {
-        var d = doc.data();
-        if (d.isOpen) {
-          if (d.teacherName) {
-            var nn = normalizeTeacherName(d.teacherName);
-            openNameMap[nn] = true;
-            if (d.subjectName) {
-              openMap[nn + '|||' + canonSubjectName(d.subjectName).trim().toLowerCase()] = true;
-            } else {
-              openMap[nn] = true;
-            }
-          }
-          if (d.teacherId) openIdMap[d.teacherId] = true;
-          docsForServer.push({
-            date: today,
-            teacherName: canonTeacherName(d.teacherName || ''),
-            subjectName: canonSubjectName(d.subjectName || ''),
-            teacherId: d.teacherId || '',
-            isOpen: true,
-            openedAt: d.openedAt || '',
-            closedAt: d.closedAt || ''
-          });
-        }
-      });
-    } catch (e) { logScanner('atc check error: ' + e.message); }
-    return { openMap: openMap, openIdMap: openIdMap, openNameMap: openNameMap, docs: docsForServer };
-  }
   function attSessionKey(s) {
     return String((s && (s.teacherId || s.teacher)) || '') + '|||' + String((s && (s.subjectId || s.subject)) || '');
   }
   function canSubmitSession(s) {
-    return !!(s && s.sessionState === 'open' && s.attendanceOpen === true);
+    return !!(s && s.sessionState === 'open' && s.attendanceOpen === true && s.sessionId);
   }
   function selectedSessionKeys() {
     var keys = {};
@@ -736,6 +699,7 @@ main{flex:1;position:relative;overflow:hidden}
     (sessions || []).forEach(function (s) {
       s.sessionState = 'unknown';
       s.attendanceOpen = false;
+      s.sessionId = '';
       s.sessionReason = reason || 'تعذر التحقق من حالة الحضور';
       s.sessionSource = detail || '';
       s.sessionCheckedAt = new Date().toISOString();
@@ -752,6 +716,7 @@ main{flex:1;position:relative;overflow:hidden}
         subjectName: s.subject || '',
         teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(s.teacher)] || '',
         subjectId: s.subjectId || '',
+        sessionId: s.sessionId || '',
       };
     });
     try {
@@ -760,7 +725,7 @@ main{flex:1;position:relative;overflow:hidden}
       var response = await fetch(ATTENDANCE_EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'x-kiosk-key': KIOSK_ACCESS_HASH },
-        body: JSON.stringify({ action: 'session-status', requestId: newRequestId(), items, controlSnapshot: currentControlDocs })
+        body: JSON.stringify({ action: 'session-status', requestId: newRequestId(), items })
       });
       var data = null;
       try { data = await response.json(); } catch (e) {}
@@ -778,8 +743,11 @@ main{flex:1;position:relative;overflow:hidden}
         s.sessionState = st.state === 'open' ? 'open' : st.state === 'closed' ? 'closed' : 'unknown';
         s.attendanceOpen = s.sessionState === 'open';
         s.sessionReason = st.reason || (s.sessionState === 'open' ? 'الأستاذ فتح جلسة الحضور' : s.sessionState === 'closed' ? 'الأستاذ لم يفتح جلسة الحضور بعد' : 'تعذر التحقق من حالة الحضور');
+        s.sessionId = st.sessionId || '';
+        s.sessionReasonCode = st.reasonCode || '';
+        s.sessionDbState = st.dbState || '';
         s.sessionSource = data.controlSource || '';
-        s.sessionCheckedAt = data.serverTime || new Date().toISOString();
+        s.sessionCheckedAt = st.checkedAt || data.serverTime || new Date().toISOString();
       });
       logAttendanceEvent({ operation: 'session-status', phase: 'ok', requestId: data.requestId, backendReached: true, source: data.controlSource || '', openCount: data.openCount || 0, itemCount: sessions.length, silent });
     } catch (e) {
@@ -1040,8 +1008,7 @@ main{flex:1;position:relative;overflow:hidden}
     var seen = {};
     var today = AttendanceService.today();
     await loadTeacherIdMap();
-    var atc = await checkAttendanceControl();
-    currentControlDocs = atc.docs || [];
+    currentControlDocs = [];
     var subsAll = [];
     try { subsAll = (await SubscriptionService.getSubscriptions(studentId)) || []; } catch (e) { logScanner('subs lookup error: ' + e.message); }
     if (!subsAll.length) {
@@ -1632,7 +1599,7 @@ if (hasActiveSub) {
       var response = await fetch(ATTENDANCE_EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'x-kiosk-key': KIOSK_ACCESS_HASH },
-        body: JSON.stringify({ action: 'status', requestId: newRequestId(), controlSnapshot: currentControlDocs })
+        body: JSON.stringify({ action: 'status', requestId: newRequestId() })
       });
       var data = null;
       try { data = await response.json(); } catch (e) {}
@@ -1708,6 +1675,7 @@ if (hasActiveSub) {
         teacherName: s.teacher || '', subjectName: s.subject || '',
         teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(s.teacher)] || '',
         subjectId: s.subjectId || '',
+        sessionId: s.sessionId || '',
         subscriptionId: forceMode === 'allow' ? String((s.sub && s.sub.id) || '') : '',
         mode: forceMode || 'normal',
       };
@@ -1744,7 +1712,6 @@ if (hasActiveSub) {
               action: 'batch',
               requestId: requestId,
               payload: payload,
-              controlSnapshot: currentControlDocs,
               studentId: pendingStudentId,
               studentName: pendingName || '',
               studentType: pendingReg ? (pendingReg.student_type || '') : '',
@@ -1956,6 +1923,20 @@ if (hasActiveSub) {
         restoreSelectedSessionKeys(keys);
       });
     }, 12000);
+    function refreshVisibleSessions() {
+      var view = $('view-teachers');
+      if (!appUnlocked || processing || overlayTimer || navigator.onLine === false) return;
+      if (!view || !view.classList.contains('active') || !currentSessions.length) return;
+      var keys = selectedSessionKeys();
+      fetchSessionStates(currentSessions, { silent: true }).then(function () {
+        renderTeacherCards(currentSessions);
+        restoreSelectedSessionKeys(keys);
+      });
+    }
+    window.addEventListener('focus', refreshVisibleSessions);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) refreshVisibleSessions();
+    });
   })();
 
 })();

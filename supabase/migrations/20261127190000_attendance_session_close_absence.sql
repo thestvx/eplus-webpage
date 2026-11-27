@@ -76,6 +76,8 @@ DECLARE
   v_now TIMESTAMPTZ := now();
   v_server_time TEXT := to_char(now() AT TIME ZONE 'Africa/Algiers', 'YYYY-MM-DD HH24:MI:SS');
   v_session_id TEXT := '';
+  v_requested_session_id TEXT := '';
+  v_control attendance_control_state%ROWTYPE;
   v_abs RECORD;
 BEGIN
   IF p_request_id IS NULL OR length(trim(p_request_id)) < 8 THEN
@@ -147,23 +149,17 @@ BEGIN
         RAISE EXCEPTION 'الحضور غير مفتوح لهذا الأستاذ' USING ERRCODE = '42501';
       END IF;
 
-      SELECT id INTO v_session_id
-        FROM attendance_control_state
-       WHERE date = p_date
-         AND is_open = true
-         AND (
-           (v_teacher_id <> '' AND teacher_id = v_teacher_id)
-           OR attendance_norm_teacher(teacher_name) = attendance_norm_teacher(v_teacher_name)
-         )
-         AND (
-           v_subject_name = ''
-           OR attendance_norm_subject(subject_name) = attendance_norm_subject(v_subject_name)
-         )
-       ORDER BY updated_at DESC
-       LIMIT 1;
-      IF NOT FOUND THEN
-        v_session_id := '';
+      v_requested_session_id := trim(COALESCE(v_item->>'sessionId', ''));
+      IF v_requested_session_id = '' THEN
+        RAISE EXCEPTION 'sessionId required' USING ERRCODE = '42501';
       END IF;
+      v_control := attendance_find_open_session(
+        p_date, v_teacher_id, v_teacher_name, v_subject_id, v_subject_name, v_requested_session_id
+      );
+      IF v_control.id IS NULL THEN
+        RAISE EXCEPTION 'الحضور غير مفتوح لهذا الأستاذ' USING ERRCODE = '42501';
+      END IF;
+      v_session_id := v_control.id;
 
       FOR v_abs IN
         SELECT id, subscription_period_id, refunded

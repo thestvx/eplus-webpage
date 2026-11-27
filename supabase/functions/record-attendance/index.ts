@@ -210,7 +210,9 @@ async function fsCreate(collection: string, id: string, fields: Record<string, a
 
 function validationCode(message: string): string {
   const m = str(message);
-  if (m.includes('الحضور غير مفتوح')) return 'ATTENDANCE_CLOSED';
+  if (m.includes('الحضور غير مفتوح') || m.includes('لم يفتح') || m.includes('مغلقة')) return 'ATTENDANCE_CLOSED';
+  if (m.includes('معرف الأستاذ')) return 'TEACHER_ID_MISMATCH';
+  if (m.includes('المادة لا تطابق')) return 'SUBJECT_MISMATCH';
   if (m.includes('انتهى الاشتراك')) return 'SUBSCRIPTION_EXPIRED';
   if (m.includes('السماح')) return 'ALLOW_INVALID';
   if (m.includes('teacherName') || m.includes('subjectName')) return 'INVALID_ITEM';
@@ -380,30 +382,16 @@ function mapControlRow(row: any): any {
 async function loadControlState(
   supabase: any,
   date: string,
-  idToken: string,
-  snapshot: unknown,
+  _idToken: string,
+  _snapshot: unknown,
   requestId: string
 ): Promise<{ docs: any[]; source: string; sources: Record<string, string> }> {
-  const sources: Record<string, string> = { firestore: 'skipped', supabase: 'skipped', snapshot: 'skipped' };
-  let firestoreDocs: any[] | null = null;
+  const sources: Record<string, string> = {
+    firestore: 'ignored',
+    supabase: 'skipped',
+    snapshot: 'ignored',
+  };
   let databaseDocs: any[] | null = null;
-
-  try {
-    firestoreDocs = (await withRetry('control.firestore', () => fsQuery('attendance_control', 'date', date, idToken)))
-      .map(mapControlRow)
-      .filter((d: any) => d.isOpen);
-    sources.firestore = 'ok';
-  } catch (e: any) {
-    sources.firestore = str(e?.message || e).slice(0, 160);
-    logEvent({
-      operation: 'control.firestore',
-      phase: 'unavailable',
-      requestId,
-      errorCode: str(e?.code || e?.status || ''),
-      detail: str(e?.message || e).slice(0, 240),
-      backendReached: true,
-    });
-  }
 
   try {
     const result = await withRetry('control.database', async () => {
@@ -413,7 +401,7 @@ async function loadControlState(
     });
     databaseDocs = (Array.isArray(result) ? result : [])
       .map(mapControlRow)
-      .filter((d: any) => d.isOpen);
+      .filter((d: any) => d.isOpen === true);
     sources.supabase = 'ok';
   } catch (e: any) {
     sources.supabase = str(e?.message || e).slice(0, 160);
@@ -425,34 +413,40 @@ async function loadControlState(
       detail: str(e?.message || e).slice(0, 240),
       backendReached: true,
     });
-  }
-
-  const snapshotDocs = Array.isArray(snapshot)
-    ? snapshot.map(mapControlRow).filter((d: any) => d.isOpen)
-    : [];
-  if (snapshotDocs.length) sources.snapshot = 'ok';
-
-  let docs: any[] = [];
-  let source = '';
-  if (databaseDocs) {
-    docs = databaseDocs;
-    source = 'database';
-  } else if (firestoreDocs) {
-    docs = firestoreDocs;
-    source = 'firestore';
-  } else if (snapshotDocs.length && sources.firestore !== 'ok' && sources.supabase !== 'ok') {
-    docs = snapshotDocs;
-    source = 'snapshot';
-  } else if (sources.firestore === 'ok' || sources.supabase === 'ok') {
-    docs = [];
-    source = sources.firestore === 'ok' ? 'firestore' : 'database';
-  } else {
     const err: any = new Error('attendance control unavailable');
     err.code = 'CONTROL_UNAVAILABLE';
     err.detail = sources;
     throw err;
   }
-  return { docs, source, sources };
+
+  return { docs: databaseDocs || [], source: 'database', sources };
+}
+
+async function checkSessionState(
+  supabase: any,
+  date: string,
+  item: any,
+  requestId: string,
+  requestedSessionId = ''
+): Promise<any> {
+  const data = await withRetry('control.session', async () => {
+    const res = await supabase.rpc('attendance_session_state', {
+      p_date: date,
+      p_teacher_id: str(item?.teacherId || ''),
+      p_teacher_name: str(item?.teacherName || ''),
+      p_subject_id: str(item?.subjectId || ''),
+      p_subject_name: str(item?.subjectName || ''),
+      p_session_id: requestedSessionId,
+    });
+    if (res.error) throw res.error;
+    return res.data;
+  });
+  if (!data || typeof data !== 'object') {
+    const err: any = new Error('attendance session state unavailable');
+    err.code = 'CONTROL_UNAVAILABLE';
+    throw err;
+  }
+  return data;
 }
 
 async function loadAllowKeys(supabase: any, studentId: string, requestId: string): Promise<Record<string, boolean>> {
@@ -593,21 +587,42 @@ Deno.serve(async (req) => {
     if (rawItems.length > 12) return json({ error: 'too many items' }, 400);
     const date = algiersDate();
     try {
-      const control = await loadControlState(supabase, date, bearerToken(req), body.controlSnapshot, requestId);
-      const statuses = rawItems.map((raw: any, i: number) => {
+      const statuses = await Promise.all(rawItems.map(async (raw: any, i: number) => {
         const item = baseItem(raw, i);
-        const isOpen = isAttendanceOpen(control.docs, item);
+        const requestedSessionId = str(raw && raw.sessionId || '');
+        const state = await checkSessionState(supabase, date, item, requestId, requestedSessionId);
+        const isOpen = state.open === true;
+        logEvent({
+          operation: isOpen ? 'session-status.open' : 'session-status.closed',
+          phase: 'checked',
+          requestId,
+          teacherId: item.teacherId,
+          subjectId: item.subjectId,
+          sessionId: requestedSessionId,
+          foundSessionId: str(state.foundSessionId || ''),
+          dbState: str(state.dbState || ''),
+          reasonCode: str(state.code || ''),
+          backendReached: true,
+        });
         return {
           ...item,
           date,
           state: isOpen ? 'open' : 'closed',
           isOpen,
-          reason: isOpen ? 'الأستاذ فتح جلسة الحضور' : 'الأستاذ لم يفتح جلسة الحضور بعد',
+          reason: str(state.reason || (isOpen ? 'الأستاذ فتح جلسة الحضور' : 'الأستاذ لم يفتح جلسة الحضور بعد')),
+          reasonCode: str(state.code || ''),
+          dbState: str(state.dbState || ''),
+          sessionId: str(state.sessionId || ''),
+          foundSessionId: str(state.foundSessionId || ''),
+          requestedSessionId,
+          matchedBy: str(state.matchedBy || ''),
+          checkedAt: str(state.checkedAt || ''),
         };
-      });
+      }));
+      const sources = { firestore: 'ignored', supabase: 'ok', snapshot: 'ignored' };
       logEvent({
         operation: 'session-status', phase: 'ok', requestId,
-        source: control.source, sources: control.sources,
+        source: 'database', sources,
         itemCount: statuses.length, openCount: statuses.filter((s: any) => s.isOpen).length,
         backendReached: true,
       });
@@ -616,8 +631,8 @@ Deno.serve(async (req) => {
         status: 'ok',
         date,
         statuses,
-        controlSource: control.source,
-        controlSources: control.sources,
+        controlSource: 'database',
+        controlSources: sources,
         openCount: statuses.filter((s: any) => s.isOpen).length,
         requestId,
         serverTime: new Date().toISOString(),
@@ -765,6 +780,7 @@ Deno.serve(async (req) => {
       const teacherMatchKey = teacherId || teacherName;
       const subjectMatchKey = subjectId || subjectName;
       const mode = str(raw.mode || 'normal');
+      const requestedSessionId = str(raw.sessionId || '');
       const base = { index: i, teacherName, subjectName, teacherId, subjectId, type: mode, stage: 'database' };
       const item: any = {
         teacherName,
@@ -777,14 +793,44 @@ Deno.serve(async (req) => {
         monthNumber: 0,
         permanent: false,
         attendanceOpen: false,
+        requestedSessionId,
+        sessionId: '',
+        foundSessionId: '',
+        dbState: '',
+        reasonCode: '',
+        reason: '',
         mirrorId: attendanceDocId(studentId, teacherMatchKey, subjectMatchKey, date),
       };
       let validationError = '';
       let pick: any = null;
       try {
         if (!teacherName || !subjectName) throw new Error('teacherName and subjectName required');
-        item.attendanceOpen = isAttendanceOpen(controlDocs, { teacherName, subjectName, teacherId });
-        if (!item.attendanceOpen) throw new Error('الحضور غير مفتوح لهذا الأستاذ');
+        const sessionState = await checkSessionState(supabase, date, {
+          teacherName, subjectName, teacherId, subjectId,
+        }, requestId, requestedSessionId);
+        item.requestedSessionId = requestedSessionId;
+        item.sessionId = str(sessionState.sessionId || '');
+        item.foundSessionId = str(sessionState.foundSessionId || '');
+        item.dbState = str(sessionState.dbState || '');
+        item.reasonCode = str(sessionState.code || '');
+        item.reason = str(sessionState.reason || '');
+        item.attendanceOpen = sessionState.open === true;
+        logEvent({
+          operation: item.attendanceOpen ? 'batch.session-accepted' : 'batch.session-denied',
+          phase: 'checked',
+          requestId,
+          studentId,
+          teacherId,
+          subjectId,
+          sessionId: requestedSessionId,
+          foundSessionId: item.foundSessionId,
+          dbState: item.dbState,
+          reasonCode: item.reasonCode,
+          backendReached: true,
+          saved: false,
+          deducted: false,
+        });
+        if (!item.attendanceOpen) throw new Error(item.reason || 'الحضور غير مفتوح لهذا الأستاذ');
 
         const resolved = resolveCheckIn(subscriptionRows, subjectMatchKey, teacherMatchKey, date);
         pick = resolved && resolved.pick;
@@ -831,10 +877,13 @@ Deno.serve(async (req) => {
       } catch (e: any) {
         validationError = str(e?.message || e) || 'تعذر تحضير التسجيل';
         item.attendanceOpen = false;
+        if (!item.reasonCode) item.reasonCode = validationCode(validationError);
+        if (!item.reason) item.reason = validationError;
       }
       prepared.push(item);
       metadata[i] = {
         base,
+        item,
         validationError,
         pick,
         fields: {
@@ -853,6 +902,11 @@ Deno.serve(async (req) => {
           subjectName,
           teacherId,
           subjectId,
+          sessionId: item.sessionId,
+          requestedSessionId: item.requestedSessionId,
+          foundSessionId: item.foundSessionId,
+          dbState: item.dbState,
+          reasonCode: item.reasonCode,
           subscriptionId: item.subscriptionId,
           subscriptionPeriodId: item.periodId,
           monthNumber: item.monthNumber,
@@ -920,6 +974,11 @@ Deno.serve(async (req) => {
         mirrorSaved: false,
         controlSource,
         requestId,
+        sessionId: str(meta.item && meta.item.sessionId || ''),
+        requestedSessionId: str(meta.item && meta.item.requestedSessionId || ''),
+        foundSessionId: str(meta.item && meta.item.foundSessionId || ''),
+        dbState: str(meta.item && meta.item.dbState || ''),
+        reasonCode: str(meta.item && meta.item.reasonCode || ''),
         subscriptionId: str(meta.item && meta.item.subscriptionId || ''),
         periodId: str(meta.item && meta.item.periodId || ''),
       };
