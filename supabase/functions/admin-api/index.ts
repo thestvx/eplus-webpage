@@ -365,6 +365,14 @@ Deno.serve(async (req) => {
         p_rate: Number(body.rate) || 0,
       });
 
+    case 'close-attendance-session':
+      return rpc('close_attendance_session', {
+        p_admin_uid: uid,
+        p_session_id: String(body.sessionId || ''),
+        p_actor: String(body.actor || ''),
+        p_closed_at: body.closedAt == null ? null : String(body.closedAt),
+      });
+
     default:
       return json({ error: 'unknown action' }, 400);
   }

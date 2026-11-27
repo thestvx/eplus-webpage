@@ -925,6 +925,18 @@ Deno.serve(async (req) => {
       };
     }
 
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (!r || !metadata[i]) continue;
+      const fields = metadata[i].fields || {};
+      fields.recordType = str(r.recordType || fields.type || 'present');
+      fields.stateReason = str(r.stateReason || '');
+      fields.deducted = r.deducted === true;
+      fields.remainingAfter = r.remaining == null ? null : Number(r.remaining);
+      fields.sessionId = str(r.sessionId || '');
+      metadata[i].fields = fields;
+    }
+
     let mirrorFailures = 0;
     for (let i = 0; i < results.length; i++) {
       const r = results[i];

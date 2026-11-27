@@ -27677,127 +27677,151 @@ function attRestoreDb(attId, periodId, refund) {
     container.innerHTML = html;
   };
 
-  // ── استهلاك حصص الغائبين عند إغلاق الحضور ──
-  // التلاميذ الذين لديهم اشتراك فعّال ولم يسجلوا حضوراً this day
-  // يُعتبرون غائبين وتُستهلك حصة من اشتراكهم.
-  async function atcConsumeAbsent(name, subjectName, teacherId) {
-    var { _db: fdb, _firestore: fs } = window;
-    if (!fdb || !fs) return;
-    var todayStr = atcToday();
+  async function atcAdminCall(action, payload) {
+    var token = await adminAuthTokenProvider();
+    if (!token) throw new Error('admin auth required');
+    var res = await fetch(SR_SUPABASE_URL + '/functions/v1/admin-api', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(Object.assign({ action: action }, payload || {}))
+    });
+    var r = null;
+    try { r = await res.json(); } catch (e) {}
+    if (!res.ok || !r || !r.ok) throw new Error((r && r.error) || ('HTTP ' + res.status));
+    return r.data;
+  }
+
+  async function atcCloseDb(name, subjectName, teacherId) {
+    var sessionId = atcDocId(name, subjectName);
+    var actor = (typeof dashActorName === 'function') ? dashActorName() : '';
+    return await atcAdminCall('close-attendance-session', {
+      sessionId: sessionId,
+      actor: actor,
+      closedAt: new Date().toISOString()
+    });
+  }
+
+  function atcAbsentReasonLabel(reason) {
+    var map = {
+      'absent-deducted': 'غياب — خُصمت حصة واحدة',
+      'permanent-no-deduction': 'غياب — اشتراك دائم بلا خصم',
+      'allow-no-deduction': 'غياب — سماح استثنائي بلا خصم',
+      'no-balance': 'غياب — لا يوجد رصيد قابل للخصم',
+      'cancelled-after-open': 'غياب — أُلغي الاشتراك بعد فتح الجلسة، بلا خصم'
+    };
+    return map[reason] || ('غياب — ' + String(reason || 'بدون سبب'));
+  }
+
+  function atcCloseSummary(result, name, subjectName) {
+    var s = (result && result.summary) || {};
+    var label = window.canonTeacherName(name || '') + (subjectName ? ' — ' + window.canonSubjectName(subjectName) : '');
+    var msg = '✅ تم إغلاق ' + label
+      + ' — حضور ' + (s.present || 0)
+      + '، غياب ' + (s.absent || 0)
+      + '، خصم ' + (s.deducted || 0)
+      + '، بلا خصم ' + (s.noDeduction || 0);
+    if (result && result.idempotentReplay) {
+      msg = '✅ الإغلاق مسجّل مسبقاً لـ ' + label + ' — لا خصم مكرر، غياب ' + (s.absent || 0) + ' وخصم ' + (s.deducted || 0);
+    }
+    showToast(msg);
+    if (window.dashLog) window.dashLog('حضور', 'إغلاق جلسة وحساب غياب', msg);
+  }
+
+  async function atcMirrorAbsenceDocs(result, name, subjectName, teacherId) {
+    var fdb = window._db;
+    var fs = window._firestore;
+    if (!fdb || !fs || !result || !Array.isArray(result.results)) return;
+    var rows = result.results.filter(function (r) { return r && r.recordType === 'absent'; });
+    if (!rows.length) return;
+    var nowIso = new Date().toISOString();
+    var batch = fs.writeBatch(fdb);
+    var ops = 0;
+    for (var ri = 0; ri < rows.length; ri++) {
+      var row = rows[ri];
+      var data = {
+        studentId: String(row.studentId || ''),
+        studentName: String(row.studentName || ''),
+        teacherId: String(result.teacherId || teacherId || ''),
+        teacherName: String(result.teacherName || name || ''),
+        subjectId: '',
+        subjectName: String(result.subjectName || subjectName || ''),
+        date: String(result.date || atcToday()),
+        checkInTime: String(row.checkInTime || ''),
+        status: 'absent',
+        type: 'absent',
+        sessionId: String(result.sessionId || ''),
+        stateReason: String(row.reason || ''),
+        deducted: row.deducted === true,
+        subscriptionId: String(row.subscriptionId || ''),
+        subscriptionPeriodId: String(row.periodId || ''),
+        monthNumber: Number(row.monthNumber) || 0,
+        remainingAfter: row.remainingAfter == null ? null : Number(row.remainingAfter),
+        confirmed: true,
+        createdAt: nowIso,
+        updatedAt: nowIso
+      };
+      batch.set(fs.doc(fdb, 'support_attendance', String(row.attendanceId)), data, { merge: true });
+      ops++;
+      if (ops >= 450) { await batch.commit(); batch = fs.writeBatch(fdb); ops = 0; }
+    }
+    if (ops > 0) await batch.commit();
+  }
+
+  async function atcConfirmFirestoreAttendance(name, subjectName, teacherId) {
+    var fdb = window._db;
+    var fs = window._firestore;
+    if (!fdb || !fs) return 0;
     var normT = atcMatchNorm(name);
     var normS = subjectName ? atcSubjNorm(subjectName) : '';
-    // present students today for this teacher/subject
-    var presentSet = new Set();
-    try {
-      var cSnap = await fs.getDocs(fs.query(fs.collection(fdb, 'support_attendance'), fs.where('date', '==', todayStr)));
-      cSnap.forEach(function (d) {
-        var r = d.data();
-        var rSubj = atcSubjNorm(r.subjectName);
-        var nameMatch = atcMatchNorm(r.teacherName) === normT && (!normS || rSubj === normS);
-        var idMatch = teacherId && r.teacherId && r.teacherId === teacherId && (!normS || rSubj === normS);
-        if ((nameMatch || idMatch) && r.studentId) presentSet.add(String(r.studentId));
-      });
-    } catch (e) { console.warn('[ATC] absent present-set failed', e); }
-    // active subscriptions for this teacher/subject
-    var subs = [];
-    try {
-      if (SubscriptionService && typeof SubscriptionService.adminListSubscriptions === 'function') {
-        subs = await SubscriptionService.adminListSubscriptions();
+    var todayStr = atcToday();
+    var snap = await fs.getDocs(fs.query(fs.collection(fdb, 'support_attendance'), fs.where('date', '==', todayStr)));
+    var batch = fs.writeBatch(fdb);
+    var confirmed = 0;
+    var ops = 0;
+    snap.forEach(function (d) {
+      var r = d.data();
+      var rSubj = atcSubjNorm(r.subjectName);
+      var nameMatch = r.confirmed === false && atcMatchNorm(r.teacherName) === normT && (!normS || rSubj === normS);
+      var idMatch = teacherId && r.teacherId && r.teacherId === teacherId && (!normS || rSubj === normS);
+      if (nameMatch || idMatch) {
+        batch.update(d.ref, { confirmed: true, updatedAt: new Date().toISOString() });
+        confirmed++; ops++;
+        if (ops >= 450) { batch.commit(); batch = fs.writeBatch(fdb); ops = 0; }
       }
-    } catch (e) { console.warn('[ATC] absent subs load failed', e); subs = []; }
-    var consumed = 0;
-    for (var i = 0; i < (subs || []).length; i++) {
-      var row = subs[i] || {};
-      var s = row.subscription || {};
-      if (s.status === 'cancelled' || s.status === 'paused') continue;
-      if (SubscriptionService.isPermanent && SubscriptionService.isPermanent(s)) continue;
-      var teaMatch = atcMatchNorm(s.teacher_name || '') === normT;
-      var idMatch2 = teacherId && s.teacher_id && s.teacher_id === teacherId;
-      if (!teaMatch && !idMatch2) continue;
-      if (normS && atcSubjNorm(s.subject_name) !== normS) continue;
-      var sid = String(s.student_id || '');
-      if (!sid || presentSet.has(sid)) continue;
-      // period with remaining sessions
-      var periods = row.periods || [];
-      var period = periods.find(function (p) { return (Number(p.total_sessions || p.totalSessions || 0) - (Number(p.used_sessions) || 0)) > 0; }) || periods[0];
-      var pid = period ? (period.period_id || period.id) : null;
-      if (!pid) continue;
-      try {
-        await SubscriptionService.incrementPeriodUsage(pid, 1);
-        consumed++;
-      } catch (e) { console.warn('[ATC] absent increment failed', e); }
-      // write absent record (best effort)
-      try {
-        var key = (sid + '_' + (s.teacher_id || 'x') + '_' + (s.subject_id || 'x') + '_' + todayStr + '_absent').replace(/[^A-Za-z0-9_.\\-]/g, '_');
-        var doc = {
-          studentId: sid,
-          studentName: '',
-          teacherId: s.teacher_id || teacherId || '',
-          teacherName: s.teacher_name || name,
-          subjectId: s.subject_id || '',
-          subjectName: s.subject_name || subjectName || '',
-          date: todayStr,
-          checkInTime: '',
-          status: 'absent',
-          sessionNumber: 1,
-          level: '',
-          stream: '',
-          institution: '',
-          subscriptionId: s.id || '',
-          subscriptionPeriodId: pid,
-          monthNumber: period ? (period.month_number || 0) : 0,
-          createdAt: new Date().toISOString(),
-          confirmed: true,
-          updatedAt: new Date().toISOString()
-        };
-        await fdb.collection('support_attendance').doc(key).set(doc, { merge: true });
-      } catch (e) { console.warn('[ATC] absent record write failed', e); }
-    }
-    if (consumed > 0) showToast('📌 تم استهلاك ' + consumed + ' حصة للغائبين');
+    });
+    if (ops > 0) await batch.commit();
+    return confirmed;
   }
 
   window.atcCloseFromBar = async function (dk) {
     var parts = dk.split('|||');
     var name = parts[0] || '';
     var subjectName = parts[1] || '';
-    var { _db: fdb, _firestore: fs } = window;
     var teacherId = (window._atcTeacherIdMap || {})[atcMatchNorm(name)] || '';
-    var closedAt = new Date().toISOString();
-    var mirrored = await atcMirrorControl(name, subjectName, teacherId, false, '', closedAt);
-    if (!mirrored) { showToast('❌ تعذر تحديث قاعدة بيانات الحضور — لم يتم الإغلاق', true); return; }
+    var result;
+    try {
+      result = await atcCloseDb(name, subjectName, teacherId);
+    } catch (e) {
+      showToast('❌ تعذر إغلاق الحضور — ' + ((e && e.message) || 'خطأ غير معروف'), true);
+      return;
+    }
+    var fdb = window._db;
+    var fs = window._firestore;
     if (fdb && fs) {
       try {
-        var docRef = fs.doc(fdb, ATC_COLLECTION, atcDocId(name, subjectName));
-        await fs.updateDoc(docRef, { isOpen: false, closedAt: closedAt });
+        await fs.updateDoc(fs.doc(fdb, ATC_COLLECTION, atcDocId(name, subjectName)), {
+          isOpen: false,
+          closedAt: result.closedAt || new Date().toISOString()
+        });
       } catch (e) { console.warn('[ATC] Firestore close mirror skipped', e); }
     }
-    if (fdb && fs) {
-      try {
-        var normT = atcMatchNorm(name);
-        var normS = subjectName ? atcSubjNorm(subjectName) : '';
-        var todayStr = atcToday();
-        var cSnap = await fs.getDocs(fs.query(fs.collection(fdb, 'support_attendance'), fs.where('date', '==', todayStr)));
-        var batch = fs.writeBatch(fdb);
-        var confirmed = 0, ops = 0;
-        cSnap.forEach(function (d) {
-          var r = d.data();
-          var rSubj = atcSubjNorm(r.subjectName);
-          var nameMatch = r.confirmed === false && atcMatchNorm(r.teacherName) === normT && (!normS || rSubj === normS);
-          var idMatch = teacherId && r.teacherId && r.teacherId === teacherId && (!normS || rSubj === normS);
-          if (nameMatch || idMatch) {
-            batch.update(d.ref, { confirmed: true, updatedAt: new Date().toISOString() });
-            confirmed++; ops++;
-            if (ops >= 450) { batch.commit(); batch = fs.writeBatch(fdb); ops = 0; }
-          }
-        });
-        if (ops > 0) await batch.commit();
-        try { await atcConsumeAbsent(name, subjectName, teacherId); } catch (e) { console.warn('[ATC] consume absent failed', e); }
-      } catch (e) { console.warn('[ATC] Firestore close confirmation skipped', e); }
-    }
-    showToast('✅ تم إغلاق حضور ' + name + (subjectName ? ' — ' + subjectName : ''));
+    try { await atcConfirmFirestoreAttendance(name, subjectName, teacherId); } catch (e) { console.warn('[ATC] Firestore close confirmation skipped', e); }
+    try { await atcMirrorAbsenceDocs(result, name, subjectName, teacherId); } catch (e) { console.warn('[ATC] Firestore absence mirror skipped', e); }
+    atcCloseSummary(result, name, subjectName);
     await atcLoad();
 
   };
+
 
   window.atcToggleSelected = async function () {
     var sel = document.getElementById('atc-teacher-select');
@@ -27813,47 +27837,47 @@ function attRestoreDb(attId, periodId, refund) {
     var isClosing = !!(current && current.isOpen);
     var teacherId = (window._atcTeacherIdMap || {})[atcMatchNorm(name)] || '';
     var nowIso = new Date().toISOString();
-    var mirrored = await atcMirrorControl(name, subjectName, teacherId, !isClosing, isClosing ? '' : nowIso, isClosing ? nowIso : '');
-    if (!mirrored) {
-      showToast('❌ تعذر تحديث قاعدة بيانات الحضور — لم تتغير الحالة', true);
-      if (btn) { btn.disabled = false; btn.textContent = isClosing ? '🔒 إغلاق الحضور' : '▶️ بدء الحضور'; }
-      return;
-    }
-    if (fdb && fs) {
-      try {
-        var docRef = fs.doc(fdb, ATC_COLLECTION, atcDocId(name, subjectName));
-        if (isClosing) await fs.updateDoc(docRef, { isOpen: false, closedAt: nowIso });
-        else await fs.setDoc(docRef, { date: atcToday(), teacherName: name, subjectName: subjectName, teacherId: teacherId, isOpen: true, openedAt: nowIso, closedAt: null }, { merge: true });
-      } catch (e) { console.warn('[ATC] Firestore mirror skipped', e); }
-    }
-    if (!isClosing && window.dashLog) window.dashLog('حضور', 'فتح حضور أستاذ', 'تم فتح تسجيل الحضور لـ ' + name + (subjectName ? ' — ' + subjectName : ''));
     if (isClosing) {
+      var result;
       try {
-        var fs2 = window._firestore, fdb2 = window._db;
-        if (!fs2 || !fdb2) throw new Error('Firebase غير متاح لتأكيد السجلات');
-        var todayStr = atcToday();
-        var normT = atcMatchNorm(name);
-        var normS = subjectName ? atcSubjNorm(subjectName) : '';
-        var cSnap = await fs2.getDocs(fs2.query(fs2.collection(fdb2, 'support_attendance'), fs2.where('date', '==', todayStr)));
-        var batch2 = fs2.writeBatch(fdb2);
-        var confirmed = 0, ops2 = 0;
-        cSnap.forEach(function (d) {
-          var r = d.data();
-          var rSubj = atcSubjNorm(r.subjectName);
-          var nameMatch = r.confirmed === false && atcMatchNorm(r.teacherName) === normT && (!normS || rSubj === normS);
-          var idMatch = teacherId && r.teacherId && r.teacherId === teacherId && (!normS || rSubj === normS);
-          if (nameMatch || idMatch) {
-            batch2.update(d.ref, { confirmed: true, updatedAt: new Date().toISOString() });
-            confirmed++; ops2++;
-            if (ops2 >= 450) { batch2.commit(); batch2 = fs2.writeBatch(fdb2); ops2 = 0; }
-          }
-        });
-        if (ops2 > 0) await batch2.commit();
-         showToast('✅ تم إغلاق الحضور وتأكيد ' + confirmed + ' سجل');
-         if (window.dashLog) window.dashLog('حضور', 'إغلاق حضور وتأكيد سجلات', 'تم إغلاق حضور ' + name + (subjectName ? ' — ' + subjectName : '') + ' وتأكيد ' + confirmed + ' سجل');
-         try { await atcConsumeAbsent(name, subjectName, teacherId); } catch (e) { console.warn('[ATC] consume absent failed', e); }
-       } catch (e) { console.error('[ATC] confirm records failed', e); }
+        result = await atcCloseDb(name, subjectName, teacherId);
+      } catch (e) {
+        showToast('❌ تعذر إغلاق الحضور — ' + ((e && e.message) || 'خطأ غير معروف'), true);
+        if (btn) { btn.disabled = false; btn.textContent = '🔒 إغلاق الحضور'; }
+        return;
+      }
+      if (fdb && fs) {
+        try {
+          await fs.updateDoc(fs.doc(fdb, ATC_COLLECTION, atcDocId(name, subjectName)), {
+            isOpen: false,
+            closedAt: result.closedAt || nowIso
+          });
+        } catch (e) { console.warn('[ATC] Firestore close mirror skipped', e); }
+      }
+      try { await atcConfirmFirestoreAttendance(name, subjectName, teacherId); } catch (e) { console.warn('[ATC] Firestore confirmation skipped', e); }
+      try { await atcMirrorAbsenceDocs(result, name, subjectName, teacherId); } catch (e) { console.warn('[ATC] Firestore absence mirror skipped', e); }
+      atcCloseSummary(result, name, subjectName);
     } else {
+      var mirrored = await atcMirrorControl(name, subjectName, teacherId, true, nowIso, '');
+      if (!mirrored) {
+        showToast('❌ تعذر تحديث قاعدة بيانات الحضور — لم تتغير الحالة', true);
+        if (btn) { btn.disabled = false; btn.textContent = '▶️ بدء الحضور'; }
+        return;
+      }
+      if (fdb && fs) {
+        try {
+          await fs.setDoc(fs.doc(fdb, ATC_COLLECTION, atcDocId(name, subjectName)), {
+            date: atcToday(),
+            teacherName: name,
+            subjectName: subjectName,
+            teacherId: teacherId,
+            isOpen: true,
+            openedAt: nowIso,
+            closedAt: null
+          }, { merge: true });
+        } catch (e) { console.warn('[ATC] Firestore mirror skipped', e); }
+      }
+      if (window.dashLog) window.dashLog('حضور', 'فتح حضور أستاذ', 'تم فتح تسجيل الحضور لـ ' + name + (subjectName ? ' — ' + subjectName : ''));
       showToast('✅ تم بدء الحضور — التلاميذ يمكنهم الآن تسجيل الحضور');
     }
     btn.disabled = false;
@@ -27861,6 +27885,7 @@ function attRestoreDb(attId, periodId, refund) {
     sel.value = val;
     atcUpdateStatus();
   };
+
 
   window.subxFilterList = function () {
     const q = ($x('subx-search').value || '').trim().toLowerCase();
@@ -28184,7 +28209,19 @@ function attRestoreDb(attId, periodId, refund) {
         if (r.type === 'grace' || r.type === 'grace_session' || r.type === 'trial_session' || r.type === 'trial_usage') return;
         if (r.cancelled) return;
         if (!r.date) return;
-        records.push({ id: d.id, date: r.date, time: r.checkInTime || r.createdAt || '', subjectName: r.subjectName || '', teacherName: r.teacherName || '', studentName: r.studentName || '' });
+        records.push({
+          id: d.id,
+          date: r.date,
+          time: r.checkInTime || r.createdAt || '',
+          subjectName: r.subjectName || '',
+          teacherName: r.teacherName || '',
+          studentName: r.studentName || '',
+          recordType: r.recordType || r.type || r.status || 'present',
+          stateReason: r.stateReason || '',
+          deducted: r.deducted === true,
+          remainingAfter: r.remainingAfter == null ? null : Number(r.remainingAfter),
+          sessionId: r.sessionId || ''
+        });
       });
       records.sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
       if (!records.length) {
@@ -28197,6 +28234,9 @@ function attRestoreDb(attId, periodId, refund) {
       h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الوقت</th>';
       h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">المادة</th>';
       h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الأستاذ</th>';
+      h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">النوع</th>';
+      h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">الخصم</th>';
+      h += '<th style="padding:8px 10px;text-align:right;font-weight:800;border-bottom:2px solid var(--border)">المتبقي بعده</th>';
       if (!((window._employeeRestrictions || {}).subxHideAttendance)) {
         h += '<th style="padding:8px 10px;text-align:center;font-weight:800;border-bottom:2px solid var(--border)">إجراء</th>';
       }
@@ -28205,9 +28245,16 @@ function attRestoreDb(attId, periodId, refund) {
         h += '<tr style="border-bottom:1px solid var(--border)" id="subx-att-row-' + r.id + '">';
         h += '<td style="padding:7px 10px;white-space:nowrap">' + SubscriptionService.fmtAr(r.date, true) + '</td>';
         h += '<td style="padding:7px 10px;white-space:nowrap" dir="ltr">' + escX(r.time) + '</td>';
-      h += '<td style="padding:7px 10px">' + escX(window.canonSubjectName(r.subjectName || '—')) + '</td>';
-      h += '<td style="padding:7px 10px">' + escX(window.canonTeacherName(r.teacherName || '—')) + '</td>';
+        h += '<td style="padding:7px 10px">' + escX(window.canonSubjectName(r.subjectName || '—')) + '</td>';
+        h += '<td style="padding:7px 10px">' + escX(window.canonTeacherName(r.teacherName || '—')) + '</td>';
+        var isAbsent = r.recordType === 'absent' || r.type === 'absent' || r.recordType === 'status_absent';
+        var typeLabel = isAbsent ? 'غياب' : (r.recordType === 'allow_sub' || r.type === 'allow_sub' ? 'سماح' : 'حضور');
+        var reasonLabel = isAbsent ? atcAbsentReasonLabel(r.stateReason) : (r.recordType === 'allow_sub' || r.type === 'allow_sub' ? 'سماح استثنائي بلا خصم' : 'حضور مسجّل');
+        h += '<td style="padding:7px 10px"><b style="color:' + (isAbsent ? '#dc2626' : '#059669') + '">' + typeLabel + '</b><div style="font-size:10px;color:var(--text-muted)">' + escX(reasonLabel) + '</div></td>';
+        h += '<td style="padding:7px 10px;text-align:center">' + (r.deducted ? '<b style="color:#dc2626">نعم</b>' : 'لا') + '</td>';
+        h += '<td style="padding:7px 10px;text-align:center" dir="ltr">' + (r.remainingAfter == null ? '—' : escX(String(r.remainingAfter))) + '</td>';
         if (!((window._employeeRestrictions || {}).subxHideAttendance)) {
+
           h += '<td style="padding:7px 10px;text-align:center"><button onclick="subxCancelAttendance(\'' + escX(r.id) + '\',\'' + escX(studentId) + '\',\'' + escX(r.date) + '\',\'' + escX(subjectName || '') + '\',\'' + escX(teacherName || '') + '\',\'' + escX(subId || '') + '\')" style="background:rgba(239,68,68,0.08);color:#dc2626;border:1px solid rgba(239,68,68,0.2);border-radius:6px;padding:4px 10px;font-size:10px;font-weight:800;font-family:inherit;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'rgba(239,68,68,0.18)\'" onmouseout="this.style.background=\'rgba(239,68,68,0.08)\'">❌ إلغاء الحضور</button></td>';
         }
         h += '</tr>';

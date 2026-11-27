@@ -886,7 +886,12 @@
               subject:(r.subjectName||''),
               teacherName:(r.teacherName||''),
               teacher:(r.teacherName||''),
-              createdAt:(r.createdAt||'')
+              createdAt:(r.createdAt||''),
+              recordType:(r.recordType||r.type||r.status||'present'),
+              stateReason:(r.stateReason||''),
+              deducted:(r.deducted===true),
+              remainingAfter:(r.remainingAfter==null?null:Number(r.remainingAfter)),
+              sessionId:(r.sessionId||'')
             });
           });
           if(events.length)return events;
@@ -1269,16 +1274,32 @@
         });
       }
 
+      function attReasonLabel(reason){
+        var map={
+          'absent-deducted':'غياب — خُصمت حصة واحدة',
+          'permanent-no-deduction':'غياب — اشتراك دائم بلا خصم',
+          'allow-no-deduction':'غياب — سماح استثنائي بلا خصم',
+          'no-balance':'غياب — لا يوجد رصيد قابل للخصم',
+          'cancelled-after-open':'غياب — أُلغي الاشتراك بعد فتح الجلسة، بلا خصم',
+          'reopened':'أُلغي الغياب بعد إعادة فتح الجلسة'
+        };
+        return map[reason]||('غياب — '+(reason||'بدون سبب'));
+      }
       function evRow(ev){
         var d=String(ev.date||ev.createdAt||'').slice(0,10);
         var s=ev.subjectName||ev.subject||'';
         var tch=ev.teacherName||ev.teacher||'';
         var icon=SUBJECT_ICONS[s]||'📘';
         var time=fmtTime(ev.checkInTime||ev.time||'');
+        var isAbsent=ev.recordType==='absent'||ev.type==='absent'||ev.status==='absent';
+        var badge=isAbsent?'<span style="display:inline-block;margin-right:6px;padding:1px 7px;border-radius:20px;background:rgba(239,68,68,0.12);color:#dc2626;font-size:10px;font-weight:900">غياب</span>':'';
+        var detail=isAbsent?attReasonLabel(ev.stateReason):(ev.recordType==='allow_sub'?'سماح استثنائي بلا خصم':'حضور مسجّل');
+        if(ev.remainingAfter!=null)detail+=' · المتبقي '+ev.remainingAfter;
         return '<div class="wali-ev">'
           +'<div class="wali-ev-icon">'+icon+'</div>'
-          +'<div class="wali-ev-main"><div class="wali-ev-subj">'+subEsc(s||'جلسة')+'</div>'
-          +'<div class="wali-ev-meta">'+subEsc(tch||'')+(time?' · '+subEsc(time):'')+'</div></div>'
+          +'<div class="wali-ev-main"><div class="wali-ev-subj">'+badge+subEsc(s||'جلسة')+'</div>'
+          +'<div class="wali-ev-meta">'+subEsc(tch||'')+(time?' · '+subEsc(time):'')+'</div>'
+          +'<div class="wali-ev-meta" style="color:#64748b;font-size:10px">'+subEsc(detail)+'</div></div>'
           +'<div class="wali-ev-date">'+(d?subEsc(subFmtAr(d)):'—')+'</div></div>';
       }
 
