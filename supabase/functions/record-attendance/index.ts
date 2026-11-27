@@ -6,6 +6,58 @@ const FIRESTORE_PROJECT = Deno.env.get('FIREBASE_PROJECT_ID') || 'eplus-center-3
 const FIRESTORE_DOCUMENTS = `https://firestore.googleapis.com/v1/projects/${FIRESTORE_PROJECT}/databases/(default)/documents`;
 const SESSIONS_PER_MONTH = 8;
 const KIOSK_ACCESS_HASH = Deno.env.get('KIOSK_ACCESS_HASH') || '023e33504ab909cf87a6f4e4e545090e40bdc0a2153e5b68b19f7fad2b737904';
+const RETRY_DELAYS = [180, 420, 850];
+
+function logEvent(fields: Record<string, unknown>): void {
+  console.log(JSON.stringify({
+    ts: new Date().toISOString(),
+    service: 'record-attendance',
+    ...fields,
+  }));
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function retryDelay(attempt: number): number {
+  const base = RETRY_DELAYS[Math.min(attempt, RETRY_DELAYS.length - 1)];
+  return base + Math.floor(Math.random() * 140);
+}
+
+async function withRetry<T>(operation: string, fn: () => Promise<T>, attempts = 3): Promise<T> {
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const value = await fn();
+      if (attempt > 1) logEvent({ operation, phase: 'recovered', attempt, backendReached: true });
+      return value;
+    } catch (e: any) {
+      lastError = e;
+      logEvent({
+        operation,
+        phase: 'attempt-failed',
+        attempt,
+        errorCode: str(e?.code || e?.status || ''),
+        errorType: str(e?.name || 'Error'),
+        detail: str(e?.message || e).slice(0, 240),
+        backendReached: true,
+      });
+      if (attempt < attempts) await sleep(retryDelay(attempt));
+    }
+  }
+  throw lastError;
+}
+
+async function safeHash(v: string): Promise<string> {
+  try {
+    const bytes = new TextEncoder().encode(str(v));
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest)).slice(0, 6).map((b) => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return 'unhashed';
+  }
+}
 
 function str(v: unknown): string {
   return v === null || v === undefined ? '' : String(v);
@@ -86,20 +138,33 @@ function encodeFields(obj: Record<string, any>): Record<string, unknown> {
 }
 
 async function fsFetch(path: string, init: RequestInit, idToken: string): Promise<any> {
-  const res = await fetch(`${FIRESTORE_DOCUMENTS}${path}`, {
-    ...init,
-    headers: {
-      'Authorization': `Bearer ${idToken}`,
-      'Content-Type': 'application/json',
-      ...(init.headers || {}),
-    },
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  let res: Response;
+  try {
+    res = await fetch(`${FIRESTORE_DOCUMENTS}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json',
+        ...(init.headers || {}),
+      },
+    });
+  } catch (e: any) {
+    const err: any = new Error(`firestore transport failed: ${str(e?.message || e)}`);
+    err.code = 'FIRESTORE_TRANSPORT';
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
   const text = await res.text();
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = null; }
   if (!res.ok) {
     const err: any = new Error(str(data?.error?.message) || `Firestore request failed (${res.status})`);
     err.status = res.status;
+    err.code = `FIRESTORE_${res.status}`;
     err.data = data;
     throw err;
   }
@@ -290,6 +355,116 @@ function allowDocId(studentId: string, teacherId: string, subjectId: string, sub
   return raw.replace(/[^A-Za-z0-9_.\-]/g, '_');
 }
 
+function mapControlRow(row: any): any {
+  return {
+    date: str(row.date || row.date_value),
+    teacherName: str(row.teacherName || row.teacher_name),
+    subjectName: str(row.subjectName || row.subject_name),
+    teacherId: str(row.teacherId || row.teacher_id),
+    isOpen: row.isOpen === true || row.is_open === true,
+    openedAt: str(row.openedAt || row.opened_at),
+    closedAt: str(row.closedAt || row.closed_at),
+    updatedAt: str(row.updatedAt || row.updated_at),
+  };
+}
+
+async function loadControlState(
+  supabase: any,
+  date: string,
+  idToken: string,
+  snapshot: unknown,
+  requestId: string
+): Promise<{ docs: any[]; source: string; sources: Record<string, string> }> {
+  const sources: Record<string, string> = { firestore: 'skipped', supabase: 'skipped', snapshot: 'skipped' };
+  let firestoreDocs: any[] | null = null;
+  let databaseDocs: any[] | null = null;
+
+  try {
+    firestoreDocs = (await withRetry('control.firestore', () => fsQuery('attendance_control', 'date', date, idToken)))
+      .map(mapControlRow)
+      .filter((d: any) => d.isOpen);
+    sources.firestore = 'ok';
+  } catch (e: any) {
+    sources.firestore = str(e?.message || e).slice(0, 160);
+    logEvent({
+      operation: 'control.firestore',
+      phase: 'unavailable',
+      requestId,
+      errorCode: str(e?.code || e?.status || ''),
+      detail: str(e?.message || e).slice(0, 240),
+      backendReached: true,
+    });
+  }
+
+  try {
+    const result = await withRetry('control.database', async () => {
+      const res = await supabase.rpc('get_attendance_control_state', { p_date: date });
+      if (res.error) throw res.error;
+      return res.data;
+    });
+    databaseDocs = (Array.isArray(result) ? result : [])
+      .map(mapControlRow)
+      .filter((d: any) => d.isOpen);
+    sources.supabase = 'ok';
+  } catch (e: any) {
+    sources.supabase = str(e?.message || e).slice(0, 160);
+    logEvent({
+      operation: 'control.database',
+      phase: 'unavailable',
+      requestId,
+      errorCode: str(e?.code || ''),
+      detail: str(e?.message || e).slice(0, 240),
+      backendReached: true,
+    });
+  }
+
+  const snapshotDocs = Array.isArray(snapshot)
+    ? snapshot.map(mapControlRow).filter((d: any) => d.isOpen)
+    : [];
+  if (snapshotDocs.length) sources.snapshot = 'ok';
+
+  const docs = firestoreDocs || databaseDocs || snapshotDocs;
+  const source = firestoreDocs ? 'firestore' : databaseDocs ? 'database' : snapshotDocs.length ? 'snapshot' : '';
+  if (!source) {
+    const err: any = new Error('attendance control unavailable');
+    err.code = 'CONTROL_UNAVAILABLE';
+    err.detail = sources;
+    throw err;
+  }
+  return { docs, source, sources };
+}
+
+async function loadAllowKeys(supabase: any, studentId: string, requestId: string): Promise<Record<string, boolean>> {
+  try {
+    const res = await withRetry('allow-cycles', async () => {
+      const query = await supabase
+        .from('attendance_sessions')
+        .select('subscription_id')
+        .eq('student_id', studentId)
+        .eq('allow_cycle', true)
+        .eq('status', 'recorded');
+      if (query.error) throw query.error;
+      return query.data;
+    });
+    const keys: Record<string, boolean> = {};
+    (Array.isArray(res) ? res : []).forEach((row: any) => {
+      const id = str(row && row.subscription_id);
+      if (id) keys[id] = true;
+    });
+    return keys;
+  } catch (e: any) {
+    logEvent({
+      operation: 'allow-cycles',
+      phase: 'unavailable',
+      requestId,
+      errorCode: str(e?.code || ''),
+      detail: str(e?.message || e).slice(0, 240),
+      backendReached: true,
+    });
+    return {};
+  }
+}
+
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
@@ -341,26 +516,76 @@ Deno.serve(async (req) => {
     return json({ ok: true, ...data });
   }
 
+  if (action === 'status') {
+    const idToken = bearerToken(req);
+    const requestId = str(body.requestId || '') || crypto.randomUUID();
+    const checks: Record<string, string> = { auth: user ? 'ok' : 'unauthorized', supabase: 'unknown', firestore: 'unknown', control: 'unknown' };
+    try {
+      await withRetry('status.supabase', async () => {
+        const res = await supabase.from('registrations').select('id').limit(1);
+        if (res.error) throw res.error;
+        return res.data;
+      }, 2);
+      checks.supabase = 'ok';
+    } catch (e: any) {
+      checks.supabase = str(e?.message || e).slice(0, 160);
+    }
+    try {
+      const control = await loadControlState(supabase, algiersDate(), idToken, body.controlSnapshot, requestId);
+      checks.firestore = control.sources.firestore === 'ok' ? 'ok' : 'fallback';
+      checks.control = control.docs.length ? 'open' : 'closed';
+    } catch (e: any) {
+      checks.firestore = 'unavailable';
+      checks.control = 'unavailable';
+      logEvent({ operation: 'status.control', phase: 'failed', requestId, detail: str(e?.message || e).slice(0, 240), backendReached: true });
+    }
+    const status = checks.auth !== 'ok' || checks.supabase !== 'ok'
+      ? 'unavailable'
+      : checks.control === 'unavailable'
+        ? 'reconnecting'
+        : 'ready';
+    return json({ ok: true, status, checks, requestId, serverTime: new Date().toISOString() });
+  }
+
   if (action === 'batch') {
+   try {
     const idToken = bearerToken(req);
     const studentId = str(body.studentId || '');
     const rawItems = Array.isArray(body.items) ? body.items : [];
+    const requestId = str(body.requestId || '');
+    const studentRef = await safeHash(studentId);
     if (!studentId) return json({ error: 'studentId required' }, 400);
     if (!rawItems.length) return json({ error: 'items required' }, 400);
     if (rawItems.length > 12) return json({ error: 'too many items' }, 400);
+    if (!/^[A-Za-z0-9_-]{8,80}$/.test(requestId)) return json({ error: 'requestId invalid' }, 400);
     const modes = rawItems.map((it: any) => str(it && it.mode || 'normal'));
     if (modes.includes('skip')) return json({ error: 'skip mode is no longer supported' }, 400);
     if (modes.some((m: string) => m !== 'normal' && m !== 'allow')) return json({ error: 'unsupported mode' }, 400);
-    if (modes.includes('allow') && req.headers.get('x-kiosk-key') !== KIOSK_ACCESS_HASH) {
+    if (req.headers.get('x-kiosk-key') !== KIOSK_ACCESS_HASH) {
       return json({ error: 'kiosk authorization required' }, 403);
     }
+    logEvent({
+      operation: 'batch.request',
+      phase: 'received',
+      requestId,
+      studentRef,
+      itemCount: rawItems.length,
+      modes,
+      backendReached: true,
+      saved: false,
+      deducted: false,
+    });
 
-    const registrationResult = await supabase
-      .from('registrations')
-      .select('id,status,deleted_at')
-      .eq('id', studentId)
-      .is('deleted_at', null)
-      .maybeSingle();
+    const registrationResult = await withRetry('registration.check', async () => {
+      const res = await supabase
+        .from('registrations')
+        .select('id,status,deleted_at')
+        .eq('id', studentId)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (res.error) throw res.error;
+      return res;
+    });
     if (registrationResult.error) return json({ error: registrationResult.error.message }, 400);
     if (!registrationResult.data || registrationResult.data.status !== 'مسجل نهائياً') {
       return json({ error: 'student is not finally registered' }, 400);
@@ -368,32 +593,64 @@ Deno.serve(async (req) => {
 
     const date = algiersDate();
     const checkInTime = algiersTime();
-    const serverTime = new Date().toISOString();
+    const payload = body.payload && typeof body.payload === 'object' ? body.payload : {
+      studentId,
+      studentName: str(body.studentName || ''),
+      studentType: str(body.studentType || ''),
+      barcodeValue: str(body.barcodeValue || ''),
+      level: str(body.level || ''),
+      stream: str(body.stream || ''),
+      institution: str(body.institution || ''),
+      items: rawItems,
+    };
 
     let controlDocs: any[] = [];
-    let attendanceDocs: any[] = [];
+    let controlSource = '';
     let subscriptionRows: any[] = [];
     try {
-      [controlDocs, attendanceDocs] = await Promise.all([
-        fsQuery('attendance_control', 'date', date, idToken),
-        fsQueryStudentAttendance(studentId, idToken),
-      ]);
+      const control = await loadControlState(supabase, date, idToken, body.controlSnapshot, requestId);
+      controlDocs = control.docs;
+      controlSource = control.source;
+      logEvent({
+        operation: 'control.load',
+        phase: 'ready',
+        requestId,
+        studentRef,
+        source: control.source,
+        sources: control.sources,
+        openCount: control.docs.length,
+        backendReached: true,
+      });
     } catch (e: any) {
-      console.error('[batch] firestore preflight failed', e);
-      return json({ error: 'attendance store unavailable', detail: str(e.message) }, 400);
+      logEvent({
+        operation: 'control.load',
+        phase: 'failed',
+        requestId,
+        studentRef,
+        errorCode: str(e?.code || ''),
+        detail: str(e?.message || e).slice(0, 240),
+        backendReached: true,
+        saved: false,
+        deducted: false,
+      });
+      return json({ error: 'attendance control unavailable', detail: e?.detail || str(e?.message || e), requestId }, 503);
     }
-    const subResult = await supabase.rpc('get_student_subscription', { p_student_id: studentId });
-    if (subResult.error) return json({ error: subResult.error.message }, 400);
-    subscriptionRows = Array.isArray(subResult.data) ? subResult.data : [];
+    try {
+      const subResult = await withRetry('subscriptions.load', async () => {
+        const res = await supabase.rpc('get_student_subscription', { p_student_id: studentId });
+        if (res.error) throw res.error;
+        return res;
+      });
+      subscriptionRows = Array.isArray(subResult.data) ? subResult.data : [];
+    } catch (e: any) {
+      logEvent({ operation: 'subscriptions.load', phase: 'failed', requestId, studentRef, detail: str(e?.message || e).slice(0, 240), backendReached: true });
+      return json({ error: 'subscription service unavailable', requestId }, 503);
+    }
 
-    const allowKeys: Record<string, boolean> = {};
-    attendanceDocs.forEach((d: any) => {
-      if (d.type !== 'allow_sub' || d.allowCycle !== true) return;
-      const key = str(d.subscriptionId || '');
-      if (key) allowKeys[key] = true;
-    });
+    const allowKeys = await loadAllowKeys(supabase, studentId, requestId);
 
-    const results: any[] = [];
+    const prepared: any[] = [];
+    const metadata: Record<number, any> = {};
     for (let i = 0; i < rawItems.length; i++) {
       const raw = (rawItems[i] || {}) as Record<string, unknown>;
       const teacherName = str(raw.teacherName || '');
@@ -404,33 +661,29 @@ Deno.serve(async (req) => {
       const subjectMatchKey = subjectId || subjectName;
       const mode = str(raw.mode || 'normal');
       const base = { index: i, teacherName, subjectName, type: mode };
+      const item: any = {
+        teacherName,
+        subjectName,
+        teacherId,
+        subjectId,
+        mode,
+        subscriptionId: '',
+        periodId: '',
+        monthNumber: 0,
+        permanent: false,
+        attendanceOpen: false,
+        mirrorId: attendanceDocId(studentId, teacherMatchKey, subjectMatchKey, date),
+      };
+      let validationError = '';
+      let pick: any = null;
       try {
         if (!teacherName || !subjectName) throw new Error('teacherName and subjectName required');
-        if (!isAttendanceOpen(controlDocs, { teacherName, subjectName, teacherId })) {
-          throw new Error('الحضور غير مفتوح لهذا الأستاذ');
-        }
+        item.attendanceOpen = isAttendanceOpen(controlDocs, { teacherName, subjectName, teacherId });
+        if (!item.attendanceOpen) throw new Error('الحضور غير مفتوح لهذا الأستاذ');
 
-        const duplicate = attendanceDocs.find((d: any) => {
-          if (!d.date || str(d.date) !== date || d.cancelled === true) return false;
-          if (d.type === 'grace' || d.type === 'grace_session') return false;
-          const sameTeacher = str(d.teacherName) === teacherName || (!!d.teacherName && eqName(d.teacherName, teacherName));
-          const sameSubject = str(d.subjectName) === subjectName || (!!d.subjectName && eqName(d.subjectName, subjectName));
-          return sameTeacher && sameSubject;
-        });
-        if (duplicate) throw new Error('تم تسجيل الحضور لهذه المادة اليوم');
-
-        let resolved = resolveCheckIn(subscriptionRows, subjectMatchKey, teacherMatchKey, date);
-        let pick = resolved && resolved.pick;
+        const resolved = resolveCheckIn(subscriptionRows, subjectMatchKey, teacherMatchKey, date);
+        pick = resolved && resolved.pick;
         let subscription = resolved && resolved.subscription;
-        let actionType = 'normal';
-        let periodId = '';
-        let monthNumber = 0;
-        let subscriptionId = '';
-        let permanent = false;
-        let allowCycle = false;
-        let docId = attendanceDocId(studentId, teacherMatchKey, subjectMatchKey, date);
-        let source = 'eplus-attendance';
-        let recordType = 'present';
 
         if (mode === 'allow') {
           const requestedCycleId = str(raw.subscriptionId || '');
@@ -456,26 +709,30 @@ Deno.serve(async (req) => {
           if (pick && pick.allowed) throw new Error('الاشتراك لا يزال نشطاً — لا حاجة للسماح الاستثنائي');
           const cycleId = str(subscription.id);
           if (allowKeys[cycleId]) throw new Error('تم استخدام السماح لهذه الدورة');
-          docId = allowDocId(studentId, teacherMatchKey, subjectMatchKey, cycleId);
-          actionType = 'allow';
-          recordType = 'allow_sub';
-          source = 'eplus-attendance-allow';
-          subscriptionId = cycleId;
-          allowCycle = true;
+          item.mirrorId = allowDocId(studentId, teacherMatchKey, subjectMatchKey, cycleId);
+          item.subscriptionId = cycleId;
           allowKeys[cycleId] = true;
         } else {
           if (!subscription || !pick || !pick.allowed) throw new Error('انتهى الاشتراك لهذه المادة');
-          subscriptionId = str(subscription.id || '');
-          permanent = pick.permanent === true;
-          if (!permanent) {
+          item.subscriptionId = str(subscription.id || '');
+          item.permanent = pick.permanent === true;
+          if (!item.permanent) {
             const period = pick.period;
-            periodId = str(period && (period.period_id || period.id));
-            monthNumber = Number((period && period.month_number) || 0) || 0;
-            if (!periodId) throw new Error('تعذر تحديد فترة الاشتراك الصالحة');
+            item.periodId = str(period && (period.period_id || period.id));
+            item.monthNumber = Number((period && period.month_number) || 0) || 0;
+            if (!item.periodId) throw new Error('تعذر تحديد فترة الاشتراك الصالحة');
           }
         }
-
-        const fields: Record<string, any> = {
+      } catch (e: any) {
+        validationError = str(e?.message || e) || 'تعذر تحضير التسجيل';
+        item.attendanceOpen = false;
+      }
+      prepared.push(item);
+      metadata[i] = {
+        base,
+        validationError,
+        pick,
+        fields: {
           studentId,
           studentName: str(body.studentName || ''),
           studentType: str(body.studentType || ''),
@@ -483,61 +740,130 @@ Deno.serve(async (req) => {
           date,
           checkInTime,
           barcodeValue: str(body.barcodeValue || ''),
-          source,
-          type: recordType,
-          allowCycle,
+          source: mode === 'allow' ? 'eplus-attendance-allow' : 'eplus-attendance',
+          type: mode === 'allow' ? 'allow_sub' : 'present',
+          allowCycle: mode === 'allow',
           status: 'present',
           teacherName,
           subjectName,
           teacherId,
           subjectId,
-          subscriptionId,
-          subscriptionPeriodId: periodId,
-          monthNumber,
+          subscriptionId: item.subscriptionId,
+          subscriptionPeriodId: item.periodId,
+          monthNumber: item.monthNumber,
           level: str(body.level || ''),
           stream: str(body.stream || ''),
           institution: str(body.institution || ''),
           confirmed: true,
-          serverTime,
+          serverTime: new Date().toISOString(),
           createdAt: checkInTime,
-          updatedAt: serverTime,
-        };
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    }
 
-        let deducted = false;
-        if (actionType === 'normal' && periodId) {
-          const inc = await supabase.rpc('increment_period_usage', { p_period_id: periodId, p_used: 1 });
-          if (inc.error) throw new Error(inc.error.message);
-          deducted = true;
-        }
-
-        try {
-          await fsCreate('support_attendance', docId, fields, idToken);
-        } catch (e: any) {
-          if (deducted) {
-            const rollback = await supabase.rpc('increment_period_usage', { p_period_id: periodId, p_used: -1 });
-            if (rollback.error) console.error('[batch] usage rollback failed', rollback.error);
-          }
-          throw e;
-        }
-
-        attendanceDocs.push({ ...fields, name: `support_attendance/${docId}` });
-        results.push({
-          ...base,
-          ok: true,
-          action: actionType,
-          attendanceId: docId,
-          periodId,
-          subscriptionId,
-          remaining: actionType === 'normal' && !permanent && pick ? pick.remaining : null,
-          permanent,
+    let data: any;
+    try {
+      const rpc = await withRetry('attendance.record', async () => {
+        const res = await supabase.rpc('record_support_attendance_batch', {
+          p_request_id: requestId,
+          p_student_id: studentId,
+          p_payload: payload,
+          p_date: date,
+          p_check_in_time: checkInTime,
+          p_items: prepared,
         });
-      } catch (e: any) {
-        results.push({ ...base, ok: false, reason: str(e.message) || 'تعذر تسجيل الحضور' });
+        if (res.error) throw res.error;
+        return res.data;
+      }, 2);
+      if (!rpc || typeof rpc !== 'object') throw new Error('invalid attendance response');
+      data = rpc;
+    } catch (e: any) {
+      logEvent({
+        operation: 'attendance.record',
+        phase: 'failed',
+        requestId,
+        studentRef,
+        errorCode: str(e?.code || ''),
+        detail: str(e?.message || e).slice(0, 240),
+        backendReached: true,
+        saved: false,
+        deducted: false,
+      });
+      return json({ error: 'attendance database unavailable', detail: str(e?.message || e), requestId }, 503);
+    }
+
+    const results: any[] = Array.isArray(data.results) ? data.results : [];
+    for (let i = 0; i < results.length; i++) {
+      const validationError = metadata[i] && metadata[i].validationError;
+      if (validationError && results[i]) {
+        results[i] = { ...metadata[i].base, ok: false, reason: validationError };
       }
     }
 
-    const succeeded = results.filter((r: any) => r.ok).length;
-    return json({ ok: true, results, summary: { total: results.length, succeeded, failed: results.length - succeeded } });
+    let mirrorFailures = 0;
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (!r || !r.ok || !metadata[i]) continue;
+      try {
+        await fsCreate('support_attendance', str(r.attendanceId), metadata[i].fields, idToken);
+      } catch (e: any) {
+        mirrorFailures++;
+        logEvent({
+          operation: 'attendance.mirror',
+          phase: 'failed',
+          requestId,
+          studentRef,
+          itemIndex: i,
+          errorCode: str(e?.code || e?.status || ''),
+          detail: str(e?.message || e).slice(0, 240),
+          backendReached: true,
+          saved: true,
+          deducted: r.action === 'normal' && !r.permanent,
+        });
+      }
+    }
+
+    const summary = data.summary && typeof data.summary === 'object' ? data.summary : {
+      total: results.length,
+      succeeded: results.filter((r: any) => r && r.ok).length,
+      failed: results.filter((r: any) => !r || !r.ok).length,
+      deducted: 0,
+    };
+    logEvent({
+      operation: 'batch.completed',
+      phase: 'completed',
+      requestId,
+      studentRef,
+      requestReplay: data.idempotent_replay === true,
+      controlSource: data.controlSource || '',
+      saved: summary.succeeded || 0,
+      deducted: summary.deducted || 0,
+      mirrorFailures,
+      backendReached: true,
+    });
+    return json({
+      ok: true,
+      results,
+      summary,
+      requestId,
+      idempotentReplay: data.idempotent_replay === true,
+      controlSource: controlSource,
+      mirrorFailures,
+    });
+   } catch (e: any) {
+    logEvent({
+      operation: 'batch.internal',
+      phase: 'failed',
+      requestId: str(body.requestId || ''),
+      errorCode: str(e?.code || e?.status || ''),
+      detail: str(e?.message || e).slice(0, 500),
+      backendReached: true,
+      saved: false,
+      deducted: false,
+    });
+    return json({ error: 'batch internal error', detail: str(e?.message || e).slice(0, 240), requestId: str(body.requestId || '') }, 500);
+   }
   }
 
   return json({ error: 'unknown action' }, 400);

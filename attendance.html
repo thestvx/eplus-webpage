@@ -479,6 +479,10 @@ main{flex:1;position:relative;overflow:hidden}
   var appUnlocked = false, processing = false, authState = { signedIn: false, reason: '' };
   var layoutInfo = '—', dbOpen = false;
   var attendedCount = 0;
+  var systemReady = true, systemState = 'ready', systemDetail = '';
+  var currentControlDocs = [];
+  var attendanceDiagnostics = [];
+  window.__attendanceDiagnostics = attendanceDiagnostics;
   if (!fbReady) console.error('[ATTENDANCE] Firebase init failed');
 
   function tick() {
@@ -516,6 +520,7 @@ main{flex:1;position:relative;overflow:hidden}
   function clearPinError() { var el = $('pin-error'); if (el) el.classList.remove('show'); }
   function showPin() {
     setUnlocked(false); appUnlocked = false;
+    resetScannerState();
     $('view-pin').classList.add('active'); $('app').classList.add('locked');
     try { $('pin-input').focus(); } catch (e) {}
   }
@@ -557,6 +562,29 @@ main{flex:1;position:relative;overflow:hidden}
     line.textContent = new Date().toLocaleTimeString('ar-DZ') + ' | ' + text;
     log.insertBefore(line, log.firstChild);
     while (log.children.length > 60) log.removeChild(log.lastChild);
+  }
+  function logAttendanceEvent(fields) {
+    var entry = Object.assign({ ts: new Date().toISOString(), online: navigator.onLine !== false }, fields || {});
+    attendanceDiagnostics.push(entry);
+    if (attendanceDiagnostics.length > 120) attendanceDiagnostics.shift();
+    try { console.log('[ATTENDANCE EVENT]', JSON.stringify(entry)); } catch (e) {}
+  }
+  function newRequestId() {
+    try { if (crypto && typeof crypto.randomUUID === 'function') return 'req_' + crypto.randomUUID().replace(/-/g, '').slice(0, 24); } catch (e) {}
+    return 'req_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+  }
+  function setSystemState(state, detail) {
+    systemState = state;
+    systemDetail = String(detail || '');
+    systemReady = state === 'ready';
+    var pill = $('k-status-pill');
+    if (!pill) return;
+    var color = '#22c55e', label = 'الماسح جاهز — امسح البطاقة';
+    if (state === 'offline') { color = '#ef4444'; label = '⚠️ لا يوجد اتصال بالإنترنت'; }
+    else if (state === 'unauthorized') { color = '#f59e0b'; label = '⚠️ انتهت الجلسة — جارٍ تجديد الدخول'; }
+    else if (state === 'reconnecting') { color = '#f59e0b'; label = '⏳ الخدمة تعاود الاتصال...'; }
+    else if (state === 'unavailable') { color = '#ef4444'; label = '🚫 خدمة الحضور غير متاحة حالياً'; }
+    pill.innerHTML = '<span class="dot" style="background:' + color + '"></span>' + label;
   }
   function updateDebug(payload) {
     if (!dbOpen) return;
@@ -624,13 +652,14 @@ main{flex:1;position:relative;overflow:hidden}
         var d = doc.data();
         if (d.name) _teacherIdByName[normalizeTeacherName(d.name)] = d.teacherId || d.id || doc.id;
       });
+      _teacherIdMapLoaded = true;
     } catch (e) { logScanner('teacherId map load error: ' + e.message); }
-    _teacherIdMapLoaded = true;
   }
   async function checkAttendanceControl() {
     var openMap = {};
     var openIdMap = {};
     var openNameMap = {};
+    var docsForServer = [];
     try {
       var today = AttendanceService.today();
       var snap = await window.db.collection('attendance_control')
@@ -649,10 +678,19 @@ main{flex:1;position:relative;overflow:hidden}
             }
           }
           if (d.teacherId) openIdMap[d.teacherId] = true;
+          docsForServer.push({
+            date: today,
+            teacherName: canonTeacherName(d.teacherName || ''),
+            subjectName: canonSubjectName(d.subjectName || ''),
+            teacherId: d.teacherId || '',
+            isOpen: true,
+            openedAt: d.openedAt || '',
+            closedAt: d.closedAt || ''
+          });
         }
       });
     } catch (e) { logScanner('atc check error: ' + e.message); }
-    return { openMap: openMap, openIdMap: openIdMap, openNameMap: openNameMap };
+    return { openMap: openMap, openIdMap: openIdMap, openNameMap: openNameMap, docs: docsForServer };
   }
   function isTeacherOpen(openMap, openIdMap, teacherName, subjectName, openNameMap) {
     var nn = normalizeTeacherName(teacherName);
@@ -669,9 +707,13 @@ main{flex:1;position:relative;overflow:hidden}
   }
 
   // ── Scan overlay (auto-dismiss) ──
-  var overlayTimer = null;
+  var overlayTimer = null, overlayOnDone = null;
   function showScanOverlay(color, icon, title, name, sub, dismissMs, onDone) {
-    if (overlayTimer) clearTimeout(overlayTimer);
+    if (overlayTimer) {
+      clearTimeout(overlayTimer);
+      if (typeof overlayOnDone === 'function') { try { overlayOnDone(); } catch (e) {} }
+    }
+    overlayTimer = null; overlayOnDone = onDone || null;
     var el = $('scan-overlay');
     el.className = 'scan-overlay show ' + color;
     $('so-icon').textContent = icon;
@@ -679,7 +721,11 @@ main{flex:1;position:relative;overflow:hidden}
     $('so-name').textContent = name || '';
     $('so-sub').innerHTML = sub || '';
     $('so-time').textContent = fmtTime();
-    overlayTimer = setTimeout(function () { el.className = 'scan-overlay'; if (typeof onDone === 'function') onDone(); }, dismissMs || 2500);
+    overlayTimer = setTimeout(function () {
+      overlayTimer = null; overlayOnDone = null;
+      el.className = 'scan-overlay';
+      if (typeof onDone === 'function') onDone();
+    }, dismissMs || 2500);
   }
 
   // ── Grace tracking (Firestore) ──
@@ -709,7 +755,7 @@ main{flex:1;position:relative;overflow:hidden}
   }
 
   function renderReady() {
-    $('k-status-pill').innerHTML = '<span class="dot"></span>الماسح جاهز — امسح البطاقة';
+    setSystemState(systemReady ? 'ready' : systemState, systemDetail);
     $('k-last-read').textContent = '';
     scanner.start();
     grabScanFocus();
@@ -718,6 +764,12 @@ main{flex:1;position:relative;overflow:hidden}
     processing = false;
     scanner.setBusy(false);
     setTimeout(renderReady, 300);
+  }
+  function resetScannerState() {
+    if (overlayTimer) { clearTimeout(overlayTimer); overlayTimer = null; }
+    processing = false;
+    pendingReg = null; pendingBarcode = null; pendingStudentId = null; pendingName = null; currentSessions = []; currentControlDocs = [];
+    if (scanner) { try { scanner.setBusy(false); } catch (e) {} }
   }
   function lcCardLabel(card) {
     return String((card && card.student_name) || '').trim() || ('بطاقة #' + ((card && card.id) || ''));
@@ -820,6 +872,11 @@ main{flex:1;position:relative;overflow:hidden}
   // ── Scan handler ──
   async function handleScan(val) {
     if (processing) return;
+    if (!systemReady) {
+      showScanOverlay('red', '🚫', 'الخدمة غير جاهزة', '', esc(systemDetail || 'تحقق من الاتصال ثم أعد المحاولة'), 2500, resetScannerSoon);
+      playSoundIncorrect();
+      return;
+    }
     processing = true;
     scanner.setBusy(true);
     $('k-status-pill').innerHTML = '<span class="dot" style="background:#f59e0b"></span>جاري التحقق...';
@@ -900,6 +957,7 @@ main{flex:1;position:relative;overflow:hidden}
     var today = AttendanceService.today();
     await loadTeacherIdMap();
     var atc = await checkAttendanceControl();
+    currentControlDocs = atc.docs || [];
     var openMap = atc.openMap, openIdMap = atc.openIdMap, openNameMap = atc.openNameMap;
     var subsAll = [];
     try { subsAll = (await SubscriptionService.getSubscriptions(studentId)) || []; } catch (e) { logScanner('subs lookup error: ' + e.message); }
@@ -1076,11 +1134,12 @@ main{flex:1;position:relative;overflow:hidden}
           }
         } catch(e) { logScanner('att check error: ' + e.message); }
         try {
-          await lcFetch(LC_URL + '/rest/v1/language_attendance', {
+          var lcWrite = await lcFetch(LC_URL + '/rest/v1/language_attendance', {
             method: 'POST',
             headers: { 'Prefer': 'return=minimal' },
             body: JSON.stringify({ card_id: parent.id, student_name: parent.student_name || lcCardLabel(parent), language: courseName, teacher_id: parent.teacher_id || '', teacher_name: courseTeacher, date: today2 })
           });
+          if (!lcWrite.ok && lcWrite.status !== 409) throw new Error('HTTP ' + lcWrite.status);
           // per-course only - do not update global card counters
           var usedCount = Number((card._attCount && card._attCount[courseName]) || 0) + 1;
           try {
@@ -1230,8 +1289,34 @@ main{flex:1;position:relative;overflow:hidden}
       body += '</tbody></table></div>';
       $('att-log-body').innerHTML = body;
     } catch (e) {
-      console.error('[ATTENDANCE LOG] load failed', e);
-      $('att-log-body').innerHTML = '<div class="att-log-empty">تعذر تحميل سجل الحضور. حاول مرة أخرى.</div>';
+      console.warn('[ATTENDANCE LOG] Firestore load failed, trying database', e);
+      try {
+        var res = await fetch(SUPABASE_URL + '/rest/v1/rpc/get_student_attendance_events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
+          body: JSON.stringify({ p_student_id: String(pendingStudentId || '') })
+        });
+        var dbRows = res.ok ? await res.json() : [];
+        var rows2 = (Array.isArray(dbRows) ? dbRows : []).filter(function (r) {
+          return canonTeacherName(r.teacherName) === canonTeacherName(session.teacher)
+            && canonSubjectName(r.subjectName) === canonSubjectName(session.subject);
+        });
+        if (!rows2.length) {
+          $('att-log-body').innerHTML = '<div class="att-log-empty">لا توجد حصص حضور مسجلة لهذا الاشتراك بعد.</div>';
+          return;
+        }
+        rows2.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+        var body2 = '<div class="att-log-summary"><span class="att-log-chip">✅ ' + rows2.length + ' حصة</span></div>';
+        body2 += '<div style="overflow-x:auto"><table class="att-log-table"><thead><tr><th>#</th><th>التاريخ</th><th>الوقت</th><th>المادة</th><th>الأستاذ</th></tr></thead><tbody>';
+        rows2.forEach(function (r, i) {
+          body2 += '<tr><td>' + (i + 1) + '</td><td>' + esc(_attLogDate(r.date)) + '</td><td dir="ltr" style="text-align:right">' + esc(_attLogTime(r) || '—') + '</td><td>' + esc(canonSubjectName(r.subjectName || '')) + '</td><td>' + esc(canonTeacherName(r.teacherName || '')) + '</td></tr>';
+        });
+        body2 += '</tbody></table></div>';
+        $('att-log-body').innerHTML = body2;
+      } catch (e2) {
+        console.error('[ATTENDANCE LOG] database load failed', e2);
+        $('att-log-body').innerHTML = '<div class="att-log-empty">تعذر تحميل سجل الحضور. حاول مرة أخرى.</div>';
+      }
     }
   };
   window.closeAttendanceLog = function () {
@@ -1397,6 +1482,60 @@ if (hasActiveSub) {
     updateBatchButtons();
   }
 
+  function attDelay(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function attRetryDelay(attempt) { return Math.min(1200, (180 * Math.pow(2, attempt - 1)) + Math.floor(Math.random() * 140)); }
+  function isRetryableFetchError(message) {
+    var m = String(message || '').toLowerCase();
+    return m.indexOf('failed to fetch') >= 0 || m.indexOf('networkerror') >= 0 || m.indexOf('load failed') >= 0 || m.indexOf('timeout') >= 0;
+  }
+
+  async function resetAttendanceAuth() {
+    authState.signedIn = false; authState.reason = '';
+    try {
+      var app = (typeof firebase !== 'undefined' && firebase.app) ? firebase.app('kiosk') : null;
+      var auth = app && app.auth ? app.auth() : null;
+      if (auth && auth.currentUser) await auth.currentUser.getIdToken(true);
+      else if (auth) await auth.signInAnonymously();
+    } catch (e) {
+      try { await firebase.app('kiosk').auth().signOut(); } catch (e2) {}
+      await ensureAttendanceAuth();
+    }
+    return kioskIdToken();
+  }
+
+  async function attendanceProbe() {
+    if (navigator.onLine === false) {
+      setSystemState('offline', 'الإنترنت غير متاح');
+      return 'offline';
+    }
+    var token = await kioskIdToken();
+    if (!token) { setSystemState('unauthorized', 'تعذر تجديد جلسة الدخول'); return 'unauthorized'; }
+    try {
+      var response = await fetch(ATTENDANCE_EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'x-kiosk-key': KIOSK_ACCESS_HASH },
+        body: JSON.stringify({ action: 'status', requestId: newRequestId(), controlSnapshot: currentControlDocs })
+      });
+      var data = null;
+      try { data = await response.json(); } catch (e) {}
+      var status = data && data.status ? data.status : 'unavailable';
+      if (response.status === 401 || status === 'unauthorized') {
+        setSystemState('unauthorized', 'جلسة الدخول منتهية');
+        return 'unauthorized';
+      }
+      if (!response.ok || (status !== 'ready' && status !== 'reconnecting')) {
+        setSystemState('unavailable', (data && data.error) || ('HTTP ' + response.status));
+        return 'unavailable';
+      }
+      setSystemState(status === 'reconnecting' ? 'reconnecting' : 'ready', '');
+      return status;
+    } catch (e) {
+      setSystemState('unavailable', (e && e.message) || 'تعذر الوصول لخدمة الحضور');
+      logAttendanceEvent({ operation: 'attendance.probe', phase: 'failed', detail: String((e && e.message) || e).slice(0, 200), backendReached: false });
+      return 'unavailable';
+    }
+  }
+
   async function kioskIdToken() {
     await ensureAttendanceAuth();
     var app = (typeof firebase !== 'undefined' && firebase.app) ? firebase.app('kiosk') : null;
@@ -1419,6 +1558,11 @@ if (hasActiveSub) {
   async function submitBatchCheckIn(sessions, btnEl, forceMode) {
     var list = Array.isArray(sessions) ? sessions.filter(Boolean) : [];
     if (!list.length || processing) return;
+    if (!systemReady) {
+      showScanOverlay('red', '🚫', 'الخدمة غير جاهزة', '', esc(systemDetail || 'تحقق من الاتصال'), 2500, resetScannerSoon);
+      playSoundIncorrect();
+      return;
+    }
     processing = true;
     scanner.setBusy(true);
     var oldHtml = btnEl ? btnEl.innerHTML : '';
@@ -1426,6 +1570,7 @@ if (hasActiveSub) {
       btnEl.classList.add('loading');
       btnEl.innerHTML = '<span class="spin"></span>جاري التسجيل...';
     }
+    var requestId = newRequestId();
     var items = list.map(function (s) {
       return {
         teacherName: s.teacher || '', subjectName: s.subject || '',
@@ -1435,27 +1580,88 @@ if (hasActiveSub) {
         mode: forceMode || 'normal',
       };
     });
+    var payload = {
+      studentId: pendingStudentId,
+      studentName: pendingName || '',
+      studentType: pendingReg ? (pendingReg.student_type || '') : '',
+      barcodeValue: pendingBarcode || '',
+      level: pendingReg ? (pendingReg.level || '') : '',
+      stream: pendingReg ? (pendingReg.stream || '') : '',
+      institution: pendingReg ? (pendingReg.institution || '') : '',
+      items: items,
+    };
+    logAttendanceEvent({
+      operation: 'batch.submit', phase: 'started', requestId,
+      itemCount: items.length, mode: forceMode || 'normal',
+      backendReached: false, saved: false, deducted: false,
+    });
     try {
-      var token = await kioskIdToken();
-      if (!token) throw new Error('تعذر الحصول على رمز الدخول — حاول فتح الحضور من جديد');
-      var response = await fetch(ATTENDANCE_EDGE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'x-kiosk-key': KIOSK_ACCESS_HASH },
-        body: JSON.stringify({
-          action: 'batch',
-          studentId: pendingStudentId,
-          studentName: pendingName || '',
-          studentType: pendingReg ? (pendingReg.student_type || '') : '',
-          barcodeValue: pendingBarcode || '',
-          level: pendingReg ? (pendingReg.level || '') : '',
-          stream: pendingReg ? (pendingReg.stream || '') : '',
-          institution: pendingReg ? (pendingReg.institution || '') : '',
-          items: items,
-        }),
-      });
-      var data = null;
-      try { data = await response.json(); } catch (e) {}
-      if (!response.ok || !data || !data.ok) throw new Error((data && data.error) || ('HTTP ' + response.status));
+      var data = null, lastError = '', backendReached = false;
+      for (var attempt = 1; attempt <= 3; attempt++) {
+        if (navigator.onLine === false) { lastError = 'لا يوجد اتصال بالإنترنت'; setSystemState('offline', lastError); break; }
+        var token = await kioskIdToken();
+        if (!token) {
+          token = await resetAttendanceAuth();
+          if (!token) { lastError = 'انتهت الجلسة — تعذر تجديد الدخول'; setSystemState('unauthorized', lastError); continue; }
+        }
+        try {
+          var response = await fetch(ATTENDANCE_EDGE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'x-kiosk-key': KIOSK_ACCESS_HASH },
+            body: JSON.stringify({
+              action: 'batch',
+              requestId: requestId,
+              payload: payload,
+              controlSnapshot: currentControlDocs,
+              studentId: pendingStudentId,
+              studentName: pendingName || '',
+              studentType: pendingReg ? (pendingReg.student_type || '') : '',
+              barcodeValue: pendingBarcode || '',
+              level: pendingReg ? (pendingReg.level || '') : '',
+              stream: pendingReg ? (pendingReg.stream || '') : '',
+              institution: pendingReg ? (pendingReg.institution || '') : '',
+              items: items,
+            }),
+          });
+          backendReached = true;
+          var parsed = null;
+          try { parsed = await response.json(); } catch (e) {}
+          if (response.status === 401) {
+            lastError = 'انتهت الجلسة — جارٍ التجديد';
+            setSystemState('unauthorized', lastError);
+            await resetAttendanceAuth();
+            if (attempt < 3) { await attDelay(attRetryDelay(attempt)); continue; }
+            break;
+          }
+          if (!response.ok || !parsed || !parsed.ok) {
+            lastError = (parsed && parsed.error) || ('HTTP ' + response.status);
+            setSystemState(response.status >= 500 ? 'reconnecting' : 'unavailable', lastError);
+            logAttendanceEvent({ operation: 'batch.submit', phase: 'attempt-failed', requestId, attempt, status: response.status, detail: lastError.slice(0, 200), backendReached: true, saved: false, deducted: false });
+            if (response.status >= 500 && attempt < 3) { await attendanceProbe(); await attDelay(attRetryDelay(attempt)); continue; }
+            break;
+          }
+          data = parsed;
+          logAttendanceEvent({
+            operation: 'batch.submit', phase: 'succeeded', requestId, attempt,
+            replay: data.idempotentReplay === true,
+            saved: data.summary && data.summary.succeeded, deducted: data.summary && data.summary.deducted,
+            backendReached: true,
+          });
+          break;
+        } catch (e) {
+          lastError = (e && e.message) || 'Failed to fetch';
+          backendReached = false;
+          setSystemState('reconnecting', lastError);
+          logAttendanceEvent({ operation: 'batch.submit', phase: 'transport-failed', requestId, attempt, detail: lastError.slice(0, 200), backendReached: false, saved: false, deducted: false });
+          if (!isRetryableFetchError(lastError)) break;
+          if (attempt < 3) {
+            var probe = await attendanceProbe();
+            if (probe === 'offline' || probe === 'unauthorized') break;
+            await attDelay(attRetryDelay(attempt));
+          }
+        }
+      }
+      if (!data) throw new Error(lastError || 'تعذر تسجيل الحضور');
       var results = Array.isArray(data.results) ? data.results : [];
       var okCount = 0;
       var failures = [];
@@ -1470,14 +1676,16 @@ if (hasActiveSub) {
           s.alreadyCheckedIn = true;
           s.attended = Number(s.attended || 0) + 1;
           if (typeof r.remaining === 'number') s.remaining = Math.max(0, r.remaining);
-          else s.remaining = Math.max(0, Number(s.remaining || 0) - 1);
+          else if (!r.permanent && r.action !== 'allow') s.remaining = Math.max(0, Number(s.remaining || 0) - 1);
           if (r.action === 'allow') s.allowAvailable = false;
         }
       });
       if (okCount) { playSoundCorrect(); attendedCount += okCount; updateCounter(); }
       if (failures.length) playSoundIncorrect();
-      var title = failures.length ? (okCount ? 'تم تسجيل جزء من المواد' : 'تعذر تسجيل الحضور') : 'تم تسجيل الحضور';
+      setSystemState('ready', '');
+      var title = failures.length ? (okCount ? 'تم تسجيل جزء من المواد' : 'تعذر تسجيل الحضور') : (data.idempotentReplay ? 'تم تسجيل الحضور سابقاً' : 'تم تسجيل الحضور');
       var sub = okCount ? okCount + ' مادة/مواد مسجلة بنجاح' : '';
+      if (data.idempotentReplay) sub += (sub ? '<br>' : '') + 'تم التحقق من العملية السابقة بدون تكرار الخصم';
       if (failures.length) sub += (sub ? '<br>' : '') + 'فشل: ' + esc(failures.slice(0, 3).join(' · '));
       showScanOverlay(failures.length ? (okCount ? 'orange' : 'red') : 'green', failures.length ? '⚠️' : '✅', title, pendingName, sub, 3400, function () {
         renderTeacherCards(currentSessions);
@@ -1487,9 +1695,11 @@ if (hasActiveSub) {
       });
       logScanner('batch result: ' + okCount + '/' + results.length);
     } catch (e) {
-      logScanner('batch error: ' + (e && e.message ? e.message : e));
+      var message = (e && e.message) || 'خطأ غير معروف';
+      logScanner('batch error: ' + message);
+      logAttendanceEvent({ operation: 'batch.submit', phase: 'failed', requestId, detail: message.slice(0, 200), backendReached: backendReached, saved: false, deducted: false });
       playSoundIncorrect();
-      showScanOverlay('red', '🚫', 'تعذر تسجيل الحضور', pendingName, esc(e && e.message ? e.message : 'خطأ غير معروف'), 3500, function () {
+      showScanOverlay('red', '🚫', message.indexOf('الإنترنت') >= 0 ? 'لا يوجد اتصال' : 'تعذر تسجيل الحضور', pendingName, esc(message), 3500, function () {
         if (btnEl) { btnEl.classList.remove('loading'); btnEl.innerHTML = oldHtml; }
         renderTeacherCards(currentSessions);
         processing = false;
@@ -1564,6 +1774,17 @@ if (hasActiveSub) {
     if (fbReady) {
       ensureAttendanceAuth();
     }
+    window.addEventListener('online', function () {
+      logAttendanceEvent({ operation: 'network', phase: 'online', backendReached: false });
+      attendanceProbe();
+    });
+    window.addEventListener('offline', function () {
+      setSystemState('offline', 'الإنترنت غير متاح');
+      logAttendanceEvent({ operation: 'network', phase: 'offline', backendReached: false });
+    });
+    setInterval(function () {
+      if (appUnlocked && !processing && navigator.onLine !== false) attendanceProbe();
+    }, 20000);
   })();
 
 })();

@@ -26197,6 +26197,41 @@ const adminAuthTokenProvider = () => (window._auth && window._auth.currentUser) 
 SubscriptionService.setAuthTokenProvider(adminAuthTokenProvider);
 TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
 
+async function attDbCall(fnName, args) {
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + fnName, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
+      body: JSON.stringify(args || {})
+    });
+    if (!res.ok) {
+      console.warn('[ATTENDANCE DB] ' + fnName + ' HTTP ' + res.status);
+      return null;
+    }
+    return await res.json().catch(() => null);
+  } catch (e) {
+    console.warn('[ATTENDANCE DB] ' + fnName + ' failed', e);
+    return null;
+  }
+}
+
+function attUndoDb(attId, periodId, refund, reason) {
+  return attDbCall('undo_attendance', {
+    p_attendance_id: String(attId || ''),
+    p_subscription_period_id: String(periodId || ''),
+    p_refund: refund !== false,
+    p_reason: String(reason || '')
+  });
+}
+
+function attRestoreDb(attId, periodId, refund) {
+  return attDbCall('restore_attendance', {
+    p_attendance_id: String(attId || ''),
+    p_subscription_period_id: String(periodId || ''),
+    p_refund: refund !== false
+  });
+}
+
 // ═══════════════════════════════════════════════════════════
 //  Subscription Editor (الاشتراكات الشهرية — واجهة بسيطة)
 //  باقات ثابتة (1/2/3 أشهر) → اختيار الطالب + الباقة + البداية فقط.
@@ -27472,6 +27507,32 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     if (subjectName) key += '_' + atcNorm(subjectName);
     return atcToday() + '_' + key;
   }
+  async function atcMirrorControl(teacherName, subjectName, teacherId, isOpen, openedAt, closedAt) {
+    try {
+      var payload = {
+        id: atcDocId(teacherName, subjectName),
+        date: atcToday(),
+        teacher_name: window.canonTeacherName(teacherName || ''),
+        subject_name: window.canonSubjectName(subjectName || ''),
+        teacher_id: String(teacherId || ''),
+        is_open: isOpen === true,
+        opened_at: String(openedAt || ''),
+        closed_at: String(closedAt || ''),
+        updated_at: new Date().toISOString()
+      };
+      var res = await fetch(SUPABASE_URL + '/rest/v1/attendance_control_state?on_conflict=id', {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates,return=minimal'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) console.warn('[ATC] Supabase control mirror failed', res.status);
+    } catch (e) { console.warn('[ATC] Supabase control mirror error', e); }
+  }
 
   window.atcLoad = async function () {
     var sel = document.getElementById('atc-teacher-select');
@@ -27675,7 +27736,9 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
       var teacherId = (window._atcTeacherIdMap || {})[atcMatchNorm(name)] || '';
       var snap = await fs.getDoc(docRef);
       if (snap.exists() && snap.data().isOpen) {
-        await fs.updateDoc(docRef, { isOpen: false, closedAt: new Date().toISOString() });
+        var closedAt = new Date().toISOString();
+        await fs.updateDoc(docRef, { isOpen: false, closedAt: closedAt });
+        await atcMirrorControl(name, subjectName, teacherId, false, '', closedAt);
         var normT = atcMatchNorm(name);
         var normS = subjectName ? atcSubjNorm(subjectName) : '';
         var todayStr = atcToday();
@@ -27718,10 +27781,14 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
     try {
       var snap = await fs.getDoc(docRef);
       if (snap.exists() && snap.data().isOpen) {
-        await fs.updateDoc(docRef, { isOpen: false, closedAt: new Date().toISOString() });
+        var closedAt = new Date().toISOString();
+        await fs.updateDoc(docRef, { isOpen: false, closedAt: closedAt });
+        await atcMirrorControl(name, subjectName, teacherId, false, '', closedAt);
         isClosing = true;
       } else {
-        await fs.setDoc(docRef, { date: atcToday(), teacherName: name, subjectName: subjectName, teacherId: teacherId, isOpen: true, openedAt: new Date().toISOString(), closedAt: null }, { merge: true });
+        var openedAt = new Date().toISOString();
+        await fs.setDoc(docRef, { date: atcToday(), teacherName: name, subjectName: subjectName, teacherId: teacherId, isOpen: true, openedAt: openedAt, closedAt: null }, { merge: true });
+        await atcMirrorControl(name, subjectName, teacherId, true, openedAt, '');
         if (window.dashLog) window.dashLog('حضور', 'فتح حضور أستاذ', 'تم فتح تسجيل الحضور لـ ' + name + (subjectName ? ' — ' + subjectName : ''));
       }
     } catch (e) { console.error('[ATC] toggle failed', e); showToast('❌ تعذر تحديث الحالة', true); }
@@ -28147,19 +28214,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           await fs.updateDoc(srcRef, { cancelled: true, cancelledAt: new Date().toISOString() });
         }
       }
-      // Decrement used_sessions for the matching period (exceptional allow never consumes a paid session)
-      if (subId && !isCycleAllow) {
-        try {
-          const d = await SubscriptionService.adminSubscriptionDetail(subId);
-          if (d && d.periods && d.periods.length) {
-            const matchedPeriod = d.periods.find(p => attDate >= p.start_date && attDate <= p.end_date);
-            if (matchedPeriod) {
-              const newUsed = Math.max(0, (matchedPeriod.used_sessions || 0) - 1);
-              await SubscriptionService.adminSetPeriodSessions(matchedPeriod.period_id || matchedPeriod.id, newUsed);
-            }
-          }
-        } catch (rpcErr) { console.warn('[SUBSCRIPTIONS] session decrement failed:', rpcErr); }
-      }
+      await attUndoDb(attId, srcData.subscriptionPeriodId || '', !isCycleAllow, 'subscancel');
       // Refresh the subscription detail to update used/remaining counts and attendance list
       if (subId) {
         subxShowDetail(subId);
@@ -28734,10 +28789,13 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         try {
           await fs.deleteDoc(srcRef);
         } catch (delErr) {
+          console.warn('[SUBSCRIPTIONS] hard delete failed, trying soft-delete:', delErr);
           await fs.updateDoc(srcRef, { cancelled: true, cancelledAt: new Date().toISOString() });
         }
       }
+      await attUndoDb(attId, data.subscriptionPeriodId || '', !isCycleAllow, 'deleted');
       showToast('🗑️ تم حذف السجل وحفظ نسخة احتياطية.');
+
       // Refresh the logs modal data
       if (typeof subxShowAllLogs === 'function') {
         await subxShowAllLogs();
@@ -28944,6 +29002,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         const clean = {};
         Object.keys(data).forEach(k => { if (!k.startsWith('_archived')) clean[k] = data[k]; });
         await fs.setDoc(liveRef, clean);
+        await attRestoreDb(origId, data.subscriptionPeriodId || '', data.type !== 'allow_sub');
         await fs.deleteDoc(arcRef);
         showToast('↩️ تمت استعادة الحصة إلى سجل الحضور.');
       }
@@ -29081,6 +29140,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
         const liveSnap = await fs.getDoc(liveRef);
         if (liveSnap.exists() && (liveSnap.data().cancelled === true || liveSnap.data().confirmed === false)) {
           await fs.updateDoc(liveRef, { cancelled: false, cancelledAt: fs.deleteField(), confirmed: true, restoredAt: new Date().toISOString() });
+          await attRestoreDb(backupId, liveSnap.data().subscriptionPeriodId || '', liveSnap.data().type !== 'allow_sub');
           showToast('↩️ تمت استعادة السجل المُخفى.');
         } else {
           showToast('⚠️ السجل غير موجود في النسخ الاحتياطي ولا في سجلات الحضور', true);
@@ -29102,6 +29162,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           if (!k.startsWith('_backup')) clean[k] = data[k];
         });
         await fs.setDoc(fs.doc(fdb, 'support_attendance', backupId.replace(/^b_/, '')), clean);
+        await attRestoreDb(backupId.replace(/^b_/, ''), data.subscriptionPeriodId || '', data.type !== 'allow_sub');
         await fs.deleteDoc(fs.doc(fdb, 'support_attendance_backup', backupId));
         showToast('↩️ تمت استعادة السجل إلى سجلات الحضور.');
       }
@@ -29129,6 +29190,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           const liveSnap = await fs.getDoc(liveRef);
           if (liveSnap.exists() && (liveSnap.data().cancelled === true || liveSnap.data().confirmed === false)) {
             await fs.updateDoc(liveRef, { cancelled: false, cancelledAt: fs.deleteField(), confirmed: true, restoredAt: new Date().toISOString() });
+            await attRestoreDb(r.id, liveSnap.data().subscriptionPeriodId || '', liveSnap.data().type !== 'allow_sub');
             restored++;
           } else { skipped++; }
           continue;
@@ -29144,6 +29206,7 @@ TeacherFinance.setAuthTokenProvider(adminAuthTokenProvider);
           if (!k.startsWith('_backup')) clean[k] = data[k];
         });
         await fs.setDoc(fs.doc(fdb, 'support_attendance', origId), clean);
+        await attRestoreDb(origId, data.subscriptionPeriodId || '', data.type !== 'allow_sub');
         await fs.deleteDoc(fs.doc(fdb, 'support_attendance_backup', r.id));
         restored++;
       }
