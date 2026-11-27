@@ -769,6 +769,22 @@ Deno.serve(async (req) => {
 
     const allowKeys = await loadAllowKeys(supabase, studentId, requestId);
 
+    const sessionRequestCache = new Map<string, Promise<any>>();
+    for (const rawItem of rawItems) {
+      const raw = (rawItem || {}) as Record<string, unknown>;
+      const teacherName = str(raw.teacherName || '');
+      const subjectName = str(raw.subjectName || '');
+      const teacherId = str(raw.teacherId || '');
+      const subjectId = str(raw.subjectId || '');
+      const requestedSessionId = str(raw.sessionId || '');
+      const key = JSON.stringify([date, teacherName, subjectName, teacherId, subjectId, requestedSessionId]);
+      if (!sessionRequestCache.has(key)) {
+        sessionRequestCache.set(key, checkSessionState(supabase, date, {
+          teacherName, subjectName, teacherId, subjectId,
+        }, requestId, requestedSessionId));
+      }
+    }
+
     const prepared: any[] = [];
     const metadata: Record<number, any> = {};
     for (let i = 0; i < rawItems.length; i++) {
@@ -805,9 +821,8 @@ Deno.serve(async (req) => {
       let pick: any = null;
       try {
         if (!teacherName || !subjectName) throw new Error('teacherName and subjectName required');
-        const sessionState = await checkSessionState(supabase, date, {
-          teacherName, subjectName, teacherId, subjectId,
-        }, requestId, requestedSessionId);
+        const sessionRequestKey = JSON.stringify([date, teacherName, subjectName, teacherId, subjectId, requestedSessionId]);
+        const sessionState = await sessionRequestCache.get(sessionRequestKey)!;
         item.requestedSessionId = requestedSessionId;
         item.sessionId = str(sessionState.sessionId || '');
         item.foundSessionId = str(sessionState.foundSessionId || '');

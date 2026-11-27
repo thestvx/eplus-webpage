@@ -851,10 +851,10 @@ async function loadCampGallery() {
 
   // قائمة صور المخيم من المجلد المحلي
   const imageNames = [
-    "IMG_4628.jpg","IMG_4629.jpg","IMG_4631.jpg","IMG_4632.jpg",
-    "IMG_4633.jpg","IMG_4634.jpg","IMG_4635.jpg","IMG_4636.jpg",
-    "IMG_4637.jpg","IMG_4638.jpg","IMG_4639.jpg","IMG_4640.jpg",
-    "IMG_4641.jpg"
+    "IMG_4628.webp","IMG_4629.webp","IMG_4631.webp","IMG_4632.webp",
+    "IMG_4633.webp","IMG_4634.webp","IMG_4635.webp","IMG_4636.webp",
+    "IMG_4637.webp","IMG_4638.webp","IMG_4639.webp","IMG_4640.webp",
+    "IMG_4641.webp"
   ];
 
   try {

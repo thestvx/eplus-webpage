@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>نظام تسجيل حضور الطلاب — E-PLUS Education Center</title>
 <link rel="icon" type="image/x-icon" href="images/eplus-icon.ico">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="fonts/tajawal-local.css" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -43,7 +43,7 @@
 }
 html,body{height:100%}
 body{font-family:'Tajawal',system-ui,sans-serif;background:linear-gradient(150deg,#151a46 0%,#2a2f77 48%,#3f3aa0 100%);color:var(--ink);line-height:1.6;overflow:hidden;-webkit-font-smoothing:antialiased}
-.bg-video{position:fixed;inset:0;z-index:0;overflow:hidden;background-color:#101538;background-image:url('backgrounds/attendencebackground01.png');background-position:center;background-size:100% 100%;background-repeat:no-repeat}
+.bg-video{position:fixed;inset:0;z-index:0;overflow:hidden;background-color:#101538;background-image:url('backgrounds/attendencebackground01.webp');background-position:center;background-size:100% 100%;background-repeat:no-repeat}
 .bg-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(14,18,52,0.55) 0%,rgba(14,18,52,0.42) 45%,rgba(12,15,44,0.82) 100%)}
 .bg-glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(62% 48% at 50% 0%,rgba(200,168,75,0.18),transparent 70%),radial-gradient(45% 40% at 85% 100%,rgba(99,102,241,0.20),transparent 70%)}
 .view{display:none}.view.active{display:flex}
@@ -706,8 +706,11 @@ main{flex:1;position:relative;overflow:hidden}
     });
   }
   var sessionStateSeq = 0;
+  var sessionStatesInFlight = null;
   async function fetchSessionStates(sessions, opts) {
     if (!sessions || !sessions.length) return sessions;
+    if (sessionStatesInFlight && sessionStatesInFlight.sessions === sessions) return sessionStatesInFlight.promise;
+    var runSessionStates = async function () {
     var silent = !!(opts && opts.silent);
     var seq = ++sessionStateSeq;
     var items = sessions.map(function (s) {
@@ -756,6 +759,10 @@ main{flex:1;position:relative;overflow:hidden}
       logAttendanceEvent({ operation: 'session-status', phase: 'failed', detail: String((e && e.message) || e).slice(0, 200), backendReached: false, silent });
     }
     return sessions;
+    };
+    sessionStatesInFlight = { sessions: sessions, promise: runSessionStates() };
+    try { return await sessionStatesInFlight.promise; }
+    finally { if (sessionStatesInFlight && sessionStatesInFlight.sessions === sessions) sessionStatesInFlight = null; }
   }
 
   // ── Scan overlay (auto-dismiss) ──
@@ -965,9 +972,11 @@ main{flex:1;position:relative;overflow:hidden}
     }
     logScanner('resolveStudent: id=' + studentId + ' raw=' + raw);
 
-    // 2. Fetch registration
-    var reg = null;
-    try { reg = await RegistrationService.getById(studentId); } catch (e) { logScanner('getById error: ' + e.message); }
+    // 2. Reuse the registration row already returned by resolveStudentFromScan
+    var reg = scanResult && scanResult.student ? scanResult.student : null;
+    if (!reg) {
+      try { reg = await RegistrationService.getById(studentId); } catch (e) { logScanner('getById error: ' + e.message); }
+    }
     if (!reg) {
       $('k-last-read').textContent = studentId;
       $('k-status-pill').innerHTML = '<span class="dot" style="background:#ef4444"></span>طالب غير موجود';

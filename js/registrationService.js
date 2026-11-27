@@ -28,7 +28,7 @@ const RegistrationService = (function () {
     try {
       const res = await fetch(baseQuery('select=barcode_value&limit=1'), { headers: headers() });
       _barcodeColOk = res.ok;
-    } catch (e) { _barcodeColOk = false; }
+    } catch (e) { return false; }
     return _barcodeColOk;
   }
 

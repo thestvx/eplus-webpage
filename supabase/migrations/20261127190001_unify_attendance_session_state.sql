@@ -102,35 +102,6 @@ BEGIN
     p_date, p_teacher_id, p_teacher_name, p_subject_id, p_subject_name, p_session_id
   );
 
-  SELECT * INTO v_any
-    FROM attendance_control_state
-   WHERE date = trim(COALESCE(p_date, ''))
-      AND (
-        CASE
-          WHEN trim(COALESCE(p_teacher_id, '')) <> '' AND trim(COALESCE(p_teacher_name, '')) <> '' THEN
-            (COALESCE(teacher_id, '') = '' OR teacher_id = trim(p_teacher_id))
-            AND attendance_norm_teacher(teacher_name)
-                = attendance_norm_teacher(trim(p_teacher_name))
-          WHEN trim(COALESCE(p_teacher_id, '')) <> '' THEN COALESCE(teacher_id, '') = '' OR teacher_id = trim(p_teacher_id)
-          ELSE attendance_norm_teacher(teacher_name)
-               = attendance_norm_teacher(trim(COALESCE(p_teacher_name, '')))
-        END
-      )
-      AND (
-        CASE
-          WHEN trim(COALESCE(p_subject_id, '')) <> '' AND trim(COALESCE(p_subject_name, '')) <> '' THEN
-            (COALESCE(subject_id, '') = '' OR subject_id = trim(p_subject_id))
-            AND attendance_norm_subject(subject_name)
-                = attendance_norm_subject(trim(p_subject_name))
-          WHEN trim(COALESCE(p_subject_id, '')) <> '' THEN COALESCE(subject_id, '') = '' OR subject_id = trim(p_subject_id)
-          ELSE attendance_norm_subject(subject_name)
-               = attendance_norm_subject(trim(COALESCE(p_subject_name, '')))
-        END
-      )
-
-   ORDER BY updated_at DESC, id DESC
-   LIMIT 1;
-
   IF v_open.id IS NOT NULL THEN
     v_code := 'ATTENDANCE_OPEN';
     v_reason := 'الأستاذ فتح جلسة الحضور';
@@ -157,6 +128,34 @@ BEGIN
       'checkedAt', v_checked_at
     );
   END IF;
+
+  SELECT * INTO v_any
+    FROM attendance_control_state
+   WHERE date = trim(COALESCE(p_date, ''))
+      AND (
+        CASE
+          WHEN trim(COALESCE(p_teacher_id, '')) <> '' AND trim(COALESCE(p_teacher_name, '')) <> '' THEN
+            (COALESCE(teacher_id, '') = '' OR teacher_id = trim(p_teacher_id))
+            AND attendance_norm_teacher(teacher_name)
+                = attendance_norm_teacher(trim(p_teacher_name))
+          WHEN trim(COALESCE(p_teacher_id, '')) <> '' THEN COALESCE(teacher_id, '') = '' OR teacher_id = trim(p_teacher_id)
+          ELSE attendance_norm_teacher(teacher_name)
+               = attendance_norm_teacher(trim(COALESCE(p_teacher_name, '')))
+        END
+      )
+      AND (
+        CASE
+          WHEN trim(COALESCE(p_subject_id, '')) <> '' AND trim(COALESCE(p_subject_name, '')) <> '' THEN
+            (COALESCE(subject_id, '') = '' OR subject_id = trim(p_subject_id))
+            AND attendance_norm_subject(subject_name)
+                = attendance_norm_subject(trim(p_subject_name))
+          WHEN trim(COALESCE(p_subject_id, '')) <> '' THEN COALESCE(subject_id, '') = '' OR subject_id = trim(p_subject_id)
+          ELSE attendance_norm_subject(subject_name)
+               = attendance_norm_subject(trim(COALESCE(p_subject_name, '')))
+        END
+      )
+   ORDER BY updated_at DESC, id DESC
+   LIMIT 1;
 
   IF trim(COALESCE(p_teacher_id, '')) <> '' THEN
     SELECT EXISTS (
