@@ -720,6 +720,7 @@ main{flex:1;position:relative;overflow:hidden}
         teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(s.teacher)] || '',
         subjectId: s.subjectId || '',
         sessionId: s.sessionId || '',
+        testRunId: s.testRunId || '',
       };
     });
     try {
@@ -747,6 +748,8 @@ main{flex:1;position:relative;overflow:hidden}
         s.attendanceOpen = s.sessionState === 'open';
         s.sessionReason = st.reason || (s.sessionState === 'open' ? 'الأستاذ فتح جلسة الحضور' : s.sessionState === 'closed' ? 'الأستاذ لم يفتح جلسة الحضور بعد' : 'تعذر التحقق من حالة الحضور');
         s.sessionId = st.sessionId || '';
+        s.testRunId = st.testRunId || '';
+        s.isTestSession = st.isTest === true;
         s.sessionReasonCode = st.reasonCode || '';
         s.sessionDbState = st.dbState || '';
         s.sessionSource = data.controlSource || '';
@@ -1042,7 +1045,7 @@ main{flex:1;position:relative;overflow:hidden}
       var key = tName + '|' + subjName;
       if (seen[key]) continue;
       seen[key] = true;
-      var sess = { teacher: tName, subject: subjName, teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(tName)] || '', subjectId: s.subjectId || '', status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, allowed: 0, alreadyCheckedIn: false, sessionState: 'unknown', attendanceOpen: false, sessionReason: 'جاري التحقق من حالة الحضور', sessionSource: '', sessionCheckedAt: '', idx: sessions.length, hasSubscription: false, allowAvailable: false };
+      var sess = { teacher: tName, subject: subjName, teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(tName)] || '', subjectId: s.subjectId || '', status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, allowed: 0, alreadyCheckedIn: false, sessionState: 'unknown', attendanceOpen: false, sessionReason: 'جاري التحقق من حالة الحضور', sessionSource: '', sessionCheckedAt: '', testRunId: '', isTestSession: false, idx: sessions.length, hasSubscription: false, allowAvailable: false };
       try {
         // قرار واحد لكل مادة: يفحص «كل» اشتراكات الطالب (صفوف منفصلة / تعدد
         // الشهور) — فلا تظهر بطاقة «انتهى الاشتراك» بينما التسجيل مسموح، والعكس.
@@ -1402,7 +1405,10 @@ main{flex:1;position:relative;overflow:hidden}
     var detail = state === 'open' ? 'الأستاذ فتح جلسة الحضور'
       : state === 'closed' ? 'الأستاذ لم يفتح جلسة الحضور بعد'
         : 'تعذر التحقق من حالة الحضور';
-    return '<span class="tc-session-state ' + state + '" title="' + esc(detail) + '">' + icon + ' ' + text + '</span>';
+    var testBadge = s && s.isTestSession
+      ? '<span class="tc-session-state open" style="background:rgba(139,92,246,.16);color:#c4b5fd;margin-inline-start:6px" title="جلسة اختبار معزولة">🧪 اختبار</span>'
+      : '';
+    return '<span class="tc-session-state ' + state + '" title="' + esc(detail) + '">' + icon + ' ' + text + '</span>' + testBadge;
   }
   function renderTeacherCards(sessions) {
     currentSessions = sessions || [];
@@ -1679,12 +1685,15 @@ if (hasActiveSub) {
       btnEl.innerHTML = '<span class="spin"></span>جاري التسجيل...';
     }
     var requestId = newRequestId();
+    var testRunIds = Array.from(new Set(list.map(function (s) { return s.testRunId || ''; }).filter(Boolean)));
+    var activeTestRunId = testRunIds.length === 1 ? testRunIds[0] : '';
     var items = list.map(function (s) {
       return {
         teacherName: s.teacher || '', subjectName: s.subject || '',
         teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(s.teacher)] || '',
         subjectId: s.subjectId || '',
         sessionId: s.sessionId || '',
+        testRunId: s.testRunId || '',
         subscriptionId: forceMode === 'allow' ? String((s.sub && s.sub.id) || '') : '',
         mode: forceMode || 'normal',
       };
@@ -1720,6 +1729,7 @@ if (hasActiveSub) {
             body: JSON.stringify({
               action: 'batch',
               requestId: requestId,
+              testRunId: activeTestRunId,
               payload: payload,
               studentId: pendingStudentId,
               studentName: pendingName || '',

@@ -427,7 +427,8 @@ async function checkSessionState(
   date: string,
   item: any,
   requestId: string,
-  requestedSessionId = ''
+  requestedSessionId = '',
+  testRunId = ''
 ): Promise<any> {
   const data = await withRetry('control.session', async () => {
     const res = await supabase.rpc('attendance_session_state', {
@@ -437,6 +438,7 @@ async function checkSessionState(
       p_subject_id: str(item?.subjectId || ''),
       p_subject_name: str(item?.subjectName || ''),
       p_session_id: requestedSessionId,
+      p_test_run_id: str(testRunId),
     });
     if (res.error) throw res.error;
     return res.data;
@@ -457,7 +459,8 @@ async function loadAllowKeys(supabase: any, studentId: string, requestId: string
         .select('subscription_id')
         .eq('student_id', studentId)
         .eq('allow_cycle', true)
-        .eq('status', 'recorded');
+        .eq('status', 'recorded')
+        .eq('is_test', false);
       if (query.error) throw query.error;
       return query.data;
     });
@@ -590,7 +593,8 @@ Deno.serve(async (req) => {
       const statuses = await Promise.all(rawItems.map(async (raw: any, i: number) => {
         const item = baseItem(raw, i);
         const requestedSessionId = str(raw && raw.sessionId || '');
-        const state = await checkSessionState(supabase, date, item, requestId, requestedSessionId);
+        const testRunId = str(raw && raw.testRunId || body.testRunId || '');
+        const state = await checkSessionState(supabase, date, item, requestId, requestedSessionId, testRunId);
         const isOpen = state.open === true;
         logEvent({
           operation: isOpen ? 'session-status.open' : 'session-status.closed',
@@ -602,6 +606,7 @@ Deno.serve(async (req) => {
           foundSessionId: str(state.foundSessionId || ''),
           dbState: str(state.dbState || ''),
           reasonCode: str(state.code || ''),
+          testRunId,
           backendReached: true,
         });
         return {
@@ -616,6 +621,8 @@ Deno.serve(async (req) => {
           foundSessionId: str(state.foundSessionId || ''),
           requestedSessionId,
           matchedBy: str(state.matchedBy || ''),
+          testRunId: str(state.testRunId || ''),
+          isTest: state.isTest === true,
           checkedAt: str(state.checkedAt || ''),
         };
       }));
@@ -682,6 +689,12 @@ Deno.serve(async (req) => {
     if (req.headers.get('x-kiosk-key') !== KIOSK_ACCESS_HASH) {
       return json({ error: 'kiosk authorization required' }, 403);
     }
+    const testRunIds = Array.from(new Set(
+      rawItems.map((it: any) => str(it && it.testRunId || '')).filter((id: string) => id.length > 0)
+    ));
+    if (testRunIds.length > 1) return json({ error: 'mixed test runs are not allowed' }, 400);
+    const testRunId = testRunIds[0] || str(body.testRunId || '');
+    const rpcRequestId = testRunId ? `test-${testRunId}-${requestId}` : requestId;
     logEvent({
       operation: 'batch.request',
       phase: 'received',
@@ -689,6 +702,7 @@ Deno.serve(async (req) => {
       studentRef,
       itemCount: rawItems.length,
       modes,
+      testRunId,
       backendReached: true,
       saved: false,
       deducted: false,
@@ -700,6 +714,7 @@ Deno.serve(async (req) => {
         .select('id,status,deleted_at')
         .eq('id', studentId)
         .is('deleted_at', null)
+        .eq('is_test_data', testRunId.length > 0)
         .maybeSingle();
       if (res.error) throw res.error;
       return res;
@@ -777,11 +792,12 @@ Deno.serve(async (req) => {
       const teacherId = str(raw.teacherId || '');
       const subjectId = str(raw.subjectId || '');
       const requestedSessionId = str(raw.sessionId || '');
-      const key = JSON.stringify([date, teacherName, subjectName, teacherId, subjectId, requestedSessionId]);
+      const itemTestRunId = str(raw.testRunId || testRunId);
+      const key = JSON.stringify([date, teacherName, subjectName, teacherId, subjectId, requestedSessionId, itemTestRunId]);
       if (!sessionRequestCache.has(key)) {
         sessionRequestCache.set(key, checkSessionState(supabase, date, {
           teacherName, subjectName, teacherId, subjectId,
-        }, requestId, requestedSessionId));
+        }, requestId, requestedSessionId, itemTestRunId));
       }
     }
 
@@ -815,13 +831,14 @@ Deno.serve(async (req) => {
         dbState: '',
         reasonCode: '',
         reason: '',
+        testRunId: str(raw.testRunId || testRunId),
         mirrorId: attendanceDocId(studentId, teacherMatchKey, subjectMatchKey, date),
       };
       let validationError = '';
       let pick: any = null;
       try {
         if (!teacherName || !subjectName) throw new Error('teacherName and subjectName required');
-        const sessionRequestKey = JSON.stringify([date, teacherName, subjectName, teacherId, subjectId, requestedSessionId]);
+        const sessionRequestKey = JSON.stringify([date, teacherName, subjectName, teacherId, subjectId, requestedSessionId, str(raw.testRunId || testRunId)]);
         const sessionState = await sessionRequestCache.get(sessionRequestKey)!;
         item.requestedSessionId = requestedSessionId;
         item.sessionId = str(sessionState.sessionId || '');
@@ -940,12 +957,13 @@ Deno.serve(async (req) => {
     try {
       const rpc = await withRetry('attendance.record', async () => {
         const res = await supabase.rpc('record_support_attendance_batch', {
-          p_request_id: requestId,
+          p_request_id: rpcRequestId,
           p_student_id: studentId,
           p_payload: payload,
           p_date: date,
           p_check_in_time: checkInTime,
           p_items: prepared,
+          p_test_run_id: testRunId,
         });
         if (res.error) throw res.error;
         return res.data;
@@ -1015,6 +1033,10 @@ Deno.serve(async (req) => {
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
       if (!r || !r.ok || !metadata[i]) continue;
+      if (testRunId) {
+        r.mirrorSaved = false;
+        continue;
+      }
       try {
         await fsCreate('support_attendance', str(r.attendanceId), metadata[i].fields, idToken);
         r.mirrorSaved = true;
@@ -1048,6 +1070,7 @@ Deno.serve(async (req) => {
       studentRef,
       requestReplay: data.idempotent_replay === true,
       controlSource: data.controlSource || '',
+      testRunId,
       saved: summary.succeeded || 0,
       deducted: summary.deducted || 0,
       mirrorFailures,
@@ -1058,6 +1081,8 @@ Deno.serve(async (req) => {
       results,
       summary,
       requestId,
+      testRunId,
+      isTest: testRunId.length > 0,
       idempotentReplay: data.idempotent_replay === true,
       controlSource: controlSource,
       controlSources,

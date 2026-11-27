@@ -374,6 +374,7 @@ Deno.serve(async (req) => {
         p_subject_id: String(body.subjectId || ''),
         p_subject_name: String(body.subjectName || ''),
         p_opened_at: body.openedAt == null ? null : String(body.openedAt),
+        p_test_run_id: String(body.testRunId || ''),
       });
 
     case 'close-attendance-session-by-ids':
@@ -387,6 +388,7 @@ Deno.serve(async (req) => {
         p_actor: String(body.actor || ''),
         p_closed_at: body.closedAt == null ? null : String(body.closedAt),
         p_session_id: String(body.sessionId || ''),
+        p_test_run_id: String(body.testRunId || ''),
       });
 
     case 'close-attendance-session':
@@ -395,6 +397,51 @@ Deno.serve(async (req) => {
         p_session_id: String(body.sessionId || ''),
         p_actor: String(body.actor || ''),
         p_closed_at: body.closedAt == null ? null : String(body.closedAt),
+        p_test_run_id: String(body.testRunId || ''),
+      });
+
+    case 'attendance-test-create':
+      return rpc('attendance_test_create', {
+        p_admin_uid: uid,
+        p_teacher_id: String(body.teacherId || ''),
+        p_teacher_name: String(body.teacherName || ''),
+        p_subject_id: String(body.subjectId || ''),
+        p_subject_name: String(body.subjectName || ''),
+      });
+
+    case 'attendance-test-start':
+      return rpc('attendance_test_start', {
+        p_admin_uid: uid,
+        p_test_run_id: String(body.testRunId || ''),
+      });
+
+    case 'attendance-test-close':
+      return rpc('attendance_test_close', {
+        p_admin_uid: uid,
+        p_test_run_id: String(body.testRunId || ''),
+        p_actor: String(body.actor || ''),
+      });
+
+    case 'attendance-test-list':
+      return rpc('attendance_test_list', {
+        p_admin_uid: uid,
+        p_search: String(body.search || ''),
+        p_subject: String(body.subject || ''),
+        p_status: String(body.status || ''),
+        p_from: String(body.from || ''),
+        p_to: String(body.to || ''),
+      });
+
+    case 'attendance-test-detail':
+      return rpc('attendance_test_detail', {
+        p_admin_uid: uid,
+        p_test_run_id: String(body.testRunId || ''),
+      });
+
+    case 'attendance-test-rollback':
+      return rpc('attendance_test_rollback', {
+        p_admin_uid: uid,
+        p_test_run_id: String(body.testRunId || ''),
       });
 
     default:
