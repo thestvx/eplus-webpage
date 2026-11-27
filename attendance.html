@@ -181,6 +181,12 @@ main{flex:1;position:relative;overflow:hidden}
 .tc-badge.orange{background:rgba(180,83,9,0.2);color:#fbbf24;border:1px solid rgba(180,83,9,0.4)}
 .tc-badge.red{background:rgba(220,38,38,0.2);color:#fca5a5;border:1px solid rgba(220,38,38,0.4)}
 .tc-badge.purple{background:rgba(124,58,237,0.2);color:#c4b5fd;border:1px solid rgba(139,92,246,0.45)}
+.tc-session-state{display:inline-flex;align-items:center;gap:5px;margin-top:5px;padding:3px 9px;border-radius:99px;font-size:10.5px;font-weight:900;line-height:1.4}
+.tc-session-state.open{background:rgba(5,150,105,0.18);color:#6ee7b7;border:1px solid rgba(5,150,105,0.35)}
+.tc-session-state.closed{background:rgba(220,38,38,0.14);color:#fca5a5;border:1px solid rgba(220,38,38,0.3)}
+.tc-session-state.unknown{background:rgba(180,83,9,0.16);color:#fbbf24;border:1px solid rgba(180,83,9,0.35)}
+.tc-batch-state{font-size:11px;font-weight:900;color:#c7d2fe;white-space:nowrap}
+.tc-batch-bar .tc-btn.refresh{background:rgba(180,83,9,0.24);border:1px solid rgba(251,191,36,0.35)}
 .tc-stats{display:flex;justify-content:center;gap:28px;padding:8px 20px 4px;border-top:1px solid rgba(255,255,255,0.06)}
 .tc-stat{text-align:center}
 .tc-stat-num{font-size:22px;font-weight:900;color:#fff;line-height:1}
@@ -693,18 +699,95 @@ main{flex:1;position:relative;overflow:hidden}
     } catch (e) { logScanner('atc check error: ' + e.message); }
     return { openMap: openMap, openIdMap: openIdMap, openNameMap: openNameMap, docs: docsForServer };
   }
-  function isTeacherOpen(openMap, openIdMap, teacherName, subjectName, openNameMap) {
-    var nn = normalizeTeacherName(teacherName);
-    if (subjectName) {
-      var sk = nn + '|||' + canonSubjectName(subjectName).trim().toLowerCase();
-      if (openMap[sk]) return true;
+  function attSessionKey(s) {
+    return String((s && (s.teacherId || s.teacher)) || '') + '|||' + String((s && (s.subjectId || s.subject)) || '');
+  }
+  function canSubmitSession(s) {
+    return !!(s && s.sessionState === 'open' && s.attendanceOpen === true);
+  }
+  function selectedSessionKeys() {
+    var keys = {};
+    document.querySelectorAll('input[data-selectidx]:checked').forEach(function (el) {
+      var idx = parseInt(el.getAttribute('data-selectidx'), 10);
+      var s = currentSessions[idx];
+      if (s) keys[attSessionKey(s)] = true;
+    });
+    return keys;
+  }
+  function restoreSelectedSessionKeys(keys) {
+    var n = 0;
+    document.querySelectorAll('input[data-selectidx]').forEach(function (el) {
+      var idx = parseInt(el.getAttribute('data-selectidx'), 10);
+      var s = currentSessions[idx];
+      var checked = !!(s && keys[attSessionKey(s)]);
+      el.checked = checked;
+      var label = el.closest('.tc-select');
+      var card = el.closest('.tc-card');
+      if (label) label.classList.toggle('checked', checked);
+      if (card) card.classList.toggle('selected', checked);
+      if (checked) n++;
+    });
+    var count = $('tc-sel-count');
+    var btn = $('tc-batch-submit');
+    if (count) count.textContent = String(n);
+    if (btn) btn.disabled = n === 0;
+  }
+  function setSessionsUnknown(sessions, reason, detail) {
+    (sessions || []).forEach(function (s) {
+      s.sessionState = 'unknown';
+      s.attendanceOpen = false;
+      s.sessionReason = reason || 'تعذر التحقق من حالة الحضور';
+      s.sessionSource = detail || '';
+      s.sessionCheckedAt = new Date().toISOString();
+    });
+  }
+  var sessionStateSeq = 0;
+  async function fetchSessionStates(sessions, opts) {
+    if (!sessions || !sessions.length) return sessions;
+    var silent = !!(opts && opts.silent);
+    var seq = ++sessionStateSeq;
+    var items = sessions.map(function (s) {
+      return {
+        teacherName: s.teacher || '',
+        subjectName: s.subject || '',
+        teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(s.teacher)] || '',
+        subjectId: s.subjectId || '',
+      };
+    });
+    try {
+      var token = await kioskIdToken();
+      if (!token) throw new Error('تعذر تجديد جلسة الدخول');
+      var response = await fetch(ATTENDANCE_EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'x-kiosk-key': KIOSK_ACCESS_HASH },
+        body: JSON.stringify({ action: 'session-status', requestId: newRequestId(), items, controlSnapshot: currentControlDocs })
+      });
+      var data = null;
+      try { data = await response.json(); } catch (e) {}
+      if (!response.ok || !data || !Array.isArray(data.statuses)) throw new Error((data && data.error) || ('HTTP ' + response.status));
+      if (seq !== sessionStateSeq) return sessions;
+      var byIndex = {}, byKey = {};
+      data.statuses.forEach(function (st) {
+        if (!st) return;
+        if (typeof st.index === 'number') byIndex[st.index] = st;
+        byKey[attSessionKey(st)] = st;
+      });
+      sessions.forEach(function (s, i) {
+        var st = byIndex[i] || byKey[attSessionKey(s)];
+        if (!st) { setSessionsUnknown([s], 'تعذر التحقق من حالة الحضور'); return; }
+        s.sessionState = st.state === 'open' ? 'open' : st.state === 'closed' ? 'closed' : 'unknown';
+        s.attendanceOpen = s.sessionState === 'open';
+        s.sessionReason = st.reason || (s.sessionState === 'open' ? 'الأستاذ فتح جلسة الحضور' : s.sessionState === 'closed' ? 'الأستاذ لم يفتح جلسة الحضور بعد' : 'تعذر التحقق من حالة الحضور');
+        s.sessionSource = data.controlSource || '';
+        s.sessionCheckedAt = data.serverTime || new Date().toISOString();
+      });
+      logAttendanceEvent({ operation: 'session-status', phase: 'ok', requestId: data.requestId, backendReached: true, source: data.controlSource || '', openCount: data.openCount || 0, itemCount: sessions.length, silent });
+    } catch (e) {
+      if (seq !== sessionStateSeq) return sessions;
+      setSessionsUnknown(sessions, 'تعذر التحقق من حالة الحضور', String((e && e.message) || e).slice(0, 160));
+      logAttendanceEvent({ operation: 'session-status', phase: 'failed', detail: String((e && e.message) || e).slice(0, 200), backendReached: false, silent });
     }
-    if (!subjectName && openMap[nn]) return true;
-    // مفتوح أي حصة/مادة لهذا الأستاذ → يعتبر حضور الأستاذ مفتوحاً
-    if (openNameMap && openNameMap[nn]) return true;
-    var tid = _teacherIdByName[nn];
-    if (tid && openIdMap[tid]) return true;
-    return false;
+    return sessions;
   }
 
   // ── Scan overlay (auto-dismiss) ──
@@ -959,7 +1042,6 @@ main{flex:1;position:relative;overflow:hidden}
     await loadTeacherIdMap();
     var atc = await checkAttendanceControl();
     currentControlDocs = atc.docs || [];
-    var openMap = atc.openMap, openIdMap = atc.openIdMap, openNameMap = atc.openNameMap;
     var subsAll = [];
     try { subsAll = (await SubscriptionService.getSubscriptions(studentId)) || []; } catch (e) { logScanner('subs lookup error: ' + e.message); }
     if (!subsAll.length) {
@@ -984,8 +1066,7 @@ main{flex:1;position:relative;overflow:hidden}
       var key = tName + '|' + subjName;
       if (seen[key]) continue;
       seen[key] = true;
-      var isOpen = isTeacherOpen(openMap, openIdMap, tName, subjName, openNameMap);
-      var sess = { teacher: tName, subject: subjName, teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(tName)] || '', subjectId: s.subjectId || '', status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, allowed: 0, alreadyCheckedIn: false, attendanceOpen: isOpen, idx: sessions.length, hasSubscription: false, allowAvailable: false };
+      var sess = { teacher: tName, subject: subjName, teacherId: s.teacherId || _teacherIdByName[normalizeTeacherName(tName)] || '', subjectId: s.subjectId || '', status: 'none', sub: null, periods: null, attended: 0, remaining: 8, permanent: false, allowed: 0, alreadyCheckedIn: false, sessionState: 'unknown', attendanceOpen: false, sessionReason: 'جاري التحقق من حالة الحضور', sessionSource: '', sessionCheckedAt: '', idx: sessions.length, hasSubscription: false, allowAvailable: false };
       try {
         // قرار واحد لكل مادة: يفحص «كل» اشتراكات الطالب (صفوف منفصلة / تعدد
         // الشهور) — فلا تظهر بطاقة «انتهى الاشتراك» بينما التسجيل مسموح، والعكس.
@@ -1057,7 +1138,7 @@ main{flex:1;position:relative;overflow:hidden}
       }
       sessions.push(sess);
     }
-    return sessions;
+    return await fetchSessionStates(sessions);
   }
 
 ﻿  async function showLanguageCardPanel(card) {
@@ -1338,38 +1419,59 @@ main{flex:1;position:relative;overflow:hidden}
     });
   })();
 
+  function sessionBadgeHtml(s) {
+    var state = s && s.sessionState === 'open' ? 'open' : s && s.sessionState === 'closed' ? 'closed' : 'unknown';
+    var icon = state === 'open' ? '🟢' : state === 'closed' ? '🔒' : '⚠️';
+    var text = state === 'open' ? 'الحضور مفتوح' : state === 'closed' ? 'الحضور مغلق' : 'تعذر التحقق';
+    var detail = state === 'open' ? 'الأستاذ فتح جلسة الحضور'
+      : state === 'closed' ? 'الأستاذ لم يفتح جلسة الحضور بعد'
+        : 'تعذر التحقق من حالة الحضور';
+    return '<span class="tc-session-state ' + state + '" title="' + esc(detail) + '">' + icon + ' ' + text + '</span>';
+  }
   function renderTeacherCards(sessions) {
     currentSessions = sessions || [];
-    var batchable = currentSessions.filter(function (s) { return s.attendanceOpen && !s.alreadyCheckedIn && s.status === 'active'; }).length;
+    var openCount = currentSessions.filter(function (s) { return s.sessionState === 'open'; }).length;
+    var closedCount = currentSessions.filter(function (s) { return s.sessionState === 'closed'; }).length;
+    var unknownCount = currentSessions.filter(function (s) { return s.sessionState !== 'open' && s.sessionState !== 'closed'; }).length;
+    var batchable = currentSessions.filter(function (s) { return canSubmitSession(s) && !s.alreadyCheckedIn && s.status === 'active'; }).length;
     var html = '<div class="tc-batch-bar" id="tc-batch-bar">'
       + '<button class="tc-btn batch-all" id="tc-select-all" type="button"' + (batchable ? '' : ' disabled') + '>تحديد الكل</button>'
       + '<button class="tc-btn batch-go" id="tc-batch-submit" type="button" disabled>تسجيل المحدد (<span id="tc-sel-count">0</span>)</button>'
-      + '<span class="tc-batch-msg" id="tc-batch-msg">' + (batchable ? 'يمكن اختيار أكثر من مادة وتسجيلها دفعة واحدة' : 'لا توجد مواد نشطة متاحة للتسجيل الدفعي') + '</span>'
+      + '<button class="tc-btn refresh" id="tc-refresh-sessions" type="button">🔄 تحديث الحالة</button>'
+      + '<span class="tc-batch-state">🟢 ' + openCount + ' · 🔒 ' + closedCount + ' · ⚠️ ' + unknownCount + '</span>'
+      + '<span class="tc-batch-msg" id="tc-batch-msg">' + (batchable ? 'يمكن اختيار المواد المؤكد فتح حضورها فقط' : 'لا توجد مواد نشطة متاحة للتسجيل الدفعي') + '</span>'
       + '</div>';
     html += '<div class="ts-grid" id="tc-grid">';
     for (var i = 0; i < sessions.length; i++) {
       var s = sessions[i];
       var icon = SubjectService.getSubjectIcon(s.subject);
       var delay = (i * 0.08) + 's';
-      var canBatch = s.attendanceOpen && !s.alreadyCheckedIn && s.status === 'active';
+      var canBatch = canSubmitSession(s) && !s.alreadyCheckedIn && s.status === 'active';
+      var sessionUnknown = s.sessionState !== 'open' && s.sessionState !== 'closed';
 
-      // ── Gate: attendance not open for this teacher ──
-      if (!s.attendanceOpen) {
+      // ── Gate: session not confirmed open ──
+      if (!canSubmitSession(s)) {
         html += '<div class="tc-card" style="animation-delay:' + delay + ';opacity:0.7">';
         html += '<div class="tc-top">';
-        html += '<div class="tc-subject-icon red">' + icon + '</div>';
-html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) + '">' + esc(s.teacher) + (s.permanent ? '<span class="tc-perm-mark">∞</span>' : '') + '</div><div class="tc-subject">' + esc(s.subject) + '</div></div>';
-        html += '<div class="tc-badge red">\uD83D\uDD12 الحضور غير مفتوح</div>';
+        html += '<div class="tc-subject-icon ' + (sessionUnknown ? 'orange' : 'red') + '">' + icon + '</div>';
+ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) + '">' + esc(s.teacher) + (s.permanent ? '<span class="tc-perm-mark">∞</span>' : '') + '</div><div class="tc-subject">' + esc(s.subject) + '</div>' + sessionBadgeHtml(s) + '</div>';
+        var gateSubClass = s.status === 'active' ? 'green' : 'red';
+        var gateSubText = s.status === 'active' ? '🟢 نشط' : s.hasSubscription ? '⚠️ انتهى الاشتراك' : '⚠️ لا يوجد اشتراك';
+        html += '<div class="tc-badge ' + gateSubClass + '">' + gateSubText + '</div>';
         html += '</div>';
         html += '<div style="text-align:center;padding:14px 8px;background:rgba(107,114,128,0.06);border-radius:12px;margin-top:4px">';
-        html += '<div style="font-size:28px;margin-bottom:6px">\uD83D\uDD12</div>';
-        html += '<div style="font-size:13px;font-weight:800;color:#6b7280">التسجيل غير متاح حالياً</div>';
-        html += '<div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;line-height:1.6">لم يبدأ المركز تسجيل الحضور لهذا الأستاذ بعد.<br>يرجى الانتظار حتى يقوم الإدارة بفتح الحضور.</div>';
+        html += '<div style="font-size:28px;margin-bottom:6px">' + (sessionUnknown ? '⚠️' : '🔒') + '</div>';
+        html += '<div style="font-size:13px;font-weight:800;color:' + (sessionUnknown ? '#fbbf24' : '#fca5a5') + '">' + esc(s.sessionReason || 'تعذر التحقق من حالة الحضور') + '</div>';
+        html += '<div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;line-height:1.6">'
+          + (sessionUnknown ? 'لم يتم التأكد من حالة الجلسة — لا يمكن تسجيل الحضور قبل التحقق.'
+            : 'لا يمكن تحديد هذه المادة أو إرسالها لتسجيل الحضور.')
+          + '</div>';
         html += '</div>';
-        html += '<div class="tc-btn-wrap"><button class="tc-btn red" disabled>\uD83D\uDD12 الحضور مغلق</button><button class="tc-btn log" data-logidx="' + i + '">\uD83D\uDCCB عرض سجل الحضور</button></div>';
+        html += '<div class="tc-btn-wrap"><button class="tc-btn ' + (sessionUnknown ? 'orange' : 'red') + '" disabled>' + (sessionUnknown ? '⚠️ تعذر التحقق' : '🔒 الحضور مغلق') + '</button><button class="tc-btn log" data-logidx="' + i + '">📋 عرض سجل الحضور</button></div>';
         html += '</div>';
         continue;
       }
+
 
       var hasActiveSub = s.status === 'active';
       var stClass, badgeClass, badgeText;
@@ -1395,7 +1497,8 @@ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) 
       html += '<div class="tc-top">';
       if (canBatch) html += '<label class="tc-select" title="اختيار لتسجيل دفعي"><input type="checkbox" data-selectidx="' + i + '"><span class="tc-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.3 4.3L19 7.2"/></svg></span></label>';
       html += '<div class="tc-subject-icon ' + stClass + '">' + icon + '</div>';
-html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) + '">' + esc(s.teacher) + (s.permanent ? '<span class="tc-perm-mark">∞</span>' : '') + '</div><div class="tc-subject">' + esc(s.subject) + '</div></div>';
+ html += '<div class="tc-info"><div class="tc-teacher" title="' + esc(s.teacher) + '">' + esc(s.teacher) + (s.permanent ? '<span class="tc-perm-mark">∞</span>' : '') + '</div><div class="tc-subject">' + esc(s.subject) + '</div>' + sessionBadgeHtml(s) + '</div>';
+
       html += '<div class="tc-badge ' + badgeClass + '">' + badgeText + '</div>';
       html += '</div>';
 if (hasActiveSub) {
@@ -1480,6 +1583,20 @@ if (hasActiveSub) {
         submitBatchCheckIn(idxs.map(function (idx) { return sessions[idx]; }), batchBtn);
       });
     }
+    var refreshBtn = $('tc-refresh-sessions');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', async function () {
+        if (processing) return;
+        var keys = selectedSessionKeys();
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = '⏳ جاري التحديث...';
+        await fetchSessionStates(currentSessions);
+        renderTeacherCards(currentSessions);
+        restoreSelectedSessionKeys(keys);
+        var msg = $('tc-batch-msg');
+        if (msg) msg.textContent = batchable ? 'يمكن اختيار المواد المؤكد فتح حضورها فقط' : 'لا توجد مواد نشطة متاحة للتسجيل الدفعي';
+      });
+    }
     updateBatchButtons();
   }
 
@@ -1561,6 +1678,18 @@ if (hasActiveSub) {
   async function submitBatchCheckIn(sessions, btnEl, forceMode) {
     var list = Array.isArray(sessions) ? sessions.filter(Boolean) : [];
     if (!list.length || processing) return;
+    var blocked = list.filter(function (s) { return !canSubmitSession(s); });
+    if (blocked.length) {
+      var blockedNames = blocked.map(function (s) { return (s.subject || 'مادة') + ' — ' + (s.teacher || 'معلم'); }).join(' · ');
+      logScanner('BLOCKED session-state: ' + blockedNames);
+      logAttendanceEvent({ operation: 'batch.blocked', phase: 'failed', detail: blockedNames.slice(0, 240), backendReached: false, saved: false, deducted: false });
+    }
+    list = list.filter(canSubmitSession);
+    if (!list.length) {
+      showScanOverlay('orange', '⚠️', 'لا يمكن تسجيل هذه المواد', pendingName, 'الحضور مغلق أو تعذر التحقق من حالة الجلسة', 3000, function () { renderTeacherCards(currentSessions); });
+      playSoundIncorrect();
+      return;
+    }
     if (!systemReady) {
       showScanOverlay('red', '🚫', 'الخدمة غير جاهزة', '', esc(systemDetail || 'تحقق من الاتصال'), 2500, resetScannerSoon);
       playSoundIncorrect();
@@ -1813,6 +1942,20 @@ if (hasActiveSub) {
     setInterval(function () {
       if (appUnlocked && !processing && navigator.onLine !== false) attendanceProbe();
     }, 20000);
+    setInterval(function () {
+      var view = $('view-teachers');
+      if (!appUnlocked || processing || overlayTimer || navigator.onLine === false) return;
+      if (!view || !view.classList.contains('active') || !currentSessions.length) return;
+      var keys = selectedSessionKeys();
+      var before = currentSessions.map(function (s) { return s.sessionState; }).join('|');
+      fetchSessionStates(currentSessions, { silent: true }).then(function () {
+        if (!currentSessions.length) return;
+        var after = currentSessions.map(function (s) { return s.sessionState; }).join('|');
+        if (before === after) return;
+        renderTeacherCards(currentSessions);
+        restoreSelectedSessionKeys(keys);
+      });
+    }, 12000);
   })();
 
 })();

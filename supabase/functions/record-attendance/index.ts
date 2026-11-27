@@ -434,12 +434,12 @@ async function loadControlState(
 
   let docs: any[] = [];
   let source = '';
-  if (firestoreDocs) {
-    docs = firestoreDocs;
-    source = 'firestore';
-  } else if (databaseDocs) {
+  if (databaseDocs) {
     docs = databaseDocs;
     source = 'database';
+  } else if (firestoreDocs) {
+    docs = firestoreDocs;
+    source = 'firestore';
   } else if (snapshotDocs.length && sources.firestore !== 'ok' && sources.supabase !== 'ok') {
     docs = snapshotDocs;
     source = 'snapshot';
@@ -574,6 +574,80 @@ Deno.serve(async (req) => {
           ? 'ready'
           : 'closed';
     return json({ ok: true, status, checks, controlSource, controlSources, openCount, requestId, serverTime: new Date().toISOString() });
+  }
+
+  if (action === 'session-status') {
+    const requestId = str(body.requestId || '') || crypto.randomUUID();
+    const rawItems = Array.isArray(body.items) ? body.items : [];
+    const baseItem = (item: any, i: number) => ({
+      index: i,
+      teacherName: str(item && item.teacherName || ''),
+      subjectName: str(item && item.subjectName || ''),
+      teacherId: str(item && item.teacherId || ''),
+      subjectId: str(item && item.subjectId || ''),
+    });
+    if (req.headers.get('x-kiosk-key') !== KIOSK_ACCESS_HASH) {
+      return json({ error: 'kiosk authorization required' }, 403);
+    }
+    if (!rawItems.length) return json({ error: 'items required' }, 400);
+    if (rawItems.length > 12) return json({ error: 'too many items' }, 400);
+    const date = algiersDate();
+    try {
+      const control = await loadControlState(supabase, date, bearerToken(req), body.controlSnapshot, requestId);
+      const statuses = rawItems.map((raw: any, i: number) => {
+        const item = baseItem(raw, i);
+        const isOpen = isAttendanceOpen(control.docs, item);
+        return {
+          ...item,
+          date,
+          state: isOpen ? 'open' : 'closed',
+          isOpen,
+          reason: isOpen ? 'الأستاذ فتح جلسة الحضور' : 'الأستاذ لم يفتح جلسة الحضور بعد',
+        };
+      });
+      logEvent({
+        operation: 'session-status', phase: 'ok', requestId,
+        source: control.source, sources: control.sources,
+        itemCount: statuses.length, openCount: statuses.filter((s: any) => s.isOpen).length,
+        backendReached: true,
+      });
+      return json({
+        ok: true,
+        status: 'ok',
+        date,
+        statuses,
+        controlSource: control.source,
+        controlSources: control.sources,
+        openCount: statuses.filter((s: any) => s.isOpen).length,
+        requestId,
+        serverTime: new Date().toISOString(),
+      });
+    } catch (e: any) {
+      const sources = (e?.detail && typeof e.detail === 'object') ? e.detail : {};
+      const statuses = rawItems.map((raw: any, i: number) => ({
+        ...baseItem(raw, i),
+        date,
+        state: 'unknown',
+        isOpen: false,
+        reason: 'تعذر التحقق من حالة الحضور',
+      }));
+      logEvent({
+        operation: 'session-status', phase: 'failed', requestId,
+        detail: str(e?.message || e).slice(0, 240), sources,
+        backendReached: true,
+      });
+      return json({
+        ok: false,
+        status: 'unavailable',
+        date,
+        statuses,
+        controlSource: '',
+        controlSources: sources,
+        error: 'تعذر التحقق من حالة الحضور',
+        requestId,
+        serverTime: new Date().toISOString(),
+      }, 503);
+    }
   }
 
   if (action === 'batch') {
