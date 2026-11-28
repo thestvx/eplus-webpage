@@ -276,7 +276,7 @@
           <td>${esc(fmt(row.rolled_back_at))}</td>
           <td>${Number(row.present_count || 0)}</td>
           <td>${Number(row.absent_count || 0)}</td>
-          <td>${Number(row.deduction_count || 0)}</td>
+          <td>${Number(row.deducted_count || row.deduction_count || 0)}</td>
           <td><span class="at-status ${statusClass(row.status)}">${esc(statusLabel(row.status))}</span></td>
         </tr>`;
       }).join('');
@@ -406,11 +406,14 @@
         ${status === 'needs_review' ? '<div class="at-note danger">هذا الاختبار يحتاج إلى مراجعة: وُجدت تغييرات لاحقة على بياناته بعد التنفيذ، لذلك لم يتم تعديل أي سجل تلقائياً.</div>' : ''}
         ${conflicts.length ? '<div class="at-section-title">تعذرات التراجع</div><div class="at-list">' + conflicts.map(function (op) { return `<div class="at-row"><span>${esc(op.entityId || op.entity_id || op.operation_type || op.event_type || 'عملية')}</span><span class="muted">${esc(op.conflict_reason || op.reason || (op.current && op.expected ? 'القيمة الحالية لا تطابق اللقطة' : 'تغيير لاحق'))}</span></div>`; }).join('') + '</div>' : ''}
 
-        <div class="at-section-title">الملخص</div>
+        <div class="at-section-title">ملخص النتائج</div>
         <div class="at-grid three">
-          <div class="at-box"><div class="k">إجمالي الخصومات</div><div class="v">${Number(summary.deduction_count || summary.deducted || 0)}</div></div>
+          <div class="at-box"><div class="k">إجمالي الحصص المخصومة</div><div class="v">${Number(summary.deduction_count || summary.deducted || 0)}</div></div>
+          <div class="at-box"><div class="k">العمليات الناجحة</div><div class="v">${Number(summary.successful || 0)}</div></div>
+          <div class="at-box"><div class="k">العمليات الفاشلة</div><div class="v">${Number(summary.failed || run.failed_count || 0)}</div></div>
           <div class="at-box"><div class="k">عمليات التراجع المنفذة</div><div class="v">${Number(summary.rolledBack || rollbackOps.length || 0)}</div></div>
           <div class="at-box"><div class="k">الأحداث المسجلة</div><div class="v">${Number(summary.operationCount || events.length)}</div></div>
+          <div class="at-box"><div class="k">حالة الاستعادة</div><div class="v">${status === 'rolled_back' ? 'تمت الاستعادة في ' + esc(fmt(run.rolled_back_at)) : status === 'needs_review' ? 'موقوفة — تحتاج مراجعة' : 'غير مطلوبة'}</div></div>
         </div>
 
         <div class="at-section-title">الحاضرون</div>
@@ -419,17 +422,44 @@
         <div class="at-section-title">الغائبون وأسباب الخصم</div>
         <div class="at-list">${absent.length ? absent.map(renderPerson).join('') : '<div class="at-empty">لا يوجد غائبون.</div>'}</div>
 
-        <div class="at-section-title">السجل الزمني الكامل</div>
+        <div class="at-section-title" id="at-timeline-title">السجل الزمني الكامل</div>
         <div class="at-list">${events.length ? events.map(function (event) { const details = event.details || event.metadata || {}; return `<div class="at-row"><span>${esc(fmt(event.created_at || event.at || event.eventAt))} — ${esc(event.event_type || event.event || event.eventType || 'حدث')}</span><span class="muted">${esc(event.description || event.reason || (typeof details === 'object' ? JSON.stringify(details) : details))}</span></div>`; }).join('') : '<div class="at-empty">لا توجد أحداث.</div>'}</div>
 
         <div class="at-actions">
-          ${status === 'in_progress' ? '<button class="at-btn secondary" id="at-continue" type="button">متابعة الاختبار في صفحة الحضور</button>' : ''}
-          ${canRollback ? '<button class="at-btn" id="at-rollback" type="button">التراجع الكامل عن الاختبار</button>' : ''}
+          ${status === 'in_progress' ? '<button class="at-btn secondary" id="at-continue" type="button">متابعة الاختبار</button><button class="at-btn ghost" id="at-session-details" type="button">عرض تفاصيل الجلسة</button><button class="at-btn danger" id="at-close-run" type="button">إغلاق جلسة الاختبار</button>' : ''}
+          ${canRollback ? '<button class="at-btn" id="at-rollback" type="button">التراجع عن الاختبار وإعادة البيانات إلى حالتها السابقة</button>' : ''}
+          ${status === 'rolled_back' || status === 'needs_review' ? '<button class="at-btn ghost" id="at-rollback-log" type="button">عرض سجل التراجع</button>' : ''}
           <button class="at-btn ghost" data-close type="button">إغلاق</button>
         </div>`;
 
       const continueBtn = modal.root.querySelector('#at-continue');
       if (continueBtn) continueBtn.addEventListener('click', function () { window.open('attendance.html', '_blank'); });
+      const sessionDetailsBtn = modal.root.querySelector('#at-session-details');
+      if (sessionDetailsBtn) sessionDetailsBtn.addEventListener('click', function () {
+        const timeline = modal.root.querySelector('#at-timeline-title');
+        if (timeline) timeline.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      const closeRunBtn = modal.root.querySelector('#at-close-run');
+      if (closeRunBtn) closeRunBtn.addEventListener('click', async function () {
+        closeRunBtn.disabled = true;
+        closeRunBtn.textContent = 'جارٍ الإغلاق...';
+        try {
+          await api('attendance-test-close', { testRunId: currentRunId, actor: 'لوحة الإدارة — اختبارات الحضور' });
+          toast('تم إغلاق جلسة الاختبار وتسجيل الغياب والخصومات.', 'success');
+          await loadList();
+          modal.close();
+          openDetailModal(currentRunId);
+        } catch (error) {
+          toast(error.message, 'error');
+          closeRunBtn.disabled = false;
+          closeRunBtn.textContent = 'إغلاق جلسة الاختبار';
+        }
+      });
+      const rollbackLogBtn = modal.root.querySelector('#at-rollback-log');
+      if (rollbackLogBtn) rollbackLogBtn.addEventListener('click', function () {
+        const timeline = modal.root.querySelector('#at-timeline-title');
+        if (timeline) timeline.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
       const rollbackBtn = modal.root.querySelector('#at-rollback');
       if (rollbackBtn) rollbackBtn.addEventListener('click', function () { openRollbackModal(currentRunId, modal); });
       modal.root.querySelectorAll('[data-close]').forEach(function (btn) { btn.addEventListener('click', modal.close); });
@@ -441,9 +471,14 @@
 
   function renderPerson(person) {
     const item = person || {};
-    const right = [item.student_name || item.studentName || item.name || 'تلميذ', item.student_id || item.studentId || ''].filter(Boolean).join(' — ');
-    const balance = item.beforeSessions == null ? '' : 'الرصيد ' + item.beforeSessions + ' ← ' + (item.afterSessions == null ? '—' : item.afterSessions);
-    const left = [item.reason || item.attendance_status || item.status || item.action || '', balance, item.subscription_id || item.subscriptionId || '', fmt(item.created_at || item.checked_at || item.checkInTime || item.eventAt)].filter(function (v) { return v && v !== '—'; }).join(' · ');
+    const name = item.student_name || item.studentName || item.name || 'تلميذ';
+    const studentId = item.student_id || item.studentId || '—';
+    const right = 'الاسم: ' + name + ' — الرقم: ' + studentId;
+    const before = item.beforeSessions == null ? '—' : item.beforeSessions;
+    const after = item.afterSessions == null ? '—' : item.afterSessions;
+    const reason = item.reason || item.attendance_status || item.status || item.action || '—';
+    const left = 'الوقت: ' + fmt(item.created_at || item.checked_at || item.checkInTime || item.eventAt)
+      + ' · قبل الخصم: ' + before + ' · بعد الخصم: ' + after + ' · السبب: ' + reason;
     return '<div class="at-row"><span>' + esc(right) + '</span><span class="muted">' + esc(left) + '</span></div>';
   }
 
