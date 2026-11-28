@@ -1627,7 +1627,7 @@ if (hasActiveSub) {
         setSystemState('unavailable', (data && data.error) || ('HTTP ' + response.status));
         return 'unavailable';
       }
-      var detail = status === 'closed' ? ('مصدر الحالة: ' + ((data && data.controlSource) || 'غير معروف')) : '';
+      var detail = '';
       setSystemState(status, detail);
       logAttendanceEvent({ operation: 'attendance.probe', phase: 'ok', status, controlSource: (data && data.controlSource) || '', openCount: (data && data.openCount) || 0, backendReached: true });
       return status;
@@ -1795,7 +1795,6 @@ if (hasActiveSub) {
         var reached = r ? r.backendReached !== false : backendReached;
         var saved = !!(r && r.saved);
         var deducted = !!(r && r.deducted);
-        var mirror = r && r.mirrorSaved === true ? 'نعم' : 'لا';
         if (ok) {
           okCount++;
           if (s) {
@@ -1813,8 +1812,8 @@ if (hasActiveSub) {
         lines.push('<div style="padding:7px 0;border-top:1px solid rgba(255,255,255,.12);text-align:right">'
           + (ok ? '✅' : '❌') + ' <b>' + esc(subject) + '</b> — ' + esc(teacher)
           + '<div style="font-size:11px;opacity:.9;margin-top:3px">' + esc(reason) + (code ? ' [' + esc(code) + ']' : '') + '</div>'
-          + '<div style="font-size:10px;opacity:.75;margin-top:2px">وصل الطلب: ' + (reached ? 'نعم' : 'لا')
-          + ' · حُفظ: ' + (saved ? 'نعم' : 'لا') + ' · خُصم: ' + (deducted ? 'نعم' : 'لا') + ' · مرآة Firestore: ' + mirror + '</div>'
+          + '<div style="font-size:10px;opacity:.75;margin-top:2px">' + (saved ? 'تم الحفظ' : 'لم يتم الحفظ')
+          + (deducted ? ' · خُصمت حصة واحدة' : '') + '</div>'
           + '</div>');
         logAttendanceEvent({
           operation: 'batch.item-result', phase: ok ? 'ok' : 'failed', requestId,
@@ -1827,9 +1826,7 @@ if (hasActiveSub) {
       setSystemState('ready', '');
       var title = failedCount ? (okCount ? 'تم تسجيل جزء من المواد' : 'تعذر تسجيل الحضور') : (replay ? 'تم تسجيل الحضور سابقاً' : 'تم تسجيل الحضور');
       var sub = '<div style="max-height:190px;overflow:auto">' + lines.join('') + '</div>'
-        + '<div style="font-size:10px;opacity:.75;margin-top:6px">طلب: ' + esc(requestId)
-        + ' · مصدر الحالة: ' + esc((data && data.controlSource) || 'غير معروف')
-        + (replay ? ' · إعادة عرض للنتيجة السابقة بدون خصم إضافي' : '') + '</div>';
+        + (replay ? '<div style="font-size:10px;opacity:.75;margin-top:6px">إعادة عرض للنتيجة السابقة بدون خصم إضافي</div>' : '');
       showScanOverlay(failedCount ? (okCount ? 'orange' : 'red') : 'green', failedCount ? '⚠️' : '✅', title, pendingName, sub, failedCount ? 7000 : 3800, function () {
         renderTeacherCards(currentSessions);
         processing = false;
